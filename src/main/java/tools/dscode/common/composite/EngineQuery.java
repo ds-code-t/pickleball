@@ -116,6 +116,10 @@ public record EngineQuery(
                 char before = selector.charAt(i - 1);
                 if (Character.isLetterOrDigit(before) || before == '-' || before == '_' || before == '=') continue;
             }
+            if (selector.regionMatches(true, i, "not-", 0, 4)) {
+                String negated = visualNameAt(selector, i + 4);
+                if (negated != null) return canonicalRelative(negated);
+            }
             String name = visualNameAt(selector, i);
             if (name != null) return canonicalRelative(name);
         }

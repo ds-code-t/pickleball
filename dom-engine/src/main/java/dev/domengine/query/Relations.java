@@ -33,19 +33,43 @@ final class Relations {
 
     static Query.Hit filter(RelationTerm term, List<DomNode> scope, DomNode root, String pierce) {
         List<DomNode> anchors = anchorNodes(term, root, pierce);
-        String why = term.relation().engine() + "(" + term.anchor() + ") anchors=" + anchors.size();
-        if (anchors.isEmpty()) {
-            log(term.relation().engine(), 0, 0, 0, space(term.relation()));
-            return new Query.Hit(List.of(), why + " matched 0");
-        }
+        String label = label(term);
         List<String> anchorIds = ids(anchors);
         List<DomNode> candidates = new ArrayList<>();
         for (DomNode candidate : Engines.scopeElements(scope, root, pierce)) {
             if (!anchorIds.contains(candidate.id())) candidates.add(candidate);
         }
-        List<DomNode> kept = keep(term.relation(), candidates, anchors, root, pierce);
-        log(term.relation().engine(), anchors.size(), candidates.size(), kept.size(), space(term.relation()));
-        return new Query.Hit(kept, why + " matched " + kept.size());
+        if (anchors.isEmpty()) {
+            if (term.negated()) {
+                List<DomNode> kept = inDocumentOrder(candidates, root, pierce);
+                log(label, 0, candidates.size(), kept.size(), space(term.relation()));
+                return new Query.Hit(kept, "anchor matched 0");
+            }
+            log(label, 0, candidates.size(), 0, space(term.relation()));
+            return new Query.Hit(List.of(), label + "(" + term.anchor() + ") anchors=0 matched 0");
+        }
+        List<DomNode> positive = keep(term.relation(), candidates, anchors, root, pierce);
+        if (!term.negated()) {
+            log(label, anchors.size(), candidates.size(), positive.size(), space(term.relation()));
+            return new Query.Hit(positive, label + "(" + term.anchor() + ") anchors=" + anchors.size() + " matched " + positive.size());
+        }
+        List<DomNode> kept = subtract(candidates, positive, root, pierce);
+        log(label, anchors.size(), candidates.size(), kept.size(), space(term.relation()));
+        return new Query.Hit(kept, label + "(" + term.anchor() + ") anchors=" + anchors.size() + " matched " + kept.size());
+    }
+
+    static Query.Hit negativeStage(RelationTerm term, String expr, List<DomNode> anchors, DomNode root, String pierce) {
+        List<DomNode> pool = without(stagePool(term.relation(), expr, root, pierce), anchors);
+        String label = label(term);
+        if (anchors == null || anchors.isEmpty()) {
+            List<DomNode> kept = inDocumentOrder(pool, root, pierce);
+            log(label, 0, pool.size(), kept.size(), space(term.relation()));
+            return new Query.Hit(kept, "anchor matched 0");
+        }
+        List<DomNode> positive = positiveInPool(term.relation(), expr, pool, anchors, root, pierce);
+        List<DomNode> kept = subtract(pool, positive, root, pierce);
+        log(label, anchors.size(), pool.size(), kept.size(), space(term.relation()));
+        return new Query.Hit(kept, label + " matched " + kept.size());
     }
 
     private static Query.Hit geometric(String name, List<DomNode> candidates, List<DomNode> anchors, DomNode root, String pierce, RelationTerm term) {
@@ -184,7 +208,7 @@ final class Relations {
             }
         }
         if (!hit) return null;
-        return new Score(best, after ? index : -index);
+        return new Score(after ? index : best, after ? index : -index);
     }
 
     private static Comparator<Scored> comparator(RelationTerm.Relation relation) {
@@ -219,6 +243,64 @@ final class Relations {
             if ("open".equals(pierce) && "closed".equalsIgnoreCase(shadow.shadowMode)) continue;
             walk(shadow, into, true, pierce, inFrame);
         }
+    }
+
+    private static List<DomNode> stagePool(RelationTerm.Relation relation, String expr, DomNode root, String pierce) {
+        String selector = expr == null || expr.isBlank() ? "*" : expr;
+        if (relation == RelationTerm.Relation.NEAR && selector.matches("\\d+(\\.\\d+)?")) selector = "*";
+        boolean shadows = (relation == RelationTerm.Relation.AFTER || relation == RelationTerm.Relation.BEFORE)
+                && pierce != null && (pierce.equals("open") || pierce.equals("all"));
+        if (relation != RelationTerm.Relation.AFTER && relation != RelationTerm.Relation.BEFORE) shadows = false;
+        return Engines.css(selector, List.of(root), shadows).nodes;
+    }
+
+    private static List<DomNode> positiveInPool(RelationTerm.Relation relation, String expr, List<DomNode> pool, List<DomNode> anchors, DomNode root, String pierce) {
+        if (relation == RelationTerm.Relation.NEAR && expr != null && expr.matches("\\d+(\\.\\d+)?")) {
+            return nearLimited(pool, anchors, Double.parseDouble(expr));
+        }
+        return keep(relation, pool, anchors, root, pierce);
+    }
+
+    private static List<DomNode> nearLimited(List<DomNode> candidates, List<DomNode> anchors, double limit) {
+        List<Scored> scored = new ArrayList<>();
+        for (DomNode candidate : candidates) {
+            if (!candidate.hasBox) continue;
+            double best = Double.MAX_VALUE;
+            boolean hit = false;
+            for (DomNode anchor : anchors) {
+                if (anchor == candidate || !anchor.hasBox) continue;
+                double distance = Engines.centerDistance(candidate, anchor);
+                if (distance <= limit) {
+                    hit = true;
+                    best = Math.min(best, distance);
+                }
+            }
+            if (hit) scored.add(new Scored(candidate, new Score(best, 0)));
+        }
+        scored.sort((left, right) -> Double.compare(left.score.primary, right.score.primary));
+        List<DomNode> kept = new ArrayList<>();
+        for (Scored one : scored) kept.add(one.node);
+        return kept;
+    }
+
+    private static List<DomNode> subtract(List<DomNode> candidates, List<DomNode> positive, DomNode root, String pierce) {
+        List<String> drop = ids(positive);
+        List<DomNode> kept = new ArrayList<>();
+        for (DomNode candidate : inDocumentOrder(candidates, root, pierce)) {
+            if (!drop.contains(candidate.id())) kept.add(candidate);
+        }
+        return kept;
+    }
+
+    private static List<DomNode> inDocumentOrder(List<DomNode> nodes, DomNode root, String pierce) {
+        IdentityHashMap<DomNode, Integer> order = documentOrder(root, pierce);
+        List<DomNode> copy = new ArrayList<>(nodes);
+        copy.sort(Comparator.comparingInt(node -> order.getOrDefault(node, Integer.MAX_VALUE)));
+        return copy;
+    }
+
+    private static String label(RelationTerm term) {
+        return (term.negated() ? "not-" : "") + term.relation().engine();
     }
 
     private static List<DomNode> without(List<DomNode> candidates, List<DomNode> anchors) {

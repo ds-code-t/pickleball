@@ -143,10 +143,7 @@ class RelationTermParseTest {
                 () -> Expressions.parse("css=button AND text=\"Submit\" OR css=span"));
         assertTrue(mixed.getMessage().contains("parentheses"), mixed.getMessage());
 
-        CdpException notNear = assertThrows(CdpException.class,
-                () -> Expressions.parse("css=#a >> not-near=div"));
-        assertEquals("invalid engine: not-near", notNear.getMessage());
-
+        assertEquals("css=#a >> not-near=div", Expressions.render(Expressions.parse("css=#a >> not-near=div")));
         assertEquals("near(role=button)", Expressions.render(Expressions.parse("near(role=button)")));
     }
 

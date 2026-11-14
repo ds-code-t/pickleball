@@ -719,6 +719,7 @@ public final class DomEngineMain {
                   EXPR accepts engine=value stages joined by >> and boolean AND, OR, and NOT
                   live xpath is XPath 1.0 via document.evaluate. An invalid expression is an error, not zero hits.
                   relatives: near below above left-of right-of inside after before (left and right are aliases); filter form <relation>(<anchor query>)
+                  negatives: not-<relation> or NOT <relation>; weights <relation>@<w>
                   look: look=color=red or look=opacity>0.5,background-color=#fff (comma AND, pipe OR)
                   example: (css=button AND text="Submit") >> near=50
                 click|type|scroll|submit|key|dblclick|contextclick|drag|eval --session ID

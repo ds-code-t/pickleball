@@ -164,6 +164,16 @@ public final class Query {
                 one.put("why", stage.why);
                 one.put("ms", stage.ms);
             }
+            if (pipeline != null) {
+                ArrayNode relations = result.putArray("relations");
+                for (RelationTerm term : RelationTerm.parseAll(pipeline)) {
+                    ObjectNode one = relations.addObject();
+                    one.put("relation", term.relation().engine());
+                    one.put("negated", term.negated());
+                    one.put("anchor", term.anchor());
+                    one.put("weight", term.weight());
+                }
+            }
         }
         if (image != null) result.set("image", image);
         if (!pierce.isBlank()) {
@@ -191,8 +201,14 @@ public final class Query {
             current = hit.nodes;
             if (hit.image != null) image = hit.image;
             long ms = (System.nanoTime() - start) / 1_000_000L;
-            String engine = expr instanceof Expressions.Stage stage ? stage.engine() : "expr";
-            String shown = expr instanceof Expressions.Stage stage ? stage.expr() : piece;
+            String engine = "expr";
+            String shown = piece;
+            if (expr instanceof Expressions.Stage stage) {
+                engine = stage.engine();
+                shown = stage.expr();
+            } else if (expr instanceof Expressions.Rel rel) {
+                engine = (rel.term().negated() ? "not-" : "") + rel.term().relation().engine();
+            }
             trace.add(new Stage(engine, shown, hit.why, current.size(), ms));
             EngineLog.info("query", engine + " " + hit.why);
         }

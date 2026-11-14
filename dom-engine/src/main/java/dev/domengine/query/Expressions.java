@@ -114,10 +114,8 @@ final class Expressions {
     }
 
     private static Query.Hit evaluateRelation(Rel rel, List<DomNode> scope, DomNode root, String pierce) {
-        if (rel.term.negated()) {
-            throw new CdpException("invalid engine: not-" + rel.term.relation().engine());
-        }
         if (rel.candidates == null) return Relations.filter(rel.term, scope, root, pierce);
+        if (rel.term.negated()) return Relations.negativeStage(rel.term, rel.candidates, scope, root, pierce);
         return Engines.apply(rel.term.relation().engine(), rel.candidates, scope, root, pierce);
     }
 
@@ -145,7 +143,7 @@ final class Expressions {
         }
         List<DomNode> distinct = Query.distinct(kept);
         EngineLog.info("expr", "and left=" + left.nodes.size() + " right=" + right.nodes.size() + " hit=" + distinct.size());
-        return new Query.Hit(distinct, "and hit " + distinct.size(), left.image != null ? left.image : right.image);
+        return new Query.Hit(distinct, prefer("and hit " + distinct.size(), left.why, right.why), left.image != null ? left.image : right.image);
     }
 
     private static Query.Hit union(Or or, List<DomNode> scope, DomNode root, String pierce) {
@@ -155,14 +153,22 @@ final class Expressions {
         kept.addAll(right.nodes);
         List<DomNode> distinct = Query.distinct(kept);
         EngineLog.info("expr", "or left=" + left.nodes.size() + " right=" + right.nodes.size() + " hit=" + distinct.size());
-        return new Query.Hit(distinct, "or hit " + distinct.size(), left.image != null ? left.image : right.image);
+        return new Query.Hit(distinct, prefer("or hit " + distinct.size(), left.why, right.why), left.image != null ? left.image : right.image);
     }
 
     private static Query.Hit sequence(Seq seq, List<DomNode> scope, DomNode root, String pierce) {
         Query.Hit left = eval(seq.left, scope, root, pierce);
         Query.Hit right = eval(seq.right, left.nodes, root, pierce);
         EngineLog.info("expr", "seq hit=" + right.nodes.size());
-        return new Query.Hit(right.nodes, right.why, right.image != null ? right.image : left.image);
+        return new Query.Hit(right.nodes, prefer(right.why, left.why), right.image != null ? right.image : left.image);
+    }
+
+    private static String prefer(String outer, String... inners) {
+        if (outer != null && outer.contains("anchor matched 0")) return outer;
+        for (String inner : inners) {
+            if (inner != null && inner.contains("anchor matched 0")) return inner;
+        }
+        return outer;
     }
 
     private static String renderStage(Rel rel) {
@@ -420,7 +426,7 @@ final class Expressions {
             if (peek(Kind.NOT)) {
                 consume();
                 Expr inner = parseNot();
-                if (relations && inner instanceof Rel rel) {
+                if (inner instanceof Rel rel) {
                     if (rel.term.negated()) throw new CdpException("invalid relation: " + source.trim());
                     return new Rel(rel.term.negate(), rel.candidates);
                 }
@@ -448,13 +454,8 @@ final class Expressions {
 
         private Expr stage(String text) {
             String piece = text.trim();
-            if (relations) {
-                Expr rel = relationStage(piece);
-                if (rel != null) return rel;
-            } else {
-                Expr rel = positiveFilter(piece);
-                if (rel != null) return rel;
-            }
+            Expr rel = relationStage(piece);
+            if (rel != null) return rel;
             int eq = piece.indexOf('=');
             if (eq <= 0) throw new CdpException("invalid pipeline stage: " + piece);
             int nameEnd = eq;
@@ -464,15 +465,6 @@ final class Expressions {
             String expr = nameEnd < eq ? piece.substring(nameEnd).trim() : piece.substring(eq + 1).trim();
             if (!Query.ENGINES.contains(engine)) throw new CdpException("invalid engine: " + engine);
             return new Stage(engine, expr);
-        }
-
-        /** Production parse accepts a positive filter form. Stage form and negatives stay on the engine path. */
-        private Expr positiveFilter(String piece) {
-            if (piece.regionMatches(true, 0, "not-", 0, 4)) return null;
-            if (relationNameEnd(piece, 0) < 0) return null;
-            Expr rel = relationStage(piece);
-            if (rel instanceof Rel parsed && parsed.candidates == null && !parsed.term.negated()) return parsed;
-            return null;
         }
 
         private Expr relationStage(String piece) {

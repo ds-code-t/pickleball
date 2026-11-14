@@ -1299,6 +1299,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/premap/PreMapLookupDefaultsTest.java`
 - `dom-engine/src/test/java/dev/domengine/premap/PreMapTest.java`
 - `dom-engine/src/test/java/dev/domengine/premap/SectionDetectionTest.java`
+- `dom-engine/src/test/java/dev/domengine/query/NegativeRelationTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/RelationTermParseTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/RelationTermTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/RelativeLocatorTest.java`

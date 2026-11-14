@@ -6,8 +6,8 @@ import java.util.Optional;
 
 /**
  * One relative-locator term. G3 reads {@code relation()}, {@code negated()},
- * {@code anchor()} and {@code weight()}. The query verb does not evaluate
- * these terms yet.
+ * {@code anchor()} and {@code weight()}. The query verb evaluates the term
+ * as a hard filter. The weight is recorded for scoring and is not a filter.
  */
 public record RelationTerm(Relation relation, boolean negated, String anchor, double weight) {
     public static final double DEFAULT_WEIGHT = 1.0;
