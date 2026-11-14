@@ -1207,6 +1207,20 @@ class AgentLiveFixTest {
     }
 
     @Test
+    void cleanupTreatsTheTopDocumentHandleAsThePageNotAChildFrame() throws Exception {
+        WebDriver live = cdpDriver("tab-a", (method, params) -> {
+            if ("Page.getFrameTree".equals(method)) {
+                return Map.of("frameTree", Map.of("frame", Map.of("id", "D3417869B451B38549E475FE5DD30274")));
+            }
+            return Map.of();
+        }, spec -> Map.of("ok", true, "removed", 1));
+        PageSurfaces.manage(live, "chrome-headed-quiet", true);
+        PageSurfaces.bindHandle(live, "tab-a", "main:15");
+        PageSurfaces.bindFrame(live, "tab-a", "STALE-FRAME");
+        PageSurfaces.cleanup(null);
+    }
+
+    @Test
     void livePageIdsDoNotCollideAcrossRunLedgersOrRestartAtAUsedId() throws Exception {
         WebDriver live = scriptDriver("tab-a", spec -> Map.of("ok", true), false);
         PageSurfaces.manage(live, "chrome-headed-quiet", true);

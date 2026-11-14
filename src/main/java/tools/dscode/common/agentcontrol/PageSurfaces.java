@@ -526,7 +526,13 @@ final class PageSurfaces {
                         throw new IllegalStateException(live.error() == null ? "cleanup failed" : live.error());
                     }
                     for (String frame : framesFor(web, handle)) {
-                        if (!enterFrame(web, frame)) throw new IllegalStateException("frame entry failed");
+                        if (!enterFrame(web, frame)) {
+                            if (!frameInTree(web, frame)) {
+                                if (!resetTop(web)) throw new IllegalStateException("top document reset failed");
+                                continue;
+                            }
+                            throw new IllegalStateException("frame entry failed");
+                        }
                         LiveResult framed = runLive(web, "cleanup", null, null, null, null, "html", HTML_SENTENCE, "", false, null, null);
                         if (!framed.ok()) {
                             throw new IllegalStateException(framed.error() == null ? "cleanup failed" : framed.error());
@@ -1247,6 +1253,7 @@ final class PageSurfaces {
             web.switchTo().defaultContent();
             List<String> chain = frameChain(web, frameId);
             if (chain == null) {
+                if ("main".equals(frameId)) return resetTop(web);
                 CompositeLog.info("window", "frame enter failed " + frameId + " frame is not in the tree");
                 return false;
             }
@@ -1282,6 +1289,16 @@ final class PageSurfaces {
             return true;
         } catch (RuntimeException failure) {
             CompositeLog.info("window", "frame enter failed " + frameId + " " + failure.getMessage());
+            return false;
+        }
+    }
+
+    /** True when {@code frameId} is the root or a child in the current tree. A miss is a frame that already navigated away. */
+    private static boolean frameInTree(WebDriver web, String frameId) {
+        try {
+            return frameChain(web, frameId) != null;
+        } catch (RuntimeException failure) {
+            CompositeLog.info("window", "frame tree failed " + failure.getMessage());
             return false;
         }
     }
