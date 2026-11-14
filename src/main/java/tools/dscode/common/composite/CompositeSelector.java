@@ -5,7 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Flags the Java binding forwards. No matching of its own. */
+/** Dictionary layer. Flags the Java binding forwards. No matching of its own. */
 public record CompositeSelector(String xpath, String css, String pipeline, String source, Integer ordinal, String phrase) {
     public Map<String, Object> body(List<String> frames, List<String> shadows) {
         Map<String, Object> body = new LinkedHashMap<>();

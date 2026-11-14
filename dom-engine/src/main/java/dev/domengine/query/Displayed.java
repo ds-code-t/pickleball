@@ -13,6 +13,11 @@ public final class Displayed {
     private Displayed() {
     }
 
+    /** Reads computed style when a live connection is bound. No-op offline. */
+    public static void prepareBound(List<DomNode> nodes) {
+        prepare(LiveXPath.connection(), nodes);
+    }
+
     /** Reads computed style and a border box for the nodes and their ancestors. No-op offline. */
     public static void prepare(CdpConnection connection, List<DomNode> nodes) {
         if (connection == null || nodes == null || nodes.isEmpty()) return;

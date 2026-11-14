@@ -376,7 +376,19 @@ final class Expressions {
             char next = text.charAt(after);
             if (!Character.isWhitespace(next) && next != ')' && next != '(') return false;
         }
+        if (!text.regionMatches(false, i, op, 0, op.length())) warnLowercase(op);
         return true;
+    }
+
+    private static final Set<String> LOWERCASE_OPERATORS = new HashSet<>();
+
+    static void resetOperatorWarningsForTests() {
+        LOWERCASE_OPERATORS.clear();
+    }
+
+    private static void warnLowercase(String op) {
+        if (!LOWERCASE_OPERATORS.add(op)) return;
+        EngineLog.warn("expr", "lowercase operator '" + op.toLowerCase(Locale.ROOT) + "' read as " + op + "; write capitals");
     }
 
     private static final class Parser {

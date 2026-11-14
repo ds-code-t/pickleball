@@ -58,6 +58,14 @@ public final class NativeDesktop {
         return id;
     }
 
+    /** Verbs this backend implements today. Click and type are wired. The rest are not. */
+    public static List<String> verbs(String backend) {
+        return switch (backend == null ? "" : backend) {
+            case "uia", "ax", "atspi" -> List.of("click", "type");
+            default -> List.of();
+        };
+    }
+
     public static DomNode capture(String windowName) {
         String platform = platformId();
         EngineLog.info("desktop", "live capture " + platform);

@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
+ * Adapter-side bridge: reads page source through WebDriver.
  * Applies a parsed {@code with look} clause on the element-find path.
  * XPath still owns role, text, state, and attribute grammar. The look stage
  * is the same engine string {@link SelectorTranslator} already builds.

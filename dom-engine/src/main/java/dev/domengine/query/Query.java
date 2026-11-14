@@ -117,8 +117,7 @@ public final class Query {
         requireWithin(root, flags.get("within"));
         current = within(current, flags.get("within"));
         current = nesting(current, flags.get("nesting"));
-        dev.domengine.cdp.CdpConnection connection = LiveXPath.connection();
-        if (connection != null && !current.isEmpty()) Displayed.prepare(connection, current);
+        Displayed.prepareBound(current);
         String filter = flags.get("filter");
         if (filter != null && !filter.isBlank()) {
             if (!"displayed".equalsIgnoreCase(filter)) throw new CdpException("invalid filter");
@@ -136,7 +135,7 @@ public final class Query {
         boolean strict = "true".equals(flags.get("strict"));
         if (strict && current.isEmpty()) throw new CdpException("not found");
         if (strict && current.size() > 1) throw new CdpException("ambiguous");
-        if (!countOnly && connection != null && !current.isEmpty()) RowStates.fill(connection, current);
+        if (!countOnly) RowStates.fillBound(current);
         ObjectNode result = Jsons.object();
         result.put("ok", true);
         result.put("source", pipeline == null ? "" : pipeline);
@@ -366,10 +365,22 @@ public final class Query {
     public static String leadingEngine(String pipeline) {
         if (pipeline == null || pipeline.isBlank()) return "css";
         String trimmed = pipeline.trim();
-        if (trimmed.startsWith("(") || Expressions.hasOperator(trimmed)) return "expr";
+        if (trimmed.startsWith("(") || Expressions.hasOperator(trimmed) || relationLead(trimmed)) return "expr";
         int eq = indexOfEngineEquals(trimmed);
         if (eq <= 0) return "css";
         return canonicalEngine(trimmed.substring(0, eq).trim().toLowerCase(Locale.ROOT));
+    }
+
+    private static boolean relationLead(String text) {
+        String piece = text;
+        if (piece.regionMatches(true, 0, "not-", 0, 4)) piece = piece.substring(4);
+        for (String name : List.of("left-of", "right-of", "inside", "before", "above", "below", "after", "right", "near", "left")) {
+            if (!piece.regionMatches(true, 0, name, 0, name.length())) continue;
+            if (piece.length() == name.length()) return false;
+            char next = piece.charAt(name.length());
+            if (next == '=' || next == '(' || next == '@') return true;
+        }
+        return false;
     }
 
     /** Index where the engine name ends. {@code text~=} keeps the comparator on the expression. */

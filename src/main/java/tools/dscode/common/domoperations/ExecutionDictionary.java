@@ -44,6 +44,10 @@ import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.tryCon
  * Dictionary layer. A category resolves to XPath and, when {@code combined(clause)} was
  * registered, a Control Engine clause. The XPath stays the fallback.
  */
+/**
+ * Dictionary layer. Categories, XPath builders, and the combined clause a
+ * category can carry. Protocol drivers are not queried from here.
+ */
 public class ExecutionDictionary {
 
 

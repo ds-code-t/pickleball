@@ -51,6 +51,12 @@ public final class RowStates {
     private RowStates() {
     }
 
+    public static void fillBound(List<DomNode> nodes) {
+        CdpConnection connection = LiveXPath.connection();
+        if (connection == null || nodes == null || nodes.isEmpty()) return;
+        fill(connection, nodes);
+    }
+
     public static void fill(CdpConnection connection, List<DomNode> nodes) {
         if (nodes == null || nodes.isEmpty()) return;
         if (connection == null) {

@@ -14,6 +14,7 @@ import dev.domengine.session.SessionRegistry;
 import dev.domengine.action.Observe;
 import dev.domengine.action.PageActions;
 import dev.domengine.desktop.DesktopTree;
+import dev.domengine.desktop.NativeDesktop;
 import dev.domengine.tree.LiveTree;
 
 import java.io.BufferedReader;
@@ -60,7 +61,7 @@ public final class DomEngineMain {
         Path globalSessionDir = peelSessionDir(args);
         if (globalSessionDir != null) SessionRegistry.get().useDirectory(globalSessionDir);
         if (args.isEmpty() || wantsHelp(args)) {
-            return CliResult.ok(helpText());
+            return CliResult.ok(helpText().formatted(EngineInfo.VERSION));
         }
         if ("log".equals(args.get(0))) {
             return logs(args);
@@ -213,6 +214,9 @@ public final class DomEngineMain {
         array(observe, "kinds", List.of("network", "navigation", "console", "log"));
         array(observe, "flags", List.of("session", "cdp", "type", "url", "since", "until", "limit", "wait-ms"));
         array(node, "engines", dev.domengine.query.Query.ENGINES);
+        node.put("display_name", "Control Engine");
+        syntax(node);
+        platforms(node);
         array(node, "actions", PageActions.VERBS);
         array(node, "query_flags", dev.domengine.query.Query.QUERY_FLAGS);
         node.put("eval_nodes", "256");
@@ -229,6 +233,64 @@ public final class DomEngineMain {
         node.put("snapshot_schema", EngineInfo.SNAPSHOT_SCHEMA);
         node.put("premap", EngineInfo.PREMAP);
         return node;
+    }
+
+    private static void syntax(ObjectNode node) {
+        ObjectNode syntax = node.putObject("syntax");
+        array(syntax, "operators", List.of("AND", "OR", "NOT"));
+        syntax.put("grouping", "()");
+        syntax.put("pipeline", ">>");
+        array(syntax, "relations", List.of("near", "below", "above", "left-of", "right-of", "inside", "after", "before"));
+        array(syntax, "relation_forms", List.of("stage", "filter"));
+        syntax.put("negative_relations", true);
+        syntax.put("weights", "@<w>");
+        List<String> clauses = new ArrayList<>();
+        for (String engine : dev.domengine.query.Query.ENGINES) {
+            if (!"frame".equals(engine) && !"shadow".equals(engine)) clauses.add(engine);
+        }
+        array(syntax, "clause_types", clauses);
+    }
+
+    private static void platforms(ObjectNode node) {
+        ObjectNode platforms = node.putObject("platforms");
+        ObjectNode browser = platforms.putObject("browser");
+        array(browser, "verbs", PageActions.VERBS);
+        array(browser, "query_flags", dev.domengine.query.Query.QUERY_FLAGS);
+        ObjectNode desktop = platforms.putObject("desktop");
+        array(desktop, "verbs", DesktopTree.VERBS);
+        array(desktop, "backends", List.of("uia", "ax", "atspi"));
+        List<String> browserOnly = new ArrayList<>();
+        for (String name : List.of("pierce", "frame", "shadow", "eval", "observe", "submit", "screenshot")) {
+            if (!DesktopTree.VERBS.contains(name)) browserOnly.add(name);
+        }
+        array(desktop, "browser_only", browserOnly);
+        ArrayNode unsupported = desktop.putArray("unsupported");
+        for (String verb : PageActions.VERBS) {
+            if (DesktopTree.VERBS.contains(verb)) continue;
+            List<String> missing = new ArrayList<>();
+            for (String backend : List.of("uia", "ax", "atspi")) {
+                if (!NativeDesktop.verbs(backend).contains(verb)) missing.add(backend);
+            }
+            if (missing.isEmpty()) continue;
+            ObjectNode one = unsupported.addObject();
+            one.put("verb", verb);
+            array(one, "backends", missing);
+            one.put("reason", desktopGap(verb));
+        }
+    }
+
+    private static String desktopGap(String verb) {
+        return switch (verb) {
+            case "scroll" -> "not wired; UIA ScrollItemPattern, AX AXScrollToVisible, and AT-SPI Component scroll are not called";
+            case "key" -> "not wired; UIA input, AX keystroke, and AT-SPI device events are not a desktop key verb";
+            case "dblclick" -> "not wired; no second Invoke, AXPress, or AT-SPI DoAction for a double click";
+            case "contextclick" -> "not wired; no right-click, AXShowMenu, or AT-SPI menu action";
+            case "drag" -> "not wired; no UIA drag pattern, AX drag, or AT-SPI drag action";
+            case "hover" -> "not wired; no UIA hover, AX hover, or AT-SPI mouse move";
+            case "submit" -> "browser form submit; desktop backends have no submit verb";
+            case "eval" -> "browser script; desktop backends have no eval";
+            default -> "not implemented on the desktop backends";
+        };
     }
 
     private static CliResult session(List<String> args) {
@@ -706,7 +768,7 @@ public final class DomEngineMain {
 
     private static String helpText() {
         return """
-                domengine %s
+                domengine %s — Control Engine for browsers and Windows, macOS and Linux desktops
                 version
                 capabilities
                 session create|list|attach|close|join|log [--session-dir DIR]

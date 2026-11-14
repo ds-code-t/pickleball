@@ -6,9 +6,10 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * The engine query object: one pipeline or expression string, plus the
- * exposure, limit, and explain flags the composite CLI already accepts.
- * Workbench, MCP, and the control bridge only forward this object.
+ * Dictionary layer. The engine query object is one pipeline or expression
+ * string, plus the exposure, limit, and explain flags the composite CLI
+ * already accepts. {@code after} and {@code before} are document order, not
+ * visual relatives. Workbench, MCP, and the control bridge only forward this object.
  */
 public record EngineQuery(
         String text,
@@ -79,12 +80,10 @@ public record EngineQuery(
         return built;
     }
 
-    /** Selenium can run a single css= or xpath= stage. A relation form needs the engine. */
+    /** Selenium can run a single css= or xpath= stage. Operators and relations need the engine. */
     public By seleniumFallback() {
-        if (relationForm(text)) return null;
-        if (text.contains(">>") || text.contains(" AND ") || text.contains(" OR ") || text.startsWith("NOT ")) {
-            return null;
-        }
+        if (text == null || text.isBlank()) return null;
+        if (text.contains(">>") || relationForm(text) || "expr".equals(dev.domengine.query.Query.leadingEngine(text))) return null;
         if (text.startsWith("css=")) return By.cssSelector(text.substring(4));
         if (text.startsWith("xpath=")) return By.xpath(text.substring(6));
         if (text.startsWith("//") || text.startsWith("(//") || text.startsWith("(/")) return By.xpath(text);
