@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** {@code session join} and {@code session log [--follow]} match the Rust composite CLI. */
+/** {@code session join} and {@code session log [--follow]} match the Java control-engine CLI. */
 class SessionJoinLogTest {
     @AfterEach
     void clean() {

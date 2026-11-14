@@ -20,8 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Selenium and composite producers must return the same snapshot fields.
  * The composite producer does not shell out. The live engine case uses the
- * in-repo Java engine (dev.domengine), which replaced the vendored Rust
- * binary. Host PATH, ~/.m2, and sibling checkouts are ignored.
+ * in-repo Java control engine (dev.domengine). Host PATH, ~/.m2, and sibling checkouts are ignored.
  */
 class ElementSnapshotParityTest {
     private HtmlUnitDriver driver;

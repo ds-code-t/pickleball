@@ -16,11 +16,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Fails when a removed engine name or lookup is still described as current
- * behaviour. Dated records stay out. Three G1 documents stay out until the
- * Phase 7 docs sweep, because G1 is still editing those sections:
- * {@code docs/configuration.md}, {@code docs/direct-control-handoff.md}, and
- * {@code docs/dynamic-control-api.md}. Generated guidance mirrors are copies
- * of those docs and are checked by {@code sync_consumer_guidance.py --check}.
+ * behaviour. Dated records stay out. Generated guidance mirrors are copies
+ * of the current docs and are checked by {@code sync_consumer_guidance.py --check}.
  */
 class NoRustLeftTest {
     private static final Pattern[] FORBIDDEN = {
@@ -32,11 +29,6 @@ class NoRustLeftTest {
             Pattern.compile("resolveRustBinary"),
             Pattern.compile("rustRequested")
     };
-    private static final List<String> G1_DOCS_LEFT_FOR_PHASE_7 = List.of(
-            "docs/configuration.md",
-            "docs/direct-control-handoff.md",
-            "docs/dynamic-control-api.md"
-    );
 
     @Test
     void mainSourcesBuildScriptsAndCurrentDocsHaveNoRemovedEngine() throws IOException {
@@ -74,7 +66,6 @@ class NoRustLeftTest {
         if (rel.startsWith("docs/maintainer/") && !rel.equals("docs/maintainer/3.0.0-dalton-design.md")) return false;
         if (rel.startsWith("docs/roadmaps/") || rel.startsWith("docs/audits/") || rel.startsWith("prompts/")) return false;
         if (rel.equals("docs/release-notes.md") || rel.equals("docs/agent/repository-index.md")) return false;
-        if (G1_DOCS_LEFT_FOR_PHASE_7.contains(rel)) return false;
         if (isMain(rel)) return textFile(path);
         if (isBuildScript(rel)) return true;
         return isCurrentDoc(rel);

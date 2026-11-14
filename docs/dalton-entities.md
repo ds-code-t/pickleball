@@ -2,7 +2,7 @@
 
 Entities are test data that scenarios can read without putting the values in the Gherkin. Case ids, user ids, and account numbers belong here. Passwords, tokens, and other secrets do not. A secret field holds a reference such as `<password:qaDb>` or a `~MASK;` value, using the same secrets and config approach as the rest of Pickleball.
 
-Dalton is off unless `pkb_dalton=true` (or `PKB_DALTON`) or the project-root `dalton.properties` says `enabled=true`. An explicit false beats the file. With Dalton off, `<entity:...>` is not a special reference and no database is opened.
+Dalton is on unless `pkb_dalton=false` (or `PKB_DALTON`, or `dalton.properties` `enabled=false`). An explicit false beats a file that turns it on. With Dalton off, `<entity:...>` is not a special reference and no database is opened.
 
 ## Files
 

@@ -837,6 +837,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/dalton/FileEditTest.java`
 - `src/test/java/tools/dscode/dalton/GherkinRewriteTest.java`
 - `src/test/java/tools/dscode/dalton/GlueEditTest.java`
+- `src/test/java/tools/dscode/docs/CurrentDocsTest.java`
 - `src/test/java/tools/dscode/engine/adapter/NativeSuiteHookTest.java`
 - `src/test/java/tools/dscode/engine/adapter/SuiteHookSteps.java`
 - `src/test/java/tools/dscode/engine/context/ExecutionContextTest.java`

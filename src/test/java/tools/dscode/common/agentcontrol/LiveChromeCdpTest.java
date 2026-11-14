@@ -258,8 +258,8 @@ class LiveChromeCdpTest {
     }
 
     /**
-     * Optional external engine named by PKB_LIVE_COMPOSITE. Null means the
-     * in-repo Java engine (dev.domengine), which replaced the Rust binary.
+     * Optional external launcher named by PKB_LIVE_COMPOSITE. Null means the
+     * in-repo Java control engine (dev.domengine).
      */
     private static Path compositeBinary() {
         String env = System.getenv("PKB_LIVE_COMPOSITE");

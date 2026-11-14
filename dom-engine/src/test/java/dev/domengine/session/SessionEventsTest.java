@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** The session event buffer that {@code observe} reads, matching the Rust Session deque projection. */
+/** The session event buffer that {@code observe} reads. It is the Java control engine's session deque. */
 class SessionEventsTest {
     private static ObjectNode row(String kind, String method, String url, long at) {
         ObjectNode row = Jsons.object();

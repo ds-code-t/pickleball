@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * {@code observe} without a selector reads the session's CDP event buffer
- * (the Rust observe-buffers contract); with a selector it still waits on a query.
+ * (the Java control engine's observe-buffer contract); with a selector it still waits on a query.
  */
 class ObserveEventsTest {
     @AfterEach
