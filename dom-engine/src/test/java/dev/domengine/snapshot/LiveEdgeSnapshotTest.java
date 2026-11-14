@@ -61,7 +61,20 @@ class LiveEdgeSnapshotTest {
         Path dir = Files.createTempDirectory("domengine-edge-snap");
         try {
             assertTrue(browser.debuggerOpen(), "Edge debugger did not open");
-            BrowserSession.awaitInitialDocument(browser.http(), url);
+            try {
+                BrowserSession.awaitInitialDocument(browser.http(), url);
+            } catch (dev.domengine.cdp.CdpException failure) {
+                String list = "";
+                try {
+                    HttpResponse<String> body = HttpClient.newHttpClient().send(
+                            HttpRequest.newBuilder(URI.create(browser.http() + "/json/list")).GET().timeout(Duration.ofSeconds(5)).build(),
+                            HttpResponse.BodyHandlers.ofString());
+                    list = body.body();
+                } catch (Exception ignored) {
+                    list = "list unavailable";
+                }
+                throw new AssertionError(edge + " " + failure.getMessage() + " list=" + list, failure);
+            }
             HttpClient client = HttpClient.newHttpClient();
             HttpResponse<String> version = client.send(
                     HttpRequest.newBuilder(URI.create(browser.http() + "/json/version")).GET().timeout(Duration.ofSeconds(5)).build(),
