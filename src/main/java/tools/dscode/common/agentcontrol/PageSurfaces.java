@@ -8,6 +8,7 @@ import org.openqa.selenium.chromium.ChromiumDriver;
 import org.openqa.selenium.remote.RemoteWebDriver;
 import tools.dscode.browser.BrowserFacade;
 import tools.dscode.browser.BrowserLog;
+import tools.dscode.browser.CdpAdapter;
 import tools.dscode.browser.ProtocolSelector;
 import tools.dscode.browser.SurfaceAssets;
 import tools.dscode.common.composite.CompositeLog;
@@ -605,6 +606,7 @@ final class PageSurfaces {
         WebDriver target = resolveDriver(handle);
         if (target == null || !cdpCapable(target)) return false;
         try {
+            cdp(target, "DOM.enable", Map.of());
             cdp(target, "Overlay.enable", Map.of());
             Map<String, Object> highlight = new LinkedHashMap<>();
             highlight.put("backendNodeId", ref.backend);
@@ -799,8 +801,13 @@ final class PageSurfaces {
     }
 
     private static Object cdp(WebDriver web, String method, Map<String, Object> params) {
-        BrowserFacade facade = direct(web);
+        BrowserFacade facade = directPage(web);
         if (facade != null) return facade.send(method, params);
+        return seleniumCdp(web, method, params);
+    }
+
+    /** Selected-tab CDP. Selenium's command is already on that page; the browser socket is not. */
+    private static Object seleniumCdp(WebDriver web, String method, Map<String, Object> params) {
         try {
             return web.getClass().getMethod("executeCdpCommand", String.class, Map.class).invoke(web, method, params);
         } catch (java.lang.reflect.InvocationTargetException failure) {
@@ -812,8 +819,17 @@ final class PageSurfaces {
         }
     }
 
-    private static Object evaluateHelper(WebDriver web, JavascriptExecutor executor, Map<String, Object> spec) {
+    private static BrowserFacade directPage(WebDriver web) {
         BrowserFacade facade = direct(web);
+        if (facade instanceof CdpAdapter adapter) {
+            String target = pageTarget(web);
+            if (target != null) adapter.attachPage(target);
+        }
+        return facade;
+    }
+
+    private static Object evaluateHelper(WebDriver web, JavascriptExecutor executor, Map<String, Object> spec) {
+        BrowserFacade facade = directPage(web);
         if (facade != null) {
             installSurface(web, facade);
             String json;
@@ -2264,7 +2280,7 @@ final class PageSurfaces {
     static String pageTarget(WebDriver web) {
         if (!cdpCapable(web)) return null;
         try {
-            Object info = cdp(web, "Target.getTargetInfo", Map.of());
+            Object info = seleniumCdp(web, "Target.getTargetInfo", Map.of());
             if (!(info instanceof Map<?, ?> map)) return null;
             Object body = map.get("targetInfo") instanceof Map<?, ?> nested ? nested : map;
             if (!(body instanceof Map<?, ?> target)) return null;

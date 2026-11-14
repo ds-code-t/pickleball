@@ -19,6 +19,8 @@ public final class CdpAdapter implements BrowserFacade {
     private final Map<String, BindingListener> bindings = new ConcurrentHashMap<>();
     private final Map<String, Integer> worlds = new ConcurrentHashMap<>();
     private volatile String rootFrame;
+    private volatile String pageTarget;
+    private volatile String pageSession;
 
     public CdpAdapter(ProtocolSocket socket) {
         this.rpc = new JsonRpc(socket, new JsonRpc.ReplyMatcher() {
@@ -52,6 +54,51 @@ public final class CdpAdapter implements BrowserFacade {
     @Override
     public String protocol() {
         return "cdp";
+    }
+
+    /**
+     * Page-domain methods ({@code Overlay}, {@code Page}, {@code Runtime}, {@code DOM})
+     * are not valid on the browser socket. {@code Target.attachToTarget} is sent
+     * with no session, then later calls carry the flattened {@code sessionId}.
+     */
+    public void attachPage(String targetId) {
+        if (targetId == null || targetId.isBlank()) return;
+        if (targetId.equals(pageTarget) && pageSession != null) return;
+        synchronized (this) {
+            if (targetId.equals(pageTarget) && pageSession != null) return;
+            rpc.session(null);
+            if (socketIsPage(targetId)) {
+                pageTarget = targetId;
+                pageSession = "";
+                return;
+            }
+            JsonNode result = rpc.call("Target.attachToTarget", Map.of("targetId", targetId, "flatten", true));
+            String session = result.path("sessionId").asText("");
+            if (session.isBlank()) {
+                throw new IllegalStateException(
+                        "error: Target.attachToTarget returned no session.\n"
+                                + "fix: Pass the selected page target id.");
+            }
+            rpc.session(session);
+            pageTarget = targetId;
+            pageSession = session;
+            rootFrame = null;
+            worlds.clear();
+        }
+    }
+
+    /** A page websocket already is the selected tab. A browser websocket is not. */
+    private boolean socketIsPage(String targetId) {
+        try {
+            JsonNode info = rpc.call("Target.getTargetInfo", Map.of());
+            JsonNode body = info.path("targetInfo").isObject() ? info.path("targetInfo") : info;
+            String type = body.path("type").asText("");
+            String id = body.path("targetId").asText("");
+            if (id.isBlank()) id = body.path("id").asText("");
+            return "page".equals(type) && targetId.equals(id);
+        } catch (RuntimeException failure) {
+            return false;
+        }
     }
 
     @Override

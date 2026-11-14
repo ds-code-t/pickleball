@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class IsolatedWorldTest {
@@ -55,6 +56,32 @@ class IsolatedWorldTest {
         assertTrue(world.contains("pkb-surface"), world);
     }
 
+    @Test
+    void pageDomainAttachesToTheSelectedTab() throws Exception {
+        ScriptedSocket socket = new ScriptedSocket().auto(request -> {
+            String method = ScriptedSocket.method(request);
+            return switch (method) {
+                case "Target.attachToTarget" -> ScriptedSocket.cdp(request, "{\"sessionId\":\"sess-9\"}");
+                case "Page.getFrameTree" -> ScriptedSocket.cdp(request, """
+                        {"frameTree":{"frame":{"id":"root","url":"https://example.test"}}}""");
+                default -> ScriptedSocket.cdp(request, "{}");
+            };
+        });
+        ProtocolSockets.useFactoryForTests(uri -> socket);
+        ProtocolSelector.useEndpointsForTests(driver -> java.net.URI.create("ws://127.0.0.1:9/devtools/browser"));
+        WebDriver driver = pageDriver();
+        PageSurfaces.manage(driver, "chrome-headed-quiet", true);
+        PageSurfaces.bindHandle(driver, "tab", "root:4");
+        Map<String, Object> painted = PageSurfaces.highlight(null, "root:4", "yellow", null, null, null, null, null);
+        assertEquals("Overlay.highlightNode", painted.get("cdp"));
+        String attach = socket.sent().stream().filter(line -> line.contains("Target.attachToTarget")).findFirst().orElseThrow();
+        assertTrue(attach.contains("PAGE"), attach);
+        assertFalse(attach.contains("sessionId"), attach);
+        String highlight = socket.sent().stream().filter(line -> line.contains("Overlay.highlightNode")).findFirst().orElseThrow();
+        assertTrue(highlight.contains("sess-9"), highlight);
+        assertEquals(1, socket.methods().stream().filter("Target.attachToTarget"::equals).count());
+    }
+
     private static WebDriver driver(AtomicInteger scripts) {
         return (WebDriver) java.lang.reflect.Proxy.newProxyInstance(
                 IsolatedWorldTest.class.getClassLoader(),
@@ -76,5 +103,34 @@ class IsolatedWorldTest {
                     case "hashCode" -> System.identityHashCode(proxy);
                     default -> null;
                 });
+    }
+
+    private static WebDriver pageDriver() {
+        return (WebDriver) java.lang.reflect.Proxy.newProxyInstance(
+                IsolatedWorldTest.class.getClassLoader(),
+                new Class<?>[]{WebDriver.class, HasCapabilities.class, JavascriptExecutor.class, Cdp.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "getCapabilities" -> {
+                        MutableCapabilities caps = new MutableCapabilities();
+                        caps.setCapability("browserName", "chrome");
+                        yield caps;
+                    }
+                    case "getWindowHandle" -> "tab";
+                    case "getWindowHandles" -> java.util.Set.of("tab");
+                    case "executeCdpCommand" -> Map.of("targetInfo", Map.of("type", "page", "targetId", "PAGE"));
+                    case "switchTo" -> java.lang.reflect.Proxy.newProxyInstance(
+                            IsolatedWorldTest.class.getClassLoader(),
+                            new Class<?>[]{WebDriver.TargetLocator.class},
+                            (locator, called, locatorArgs) -> null);
+                    case "executeScript" -> Map.of("ok", true);
+                    case "toString" -> "chrome";
+                    case "equals" -> proxy == args[0];
+                    case "hashCode" -> System.identityHashCode(proxy);
+                    default -> null;
+                });
+    }
+
+    private interface Cdp {
+        Object executeCdpCommand(String method, Map<String, Object> params);
     }
 }

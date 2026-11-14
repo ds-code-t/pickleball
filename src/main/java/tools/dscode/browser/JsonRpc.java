@@ -18,6 +18,7 @@ final class JsonRpc {
     private final AtomicLong ids = new AtomicLong();
     private final ConcurrentHashMap<Long, CompletableFuture<JsonNode>> pending = new ConcurrentHashMap<>();
     private final ReplyMatcher replies;
+    private volatile String sessionId;
     private volatile EventHandler events = (method, params) -> {
     };
 
@@ -32,12 +33,19 @@ final class JsonRpc {
         } : handler;
     }
 
+    /** Flattened CDP session. Null sends on the browser socket. */
+    void session(String id) {
+        sessionId = id == null || id.isBlank() ? null : id;
+    }
+
     JsonNode call(String method, Map<String, ?> params) {
         long id = ids.incrementAndGet();
         ObjectNode request = MAPPER.createObjectNode();
         request.put("id", id);
         request.put("method", method);
         request.set("params", params == null ? MAPPER.createObjectNode() : MAPPER.valueToTree(params));
+        String attached = sessionId;
+        if (attached != null) request.put("sessionId", attached);
         CompletableFuture<JsonNode> future = new CompletableFuture<>();
         pending.put(id, future);
         try {

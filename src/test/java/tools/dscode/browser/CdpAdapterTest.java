@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CdpAdapterTest {
@@ -57,5 +58,44 @@ class CdpAdapterTest {
                 .orElseThrow();
         assertTrue(world.contains("pkb-snapshot"), world);
         assertTrue(world.contains("grantUniveralAccess"), world);
+    }
+
+    @Test
+    void attachPageCarriesTheFlattenedSession() {
+        ScriptedSocket socket = new ScriptedSocket().auto(request -> {
+            String method = ScriptedSocket.method(request);
+            if ("Target.attachToTarget".equals(method)) {
+                return ScriptedSocket.cdp(request, "{\"sessionId\":\"page-1\"}");
+            }
+            return ScriptedSocket.cdp(request, "{}");
+        });
+        CdpAdapter adapter = new CdpAdapter(socket);
+        adapter.attachPage("PAGE");
+        adapter.send("Overlay.hideHighlight", Map.of());
+        adapter.attachPage("PAGE");
+        String attach = socket.sent().stream().filter(line -> line.contains("Target.attachToTarget")).findFirst().orElseThrow();
+        assertTrue(attach.contains("PAGE"), attach);
+        assertTrue(attach.contains("flatten"), attach);
+        assertFalse(attach.contains("sessionId"), attach);
+        String hide = socket.sent().stream().filter(line -> line.contains("Overlay.hideHighlight")).findFirst().orElseThrow();
+        assertTrue(hide.contains("page-1"), hide);
+        assertEquals(1, socket.methods().stream().filter("Target.attachToTarget"::equals).count());
+    }
+
+    @Test
+    void attachPageLeavesAPageSocketUntouched() {
+        ScriptedSocket socket = new ScriptedSocket().auto(request -> {
+            String method = ScriptedSocket.method(request);
+            if ("Target.getTargetInfo".equals(method)) {
+                return ScriptedSocket.cdp(request, "{\"targetInfo\":{\"type\":\"page\",\"targetId\":\"PAGE\"}}");
+            }
+            return ScriptedSocket.cdp(request, "{}");
+        });
+        CdpAdapter adapter = new CdpAdapter(socket);
+        adapter.attachPage("PAGE");
+        adapter.send("Overlay.hideHighlight", Map.of());
+        assertFalse(socket.methods().contains("Target.attachToTarget"), socket.methods().toString());
+        String hide = socket.sent().stream().filter(line -> line.contains("Overlay.hideHighlight")).findFirst().orElseThrow();
+        assertFalse(hide.contains("sessionId"), hide);
     }
 }
