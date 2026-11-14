@@ -538,11 +538,19 @@ public final class DomCompositeAdapter {
     }
 
     public void type(CompositeWebElement element, String text) {
+        type(element, text, false);
+    }
+
+    /** {@code append} inserts. Without it, engine {@code type} clears the field first. */
+    public void type(CompositeWebElement element, String text, boolean append) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("text", text == null ? "" : text);
+        if (append) body.put("append", Boolean.TRUE);
         if (desktopSource(element)) {
-            desktopAct("type", element, Map.of("text", text == null ? "" : text));
+            desktopAct("type", element, body);
             return;
         }
-        act("type", element, Map.of("text", text == null ? "" : text));
+        act("type", element, body);
     }
 
     public void hover(CompositeWebElement element) {

@@ -54,7 +54,7 @@ public final class PageActions {
             case "click" -> optionClick ? selectOption(cdp, node) : mouseClick(cdp, x, y, "left", 1);
             case "dblclick" -> mouseClick(cdp, x, y, "left", 2);
             case "contextclick" -> mouseClick(cdp, x, y, "right", 1);
-            case "type" -> type(cdp, x, y, flags.getOrDefault("text", ""), "true".equals(flags.get("append")), "true".equals(flags.get("submit")));
+            case "type" -> type(cdp, node, x, y, flags.getOrDefault("text", ""), "true".equals(flags.get("append")), "true".equals(flags.get("submit")));
             case "scroll" -> scroll(cdp, node, x, y, number(flags.get("dx")), number(flags.get("dy")));
             case "key" -> {
                 focus(cdp, node);
@@ -270,9 +270,12 @@ public final class PageActions {
         cdp.call("Input.dispatchMouseEvent", params, java.time.Duration.ofSeconds(5));
     }
 
-    private static ObjectNode type(CdpConnection cdp, double x, double y, String text, boolean append, boolean submit) {
+    private static ObjectNode type(CdpConnection cdp, DomNode node, double x, double y, String text, boolean append, boolean submit) {
         mouseClick(cdp, x, y, "left", 1);
-        if (!append) key(cdp, "CONTROL+A");
+        if (!append && !clearValue(cdp, node)) {
+            key(cdp, "CONTROL+A");
+            key(cdp, "DELETE");
+        }
         ObjectNode insert = Jsons.object();
         insert.put("text", text == null ? "" : text);
         cdp.call("Input.insertText", insert, java.time.Duration.ofSeconds(5));
@@ -281,6 +284,34 @@ public final class PageActions {
         result.put("text", text == null ? "" : text);
         result.put("append", append);
         return result;
+    }
+
+    /** Empty the control and fire {@code input}. False when the node has no value to clear. */
+    private static boolean clearValue(CdpConnection cdp, DomNode node) {
+        if (node == null || node.nodeId <= 0) return false;
+        String source = "function(){"
+                + "var el=this; if(!el) return false;"
+                + "var tag=(el.tagName||'').toUpperCase();"
+                + "if(tag==='INPUT'||tag==='TEXTAREA'){"
+                + " var type=(el.type||'').toLowerCase();"
+                + " if(type==='checkbox'||type==='radio'||type==='file'||type==='button'||type==='submit'||type==='reset'||type==='image') return false;"
+                + " el.value='';"
+                + " el.dispatchEvent(new Event('input',{bubbles:true}));"
+                + " return true;"
+                + "}"
+                + "if(el.isContentEditable){"
+                + " el.textContent='';"
+                + " el.dispatchEvent(new Event('input',{bubbles:true}));"
+                + " return true;"
+                + "}"
+                + "return false;"
+                + "}";
+        try {
+            JsonNode value = callOn(cdp, node, source).path("result").path("value");
+            return value.isBoolean() && value.booleanValue();
+        } catch (RuntimeException ignored) {
+            return false;
+        }
     }
 
     private static ObjectNode scroll(CdpConnection cdp, DomNode node, double x, double y, double dx, double dy) {
@@ -333,6 +364,11 @@ public final class PageActions {
         }
     }
 
+    private static final int ALT = 1;
+    private static final int CONTROL = 2;
+    private static final int META = 4;
+    private static final int SHIFT = 8;
+
     private static ObjectNode key(CdpConnection cdp, String key) {
         if (key == null || key.isBlank()) throw new CdpException("invalid key");
         if (key.contains(" ") && key.contains("+")) throw new CdpException("invalid key");
@@ -340,16 +376,33 @@ public final class PageActions {
         for (String part : parts) {
             if (!KNOWN.contains(part.toUpperCase(Locale.ROOT)) && part.length() != 1) throw new CdpException("invalid key");
         }
-        for (int i = 0; i < parts.length - 1; i++) press(cdp, parts[i], "keyDown");
-        press(cdp, parts[parts.length - 1], "keyDown");
-        press(cdp, parts[parts.length - 1], "keyUp");
-        for (int i = parts.length - 2; i >= 0; i--) press(cdp, parts[i], "keyUp");
+        int modifiers = 0;
+        for (int i = 0; i < parts.length; i++) {
+            int down = modifiers | modifierBit(parts[i]);
+            press(cdp, parts[i], "keyDown", down);
+            if (i == parts.length - 1) press(cdp, parts[i], "keyUp", down);
+            modifiers = down;
+        }
+        for (int i = parts.length - 2; i >= 0; i--) {
+            modifiers &= ~modifierBit(parts[i]);
+            press(cdp, parts[i], "keyUp", modifiers);
+        }
         ObjectNode result = Jsons.object();
         result.put("key", key);
         return result;
     }
 
-    private static void press(CdpConnection cdp, String key, String type) {
+    private static int modifierBit(String token) {
+        return switch (token == null ? "" : token.toUpperCase(Locale.ROOT)) {
+            case "ALT" -> ALT;
+            case "CONTROL" -> CONTROL;
+            case "META" -> META;
+            case "SHIFT" -> SHIFT;
+            default -> 0;
+        };
+    }
+
+    private static void press(CdpConnection cdp, String key, String type, int modifiers) {
         Stroke stroke = stroke(key);
         ObjectNode params = Jsons.object();
         params.put("type", type);
@@ -359,44 +412,50 @@ public final class PageActions {
             params.put("windowsVirtualKeyCode", stroke.vk);
             params.put("nativeVirtualKeyCode", stroke.vk);
         }
+        if (modifiers != 0) params.put("modifiers", modifiers);
+        boolean shortcut = (modifiers & (ALT | CONTROL | META)) != 0;
+        if ("keyDown".equals(type) && stroke.text != null && !shortcut) params.put("text", stroke.text);
         cdp.call("Input.dispatchKeyEvent", params, java.time.Duration.ofSeconds(5));
     }
 
     /** DOM {@code event.key} / {@code event.code}. A single letter stays the token the caller sent. */
     private static Stroke stroke(String token) {
-        String name = token == null ? "" : token.toUpperCase(Locale.ROOT);
+        String raw = token == null ? "" : token;
+        String name = raw.toUpperCase(Locale.ROOT);
         return switch (name) {
-            case "ENTER" -> new Stroke("Enter", "Enter", 13);
-            case "TAB" -> new Stroke("Tab", "Tab", 9);
-            case "ESCAPE" -> new Stroke("Escape", "Escape", 27);
-            case "ARROWUP" -> new Stroke("ArrowUp", "ArrowUp", 38);
-            case "ARROWDOWN" -> new Stroke("ArrowDown", "ArrowDown", 40);
-            case "ARROWLEFT" -> new Stroke("ArrowLeft", "ArrowLeft", 37);
-            case "ARROWRIGHT" -> new Stroke("ArrowRight", "ArrowRight", 39);
-            case "BACKSPACE" -> new Stroke("Backspace", "Backspace", 8);
-            case "DELETE" -> new Stroke("Delete", "Delete", 46);
-            case "HOME" -> new Stroke("Home", "Home", 36);
-            case "END" -> new Stroke("End", "End", 35);
-            case "PAGEUP" -> new Stroke("PageUp", "PageUp", 33);
-            case "PAGEDOWN" -> new Stroke("PageDown", "PageDown", 34);
-            case "SPACE" -> new Stroke(" ", "Space", 32);
-            case "CONTROL" -> new Stroke("Control", "ControlLeft", 17);
-            case "SHIFT" -> new Stroke("Shift", "ShiftLeft", 16);
-            case "ALT" -> new Stroke("Alt", "AltLeft", 18);
-            case "META" -> new Stroke("Meta", "MetaLeft", 91);
-            default -> {
-                if (name.length() == 1 && name.charAt(0) >= 'A' && name.charAt(0) <= 'Z') {
-                    yield new Stroke(name, "Key" + name, name.charAt(0));
-                }
-                if (name.length() == 1 && name.charAt(0) >= '0' && name.charAt(0) <= '9') {
-                    yield new Stroke(name, "Digit" + name, name.charAt(0));
-                }
-                yield new Stroke(token == null ? "" : token, name, 0);
-            }
+            case "ENTER" -> new Stroke("Enter", "Enter", 13, null);
+            case "TAB" -> new Stroke("Tab", "Tab", 9, null);
+            case "ESCAPE" -> new Stroke("Escape", "Escape", 27, null);
+            case "ARROWUP" -> new Stroke("ArrowUp", "ArrowUp", 38, null);
+            case "ARROWDOWN" -> new Stroke("ArrowDown", "ArrowDown", 40, null);
+            case "ARROWLEFT" -> new Stroke("ArrowLeft", "ArrowLeft", 37, null);
+            case "ARROWRIGHT" -> new Stroke("ArrowRight", "ArrowRight", 39, null);
+            case "BACKSPACE" -> new Stroke("Backspace", "Backspace", 8, null);
+            case "DELETE" -> new Stroke("Delete", "Delete", 46, null);
+            case "HOME" -> new Stroke("Home", "Home", 36, null);
+            case "END" -> new Stroke("End", "End", 35, null);
+            case "PAGEUP" -> new Stroke("PageUp", "PageUp", 33, null);
+            case "PAGEDOWN" -> new Stroke("PageDown", "PageDown", 34, null);
+            case "SPACE" -> new Stroke(" ", "Space", 32, " ");
+            case "CONTROL" -> new Stroke("Control", "ControlLeft", 17, null);
+            case "SHIFT" -> new Stroke("Shift", "ShiftLeft", 16, null);
+            case "ALT" -> new Stroke("Alt", "AltLeft", 18, null);
+            case "META" -> new Stroke("Meta", "MetaLeft", 91, null);
+            default -> printable(raw, name);
         };
     }
 
-    private record Stroke(String key, String code, int vk) {
+    private static Stroke printable(String raw, String name) {
+        if (raw.length() == 1 && !Character.isISOControl(raw.charAt(0))) {
+            char upper = Character.toUpperCase(raw.charAt(0));
+            if (upper >= 'A' && upper <= 'Z') return new Stroke(raw, "Key" + upper, upper, raw);
+            if (raw.charAt(0) >= '0' && raw.charAt(0) <= '9') return new Stroke(raw, "Digit" + raw, raw.charAt(0), raw);
+            return new Stroke(raw, raw, 0, raw);
+        }
+        return new Stroke(raw, name, 0, null);
+    }
+
+    private record Stroke(String key, String code, int vk, String text) {
     }
 
     private static ObjectNode submit(CdpConnection cdp, DomNode node) {

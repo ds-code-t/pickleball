@@ -106,7 +106,7 @@ public final class KeyParser {
             String plain = plainCharacters(input);
             if (plain != null) {
                 if (!plain.isEmpty()) {
-                    tools.dscode.common.composite.ElementOperations.sendKeys(driver, element, plain);
+                    tools.dscode.common.composite.ElementOperations.appendKeys(driver, element, plain);
                 }
                 return;
             }

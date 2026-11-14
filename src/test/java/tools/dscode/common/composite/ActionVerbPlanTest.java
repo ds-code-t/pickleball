@@ -81,6 +81,15 @@ class ActionVerbPlanTest {
         int sourceAt = dragArgv.indexOf("--source");
         assertTrue(dragArgv.get(sourceAt + 1).startsWith("{"), dragArgv.toString());
         assertTrue(dragArgv.get(sourceAt + 1).contains("\"css\":\"#a\""), dragArgv.toString());
+
+        ObjectNode type = MAPPER.createObjectNode();
+        type.put("css", "#name");
+        type.put("text", "a");
+        type.put("append", true);
+        List<String> typeArgv = Argv.from("type", type);
+        assertEquals("type", typeArgv.get(0));
+        assertTrue(typeArgv.contains("--text"), typeArgv.toString());
+        assertTrue(typeArgv.contains("--append"), typeArgv.toString());
     }
 
     @Test
@@ -176,6 +185,21 @@ class ActionVerbPlanTest {
         assertTrue(trace.contains("verb drag real"), trace);
         assertTrue(trace.contains("verb drag fallback"), trace);
         assertTrue(trace.contains("verb key real"), trace);
+    }
+
+    @Test
+    void pressLettersAppendAndSendKeysReplaces() throws Exception {
+        Path log = temp.resolve("press.log");
+        Path binary = stub(temp.resolve("press").resolve("composite"), log, true);
+        System.setProperty(CompositeBinaryLocator.BIN_KEY, binary.toString());
+        WebElement found = ElementOperations.findElements(null, org.openqa.selenium.By.cssSelector("#save")).get(0);
+        ElementOperations.appendKeys(null, found, "A");
+        found.sendKeys("Ava");
+        String calls = Files.readString(log);
+        long typeLines = calls.lines().filter(line -> line.startsWith("type ")).count();
+        long appendLines = calls.lines().filter(line -> line.startsWith("type ") && line.contains(" --append")).count();
+        assertEquals(2, typeLines, calls);
+        assertEquals(1, appendLines, calls);
     }
 
     @Test

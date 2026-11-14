@@ -30,6 +30,10 @@ public final class FakeCdp implements AutoCloseable {
     public final List<String> methods = new CopyOnWriteArrayList<>();
     /** {@code Input.dispatchKeyEvent} {@code key} values, in order. */
     public final List<String> keys = new CopyOnWriteArrayList<>();
+    /** {@code text} sent with a key event, when the event set one. */
+    public final List<String> texts = new CopyOnWriteArrayList<>();
+    /** Non-zero {@code modifiers} on a key event. */
+    public final List<Integer> modifiers = new CopyOnWriteArrayList<>();
     /** CDP event frames sent right after the reply to {@code Network.enable}, as Chrome replays traffic. */
     public final List<ObjectNode> eventsAfterNetworkEnable = new CopyOnWriteArrayList<>();
     private final ServerSocket server;
@@ -178,7 +182,13 @@ public final class FakeCdp implements AutoCloseable {
             } else if ("Page.createIsolatedWorld".equals(method)) {
                 result.put("executionContextId", 17);
             } else if ("Input.dispatchMouseEvent".equals(method) || "Input.insertText".equals(method) || "Input.dispatchKeyEvent".equals(method)) {
-                if ("Input.dispatchKeyEvent".equals(method)) keys.add(request.path("params").path("key").asText(""));
+                if ("Input.dispatchKeyEvent".equals(method)) {
+                    keys.add(request.path("params").path("key").asText(""));
+                    JsonNode inserted = request.path("params").get("text");
+                    if (inserted != null && inserted.isTextual()) texts.add(inserted.asText());
+                    JsonNode bits = request.path("params").get("modifiers");
+                    if (bits != null && bits.asInt(0) != 0) modifiers.add(bits.asInt());
+                }
                 result.put("ok", true);
             }
             writeFrame(out, Jsons.compact(response));

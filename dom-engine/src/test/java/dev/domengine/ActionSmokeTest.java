@@ -39,6 +39,13 @@ class ActionSmokeTest {
             assertTrue(cdp.methods.contains("Input.dispatchKeyEvent"));
             assertTrue(cdp.keys.contains("Enter"), cdp.keys.toString());
 
+            assertOk(DomEngineMain.dispatch(List.of("key", "--session", "live", "--css", "#go", "--key", "a")));
+            assertTrue(cdp.texts.contains("a"), cdp.texts.toString());
+
+            assertOk(DomEngineMain.dispatch(List.of("key", "--session", "live", "--css", "#go", "--key", "CONTROL+A")));
+            assertTrue(cdp.modifiers.contains(2), cdp.modifiers.toString());
+            assertTrue(cdp.keys.contains("Control"), cdp.keys.toString());
+
             assertOk(DomEngineMain.dispatch(List.of(
                     "drag", "--session", "live",
                     "--source", "{\"css\":\"#host\"}",

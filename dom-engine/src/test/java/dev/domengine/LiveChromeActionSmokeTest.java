@@ -175,7 +175,20 @@ class LiveChromeActionSmokeTest {
                     "eval", "--session", "live-key", "--css", "#box",
                     "--source", "function(){return this.value}"));
             assertOk(typed);
-            assertEquals("Avaa", Jsons.MAPPER.readTree(typed.stdout()).path("value").asText(), typed.stdout());
+            assertEquals("a", Jsons.MAPPER.readTree(typed.stdout()).path("value").asText(), typed.stdout());
+            assertOk(DomEngineMain.dispatch(List.of(
+                    "type", "--session", "live-key", "--css", "#box", "--text", "Z", "--append")));
+            CliResult appended = DomEngineMain.dispatch(List.of(
+                    "eval", "--session", "live-key", "--css", "#box",
+                    "--source", "function(){return this.value}"));
+            assertOk(appended);
+            assertEquals("aZ", Jsons.MAPPER.readTree(appended.stdout()).path("value").asText(), appended.stdout());
+            assertOk(DomEngineMain.dispatch(List.of("key", "--session", "live-key", "--css", "#box", "--key", "b")));
+            CliResult letter = DomEngineMain.dispatch(List.of(
+                    "eval", "--session", "live-key", "--css", "#box",
+                    "--source", "function(){return this.value}"));
+            assertOk(letter);
+            assertEquals("aZb", Jsons.MAPPER.readTree(letter.stdout()).path("value").asText(), letter.stdout());
         } finally {
             server.stop(0);
             DomEngineMain.dispatch(List.of("session", "close", "--id", "live-key", "--session-dir", dir.toString()));

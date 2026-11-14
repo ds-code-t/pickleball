@@ -136,6 +136,19 @@ public final class ElementOperations {
         raw.sendKeys(keys);
     }
 
+    /**
+     * A press of letters and digits. Composite {@code type} is called with {@code append}
+     * so the existing value stays. {@link #sendKeys} still replaces.
+     */
+    public static void appendKeys(WebDriver driver, WebElement element, CharSequence... keys) {
+        WebElement raw = unwrap(element);
+        if (raw instanceof CompositeWebElement composite) {
+            DomCompositeAdapter.get().type(composite, text(keys), true);
+            return;
+        }
+        sendKeys(driver, element, keys);
+    }
+
     public static void doubleClick(WebDriver driver, WebElement element) {
         WebElement raw = unwrap(element);
         if (raw instanceof CompositeWebElement composite) {
