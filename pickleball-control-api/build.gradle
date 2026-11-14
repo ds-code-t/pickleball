@@ -51,9 +51,13 @@ tasks.named('test') {
     // The plain classes directory does not contain woven Cucumber types.
     // hasInlineArgument() and the other PickleStep metadata members exist only
     // on the woven classes. Put those first so they beat the unwoven api jars.
+    // The root runtime variant publishes classes only, so page-surface scripts
+    // are added from the main resources directory.
     dependsOn rootProject.tasks.named('expandWoven')
+    dependsOn rootProject.tasks.named('processResources')
     def wovenExpanded = rootProject.layout.buildDirectory.dir('woven-expanded')
-    classpath = rootProject.files(wovenExpanded) + classpath
+    def rootResources = rootProject.layout.buildDirectory.dir('resources/main')
+    classpath = rootProject.files(wovenExpanded, rootResources) + classpath
 }
 
 // Keep the control API as a separate source module, but bundle its output into

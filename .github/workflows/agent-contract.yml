@@ -117,7 +117,36 @@ jobs:
           echo "chrome-for-testing $version"
 
       - name: DOM engine tests including live Chrome
-        run: ./gradlew --no-daemon :dom-engine:test
+        run: |
+          set +e
+          ./gradlew --no-daemon :dom-engine:test
+          code=$?
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+          reports = list(Path("dom-engine/build/test-results/test").glob("TEST-dev.domengine.snapshot.LiveEdgeSnapshotTest.xml"))
+          if not reports:
+              print("LiveEdgeSnapshotTest: no result")
+          else:
+              cases = ET.parse(reports[0]).getroot().findall("testcase")
+              ran = skipped = failed = 0
+              notes = []
+              for case in cases:
+                  name = case.attrib.get("name", "")
+                  skip = case.find("skipped")
+                  if skip is not None:
+                      skipped += 1
+                      message = (skip.attrib.get("message") or "").strip()
+                      notes.append(name + (": " + message if message else ""))
+                  elif case.find("failure") is not None or case.find("error") is not None:
+                      failed += 1
+                      notes.append(name + ": failed")
+                  else:
+                      ran += 1
+              detail = ("; " + "; ".join(notes)) if notes else ""
+              print(f"LiveEdgeSnapshotTest: ran {ran}, skipped {skipped}, failed {failed}{detail}")
+          PY
+          exit "$code"
 
       - name: Workbench direct-control attach on the Java engine
         run: ./gradlew --no-daemon :pickleball-control-protocol:test --tests tools.dscode.control.protocol.DirectControlProviderTest

@@ -232,9 +232,10 @@ class PageElementQueryTest {
         assertEquals("above", EngineQuery.visualRelative("css=#a AND above=#b"));
         assertEquals(null, EngineQuery.visualRelative("css=#save"));
         assertEquals(null, EngineQuery.visualRelative("text=left=foo"));
-        assertTrue(SelectorTranslator.phrase(
-                ElementPhrase.of("Button", "Save").context("after", "Billing", "Section")
-        ).pipeline().contains("below=1"));
+        assertEquals("(role=button AND text=\"Save\") AND after(role=region AND text=\"Billing\")",
+                SelectorTranslator.phrase(
+                        ElementPhrase.of("Button", "Save").context("after", "Billing", "Section")
+                ).pipeline());
     }
 
     @Test
