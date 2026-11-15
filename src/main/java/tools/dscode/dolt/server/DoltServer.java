@@ -3,6 +3,7 @@ package tools.dscode.dolt.server;
 import tools.dscode.dolt.DoltLog;
 import tools.dscode.dolt.install.DoltInstaller;
 import tools.dscode.dolt.install.DoltReleaseCatalog;
+import tools.dscode.dolt.store.DoltJdbc;
 
 import java.io.IOException;
 import java.io.PrintStream;
@@ -15,11 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -32,11 +29,8 @@ import java.util.Properties;
  * commands call this class. The Workbench does not.
  */
 public final class DoltServer {
-    public static final String DRIVER = "org.mariadb.jdbc.Driver";
-    public static final String MISSING_DRIVER =
-            "Dolt is enabled but org.mariadb.jdbc:mariadb-java-client is not on the classpath. "
-                    + "Add it as testRuntimeOnly / test scope or use the Gradle dolt* tasks. "
-                    + "Dolt is on by default; add org.mariadb.jdbc:mariadb-java-client or set pkb_dolt=false to run file-only.";
+    public static final String DRIVER = DoltJdbc.DRIVER;
+    public static final String MISSING_DRIVER = DoltJdbc.MISSING_DRIVER;
     public static final int DEFAULT_START_MS = 15_000;
     public static final int DEFAULT_SERVER_LOG_MAX = 4_194_304;
 
@@ -66,12 +60,7 @@ public final class DoltServer {
     }
 
     public static boolean driverPresent() {
-        try {
-            Class.forName(DRIVER);
-            return true;
-        } catch (ClassNotFoundException failure) {
-            return false;
-        }
+        return DoltJdbc.driverPresent();
     }
 
     public static Path home(Path project) {
@@ -92,7 +81,12 @@ public final class DoltServer {
         try (FileChannel channel = FileChannel.open(lockPath, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
             FileLock lock = null;
             while (lock == null) {
-                lock = channel.tryLock();
+                try {
+                    lock = channel.tryLock();
+                } catch (java.nio.channels.OverlappingFileLockException busy) {
+                    // Another thread in this JVM already holds server.lock.
+                    lock = null;
+                }
                 if (lock == null) {
                     ServerInfo ready = probe(project, 2_000);
                     if (ready != null) return ready.reused(true);
@@ -177,15 +171,7 @@ public final class DoltServer {
     }
 
     public static boolean selectOne(int port, int timeoutMs) throws SQLException {
-        if (!driverPresent()) throw new SQLException(MISSING_DRIVER);
-        String url = "jdbc:mariadb://127.0.0.1:" + port + "/?user=root&connectTimeout=" + timeoutMs
-                + "&socketTimeout=" + timeoutMs;
-        DriverManager.setLoginTimeout(Math.max(1, timeoutMs / 1000));
-        try (Connection connection = DriverManager.getConnection(url);
-             Statement statement = connection.createStatement();
-             ResultSet rows = statement.executeQuery("SELECT 1")) {
-            return rows.next() && rows.getInt(1) == 1;
-        }
+        return DoltJdbc.selectOne(port, timeoutMs);
     }
 
     static ServerInfo probe(Path project, int timeoutMs) throws IOException {

@@ -526,6 +526,13 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/dolt/install/DoltReleaseCatalog.java`
 - `src/main/java/tools/dscode/dolt/server/DoltServer.java`
 - `src/main/java/tools/dscode/dolt/server/DoltServerSupervisor.java`
+- `src/main/java/tools/dscode/dolt/store/Binding.java`
+- `src/main/java/tools/dscode/dolt/store/DoltConnections.java`
+- `src/main/java/tools/dscode/dolt/store/DoltDialect.java`
+- `src/main/java/tools/dscode/dolt/store/DoltJdbc.java`
+- `src/main/java/tools/dscode/dolt/store/DoltSession.java`
+- `src/main/java/tools/dscode/dolt/store/DoltStatements.java`
+- `src/main/java/tools/dscode/dolt/store/DoltStore.java`
 - `src/main/java/tools/dscode/engine/adapter/CucumberAdapterRun.java`
 - `src/main/java/tools/dscode/engine/adapter/NativeSuiteExecution.java`
 - `src/main/java/tools/dscode/engine/context/ExecutionContext.java`
@@ -793,6 +800,11 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/dolt/install/DoltInstallerTest.java`
 - `src/test/java/tools/dscode/dolt/server/DoltJdbcBranchSpikeTest.java`
 - `src/test/java/tools/dscode/dolt/server/DoltServerLifecycleTest.java`
+- `src/test/java/tools/dscode/dolt/store/DoltConcurrencyTest.java`
+- `src/test/java/tools/dscode/dolt/store/DoltDialectInventoryTest.java`
+- `src/test/java/tools/dscode/dolt/store/DoltDialectTrapsTest.java`
+- `src/test/java/tools/dscode/dolt/store/DoltSchemaTest.java`
+- `src/test/java/tools/dscode/dolt/store/DoltStoreFixture.java`
 - `src/test/java/tools/dscode/engine/adapter/NativeSuiteHookTest.java`
 - `src/test/java/tools/dscode/engine/adapter/SuiteHookSteps.java`
 - `src/test/java/tools/dscode/engine/context/ExecutionContextTest.java`

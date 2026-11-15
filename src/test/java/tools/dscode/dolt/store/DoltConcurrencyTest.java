@@ -1,0 +1,98 @@
+package tools.dscode.dolt.store;
+
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+class DoltConcurrencyTest {
+    @TempDir
+    static Path project;
+
+    static DoltStore store;
+
+    @BeforeAll
+    static void open() throws Exception {
+        DoltStoreFixture.preferBinary();
+        store = DoltStore.open(project, Binding.main());
+    }
+
+    @AfterAll
+    static void shutdown() throws Exception {
+        if (store != null) store.close();
+        DoltStoreFixture.stop(project);
+    }
+
+    @Test
+    void parallelWritersOnOneBranchRetryAndSucceed() throws Exception {
+        store.session().update(DoltDialect.UPSERT_META, "counter", "0");
+        store.session().script("CALL DOLT_ADD('schema_meta')");
+        store.session().script("CALL DOLT_COMMIT('-m', 'counter')");
+        int threads = 8;
+        ExecutorService pool = Executors.newFixedThreadPool(threads);
+        List<Future<?>> futures = new ArrayList<>();
+        for (int index = 0; index < threads; index++) {
+            futures.add(pool.submit(() -> {
+                try (DoltStore local = DoltStore.open(project, Binding.main())) {
+                    local.session().transaction("schema_meta", () -> {
+                        local.session().scalar("SELECT value FROM schema_meta WHERE `key` = 'counter' FOR UPDATE");
+                        local.session().update("""
+                                UPDATE schema_meta SET value = CAST(CAST(value AS SIGNED) + 1 AS CHAR)
+                                WHERE `key` = 'counter'
+                                """);
+                    });
+                } catch (Exception failure) {
+                    throw new RuntimeException(failure);
+                }
+                return null;
+            }));
+        }
+        pool.shutdown();
+        assertEquals(true, pool.awaitTermination(120, TimeUnit.SECONDS));
+        for (Future<?> future : futures) future.get(5, TimeUnit.SECONDS);
+        assertEquals(Integer.toString(threads),
+                store.session().scalar("SELECT value FROM schema_meta WHERE `key` = 'counter'"));
+    }
+
+    @Test
+    void aForcedConflictIsRetriedThenSucceeds() throws Exception {
+        DoltDialect.forcedConflictRemaining = 1;
+        try {
+            store.session().transaction("schema_meta", () ->
+                    store.session().update(DoltDialect.UPSERT_META, "forced", "ok"));
+        } finally {
+            DoltDialect.forcedConflictRemaining = 0;
+        }
+        assertEquals("ok", store.session().scalar("SELECT value FROM schema_meta WHERE `key` = 'forced'"));
+    }
+
+    @Test
+    void twentyBranchesSeeOnlyTheirOwnRows() throws Exception {
+        for (int index = 0; index < 20; index++) {
+            String name = "n" + index;
+            String path = "branch-" + index + ".feature";
+            store.createBranch(name);
+            try (DoltStore other = DoltStore.open(project, Binding.sandbox(name))) {
+                other.session().update("""
+                        INSERT INTO files(path, content_hash, raw_content, mtime, source_type, last_hydrated_at,
+                            last_synced_hash, db_edited, git_blob, binary_ref, byte_size)
+                        VALUES (?, 'h', ?, 1, 'feature', 't', 'h', 0, NULL, 0, 1)
+                        """, path, new byte[] {1});
+                assertEquals("1", other.session().scalar("SELECT COUNT(*) FROM files WHERE path = ?", path));
+                assertEquals("0", other.session().scalar(
+                        "SELECT COUNT(*) FROM files WHERE path LIKE 'branch-%' AND path <> ?", path), name);
+            }
+        }
+        assertEquals("0", store.session().scalar("SELECT COUNT(*) FROM files WHERE path LIKE 'branch-%'"));
+    }
+}
