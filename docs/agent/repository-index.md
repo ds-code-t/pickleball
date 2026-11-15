@@ -836,6 +836,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/dalton/DaltonGitInfoTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonHistoryTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonHydrateTest.java`
+- `src/test/java/tools/dscode/dalton/DaltonLinkedTrackingSmokeTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonLogLinkTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonParseTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonQueryCliTest.java`
