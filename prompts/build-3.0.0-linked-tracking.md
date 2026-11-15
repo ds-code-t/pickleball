@@ -16,6 +16,13 @@ You are Grok Build. Implement the linked data model, tracking dashboard, and tim
 - Never write placeholder or 0-byte files. Verify file sizes and contents before claiming success.
 - Secrets: never store cleartext secret values in any new table, log, timeline, or dashboard. Mask through the existing secrets approach.
 
+## DOC SAFETY (added by the coordinator after the design push)
+
+- The design push (210acc83/cf8d56c4) replaced `AGENTS.md` (about 66 KB) and `docs/agent/feature-map.md` (about 62 KB) with placeholder text, which broke Agent Contract. Both were restored in 4634e720. Never replace, truncate, or regenerate either file wholesale. Edit only the specific paragraphs your phase changes, keep every other line byte-for-byte, and check before every push that neither file shrank by more than a few hundred bytes (`wc -c AGENTS.md docs/agent/feature-map.md`).
+- AGENTS.md must keep the rules on dom-composite PRs #2 and #3, Query.run with frame/shadow/pierce rejected on desktop, the empty breaking-change list, and the Workbench controller guidance that `verify_agent_contract.py` and the Windows consumer check look for (for example `pickleball-control-protocol`, `Pickleball may contain Workbench`, `Workbench must not contain Pickleball`, `@control-bridge`, `pkb_parallel=80`).
+- When a phase lands, replace the "Planned, not implemented yet: linked tracking" bullet under `## Dalton` in AGENTS.md with an accurate description of what is now implemented.
+- Known pre-existing red test, not yours unless your phase touches `GherkinRewrite`: `GherkinRewriteTest.addModifyAndDeleteKeepCommentsAndValidGherkin`.
+
 ## START PROCEDURE
 
 1. `git fetch origin 3.0.0` and check out the CURRENT tip of `origin/3.0.0`. Record the actual SHA you start from in every doc you write and in the scoreboard.
