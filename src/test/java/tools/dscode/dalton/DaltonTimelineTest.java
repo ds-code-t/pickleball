@@ -200,6 +200,41 @@ class DaltonTimelineTest {
     }
 
     @Test
+    void tagSelectsTheTaggedScenarioNotItsFileSibling() throws Exception {
+        Path feature = writePaySiblings();
+        assertEquals(0, run("dalton", "hydrate", "--project=" + project).code);
+        int pay = lineContaining(feature, "Scenario: Pay");
+        int refund = lineContaining(feature, "Scenario: Refund");
+        record("run-a", "features/pay.feature|" + pay, "Pay", null, "pay step", "2020-01-01T00:00:00Z");
+        record("run-a", "features/pay.feature|" + refund, "Refund", null, "refund step", "2020-01-01T00:00:02Z");
+
+        JsonNode tagged = JSON.readTree(run("dalton", "timeline", "--tag=@fast", "--json", "--project=" + project).out);
+        assertEquals(2, tagged.path("total").asInt(), tagged.toString());
+        assertEquals(1, countKind(tagged.path("events"), "run"));
+        assertFalse(tagged.toString().contains("features/pay.feature|" + refund), tagged.toString());
+        assertTrue(tagged.toString().contains("features/pay.feature|" + pay), tagged.toString());
+    }
+
+    @Test
+    void tagSelectsOutlineExampleRowsNotTheUntaggedSibling() throws Exception {
+        Path feature = writeOutlineAndRefund();
+        assertEquals(0, run("dalton", "hydrate", "--project=" + project).code);
+        int examples = lineContaining(feature, "Examples:");
+        int ada = lineContaining(feature, "| Ada |");
+        int refund = lineContaining(feature, "Scenario: Refund");
+        record("run-a", "features/pay.feature|" + examples, "Pay Ada", 1, "outline header", "2020-01-01T00:00:00Z");
+        record("run-a", "features/pay.feature|" + ada, "Pay Bob", 2, "outline row", "2020-01-01T00:00:02Z");
+        record("run-a", "features/pay.feature|" + refund, "Refund", null, "refund step", "2020-01-01T00:00:04Z");
+
+        JsonNode tagged = JSON.readTree(run("dalton", "timeline", "--tag=@fast", "--json", "--project=" + project).out);
+        assertEquals(3, tagged.path("total").asInt(), tagged.toString());
+        assertEquals(1, countKind(tagged.path("events"), "run"));
+        assertFalse(tagged.toString().contains("features/pay.feature|" + refund), tagged.toString());
+        assertTrue(tagged.toString().contains("features/pay.feature|" + examples), tagged.toString());
+        assertTrue(tagged.toString().contains("features/pay.feature|" + ada), tagged.toString());
+    }
+
+    @Test
     void retainDropsRowsAndKeepsTheReport() throws Exception {
         Path shot = project.resolve("reports/diagnostic-runs/sample/shot.png");
         Files.createDirectories(shot.getParent());
@@ -214,6 +249,57 @@ class DaltonTimelineTest {
         assertEquals(png.length, Files.readAllBytes(shot).length);
         Capture after = run("dalton", "timeline", "--json", "--project=" + project);
         assertEquals(0, JSON.readTree(after.out).path("total").asInt(), after.out);
+    }
+
+    private Path writePaySiblings() throws Exception {
+        Files.createDirectories(project.resolve("features"));
+        Path feature = project.resolve("features/pay.feature");
+        Files.writeString(feature, """
+                Feature: Pay
+                  @fast
+                  Scenario: Pay
+                    * the total is 10
+                  Scenario: Refund
+                    * the total is 0
+                """);
+        return feature;
+    }
+
+    private Path writeOutlineAndRefund() throws Exception {
+        Files.createDirectories(project.resolve("features"));
+        Path feature = project.resolve("features/pay.feature");
+        Files.writeString(feature, """
+                Feature: Pay
+                  @fast
+                  Scenario Outline: Pay <who>
+                    * the total is 10
+                    Examples:
+                      | who |
+                      | Ada |
+                      | Bob |
+                  Scenario: Refund
+                    * the total is 0
+                """);
+        return feature;
+    }
+
+    private static int lineContaining(Path feature, String text) throws Exception {
+        java.util.List<String> lines = Files.readAllLines(feature);
+        for (int index = 0; index < lines.size(); index++) {
+            if (lines.get(index).contains(text)) return index + 1;
+        }
+        throw new AssertionError(text + " not in " + feature);
+    }
+
+    private void record(String runId, String key, String name, Integer examplesRow, String text, String at) throws Exception {
+        DaltonExecution.recordStep(project, new DaltonExecution.StepDraft(
+                runId, key, name, null, examplesRow, 1, text, null, "PASSED", at, at));
+    }
+
+    private static int countKind(JsonNode events, String kind) {
+        int count = 0;
+        for (JsonNode event : events) if (kind.equals(event.path("kind").asText())) count++;
+        return count;
     }
 
     private static Capture run(String... args) {

@@ -204,11 +204,14 @@ public final class DaltonTrack {
             String token = tagToken(filter.tag());
             String pattern = likeToken(token);
             sql.append(" AND (");
-            sql.append("EXISTS (SELECT 1 FROM scenarios sc WHERE instr(scenario_key, sc.file_path || '|') = 1 AND (' ' || sc.tags || ' ') LIKE ? ESCAPE '\\')");
+            sql.append("EXISTS (SELECT 1 FROM scenarios sc WHERE ");
+            sql.append(taggedScenario("scenario_key"));
+            sql.append(" AND (' ' || sc.tags || ' ') LIKE ? ESCAPE '\\')");
             values.add(pattern);
             sql.append(" OR EXISTS (SELECT 1 FROM feature_docs d WHERE instr(scenario_key, d.file_path || '|') = 1 AND (' ' || d.tags || ' ') LIKE ? ESCAPE '\\')");
             values.add(pattern);
-            sql.append(" OR (kind = 'run' AND run_id IN (SELECT e.run_id FROM scenario_executions e JOIN scenarios sc ON instr(e.scenario_key, sc.file_path || '|') = 1");
+            sql.append(" OR (kind = 'run' AND run_id IN (SELECT e.run_id FROM scenario_executions e JOIN scenarios sc ON ");
+            sql.append(taggedScenario("e.scenario_key"));
             sql.append(" WHERE (' ' || sc.tags || ' ') LIKE ? ESCAPE '\\'))");
             values.add(pattern);
             sql.append(" OR (kind = 'run' AND run_id IN (SELECT e.run_id FROM scenario_executions e JOIN feature_docs d ON instr(e.scenario_key, d.file_path || '|') = 1");
@@ -249,6 +252,17 @@ public final class DaltonTrack {
             values.add(before != null ? 0 : offset);
         }
         return new Sql(sql.toString(), values);
+    }
+
+    /**
+     * A scenario tag matches that scenario's file and line. An outline example row
+     * keeps the Examples line or the example-row line, which still falls before the next scenario.
+     */
+    private static String taggedScenario(String key) {
+        return "instr(" + key + ", sc.file_path || '|') = 1"
+                + " AND CAST(substr(" + key + ", length(sc.file_path) + 2) AS INTEGER) >= sc.line"
+                + " AND CAST(substr(" + key + ", length(sc.file_path) + 2) AS INTEGER) < COALESCE("
+                + "(SELECT MIN(nx.line) FROM scenarios nx WHERE nx.file_path = sc.file_path AND nx.line > sc.line), 2147483647)";
     }
 
     private static String touchedRuns(boolean id, boolean field) {
