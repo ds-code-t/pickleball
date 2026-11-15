@@ -44,6 +44,12 @@ final class TrackingPanel extends JPanel {
     private final Consumer<String> openExplorer;
     private final JTextField entity = new JTextField(16);
     private final JTextField statusFilter = new JTextField(8);
+    private final JTextField from = new JTextField(18);
+    private final JTextField to = new JTextField(18);
+    private final JTextField tag = new JTextField(8);
+    private final JTextField feature = new JTextField(16);
+    private final JTextField run = new JTextField(12);
+    private final JTextField text = new JTextField(12);
     private final DefaultListModel<String> rows = new DefaultListModel<>();
     private final JList<String> list = new JList<>(rows);
     private final JSlider scrub = new JSlider(0, 0, 0);
@@ -53,6 +59,8 @@ final class TrackingPanel extends JPanel {
     private final List<Beat> beats = new ArrayList<>();
     private final Timer playTimer;
     private int index;
+    private String pageCursor = "";
+    private String pagePrev = "";
 
     TrackingPanel(Supplier<Path> project, Forwarder forwarder, Consumer<String> openExplorer) {
         super(new BorderLayout(8, 8));
@@ -63,12 +71,30 @@ final class TrackingPanel extends JPanel {
         playTimer = new Timer(1000, event -> next());
         playTimer.setRepeats(true);
         JPanel north = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        north.add(button("Refresh", "dalton timeline", () -> run(DaltonBrowser.timeline())));
-        north.add(button("Query", "dalton query", () -> run(DaltonBrowser.query(entity.getText(), statusFilter.getText()))));
+        north.add(button("Refresh", "dalton timeline", () -> run(timeline(true, null, null))));
+        north.add(button("Latest", "Newest timeline page", () -> run(timeline(true, null, null))));
+        north.add(button("Older", "Previous timeline page", this::older));
+        north.add(button("Newer", "Next timeline page", this::newer));
+        north.add(button("Query", "dalton query", () -> run(DaltonBrowser.query(
+                entity.getText(), statusFilter.getText(), tag.getText(), feature.getText(),
+                run.getText(), text.getText(), from.getText(), to.getText()))));
         north.add(new JLabel("Entity"));
         north.add(entity);
         north.add(new JLabel("Status"));
         north.add(statusFilter);
+        north.add(new JLabel("From"));
+        north.add(from);
+        north.add(new JLabel("To"));
+        north.add(to);
+        north.add(new JLabel("Tag"));
+        north.add(tag);
+        north.add(new JLabel("Feature"));
+        north.add(feature);
+        north.add(new JLabel("Run"));
+        north.add(run);
+        north.add(new JLabel("Text"));
+        north.add(text);
+        north.add(button("Retain", "dalton retain", () -> run(DaltonBrowser.retain())));
         north.add(button("Previous", "Previous timeline beat", this::previous));
         north.add(button("Next", "Next timeline beat", this::next));
         north.add(button("Play", "Play recorded beats", this::play));
@@ -90,6 +116,28 @@ final class TrackingPanel extends JPanel {
         south.add(honesty, BorderLayout.CENTER);
         south.add(status, BorderLayout.SOUTH);
         add(south, BorderLayout.SOUTH);
+    }
+
+    private void older() {
+        if (pagePrev == null || pagePrev.isBlank()) {
+            status.setText("no older page");
+            return;
+        }
+        run(timeline(false, null, pagePrev));
+    }
+
+    private void newer() {
+        if (pageCursor == null || pageCursor.isBlank()) {
+            status.setText("no newer page");
+            return;
+        }
+        run(timeline(false, pageCursor, null));
+    }
+
+    private List<String> timeline(boolean latest, String cursor, String before) {
+        return DaltonBrowser.timeline(
+                from.getText(), to.getText(), tag.getText(), feature.getText(),
+                run.getText(), text.getText(), cursor, before, latest);
     }
 
     private void play() {
@@ -178,9 +226,13 @@ final class TrackingPanel extends JPanel {
         String body = result.out() == null ? "" : result.out();
         beats.clear();
         rows.clear();
+        pageCursor = "";
+        pagePrev = "";
         try {
             if (body.trim().startsWith("{")) {
                 JsonNode root = JSON.readTree(body);
+                pageCursor = root.path("cursor").asText("");
+                pagePrev = root.path("prev").asText("");
                 JsonNode events = root.has("events") ? root.get("events") : root.path("rows");
                 if (events.isArray()) {
                     for (JsonNode event : events) {

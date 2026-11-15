@@ -8,8 +8,12 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
@@ -18,6 +22,8 @@ import java.util.regex.Pattern;
  */
 public final class DaltonExecution {
     private static final ThreadLocal<Active> ACTIVE = new ThreadLocal<>();
+    private static final DateTimeFormatter RUN_STAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss'Z'")
+            .withZone(ZoneOffset.UTC);
 
     private DaltonExecution() {
     }
@@ -108,15 +114,23 @@ public final class DaltonExecution {
         }
     }
 
+    public static void beforeStep(Path project, String scenarioName, String uri, int scenarioLine, String stepText, int stepLine) {
+        beforeStep(project, scenarioName, uri, scenarioLine, stepText, stepLine, null);
+    }
+
     /**
      * Opens a running step when tracking is on. Lookup during the step can attach
      * entity usages. Failures here never fail the scenario.
+     * {@code examplesRow} is the 1-based Scenario Outline row, or null for a plain scenario.
+     * The database is {@link DaltonConfig#project()} when {@code pkb_dalton_project} is set.
      */
-    public static void beforeStep(Path project, String scenarioName, String uri, int scenarioLine, String stepText, int stepLine) {
+    public static void beforeStep(
+            Path project, String scenarioName, String uri, int scenarioLine, String stepText, int stepLine, Integer examplesRow
+    ) {
         if (!shouldTrack()) return;
         try {
-            Path root = project == null ? DaltonConfig.project() : project.toAbsolutePath().normalize();
-            Active active = active(root, scenarioName, uri, scenarioLine);
+            Path root = resolveProject(project);
+            Active active = active(root, scenarioName, uri, scenarioLine, examplesRow);
             String text = stepText == null ? "" : stepText;
             if (active.current != null && text.equals(active.currentText)) {
                 DaltonRunContext.activate(root, active.current);
@@ -132,7 +146,8 @@ public final class DaltonExecution {
                 connection.setAutoCommit(false);
                 try {
                     ensureRun(connection, active.runId, active.started, now, active.scenarioName);
-                    ensureScenario(connection, active.execId, active.runId, active.scenarioKey, active.scenarioHash(), null, active.started, "RUNNING");
+                    ensureScenario(connection, active.execId, active.runId, active.scenarioKey, active.scenarioHash(),
+                            active.examplesRow, active.started, "RUNNING");
                     writeStep(connection, stepExec, active.execId, ord, text, hash, match(connection, text),
                             stepLine > 0 ? stepLine : null, now, null, "RUNNING");
                     connection.commit();
@@ -185,12 +200,18 @@ public final class DaltonExecution {
         }
     }
 
-    /** Plugin finish for a step that was not opened with {@link #beforeStep}. */
     public static void finishUnopenedStep(Path project, String scenarioName, String uri, int scenarioLine, String stepText, int stepLine, String status) {
+        finishUnopenedStep(project, scenarioName, uri, scenarioLine, stepText, stepLine, status, null);
+    }
+
+    /** Plugin finish for a step that was not opened with {@link #beforeStep}. */
+    public static void finishUnopenedStep(
+            Path project, String scenarioName, String uri, int scenarioLine, String stepText, int stepLine, String status, Integer examplesRow
+    ) {
         if (!shouldTrack()) return;
         try {
-            Path root = project == null ? DaltonConfig.project() : project.toAbsolutePath().normalize();
-            Active active = active(root, scenarioName, uri, scenarioLine);
+            Path root = resolveProject(project);
+            Active active = active(root, scenarioName, uri, scenarioLine, examplesRow);
             String text = stepText == null ? "" : stepText;
             int ord;
             if (active.pluginOrd < active.texts.size() && text.equals(active.texts.get(active.pluginOrd))) {
@@ -207,7 +228,7 @@ public final class DaltonExecution {
                     active.scenarioKey,
                     active.scenarioName,
                     null,
-                    null,
+                    active.examplesRow,
                     ord,
                     stepText,
                     stepLine > 0 ? stepLine : null,
@@ -282,29 +303,46 @@ public final class DaltonExecution {
         return path + "|" + Math.max(line, 0);
     }
 
-    static String runId() {
-        String raw = System.getProperty("pkb_run_id");
-        if (raw == null || raw.isBlank()) raw = "dalton-run";
-        StringBuilder cleaned = new StringBuilder();
-        for (int index = 0; index < raw.length() && cleaned.length() < 128; index++) {
-            char ch = raw.charAt(index);
-            if (Character.isLetterOrDigit(ch) || ch == '.' || ch == '_' || ch == '-') cleaned.append(ch);
-            else cleaned.append('-');
-        }
-        if (cleaned.isEmpty() || !Character.isLetterOrDigit(cleaned.charAt(0))) cleaned.insert(0, 'r');
-        if (cleaned.length() > 128) cleaned.setLength(128);
-        return cleaned.toString();
+    /** A new id in the same shape as a diagnostic run id: UTC stamp, hyphen, 8 hex characters. */
+    public static String newRunId() {
+        return RUN_STAMP.format(Instant.now()) + "-" + UUID.randomUUID().toString().substring(0, 8);
     }
 
-    private static Active active(Path project, String scenarioName, String uri, int scenarioLine) {
+    static String runId() {
+        String raw = System.getProperty("pkb_run_id");
+        if (raw != null && !raw.isBlank()) {
+            return tools.dscode.common.coordination.AgentCoordination.requireSafeId(raw.trim(), "run id");
+        }
+        String diagnostic = tools.dscode.common.reporting.diagnostic.DiagnosticRuntime.runId();
+        if (diagnostic != null && !diagnostic.isBlank()) {
+            return tools.dscode.common.coordination.AgentCoordination.requireSafeId(diagnostic.trim(), "run id");
+        }
+        String created = newRunId();
+        System.setProperty("pkb_run_id", created);
+        return created;
+    }
+
+    /**
+     * Configured {@code pkb_dalton_project} wins over the caller path.
+     * A caller path is only the working directory when that property is unset.
+     */
+    static Path resolveProject(Path passed) {
+        String configured = System.getProperty("pkb_dalton_project");
+        if (configured != null && !configured.isBlank()) return DaltonConfig.project();
+        if (passed != null) return passed.toAbsolutePath().normalize();
+        return DaltonConfig.project();
+    }
+
+    private static Active active(Path project, String scenarioName, String uri, int scenarioLine, Integer examplesRow) {
         Active active = ACTIVE.get();
         String key = scenarioKey(uri, scenarioLine);
         String name = scenarioName == null || scenarioName.isBlank() ? key : scenarioName;
         if (active != null && project.equals(active.project)
+                && Objects.equals(active.examplesRow, examplesRow)
                 && (key.equals(active.scenarioKey) || name.equals(active.scenarioName))) {
             return active;
         }
-        Active created = new Active(project, runId(), name, key);
+        Active created = new Active(project, runId(), name, key, examplesRow);
         ACTIVE.set(created);
         return created;
     }
@@ -511,6 +549,7 @@ public final class DaltonExecution {
         private final String scenarioName;
         private final String scenarioKey;
         private final String execId;
+        private final Integer examplesRow;
         private final String started = Instant.now().toString();
         private final List<String> texts = new ArrayList<>();
         private int nextOrd;
@@ -518,12 +557,13 @@ public final class DaltonExecution {
         private String current;
         private String currentText;
 
-        private Active(Path project, String runId, String scenarioName, String scenarioKey) {
+        private Active(Path project, String runId, String scenarioName, String scenarioKey, Integer examplesRow) {
             this.project = project;
             this.runId = runId;
             this.scenarioName = scenarioName;
             this.scenarioKey = scenarioKey;
-            this.execId = executionId(runId, scenarioKey, null);
+            this.examplesRow = examplesRow;
+            this.execId = executionId(runId, scenarioKey, examplesRow);
         }
 
         private String scenarioHash() {

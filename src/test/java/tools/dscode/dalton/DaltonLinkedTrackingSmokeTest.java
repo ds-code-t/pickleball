@@ -13,6 +13,7 @@ import java.sql.Statement;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** One path through catalog, execution, usage, link, artifact, query, timeline, and retain. */
@@ -122,8 +123,74 @@ class DaltonLinkedTrackingSmokeTest {
         }
     }
 
+    @Test
+    void hydrateTwiceTwoRunsAndConfiguredProject() throws Exception {
+        Path configured = Files.createTempDirectory("dalton-smoke-configured");
+        Path java = project.resolve("src/test/java/demo/Steps.java");
+        Files.createDirectories(java.getParent());
+        Files.writeString(java, """
+                package demo;
+                public class Steps {
+                    @When("the total is {int}")
+                    public void total(int amount) {}
+                }
+                """, StandardCharsets.UTF_8);
+        String previous = System.getProperty("pkb_dalton");
+        String previousProject = System.getProperty("pkb_dalton_project");
+        String track = System.getProperty("pkb_dalton_track");
+        String run = System.getProperty("pkb_run_id");
+        try {
+            System.setProperty("pkb_dalton", "true");
+            System.setProperty("pkb_dalton_project", project.toString());
+            Capture first = run("dalton", "hydrate", "--project=" + project);
+            assertEquals(0, first.code, first.err);
+            String step = DaltonExecution.recordStep(project, new DaltonExecution.StepDraft(
+                    "smoke-1", "features/pay.feature|2", "Pay", null, null, 1,
+                    "the total is 10", 3, "PASSED", null, null));
+            assertFalse(step.isBlank());
+            Capture second = run("dalton", "hydrate", "--project=" + project);
+            assertEquals(0, second.code, second.err);
+            assertTrue(count("SELECT COUNT(*) FROM step_executions WHERE step_exec_id = '" + step + "'") == 1);
+            assertEquals(1, count("""
+                    SELECT COUNT(*) FROM step_executions s
+                    JOIN step_definitions d ON d.definition_id = s.definition_id
+                    WHERE s.step_exec_id = '""" + step + "'"));
+
+            System.setProperty("pkb_dalton_track", "true");
+            System.setProperty("pkb_dalton_project", configured.toString());
+            System.clearProperty("pkb_run_id");
+            DaltonExecution.beforeStep(project, "One", "features/pay.feature", 2, "alpha", 3);
+            String firstRun = System.getProperty("pkb_run_id");
+            DaltonExecution.afterStep("PASSED");
+            DaltonExecution.finishScenario("PASSED");
+            System.clearProperty("pkb_run_id");
+            DaltonExecution.beforeStep(project, "Two", "features/pay.feature", 4, "beta", 5);
+            String secondRun = System.getProperty("pkb_run_id");
+            DaltonExecution.afterStep("FAILED");
+            DaltonExecution.finishScenario("FAILED");
+            assertNotEquals(firstRun, secondRun);
+            assertEquals(1, count(configured, "SELECT COUNT(*) FROM runs WHERE run_id = '" + firstRun + "' AND status = 'PASSED'"));
+            assertEquals(1, count(configured, "SELECT COUNT(*) FROM runs WHERE run_id = '" + secondRun + "' AND status = 'FAILED'"));
+            assertFalse(Files.exists(project.resolve(".pickleball/dalton/dalton.db"))
+                    && count(project, "SELECT COUNT(*) FROM runs WHERE run_id = '" + firstRun + "'") > 0);
+            String timeline = run("dalton", "timeline", "--json", "--project=" + configured).out;
+            assertTrue(timeline.contains(firstRun), timeline);
+            assertTrue(timeline.contains(secondRun), timeline);
+        } finally {
+            restore("pkb_dalton", previous);
+            restore("pkb_dalton_project", previousProject);
+            restore("pkb_dalton_track", track);
+            restore("pkb_run_id", run);
+            DaltonExecution.finishScenario("PASSED");
+        }
+    }
+
     private int count(String sql) throws Exception {
-        try (DaltonDatabase database = DaltonDatabase.open(project);
+        return count(project, sql);
+    }
+
+    private static int count(Path root, String sql) throws Exception {
+        try (DaltonDatabase database = DaltonDatabase.open(root);
              Statement statement = database.connection().createStatement();
              ResultSet rows = statement.executeQuery(sql)) {
             return rows.next() ? rows.getInt(1) : 0;

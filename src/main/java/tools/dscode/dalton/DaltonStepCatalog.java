@@ -8,11 +8,12 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -42,7 +43,7 @@ public final class DaltonStepCatalog {
     ) {
     }
 
-    /** Replaces the catalog from the current glue sources. */
+    /** Upserts the catalog from the current glue sources. Rows a step execution still references stay. */
     public static int refresh(Path project) throws SQLException {
         String now = Instant.now().toString();
         try (DaltonDatabase database = DaltonDatabase.open(project)) {
@@ -63,13 +64,26 @@ public final class DaltonStepCatalog {
 
     public static int refresh(Connection connection, Path project, String hydratedAt) throws SQLException {
         List<Definition> found = scan(project);
-        try (Statement statement = connection.createStatement()) {
-            statement.execute("DELETE FROM step_definitions");
+        Map<String, Definition> foundById = new LinkedHashMap<>();
+        Map<String, List<Definition>> foundByKey = new LinkedHashMap<>();
+        for (Definition definition : found) {
+            foundById.put(definition.id(), definition);
+            foundByKey.computeIfAbsent(stableKey(definition), ignored -> new ArrayList<>()).add(definition);
         }
+        List<Stored> existing = stored(connection);
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO step_definitions(
-                    definition_id, language, pattern, method_name, source_path, source_line, content_hash, hydrated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    definition_id, language, pattern, method_name, source_path, source_line, content_hash, hydrated_at, removed)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+                ON CONFLICT(definition_id) DO UPDATE SET
+                    language = excluded.language,
+                    pattern = excluded.pattern,
+                    method_name = excluded.method_name,
+                    source_path = excluded.source_path,
+                    source_line = excluded.source_line,
+                    content_hash = excluded.content_hash,
+                    hydrated_at = excluded.hydrated_at,
+                    removed = 0
                 """)) {
             for (Definition definition : found) {
                 statement.setString(1, definition.id());
@@ -84,8 +98,65 @@ public final class DaltonStepCatalog {
             }
             if (!found.isEmpty()) statement.executeBatch();
         }
+        try (PreparedStatement move = connection.prepareStatement(
+                "UPDATE step_executions SET definition_id = ? WHERE definition_id = ?")) {
+            for (Stored row : existing) {
+                if (foundById.containsKey(row.id())) continue;
+                List<Definition> matches = foundByKey.get(row.key());
+                if (matches == null || matches.size() != 1) continue;
+                String next = matches.get(0).id();
+                if (next.equals(row.id())) continue;
+                move.setString(1, next);
+                move.setString(2, row.id());
+                move.executeUpdate();
+            }
+        }
+        try (PreparedStatement referenced = connection.prepareStatement(
+                     "SELECT COUNT(*) FROM step_executions WHERE definition_id = ?");
+             PreparedStatement drop = connection.prepareStatement(
+                     "DELETE FROM step_definitions WHERE definition_id = ?");
+             PreparedStatement retire = connection.prepareStatement(
+                     "UPDATE step_definitions SET removed = 1, hydrated_at = ? WHERE definition_id = ?")) {
+            for (Stored row : existing) {
+                if (foundById.containsKey(row.id())) continue;
+                referenced.setString(1, row.id());
+                int uses;
+                try (ResultSet count = referenced.executeQuery()) {
+                    uses = count.next() ? count.getInt(1) : 0;
+                }
+                if (uses == 0) {
+                    drop.setString(1, row.id());
+                    drop.executeUpdate();
+                } else {
+                    retire.setString(1, hydratedAt);
+                    retire.setString(2, row.id());
+                    retire.executeUpdate();
+                }
+            }
+        }
         DaltonLog.log(project, "track", "step-definitions", "catalog " + found.size());
         return found.size();
+    }
+
+    private static String stableKey(Definition definition) {
+        return definition.language() + "\u001f" + definition.pattern() + "\u001f" + definition.sourcePath();
+    }
+
+    private record Stored(String id, String key) {
+    }
+
+    private static List<Stored> stored(Connection connection) throws SQLException {
+        List<Stored> rows = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(
+                     "SELECT definition_id, language, pattern, source_path FROM step_definitions");
+             ResultSet result = statement.executeQuery()) {
+            while (result.next()) {
+                rows.add(new Stored(
+                        result.getString(1),
+                        result.getString(2) + "\u001f" + result.getString(3) + "\u001f" + result.getString(4)));
+            }
+        }
+        return rows;
     }
 
     public static List<Definition> list(Path project) throws SQLException {
@@ -93,7 +164,9 @@ public final class DaltonStepCatalog {
         try (DaltonDatabase database = DaltonDatabase.open(project);
              PreparedStatement statement = database.connection().prepareStatement("""
                      SELECT definition_id, language, pattern, method_name, source_path, source_line, content_hash
-                     FROM step_definitions ORDER BY source_path, source_line, definition_id
+                     FROM step_definitions
+                     WHERE removed = 0
+                     ORDER BY source_path, source_line, definition_id
                      """);
              ResultSet rows = statement.executeQuery()) {
             List<Definition> found = new ArrayList<>();

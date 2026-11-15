@@ -18,12 +18,17 @@ public final class DaltonRuntime {
             throw new IllegalStateException(DaltonDatabase.MISSING_DRIVER);
         }
         if (attempted) return;
-        attempted = true;
         try {
             DaltonHydrator.Result result = DaltonHydrator.hydrate(DaltonConfig.project(), DaltonHydrator.Options.full());
+            attempted = true;
             DaltonLog.log(DaltonConfig.project(), "hydrate", "files", "auto " + result.line());
         } catch (Exception failure) {
-            System.err.println("Dalton auto-hydrate skipped: " + failure.getMessage());
+            String message = failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
+            String error = "error: Dalton auto-hydrate failed: " + message;
+            String fix = "fix: dalton hydrate";
+            System.err.println(error);
+            System.err.println(fix);
+            throw new IllegalStateException(error + "\n" + fix, failure);
         }
     }
 

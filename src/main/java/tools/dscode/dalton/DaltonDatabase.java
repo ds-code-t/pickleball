@@ -282,6 +282,7 @@ public final class DaltonDatabase implements AutoCloseable {
         addColumn("provenance", "git_remote", "TEXT");
         addColumn("provenance", "github_repo", "TEXT");
         addColumn("provenance", "git_dirty", "INTEGER");
+        addColumn("step_definitions", "removed", "INTEGER NOT NULL DEFAULT 0");
         try (Statement statement = connection.createStatement()) {
             statement.execute("INSERT INTO schema_meta(key, value) VALUES ('schema_version', '"
                     + SCHEMA_VERSION + "') ON CONFLICT(key) DO UPDATE SET value = '" + SCHEMA_VERSION + "'");

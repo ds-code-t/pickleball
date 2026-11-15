@@ -43,10 +43,17 @@ public final class WorkbenchDirectRun {
             LauncherDiscoveryRequestBuilder requestBuilder = LauncherDiscoveryRequestBuilder.request()
                     .selectors(DiscoverySelectors.selectDirectory(tests.toString()))
                     .filters(EngineFilter.includeEngines(DynamicSuiteEngine.ENGINE_ID));
-            if (DaltonConfig.truthy(System.getProperty(DaltonRunTrace.ENABLED))) {
+            boolean trace = DaltonConfig.truthy(System.getProperty(DaltonRunTrace.ENABLED));
+            boolean record = false;
+            try {
+                record = DaltonConfig.enabled() && !tools.dscode.engine.EngineConfig.nativeSelected();
+            } catch (RuntimeException ignored) {
+                record = false;
+            }
+            if (trace || record) {
                 requestBuilder.configurationParameter(
                         io.cucumber.core.options.Constants.PLUGIN_PROPERTY_NAME,
-                        DaltonRunTrace.class.getName());
+                        DaltonRunTrace.withPlugin(null));
             }
             LauncherDiscoveryRequest request = requestBuilder.build();
             SummaryGeneratingListener summary = new SummaryGeneratingListener();

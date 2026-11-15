@@ -124,7 +124,8 @@ public final class NativeScenarioRun {
                             scenario.location() == null ? "" : scenario.location().uri(),
                             scenario.location() == null ? 0 : scenario.location().line(),
                             stepText,
-                            stepLine);
+                            stepLine,
+                            exampleRow(scenario));
                     try {
                         state.runStep(frame);
                     } catch (Throwable thrown) {
@@ -415,5 +416,17 @@ public final class NativeScenarioRun {
             case AMBIGUOUS -> Status.AMBIGUOUS;
             default -> Status.FAILED;
         };
+    }
+
+    /** 1-based Examples row from {@code GherkinEngineParser.expand}, or null for a plain scenario. */
+    private static Integer exampleRow(EngineScenario scenario) {
+        if (scenario == null || scenario.metadata() == null) return null;
+        String raw = scenario.metadata().get("exampleRow");
+        if (raw == null || raw.isBlank()) return null;
+        try {
+            return Integer.valueOf(raw.trim());
+        } catch (NumberFormatException failure) {
+            return null;
+        }
     }
 }

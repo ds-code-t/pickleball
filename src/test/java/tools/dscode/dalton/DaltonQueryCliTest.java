@@ -102,6 +102,46 @@ class DaltonQueryCliTest {
         assertTrue(paged.path("total").asInt() > 1, page.out);
     }
 
+    @Test
+    void tagFeatureRunAndTextFilters() throws Exception {
+        Path feature = project.resolve("features/pay.feature");
+        Files.createDirectories(feature.getParent());
+        Files.writeString(feature, """
+                @pay
+                Feature: Pay
+                  Scenario: Total
+                    * the total is 10
+                """, StandardCharsets.UTF_8);
+        DaltonHydrator.hydrate(project, DaltonHydrator.Options.full());
+        int line;
+        try (DaltonDatabase database = DaltonDatabase.open(project);
+             java.sql.Statement statement = database.connection().createStatement();
+             java.sql.ResultSet rows = statement.executeQuery(
+                     "SELECT line FROM scenarios WHERE file_path = 'features/pay.feature'")) {
+            assertTrue(rows.next(), "scenario was not stored");
+            line = rows.getInt(1);
+        }
+        DaltonExecution.recordStep(project, new DaltonExecution.StepDraft(
+                "sample-run", "features/pay.feature|" + line, "Total", null, null, 1,
+                "the total is 10", line, "PASSED", "2020-01-02T00:00:00Z", "2020-01-02T00:00:01Z"));
+        DaltonExecution.recordStep(project, new DaltonExecution.StepDraft(
+                "other-run", "features/other.feature|2", "Other", null, null, 1,
+                "something else", 2, "PASSED", "2020-01-03T00:00:00Z", "2020-01-03T00:00:01Z"));
+        Capture tagged = run("dalton", "query", "--tag=pay", "--json", "--project=" + project);
+        assertEquals(0, tagged.code, tagged.err);
+        assertTrue(tagged.out.contains("sample-run"), tagged.out);
+        assertFalse(tagged.out.contains("other-run"), tagged.out);
+        Capture featureFilter = run("dalton", "query", "--feature=features/pay.feature", "--json", "--project=" + project);
+        assertTrue(featureFilter.out.contains("sample-run"), featureFilter.out);
+        assertFalse(featureFilter.out.contains("other-run"), featureFilter.out);
+        Capture byRun = run("dalton", "query", "--run=other-run", "--json", "--project=" + project);
+        assertTrue(byRun.out.contains("other-run"), byRun.out);
+        assertFalse(byRun.out.contains("sample-run"), byRun.out);
+        Capture text = run("dalton", "query", "--text=something else", "--json", "--project=" + project);
+        assertTrue(text.out.contains("something else"), text.out);
+        assertFalse(text.out.contains("the total is 10"), text.out);
+    }
+
     private static Capture run(String... args) {
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();

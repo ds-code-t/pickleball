@@ -61,7 +61,7 @@ class WorkbenchTrackingForwarderTest {
         assertEquals("Rewind is view-only over recorded history. It does not undo browser or service side effects.",
                 honesty.getText());
         click(panel, "Refresh");
-        assertEquals(List.of("timeline", "--json"), forwarded.get(0));
+        assertEquals(List.of("timeline", "--latest", "--json"), forwarded.get(0));
         assertEquals("2020-01-01T00:00:00Z run sample-run", row(panel, 0));
         JSlider scrub = slider(panel);
         SwingUtilities.invokeAndWait(() -> scrub.setValue(1));
@@ -80,6 +80,62 @@ class WorkbenchTrackingForwarderTest {
         });
         click(panel, "Query");
         assertEquals(List.of("query", "--entity=Account#ada", "--status=FAILED", "--json"), forwarded.get(1));
+        assertFalse(Files.exists(project.resolve(".pickleball/dalton/dalton.db")));
+    }
+
+    @Test
+    void pagingRangeRetainAndFiltersAreForwarded() throws Exception {
+        List<List<String>> forwarded = new ArrayList<>();
+        String body = """
+                {"command":"timeline","count":1,"total":2,"limit":50,"offset":0,"cursor":"2020-01-02T00:00:00Z\\u001fstep\\u001fstep-1","prev":"2020-01-01T00:00:00Z\\u001frun\\u001fsample-run","events":[
+                  {"at":"2020-01-02T00:00:00Z","kind":"step","id":"step-1","runId":"sample-run","status":"PASSED","scenarioKey":"features/pay.feature|2","stepExecId":"step-1","stepText":"the total is 10","definitionId":"","entityType":"","entityId":"","field":"","operation":"","valueRef":"","message":"","path":""}
+                ]}
+                """;
+        TrackingPanel[] holder = new TrackingPanel[1];
+        SwingUtilities.invokeAndWait(() -> holder[0] = new TrackingPanel(() -> project, (root, args) -> {
+            forwarded.add(List.copyOf(args));
+            return new DaltonCliForwarder.Result(0, body, "", List.of());
+        }, ignored -> { }));
+        TrackingPanel panel = holder[0];
+        SwingUtilities.invokeAndWait(() -> {
+            fieldAfter(panel, "From").setText("2020-01-01T00:00:00Z");
+            fieldAfter(panel, "To").setText("2020-01-03T00:00:00Z");
+            fieldAfter(panel, "Tag").setText("@pay");
+            fieldAfter(panel, "Feature").setText("features/pay.feature");
+            fieldAfter(panel, "Run").setText("sample-run");
+            fieldAfter(panel, "Text").setText("total");
+        });
+        click(panel, "Refresh");
+        assertEquals(List.of(
+                "timeline",
+                "--from=2020-01-01T00:00:00Z",
+                "--to=2020-01-03T00:00:00Z",
+                "--tag=@pay",
+                "--feature=features/pay.feature",
+                "--run=sample-run",
+                "--text=total",
+                "--latest",
+                "--json"), forwarded.get(0));
+        click(panel, "Older");
+        assertTrue(forwarded.get(1).contains("--before=2020-01-01T00:00:00Z\u001frun\u001fsample-run"), forwarded.get(1).toString());
+        assertFalse(forwarded.get(1).contains("--latest"), forwarded.get(1).toString());
+        click(panel, "Newer");
+        assertTrue(forwarded.get(2).contains("--cursor=2020-01-02T00:00:00Z\u001fstep\u001fstep-1"), forwarded.get(2).toString());
+        click(panel, "Latest");
+        assertTrue(forwarded.get(3).contains("--latest"), forwarded.get(3).toString());
+        click(panel, "Retain");
+        assertEquals(List.of("retain"), forwarded.get(4));
+        click(panel, "Query");
+        assertEquals(List.of(
+                "query",
+                "--tag=@pay",
+                "--feature=features/pay.feature",
+                "--run=sample-run",
+                "--text=total",
+                "--from=2020-01-01T00:00:00Z",
+                "--to=2020-01-03T00:00:00Z",
+                "--json"), forwarded.get(5));
+        assertEquals("No retained diagnostic run matches sample-run", WorkbenchFrame.unmatchedDiagnosticRun("sample-run"));
         assertFalse(Files.exists(project.resolve(".pickleball/dalton/dalton.db")));
     }
 
@@ -107,7 +163,10 @@ class WorkbenchTrackingForwarderTest {
             for (Component component : walk(root)) {
                 if (component instanceof JLabel label && !TrackingPanel.HONESTY.equals(label.getText())
                         && !"Entity".equals(label.getText()) && !"Status".equals(label.getText())
-                        && !"Speed".equals(label.getText())) {
+                        && !"Speed".equals(label.getText()) && !"From".equals(label.getText())
+                        && !"To".equals(label.getText()) && !"Tag".equals(label.getText())
+                        && !"Feature".equals(label.getText()) && !"Run".equals(label.getText())
+                        && !"Text".equals(label.getText())) {
                     text[0] = label.getText();
                 }
             }

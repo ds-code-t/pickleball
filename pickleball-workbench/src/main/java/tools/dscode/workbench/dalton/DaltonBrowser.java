@@ -56,11 +56,42 @@ public final class DaltonBrowser {
         return List.of("timeline", "--json");
     }
 
+    public static List<String> timeline(
+            String from, String to, String tag, String feature, String run, String text,
+            String cursor, String before, boolean latest
+    ) {
+        List<String> args = new ArrayList<>();
+        args.add("timeline");
+        append(args, "--from=", from);
+        append(args, "--to=", to);
+        append(args, "--tag=", tag);
+        append(args, "--feature=", feature);
+        append(args, "--run=", run);
+        append(args, "--text=", text);
+        append(args, "--cursor=", cursor);
+        append(args, "--before=", before);
+        if (latest) args.add("--latest");
+        args.add("--json");
+        return List.copyOf(args);
+    }
+
     public static List<String> query(String entity, String status) {
+        return query(entity, status, null, null, null, null, null, null);
+    }
+
+    public static List<String> query(
+            String entity, String status, String tag, String feature, String run, String text, String from, String to
+    ) {
         List<String> args = new ArrayList<>();
         args.add("query");
-        if (entity != null && !entity.isBlank()) args.add("--entity=" + entity.trim());
-        if (status != null && !status.isBlank()) args.add("--status=" + status.trim());
+        append(args, "--entity=", entity);
+        append(args, "--status=", status);
+        append(args, "--tag=", tag);
+        append(args, "--feature=", feature);
+        append(args, "--run=", run);
+        append(args, "--text=", text);
+        append(args, "--from=", from);
+        append(args, "--to=", to);
         args.add("--json");
         return List.copyOf(args);
     }
@@ -321,5 +352,10 @@ public final class DaltonBrowser {
             }
         }
         return labels.isEmpty() ? List.of("none") : labels;
+    }
+
+    private static void append(List<String> args, String prefix, String value) {
+        if (value == null || value.isBlank()) return;
+        args.add(prefix + value.trim());
     }
 }

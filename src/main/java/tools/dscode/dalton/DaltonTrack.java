@@ -8,13 +8,13 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
 /**
  * Read-only query and timeline over linked tracking rows.
  * A missing database is an empty result and is not created.
+ * Filters and the page limit run in SQL. The page is not the whole table.
  */
 public final class DaltonTrack {
     private DaltonTrack() {
@@ -30,242 +30,318 @@ public final class DaltonTrack {
             String to,
             String cursor,
             int limit,
-            int offset
+            int offset,
+            String before,
+            String tag,
+            String feature,
+            String run,
+            String text,
+            boolean latest
     ) {
         public Filter {
             if (limit < 0) throw new IllegalArgumentException("limit must be zero or greater");
             if (offset < 0) throw new IllegalArgumentException("offset must be zero or greater");
         }
+
+        /** Older callers that do not pass the fix-back filters. */
+        public Filter(
+                String entity, String field, String stepDef, String scenario, String status,
+                String from, String to, String cursor, int limit, int offset
+        ) {
+            this(entity, field, stepDef, scenario, status, from, to, cursor, limit, offset,
+                    null, null, null, null, null, false);
+        }
     }
 
     public static String query(Path project, Filter filter, boolean json) throws SQLException {
-        List<Event> page = page(project, filter, false);
-        int total = matched(project, filter, false).size();
-        DaltonLog.log(project, "query", "query", "rows=" + page.size());
-        return json ? json("query", page, filter, total, false) : text(page);
+        Page page = select(project, filter, false);
+        DaltonLog.log(project, "query", "query", "rows=" + page.events().size());
+        return json ? json("query", page, filter, false) : text(page.events());
     }
 
     public static String timeline(Path project, Filter filter, boolean json) throws SQLException {
-        List<Event> page = page(project, filter, true);
-        int total = matched(project, filter, true).size();
-        DaltonLog.log(project, "track", "timeline", "events=" + page.size());
-        return json ? json("timeline", page, filter, total, true) : text(page);
+        Page page = select(project, filter, true);
+        DaltonLog.log(project, "track", "timeline", "events=" + page.events().size());
+        return json ? json("timeline", page, filter, true) : text(page.events());
     }
 
-    private static List<Event> page(Path project, Filter filter, boolean timeline) throws SQLException {
-        List<Event> matched = matched(project, filter, timeline);
-        int start = Math.min(filter.offset(), matched.size());
-        int end = Math.min(matched.size(), start + filter.limit());
-        return matched.subList(start, end);
+    private record Page(List<Event> events, int total, int offset) {
     }
 
-    private static List<Event> matched(Path project, Filter filter, boolean timeline) throws SQLException {
-        List<Event> events = load(project, timeline);
-        String type = entityType(filter.entity());
-        String id = entityId(filter.entity());
-        Instant from = instant(filter.from(), "--from");
-        Instant to = instant(filter.to(), "--to");
-        List<Event> touched = new ArrayList<>();
-        for (Event event : events) {
-            if (!entityMatches(event, type, id, filter.field())) continue;
-            touched.add(event);
+    private static Page select(Path project, Filter filter, boolean timeline) throws SQLException {
+        instant(filter.from(), "--from");
+        instant(filter.to(), "--to");
+        Cursor after = cursor(filter.cursor(), "--cursor");
+        Cursor before = cursor(filter.before(), "--before");
+        if (project == null || !Files.isRegularFile(DaltonPaths.database(project))) {
+            return new Page(List.of(), 0, filter.offset());
         }
-        java.util.Set<String> runs = new java.util.LinkedHashSet<>();
-        java.util.Set<String> steps = new java.util.LinkedHashSet<>();
-        if (type != null) {
-            for (Event event : touched) {
-                if (!event.runId().isBlank()) runs.add(event.runId());
-                if (!event.stepExecId().isBlank()) steps.add(event.stepExecId());
-            }
-        }
-        List<Event> matched = new ArrayList<>();
-        for (Event event : events) {
-            if (type != null) {
-                boolean direct = entityMatches(event, type, id, filter.field())
-                        && ("usage".equals(event.kind()) || "log".equals(event.kind()));
-                boolean parent = runs.contains(event.runId()) || steps.contains(event.stepExecId());
-                if (!direct && !parent) continue;
-            } else if (filter.field() != null && !filter.field().isBlank()
-                    && !filter.field().equals(event.field())) {
-                continue;
-            }
-            if (filter.stepDef() != null && !filter.stepDef().isBlank()
-                    && !filter.stepDef().equals(event.definitionId())) {
-                continue;
-            }
-            if (filter.scenario() != null && !filter.scenario().isBlank()
-                    && !event.scenarioKey().contains(filter.scenario())) {
-                continue;
-            }
-            if (filter.status() != null && !filter.status().isBlank()
-                    && !filter.status().equalsIgnoreCase(event.status())) {
-                continue;
-            }
-            Instant at = parse(event.at());
-            if (from != null && (at == null || at.isBefore(from))) continue;
-            if (to != null && (at == null || at.isAfter(to))) continue;
-            if (filter.cursor() != null && !filter.cursor().isBlank() && !afterCursor(event, filter.cursor())) continue;
-            matched.add(event);
-        }
-        matched.sort(ORDER);
-        return matched;
-    }
-
-    private static boolean entityMatches(Event event, String type, String id, String field) {
-        if (type == null) return true;
-        if (!type.equals(event.entityType())) return false;
-        if (id != null && !id.equals(event.entityId())) return false;
-        return field == null || field.isBlank() || field.equals(event.field());
-    }
-
-    private static boolean afterCursor(Event event, String cursor) {
-        String[] parts = cursor.split("\u001f", 3);
-        if (parts.length != 3) throw new IllegalArgumentException("timeline cursor is not valid");
-        Event mark = new Event(parts[0], parts[1], parts[2], "", "", "", "", "", "", "", "", "", "", "", "", "");
-        return ORDER.compare(event, mark) > 0;
-    }
-
-    private static final Comparator<Event> ORDER = (left, right) -> {
-        int at = compareAt(left.at(), right.at());
-        if (at != 0) return at;
-        int kind = Integer.compare(rank(left.kind()), rank(right.kind()));
-        if (kind != 0) return kind;
-        return left.id().compareTo(right.id());
-    };
-
-    private static int compareAt(String left, String right) {
-        Instant a = parse(left);
-        Instant b = parse(right);
-        if (a != null && b != null) return a.compareTo(b);
-        return (left == null ? "" : left).compareTo(right == null ? "" : right);
-    }
-
-    private static int rank(String kind) {
-        return switch (kind) {
-            case "run" -> 0;
-            case "step" -> 1;
-            case "usage" -> 2;
-            case "log" -> 3;
-            case "artifact" -> 4;
-            default -> 5;
-        };
-    }
-
-    private static List<Event> load(Path project, boolean timeline) throws SQLException {
-        if (project == null || !Files.isRegularFile(DaltonPaths.database(project))) return List.of();
-        List<Event> events = new ArrayList<>();
         try (DaltonDatabase database = DaltonDatabase.open(project)) {
             Connection connection = database.connection();
-            if (timeline) loadRuns(connection, events);
-            loadSteps(connection, events);
-            loadUsages(connection, events);
-            loadLogs(connection, events);
-            if (timeline) loadArtifacts(connection, events);
+            int total = count(connection, filter, timeline, after, null);
+            int offset = filter.offset();
+            if (filter.latest() && before == null && (filter.cursor() == null || filter.cursor().isBlank()) && offset == 0) {
+                offset = Math.max(0, total - filter.limit());
+            }
+            List<Event> events = before == null
+                    ? read(connection, filter, timeline, after, null, filter.limit(), offset, false)
+                    : read(connection, filter, timeline, null, before, filter.limit(), 0, true);
+            return new Page(events, total, before == null ? offset : filter.offset());
         }
-        return events;
     }
 
-    private static void loadRuns(Connection connection, List<Event> events) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(
-                "SELECT run_id, started_at, status, scenario FROM runs");
-             ResultSet rows = statement.executeQuery()) {
-            while (rows.next()) {
-                events.add(event(rows.getString(2), "run", rows.getString(1), rows.getString(1),
-                        rows.getString(3), text(rows.getString(4)), "", "", "", "", "", "", "", "", "", ""));
+    private static int count(Connection connection, Filter filter, boolean timeline, Cursor after, Cursor before) throws SQLException {
+        Sql sql = statement(filter, timeline, after, before, false, 0, 0);
+        try (PreparedStatement statement = connection.prepareStatement("SELECT COUNT(*) FROM (" + sql.body + ") counted")) {
+            sql.bind(statement);
+            try (ResultSet rows = statement.executeQuery()) {
+                return rows.next() ? rows.getInt(1) : 0;
             }
         }
     }
 
-    private static void loadSteps(Connection connection, List<Event> events) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement("""
-                SELECT s.started_at, s.step_exec_id, e.run_id, s.status, e.scenario_key, s.step_text, s.definition_id
+    private static List<Event> read(
+            Connection connection, Filter filter, boolean timeline, Cursor after, Cursor before,
+            int limit, int offset, boolean rewind
+    ) throws SQLException {
+        Sql sql = statement(filter, timeline, after, before, true, limit, offset);
+        String body = sql.body;
+        if (rewind) {
+            body = "SELECT * FROM (" + body + ") page ORDER BY at ASC, kind_rank ASC, id ASC";
+        }
+        try (PreparedStatement statement = connection.prepareStatement(body)) {
+            sql.bind(statement);
+            try (ResultSet rows = statement.executeQuery()) {
+                List<Event> events = new ArrayList<>();
+                while (rows.next()) events.add(event(rows));
+                return events;
+            }
+        }
+    }
+
+    private record Sql(String body, List<Object> values) {
+        private void bind(PreparedStatement statement) throws SQLException {
+            int index = 1;
+            for (Object value : values) {
+                if (value instanceof Integer number) statement.setInt(index++, number);
+                else statement.setString(index++, value == null ? "" : value.toString());
+            }
+        }
+    }
+
+    private static Sql statement(
+            Filter filter, boolean timeline, Cursor after, Cursor before, boolean page, int limit, int offset
+    ) {
+        StringBuilder sql = new StringBuilder();
+        List<Object> values = new ArrayList<>();
+        sql.append("SELECT at, kind, id, run_id, status, scenario_key, step_exec_id, step_text, definition_id, ");
+        sql.append("entity_type, entity_id, field, operation, value_ref, message, path, kind_rank FROM (");
+        sql.append(union(timeline));
+        sql.append(") events WHERE 1 = 1");
+        String type = entityType(filter.entity());
+        String id = entityId(filter.entity());
+        if (type != null) {
+            sql.append(" AND (");
+            sql.append("((kind = 'usage' OR kind = 'log') AND entity_type = ?");
+            values.add(type);
+            if (id != null) {
+                sql.append(" AND entity_id = ?");
+                values.add(id);
+            }
+            if (filter.field() != null && !filter.field().isBlank()) {
+                sql.append(" AND field = ?");
+                values.add(filter.field());
+            }
+            sql.append(") OR run_id IN (");
+            sql.append(touchedRuns(id != null, filter.field() != null && !filter.field().isBlank()));
+            values.add(type);
+            if (id != null) values.add(id);
+            if (filter.field() != null && !filter.field().isBlank()) values.add(filter.field());
+            values.add(type);
+            if (id != null) values.add(id);
+            sql.append(") OR step_exec_id IN (");
+            sql.append(touchedSteps(id != null, filter.field() != null && !filter.field().isBlank()));
+            values.add(type);
+            if (id != null) values.add(id);
+            if (filter.field() != null && !filter.field().isBlank()) values.add(filter.field());
+            sql.append("))");
+        } else if (filter.field() != null && !filter.field().isBlank()) {
+            sql.append(" AND field = ?");
+            values.add(filter.field());
+        }
+        if (filter.stepDef() != null && !filter.stepDef().isBlank()) {
+            sql.append(" AND definition_id = ?");
+            values.add(filter.stepDef());
+        }
+        if (filter.scenario() != null && !filter.scenario().isBlank()) {
+            sql.append(" AND instr(scenario_key, ?) > 0");
+            values.add(filter.scenario());
+        }
+        if (filter.status() != null && !filter.status().isBlank()) {
+            sql.append(" AND status = ? COLLATE NOCASE");
+            values.add(filter.status());
+        }
+        if (filter.from() != null && !filter.from().isBlank()) {
+            sql.append(" AND at >= ?");
+            values.add(filter.from().trim());
+        }
+        if (filter.to() != null && !filter.to().isBlank()) {
+            sql.append(" AND at <= ?");
+            values.add(filter.to().trim());
+        }
+        if (filter.run() != null && !filter.run().isBlank()) {
+            sql.append(" AND run_id = ?");
+            values.add(filter.run().trim());
+        }
+        if (filter.feature() != null && !filter.feature().isBlank()) {
+            String pattern = like(filter.feature().trim());
+            sql.append(" AND (scenario_key LIKE ? ESCAPE '\\' OR run_id IN (SELECT e.run_id FROM scenario_executions e WHERE e.scenario_key LIKE ? ESCAPE '\\'))");
+            values.add(pattern);
+            values.add(pattern);
+        }
+        if (filter.tag() != null && !filter.tag().isBlank()) {
+            String token = tagToken(filter.tag());
+            String pattern = likeToken(token);
+            sql.append(" AND (");
+            sql.append("EXISTS (SELECT 1 FROM scenarios sc WHERE instr(scenario_key, sc.file_path || '|') = 1 AND (' ' || sc.tags || ' ') LIKE ? ESCAPE '\\')");
+            values.add(pattern);
+            sql.append(" OR EXISTS (SELECT 1 FROM feature_docs d WHERE instr(scenario_key, d.file_path || '|') = 1 AND (' ' || d.tags || ' ') LIKE ? ESCAPE '\\')");
+            values.add(pattern);
+            sql.append(" OR run_id IN (SELECT e.run_id FROM scenario_executions e JOIN scenarios sc ON instr(e.scenario_key, sc.file_path || '|') = 1");
+            sql.append(" WHERE (' ' || sc.tags || ' ') LIKE ? ESCAPE '\\')");
+            values.add(pattern);
+            sql.append(" OR run_id IN (SELECT e.run_id FROM scenario_executions e JOIN feature_docs d ON instr(e.scenario_key, d.file_path || '|') = 1");
+            sql.append(" WHERE (' ' || d.tags || ' ') LIKE ? ESCAPE '\\')");
+            values.add(pattern);
+            sql.append(")");
+        }
+        if (filter.text() != null && !filter.text().isBlank()) {
+            String pattern = like(filter.text().trim());
+            sql.append(" AND (message LIKE ? ESCAPE '\\' OR step_text LIKE ? ESCAPE '\\' OR scenario_key LIKE ? ESCAPE '\\')");
+            values.add(pattern);
+            values.add(pattern);
+            values.add(pattern);
+        }
+        if (after != null) {
+            sql.append(" AND (at > ? OR (at = ? AND kind_rank > ?) OR (at = ? AND kind_rank = ? AND id > ?))");
+            values.add(after.at());
+            values.add(after.at());
+            values.add(after.rank());
+            values.add(after.at());
+            values.add(after.rank());
+            values.add(after.id());
+        }
+        if (before != null) {
+            sql.append(" AND (at < ? OR (at = ? AND kind_rank < ?) OR (at = ? AND kind_rank = ? AND id < ?))");
+            values.add(before.at());
+            values.add(before.at());
+            values.add(before.rank());
+            values.add(before.at());
+            values.add(before.rank());
+            values.add(before.id());
+        }
+        if (page) {
+            if (before != null) sql.append(" ORDER BY at DESC, kind_rank DESC, id DESC");
+            else sql.append(" ORDER BY at ASC, kind_rank ASC, id ASC");
+            sql.append(" LIMIT ? OFFSET ?");
+            values.add(limit);
+            values.add(before != null ? 0 : offset);
+        }
+        return new Sql(sql.toString(), values);
+    }
+
+    private static String touchedRuns(boolean id, boolean field) {
+        String usage = "SELECT e.run_id FROM entity_usages u JOIN step_executions s ON s.step_exec_id = u.step_exec_id"
+                + " JOIN scenario_executions e ON e.exec_id = s.scenario_exec_id WHERE u.entity_type = ?";
+        if (id) usage += " AND u.entity_id = ?";
+        if (field) usage += " AND u.field = ?";
+        String log = " UNION SELECT g.run_id FROM log_entity_links l JOIN run_logs g ON g.id = l.log_id WHERE l.entity_type = ?";
+        if (id) log += " AND l.entity_id = ?";
+        return usage + log;
+    }
+
+    private static String touchedSteps(boolean id, boolean field) {
+        String usage = "SELECT u.step_exec_id FROM entity_usages u WHERE u.entity_type = ?";
+        if (id) usage += " AND u.entity_id = ?";
+        if (field) usage += " AND u.field = ?";
+        return usage;
+    }
+
+    private static String union(boolean timeline) {
+        StringBuilder sql = new StringBuilder();
+        if (timeline) {
+            sql.append("""
+                    SELECT started_at AS at, 'run' AS kind, run_id AS id, run_id AS run_id, status AS status,
+                           scenario AS scenario_key, '' AS step_exec_id, '' AS step_text, '' AS definition_id,
+                           '' AS entity_type, '' AS entity_id, '' AS field, '' AS operation, '' AS value_ref,
+                           '' AS message, '' AS path, 0 AS kind_rank
+                    FROM runs
+                    UNION ALL
+                    """);
+        }
+        sql.append("""
+                SELECT s.started_at AS at, 'step' AS kind, s.step_exec_id AS id, e.run_id AS run_id, s.status AS status,
+                       e.scenario_key AS scenario_key, s.step_exec_id AS step_exec_id, s.step_text AS step_text,
+                       COALESCE(s.definition_id, '') AS definition_id,
+                       '' AS entity_type, '' AS entity_id, '' AS field, '' AS operation, '' AS value_ref,
+                       '' AS message, '' AS path, 1 AS kind_rank
                 FROM step_executions s
                 JOIN scenario_executions e ON e.exec_id = s.scenario_exec_id
-                """);
-             ResultSet rows = statement.executeQuery()) {
-            while (rows.next()) {
-                String step = text(rows.getString(2));
-                events.add(event(rows.getString(1), "step", step, rows.getString(3), rows.getString(4),
-                        rows.getString(5), step, rows.getString(6), rows.getString(7), "", "", "", "", "", "", ""));
-            }
-        }
-    }
-
-    private static void loadUsages(Connection connection, List<Event> events) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement("""
-                SELECT u.logged_at, u.usage_id, e.run_id, s.status, e.scenario_key, u.step_exec_id, s.step_text,
-                       s.definition_id, u.entity_type, u.entity_id, u.field, u.operation, u.value_ref
+                UNION ALL
+                SELECT u.logged_at, 'usage', CAST(u.usage_id AS TEXT), e.run_id, s.status, e.scenario_key,
+                       u.step_exec_id, s.step_text, COALESCE(s.definition_id, ''),
+                       u.entity_type, u.entity_id, COALESCE(u.field, ''), u.operation, COALESCE(u.value_ref, ''),
+                       '', '', 2
                 FROM entity_usages u
                 JOIN step_executions s ON s.step_exec_id = u.step_exec_id
                 JOIN scenario_executions e ON e.exec_id = s.scenario_exec_id
-                """);
-             ResultSet rows = statement.executeQuery()) {
-            while (rows.next()) {
-                events.add(event(rows.getString(1), "usage", String.valueOf(rows.getLong(2)), rows.getString(3),
-                        rows.getString(4), rows.getString(5), rows.getString(6), rows.getString(7), rows.getString(8),
-                        rows.getString(9), rows.getString(10), rows.getString(11), rows.getString(12), rows.getString(13),
-                        "", ""));
-            }
-        }
-    }
-
-    private static void loadLogs(Connection connection, List<Event> events) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement("""
-                SELECT g.logged_at, l.log_id, g.run_id, runs.status, runs.scenario, l.entity_type, l.entity_id, g.message
+                UNION ALL
+                SELECT g.logged_at, 'log', CAST(l.log_id AS TEXT), g.run_id, runs.status, runs.scenario,
+                       '', '', '',
+                       l.entity_type, l.entity_id, '', '', '',
+                       g.message, '', 3
                 FROM log_entity_links l
                 JOIN run_logs g ON g.id = l.log_id
                 JOIN runs ON runs.run_id = g.run_id
                 """);
-             ResultSet rows = statement.executeQuery()) {
-            while (rows.next()) {
-                events.add(event(rows.getString(1), "log", String.valueOf(rows.getLong(2)), rows.getString(3),
-                        rows.getString(4), rows.getString(5), "", "", "", rows.getString(6), rows.getString(7),
-                        "", "", "", rows.getString(8), ""));
-            }
+        if (timeline) {
+            sql.append("""
+                    UNION ALL
+                    SELECT a.retained_at, 'artifact', a.artifact_id, COALESCE(a.run_id, ''), COALESCE(runs.status, ''),
+                           COALESCE(runs.scenario, ''), COALESCE(a.step_exec_id, ''), COALESCE(a.kind, ''), '',
+                           '', '', '', '', '', '', a.path, 4
+                    FROM artifacts a
+                    LEFT JOIN runs ON runs.run_id = a.run_id
+                    """);
         }
+        return sql.toString();
     }
 
-    private static void loadArtifacts(Connection connection, List<Event> events) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement("""
-                SELECT a.retained_at, a.artifact_id, a.run_id, runs.status, runs.scenario, a.step_exec_id, a.kind, a.path
-                FROM artifacts a
-                LEFT JOIN runs ON runs.run_id = a.run_id
-                """);
-             ResultSet rows = statement.executeQuery()) {
-            while (rows.next()) {
-                events.add(event(rows.getString(1), "artifact", rows.getString(2), rows.getString(3),
-                        rows.getString(4), rows.getString(5), rows.getString(6), rows.getString(7), "",
-                        "", "", "", "", "", "", rows.getString(8)));
-            }
-        }
+    private static Event event(ResultSet rows) throws SQLException {
+        return new Event(
+                text(rows.getString(1)), text(rows.getString(2)), text(rows.getString(3)), text(rows.getString(4)),
+                text(rows.getString(5)), text(rows.getString(6)), text(rows.getString(7)), text(rows.getString(8)),
+                text(rows.getString(9)), text(rows.getString(10)), text(rows.getString(11)), text(rows.getString(12)),
+                text(rows.getString(13)), text(rows.getString(14)), text(rows.getString(15)), text(rows.getString(16)));
     }
 
-    private static Event event(
-            String at, String kind, String id, String runId, String status, String scenarioKey, String stepExecId,
-            String stepText, String definitionId, String entityType, String entityId, String field, String operation,
-            String valueRef, String message, String path
-    ) {
-        return new Event(text(at), kind, text(id), text(runId), text(status), text(scenarioKey), text(stepExecId),
-                text(stepText), text(definitionId), text(entityType), text(entityId), text(field), text(operation),
-                text(valueRef), text(message), text(path));
-    }
-
-    private static String json(String command, List<Event> page, Filter filter, int total, boolean timeline) {
+    private static String json(String command, Page page, Filter filter, boolean timeline) {
         StringBuilder json = new StringBuilder();
         json.append("{\"command\":").append(quote(command));
-        json.append(",\"count\":").append(page.size());
-        json.append(",\"total\":").append(total);
+        json.append(",\"count\":").append(page.events().size());
+        json.append(",\"total\":").append(page.total());
         json.append(",\"limit\":").append(filter.limit());
-        json.append(",\"offset\":").append(filter.offset());
+        json.append(",\"offset\":").append(page.offset());
         if (timeline) {
-            String cursor = page.isEmpty() ? "" : page.get(page.size() - 1).at() + "\u001f"
-                    + page.get(page.size() - 1).kind() + "\u001f" + page.get(page.size() - 1).id();
+            String cursor = page.events().isEmpty() ? "" : mark(page.events().get(page.events().size() - 1));
+            String prev = page.events().isEmpty() ? "" : mark(page.events().get(0));
             json.append(",\"cursor\":").append(quote(cursor));
+            json.append(",\"prev\":").append(quote(prev));
         }
         json.append(timeline ? ",\"events\":[" : ",\"rows\":[");
-        for (int index = 0; index < page.size(); index++) {
+        for (int index = 0; index < page.events().size(); index++) {
             if (index > 0) json.append(',');
-            Event event = page.get(index);
+            Event event = page.events().get(index);
             json.append("{\"at\":").append(quote(event.at()));
             json.append(",\"kind\":").append(quote(event.kind()));
             json.append(",\"id\":").append(quote(event.id()));
@@ -286,6 +362,10 @@ public final class DaltonTrack {
         }
         json.append("]}");
         return json.toString();
+    }
+
+    private static String mark(Event event) {
+        return event.at() + "\u001f" + event.kind() + "\u001f" + event.id();
     }
 
     private static String text(List<Event> page) {
@@ -323,6 +403,27 @@ public final class DaltonTrack {
         return out.append('"').toString();
     }
 
+    private record Cursor(String at, int rank, String id) {
+    }
+
+    private static Cursor cursor(String raw, String flag) {
+        if (raw == null || raw.isBlank()) return null;
+        String[] parts = raw.split("\u001f", 3);
+        if (parts.length != 3) throw new IllegalArgumentException(flag + " is not a valid timeline cursor");
+        return new Cursor(parts[0], rank(parts[1]), parts[2]);
+    }
+
+    private static int rank(String kind) {
+        return switch (kind) {
+            case "run" -> 0;
+            case "step" -> 1;
+            case "usage" -> 2;
+            case "log" -> 3;
+            case "artifact" -> 4;
+            default -> 5;
+        };
+    }
+
     private static String entityType(String entity) {
         if (entity == null || entity.isBlank()) return null;
         int hash = entity.indexOf('#');
@@ -349,13 +450,28 @@ public final class DaltonTrack {
         }
     }
 
-    private static Instant parse(String raw) {
-        if (raw == null || raw.isBlank()) return null;
-        try {
-            return Instant.parse(raw.trim());
-        } catch (RuntimeException failure) {
-            return null;
+    private static String tagToken(String tag) {
+        String trimmed = tag.trim();
+        if (trimmed.startsWith("@")) return trimmed;
+        return "@" + trimmed;
+    }
+
+    private static String likeToken(String token) {
+        return "% " + escapeLike(token) + " %";
+    }
+
+    private static String like(String raw) {
+        return "%" + escapeLike(raw) + "%";
+    }
+
+    private static String escapeLike(String raw) {
+        StringBuilder out = new StringBuilder();
+        for (int index = 0; index < raw.length(); index++) {
+            char ch = raw.charAt(index);
+            if (ch == '\\' || ch == '%' || ch == '_') out.append('\\');
+            out.append(ch);
         }
+        return out.toString();
     }
 
     private static String text(String value) {

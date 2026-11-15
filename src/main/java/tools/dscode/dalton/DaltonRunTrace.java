@@ -14,15 +14,32 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 
 /**
- * Scenario and step lines for a warm {@code dalton run}. The worker prints
- * these after the exit code. A normal engine run is unchanged unless
- * {@code pkb_dalton_run_trace=true}.
+ * Records scenario and step executions when Dalton is on, and writes the warm
+ * {@code dalton run} outcome lines when {@code pkb_dalton_run_trace_file} is set.
+ * Dalton off does not register this listener. An explicit falsy {@code pkb_dalton_track}
+ * still writes nothing.
  */
 public final class DaltonRunTrace implements ConcurrentEventListener {
     public static final String ENABLED = "pkb_dalton_run_trace";
     public static final String FILE = "pkb_dalton_run_trace_file";
 
     public DaltonRunTrace() {
+    }
+
+    /** Appends this recorder to a cucumber plugin list when Dalton is on. Dalton off leaves the list unchanged. */
+    public static String withPlugin(String existing) {
+        try {
+            if (!DaltonConfig.enabled()) return existing;
+        } catch (RuntimeException failure) {
+            return existing;
+        }
+        String name = DaltonRunTrace.class.getName();
+        if (existing == null || existing.isBlank()) return name;
+        for (String part : existing.split(",")) {
+            String token = part.trim();
+            if (name.equals(token) || token.startsWith(name + ":")) return existing;
+        }
+        return existing + "," + name;
     }
 
     @Override

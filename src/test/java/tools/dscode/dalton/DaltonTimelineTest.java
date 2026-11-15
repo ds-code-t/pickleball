@@ -67,6 +67,35 @@ class DaltonTimelineTest {
     }
 
     @Test
+    void beforeAndLatestPageTheNewestEvents() throws Exception {
+        DaltonExecution.recordStep(project, new DaltonExecution.StepDraft(
+                "sample-run", "features/pay.feature|2", "Pay", null, null, 1,
+                "one", 3, "PASSED", "2020-01-01T00:00:00Z", "2020-01-01T00:00:01Z"));
+        DaltonExecution.recordStep(project, new DaltonExecution.StepDraft(
+                "sample-run", "features/pay.feature|2", "Pay", null, null, 2,
+                "two", 4, "PASSED", "2020-01-02T00:00:00Z", "2020-01-02T00:00:01Z"));
+        DaltonExecution.recordStep(project, new DaltonExecution.StepDraft(
+                "sample-run", "features/pay.feature|2", "Pay", null, null, 3,
+                "three", 5, "PASSED", "2020-01-03T00:00:00Z", "2020-01-03T00:00:01Z"));
+        Capture latest = run("dalton", "timeline", "--latest", "--limit=1", "--json", "--project=" + project);
+        assertEquals(0, latest.code, latest.err);
+        JsonNode latestJson = JSON.readTree(latest.out);
+        assertEquals(1, latestJson.path("count").asInt(), latest.out);
+        assertTrue(latestJson.path("offset").asInt() > 0, latest.out);
+        assertEquals("three", latestJson.path("events").get(0).path("stepText").asText(), latest.out);
+        assertFalse(latestJson.path("prev").asText().isBlank(), latest.out);
+        String cursor = JSON.readTree(run("dalton", "timeline", "--json", "--project=" + project).out).path("cursor").asText();
+        Capture before = run("dalton", "timeline", "--before=" + cursor, "--limit=1", "--json", "--project=" + project);
+        assertEquals(0, before.code, before.err);
+        JsonNode beforeEvents = JSON.readTree(before.out).path("events");
+        assertEquals(1, beforeEvents.size(), before.out);
+        assertEquals("two", beforeEvents.get(0).path("stepText").asText(), before.out);
+        Capture bad = run("dalton", "timeline", "--cursor=not-a-cursor", "--project=" + project);
+        assertEquals(1, bad.code, bad.out);
+        assertTrue(bad.err.contains("--cursor is not a valid timeline cursor"), bad.err);
+    }
+
+    @Test
     void retainDropsRowsAndKeepsTheReport() throws Exception {
         Path shot = project.resolve("reports/diagnostic-runs/sample/shot.png");
         Files.createDirectories(shot.getParent());

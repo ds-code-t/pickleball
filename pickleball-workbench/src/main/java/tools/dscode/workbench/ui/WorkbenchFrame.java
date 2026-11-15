@@ -1305,13 +1305,37 @@ final class WorkbenchFrame extends JFrame {
         if (runId != null && !runId.isBlank()) showDiagnosticRun(runId, 0);
     }
 
+    /** Status shown on Explorer when Tracking opens a run the catalog does not have. */
+    static String unmatchedDiagnosticRun(String runId) {
+        String id = runId == null ? "" : runId.trim();
+        return "No retained diagnostic run matches " + id;
+    }
+
     private void showDiagnosticRun(String runId, long eventSeq) {
         if (diagnosticView == null || diagnosticNavigator == null) return;
         DiagnosticEvidenceNavigator.CatalogRun selected = diagnosticNavigator.catalogRuns().stream()
                 .filter(run -> run.runId().equals(runId))
                 .findFirst()
                 .orElse(null);
-        if (selected == null) return;
+        if (selected == null) {
+            List<Map<String, Object>> known = new ArrayList<>();
+            for (var run : diagnosticNavigator.catalogRuns()) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("runId", run.runId());
+                row.put("label", run.displayLabel());
+                row.put("outcome", run.outcome());
+                row.put("inProgress", run.inProgress());
+                row.put("selected", false);
+                known.add(row);
+            }
+            diagnosticView.evalJsonCall("window.setDiagnosticState", WorkbenchWebJson.write(Map.of(
+                    "runs", known,
+                    "frames", List.of(),
+                    "layers", List.of(),
+                    "gap", unmatchedDiagnosticRun(runId)
+            )));
+            return;
+        }
         currentDiagnosticRunId = runId;
         lastExplorerEventSeq = Math.max(0, eventSeq);
         DiagnosticEvidenceNavigator.ReplayModel replay = diagnosticNavigator.replayModel(selected.runRoot());

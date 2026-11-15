@@ -12,6 +12,8 @@ import io.cucumber.plugin.event.TestCaseStarted;
 import io.cucumber.plugin.event.TestStep;
 import io.cucumber.plugin.event.TestStepFinished;
 import tools.dscode.common.reporting.logging.Level;
+import tools.dscode.dalton.DaltonConfig;
+import tools.dscode.dalton.DaltonRunTrace;
 import tools.dscode.engine.model.RunResult;
 import tools.dscode.engine.model.ScenarioResult;
 import tools.dscode.engine.model.Status;
@@ -44,9 +46,7 @@ public final class CucumberAdapterRun {
                     && !"tools.dscode.coredefinitions".equals(gluePackage)) {
                 options.addGlue(GluePath.parse(gluePackage));
             }
-            Runtime runtime = Runtime.builder()
-                    .withRuntimeOptions(options.build())
-                    .withAdditionalPlugins((EventListener) publisher -> {
+            EventListener recorder = publisher -> {
                         publisher.registerHandlerFor(TestCaseStarted.class, event -> {
                             PickleballRunner.LOG_LEVEL = Level.DEBUG;
                             if (previousFeatures[0] == null) previousFeatures[0] = PKB_props.features();
@@ -64,8 +64,12 @@ public final class CucumberAdapterRun {
                         });
                         publisher.registerHandlerFor(TestCaseFinished.class, event ->
                                 append("END\t" + event.getResult().getStatus().name()));
-                    })
-                    .build();
+                    };
+            io.cucumber.core.runtime.Runtime.Builder runtimeBuilder = Runtime.builder()
+                    .withRuntimeOptions(options.build());
+            if (DaltonConfig.enabled()) runtimeBuilder.withAdditionalPlugins(recorder, new DaltonRunTrace());
+            else runtimeBuilder.withAdditionalPlugins(recorder);
+            Runtime runtime = runtimeBuilder.build();
             // Block conditionals log at DEBUG. INFO drops their finish events.
             // TRACE also records Aviator trace lines that contain pkbLazy tokens,
             // which the lazy-boolean checks reject. DEBUG keeps the finish events

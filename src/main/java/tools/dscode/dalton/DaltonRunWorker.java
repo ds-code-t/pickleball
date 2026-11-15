@@ -66,25 +66,13 @@ public final class DaltonRunWorker {
             writer.println("END");
             return false;
         }
-        List<String> properties = new ArrayList<>();
+        List<String> incoming = new ArrayList<>();
         String line;
-        while ((line = reader.readLine()) != null && !".".equals(line)) properties.add(line);
+        while ((line = reader.readLine()) != null && !".".equals(line)) incoming.add(line);
         String project = reader.readLine();
         Path trace = outcomeFile;
-        if (trace != null) {
-            Files.deleteIfExists(trace);
-            properties.add("-D" + DaltonRunTrace.ENABLED + "=true");
-            properties.add("-D" + DaltonRunTrace.FILE + "=" + trace.toAbsolutePath().normalize());
-        }
-        if (properties.stream().noneMatch(item -> item.startsWith("-Dpkb_dalton_track="))) {
-            properties.add("-Dpkb_dalton_track=true");
-        }
-        if (properties.stream().noneMatch(item -> item.startsWith("-Dpkb_run_id="))) {
-            properties.add("-Dpkb_run_id=dalton-run");
-        }
-        if (project != null && properties.stream().noneMatch(item -> item.startsWith("-Dpkb_dalton_project="))) {
-            properties.add("-Dpkb_dalton_project=" + Path.of(project).toAbsolutePath().normalize());
-        }
+        if (trace != null) Files.deleteIfExists(trace);
+        List<String> properties = runProperties(incoming, trace, project);
         int exit = WorkbenchDirectRun.run(project == null ? Path.of("") : Path.of(project), properties);
         writer.println("EXIT " + exit);
         if (trace != null && Files.isRegularFile(trace)) {
@@ -94,5 +82,25 @@ public final class DaltonRunWorker {
         }
         writer.println("END");
         return false;
+    }
+
+    /** Properties for one RUN. A missing run id becomes a new diagnostic-shaped id. */
+    static List<String> runProperties(List<String> incoming, Path trace, String project) {
+        List<String> properties = new ArrayList<>();
+        if (incoming != null) properties.addAll(incoming);
+        if (trace != null) {
+            properties.add("-D" + DaltonRunTrace.ENABLED + "=true");
+            properties.add("-D" + DaltonRunTrace.FILE + "=" + trace.toAbsolutePath().normalize());
+        }
+        if (properties.stream().noneMatch(item -> item.startsWith("-Dpkb_dalton_track="))) {
+            properties.add("-Dpkb_dalton_track=true");
+        }
+        if (properties.stream().noneMatch(item -> item.startsWith("-Dpkb_run_id="))) {
+            properties.add("-Dpkb_run_id=" + DaltonExecution.newRunId());
+        }
+        if (project != null && properties.stream().noneMatch(item -> item.startsWith("-Dpkb_dalton_project="))) {
+            properties.add("-Dpkb_dalton_project=" + Path.of(project).toAbsolutePath().normalize());
+        }
+        return properties;
     }
 }

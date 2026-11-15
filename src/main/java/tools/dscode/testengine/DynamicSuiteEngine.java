@@ -32,6 +32,7 @@ import java.util.TreeMap;
 import static io.cucumber.core.options.Constants.FEATURES_PROPERTY_NAME;
 import static io.cucumber.core.options.Constants.FILTER_NAME_PROPERTY_NAME;
 import static io.cucumber.core.options.Constants.FILTER_TAGS_PROPERTY_NAME;
+import static io.cucumber.core.options.Constants.PLUGIN_PROPERTY_NAME;
 import static tools.dscode.common.reporting.logging.LogForwarder.logError;
 import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
 
@@ -129,7 +130,7 @@ public final class DynamicSuiteEngine implements TestEngine {
             MergedConfigurationParameters mergedParameters =
                     new MergedConfigurationParameters(
                             request.getConfigurationParameters(),
-                            overlayTopLevelFeatures(suite.values())
+                            trackingPlugins(overlayTopLevelFeatures(suite.values()))
                     );
 
             logTrace("[DynamicSuiteEngine] Final execution configuration parameters: "
@@ -155,6 +156,20 @@ public final class DynamicSuiteEngine implements TestEngine {
             e.printStackTrace(System.err);
             throw e;
         }
+    }
+
+    /** Cucumber runs record executions when Dalton is on. Dalton off does not add a plugin. */
+    private static Map<String, String> trackingPlugins(Map<String, String> overlay) {
+        LinkedHashMap<String, String> copy = new LinkedHashMap<>();
+        if (overlay != null) copy.putAll(overlay);
+        try {
+            if (!tools.dscode.dalton.DaltonConfig.enabled()) return copy;
+        } catch (RuntimeException failure) {
+            return copy;
+        }
+        if (tools.dscode.engine.EngineConfig.nativeSelected()) return copy;
+        copy.put(PLUGIN_PROPERTY_NAME, tools.dscode.dalton.DaltonRunTrace.withPlugin(copy.get(PLUGIN_PROPERTY_NAME)));
+        return copy;
     }
 
     /**

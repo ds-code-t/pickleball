@@ -2,6 +2,10 @@ package tools.dscode.dalton;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.dalton.usage.LookupProbe;
+import tools.dscode.engine.EngineOptions;
+import tools.dscode.engine.PickleballEngine;
+import tools.dscode.engine.model.Status;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -89,6 +93,43 @@ class DaltonEntityUsageTest {
     void unknownOperationIsRejected() {
         assertThrows(IllegalArgumentException.class, () ->
                 DaltonEntities.note(project, "step", "Account", "ada", "name", "delete", null));
+    }
+
+    @Test
+    void aRealStepRecordsTheLookup() throws Exception {
+        writeEntity();
+        String previous = System.getProperty("pkb_dalton");
+        String previousProject = System.getProperty("pkb_dalton_project");
+        String track = System.getProperty("pkb_dalton_track");
+        String run = System.getProperty("pkb_run_id");
+        try {
+            System.setProperty("pkb_dalton", "true");
+            System.setProperty("pkb_dalton_track", "true");
+            System.setProperty("pkb_dalton_project", project.toAbsolutePath().normalize().toString());
+            System.setProperty("pkb_run_id", "usage-live");
+            DaltonRunContext.clear();
+            var result = PickleballEngine.run("""
+                    Feature: Usage
+                      Scenario: Read the account
+                        * the account name is read
+                    """, EngineOptions.of(LookupProbe.class).project(project));
+            assertEquals(Status.PASSED, result.status(), result.message());
+            List<DaltonEntities.Usage> rows = DaltonEntities.usages(project);
+            assertTrue(rows.stream().anyMatch(row ->
+                    "Account".equals(row.type())
+                            && "ada".equals(row.id())
+                            && "name".equals(row.field())
+                            && "read".equals(row.operation())
+                            && "<entity:Account#ada.name>".equals(row.valueRef())), rows.toString());
+            assertTrue(rows.stream().noneMatch(row -> "Ada".equals(row.valueRef())));
+        } finally {
+            restore("pkb_dalton", previous);
+            restore("pkb_dalton_project", previousProject);
+            restore("pkb_dalton_track", track);
+            restore("pkb_run_id", run);
+            DaltonRunContext.clear();
+            DaltonExecution.finishScenario("PASSED");
+        }
     }
 
     private void writeEntity() throws Exception {

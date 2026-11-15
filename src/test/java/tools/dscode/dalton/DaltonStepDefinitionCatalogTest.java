@@ -3,6 +3,8 @@ package tools.dscode.dalton;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -59,5 +61,71 @@ class DaltonStepDefinitionCatalogTest {
         String expected = DaltonStepCatalog.definitionId("java", "a user {string}", "src/test/java/demo/Steps.java", 4);
         assertEquals(expected, rows.stream().filter(row -> "a user {string}".equals(row.pattern())).findFirst().orElseThrow().id());
         assertEquals(64, expected.length());
+    }
+
+    @Test
+    void lineMoveAndAutoHydrateKeepExecutionsAndStoreANewFeature() throws Exception {
+        Path java = project.resolve("src/test/java/demo/Steps.java");
+        Files.createDirectories(java.getParent());
+        Files.writeString(java, """
+                package demo;
+                public class Steps {
+                    @When("the total is {int}")
+                    public void total(int amount) {}
+                }
+                """, StandardCharsets.UTF_8);
+        DaltonHydrator.hydrate(project, DaltonHydrator.Options.full());
+        String step = DaltonExecution.recordStep(project, new DaltonExecution.StepDraft(
+                "sample-run", "features/pay.feature|2", "Pay", null, null, 1,
+                "the total is 10", 3, "PASSED", "2020-01-02T00:00:00Z", "2020-01-02T00:00:01Z"));
+        assertFalse(step.isBlank());
+        Files.writeString(java, """
+                package demo;
+                public class Steps {
+
+                    @When("the total is {int}")
+                    public void total(int amount) {}
+                }
+                """, StandardCharsets.UTF_8);
+        String previous = System.getProperty("pkb_dalton");
+        String previousProject = System.getProperty("pkb_dalton_project");
+        try {
+            System.setProperty("pkb_dalton", "true");
+            System.setProperty("pkb_dalton_project", project.toString());
+            DaltonRuntime.reset();
+            DaltonRuntime.beforeFeatureLoad();
+            String moved = DaltonStepCatalog.definitionId("java", "the total is {int}", "src/test/java/demo/Steps.java", 4);
+            try (DaltonDatabase database = DaltonDatabase.open(project);
+                 Statement statement = database.connection().createStatement();
+                 ResultSet rows = statement.executeQuery("""
+                         SELECT s.definition_id, d.removed, d.source_line
+                         FROM step_executions s
+                         JOIN step_definitions d ON d.definition_id = s.definition_id
+                         """)) {
+                assertTrue(rows.next(), "execution lost its definition");
+                assertEquals(moved, rows.getString(1));
+                assertEquals(0, rows.getInt(2));
+                assertEquals(4, rows.getInt(3));
+                assertFalse(rows.next());
+            }
+            Path feature = project.resolve("features/extra.feature");
+            Files.createDirectories(feature.getParent());
+            Files.writeString(feature, "Feature: Extra\n  Scenario: One\n    * ready\n", StandardCharsets.UTF_8);
+            DaltonRuntime.reset();
+            DaltonRuntime.beforeFeatureLoad();
+            try (DaltonDatabase database = DaltonDatabase.open(project);
+                 Statement statement = database.connection().createStatement();
+                 ResultSet rows = statement.executeQuery(
+                         "SELECT source_type FROM files WHERE path = 'features/extra.feature'")) {
+                assertTrue(rows.next(), "new feature was not stored");
+                assertEquals("feature", rows.getString(1));
+            }
+        } finally {
+            if (previous == null) System.clearProperty("pkb_dalton");
+            else System.setProperty("pkb_dalton", previous);
+            if (previousProject == null) System.clearProperty("pkb_dalton_project");
+            else System.setProperty("pkb_dalton_project", previousProject);
+            DaltonRuntime.reset();
+        }
     }
 }
