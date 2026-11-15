@@ -29,6 +29,7 @@ public final class DoltRun {
     public static final String CACHE = "classpath.cache";
     public static final String FINGERPRINT = "glue.fingerprint";
     public static final String WARM = "warm.txt";
+    static final String CLASSES_STAMP = "classes.stamp";
 
     private DoltRun() {
     }
@@ -93,15 +94,11 @@ public final class DoltRun {
             if (!updated.equals(plan.fingerprint())) stop(root);
             plan = new Plan(updated, false, true, plan.compileCommand());
         }
-        Path cache = state(root).resolve(CACHE);
-        if (!Files.isRegularFile(cache)) {
-            String built = writeClasspath(root);
-            if (built == null) {
-                return new Outcome(1, "",
-                        "error: Dolt run has no classpath cache\n"
-                                + "fix: run the project wrapper once so the Workbench classpath cache exists, or set pkb_dolt_run_classpath\n",
-                        false, elapsed(started), plan);
-            }
+        if (!refreshClasspath(root)) {
+            return new Outcome(1, "",
+                    "error: Dolt run has no classpath cache\n"
+                            + "fix: run the project wrapper once so the Workbench classpath cache exists, or set pkb_dolt_run_classpath\n",
+                    false, elapsed(started), plan);
         }
         boolean reused = workerAlive(root, Files.readString(state(root).resolve(FINGERPRINT)).trim());
         if (!reused) startWorker(root);
@@ -212,15 +209,74 @@ public final class DoltRun {
 
     static String writeClasspath(Path project) throws java.io.IOException {
         Path root = root(project);
+        String body = classpathBody(root);
+        if (body == null) return null;
+        Path file = state(root).resolve(CACHE);
+        Files.createDirectories(file.getParent());
+        Files.writeString(file, body, StandardCharsets.UTF_8);
+        return body;
+    }
+
+    /**
+     * Rewrites {@code classpath.cache} when the text or the classes directory
+     * changes, and stops the worker so the next start loads that classpath.
+     * A cache written by a caller is kept when this process cannot build one.
+     */
+    private static boolean refreshClasspath(Path root) throws java.io.IOException {
+        Path cache = state(root).resolve(CACHE);
+        Path stampFile = state(root).resolve(CLASSES_STAMP);
+        String stamp = classesStamp(classesDir(root));
+        String previousStamp = Files.isRegularFile(stampFile) ? Files.readString(stampFile).trim() : "";
+        boolean stampChanged = !stamp.equals(previousStamp);
+        String body = classpathBody(root);
+        if (body == null) {
+            if (!Files.isRegularFile(cache)) return false;
+            if (stampChanged) {
+                Files.writeString(stampFile, stamp + "\n", StandardCharsets.UTF_8);
+                stop(root);
+            }
+            return true;
+        }
+        String previous = Files.isRegularFile(cache) ? Files.readString(cache) : "";
+        if (!previous.equals(body) || stampChanged) {
+            Files.createDirectories(cache.getParent());
+            Files.writeString(cache, body, StandardCharsets.UTF_8);
+            Files.writeString(stampFile, stamp + "\n", StandardCharsets.UTF_8);
+            stop(root);
+        }
+        return true;
+    }
+
+    private static String classpathBody(Path root) throws java.io.IOException {
         List<String> runtime = classpathEntries(root, false);
         if (runtime.isEmpty()) return null;
         List<String> entries = classpathEntries(root, true);
-        Path file = state(root).resolve(CACHE);
-        Files.createDirectories(file.getParent());
         String joined = String.join(java.io.File.pathSeparator, entries);
         if (joined.indexOf(' ') >= 0) joined = "\"" + joined + "\"";
-        Files.writeString(file, joined + "\n", StandardCharsets.UTF_8);
-        return joined;
+        return joined + "\n";
+    }
+
+    private static String classesStamp(Path classes) throws java.io.IOException {
+        if (!Files.isDirectory(classes)) return "absent";
+        MessageDigest digest = sha256();
+        boolean any = false;
+        try (var walk = Files.walk(classes)) {
+            List<Path> files = walk.filter(Files::isRegularFile)
+                    .filter(file -> file.getFileName().toString().endsWith(".class"))
+                    .sorted()
+                    .toList();
+            for (Path file : files) {
+                any = true;
+                String key = classes.relativize(file).toString().replace('\\', '/');
+                digest.update(key.getBytes(StandardCharsets.UTF_8));
+                digest.update((byte) 0);
+                digest.update(Long.toString(Files.size(file)).getBytes(StandardCharsets.UTF_8));
+                digest.update((byte) 0);
+                digest.update(Long.toString(Files.getLastModifiedTime(file).toMillis()).getBytes(StandardCharsets.UTF_8));
+            }
+        }
+        if (!any) return "empty";
+        return HexFormat.of().formatHex(digest.digest());
     }
 
     public static List<String> compileCommand(Path project) {
