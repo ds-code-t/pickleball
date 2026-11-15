@@ -87,7 +87,7 @@ public final class DaltonCli {
                 Usage: dalton extract [--project=<dir>] [--path=<relative>] [--force]
                 Usage: dalton history list [--project=<dir>]
                 Usage: dalton history show <run-id> [--project=<dir>]
-                Usage: dalton history record <run-id> [--status=<text>] [--scenario=<name>] [--passed=N] [--failed=N] [--note=<text>] [--message=<text>] [--entity=<name>] [--started=<iso>] [--from=<run-index.json>] [--project=<dir>]
+                Usage: dalton history record <run-id> [--status=<text>] [--scenario=<name>] [--passed=N] [--failed=N] [--note=<text>] [--message=<text>] [--entity=<name>] [--started=<iso>] [--from=<run-index.json>] [--link=Type#id] [--project=<dir>]
                 Usage: dalton history retain [--days=N] [--max-bytes=N] [--project=<dir>]
                 Usage: dalton entity list [--project=<dir>]
                 Usage: dalton entity get <type> <id> [--project=<dir>]
@@ -119,7 +119,7 @@ public final class DaltonCli {
                 entity export writes a changed entity back to its file. It is extract limited to dalton-entities/. It refuses when the file and the database both changed. --force overwrites the file from the stored bytes.
                 entity use records a read, write, or mention on the active tracked step or on --step. value-ref is stored only when it is a reference such as <password:qaDb>, <entity:Type#id.field>, or ~MASK;. Any other text is stored as ~MASK;. A lookup during a tracked step records operation=read the same way and does not open a database when no step is active.
                 extract copies stored file bytes back to disk and does not reformat them. hydrate-out is the same command. An unedited row is left untouched. A deleted file is not recreated unless that row was edited or --force is set.
-                history stores a run summary in the database. It does not change diagnostic reports or pkb_reportretention. --from copies outcome and counts from a run-index.json file. retain drops runs older than --days and then the oldest runs until the note, scenario, and message bytes fit --max-bytes.
+                history stores a run summary in the database. It does not change diagnostic reports or pkb_reportretention. --from copies outcome and counts from a run-index.json file and links screenshot files under that directory. Those files are not deleted or rewritten. --link=Type#id writes log_entity_links for that log row. The message text is not scanned. retain drops runs older than --days and then the oldest runs until the note, scenario, and message bytes fit --max-bytes. Retaining a run does not delete the diagnostic report files.
                 sqlite-jdbc is a published runtime dependency (scope runtime, not shaded into the consumer shadow JAR). When Dalton is enabled and that driver is missing, status, hydrate, extract, and the auto-hydrate hook fail with: Dalton is enabled but org.xerial:sqlite-jdbc is not on the classpath. Add it as testRuntimeOnly / test scope or use the Gradle dalton* tasks. They do not fall back to the files. Gradle dalton* tasks put the driver on their own classpath.
                 feature put writes that .feature text into the database. It sets db_edited, leaves last_synced_hash, and replaces the stored scenarios, steps, tags, docstrings, and data tables in the same transaction. Bad Gherkin is rejected and the previous rows stay. The file is not changed until dalton extract. Use --file for multiline text. dalton scenario put and dalton step put are rejected. A database row whose content hash moved while db_edited is still 0 is an untracked DB edit. hydrate reports it and will not overwrite it unless --force is set.
                 category, file, glue, and feature scenario-add, scenario-modify, scenario-delete, step-add, step-modify, and step-delete are the shared edit model. --json prints one object with ok, command, family, action, dalton, path, id, dbEdited, conflict, confirmRequired, applied, items, text, message, error, and fix. remove and delete require --confirm and do not write without it. Validation runs before a write. A conflict or an untracked DB edit on that path is refused unless --force is set. When Dalton is off the command writes the file and does not open the database. When Dalton is on, put uses the same db_edited write as feature put. Set pkb_dalton_log=edit to log each edit. The log is date-stamped, per entity, and size-capped.
@@ -655,8 +655,13 @@ public final class DaltonCli {
                             integer(option(tokens, "--failed="), imported == null ? 0 : imported.failed()),
                             first(option(tokens, "--note="), imported == null ? "" : imported.note()),
                             first(option(tokens, "--entity="), imported == null ? "run" : imported.entity()),
-                            option(tokens, "--message=")));
+                            option(tokens, "--message=")),
+                            historyLinks(tokens));
                     out.println("run " + run.id() + " status " + run.status());
+                    if (from != null) {
+                        int artifacts = DaltonArtifacts.linkRetained(project, run.id(), from, null);
+                        out.println("artifacts " + artifacts);
+                    }
                     yield 0;
                 }
                 case "retain" -> {
@@ -679,6 +684,20 @@ public final class DaltonCli {
             err.println("fix: dalton history list");
             return 1;
         }
+    }
+
+    private static List<DaltonHistory.Link> historyLinks(List<String> tokens) {
+        List<DaltonHistory.Link> links = new ArrayList<>();
+        for (String token : tokens) {
+            if (!token.startsWith("--link=")) continue;
+            String body = token.substring("--link=".length()).trim();
+            int hash = body.indexOf('#');
+            if (hash <= 0 || hash >= body.length() - 1 || body.indexOf('#', hash + 1) >= 0) {
+                throw new IllegalArgumentException("history link must be Type#id");
+            }
+            links.add(new DaltonHistory.Link(body.substring(0, hash), body.substring(hash + 1)));
+        }
+        return links;
     }
 
     private static String historyId(List<String> tokens, DaltonHistory.Draft imported) {

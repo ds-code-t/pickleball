@@ -65,7 +65,17 @@ public final class DaltonHistory {
         }
     }
 
+    public record Link(String type, String id) {
+    }
+
+    public record LinkRow(long logId, String type, String id) {
+    }
+
     public static Run record(Path project, Draft draft) throws SQLException {
+        return record(project, draft, List.of());
+    }
+
+    public static Run record(Path project, Draft draft, List<Link> links) throws SQLException {
         DaltonSecrets.rejectAssignment(project, draft.note());
         DaltonSecrets.rejectAssignment(project, draft.message());
         String id = requireId(draft.id());
@@ -75,6 +85,9 @@ public final class DaltonHistory {
         String note = draft.note() == null ? "" : draft.note();
         String entity = blank(draft.entity()) ? "run" : draft.entity().trim();
         String finished = Instant.now().toString();
+        List<Link> structured = links == null ? List.of() : List.copyOf(links);
+        String message = draft.message();
+        if (blank(message) && !structured.isEmpty()) message = "linked";
         try (DaltonDatabase database = DaltonDatabase.open(project)) {
             Connection connection = database.connection();
             connection.setAutoCommit(false);
@@ -100,15 +113,21 @@ public final class DaltonHistory {
                     statement.setString(8, note);
                     statement.executeUpdate();
                 }
-                if (!blank(draft.message())) {
+                if (!blank(message)) {
                     try (PreparedStatement statement = connection.prepareStatement(
                             "INSERT INTO run_logs(run_id, logged_at, entity, message) VALUES (?, ?, ?, ?)")) {
                         statement.setString(1, id);
                         statement.setString(2, finished);
                         statement.setString(3, entity);
-                        statement.setString(4, draft.message());
+                        statement.setString(4, message);
                         statement.executeUpdate();
                     }
+                    long logId;
+                    try (PreparedStatement statement = connection.prepareStatement("SELECT last_insert_rowid()");
+                         ResultSet rows = statement.executeQuery()) {
+                        logId = rows.next() ? rows.getLong(1) : 0L;
+                    }
+                    insertLinks(connection, logId, structured);
                 }
                 connection.commit();
             } catch (SQLException | RuntimeException failure) {
@@ -119,8 +138,52 @@ public final class DaltonHistory {
             }
         }
         DaltonLog.log(project, "history", id, "record status=" + status);
+        for (Link link : structured) {
+            DaltonLog.log(project, "track", link.type() + "#" + link.id(), "log-link");
+        }
         return new Run(id, started, finished, status, scenario, draft.passed(), draft.failed(), note);
     }
+
+    public static List<LinkRow> links(Path project, String id) throws SQLException {
+        requireId(id);
+        if (!Files.isRegularFile(DaltonPaths.database(project))) return List.of();
+        try (DaltonDatabase database = DaltonDatabase.open(project);
+             PreparedStatement statement = database.connection().prepareStatement("""
+                     SELECT l.log_id, l.entity_type, l.entity_id
+                     FROM log_entity_links l
+                     JOIN run_logs r ON r.id = l.log_id
+                     WHERE r.run_id = ?
+                     ORDER BY l.log_id, l.entity_type, l.entity_id
+                     """)) {
+            statement.setString(1, id);
+            try (ResultSet rows = statement.executeQuery()) {
+                List<LinkRow> found = new ArrayList<>();
+                while (rows.next()) found.add(new LinkRow(rows.getLong(1), rows.getString(2), rows.getString(3)));
+                return found;
+            }
+        }
+    }
+
+    private static void insertLinks(Connection connection, long logId, List<Link> links) throws SQLException {
+        if (logId <= 0 || links.isEmpty()) return;
+        try (PreparedStatement statement = connection.prepareStatement("""
+                INSERT OR IGNORE INTO log_entity_links(log_id, entity_type, entity_id) VALUES (?, ?, ?)
+                """)) {
+            for (Link link : links) {
+                if (link == null || !TYPE.matcher(link.type() == null ? "" : link.type()).matches()
+                        || !ID.matcher(link.id() == null ? "" : link.id()).matches()) {
+                    throw new IllegalArgumentException("history link must be Type#id");
+                }
+                statement.setLong(1, logId);
+                statement.setString(2, link.type());
+                statement.setString(3, link.id());
+                statement.executeUpdate();
+            }
+        }
+    }
+
+    private static final Pattern TYPE = Pattern.compile("[A-Za-z][A-Za-z0-9_-]*");
+    private static final Pattern ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_-]*");
 
     public static Draft fromDiagnostic(Path project, String relative) throws IOException {
         String path = DaltonPaths.normalizeRelative(relative);
