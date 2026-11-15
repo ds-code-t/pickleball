@@ -45,5 +45,7 @@ class DoltGradleForwardTest {
         assertTrue(gradle.contains("args = ['dolt', 'sandbox']"));
         assertTrue(gradle.contains("args = ['dolt', 'migrate']"));
         assertTrue(gradle.contains("args = ['dolt', 'run-classpath', '--out=' + out.get().asFile.absolutePath]"));
+        assertTrue(gradle.contains("providers.gradleProperty('doltSandbox')"), gradle);
+        assertFalse(gradle.contains("hasProperty('doltSandbox')"), gradle);
     }
 }
