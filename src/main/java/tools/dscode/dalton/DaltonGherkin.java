@@ -244,6 +244,10 @@ public final class DaltonGherkin {
              PreparedStatement step = connection.prepareStatement("""
                 INSERT INTO steps(file_path, scenario_ord, ord, keyword, text, line, docstring, docstring_type, table_json)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """);
+             PreparedStatement examples = connection.prepareStatement("""
+                INSERT INTO example_blocks(file_path, scenario_ord, ord, line, tags)
+                VALUES (?, ?, ?, ?, ?)
                 """)) {
             for (Scenario one : document.scenarios()) {
                 scenario.setString(1, path);
@@ -265,6 +269,15 @@ public final class DaltonGherkin {
                     step.setString(8, oneStep.docstringType());
                     step.setString(9, oneStep.tableJson());
                     step.executeUpdate();
+                    String tags = examplesTags(oneStep.text());
+                    if ("Examples".equals(oneStep.keyword()) && !tags.isEmpty()) {
+                        examples.setString(1, path);
+                        examples.setInt(2, one.ord());
+                        examples.setInt(3, oneStep.ord());
+                        examples.setInt(4, oneStep.line());
+                        examples.setString(5, tags);
+                        examples.executeUpdate();
+                    }
                 }
             }
         }
@@ -288,6 +301,7 @@ public final class DaltonGherkin {
     private static void delete(Connection connection, String path) throws SQLException {
         for (String sql : List.of(
                 "DELETE FROM steps WHERE file_path = ?",
+                "DELETE FROM example_blocks WHERE file_path = ?",
                 "DELETE FROM scenarios WHERE file_path = ?",
                 "DELETE FROM feature_docs WHERE file_path = ?"
         )) {
@@ -296,6 +310,13 @@ public final class DaltonGherkin {
                 statement.executeUpdate();
             }
         }
+    }
+
+    static String examplesTags(String text) {
+        if (text == null || text.isBlank()) return "";
+        int breakAt = text.indexOf('\n');
+        String first = (breakAt < 0 ? text : text.substring(0, breakAt)).trim();
+        return isTags(first) ? first : "";
     }
 
     private static String examplesText(String tags, String name) {

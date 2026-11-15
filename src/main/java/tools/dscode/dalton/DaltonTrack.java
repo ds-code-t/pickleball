@@ -210,12 +210,20 @@ public final class DaltonTrack {
             values.add(pattern);
             sql.append(" OR EXISTS (SELECT 1 FROM feature_docs d WHERE instr(scenario_key, d.file_path || '|') = 1 AND (' ' || d.tags || ' ') LIKE ? ESCAPE '\\')");
             values.add(pattern);
+            sql.append(" OR EXISTS (SELECT 1 FROM example_blocks eb WHERE ");
+            sql.append(taggedExamples("scenario_key"));
+            sql.append(" AND (' ' || eb.tags || ' ') LIKE ? ESCAPE '\\')");
+            values.add(pattern);
             sql.append(" OR (kind = 'run' AND run_id IN (SELECT e.run_id FROM scenario_executions e JOIN scenarios sc ON ");
             sql.append(taggedScenario("e.scenario_key"));
             sql.append(" WHERE (' ' || sc.tags || ' ') LIKE ? ESCAPE '\\'))");
             values.add(pattern);
             sql.append(" OR (kind = 'run' AND run_id IN (SELECT e.run_id FROM scenario_executions e JOIN feature_docs d ON instr(e.scenario_key, d.file_path || '|') = 1");
             sql.append(" WHERE (' ' || d.tags || ' ') LIKE ? ESCAPE '\\'))");
+            values.add(pattern);
+            sql.append(" OR (kind = 'run' AND run_id IN (SELECT e.run_id FROM scenario_executions e JOIN example_blocks eb ON ");
+            sql.append(taggedExamples("e.scenario_key"));
+            sql.append(" WHERE (' ' || eb.tags || ' ') LIKE ? ESCAPE '\\'))");
             values.add(pattern);
             sql.append(")");
         }
@@ -257,12 +265,23 @@ public final class DaltonTrack {
     /**
      * A scenario tag matches that scenario's file and line. An outline example row
      * keeps the Examples line or the example-row line, which still falls before the next scenario.
+     * An Examples tag matches only that block, up to the next Examples line or the next scenario.
      */
     private static String taggedScenario(String key) {
         return "instr(" + key + ", sc.file_path || '|') = 1"
                 + " AND CAST(substr(" + key + ", length(sc.file_path) + 2) AS INTEGER) >= sc.line"
                 + " AND CAST(substr(" + key + ", length(sc.file_path) + 2) AS INTEGER) < COALESCE("
                 + "(SELECT MIN(nx.line) FROM scenarios nx WHERE nx.file_path = sc.file_path AND nx.line > sc.line), 2147483647)";
+    }
+
+    private static String taggedExamples(String key) {
+        return "instr(" + key + ", eb.file_path || '|') = 1"
+                + " AND CAST(substr(" + key + ", length(eb.file_path) + 2) AS INTEGER) >= eb.line"
+                + " AND CAST(substr(" + key + ", length(eb.file_path) + 2) AS INTEGER) < COALESCE("
+                + "(SELECT MIN(nx.line) FROM steps nx WHERE nx.file_path = eb.file_path"
+                + " AND nx.scenario_ord = eb.scenario_ord AND nx.keyword = 'Examples' AND nx.line > eb.line),"
+                + "(SELECT MIN(sc.line) FROM scenarios sc WHERE sc.file_path = eb.file_path AND sc.line > eb.line),"
+                + "2147483647)";
     }
 
     private static String touchedRuns(boolean id, boolean field) {

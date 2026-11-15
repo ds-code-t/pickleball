@@ -230,6 +230,32 @@ class DaltonQueryCliTest {
         assertTrue(tagged.toString().contains("features/pay.feature|" + ada), tagged.toString());
     }
 
+    @Test
+    void tagSelectsOnlyTheTaggedExamplesBlock() throws Exception {
+        Path feature = writeTaggedExamples();
+        assertEquals(0, run("dalton", "hydrate", "--project=" + project).code);
+        int examples = lineContaining(feature, "Examples:");
+        int ada = lineContaining(feature, "| Ada |");
+        int bob = lineContaining(feature, "| Bob |");
+        int refund = lineContaining(feature, "Scenario: Refund");
+        record("run-a", "features/pay.feature|" + examples, "Pay header", 1, "outline header", "2020-01-01T00:00:00Z");
+        record("run-a", "features/pay.feature|" + ada, "Pay Ada", 2, "ada row", "2020-01-01T00:00:02Z");
+        record("run-a", "features/pay.feature|" + bob, "Pay Bob", 3, "bob row", "2020-01-01T00:00:04Z");
+        record("run-a", "features/pay.feature|" + refund, "Refund", null, "refund step", "2020-01-01T00:00:06Z");
+
+        JsonNode tagged = JSON.readTree(run("dalton", "query", "--tag=@extag", "--json", "--project=" + project).out);
+        assertEquals(2, tagged.path("total").asInt(), tagged.toString());
+        assertTrue(tagged.toString().contains("features/pay.feature|" + examples), tagged.toString());
+        assertTrue(tagged.toString().contains("features/pay.feature|" + ada), tagged.toString());
+        assertFalse(tagged.toString().contains("features/pay.feature|" + bob), tagged.toString());
+        assertFalse(tagged.toString().contains("features/pay.feature|" + refund), tagged.toString());
+
+        JsonNode outline = JSON.readTree(run("dalton", "query", "--tag=@fast", "--json", "--project=" + project).out);
+        assertEquals(3, outline.path("total").asInt(), outline.toString());
+        assertTrue(outline.toString().contains("features/pay.feature|" + bob), outline.toString());
+        assertFalse(outline.toString().contains("features/pay.feature|" + refund), outline.toString());
+    }
+
     private Path writePaySiblings() throws Exception {
         Files.createDirectories(project.resolve("features"));
         Path feature = project.resolve("features/pay.feature");
@@ -255,6 +281,27 @@ class DaltonQueryCliTest {
                     Examples:
                       | who |
                       | Ada |
+                      | Bob |
+                  Scenario: Refund
+                    * the total is 0
+                """);
+        return feature;
+    }
+
+    private Path writeTaggedExamples() throws Exception {
+        Files.createDirectories(project.resolve("features"));
+        Path feature = project.resolve("features/pay.feature");
+        Files.writeString(feature, """
+                Feature: Pay
+                  @fast
+                  Scenario Outline: Pay <who>
+                    * the total is 10
+                    @extag
+                    Examples:
+                      | who |
+                      | Ada |
+                    Examples:
+                      | who |
                       | Bob |
                   Scenario: Refund
                     * the total is 0

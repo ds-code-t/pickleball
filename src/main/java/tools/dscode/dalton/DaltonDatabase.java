@@ -165,6 +165,16 @@ public final class DaltonDatabase implements AutoCloseable {
                     )
                     """);
             statement.execute("""
+                    CREATE TABLE IF NOT EXISTS example_blocks (
+                        file_path TEXT NOT NULL,
+                        scenario_ord INTEGER NOT NULL,
+                        ord INTEGER NOT NULL,
+                        line INTEGER NOT NULL,
+                        tags TEXT NOT NULL,
+                        PRIMARY KEY (file_path, scenario_ord, ord)
+                    )
+                    """);
+            statement.execute("""
                     CREATE TABLE IF NOT EXISTS entities (
                         entity_type TEXT NOT NULL,
                         entity_id TEXT NOT NULL,
@@ -288,6 +298,44 @@ public final class DaltonDatabase implements AutoCloseable {
                     + SCHEMA_VERSION + "') ON CONFLICT(key) DO UPDATE SET value = '" + SCHEMA_VERSION + "'");
             statement.execute("INSERT INTO provenance(id, schema_version) VALUES (1, " + SCHEMA_VERSION
                     + ") ON CONFLICT(id) DO UPDATE SET schema_version = " + SCHEMA_VERSION);
+        }
+        indexExistingExampleTags();
+    }
+
+    /** One-time read of Examples tags already stored on steps. Later hydrates write the rows themselves. */
+    private void indexExistingExampleTags() throws SQLException {
+        try (Statement statement = connection.createStatement();
+             ResultSet rows = statement.executeQuery(
+                     "SELECT value FROM schema_meta WHERE key = 'example_blocks'")) {
+            if (rows.next()) return;
+        }
+        java.util.List<String[]> found = new java.util.ArrayList<>();
+        try (Statement statement = connection.createStatement();
+             ResultSet rows = statement.executeQuery(
+                     "SELECT file_path, scenario_ord, ord, line, text FROM steps WHERE keyword = 'Examples'")) {
+            while (rows.next()) {
+                String tags = DaltonGherkin.examplesTags(rows.getString(5));
+                if (tags.isEmpty()) continue;
+                found.add(new String[] {
+                        rows.getString(1), rows.getString(2), rows.getString(3), rows.getString(4), tags
+                });
+            }
+        }
+        try (java.sql.PreparedStatement insert = connection.prepareStatement("""
+                INSERT OR IGNORE INTO example_blocks(file_path, scenario_ord, ord, line, tags)
+                VALUES (?, ?, ?, ?, ?)
+                """)) {
+            for (String[] row : found) {
+                insert.setString(1, row[0]);
+                insert.setInt(2, Integer.parseInt(row[1]));
+                insert.setInt(3, Integer.parseInt(row[2]));
+                insert.setInt(4, Integer.parseInt(row[3]));
+                insert.setString(5, row[4]);
+                insert.executeUpdate();
+            }
+        }
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("INSERT INTO schema_meta(key, value) VALUES ('example_blocks', '1')");
         }
     }
 
