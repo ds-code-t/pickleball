@@ -52,6 +52,23 @@ public final class DaltonBrowser {
         return List.of("entity", "get", type, id);
     }
 
+    public static List<String> timeline() {
+        return List.of("timeline", "--json");
+    }
+
+    public static List<String> query(String entity, String status) {
+        List<String> args = new ArrayList<>();
+        args.add("query");
+        if (entity != null && !entity.isBlank()) args.add("--entity=" + entity.trim());
+        if (status != null && !status.isBlank()) args.add("--status=" + status.trim());
+        args.add("--json");
+        return List.copyOf(args);
+    }
+
+    public static List<String> retain() {
+        return List.of("retain");
+    }
+
     public static List<String> history() {
         return List.of("history", "list");
     }

@@ -385,11 +385,11 @@ final class WorkbenchMcpTools {
                     return value == null ? Map.of("status", "UNAVAILABLE", "op", op) : value;
                 });
         add("dalton",
-                "Forward arguments to the pickleball dalton CLI. Does not implement Dalton inside Workbench.",
+                "Forward arguments to the pickleball dalton CLI, including query, timeline, and retain. Does not implement Dalton inside Workbench.",
                 schema(Map.of(
                         "args", Map.of(
                                 "type", "array",
-                                "description", "Arguments after dalton. Example: [\"status\"], [\"files\", \"list\", \"--json\"], [\"category\", \"list\", \"--json\"], [\"file\", \"put\", \"--path=configs/a.yaml\", \"--text=a: 1\"], [\"glue\", \"list\", \"--json\"], [\"feature\", \"scenario-add\", \"--feature=features/a.feature\", \"--name=One\"], [\"conflicts\"], or [\"run\", \"--dry-run\"].",
+                                "description", "Arguments after dalton. Example: [\"status\"], [\"query\", \"--entity=Account#ada\", \"--json\"], [\"timeline\", \"--json\"], [\"retain\", \"--days=30\"], [\"files\", \"list\", \"--json\"], [\"run\", \"--dry-run\"].",
                                 "items", Map.of("type", "string")
                         )
                 ), "args"),

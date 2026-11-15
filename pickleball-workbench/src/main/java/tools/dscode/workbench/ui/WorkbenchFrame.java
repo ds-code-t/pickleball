@@ -11,6 +11,7 @@ import tools.dscode.control.protocol.WindowDriver;
 import tools.dscode.control.protocol.ControlBridgeStepResolution;
 import tools.dscode.workbench.WorkbenchSessionActions;
 import tools.dscode.workbench.catalog.CatalogTargetResolver;
+import tools.dscode.workbench.dalton.DaltonCliForwarder;
 import tools.dscode.workbench.catalog.ConsumerFeatureCatalog;
 import tools.dscode.workbench.catalog.JavaGlueIndex;
 import tools.dscode.workbench.diagnostics.DiagnosticEvidenceNavigator;
@@ -586,6 +587,10 @@ final class WorkbenchFrame extends JFrame {
         rightTabs.addTab("Explorer", diagnosticsPanel());
         rightTabs.addTab("Report", reportPanel());
         rightTabs.addTab("Dalton", new DaltonPanel(() -> controller.projectRoot()));
+        rightTabs.addTab("Tracking", new TrackingPanel(
+                () -> controller.projectRoot(),
+                DaltonCliForwarder::run,
+                this::openRecordedRun));
         rightTabs.addTab("Editor", new EditPanel(() -> controller.projectRoot()));
         rightTabs.addTab("Logs", new LogPanel(() -> controller.projectRoot()));
         rightTabs.addTab("Chat", new AgentChatPanel(actions));
@@ -1289,6 +1294,15 @@ final class WorkbenchFrame extends JFrame {
 
     private void showDiagnosticRun(String runId) {
         showDiagnosticRun(runId, 0);
+    }
+
+    /** Selects Explorer and replays one retained run. Tracking does not build a second player. */
+    void openRecordedRun(String runId) {
+        if (rightTabs != null) {
+            int index = rightTabs.indexOfTab("Explorer");
+            if (index >= 0) rightTabs.setSelectedIndex(index);
+        }
+        if (runId != null && !runId.isBlank()) showDiagnosticRun(runId, 0);
     }
 
     private void showDiagnosticRun(String runId, long eventSeq) {
