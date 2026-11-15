@@ -33,6 +33,7 @@ public final class DoltRunWorker {
             return;
         }
         Path state = Path.of(args[0]);
+        DoltScope.current();
         Files.createDirectories(state);
         outcomeFile = state.resolve("run-outcomes.txt");
         String fingerprint = Files.readString(state.resolve(DoltRun.FINGERPRINT), StandardCharsets.UTF_8).trim();

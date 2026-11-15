@@ -38,6 +38,24 @@ public final class DoltPaths {
         return root(project).resolve(LOG_FILE);
     }
 
+    /** Per-sandbox home. {@code main} is {@code .pickleball/dolt/sandboxes/main}. */
+    public static Path sandboxHome(Path project, String name) {
+        String box = name == null || name.isBlank() ? "main" : name;
+        return root(project).resolve("sandboxes").resolve(box);
+    }
+
+    public static Path worker(Path project, String name) {
+        return sandboxHome(project, name).resolve("worker");
+    }
+
+    public static Path classes(Path project, String name) {
+        return sandboxHome(project, name).resolve("classes");
+    }
+
+    public static Path glueSources(Path project, String name) {
+        return sandboxHome(project, name).resolve("src");
+    }
+
     public static String display(Path project, Path file) {
         Path root = project.toAbsolutePath().normalize();
         Path absolute = file.toAbsolutePath().normalize();

@@ -55,7 +55,7 @@ public final class DoltLog {
     }
 
     public static void log(Path project, String capability, String entity, String message) {
-        log(project, capability, entity, "main", message);
+        log(project, capability, entity, DoltScope.label(DoltScope.current()), message);
     }
 
     public static void log(Path project, String capability, String entity, String sandbox, String message) {

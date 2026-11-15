@@ -86,6 +86,9 @@ def compare(project: Path, tags: str | None, name: str | None, glue: str | None,
     cache = project / ".pickleball" / "dolt" / "classpath.cache"
     cache.parent.mkdir(parents=True, exist_ok=True)
     cache.write_text(text + "\n", encoding="utf-8")
+    worker_cache = project / ".pickleball" / "dolt" / "sandboxes" / "main" / "worker" / "classpath.cache"
+    worker_cache.parent.mkdir(parents=True, exist_ok=True)
+    worker_cache.write_text(text + "\n", encoding="utf-8")
     cold_code, cold_ms, cold_out, cold_err = timed(cold, project)
     warm = [
         java_bin(),
@@ -128,7 +131,7 @@ def compare(project: Path, tags: str | None, name: str | None, glue: str | None,
         failed = True
     if second_reused is not True:
         print("error: the second warm run did not reuse the worker", file=sys.stderr)
-        print("fix: seed .pickleball/dolt/glue.fingerprint so the run does not restart", file=sys.stderr)
+        print("fix: seed .pickleball/dolt/sandboxes/main/worker/glue.fingerprint so the run does not restart", file=sys.stderr)
         failed = True
     if failed:
         print(tail("cold stdout", cold_out), file=sys.stderr)

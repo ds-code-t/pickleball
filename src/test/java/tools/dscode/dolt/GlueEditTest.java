@@ -74,7 +74,7 @@ class GlueEditTest {
         Files.writeString(wrapper, "#!/bin/sh\nif [ -f fail.marker ]; then exit 1; fi\nexit 0\n");
         wrapper.toFile().setExecutable(true);
         Files.writeString(project.resolve("fail.marker"), "1\n");
-        Path state = project.resolve(".pickleball/dolt");
+        Path state = project.resolve(".pickleball/dolt/sandboxes/main/worker");
         Files.createDirectories(state);
         Files.writeString(state.resolve("glue.fingerprint"), "old\n");
         Files.writeString(state.resolve("warm.txt"), "999999\n1\nold\n");
@@ -117,7 +117,7 @@ class GlueEditTest {
         String items = JSON.readTree(listed.out).get("items").toString();
         assertTrue(items.contains("glue/js/steps.js"), items);
         assertTrue(items.contains("glue/js/steps.ts"), items);
-        assertFalse(Files.exists(project.resolve(".pickleball/dolt/glue.fingerprint")));
+        assertFalse(Files.exists(project.resolve(".pickleball/dolt/sandboxes/main/worker/glue.fingerprint")));
     }
 
     @Test

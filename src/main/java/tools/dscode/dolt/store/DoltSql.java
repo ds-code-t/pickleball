@@ -36,7 +36,7 @@ public final class DoltSql {
                     && ("prepareStatement".equals(method.getName()) || "prepareCall".equals(method.getName())
                     || "nativeSQL".equals(method.getName()))) {
                 args = args.clone();
-                args[0] = translate(sql);
+                args[0] = rewrite(sql, session.binding());
                 if ("prepareStatement".equals(method.getName()) && method.getParameterCount() == 1
                         && startsWith(args[0].toString(), "insert")) {
                     return delegate.prepareStatement(args[0].toString(), Statement.RETURN_GENERATED_KEYS);
@@ -44,7 +44,7 @@ public final class DoltSql {
             }
             Object value = invoke(delegate, method, args);
             if (value instanceof Statement statement && "createStatement".equals(method.getName())) {
-                return wrapStatement(statement);
+                return wrapStatement(statement, session.binding());
             }
             return value;
         };
@@ -53,6 +53,27 @@ public final class DoltSql {
     }
 
     public static String translate(String sql) {
+        return rewrite(sql, null);
+    }
+
+    /** SQLite text becomes Dolt text. Run-state tables on a sandbox session are qualified onto main. */
+    public static String rewrite(String sql, Binding binding) {
+        String translated = translateBody(sql);
+        if (binding == null || binding.primary()) return translated;
+        return qualifyRunState(translated);
+    }
+
+    private static String qualifyRunState(String sql) {
+        String current = sql;
+        for (String table : DoltDialect.RUN_STATE_TABLES) {
+            current = current.replaceAll(
+                    "(?i)(?<![\\w.`])`?" + table + "`?(?![\\w])",
+                    "pickleball." + table);
+        }
+        return current;
+    }
+
+    public static String translateBody(String sql) {
         if (sql == null) return null;
         String trimmed = sql.strip();
         String head = trimmed.toLowerCase(Locale.ROOT);
@@ -293,11 +314,11 @@ public final class DoltSql {
         return out.substring(index + 1, end).toLowerCase(Locale.ROOT);
     }
 
-    private static Statement wrapStatement(Statement delegate) {
+    private static Statement wrapStatement(Statement delegate, Binding binding) {
         InvocationHandler handler = (proxy, method, args) -> {
             if (args != null && args.length > 0 && args[0] instanceof String sql && sqlMethod(method.getName())) {
                 args = args.clone();
-                args[0] = translate(sql);
+                args[0] = rewrite(sql, binding);
             }
             return invoke(delegate, method, args);
         };

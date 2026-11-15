@@ -1,5 +1,6 @@
 package tools.dscode.engine;
 
+import tools.dscode.dolt.DoltScope;
 import tools.dscode.engine.context.ExecutionContext;
 import tools.dscode.engine.model.EngineScenario;
 import tools.dscode.engine.model.RunResult;
@@ -68,7 +69,7 @@ public final class EngineCli {
     public static String help() {
         return """
                 Usage: engine help
-                Usage: engine run [--project=<dir>] [--text=<gherkin>] [--file=<path>] [--steps=<line>] [--glue=<class>] [--name=<scenario>] [--dolt] [--feature=<path>]
+                Usage: engine run [--project=<dir>] [--text=<gherkin>] [--file=<path>] [--steps=<line>] [--glue=<class>] [--name=<scenario>] [--dolt] [--sandbox=<name>] [--feature=<path>]
                 Usage: engine step --text=<step> [--argument=<text>] [--glue=<class>] [--project=<dir>]
                 The engine runs steps without Cucumber. --text and --steps do not read a feature file.
                 --dolt reads feature bytes from the Dolt store at .pickleball/dolt/data. --glue is a glue class name.
@@ -79,6 +80,7 @@ public final class EngineCli {
     }
 
     private static int run(List<String> tokens, PrintStream out, PrintStream err) throws Exception {
+        DoltScope.bindCommand(tokens);
         Path project = project(tokens);
         EngineOptions options = options(tokens, project);
         ScenarioSource source = source(tokens, project);
@@ -100,6 +102,7 @@ public final class EngineCli {
             return 2;
         }
         Path project = project(tokens);
+        DoltScope.bindCommand(tokens);
         try (ExecutionContext context = ExecutionContext.open(EngineScenario.of("step", List.of()))) {
             context.resource("glue", options(tokens, project).glue());
             StepResult result = PickleballEngine.runStep(text, value(tokens, "--argument"), context);

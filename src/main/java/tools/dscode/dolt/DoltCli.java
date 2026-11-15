@@ -48,6 +48,12 @@ public final class DoltCli {
             return 1;
         }
         try {
+            DoltScope.bindCommand(tokens);
+        } catch (RuntimeException failure) {
+            printFailure(stderr, failure.getMessage(), "dolt help");
+            return 1;
+        }
+        try {
             return switch (command) {
                 case "help", "--help", "-h" -> {
                     stdout.print(help());
@@ -56,6 +62,7 @@ public final class DoltCli {
                 case "install" -> tools.dscode.dolt.install.DoltInstaller.cli(tokens, stdout, stderr);
                 case "server" -> tools.dscode.dolt.server.DoltServer.cli(tokens, stdout, stderr);
                 case "migrate" -> DoltMigrate.cli(tokens, stdout, stderr);
+                case "sandbox" -> DoltSandbox.execute(project, tokens, stdout, stderr);
                 case "status" -> status(project, json(tokens), stdout);
                 case "hydrate" -> hydrate(project, tokens, stdout, stderr);
                 case "extract", "hydrate-out" -> extract(project, tokens, stdout, stderr);
@@ -68,7 +75,11 @@ public final class DoltCli {
                     }
                     yield feature(project, tokens, stdout, stderr);
                 }
-                case "category", "file", "glue" -> DoltEdit.execute(project, tokens, stdout, stderr);
+                case "category", "file" -> DoltEdit.execute(project, tokens, stdout, stderr);
+                case "glue" -> {
+                    if (tokens.size() > 1 && "compile".equals(tokens.get(1))) yield DoltGlueCompiler.cli(project, stdout, stderr);
+                    yield DoltEdit.execute(project, tokens, stdout, stderr);
+                }
                 case "files" -> files(project, tokens, json(tokens), stdout, stderr);
                 case "features" -> features(project, tokens, json(tokens), stdout, stderr);
                 case "scenario", "scenarios" -> scenarios(project, tokens, json(tokens), stdout, stderr);
@@ -96,6 +107,13 @@ public final class DoltCli {
                 Usage: dolt install [--check] [--force] [--dir=<path>] [--project=<dir>]
                 Usage: dolt server start|stop|status [--json] [--project=<dir>]
                 Usage: dolt migrate [--dry-run] [--remove-legacy] [--project=<dir>]
+                Usage: dolt sandbox create <name> [--from=<commit>] [--owner=<id>] [--ttl=<duration>] [--project=<dir>]
+                Usage: dolt sandbox list [--json] [--project=<dir>]
+                Usage: dolt sandbox use <name> [--project=<dir>]
+                Usage: dolt sandbox diff <name> [--table=<t>] [--json] [--project=<dir>]
+                Usage: dolt sandbox extract <name> --to=<dir> [--into-project] [--project=<dir>]
+                Usage: dolt sandbox drop <name> [--force] [--project=<dir>]
+                Usage: dolt sandbox prune [--older-than=<duration>] [--owner=<id>] [--dry-run] [--with-history] [--project=<dir>]
                 Usage: dolt status [--project=<dir>] [--json]
                 Usage: dolt hydrate [--project=<dir>] [--path=<relative>] [--force] [--dry-run]
                 Usage: dolt extract [--project=<dir>] [--path=<relative>] [--force]
@@ -113,7 +131,7 @@ public final class DoltCli {
                 Usage: dolt feature scenario-add|scenario-modify|scenario-delete|step-add|step-modify|step-delete --feature=<relative-path> [--name=<text>] [--scenario=<ord-or-name>] [--step=<ord>] [--keyword=<Given|When|Then|And|But|*>] [--text=<text>] [--file=<path>] [--confirm] [--force] [--json] [--project=<dir>]
                 Usage: dolt category list|show|put|remove [--id=<name>] [--text=<yaml>] [--file=<path>] [--confirm] [--force] [--json] [--project=<dir>]
                 Usage: dolt file put|delete|show --path=<relative> [--text=<text>] [--file=<path>] [--confirm] [--force] [--json] [--project=<dir>]
-                Usage: dolt glue list|show|put|remove [--path=<relative.java-or-glue/js>] [--text=<source>] [--file=<path>] [--confirm] [--force] [--json] [--project=<dir>]
+                Usage: dolt glue list|show|put|remove|compile [--path=<relative.java-or-glue/js>] [--text=<source>] [--file=<path>] [--confirm] [--force] [--json] [--sandbox=<name>] [--project=<dir>]
                 Usage: dolt files list [--project=<dir>] [--json]
                 Usage: dolt files show <relative-path> [--project=<dir>] [--json]
                 Usage: dolt features list [--project=<dir>] [--json]
@@ -124,7 +142,7 @@ public final class DoltCli {
                 Usage: dolt query [--entity=Type#id] [--field=<name>] [--step-def=<definition-id>] [--scenario=<key>] [--status=<status>] [--from=<iso>] [--to=<iso>] [--tag=<tag>] [--feature=<path>] [--run=<run-id>] [--text=<log text>] [--limit=N] [--offset=N] [--json] [--project=<dir>]
                 Usage: dolt timeline [--from=<iso>] [--to=<iso>] [--entity=Type#id] [--tag=<tag>] [--feature=<path>] [--run=<run-id>] [--text=<log text>] [--cursor=<cursor>] [--before=<cursor>] [--latest] [--limit=N] [--offset=N] [--json] [--project=<dir>]
                 Usage: dolt retain [--days=N] [--max-bytes=N] [--project=<dir>]
-                Usage: dolt run [--project=<dir>] [--dry-run] [--tags=<expr>] [--name=<text>] [--glue=<packages>] [--engine]
+                Usage: dolt run [--project=<dir>] [--dry-run] [--tags=<expr>] [--name=<text>] [--glue=<packages>] [--sandbox=<name>] [--engine]
                 Files stay the source of truth. The working copy is .pickleball/dolt/data and is gitignored.
                 status and hydrate --dry-run do not create a database when it is missing.
                 hydrate copies features, configs, calls, components, resource maps, templates, and dolt-entities/*.entity files.
@@ -920,6 +938,21 @@ public final class DoltCli {
              var rows = statement.executeQuery(sql)) {
             return rows.next() ? rows.getInt(1) : 0;
         }
+    }
+
+    private static void printFailure(PrintStream err, String message, String fix) {
+        String text = message == null || message.isBlank() ? "Dolt command failed" : message;
+        String error = text;
+        String hint = fix;
+        int split = text.indexOf('\n');
+        if (split >= 0) {
+            error = text.substring(0, split);
+            String rest = text.substring(split + 1).trim();
+            if (rest.startsWith("fix:")) hint = rest.substring(4).trim();
+        }
+        if (error.startsWith("error:")) error = error.substring(6).trim();
+        err.println("error: " + error);
+        err.println("fix: " + hint);
     }
 
     private static Path project(List<String> tokens) {

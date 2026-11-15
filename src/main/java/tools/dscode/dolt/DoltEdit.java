@@ -255,6 +255,9 @@ public final class DoltEdit {
         if (!tokens.contains("--confirm")) {
             throw new IllegalArgumentException("confirmation required");
         }
+        if (relative.endsWith(".java") && isGluePath(relative) && DoltConfig.enabled(project)) {
+            throw new IllegalArgumentException(DoltGlueCompiler.DELETE_REFUSED);
+        }
         CategoryRules.beforeDelete(relative);
         refuseConflict(project, relative, tokens.contains("--force"));
         boolean removed;

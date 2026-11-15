@@ -577,6 +577,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/dolt/DoltFiles.java`
 - `src/main/java/tools/dscode/dolt/DoltGherkin.java`
 - `src/main/java/tools/dscode/dolt/DoltGit.java`
+- `src/main/java/tools/dscode/dolt/DoltGlueCompiler.java`
 - `src/main/java/tools/dscode/dolt/DoltHashes.java`
 - `src/main/java/tools/dscode/dolt/DoltHistory.java`
 - `src/main/java/tools/dscode/dolt/DoltHydrator.java`
@@ -588,6 +589,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/dolt/DoltRunContext.java`
 - `src/main/java/tools/dscode/dolt/DoltRuntime.java`
 - `src/main/java/tools/dscode/dolt/DoltRunWorker.java`
+- `src/main/java/tools/dscode/dolt/DoltSandbox.java`
+- `src/main/java/tools/dscode/dolt/DoltScope.java`
 - `src/main/java/tools/dscode/dolt/DoltSecrets.java`
 - `src/main/java/tools/dscode/dolt/DoltSources.java`
 - `src/main/java/tools/dscode/dolt/DoltStepCatalog.java`
@@ -859,6 +862,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/dolt/DoltFoundationTest.java`
 - `src/test/java/tools/dscode/dolt/DoltFreshCloneTest.java`
 - `src/test/java/tools/dscode/dolt/DoltGitInfoTest.java`
+- `src/test/java/tools/dscode/dolt/DoltGlueCompileTest.java`
+- `src/test/java/tools/dscode/dolt/DoltGlueGapTest.java`
 - `src/test/java/tools/dscode/dolt/DoltHistoryTest.java`
 - `src/test/java/tools/dscode/dolt/DoltHydrateCommitTest.java`
 - `src/test/java/tools/dscode/dolt/DoltHydrateTest.java`
@@ -871,6 +876,11 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/dolt/DoltQueryTest.java`
 - `src/test/java/tools/dscode/dolt/DoltRunProbe.java`
 - `src/test/java/tools/dscode/dolt/DoltRunTest.java`
+- `src/test/java/tools/dscode/dolt/DoltSandboxBindingTest.java`
+- `src/test/java/tools/dscode/dolt/DoltSandboxCliTest.java`
+- `src/test/java/tools/dscode/dolt/DoltSandboxIsolationTest.java`
+- `src/test/java/tools/dscode/dolt/DoltSandboxPruneTest.java`
+- `src/test/java/tools/dscode/dolt/DoltSandboxWorkerTest.java`
 - `src/test/java/tools/dscode/dolt/DoltScenarioHarness.java`
 - `src/test/java/tools/dscode/dolt/DoltSchemaUpgradeTest.java`
 - `src/test/java/tools/dscode/dolt/DoltSecretsTest.java`

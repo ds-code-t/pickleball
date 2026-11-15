@@ -46,6 +46,27 @@ public final class DoltConnections {
         return false;
     }
 
+    public static boolean branchInUse(java.nio.file.Path project, String branch) {
+        String key = project.toAbsolutePath().normalize() + "|" + branch;
+        Pool pool = POOLS.get(key);
+        if (pool == null) return false;
+        synchronized (pool) {
+            return pool.open > pool.idle.size();
+        }
+    }
+
+    public static void closeBranch(java.nio.file.Path project, String branch) {
+        String key = project.toAbsolutePath().normalize() + "|" + branch;
+        Pool pool = POOLS.remove(key);
+        if (pool == null) return;
+        synchronized (pool) {
+            int borrowed = pool.open - pool.idle.size();
+            Held held;
+            while ((held = pool.idle.pollFirst()) != null) closeQuiet(held.connection);
+            pool.open = Math.max(0, borrowed);
+        }
+    }
+
     public static void closeProject(java.nio.file.Path project) {
         String prefix = project.toAbsolutePath().normalize() + "|";
         java.util.List<String> keys = new java.util.ArrayList<>();

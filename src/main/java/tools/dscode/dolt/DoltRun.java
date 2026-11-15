@@ -49,8 +49,8 @@ public final class DoltRun {
     public static Plan plan(Path project) throws java.io.IOException {
         Path root = root(project);
         String fingerprint = glueFingerprint(root);
-        String saved = readIfExists(root.resolve(".pickleball").resolve("dolt").resolve(FINGERPRINT));
-        boolean compile = saved == null || !saved.equals(fingerprint);
+        String saved = readIfExists(state(root).resolve(FINGERPRINT));
+        boolean compile = saved == null || !diskPart(saved).equals(diskPart(fingerprint));
         boolean alive = workerAlive(root, fingerprint);
         return new Plan(fingerprint, compile, compile || !alive, compileCommand(root));
     }
@@ -79,6 +79,19 @@ public final class DoltRun {
         } else {
             Files.createDirectories(state(root));
             Files.writeString(state(root).resolve(FINGERPRINT), plan.fingerprint(), StandardCharsets.UTF_8);
+        }
+        if (dbPart(plan.fingerprint()).length() > 0 && (plan.restart() || !Files.isDirectory(classesDir(root)))) {
+            try {
+                DoltGlueCompiler.compile(root);
+            } catch (IllegalStateException failure) {
+                return new Outcome(1, "", failure.getMessage() + "\n", false, elapsed(started), plan);
+            } catch (Exception failure) {
+                return new Outcome(1, "", "error: glue compile failed\nfix: dolt glue compile\n", false, elapsed(started), plan);
+            }
+            String updated = glueFingerprint(root);
+            Files.writeString(state(root).resolve(FINGERPRINT), updated, StandardCharsets.UTF_8);
+            if (!updated.equals(plan.fingerprint())) stop(root);
+            plan = new Plan(updated, false, true, plan.compileCommand());
         }
         Path cache = state(root).resolve(CACHE);
         if (!Files.isRegularFile(cache)) {
@@ -126,6 +139,13 @@ public final class DoltRun {
 
     public static String glueFingerprint(Path project) throws java.io.IOException {
         Path root = root(project);
+        String disk = diskFingerprint(root);
+        String database = dbFingerprint(root);
+        if (database.isEmpty()) return disk;
+        return disk + "+" + database;
+    }
+
+    private static String diskFingerprint(Path root) throws java.io.IOException {
         MessageDigest digest = sha256();
         stamp(digest, root, List.of("src/main/java", "src/test/java"), ".java");
         stamp(digest, root, List.of(
@@ -135,6 +155,72 @@ public final class DoltRun {
                 "build/classes/java/test"
         ), ".class");
         return HexFormat.of().formatHex(digest.digest());
+    }
+
+    private static String dbFingerprint(Path root) {
+        if (!DoltPaths.ready(root)) return "";
+        try (DoltDatabase database = DoltDatabase.open(root);
+             var statement = database.connection().createStatement();
+             var rows = statement.executeQuery(
+                     "SELECT path, content_hash FROM files WHERE db_edited = 1 AND path LIKE '%.java' ORDER BY path")) {
+            MessageDigest digest = sha256();
+            boolean any = false;
+            while (rows.next()) {
+                any = true;
+                digest.update(rows.getString(1).getBytes(StandardCharsets.UTF_8));
+                digest.update((byte) 0);
+                String hash = rows.getString(2);
+                digest.update((hash == null ? "" : hash).getBytes(StandardCharsets.UTF_8));
+                digest.update((byte) 1);
+            }
+            return any ? HexFormat.of().formatHex(digest.digest()) : "";
+        } catch (Exception failure) {
+            return "";
+        }
+    }
+
+    public static Path workerDirectory(Path project) {
+        return state(root(project));
+    }
+
+    static List<String> classpathEntries(Path project, boolean prependClasses) throws java.io.IOException {
+        Path root = root(project);
+        List<String> entries = new ArrayList<>();
+        String override = System.getProperty("pkb_dolt_run_classpath");
+        if (override != null && !override.isBlank()) {
+            for (String part : override.split(java.io.File.pathSeparator)) {
+                if (!part.isBlank()) entries.add(part);
+            }
+        }
+        if (entries.isEmpty()) {
+            Path workbench = tools.dscode.control.protocol.PickleballLocalLayout.workbenchStateRoot(root).resolve(CACHE);
+            if (Files.isRegularFile(workbench)) {
+                String text = Files.readString(workbench, StandardCharsets.UTF_8).trim();
+                if (text.startsWith("\"") && text.endsWith("\"") && text.length() >= 2) {
+                    text = text.substring(1, text.length() - 1);
+                }
+                for (String part : text.split(java.io.File.pathSeparator)) {
+                    if (!part.isBlank()) entries.add(part);
+                }
+            }
+        }
+        if (prependClasses && Files.isDirectory(classesDir(root))) {
+            entries.add(0, classesDir(root).toAbsolutePath().normalize().toString());
+        }
+        return entries;
+    }
+
+    static String writeClasspath(Path project) throws java.io.IOException {
+        Path root = root(project);
+        List<String> runtime = classpathEntries(root, false);
+        if (runtime.isEmpty()) return null;
+        List<String> entries = classpathEntries(root, true);
+        Path file = state(root).resolve(CACHE);
+        Files.createDirectories(file.getParent());
+        String joined = String.join(java.io.File.pathSeparator, entries);
+        if (joined.indexOf(' ') >= 0) joined = "\"" + joined + "\"";
+        Files.writeString(file, joined + "\n", StandardCharsets.UTF_8);
+        return joined;
     }
 
     public static List<String> compileCommand(Path project) {
@@ -182,43 +268,19 @@ public final class DoltRun {
         return List.copyOf(properties);
     }
 
-    static String writeClasspath(Path project) throws java.io.IOException {
-        Path root = root(project);
-        String override = System.getProperty("pkb_dolt_run_classpath");
-        List<String> entries = new ArrayList<>();
-        if (override != null && !override.isBlank()) {
-            for (String part : override.split(java.io.File.pathSeparator)) {
-                if (!part.isBlank()) entries.add(part);
-            }
-        }
-        Path workbench = tools.dscode.control.protocol.PickleballLocalLayout.workbenchStateRoot(root).resolve(CACHE);
-        if (entries.isEmpty() && Files.isRegularFile(workbench)) {
-            String text = Files.readString(workbench, StandardCharsets.UTF_8).trim();
-            if (text.startsWith("\"") && text.endsWith("\"") && text.length() >= 2) text = text.substring(1, text.length() - 1);
-            for (String part : text.split(java.io.File.pathSeparator)) {
-                if (!part.isBlank()) entries.add(part);
-            }
-        }
-        if (entries.isEmpty()) return null;
-        Path file = state(root).resolve(CACHE);
-        Files.createDirectories(file.getParent());
-        String joined = String.join(java.io.File.pathSeparator, entries);
-        if (joined.indexOf(' ') >= 0) joined = "\"" + joined + "\"";
-        Files.writeString(file, joined + "\n", StandardCharsets.UTF_8);
-        return joined;
-    }
-
     private static void startWorker(Path root) throws Exception {
         stop(root);
         Path cache = state(root).resolve(CACHE);
         String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
-        ProcessBuilder builder = new ProcessBuilder(
-                java,
-                "-cp",
-                "@" + cache.toAbsolutePath().normalize(),
-                "tools.dscode.dolt.DoltRunWorker",
-                state(root).toString()
-        );
+        String box = DoltScope.label(DoltScope.current());
+        List<String> command = new ArrayList<>();
+        command.add(java);
+        if (!"main".equals(box)) command.add("-Dpkb_dolt_sandbox=" + box);
+        command.add("-cp");
+        command.add("@" + cache.toAbsolutePath().normalize());
+        command.add("tools.dscode.dolt.DoltRunWorker");
+        command.add(state(root).toString());
+        ProcessBuilder builder = new ProcessBuilder(command);
         builder.directory(root.toFile());
         builder.redirectOutput(state(root).resolve("warm.out.log").toFile());
         builder.redirectError(state(root).resolve("warm.err.log").toFile());
@@ -348,7 +410,23 @@ public final class DoltRun {
     }
 
     private static Path state(Path root) {
-        return root.resolve(".pickleball").resolve("dolt");
+        return DoltPaths.worker(root, DoltScope.label(DoltScope.current()));
+    }
+
+    private static Path classesDir(Path root) {
+        return DoltPaths.classes(root, DoltScope.label(DoltScope.current()));
+    }
+
+    private static String diskPart(String fingerprint) {
+        if (fingerprint == null) return "";
+        int split = fingerprint.indexOf('+');
+        return split < 0 ? fingerprint : fingerprint.substring(0, split);
+    }
+
+    private static String dbPart(String fingerprint) {
+        if (fingerprint == null) return "";
+        int split = fingerprint.indexOf('+');
+        return split < 0 ? "" : fingerprint.substring(split + 1);
     }
 
     private static Path root(Path project) {

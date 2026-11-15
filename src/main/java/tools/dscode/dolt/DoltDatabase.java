@@ -35,13 +35,37 @@ public final class DoltDatabase implements AutoCloseable {
     }
 
     public static DoltDatabase open(Path project) throws SQLException {
+        return open(project, DoltScope.current());
+    }
+
+    public static DoltDatabase open(Path project, Binding binding) throws SQLException {
         if (!driverPresent()) throw new SQLException(MISSING_DRIVER);
+        Binding chosen = binding == null ? Binding.main() : binding;
         try {
             DoltMigrate.auto(project);
             DoltServer.retain(project);
-            DoltSession session = DoltConnections.borrow(project, Binding.main());
+            try (DoltSession schema = DoltConnections.borrow(project, Binding.main())) {
+                DoltDialect.ensureSchema(schema);
+                if (!chosen.primary()) {
+                    String name = schema.scalar("SELECT name FROM sandboxes WHERE name = ?", chosen.name());
+                    if (name == null) {
+                        throw new SQLException("unknown sandbox " + chosen.name()
+                                + "\nfix: dolt sandbox create " + chosen.name());
+                    }
+                    schema.update(
+                            "UPDATE sandboxes SET last_used = ? WHERE name = ?",
+                            java.time.Instant.now().toString(),
+                            chosen.name());
+                }
+            }
+            DoltSession session = DoltConnections.borrow(project, chosen);
             try {
-                DoltDialect.ensureSchema(session);
+                if (!chosen.primary()) {
+                    String active = session.scalar(DoltDialect.ACTIVE_BRANCH);
+                    if (active != null && !chosen.branch().equals(active)) {
+                        throw new SQLException("connection is on " + active + " not " + chosen.branch());
+                    }
+                }
                 return new DoltDatabase(DoltSql.wrap(session), project.toAbsolutePath().normalize());
             } catch (SQLException | RuntimeException failure) {
                 session.close();

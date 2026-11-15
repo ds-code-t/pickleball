@@ -1,6 +1,7 @@
 package tools.dscode.dolt;
 
 import io.cucumber.core.runtime.FeaturePathLoadCache;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
@@ -27,6 +28,11 @@ class DoltRunTest {
     @TempDir
     Path project;
 
+    @AfterEach
+    void releaseSandbox() {
+        DoltScope.clear();
+    }
+
     @Test
     void fingerprintAndCompilePlanFollowTheGlue() throws Exception {
         Path java = project.resolve("src/test/java/Sample.java");
@@ -51,8 +57,8 @@ class DoltRunTest {
             System.setProperty("os.name", os);
         }
 
-        Files.createDirectories(project.resolve(".pickleball/dolt"));
-        Files.writeString(project.resolve(".pickleball/dolt/glue.fingerprint"), first);
+        Files.createDirectories(project.resolve(".pickleball/dolt/sandboxes/main/worker"));
+        Files.writeString(project.resolve(".pickleball/dolt/sandboxes/main/worker/glue.fingerprint"), first);
         assertFalse(DoltRun.plan(project).compile());
 
         Files.writeString(java, "class Sample { int x; }\n");
@@ -93,9 +99,9 @@ class DoltRunTest {
     @Timeout(value = 180, unit = TimeUnit.SECONDS)
     void warmWorkerIsReusedAndLogsTheRun() throws Exception {
         Files.createDirectories(project.resolve("build/classes/java/test"));
-        Files.createDirectories(project.resolve(".pickleball/dolt"));
+        Files.createDirectories(project.resolve(".pickleball/dolt/sandboxes/main/worker"));
         String fingerprint = DoltRun.glueFingerprint(project);
-        Files.writeString(project.resolve(".pickleball/dolt/glue.fingerprint"), fingerprint);
+        Files.writeString(project.resolve(".pickleball/dolt/sandboxes/main/worker/glue.fingerprint"), fingerprint);
         String classpath = System.getProperty("pkb_dolt_run_classpath");
         String log = System.getProperty("pkb_dolt_log");
         try {
@@ -118,7 +124,7 @@ class DoltRunTest {
             restore("pkb_dolt_run_classpath", classpath);
             restore("pkb_dolt_log", log);
         }
-        assertFalse(Files.isRegularFile(project.resolve(".pickleball/dolt/warm.txt")));
+        assertFalse(Files.isRegularFile(project.resolve(".pickleball/dolt/sandboxes/main/worker/warm.txt")));
     }
 
     @Test
@@ -142,8 +148,8 @@ class DoltRunTest {
                 """;
         Path file = features.resolve("sample.feature");
         Files.writeString(file, feature);
-        Files.createDirectories(project.resolve(".pickleball/dolt"));
-        Files.writeString(project.resolve(".pickleball/dolt/glue.fingerprint"), DoltRun.glueFingerprint(project));
+        Files.createDirectories(project.resolve(".pickleball/dolt/sandboxes/main/worker"));
+        Files.writeString(project.resolve(".pickleball/dolt/sandboxes/main/worker/glue.fingerprint"), DoltRun.glueFingerprint(project));
         Capture hydrated = cli("dolt", "hydrate", "--project=" + project);
         assertEquals(0, hydrated.code, hydrated.err);
 
@@ -293,8 +299,8 @@ class DoltRunTest {
         if (!System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win")) {
             Files.setPosixFilePermissions(gradlew, PosixFilePermissions.fromString("rwxr-xr-x"));
         }
-        Files.createDirectories(project.resolve(".pickleball/dolt"));
-        Files.writeString(project.resolve(".pickleball/dolt/glue.fingerprint"), DoltRun.glueFingerprint(project));
+        Files.createDirectories(project.resolve(".pickleball/dolt/sandboxes/main/worker"));
+        Files.writeString(project.resolve(".pickleball/dolt/sandboxes/main/worker/glue.fingerprint"), DoltRun.glueFingerprint(project));
         Path classpathFile = Path.of("build", "dolt-run-classpath.txt");
         Files.createDirectories(classpathFile.getParent());
         String previous = Files.isRegularFile(classpathFile) ? Files.readString(classpathFile) : null;
@@ -366,8 +372,8 @@ class DoltRunTest {
         }
         Path java = project.resolve("src/test/java/Sample.java");
         Files.writeString(java, "class Sample { int x; }\n");
-        Files.createDirectories(project.resolve(".pickleball/dolt"));
-        Files.writeString(project.resolve(".pickleball/dolt/glue.fingerprint"), DoltRun.glueFingerprint(project));
+        Files.createDirectories(project.resolve(".pickleball/dolt/sandboxes/main/worker"));
+        Files.writeString(project.resolve(".pickleball/dolt/sandboxes/main/worker/glue.fingerprint"), DoltRun.glueFingerprint(project));
         String classpath = System.getProperty("pkb_dolt_run_classpath");
         String log = System.getProperty("pkb_dolt_log");
         try {
@@ -487,12 +493,12 @@ class DoltRunTest {
     }
 
     private long warmPid() throws Exception {
-        List<String> lines = Files.readAllLines(project.resolve(".pickleball/dolt/warm.txt"));
+        List<String> lines = Files.readAllLines(project.resolve(".pickleball/dolt/sandboxes/main/worker/warm.txt"));
         return Long.parseLong(lines.get(0).trim());
     }
 
     private String workerLog(DoltRun.Outcome outcome) throws Exception {
-        Path err = project.resolve(".pickleball/dolt/warm.err.log");
+        Path err = project.resolve(".pickleball/dolt/sandboxes/main/worker/warm.err.log");
         String logged = Files.isRegularFile(err) ? Files.readString(err) : "";
         return outcome.out() + outcome.err() + "\n" + logged;
     }

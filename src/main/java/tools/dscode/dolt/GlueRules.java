@@ -42,6 +42,10 @@ final class GlueRules {
         if (!path.endsWith(".java")) {
             return "js/ts source only; no step runtime";
         }
+        if (DoltConfig.enabled(project)) {
+            DoltLog.log(project, "glue", path, "compile pending");
+            return "glue compile pending";
+        }
         try {
             DoltRun.Plan plan = DoltRun.plan(project);
             if (!plan.compile()) return "glue fingerprint unchanged";
@@ -51,7 +55,7 @@ final class GlueRules {
             if (compile(project, plan.compileCommand()) != 0) {
                 return "compile failed; prior worker kept";
             }
-            Path state = project.resolve(".pickleball").resolve("dolt");
+            Path state = DoltRun.workerDirectory(project);
             Files.createDirectories(state);
             Files.writeString(state.resolve(DoltRun.FINGERPRINT), plan.fingerprint(), StandardCharsets.UTF_8);
             DoltRun.stop(project);
