@@ -78,7 +78,7 @@ public final class DaltonTrack {
         }
         try (DaltonDatabase database = DaltonDatabase.open(project)) {
             Connection connection = database.connection();
-            int total = count(connection, filter, timeline, after, null);
+            int total = count(connection, filter, timeline, null, null);
             int offset = filter.offset();
             if (filter.latest() && before == null && (filter.cursor() == null || filter.cursor().isBlank()) && offset == 0) {
                 offset = Math.max(0, total - filter.limit());
@@ -195,8 +195,9 @@ public final class DaltonTrack {
         }
         if (filter.feature() != null && !filter.feature().isBlank()) {
             String pattern = like(filter.feature().trim());
-            sql.append(" AND (scenario_key LIKE ? ESCAPE '\\' OR run_id IN (SELECT e.run_id FROM scenario_executions e WHERE e.scenario_key LIKE ? ESCAPE '\\'))");
+            sql.append(" AND (scenario_key LIKE ? ESCAPE '\\'");
             values.add(pattern);
+            sql.append(" OR (kind = 'run' AND run_id IN (SELECT e.run_id FROM scenario_executions e WHERE e.scenario_key LIKE ? ESCAPE '\\')))");
             values.add(pattern);
         }
         if (filter.tag() != null && !filter.tag().isBlank()) {
@@ -207,11 +208,11 @@ public final class DaltonTrack {
             values.add(pattern);
             sql.append(" OR EXISTS (SELECT 1 FROM feature_docs d WHERE instr(scenario_key, d.file_path || '|') = 1 AND (' ' || d.tags || ' ') LIKE ? ESCAPE '\\')");
             values.add(pattern);
-            sql.append(" OR run_id IN (SELECT e.run_id FROM scenario_executions e JOIN scenarios sc ON instr(e.scenario_key, sc.file_path || '|') = 1");
-            sql.append(" WHERE (' ' || sc.tags || ' ') LIKE ? ESCAPE '\\')");
+            sql.append(" OR (kind = 'run' AND run_id IN (SELECT e.run_id FROM scenario_executions e JOIN scenarios sc ON instr(e.scenario_key, sc.file_path || '|') = 1");
+            sql.append(" WHERE (' ' || sc.tags || ' ') LIKE ? ESCAPE '\\'))");
             values.add(pattern);
-            sql.append(" OR run_id IN (SELECT e.run_id FROM scenario_executions e JOIN feature_docs d ON instr(e.scenario_key, d.file_path || '|') = 1");
-            sql.append(" WHERE (' ' || d.tags || ' ') LIKE ? ESCAPE '\\')");
+            sql.append(" OR (kind = 'run' AND run_id IN (SELECT e.run_id FROM scenario_executions e JOIN feature_docs d ON instr(e.scenario_key, d.file_path || '|') = 1");
+            sql.append(" WHERE (' ' || d.tags || ' ') LIKE ? ESCAPE '\\'))");
             values.add(pattern);
             sql.append(")");
         }

@@ -96,6 +96,110 @@ class DaltonTimelineTest {
     }
 
     @Test
+    void totalStaysTheFullCountOnEveryPage() throws Exception {
+        for (int index = 1; index <= 5; index++) {
+            DaltonExecution.recordStep(project, new DaltonExecution.StepDraft(
+                    "sample-run", "features/pay.feature|2", "Pay", null, null, index,
+                    "step-" + index, index, "PASSED",
+                    "2020-01-0" + index + "T00:00:00Z", "2020-01-0" + index + "T00:00:01Z"));
+        }
+        Capture all = run("dalton", "timeline", "--json", "--limit=50", "--project=" + project);
+        int full = JSON.readTree(all.out).path("total").asInt();
+        assertTrue(full > 4, all.out);
+        String cursor = "";
+        int pages = 0;
+        int seen = 0;
+        while (pages < 6) {
+            Capture page = cursor.isBlank()
+                    ? run("dalton", "timeline", "--limit=2", "--json", "--project=" + project)
+                    : run("dalton", "timeline", "--cursor=" + cursor, "--limit=2", "--json", "--project=" + project);
+            JsonNode json = JSON.readTree(page.out);
+            assertEquals(full, json.path("total").asInt(), page.out);
+            int count = json.path("count").asInt();
+            seen += count;
+            pages++;
+            if (count < 2) break;
+            cursor = json.path("cursor").asText();
+            assertFalse(cursor.isBlank(), page.out);
+        }
+        assertTrue(pages > 2, "pages=" + pages);
+        assertEquals(full, seen);
+
+        String before = JSON.readTree(run("dalton", "timeline", "--latest", "--limit=2", "--json", "--project=" + project).out)
+                .path("prev").asText();
+        int backPages = 0;
+        int backSeen = 0;
+        while (backPages < 6 && before != null && !before.isBlank()) {
+            Capture page = run("dalton", "timeline", "--before=" + before, "--limit=2", "--json", "--project=" + project);
+            JsonNode json = JSON.readTree(page.out);
+            assertEquals(full, json.path("total").asInt(), page.out);
+            int count = json.path("count").asInt();
+            backSeen += count;
+            backPages++;
+            if (count < 2) break;
+            String next = json.path("prev").asText();
+            if (next.equals(before)) break;
+            before = next;
+        }
+        assertTrue(backPages > 2, "back=" + backPages + " seen=" + backSeen);
+    }
+
+    @Test
+    void featureAndTagNarrowTheTimeline() throws Exception {
+        Files.createDirectories(project.resolve("features"));
+        Files.writeString(project.resolve("features/pay.feature"), """
+                Feature: Pay
+                  @fast
+                  Scenario: Pay
+                    * the total is 10
+                """);
+        Files.writeString(project.resolve("features/other.feature"), """
+                Feature: Other
+                  Scenario: Other
+                    * something else
+                """);
+        assertEquals(0, run("dalton", "hydrate", "--project=" + project).code);
+        int payLine;
+        int otherLine;
+        try (DaltonDatabase database = DaltonDatabase.open(project);
+             java.sql.Statement statement = database.connection().createStatement()) {
+            try (java.sql.ResultSet rows = statement.executeQuery(
+                    "SELECT line FROM scenarios WHERE file_path = 'features/pay.feature'")) {
+                assertTrue(rows.next());
+                payLine = rows.getInt(1);
+            }
+            try (java.sql.ResultSet rows = statement.executeQuery(
+                    "SELECT line FROM scenarios WHERE file_path = 'features/other.feature'")) {
+                assertTrue(rows.next());
+                otherLine = rows.getInt(1);
+            }
+        }
+        for (String runId : new String[] {"run-a", "run-b"}) {
+            String day = "run-a".equals(runId) ? "01" : "02";
+            DaltonExecution.recordStep(project, new DaltonExecution.StepDraft(
+                    runId, "features/pay.feature|" + payLine, "Pay", null, null, 1,
+                    "pay " + runId, payLine, "PASSED", "2020-01-" + day + "T00:00:00Z", "2020-01-" + day + "T00:00:01Z"));
+            DaltonExecution.recordStep(project, new DaltonExecution.StepDraft(
+                    runId, "features/other.feature|" + otherLine, "Other", null, null, 1,
+                    "other " + runId, otherLine, "PASSED", "2020-01-" + day + "T00:00:02Z", "2020-01-" + day + "T00:00:03Z"));
+        }
+        JsonNode feature = JSON.readTree(run("dalton", "timeline", "--feature=other.feature", "--json", "--project=" + project).out);
+        assertEquals(4, feature.path("total").asInt(), feature.toString());
+        for (JsonNode event : feature.path("events")) {
+            assertFalse(event.path("scenarioKey").asText().startsWith("features/pay.feature"), feature.toString());
+        }
+        JsonNode tagged = JSON.readTree(run("dalton", "timeline", "--tag=@fast", "--json", "--project=" + project).out);
+        assertEquals(4, tagged.path("total").asInt(), tagged.toString());
+        for (JsonNode event : tagged.path("events")) {
+            String key = event.path("scenarioKey").asText();
+            if ("step".equals(event.path("kind").asText())) {
+                assertTrue(key.startsWith("features/pay.feature"), tagged.toString());
+                assertFalse(key.startsWith("features/other.feature"), tagged.toString());
+            }
+        }
+    }
+
+    @Test
     void retainDropsRowsAndKeepsTheReport() throws Exception {
         Path shot = project.resolve("reports/diagnostic-runs/sample/shot.png");
         Files.createDirectories(shot.getParent());

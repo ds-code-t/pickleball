@@ -142,6 +142,103 @@ class DaltonQueryCliTest {
         assertFalse(text.out.contains("the total is 10"), text.out);
     }
 
+    @Test
+    void featureAndTagSelectScenariosNotWholeRuns() throws Exception {
+        Files.createDirectories(project.resolve("features"));
+        Files.writeString(project.resolve("features/pay.feature"), """
+                Feature: Pay
+                  @fast
+                  Scenario: Pay
+                    * the total is 10
+                """);
+        Files.writeString(project.resolve("features/other.feature"), """
+                Feature: Other
+                  Scenario: Other
+                    * something else
+                """);
+        assertEquals(0, run("dalton", "hydrate", "--project=" + project).code);
+        int payLine = scenarioLine("features/pay.feature");
+        int otherLine = scenarioLine("features/other.feature");
+        DaltonExecution.recordStep(project, new DaltonExecution.StepDraft(
+                "run-a", "features/pay.feature|" + payLine, "Pay", null, null, 1,
+                "pay one", payLine, "PASSED", "2020-01-01T00:00:00Z", "2020-01-01T00:00:01Z"));
+        DaltonExecution.recordStep(project, new DaltonExecution.StepDraft(
+                "run-a", "features/other.feature|" + otherLine, "Other", null, null, 1,
+                "other one", otherLine, "PASSED", "2020-01-01T00:00:02Z", "2020-01-01T00:00:03Z"));
+        DaltonExecution.recordStep(project, new DaltonExecution.StepDraft(
+                "run-b", "features/pay.feature|" + payLine, "Pay", null, null, 1,
+                "pay two", payLine, "PASSED", "2020-01-02T00:00:00Z", "2020-01-02T00:00:01Z"));
+        DaltonExecution.recordStep(project, new DaltonExecution.StepDraft(
+                "run-b", "features/other.feature|" + otherLine, "Other", null, null, 1,
+                "other two", otherLine, "PASSED", "2020-01-02T00:00:02Z", "2020-01-02T00:00:03Z"));
+
+        JsonNode feature = JSON.readTree(run("dalton", "query", "--feature=other.feature", "--json", "--project=" + project).out);
+        assertEquals(2, feature.path("total").asInt(), feature.toString());
+        assertEquals(2, feature.path("count").asInt(), feature.toString());
+        assertScoped(feature.path("rows"), "features/other.feature", "features/pay.feature");
+
+        JsonNode tagged = JSON.readTree(run("dalton", "query", "--tag=@fast", "--json", "--project=" + project).out);
+        assertEquals(2, tagged.path("total").asInt(), tagged.toString());
+        assertEquals(2, tagged.path("count").asInt(), tagged.toString());
+        assertScoped(tagged.path("rows"), "features/pay.feature", "features/other.feature");
+
+        JsonNode featureTimeline = JSON.readTree(run("dalton", "timeline", "--feature=other.feature", "--json", "--project=" + project).out);
+        assertEquals(4, featureTimeline.path("total").asInt(), featureTimeline.toString());
+        assertEquals(4, featureTimeline.path("count").asInt(), featureTimeline.toString());
+        assertNoScenario(featureTimeline.path("events"), "features/pay.feature");
+        assertEquals(2, countKind(featureTimeline.path("events"), "run"));
+        assertEquals(2, countPrefix(featureTimeline.path("events"), "features/other.feature"));
+
+        JsonNode tagTimeline = JSON.readTree(run("dalton", "timeline", "--tag=@fast", "--json", "--project=" + project).out);
+        assertEquals(4, tagTimeline.path("total").asInt(), tagTimeline.toString());
+        assertEquals(4, tagTimeline.path("count").asInt(), tagTimeline.toString());
+        assertNoScenario(tagTimeline.path("events"), "features/other.feature");
+        assertEquals(2, countKind(tagTimeline.path("events"), "run"));
+        assertEquals(2, countPrefix(tagTimeline.path("events"), "features/pay.feature"));
+    }
+
+    private int scenarioLine(String path) throws Exception {
+        try (DaltonDatabase database = DaltonDatabase.open(project);
+             java.sql.Statement statement = database.connection().createStatement();
+             java.sql.ResultSet rows = statement.executeQuery(
+                     "SELECT line FROM scenarios WHERE file_path = '" + path + "'")) {
+            assertTrue(rows.next(), path);
+            return rows.getInt(1);
+        }
+    }
+
+    private static void assertScoped(JsonNode rows, String keep, String drop) {
+        assertEquals(2, rows.size(), rows.toString());
+        for (JsonNode row : rows) {
+            String key = row.path("scenarioKey").asText();
+            assertTrue(key.startsWith(keep), rows.toString());
+            assertFalse(key.startsWith(drop), rows.toString());
+        }
+    }
+
+    private static void assertNoScenario(JsonNode events, String prefix) {
+        for (JsonNode event : events) {
+            String key = event.path("scenarioKey").asText();
+            assertFalse(key.startsWith(prefix), events.toString());
+            if ("step".equals(event.path("kind").asText()) || "usage".equals(event.path("kind").asText())
+                    || "log".equals(event.path("kind").asText())) {
+                assertFalse(key.startsWith("features/") && !key.contains("|"), events.toString());
+            }
+        }
+    }
+
+    private static int countKind(JsonNode events, String kind) {
+        int count = 0;
+        for (JsonNode event : events) if (kind.equals(event.path("kind").asText())) count++;
+        return count;
+    }
+
+    private static int countPrefix(JsonNode events, String prefix) {
+        int count = 0;
+        for (JsonNode event : events) if (event.path("scenarioKey").asText().startsWith(prefix)) count++;
+        return count;
+    }
+
     private static Capture run(String... args) {
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
