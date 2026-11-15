@@ -59,11 +59,15 @@ class DoltGlueCompileTest {
         assertTrue(put.out.contains("glue compile pending"), put.out);
         DoltScope.clear();
 
+        Path stale = project.resolve(".pickleball/dolt/sandboxes/box/classes/sample/Stale.class");
+        Files.createDirectories(stale.getParent());
+        Files.write(stale, new byte[] {1, 2, 3, 4});
         Capture compiled = cli("dolt", "glue", "compile", "--sandbox=box", "--project=" + project);
         assertEquals(0, compiled.code, compiled.err);
         Path boxClass = project.resolve(".pickleball/dolt/sandboxes/box/classes/sample/Steps.class");
         Path otherClass = project.resolve(".pickleball/dolt/sandboxes/other/classes/sample/Steps.class");
         assertTrue(Files.isRegularFile(boxClass), compiled.out);
+        assertFalse(Files.exists(stale), "stale class was not cleared before compile");
         String bytes = new String(Files.readAllBytes(boxClass), StandardCharsets.ISO_8859_1);
         assertTrue(bytes.contains("sandboxOnly"), "compiled class does not contain the sandbox edit");
         assertFalse(Files.exists(otherClass));

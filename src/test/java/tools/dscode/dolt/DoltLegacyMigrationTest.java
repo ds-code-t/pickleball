@@ -2,7 +2,7 @@ package tools.dscode.dolt;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import tools.dscode.dolt.store.LegacySqlite;
+import tools.dscode.dolt.store.LegacySqliteFixture;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -80,7 +80,7 @@ class DoltLegacyMigrationTest {
     private void seed() throws Exception {
         Path db = DoltPaths.database(project);
         Files.createDirectories(db.getParent());
-        try (Connection connection = DriverManager.getConnection(LegacySqlite.jdbcUrl(db));
+        try (Connection connection = DriverManager.getConnection(LegacySqliteFixture.jdbcUrl(db));
              Statement statement = connection.createStatement()) {
             statement.execute("""
                     CREATE TABLE files (

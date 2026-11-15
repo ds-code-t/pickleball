@@ -11,7 +11,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import tools.dscode.dolt.store.LegacySqlite;
+import tools.dscode.dolt.store.LegacySqliteFixture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -33,7 +33,7 @@ class DoltSchemaUpgradeTest {
         Path feature = project.resolve("features/one.feature");
         Files.createDirectories(feature.getParent());
         Files.writeString(feature, disk, StandardCharsets.UTF_8);
-        try (Connection connection = DriverManager.getConnection(LegacySqlite.jdbcUrl(db));
+        try (Connection connection = DriverManager.getConnection(LegacySqliteFixture.jdbcUrl(db));
              Statement statement = connection.createStatement()) {
             statement.execute("""
                     CREATE TABLE schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)
@@ -78,7 +78,7 @@ class DoltSchemaUpgradeTest {
     void schemaFiveUpgradesInPlaceAndKeepsRows() throws Exception {
         Path db = DoltPaths.database(project);
         Files.createDirectories(db.getParent());
-        try (Connection connection = DriverManager.getConnection(LegacySqlite.jdbcUrl(db));
+        try (Connection connection = DriverManager.getConnection(LegacySqliteFixture.jdbcUrl(db));
              Statement statement = connection.createStatement()) {
             statement.execute("""
                     CREATE TABLE schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)

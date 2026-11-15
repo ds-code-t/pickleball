@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Supplier;
@@ -64,6 +65,7 @@ public final class DoltGlueCompiler {
         Path sources = DoltPaths.glueSources(project, box);
         Path classes = DoltPaths.classes(project, box);
         Files.createDirectories(sources);
+        clearClasses(classes);
         Files.createDirectories(classes);
         List<Path> files = new ArrayList<>();
         for (Row row : rows) {
@@ -95,6 +97,17 @@ public final class DoltGlueCompiler {
         }
         DoltLog.log(project, "glue", "compile", box, "classes=" + rows.size());
         return "glue compile: " + rows.size();
+    }
+
+    private static void clearClasses(Path classes) throws java.io.IOException {
+        if (!Files.isDirectory(classes)) return;
+        List<Path> paths;
+        try (var walk = Files.walk(classes)) {
+            paths = walk.sorted(Comparator.reverseOrder()).toList();
+        }
+        for (Path path : paths) {
+            if (!path.equals(classes)) Files.deleteIfExists(path);
+        }
     }
 
     static boolean hasEditedJava(Path project) {

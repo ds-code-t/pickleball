@@ -10,11 +10,6 @@ public final class LegacySqlite {
     private LegacySqlite() {
     }
 
-    public static String jdbcUrl(Path database) {
-        String path = database.toAbsolutePath().normalize().toString().replace('\\', '/');
-        return "jdbc:sqlite:" + path;
-    }
-
     public static Connection openReadOnly(Path database) throws SQLException {
         try {
             Class.forName("org.sqlite.JDBC");
