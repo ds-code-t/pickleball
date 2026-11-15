@@ -2,7 +2,10 @@ package tools.dscode.dolt;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.dolt.store.Binding;
+import tools.dscode.dolt.store.DoltStore;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -15,6 +18,7 @@ import java.time.temporal.ChronoUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DoltSandboxPruneTest {
@@ -24,12 +28,24 @@ class DoltSandboxPruneTest {
     @AfterEach
     void releaseSandbox() {
         DoltScope.clear();
+        DoltScope.bind(Binding.sandbox("linbox"));
+        DoltRun.stop(project);
+        DoltScope.clear();
+        DoltRun.stop(project);
+        System.clearProperty("pkb_dolt_run_classpath");
     }
 
     @Test
+    @Timeout(value = 300, unit = java.util.concurrent.TimeUnit.SECONDS)
     void pruneDropsByAgeAndOwnerAndKeepsHistoryUnlessAsked() throws Exception {
         Files.createDirectories(project.resolve("features"));
-        Files.writeString(project.resolve("features/pay.feature"), "Feature: Pay\n  Scenario: Ada\n    * INFO: amount is 1\n");
+        Files.writeString(project.resolve("features/pay.feature"), """
+                Feature: Pay
+                  @dolt-prune
+                  Scenario: Ada
+                    * INFO: amount is 1
+                    * ASSERT: "1" equals "1"
+                """);
         assertEquals(0, cli("dolt", "hydrate", "--project=" + project).code);
         DoltScope.clear();
         assertEquals(0, cli("dolt", "sandbox", "create", "oldbox", "--owner=ada", "--project=" + project).code);
@@ -38,6 +54,26 @@ class DoltSandboxPruneTest {
         DoltScope.clear();
         assertEquals(0, cli("dolt", "sandbox", "create", "linbox", "--owner=lin", "--project=" + project).code);
         DoltScope.clear();
+        Path worker = DoltPaths.worker(project, "linbox");
+        Files.createDirectories(worker);
+        Files.writeString(worker.resolve(DoltRun.FINGERPRINT), DoltRun.glueFingerprint(project));
+        System.setProperty("pkb_dolt_run_classpath", System.getProperty("java.class.path"));
+        String features = project.resolve("features").toAbsolutePath().normalize().toString();
+        Capture ran = cli(
+                "dolt", "run", "--sandbox=linbox",
+                "--tags=@dolt-prune",
+                "--glue=tools.dscode.coredefinitions",
+                "-Dpkb_dolt_track=true",
+                "-Dpkb_features=wd-file:" + features,
+                "-Dpkb_loglevel=error",
+                "-Dpkb_parallel=1",
+                "-Dcucumber.execution.parallel.enabled=false",
+                "--project=" + project);
+        assertEquals(0, ran.code, ran.out + ran.err);
+        DoltScope.clear();
+        try (DoltStore store = DoltStore.open(project, Binding.main())) {
+            assertNotEquals("0", store.session().scalar("SELECT COUNT(*) FROM runs WHERE sandbox = 'linbox'"));
+        }
 
         String old = Instant.now().minus(3, ChronoUnit.DAYS).toString();
         try (DoltDatabase database = DoltDatabase.open(project);
@@ -45,8 +81,6 @@ class DoltSandboxPruneTest {
             statement.execute("UPDATE sandboxes SET last_used = '" + old + "' WHERE name IN ('oldbox', 'linbox')");
             statement.execute("INSERT INTO runs(run_id, started_at, status, scenario, note, sandbox) "
                     + "VALUES ('kept', '" + old + "', 'passed', 'Ada', '', 'oldbox')");
-            statement.execute("INSERT INTO runs(run_id, started_at, status, scenario, note, sandbox) "
-                    + "VALUES ('gone', '" + old + "', 'passed', 'Lin', '', 'linbox')");
         }
         Path oldHome = project.resolve(".pickleball/dolt/sandboxes/oldbox");
         Files.createDirectories(oldHome);

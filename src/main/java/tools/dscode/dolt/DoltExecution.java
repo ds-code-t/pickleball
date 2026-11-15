@@ -406,14 +406,15 @@ public final class DoltExecution {
 
     private static void ensureRun(Connection connection, String runId, String started, String finished, String scenario) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement("""
-                INSERT INTO runs(run_id, started_at, finished_at, status, scenario, passed, failed, note)
-                VALUES (?, ?, ?, 'RUNNING', ?, 0, 0, '')
-                ON CONFLICT(run_id) DO UPDATE SET finished_at = excluded.finished_at
+                INSERT INTO runs(run_id, started_at, finished_at, status, scenario, passed, failed, note, sandbox)
+                VALUES (?, ?, ?, 'RUNNING', ?, 0, 0, '', ?)
+                ON CONFLICT(run_id) DO UPDATE SET finished_at = excluded.finished_at, sandbox = excluded.sandbox
                 """)) {
             statement.setString(1, runId);
             statement.setString(2, started);
             statement.setString(3, finished);
             statement.setString(4, scenario == null ? "" : scenario);
+            statement.setString(5, DoltScope.current().sandboxColumn());
             statement.executeUpdate();
         }
     }
@@ -430,9 +431,9 @@ public final class DoltExecution {
     ) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO scenario_executions(
-                    exec_id, run_id, scenario_key, scenario_hash, examples_row, started_at, finished_at, status, passed, failed)
-                VALUES (?, ?, ?, ?, ?, ?, NULL, ?, 0, 0)
-                ON CONFLICT(exec_id) DO UPDATE SET scenario_hash = excluded.scenario_hash
+                    exec_id, run_id, scenario_key, scenario_hash, examples_row, started_at, finished_at, status, passed, failed, sandbox)
+                VALUES (?, ?, ?, ?, ?, ?, NULL, ?, 0, 0, ?)
+                ON CONFLICT(exec_id) DO UPDATE SET scenario_hash = excluded.scenario_hash, sandbox = excluded.sandbox
                 """)) {
             statement.setString(1, execId);
             statement.setString(2, runId);
@@ -442,6 +443,7 @@ public final class DoltExecution {
             else statement.setInt(5, examplesRow);
             statement.setString(6, started);
             statement.setString(7, status);
+            statement.setString(8, DoltScope.current().sandboxColumn());
             statement.executeUpdate();
         }
     }
@@ -462,29 +464,58 @@ public final class DoltExecution {
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO step_executions(
                     step_exec_id, scenario_exec_id, step_ord, step_text, step_text_hash, definition_id,
-                    source_line, started_at, finished_at, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    source_line, started_at, finished_at, status, sandbox)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(step_exec_id) DO UPDATE SET
                     definition_id = excluded.definition_id,
                     status = excluded.status,
                     finished_at = excluded.finished_at,
-                    source_line = COALESCE(excluded.source_line, step_executions.source_line)
+                    source_line = COALESCE(excluded.source_line, step_executions.source_line),
+                    sandbox = excluded.sandbox
                 """)) {
-            statement.setString(1, stepId);
-            statement.setString(2, execId);
-            statement.setInt(3, ord);
-            statement.setString(4, text);
-            statement.setString(5, hash);
-            if (definitionId == null) statement.setNull(6, java.sql.Types.VARCHAR);
-            else statement.setString(6, definitionId);
-            if (sourceLine == null) statement.setNull(7, java.sql.Types.INTEGER);
-            else statement.setInt(7, sourceLine);
-            statement.setString(8, started);
-            if (finished == null) statement.setNull(9, java.sql.Types.VARCHAR);
-            else statement.setString(9, finished);
-            statement.setString(10, status);
-            statement.executeUpdate();
+            bindStep(statement, stepId, execId, ord, text, hash, definitionId, sourceLine, started, finished, status);
+            try {
+                statement.executeUpdate();
+            } catch (SQLException failure) {
+                if (definitionId == null || !foreignKey(failure)) throw failure;
+                bindStep(statement, stepId, execId, ord, text, hash, null, sourceLine, started, finished, status);
+                statement.executeUpdate();
+            }
         }
+    }
+
+    private static void bindStep(
+            PreparedStatement statement,
+            String stepId,
+            String execId,
+            int ord,
+            String text,
+            String hash,
+            String definitionId,
+            Integer sourceLine,
+            String started,
+            String finished,
+            String status
+    ) throws SQLException {
+        statement.setString(1, stepId);
+        statement.setString(2, execId);
+        statement.setInt(3, ord);
+        statement.setString(4, text);
+        statement.setString(5, hash);
+        if (definitionId == null) statement.setNull(6, java.sql.Types.VARCHAR);
+        else statement.setString(6, definitionId);
+        if (sourceLine == null) statement.setNull(7, java.sql.Types.INTEGER);
+        else statement.setInt(7, sourceLine);
+        statement.setString(8, started);
+        if (finished == null) statement.setNull(9, java.sql.Types.VARCHAR);
+        else statement.setString(9, finished);
+        statement.setString(10, status);
+        statement.setString(11, DoltScope.current().sandboxColumn());
+    }
+
+    private static boolean foreignKey(SQLException failure) {
+        String message = failure.getMessage() == null ? "" : failure.getMessage().toLowerCase(java.util.Locale.ROOT);
+        return message.contains("foreign key");
     }
 
     private static void recount(Connection connection, String execId, String runId, String finished) throws SQLException {

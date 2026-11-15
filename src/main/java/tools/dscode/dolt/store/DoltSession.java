@@ -31,6 +31,10 @@ public final class DoltSession implements AutoCloseable {
         this.pool = pool;
     }
 
+    public Path project() {
+        return project;
+    }
+
     public Binding binding() {
         return binding;
     }
@@ -47,6 +51,17 @@ public final class DoltSession implements AutoCloseable {
         long started = System.nanoTime();
         try (Statement statement = connection.createStatement()) {
             drain(statement, statement.execute(sql));
+        } finally {
+            log(sql, started);
+        }
+    }
+
+    /** Bound stored-procedure call. Arguments are parameters, never concatenated SQL. */
+    public void call(String sql, Object... args) throws SQLException {
+        long started = System.nanoTime();
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            bind(statement, args);
+            drain(statement, statement.execute());
         } finally {
             log(sql, started);
         }

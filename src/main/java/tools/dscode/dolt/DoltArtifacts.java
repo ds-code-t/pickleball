@@ -53,11 +53,12 @@ public final class DoltArtifacts {
         try (DoltDatabase database = DoltDatabase.open(project)) {
             Connection connection = database.connection();
             try (PreparedStatement statement = connection.prepareStatement("""
-                    INSERT INTO artifacts(artifact_id, run_id, step_exec_id, kind, path, retained_at)
-                    VALUES (?, ?, ?, 'screenshot', ?, ?)
+                    INSERT INTO artifacts(artifact_id, run_id, step_exec_id, kind, path, retained_at, sandbox)
+                    VALUES (?, ?, ?, 'screenshot', ?, ?, ?)
                     ON CONFLICT(artifact_id) DO UPDATE SET
                         step_exec_id = COALESCE(excluded.step_exec_id, artifacts.step_exec_id),
-                        path = excluded.path
+                        path = excluded.path,
+                        sandbox = excluded.sandbox
                     """)) {
                 statement.setString(1, id);
                 statement.setString(2, runId);
@@ -65,6 +66,7 @@ public final class DoltArtifacts {
                 else statement.setString(3, stepExecId);
                 statement.setString(4, relative);
                 statement.setString(5, now);
+                statement.setString(6, DoltScope.current().sandboxColumn());
                 statement.executeUpdate();
             }
         }

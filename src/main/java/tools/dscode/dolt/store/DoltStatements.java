@@ -54,26 +54,27 @@ SELECT s.step_exec_id, s.scenario_exec_id, e.run_id, s.step_ord, s.step_text, s.
                      ORDER BY s.step_ord, s.step_exec_id
 """,
             """
-INSERT INTO runs(run_id, started_at, finished_at, status, scenario, passed, failed, note)
-                VALUES (?, ?, ?, 'RUNNING', ?, 0, 0, '')
-                ON DUPLICATE KEY UPDATE finished_at = VALUES(finished_at)
+INSERT INTO runs(run_id, started_at, finished_at, status, scenario, passed, failed, note, sandbox)
+                VALUES (?, ?, ?, 'RUNNING', ?, 0, 0, '', ?)
+                ON DUPLICATE KEY UPDATE finished_at = VALUES(finished_at), sandbox = VALUES(sandbox)
 """,
             """
 INSERT INTO scenario_executions(
-                    exec_id, run_id, scenario_key, scenario_hash, examples_row, started_at, finished_at, status, passed, failed)
-                VALUES (?, ?, ?, ?, ?, ?, NULL, ?, 0, 0)
-                ON DUPLICATE KEY UPDATE scenario_hash = VALUES(scenario_hash)
+                    exec_id, run_id, scenario_key, scenario_hash, examples_row, started_at, finished_at, status, passed, failed, sandbox)
+                VALUES (?, ?, ?, ?, ?, ?, NULL, ?, 0, 0, ?)
+                ON DUPLICATE KEY UPDATE scenario_hash = VALUES(scenario_hash), sandbox = VALUES(sandbox)
 """,
             """
 INSERT INTO step_executions(
                     step_exec_id, scenario_exec_id, step_ord, step_text, step_text_hash, definition_id,
-                    source_line, started_at, finished_at, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    source_line, started_at, finished_at, status, sandbox)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE
                     definition_id = VALUES(definition_id),
                     status = VALUES(status),
                     finished_at = VALUES(finished_at),
-                    source_line = COALESCE(VALUES(source_line), step_executions.source_line)
+                    source_line = COALESCE(VALUES(source_line), step_executions.source_line),
+                    sandbox = VALUES(sandbox)
 """,
             """
 SELECT COUNT(*) FROM step_executions s
@@ -107,11 +108,12 @@ UPDATE runs SET passed = ?, failed = ?, status = ?, finished_at = ? WHERE run_id
 SELECT definition_id, pattern FROM step_definitions
 """,
             """
-INSERT INTO artifacts(artifact_id, run_id, step_exec_id, kind, path, retained_at)
-                    VALUES (?, ?, ?, 'screenshot', ?, ?)
+INSERT INTO artifacts(artifact_id, run_id, step_exec_id, kind, path, retained_at, sandbox)
+                    VALUES (?, ?, ?, 'screenshot', ?, ?, ?)
                     ON DUPLICATE KEY UPDATE
                         step_exec_id = COALESCE(VALUES(step_exec_id), artifacts.step_exec_id),
-                        path = VALUES(path)
+                        path = VALUES(path),
+                        sandbox = VALUES(sandbox)
 """,
             """
 SELECT artifact_id, run_id, step_exec_id, kind, path, retained_at
@@ -229,15 +231,16 @@ SELECT file_path, scenario_ord, ord, line, text FROM steps WHERE keyword = 'Exam
 INSERT INTO schema_meta(key, value) VALUES ('example_blocks', '1')
 """,
             """
-INSERT INTO runs(run_id, started_at, finished_at, status, scenario, passed, failed, note)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO runs(run_id, started_at, finished_at, status, scenario, passed, failed, note, sandbox)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ON DUPLICATE KEY UPDATE
                             finished_at = VALUES(finished_at),
                             status = VALUES(status),
                             scenario = VALUES(scenario),
                             passed = VALUES(passed),
                             failed = VALUES(failed),
-                            note = VALUES(note)
+                            note = VALUES(note),
+                            sandbox = VALUES(sandbox)
 """,
             """
 SELECT l.log_id, l.entity_type, l.entity_id
@@ -247,10 +250,10 @@ SELECT l.log_id, l.entity_type, l.entity_id
                      ORDER BY l.log_id, l.entity_type, l.entity_id
 """,
             """
-INSERT IGNORE INTO log_entity_links(log_id, entity_type, entity_id) VALUES (?, ?, ?)
+INSERT IGNORE INTO log_entity_links(log_id, entity_type, entity_id, sandbox) VALUES (?, ?, ?, ?)
 """,
             """
-INSERT INTO run_logs(run_id, logged_at, entity, message) VALUES (?, ?, ?, ?)
+INSERT INTO run_logs(run_id, logged_at, entity, message, sandbox) VALUES (?, ?, ?, ?, ?)
 """,
             """
 SELECT run_id, started_at, finished_at, status, scenario, passed, failed, note FROM runs ORDER BY started_at, run_id
@@ -293,8 +296,8 @@ SELECT 1 FROM feature_docs WHERE file_path = ?
 DELETE FROM example_blocks WHERE file_path = ?
 """,
             """
-INSERT INTO entity_usages(step_exec_id, entity_type, entity_id, field, operation, value_ref, logged_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+INSERT INTO entity_usages(step_exec_id, entity_type, entity_id, field, operation, value_ref, logged_at, sandbox)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 """,
             """
 SELECT usage_id, step_exec_id, entity_type, entity_id, field, operation, value_ref, logged_at

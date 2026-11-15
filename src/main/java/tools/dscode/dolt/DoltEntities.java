@@ -88,8 +88,8 @@ public final class DoltEntities {
         try (DoltDatabase database = DoltDatabase.open(project)) {
             Connection connection = database.connection();
             try (PreparedStatement statement = connection.prepareStatement("""
-                    INSERT INTO entity_usages(step_exec_id, entity_type, entity_id, field, operation, value_ref, logged_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO entity_usages(step_exec_id, entity_type, entity_id, field, operation, value_ref, logged_at, sandbox)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """)) {
                 statement.setString(1, step);
                 statement.setString(2, type);
@@ -99,6 +99,7 @@ public final class DoltEntities {
                 statement.setString(5, kind);
                 statement.setString(6, stored);
                 statement.setString(7, now);
+                statement.setString(8, DoltScope.current().sandboxColumn());
                 statement.executeUpdate();
             }
             try (PreparedStatement statement = connection.prepareStatement("SELECT last_insert_rowid()");

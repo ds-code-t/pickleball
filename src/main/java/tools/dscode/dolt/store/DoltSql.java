@@ -7,44 +7,71 @@ import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Rewrites the Dolt SQLite statements onto the Dolt dialect at execution time.
  * Callers keep their SQL text; the connection they receive from {@link DoltSession}
- * is this wrapper. {@code jdbc:sqlite} is not opened here.
+ * is this wrapper. The legacy SQLite driver is not opened here.
  */
 public final class DoltSql {
+    private static final Pattern TABLE_REF = Pattern.compile(
+            "(?i)(?:\\bfrom|\\bjoin|\\binto|\\bupdate|\\btable)\\s+(`?)([a-zA-Z0-9_]+)\\1");
+
     private DoltSql() {
     }
 
     public static Connection wrap(DoltSession session) {
-        Connection delegate = session.connection();
-        boolean[] closed = new boolean[1];
+        Router router = new Router(session);
         InvocationHandler handler = (proxy, method, args) -> {
-            if ("close".equals(method.getName()) && method.getParameterCount() == 0) {
-                if (!closed[0]) {
-                    closed[0] = true;
-                    session.close();
-                }
+            String name = method.getName();
+            if ("close".equals(name) && method.getParameterCount() == 0) {
+                router.close();
                 return null;
             }
-            if ("isClosed".equals(method.getName()) && method.getParameterCount() == 0) {
-                return closed[0];
+            if ("isClosed".equals(name) && method.getParameterCount() == 0) {
+                return router.closed;
+            }
+            if ("setAutoCommit".equals(name) && method.getParameterCount() == 1) {
+                boolean auto = Boolean.TRUE.equals(args[0]);
+                router.delegate.setAutoCommit(auto);
+                if (router.main != null) router.main.setAutoCommit(auto);
+                return null;
+            }
+            if ("commit".equals(name) && method.getParameterCount() == 0) {
+                if (router.main != null && !router.main.getAutoCommit()) router.main.commit();
+                router.delegate.commit();
+                return null;
+            }
+            if ("rollback".equals(name) && method.getParameterCount() == 0) {
+                if (router.main != null && !router.main.getAutoCommit()) router.main.rollback();
+                router.delegate.rollback();
+                return null;
             }
             if (args != null && args.length > 0 && args[0] instanceof String sql
-                    && ("prepareStatement".equals(method.getName()) || "prepareCall".equals(method.getName())
-                    || "nativeSQL".equals(method.getName()))) {
-                args = args.clone();
-                args[0] = rewrite(sql, session.binding());
-                if ("prepareStatement".equals(method.getName()) && method.getParameterCount() == 1
-                        && startsWith(args[0].toString(), "insert")) {
-                    return delegate.prepareStatement(args[0].toString(), Statement.RETURN_GENERATED_KEYS);
+                    && ("prepareStatement".equals(name) || "prepareCall".equals(name)
+                    || "nativeSQL".equals(name))) {
+                Routed routed = router.route(sql);
+                if ("nativeSQL".equals(name)) {
+                    args = args.clone();
+                    args[0] = routed.sql;
+                    return invoke(router.delegate, method, args);
                 }
+                if ("prepareStatement".equals(name) && method.getParameterCount() == 1
+                        && startsWith(routed.sql, "insert")) {
+                    return routed.connection.prepareStatement(routed.sql, Statement.RETURN_GENERATED_KEYS);
+                }
+                args = args.clone();
+                args[0] = routed.sql;
+                return invoke(routed.connection, method, args);
             }
-            Object value = invoke(delegate, method, args);
-            if (value instanceof Statement statement && "createStatement".equals(method.getName())) {
-                return wrapStatement(statement, session.binding());
+            Object value = invoke(router.delegate, method, args);
+            if (value instanceof Statement statement && "createStatement".equals(name)) {
+                return wrapStatement(statement, router);
             }
             return value;
         };
@@ -56,11 +83,12 @@ public final class DoltSql {
         return rewrite(sql, null);
     }
 
-    /** SQLite text becomes Dolt text. Run-state tables on a sandbox session are qualified onto main. */
+    /** SQLite text becomes Dolt text. Mixed run-state reads stay qualified onto main. */
     public static String rewrite(String sql, Binding binding) {
         String translated = translateBody(sql);
         if (binding == null || binding.primary()) return translated;
-        return qualifyRunState(translated);
+        if (classify(translated) == SqlKind.MIXED) return qualifyRunState(translated);
+        return translated;
     }
 
     private static String qualifyRunState(String sql) {
@@ -314,11 +342,18 @@ public final class DoltSql {
         return out.substring(index + 1, end).toLowerCase(Locale.ROOT);
     }
 
-    private static Statement wrapStatement(Statement delegate, Binding binding) {
+    private static Statement wrapStatement(Statement delegate, Router router) {
         InvocationHandler handler = (proxy, method, args) -> {
             if (args != null && args.length > 0 && args[0] instanceof String sql && sqlMethod(method.getName())) {
+                Routed routed = router.route(sql);
                 args = args.clone();
-                args[0] = rewrite(sql, binding);
+                args[0] = routed.sql;
+                if (routed.connection != router.delegate) {
+                    Statement onMain = routed.connection.createStatement();
+                    router.extras.add(onMain);
+                    return invoke(onMain, method, args);
+                }
+                return invoke(delegate, method, args);
             }
             return invoke(delegate, method, args);
         };
@@ -333,6 +368,99 @@ public final class DoltSql {
 
     private static boolean startsWith(String sql, String word) {
         return sql.strip().toLowerCase(Locale.ROOT).startsWith(word);
+    }
+
+    enum SqlKind { RUN_STATE, MIXED, OTHER, NONE }
+
+    static SqlKind classify(String sql) {
+        if (sql == null || sql.isBlank()) return SqlKind.NONE;
+        Matcher matcher = TABLE_REF.matcher(sql);
+        boolean run = false;
+        boolean other = false;
+        boolean any = false;
+        while (matcher.find()) {
+            any = true;
+            String table = matcher.group(2).toLowerCase(Locale.ROOT);
+            if (DoltDialect.RUN_STATE_TABLES.contains(table)) run = true;
+            else other = true;
+        }
+        if (!any) return SqlKind.NONE;
+        if (run && other) return SqlKind.MIXED;
+        if (run) return SqlKind.RUN_STATE;
+        return SqlKind.OTHER;
+    }
+
+    /**
+     * Pure run-state statements go to a main session. A statement that joins
+     * run-state to a source table cannot change branch mid-query, so that text
+     * stays on the sandbox connection and run-state names are qualified.
+     */
+    private static final class Router {
+        final DoltSession session;
+        final Connection delegate;
+        final List<Statement> extras = new ArrayList<>();
+        boolean closed;
+        boolean lastOnMain;
+        DoltSession mainSession;
+        Connection main;
+
+        Router(DoltSession session) {
+            this.session = session;
+            this.delegate = session.connection();
+        }
+
+        Routed route(String original) throws SQLException {
+            String translated = translateBody(original);
+            if (session.binding().primary()) {
+                lastOnMain = false;
+                return new Routed(delegate, translated);
+            }
+            SqlKind kind = classify(translated);
+            if (kind == SqlKind.RUN_STATE || (kind == SqlKind.NONE && lastOnMain)) {
+                Connection mainConnection = main();
+                lastOnMain = true;
+                return new Routed(mainConnection, translated);
+            }
+            lastOnMain = false;
+            if (kind == SqlKind.MIXED) return new Routed(delegate, qualifyRunState(translated));
+            return new Routed(delegate, translated);
+        }
+
+        Connection main() throws SQLException {
+            if (main != null) return main;
+            try {
+                mainSession = DoltConnections.borrow(session.project(), Binding.main());
+            } catch (java.io.IOException failure) {
+                throw new SQLException(failure.getMessage() == null ? "Dolt server did not start" : failure.getMessage(), failure);
+            }
+            main = mainSession.connection();
+            if (!delegate.getAutoCommit()) main.setAutoCommit(false);
+            return main;
+        }
+
+        void close() {
+            if (closed) return;
+            closed = true;
+            for (Statement extra : extras) {
+                try {
+                    extra.close();
+                } catch (SQLException ignored) {
+                    // Closing a finished statement is best-effort.
+                }
+            }
+            if (main != null) {
+                try {
+                    if (!main.getAutoCommit()) main.setAutoCommit(true);
+                } catch (SQLException ignored) {
+                    // The pool replaces a connection that will not reset.
+                }
+            }
+            if (mainSession != null) mainSession.close();
+            session.close();
+        }
+    }
+
+    private record Routed(Connection connection, String sql) {
     }
 
     private static Object invoke(Object target, Method method, Object[] args) throws Throwable {

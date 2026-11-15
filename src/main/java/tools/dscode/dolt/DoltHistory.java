@@ -93,15 +93,16 @@ public final class DoltHistory {
             connection.setAutoCommit(false);
             try {
                 try (PreparedStatement statement = connection.prepareStatement("""
-                        INSERT INTO runs(run_id, started_at, finished_at, status, scenario, passed, failed, note)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        INSERT INTO runs(run_id, started_at, finished_at, status, scenario, passed, failed, note, sandbox)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ON CONFLICT(run_id) DO UPDATE SET
                             finished_at = excluded.finished_at,
                             status = excluded.status,
                             scenario = excluded.scenario,
                             passed = excluded.passed,
                             failed = excluded.failed,
-                            note = excluded.note
+                            note = excluded.note,
+                            sandbox = excluded.sandbox
                         """)) {
                     statement.setString(1, id);
                     statement.setString(2, started);
@@ -111,15 +112,17 @@ public final class DoltHistory {
                     statement.setInt(6, draft.passed());
                     statement.setInt(7, draft.failed());
                     statement.setString(8, note);
+                    statement.setString(9, DoltScope.current().sandboxColumn());
                     statement.executeUpdate();
                 }
                 if (!blank(message)) {
                     try (PreparedStatement statement = connection.prepareStatement(
-                            "INSERT INTO run_logs(run_id, logged_at, entity, message) VALUES (?, ?, ?, ?)")) {
+                            "INSERT INTO run_logs(run_id, logged_at, entity, message, sandbox) VALUES (?, ?, ?, ?, ?)")) {
                         statement.setString(1, id);
                         statement.setString(2, finished);
                         statement.setString(3, entity);
                         statement.setString(4, message);
+                        statement.setString(5, DoltScope.current().sandboxColumn());
                         statement.executeUpdate();
                     }
                     long logId;
@@ -167,7 +170,7 @@ public final class DoltHistory {
     private static void insertLinks(Connection connection, long logId, List<Link> links) throws SQLException {
         if (logId <= 0 || links.isEmpty()) return;
         try (PreparedStatement statement = connection.prepareStatement("""
-                INSERT OR IGNORE INTO log_entity_links(log_id, entity_type, entity_id) VALUES (?, ?, ?)
+                INSERT OR IGNORE INTO log_entity_links(log_id, entity_type, entity_id, sandbox) VALUES (?, ?, ?, ?)
                 """)) {
             for (Link link : links) {
                 if (link == null || !TYPE.matcher(link.type() == null ? "" : link.type()).matches()
@@ -177,6 +180,7 @@ public final class DoltHistory {
                 statement.setLong(1, logId);
                 statement.setString(2, link.type());
                 statement.setString(3, link.id());
+                statement.setString(4, DoltScope.current().sandboxColumn());
                 statement.executeUpdate();
             }
         }
