@@ -5,18 +5,24 @@ import tools.dscode.dolt.store.DoltConnections;
 import tools.dscode.dolt.store.DoltSession;
 import tools.dscode.dolt.store.DoltStore;
 
+import tools.dscode.dolt.store.DoltDialect;
+
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 /** {@code pickleball dolt sandbox}. Metadata stays on main. Edits stay on {@code sbx-<name>}. */
 public final class DoltSandbox {
+    private static final Pattern COMMIT = Pattern.compile("[0-9a-zA-Z]{6,64}");
+
     private DoltSandbox() {
     }
 
@@ -50,24 +56,34 @@ public final class DoltSandbox {
     private static int create(Path project, List<String> tokens, PrintStream out) throws Exception {
         String name = positional(tokens, 2, "sandbox create needs a name");
         Binding binding = Binding.sandbox(name);
-        String owner = value(tokens, "--owner=");
-        if (owner == null || owner.isBlank()) owner = System.getProperty("user.name", "local");
-        String ttl = value(tokens, "--ttl=");
-        if (ttl == null || ttl.isBlank()) ttl = "24h";
+        String suppliedOwner = value(tokens, "--owner=");
+        String owner = suppliedOwner == null || suppliedOwner.isBlank()
+                ? System.getProperty("user.name", "local") : suppliedOwner;
+        String suppliedTtl = value(tokens, "--ttl=");
+        String ttl = suppliedTtl == null || suppliedTtl.isBlank() ? "24h" : suppliedTtl;
         parseDuration(ttl);
         String from = value(tokens, "--from=");
+        if (from != null && !from.isBlank() && !COMMIT.matcher(from).matches()) {
+            throw new IllegalArgumentException(
+                    "sandbox --from must be a commit hash\nfix: dolt sandbox create " + name + " --from=<hash>");
+        }
         String now = Instant.now().toString();
         try (DoltStore store = DoltStore.open(project, Binding.main())) {
             DoltSession session = store.session();
-            if (session.scalar("SELECT name FROM sandboxes WHERE name = ?", name) != null) {
-                throw new IllegalStateException("sandbox already exists: " + name + "\nfix: dolt sandbox list");
-            }
-            if (from == null || from.isBlank()) store.createBranch(name);
-            else session.script("CALL DOLT_BRANCH('" + binding.branch() + "', '" + from.replace("'", "") + "')");
-            String base = from == null || from.isBlank() ? head(session) : from;
-            session.update(
-                    "INSERT INTO sandboxes(name, owner, base_commit, created, last_used, ttl, sandbox) VALUES (?, ?, ?, ?, ?, ?, '')",
-                    name, owner, base == null ? "" : base, now, now, ttl);
+            withSandboxesLock(session, () -> {
+                if (session.scalar("SELECT name FROM sandboxes WHERE name = ?", name) != null) {
+                    throw new IllegalStateException("sandbox already exists: " + name + "\nfix: dolt sandbox list");
+                }
+                if (from == null || from.isBlank()) store.createBranch(name);
+                else session.call("CALL DOLT_BRANCH(?, ?)", binding.branch(), from);
+                String base = from == null || from.isBlank() ? head(session) : from;
+                session.transaction("sandboxes", () -> {
+                    session.script("SELECT name FROM sandboxes FOR UPDATE");
+                    session.update(
+                            "INSERT INTO sandboxes(name, owner, base_commit, created, last_used, ttl, sandbox) VALUES (?, ?, ?, ?, ?, ?, '')",
+                            name, owner, base == null ? "" : base, now, now, ttl);
+                });
+            });
         }
         DoltLog.log(project, "sandbox", name, name, "create owner=" + owner + " ttl=" + ttl);
         out.println("sandbox " + name + " branch " + binding.branch());
@@ -175,8 +191,20 @@ public final class DoltSandbox {
                     String path = rows.getString(1);
                     byte[] body = rows.getBytes(2);
                     if (path == null) continue;
-                    Path file = dest.resolve(path);
-                    Files.createDirectories(file.getParent());
+                    String relative;
+                    try {
+                        relative = DoltPaths.normalizeRelative(path);
+                    } catch (IllegalArgumentException refused) {
+                        throw new IllegalArgumentException(
+                                "extract refused " + path + "\nfix: store a relative path without ..");
+                    }
+                    Path file = dest.resolve(relative).normalize();
+                    if (!file.startsWith(dest)) {
+                        throw new IllegalArgumentException(
+                                "extract refused " + path + "\nfix: store a relative path without ..");
+                    }
+                    Path parent = file.getParent();
+                    if (parent != null) Files.createDirectories(parent);
                     Files.write(file, body == null ? new byte[0] : body);
                     written++;
                 }
@@ -198,8 +226,14 @@ public final class DoltSandbox {
         }
         if (force) DoltConnections.closeBranch(project, binding.branch());
         try (DoltStore store = DoltStore.open(project, Binding.main())) {
-            store.session().script("CALL DOLT_BRANCH('-D', '" + binding.branch() + "')");
-            store.session().update("DELETE FROM sandboxes WHERE name = ?", name);
+            DoltSession session = store.session();
+            withSandboxesLock(session, () -> {
+                session.call("CALL DOLT_BRANCH('-D', ?)", binding.branch());
+                session.transaction("sandboxes", () -> {
+                    session.scalar("SELECT name FROM sandboxes WHERE name = ? FOR UPDATE", name);
+                    session.update("DELETE FROM sandboxes WHERE name = ?", name);
+                });
+            });
         }
         deleteTree(DoltPaths.sandboxHome(project, name));
         DoltLog.log(project, "sandbox", name, name, "drop force=" + force);
@@ -233,20 +267,25 @@ public final class DoltSandbox {
                 DoltConnections.closeBranch(project, binding.branch());
             }
             try (DoltStore store = DoltStore.open(project, Binding.main())) {
-                try {
-                    store.session().script("CALL DOLT_BRANCH('-D', '" + binding.branch() + "')");
-                } catch (java.sql.SQLException failure) {
-                    // A branch that is already gone still loses its metadata.
-                }
-                store.session().update("DELETE FROM sandboxes WHERE name = ?", row.name());
-                if (history) {
-                    store.session().update("DELETE FROM runs WHERE sandbox = ?", row.name());
-                    for (String table : List.of(
-                            "run_logs", "scenario_executions", "step_executions",
-                            "entity_usages", "log_entity_links", "artifacts")) {
-                        store.session().update("DELETE FROM " + table + " WHERE sandbox = ?", row.name());
+                DoltSession session = store.session();
+                withSandboxesLock(session, () -> {
+                    try {
+                        session.call("CALL DOLT_BRANCH('-D', ?)", binding.branch());
+                    } catch (SQLException failure) {
+                        // A branch that is already gone still loses its metadata.
                     }
-                }
+                    session.transaction("sandboxes", () -> {
+                        session.update("DELETE FROM sandboxes WHERE name = ?", row.name());
+                        if (history) {
+                            session.update("DELETE FROM runs WHERE sandbox = ?", row.name());
+                            for (String table : List.of(
+                                    "run_logs", "scenario_executions", "step_executions",
+                                    "entity_usages", "log_entity_links", "artifacts")) {
+                                session.update("DELETE FROM " + table + " WHERE sandbox = ?", row.name());
+                            }
+                        }
+                    });
+                });
             }
             deleteTree(DoltPaths.sandboxHome(project, row.name()));
             out.println("dropped " + row.name());
@@ -257,6 +296,22 @@ public final class DoltSandbox {
         }
         out.println("gc " + victims.size());
         return 0;
+    }
+
+    private static void withSandboxesLock(DoltSession session, DoltDialect.SqlTask work) throws Exception {
+        String got = session.scalar("SELECT GET_LOCK('pkb:sandboxes', 30)");
+        if (!"1".equals(got)) {
+            throw new IllegalStateException("sandboxes lock was not acquired\nfix: retry dolt sandbox");
+        }
+        try {
+            work.run();
+        } finally {
+            try {
+                session.scalar("SELECT RELEASE_LOCK('pkb:sandboxes')");
+            } catch (SQLException ignored) {
+                // Closing the connection releases a leftover lock.
+            }
+        }
     }
 
     private static String diffSql(String table) {
