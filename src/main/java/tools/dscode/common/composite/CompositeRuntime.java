@@ -67,7 +67,7 @@ public final class CompositeRuntime {
                     "pkb_runvars." + CompositeMode.KEY,
                     CompositeBinaryLocator.ENGINE_KEY,
                     "pkb_runvars." + CompositeBinaryLocator.ENGINE_KEY,
-                    "pkb_dalton",
+                    "pkb_dolt",
                     CompositeLog.KEY,
                     "pkb_runvars." + CompositeLog.KEY,
                     CompositeLog.DIR_KEY,
@@ -319,20 +319,20 @@ public final class CompositeRuntime {
     }
 
     /**
-     * Optional Dalton note. The engine stays usable when Dalton is off.
-     * This adapter writes one line; it does not open the Dalton database.
+     * Optional Dolt note. The engine stays usable when Dolt is off.
+     * This adapter writes one line; it does not open the Dolt database.
      */
-    private static void recordDalton(Sources sources, Path binary, String version) {
-        String flag = CompositeMode.read("pkb_dalton", sources);
+    private static void recordDolt(Sources sources, Path binary, String version) {
+        String flag = CompositeMode.read("pkb_dolt", sources);
         if (flag == null || !(flag.equalsIgnoreCase("true") || "1".equals(flag))) return;
         Path root = sources.project() == null ? Path.of("") : sources.project();
-        Path file = root.resolve(".pickleball").resolve("dalton").resolve("engine-sessions.log");
+        Path file = root.resolve(".pickleball").resolve("dolt").resolve("engine-sessions.log");
         String line = Instant.now() + " engine=" + version + " bin=" + binary + "\n";
         try {
             Files.createDirectories(file.getParent());
             Files.writeString(file, line, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         } catch (java.io.IOException failure) {
-            CompositeLog.debug("session", "dalton note: " + failure.getMessage());
+            CompositeLog.debug("session", "dolt note: " + failure.getMessage());
         }
     }
 
@@ -372,7 +372,7 @@ public final class CompositeRuntime {
             String version = opened.version().path("version").asText("");
             client = opened;
             CompositeLog.info("session", "client " + binary.get() + " version " + version);
-            recordDalton(sources, binary.get(), version);
+            recordDolt(sources, binary.get(), version);
             return new Decision(true, binary.get(), version, "composite");
         } catch (RuntimeException failure) {
             CompositeLog.fallbackOnce(

@@ -126,12 +126,12 @@ Template resolution behavior for ordinary runtime resource files is unchanged by
 
 When a consumer agent needs project configuration data, read the version-matched Pickleball documentation and the consumer's active `pkb_configpath`. Prefer `<config:...>` for new references; preserve existing `<configs...>` references unless there is a reason to modernize them. Never rewrite config references to match a physical directory name.
 
-## Dalton hydrate
+## Dolt hydrate
 
-`dalton hydrate` reads the same on-disk trees a project already keeps in Git: `src/test/resources/features`, `configs`, `calls`, `component`, `templates`, and `resource-maps`, plus `pickleball.properties` and `profiles.yaml` when they sit in `src/test/resources`. Paths are stored with `/` even when the CLI is given Windows `\`. File bytes are copied as-is, including non-UTF-8 bytes. Hydrate does not change `pkb_configpath`, `<config:...>`, or `<file:...>`. A run hydrates on the first feature load unless Dalton is explicitly off. `dalton hydrate` is that same copy when you invoke the CLI.
+`dolt hydrate` reads the same on-disk trees a project already keeps in Git: `src/test/resources/features`, `configs`, `calls`, `component`, `templates`, and `resource-maps`, plus `pickleball.properties` and `profiles.yaml` when they sit in `src/test/resources`. Paths are stored with `/` even when the CLI is given Windows `\`. File bytes are copied as-is, including non-UTF-8 bytes. Hydrate does not change `pkb_configpath`, `<config:...>`, or `<file:...>`. A run hydrates on the first feature load unless Dolt is explicitly off. `dolt hydrate` is that same copy when you invoke the CLI.
 
-With Dalton on (the default; `pkb_dalton=false`, `PKB_DALTON=false`, or `dalton.properties` `enabled=false` turns it off), feature loading uses the hydrated `.feature` bytes. The query rows (scenarios, steps, tags, docstrings, and data tables) are not a second Gherkin dialect. The native engine reads those bytes. `pkb_engine=cucumber` gives the same bytes to the Cucumber adapter. With Dalton off, that load does not open the database.
+With Dolt on (the default; `pkb_dolt=false`, `PKB_DOLT=false`, or `dolt.properties` `enabled=false` turns it off), feature loading uses the hydrated `.feature` bytes. The query rows (scenarios, steps, tags, docstrings, and data tables) are not a second Gherkin dialect. The native engine reads those bytes. `pkb_engine=cucumber` gives the same bytes to the Cucumber adapter. With Dolt off, that load does not open the database.
 
-`<entity:Type#id.field>` resolves only when Dalton is on. It does not change `<config:...>`, `<file:...>`, or `<data:...>`. Entity files and the no-cleartext rule are in [Dalton entities](dalton-entities.md).
+`<entity:Type#id.field>` resolves only when Dolt is on. It does not change `<config:...>`, `<file:...>`, or `<data:...>`. Entity files and the no-cleartext rule are in [Dolt entities](dolt-entities.md).
 
-`dalton extract` copies stored bytes back to those files and does not reformat them. It leaves a file that only changed on disk. It refuses with `conflict: <path>` when the file and the database both changed, unless `--force` is set.
+`dolt extract` copies stored bytes back to those files and does not reformat them. It leaves a file that only changed on disk. It refuses with `conflict: <path>` when the file and the database both changed, unless `--force` is set.

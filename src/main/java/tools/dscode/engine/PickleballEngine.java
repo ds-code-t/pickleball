@@ -60,9 +60,9 @@ public final class PickleballEngine {
         // surrounding suite that lowered the level still records the same lines.
         Level previousLevel = PickleballRunner.LOG_LEVEL;
         PickleballRunner.LOG_LEVEL = Level.DEBUG;
-        tools.dscode.dalton.DaltonExecution.RunLease runLease = null;
+        tools.dscode.dolt.DoltExecution.RunLease runLease = null;
         try {
-            runLease = tools.dscode.dalton.DaltonExecution.RunLease.open(topLevel);
+            runLease = tools.dscode.dolt.DoltExecution.RunLease.open(topLevel);
             for (EngineFeature feature : loaded) {
                 EngineFeature expanded = GherkinEngineParser.expand(feature);
                 for (EngineScenario scenario : expanded.scenarios()) {

@@ -91,7 +91,7 @@ class WorkbenchMcpServerTest {
             "workbench_investigation_emit",
             "workbench_go",
             "workbench_agent_command",
-            "dalton",
+            "dolt",
             "engine",
             "domengine",
             "query",

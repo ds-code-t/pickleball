@@ -2,8 +2,8 @@ package tools.dscode.engine.resolve;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import tools.dscode.dalton.DaltonHydrator;
-import tools.dscode.engine.source.DaltonScenarioSource;
+import tools.dscode.dolt.DoltHydrator;
+import tools.dscode.engine.source.DoltScenarioSource;
 import tools.dscode.engine.source.MemoryScenarioSource;
 
 import java.nio.file.Files;
@@ -47,13 +47,13 @@ class ScenarioResolverTest {
     }
 
     @Test
-    void resolvesADaltonRow(@TempDir Path project) throws Exception {
+    void resolvesADoltRow(@TempDir Path project) throws Exception {
         Path file = project.resolve("features/box.feature");
         Files.createDirectories(file.getParent());
         Files.writeString(file, FEATURE);
-        DaltonHydrator.hydrate(project, DaltonHydrator.Options.full());
+        DoltHydrator.hydrate(project, DoltHydrator.Options.full());
         List<ScenarioResolver.Hit> hits = ScenarioResolver.resolve(
-                new DaltonScenarioSource(project, "features/box.feature"),
+                new DoltScenarioSource(project, "features/box.feature"),
                 ScenarioResolver.Query.of("@all", "Alpha", "Box", null)
         );
         assertEquals("Alpha", hits.getFirst().scenario().name());

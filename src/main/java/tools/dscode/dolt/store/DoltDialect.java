@@ -27,17 +27,17 @@ public final class DoltDialect {
 
     /** The eleven {@code setAutoCommit(false)} sites, plus the schema commit. */
     public static final List<String> TRANSACTIONS = List.of(
-            "DaltonContent.put",
-            "DaltonContent.delete",
-            "DaltonEntities.put",
-            "DaltonEntities.remove",
-            "DaltonExecution.recordStep",
-            "DaltonExecution.beforeStep",
-            "DaltonExtractor.extract",
-            "DaltonHistory.record",
-            "DaltonHistory.retain",
-            "DaltonHydrator.hydrate",
-            "DaltonStepCatalog.refresh",
+            "DoltContent.put",
+            "DoltContent.delete",
+            "DoltEntities.put",
+            "DoltEntities.remove",
+            "DoltExecution.recordStep",
+            "DoltExecution.beforeStep",
+            "DoltExtractor.extract",
+            "DoltHistory.record",
+            "DoltHistory.retain",
+            "DoltHydrator.hydrate",
+            "DoltStepCatalog.refresh",
             "DoltDialect.ensureSchema");
 
     public static final List<String> SOURCE_DDL = List.of(

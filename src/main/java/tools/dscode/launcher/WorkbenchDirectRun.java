@@ -7,8 +7,8 @@ import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
 import org.junit.platform.launcher.core.LauncherFactory;
 import org.junit.platform.launcher.listeners.SummaryGeneratingListener;
 import tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner;
-import tools.dscode.dalton.DaltonConfig;
-import tools.dscode.dalton.DaltonRunTrace;
+import tools.dscode.dolt.DoltConfig;
+import tools.dscode.engine.adapter.cucumber.DoltRunTracePlugin;
 import tools.dscode.testengine.DynamicSuiteEngine;
 
 import java.nio.file.Files;
@@ -43,17 +43,17 @@ public final class WorkbenchDirectRun {
             LauncherDiscoveryRequestBuilder requestBuilder = LauncherDiscoveryRequestBuilder.request()
                     .selectors(DiscoverySelectors.selectDirectory(tests.toString()))
                     .filters(EngineFilter.includeEngines(DynamicSuiteEngine.ENGINE_ID));
-            boolean trace = DaltonConfig.truthy(System.getProperty(DaltonRunTrace.ENABLED));
+            boolean trace = DoltConfig.truthy(System.getProperty(DoltRunTracePlugin.ENABLED));
             boolean record = false;
             try {
-                record = DaltonConfig.enabled() && !tools.dscode.engine.EngineConfig.nativeSelected();
+                record = DoltConfig.enabled() && !tools.dscode.engine.EngineConfig.nativeSelected();
             } catch (RuntimeException ignored) {
                 record = false;
             }
             if (trace || record) {
                 requestBuilder.configurationParameter(
                         io.cucumber.core.options.Constants.PLUGIN_PROPERTY_NAME,
-                        DaltonRunTrace.withPlugin(null));
+                        DoltRunTracePlugin.withPlugin(null));
             }
             LauncherDiscoveryRequest request = requestBuilder.build();
             SummaryGeneratingListener summary = new SummaryGeneratingListener();

@@ -1,7 +1,7 @@
 package tools.dscode.workbench.ui;
 
-import tools.dscode.workbench.dalton.DaltonBrowser;
-import tools.dscode.workbench.dalton.DaltonCliForwarder;
+import tools.dscode.workbench.dolt.DoltBrowser;
+import tools.dscode.workbench.dolt.DoltCliForwarder;
 
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
@@ -26,13 +26,13 @@ import java.util.function.Supplier;
 
 /**
  * Unified editor for categories, config files, scenarios, steps, and glue.
- * Every action is a {@link DaltonCliForwarder} argument list. Deletes are confirmed
+ * Every action is a {@link DoltCliForwarder} argument list. Deletes are confirmed
  * before {@code --confirm} is sent. This panel does not open SQLite.
  */
 final class EditPanel extends JPanel {
     @FunctionalInterface
     interface Forwarder {
-        DaltonCliForwarder.Result run(Path root, List<String> args);
+        DoltCliForwarder.Result run(Path root, List<String> args);
     }
 
     @FunctionalInterface
@@ -54,13 +54,13 @@ final class EditPanel extends JPanel {
     private final JList<String> list = new JList<>(rows);
     private final JTextArea editor = new JTextArea();
     private final JLabel status = new JLabel("Editor");
-    private final JButton refresh = WorkbenchTheme.flatButton("Refresh", "List this surface through the Dalton CLI");
-    private final JButton load = WorkbenchTheme.flatButton("Load", "Show the selected entity through the Dalton CLI");
-    private final JButton save = WorkbenchTheme.accentButton("Save", "Validate and write through the Dalton CLI");
-    private final JButton delete = WorkbenchTheme.flatButton("Delete", "Confirm, then delete through the Dalton CLI");
+    private final JButton refresh = WorkbenchTheme.flatButton("Refresh", "List this surface through the Dolt CLI");
+    private final JButton load = WorkbenchTheme.flatButton("Load", "Show the selected entity through the Dolt CLI");
+    private final JButton save = WorkbenchTheme.accentButton("Save", "Validate and write through the Dolt CLI");
+    private final JButton delete = WorkbenchTheme.flatButton("Delete", "Confirm, then delete through the Dolt CLI");
 
     EditPanel(Supplier<Path> project) {
-        this(project, DaltonCliForwarder::run, EditPanel::confirmDialog);
+        this(project, DoltCliForwarder::run, EditPanel::confirmDialog);
     }
 
     EditPanel(Supplier<Path> project, Forwarder forwarder, Confirmer confirmer) {
@@ -95,11 +95,11 @@ final class EditPanel extends JPanel {
 
     private void refresh() {
         List<String> args = switch (String.valueOf(surface.getSelectedItem())) {
-            case "Files" -> DaltonBrowser.files();
-            case "Scenarios" -> DaltonBrowser.scenarios(path.getText());
-            case "Steps" -> DaltonBrowser.steps(path.getText(), scenario.getText());
-            case "Glue" -> DaltonBrowser.glueList();
-            default -> DaltonBrowser.categoryList();
+            case "Files" -> DoltBrowser.files();
+            case "Scenarios" -> DoltBrowser.scenarios(path.getText());
+            case "Steps" -> DoltBrowser.steps(path.getText(), scenario.getText());
+            case "Glue" -> DoltBrowser.glueList();
+            default -> DoltBrowser.categoryList();
         };
         run(args);
     }
@@ -108,10 +108,10 @@ final class EditPanel extends JPanel {
         String selected = String.valueOf(surface.getSelectedItem());
         try {
             List<String> args = switch (selected) {
-                case "Files" -> DaltonBrowser.fileShow(required(path.getText(), "a path"));
-                case "Scenarios", "Steps" -> DaltonBrowser.featureShow(required(path.getText(), "a feature path"));
-                case "Glue" -> DaltonBrowser.glueShow(required(path.getText(), "a glue path"));
-                default -> DaltonBrowser.categoryShow(required(id(), "a category id"));
+                case "Files" -> DoltBrowser.fileShow(required(path.getText(), "a path"));
+                case "Scenarios", "Steps" -> DoltBrowser.featureShow(required(path.getText(), "a feature path"));
+                case "Glue" -> DoltBrowser.glueShow(required(path.getText(), "a glue path"));
+                default -> DoltBrowser.categoryShow(required(id(), "a category id"));
             };
             run(args);
         } catch (IllegalArgumentException failure) {
@@ -125,15 +125,15 @@ final class EditPanel extends JPanel {
             Files.writeString(file, editor.getText(), StandardCharsets.UTF_8);
             String selected = String.valueOf(surface.getSelectedItem());
             List<String> args = switch (selected) {
-                case "Files" -> DaltonBrowser.filePut(required(path.getText(), "a path"), file);
+                case "Files" -> DoltBrowser.filePut(required(path.getText(), "a path"), file);
                 case "Scenarios" -> scenario.getText().isBlank()
-                        ? DaltonBrowser.scenarioAdd(required(path.getText(), "a feature path"), required(name.getText(), "a scenario name"), file)
-                        : DaltonBrowser.scenarioModify(required(path.getText(), "a feature path"), scenario.getText().trim(), file);
+                        ? DoltBrowser.scenarioAdd(required(path.getText(), "a feature path"), required(name.getText(), "a scenario name"), file)
+                        : DoltBrowser.scenarioModify(required(path.getText(), "a feature path"), scenario.getText().trim(), file);
                 case "Steps" -> step.getText().isBlank()
-                        ? DaltonBrowser.stepAdd(required(path.getText(), "a feature path"), required(scenario.getText(), "a scenario"), file)
-                        : DaltonBrowser.stepModify(required(path.getText(), "a feature path"), required(scenario.getText(), "a scenario"), step.getText().trim(), file);
-                case "Glue" -> DaltonBrowser.gluePut(required(path.getText(), "a glue path"), file);
-                default -> DaltonBrowser.categoryPut(required(id(), "a category id"), file);
+                        ? DoltBrowser.stepAdd(required(path.getText(), "a feature path"), required(scenario.getText(), "a scenario"), file)
+                        : DoltBrowser.stepModify(required(path.getText(), "a feature path"), required(scenario.getText(), "a scenario"), step.getText().trim(), file);
+                case "Glue" -> DoltBrowser.gluePut(required(path.getText(), "a glue path"), file);
+                default -> DoltBrowser.categoryPut(required(id(), "a category id"), file);
             };
             run(args);
         } catch (IllegalArgumentException failure) {
@@ -156,11 +156,11 @@ final class EditPanel extends JPanel {
         }
         try {
             List<String> args = switch (selected) {
-                case "Files" -> DaltonBrowser.fileDelete(required(path.getText(), "a path"));
-                case "Scenarios" -> DaltonBrowser.scenarioDelete(required(path.getText(), "a feature path"), required(scenario.getText(), "a scenario"));
-                case "Steps" -> DaltonBrowser.stepDelete(required(path.getText(), "a feature path"), required(scenario.getText(), "a scenario"), required(step.getText(), "a step"));
-                case "Glue" -> DaltonBrowser.glueRemove(required(path.getText(), "a glue path"));
-                default -> DaltonBrowser.categoryRemove(required(id(), "a category id"));
+                case "Files" -> DoltBrowser.fileDelete(required(path.getText(), "a path"));
+                case "Scenarios" -> DoltBrowser.scenarioDelete(required(path.getText(), "a feature path"), required(scenario.getText(), "a scenario"));
+                case "Steps" -> DoltBrowser.stepDelete(required(path.getText(), "a feature path"), required(scenario.getText(), "a scenario"), required(step.getText(), "a step"));
+                case "Glue" -> DoltBrowser.glueRemove(required(path.getText(), "a glue path"));
+                default -> DoltBrowser.categoryRemove(required(id(), "a category id"));
             };
             run(args);
         } catch (IllegalArgumentException failure) {
@@ -187,9 +187,9 @@ final class EditPanel extends JPanel {
         setBusy(true);
         status.setText(String.join(" ", args));
         Path root = project.get();
-        new SwingWorker<DaltonCliForwarder.Result, Void>() {
+        new SwingWorker<DoltCliForwarder.Result, Void>() {
             @Override
-            protected DaltonCliForwarder.Result doInBackground() {
+            protected DoltCliForwarder.Result doInBackground() {
                 return forwarder.run(root, args);
             }
 
@@ -205,12 +205,12 @@ final class EditPanel extends JPanel {
         }.execute();
     }
 
-    private void show(DaltonCliForwarder.Result result) {
+    private void show(DoltCliForwarder.Result result) {
         String body = result.out() == null ? "" : result.out();
         rows.clear();
-        for (String line : DaltonBrowser.labels(body)) rows.addElement(line);
+        for (String line : DoltBrowser.labels(body)) rows.addElement(line);
         if (body.trim().startsWith("{")) {
-            editor.setText(DaltonBrowser.editableText(body));
+            editor.setText(DoltBrowser.editableText(body));
         }
         String err = result.err() == null ? "" : result.err().trim();
         status.setText(result.exit() == 0 ? "exit 0" : (err.isEmpty() ? "exit " + result.exit() : err));

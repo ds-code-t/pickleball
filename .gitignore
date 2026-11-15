@@ -44,8 +44,8 @@ bin/
 ### Pickleball generated local state ###
 .pickleball/
 
-### Dalton hydrated working copy (explicit; parent .pickleball/ is already ignored) ###
-.pickleball/dalton/
+### Dolt hydrated working copy (explicit; parent .pickleball/ is already ignored) ###
+.pickleball/dolt/
 
 ### Temporary agent and migration work ###
 .agent-work/

@@ -122,7 +122,7 @@ public final class NativeScenarioRun {
                     context.pushStep(engineStep == null ? tools.dscode.engine.model.EngineStep.of("* ", frame.getStepText()) : engineStep);
                     String stepText = engineStep == null ? frame.getStepText() : engineStep.text();
                     int stepLine = engineStep == null || engineStep.location() == null ? 0 : engineStep.location().line();
-                    tools.dscode.dalton.DaltonExecution.beforeStep(
+                    tools.dscode.dolt.DoltExecution.beforeStep(
                             options == null ? null : options.project(),
                             scenario.name(),
                             scenario.location() == null ? "" : scenario.location().uri(),
@@ -147,7 +147,7 @@ public final class NativeScenarioRun {
                         String trackedStatus = frame.result == null || frame.result.getStatus() == null
                                 ? "PASSED"
                                 : frame.result.getStatus().name();
-                        tools.dscode.dalton.DaltonExecution.afterStep(trackedStatus);
+                        tools.dscode.dolt.DoltExecution.afterStep(trackedStatus);
                         frame.nextSibling = savedNext;
                         context.popStep();
                     }
@@ -276,7 +276,7 @@ public final class NativeScenarioRun {
         void close() {
             if (!close || closed) return;
             closed = true;
-            tools.dscode.dalton.DaltonExecution.finishScenario(status.name());
+            tools.dscode.dolt.DoltExecution.finishScenario(status.name());
         }
     }
 

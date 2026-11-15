@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Current-behaviour docs describe what ships now. Dated records
- * ({@code docs/maintainer} other than the Dalton design, roadmaps, audits,
+ * ({@code docs/maintainer} other than the Dolt design, roadmaps, audits,
  * prompts) and {@code docs/release-notes.md} are history and stay out.
  * The generated repository index stays out; {@code refresh_agent_index.py --check}
  * owns it. A current-behaviour doc also fails when it says the Control Engine
@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CurrentDocsTest {
     private static final Pattern RUST = Pattern.compile("(?i)\\brust\\b");
     private static final Pattern OPT_IN = Pattern.compile("(?i)opt-in");
-    private static final Pattern DALTON = Pattern.compile("(?i)dalton");
+    private static final Pattern DOLT = Pattern.compile("(?i)dolt");
     private static final Pattern ENGINE_RUST = Pattern.compile("pkb_composite_engine=rust");
     private static final Pattern HOME = Pattern.compile("COMPOSITE_HOME");
     private static final Pattern NATIVE = Pattern.compile("composite-native");
@@ -74,19 +74,19 @@ class CurrentDocsTest {
                     hits.add(rel + ":" + n + ": pkb_composite=auto starts the engine: " + clip(line));
                 }
             }
-            optInNextToDalton(rel, text, hits);
+            optInNextToDolt(rel, text, hits);
         }
         assertTrue(hits.isEmpty(), String.join("\n", hits));
     }
 
-    private static void optInNextToDalton(String rel, String text, List<String> hits) {
-        List<Integer> dalton = starts(DALTON, text);
+    private static void optInNextToDolt(String rel, String text, List<String> hits) {
+        List<Integer> dolt = starts(DOLT, text);
         List<Integer> optIn = starts(OPT_IN, text);
-        for (int d : dalton) {
+        for (int d : dolt) {
             for (int o : optIn) {
                 if (Math.abs(d - o) <= OPT_IN_WINDOW) {
                     int line = text.substring(0, Math.min(d, o)).split("\n", -1).length;
-                    hits.add(rel + ":" + line + ": opt-in next to Dalton");
+                    hits.add(rel + ":" + line + ": opt-in next to Dolt");
                     return;
                 }
             }
@@ -117,7 +117,7 @@ class CurrentDocsTest {
         String rel = root.relativize(path).toString().replace('\\', '/');
         if (rel.startsWith(".git/") || rel.contains("/build/") || rel.startsWith("build/")) return false;
         if (rel.equals("docs/release-notes.md") || rel.equals("docs/agent/repository-index.md")) return false;
-        if (rel.startsWith("docs/maintainer/") && !rel.equals("docs/maintainer/3.0.0-dalton-design.md")) return false;
+        if (rel.startsWith("docs/maintainer/") && !rel.equals("docs/maintainer/3.0.0-dolt-working-copy-design.md")) return false;
         if (rel.startsWith("docs/roadmaps/") || rel.startsWith("docs/audits/") || rel.startsWith("prompts/")) return false;
         if (rel.startsWith("src/main/resources/META-INF/pickleball/guidance/")) return false;
         return isCurrentDoc(rel);
@@ -125,7 +125,7 @@ class CurrentDocsTest {
 
     private static boolean isCurrentDoc(String rel) {
         if (rel.equals("AGENTS.md") || rel.equals("README.md")) return true;
-        if (rel.equals("docs/maintainer/3.0.0-dalton-design.md")) return true;
+        if (rel.equals("docs/maintainer/3.0.0-dolt-working-copy-design.md")) return true;
         if (rel.startsWith("docs/agent/") && rel.endsWith(".md")) return true;
         return rel.startsWith("docs/") && !rel.substring("docs/".length()).contains("/") && rel.endsWith(".md");
     }

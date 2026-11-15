@@ -2,8 +2,8 @@ package tools.dscode.workbench.ui;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import tools.dscode.workbench.dalton.DaltonBrowser;
-import tools.dscode.workbench.dalton.DaltonCliForwarder;
+import tools.dscode.workbench.dolt.DoltBrowser;
+import tools.dscode.workbench.dolt.DoltCliForwarder;
 
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
@@ -25,7 +25,7 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
- * Tracking and timeline. Every read shells out through {@link DaltonCliForwarder}.
+ * Tracking and timeline. Every read shells out through {@link DoltCliForwarder}.
  * Play, scrub, and speed walk the returned events. Opening a run jumps to Explorer.
  */
 final class TrackingPanel extends JPanel {
@@ -34,7 +34,7 @@ final class TrackingPanel extends JPanel {
 
     @FunctionalInterface
     interface Forwarder {
-        DaltonCliForwarder.Result run(Path root, List<String> args);
+        DoltCliForwarder.Result run(Path root, List<String> args);
     }
 
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -71,11 +71,11 @@ final class TrackingPanel extends JPanel {
         playTimer = new Timer(1000, event -> next());
         playTimer.setRepeats(true);
         JPanel north = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        north.add(button("Refresh", "dalton timeline", () -> run(timeline(true, null, null))));
+        north.add(button("Refresh", "dolt timeline", () -> run(timeline(true, null, null))));
         north.add(button("Latest", "Newest timeline page", () -> run(timeline(true, null, null))));
         north.add(button("Older", "Previous timeline page", this::older));
         north.add(button("Newer", "Next timeline page", this::newer));
-        north.add(button("Query", "dalton query", () -> run(DaltonBrowser.query(
+        north.add(button("Query", "dolt query", () -> run(DoltBrowser.query(
                 entity.getText(), statusFilter.getText(), tag.getText(), feature.getText(),
                 run.getText(), text.getText(), from.getText(), to.getText()))));
         north.add(new JLabel("Entity"));
@@ -94,7 +94,7 @@ final class TrackingPanel extends JPanel {
         north.add(run);
         north.add(new JLabel("Text"));
         north.add(text);
-        north.add(button("Retain", "dalton retain", () -> run(DaltonBrowser.retain())));
+        north.add(button("Retain", "dolt retain", () -> run(DoltBrowser.retain())));
         north.add(button("Previous", "Previous timeline beat", this::previous));
         north.add(button("Next", "Next timeline beat", this::next));
         north.add(button("Play", "Play recorded beats", this::play));
@@ -135,7 +135,7 @@ final class TrackingPanel extends JPanel {
     }
 
     private List<String> timeline(boolean latest, String cursor, String before) {
-        return DaltonBrowser.timeline(
+        return DoltBrowser.timeline(
                 from.getText(), to.getText(), tag.getText(), feature.getText(),
                 run.getText(), text.getText(), cursor, before, latest);
     }
@@ -209,9 +209,9 @@ final class TrackingPanel extends JPanel {
     private void run(List<String> args) {
         status.setText(String.join(" ", args));
         Path root = project.get();
-        new SwingWorker<DaltonCliForwarder.Result, Void>() {
+        new SwingWorker<DoltCliForwarder.Result, Void>() {
             @Override
-            protected DaltonCliForwarder.Result doInBackground() {
+            protected DoltCliForwarder.Result doInBackground() {
                 return forwarder.run(root, args);
             }
 
@@ -226,7 +226,7 @@ final class TrackingPanel extends JPanel {
         }.execute();
     }
 
-    private void show(DaltonCliForwarder.Result result) {
+    private void show(DoltCliForwarder.Result result) {
         String body = result.out() == null ? "" : result.out();
         beats.clear();
         rows.clear();

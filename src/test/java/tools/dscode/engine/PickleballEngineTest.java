@@ -3,12 +3,12 @@ package tools.dscode.engine;
 import io.cucumber.java.en.Given;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import tools.dscode.dalton.DaltonHydrator;
+import tools.dscode.dolt.DoltHydrator;
 import tools.dscode.engine.context.ExecutionContext;
 import tools.dscode.engine.model.EngineStep;
 import tools.dscode.engine.model.RunResult;
 import tools.dscode.engine.model.Status;
-import tools.dscode.engine.source.DaltonScenarioSource;
+import tools.dscode.engine.source.DoltScenarioSource;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -36,7 +36,7 @@ class PickleballEngineTest {
             """;
 
     @Test
-    void runsFromTextAStepListAndADaltonRowWithNothingElseOnDisk(@TempDir Path dir) throws Exception {
+    void runsFromTextAStepListAndADoltRowWithNothingElseOnDisk(@TempDir Path dir) throws Exception {
         EngineOptions options = EngineOptions.of(EchoGlue.class).project(dir);
         RunResult text = PickleballEngine.run(FEATURE, options);
         assertEquals(Status.PASSED, text.status());
@@ -50,11 +50,11 @@ class PickleballEngineTest {
         Path feature = dir.resolve("features/echo.feature");
         Files.createDirectories(feature.getParent());
         Files.writeString(feature, FEATURE);
-        DaltonHydrator.hydrate(dir, DaltonHydrator.Options.full());
+        DoltHydrator.hydrate(dir, DoltHydrator.Options.full());
         Files.delete(feature);
-        RunResult dalton = PickleballEngine.run(new DaltonScenarioSource(dir, "features/echo.feature"), options.scenario("Hi"));
-        assertEquals(Status.PASSED, dalton.status());
-        assertEquals("hi", dalton.scenarios().getFirst().steps().getFirst().returned());
+        RunResult dolt = PickleballEngine.run(new DoltScenarioSource(dir, "features/echo.feature"), options.scenario("Hi"));
+        assertEquals(Status.PASSED, dolt.status());
+        assertEquals("hi", dolt.scenarios().getFirst().steps().getFirst().returned());
         assertFalse(Files.exists(feature));
     }
 

@@ -3,12 +3,12 @@ package tools.dscode.engine.parse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.common.GlobalConstants;
-import tools.dscode.dalton.DaltonHydrator;
+import tools.dscode.dolt.DoltHydrator;
 import tools.dscode.engine.model.EngineFeature;
 import tools.dscode.engine.model.EngineScenario;
 import tools.dscode.engine.model.EngineStep;
 import tools.dscode.engine.model.StepArgument;
-import tools.dscode.engine.source.DaltonScenarioSource;
+import tools.dscode.engine.source.DoltScenarioSource;
 import tools.dscode.engine.source.FileScenarioSource;
 import tools.dscode.engine.source.MemoryScenarioSource;
 import tools.dscode.engine.source.StepListScenarioSource;
@@ -78,7 +78,7 @@ class GherkinEngineParserTest {
     }
 
     @Test
-    void memoryFileStepListAndDaltonSourcesLoad(@TempDir Path project) throws Exception {
+    void memoryFileStepListAndDoltSourcesLoad(@TempDir Path project) throws Exception {
         EngineFeature memory = new MemoryScenarioSource(FEATURE).load().getFirst();
         assertEquals("Box", memory.name());
         Path file = project.resolve("features/box.feature");
@@ -89,10 +89,10 @@ class GherkinEngineParserTest {
         assertEquals("", steps.scenarios().getFirst().steps().getFirst().location().uri());
         assertEquals("runtime step", steps.scenarios().getFirst().steps().getFirst().text());
         assertEquals("just text", steps.scenarios().getFirst().steps().get(1).text());
-        DaltonHydrator.hydrate(project, DaltonHydrator.Options.full());
-        List<EngineFeature> dalton = new DaltonScenarioSource(project, "features/box.feature").load();
-        assertFalse(dalton.isEmpty());
-        assertEquals("Box", dalton.getFirst().name());
-        assertEquals(3, dalton.getFirst().scenarios().size());
+        DoltHydrator.hydrate(project, DoltHydrator.Options.full());
+        List<EngineFeature> dolt = new DoltScenarioSource(project, "features/box.feature").load();
+        assertFalse(dolt.isEmpty());
+        assertEquals("Box", dolt.getFirst().name());
+        assertEquals(3, dolt.getFirst().scenarios().size());
     }
 }

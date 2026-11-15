@@ -74,11 +74,6 @@ public final class PickleballWorkbenchLauncher {
             if (dolt != 0) exitProcess(dolt);
             return;
         }
-        int dalton = dispatchDaltonIfAny(args, System.out, System.err);
-        if (dalton >= 0) {
-            if (dalton != 0) exitProcess(dalton);
-            return;
-        }
         if (WorkbenchCliHelp.isHelpRequest(args)) {
             int code = WorkbenchCliHelp.answer(args, System.out, System.err);
             if (code != 0) exitProcess(code);
@@ -131,16 +126,6 @@ public final class PickleballWorkbenchLauncher {
     static int dispatchDoltIfAny(String[] args, PrintStream out, PrintStream err) {
         if (!tools.dscode.dolt.DoltCli.handles(args)) return -1;
         return tools.dscode.dolt.DoltCli.execute(args, out, err);
-    }
-
-    /**
-     * Dalton is a core CLI, not a Workbench verb. Returns {@code -1} when
-     * {@code args} are not a {@code dalton} invocation so help and the
-     * Workbench dispatcher stay on their existing path.
-     */
-    static int dispatchDaltonIfAny(String[] args, PrintStream out, PrintStream err) {
-        if (!tools.dscode.dalton.DaltonCli.handles(args)) return -1;
-        return tools.dscode.dalton.DaltonCli.execute(args, out, err);
     }
 
     /**

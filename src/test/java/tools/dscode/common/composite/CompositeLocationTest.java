@@ -190,18 +190,18 @@ class CompositeLocationTest {
     }
 
     @Test
-    void daltonRecordsTheJavaEngineWhenEnabled() throws Exception {
-        Path project = temp.resolve("dalton-project");
+    void doltRecordsTheJavaEngineWhenEnabled() throws Exception {
+        Path project = temp.resolve("dolt-project");
         Files.createDirectories(project);
         CompositeRuntime.use(
                 project,
-                Map.of("PKB_DALTON", "true", "PKB_COMPOSITE", "on"),
+                Map.of("PKB_DOLT", "true", "PKB_COMPOSITE", "on"),
                 CompositeLocationTest.class.getClassLoader(),
                 temp.resolve("home")
         );
         assertTrue(CompositeRuntime.primary(), CompositeLog.lastFallbackForTests());
         assertEquals("3.0.0", CompositeRuntime.current().version());
-        String note = Files.readString(project.resolve(".pickleball/dalton/engine-sessions.log"));
+        String note = Files.readString(project.resolve(".pickleball/dolt/engine-sessions.log"));
         assertTrue(note.contains("engine=3.0.0"), note);
     }
 

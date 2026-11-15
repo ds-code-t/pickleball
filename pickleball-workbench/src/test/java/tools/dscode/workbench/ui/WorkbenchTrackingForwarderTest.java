@@ -2,8 +2,8 @@ package tools.dscode.workbench.ui;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import tools.dscode.workbench.dalton.DaltonBrowser;
-import tools.dscode.workbench.dalton.DaltonCliForwarder;
+import tools.dscode.workbench.dolt.DoltBrowser;
+import tools.dscode.workbench.dolt.DoltCliForwarder;
 import tools.dscode.workbench.diagnostics.DiagnosticEvidenceNavigator;
 
 import javax.swing.JButton;
@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Headless Tracking tab. The forwarder stands in for the dalton CLI process. */
+/** Headless Tracking tab. The forwarder stands in for the dolt CLI process. */
 class WorkbenchTrackingForwarderTest {
     static {
         System.setProperty("java.awt.headless", "true");
@@ -37,10 +37,10 @@ class WorkbenchTrackingForwarderTest {
 
     @Test
     void commandsAreCliArgumentsOnly() {
-        assertEquals(List.of("timeline", "--json"), DaltonBrowser.timeline());
+        assertEquals(List.of("timeline", "--json"), DoltBrowser.timeline());
         assertEquals(List.of("query", "--entity=Account#ada", "--status=FAILED", "--json"),
-                DaltonBrowser.query("Account#ada", "FAILED"));
-        assertEquals(List.of("retain"), DaltonBrowser.retain());
+                DoltBrowser.query("Account#ada", "FAILED"));
+        assertEquals(List.of("retain"), DoltBrowser.retain());
     }
 
     @Test
@@ -56,7 +56,7 @@ class WorkbenchTrackingForwarderTest {
         TrackingPanel[] holder = new TrackingPanel[1];
         SwingUtilities.invokeAndWait(() -> holder[0] = new TrackingPanel(() -> project, (root, args) -> {
             forwarded.add(List.copyOf(args));
-            return new DaltonCliForwarder.Result(0, body, "", List.of());
+            return new DoltCliForwarder.Result(0, body, "", List.of());
         }, opened::add));
         TrackingPanel panel = holder[0];
         JLabel honesty = label(panel, TrackingPanel.HONESTY);
@@ -82,7 +82,7 @@ class WorkbenchTrackingForwarderTest {
         });
         click(panel, "Query");
         assertEquals(List.of("query", "--entity=Account#ada", "--status=FAILED", "--json"), forwarded.get(1));
-        assertFalse(Files.exists(project.resolve(".pickleball/dalton/dalton.db")));
+        assertFalse(Files.exists(project.resolve(".pickleball/dolt/data/pickleball/.dolt")));
     }
 
     @Test
@@ -96,7 +96,7 @@ class WorkbenchTrackingForwarderTest {
         TrackingPanel[] holder = new TrackingPanel[1];
         SwingUtilities.invokeAndWait(() -> holder[0] = new TrackingPanel(() -> project, (root, args) -> {
             forwarded.add(List.copyOf(args));
-            return new DaltonCliForwarder.Result(0, body, "", List.of());
+            return new DoltCliForwarder.Result(0, body, "", List.of());
         }, ignored -> { }));
         TrackingPanel panel = holder[0];
         SwingUtilities.invokeAndWait(() -> {
@@ -138,7 +138,7 @@ class WorkbenchTrackingForwarderTest {
                 "--to=2020-01-03T00:00:00Z",
                 "--json"), forwarded.get(5));
         assertEquals("No retained diagnostic run matches sample-run", WorkbenchFrame.unmatchedDiagnosticRun("sample-run"));
-        assertFalse(Files.exists(project.resolve(".pickleball/dalton/dalton.db")));
+        assertFalse(Files.exists(project.resolve(".pickleball/dolt/data/pickleball/.dolt")));
     }
 
     @Test
@@ -151,7 +151,7 @@ class WorkbenchTrackingForwarderTest {
         List<String> opened = new ArrayList<>();
         TrackingPanel[] holder = new TrackingPanel[1];
         SwingUtilities.invokeAndWait(() -> holder[0] = new TrackingPanel(() -> project, (root, args) ->
-                new DaltonCliForwarder.Result(0, body, "", List.of()), opened::add));
+                new DoltCliForwarder.Result(0, body, "", List.of()), opened::add));
         TrackingPanel panel = holder[0];
         click(panel, "Refresh");
         click(panel, "Open in Explorer");

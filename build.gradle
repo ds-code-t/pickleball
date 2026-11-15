@@ -456,75 +456,75 @@ tasks.register('engineRun', JavaExec) {
     if (project.hasProperty('engineSteps')) args += ['--steps=' + project.property('engineSteps')]
     if (project.hasProperty('engineGlue')) args += ['--glue=' + project.property('engineGlue')]
     if (project.hasProperty('engineName')) args += ['--name=' + project.property('engineName')]
-    if (project.hasProperty('engineDalton')) args += ['--dalton']
+    if (project.hasProperty('engineDolt')) args += ['--dolt']
     if (project.hasProperty('engineFeature')) args += ['--feature=' + project.property('engineFeature')]
 }
 
-tasks.register('daltonStatus', JavaExec) {
-    group = 'dalton'
-    description = 'Forward to the Dalton CLI status command. sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
+tasks.register('doltStatus', JavaExec) {
+    group = 'dolt'
+    description = 'Forward to the Dolt CLI status command. sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
     classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
             dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
     )
-    mainClass = 'tools.dscode.dalton.DaltonCli'
-    args = ['dalton', 'status']
+    mainClass = 'tools.dscode.dolt.DoltCli'
+    args = ['dolt', 'status']
 }
 
-tasks.register('daltonHydrate', JavaExec) {
-    group = 'dalton'
-    description = 'Forward to the Dalton CLI hydrate command. sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
+tasks.register('doltHydrate', JavaExec) {
+    group = 'dolt'
+    description = 'Forward to the Dolt CLI hydrate command. sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
     classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
             dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
     )
-    mainClass = 'tools.dscode.dalton.DaltonCli'
-    args = ['dalton', 'hydrate']
-    if (project.hasProperty('daltonPath')) args += ['--path=' + project.property('daltonPath')]
-    if (project.hasProperty('daltonForce')) args += ['--force']
+    mainClass = 'tools.dscode.dolt.DoltCli'
+    args = ['dolt', 'hydrate']
+    if (project.hasProperty('doltPath')) args += ['--path=' + project.property('doltPath')]
+    if (project.hasProperty('doltForce')) args += ['--force']
 }
 
-tasks.register('daltonExtract', JavaExec) {
-    group = 'dalton'
-    description = 'Forward to the Dalton CLI extract command. sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
+tasks.register('doltExtract', JavaExec) {
+    group = 'dolt'
+    description = 'Forward to the Dolt CLI extract command. sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
     classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
             dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
     )
-    mainClass = 'tools.dscode.dalton.DaltonCli'
-    args = ['dalton', 'extract']
-    if (project.hasProperty('daltonPath')) args += ['--path=' + project.property('daltonPath')]
-    if (project.hasProperty('daltonForce')) args += ['--force']
+    mainClass = 'tools.dscode.dolt.DoltCli'
+    args = ['dolt', 'extract']
+    if (project.hasProperty('doltPath')) args += ['--path=' + project.property('doltPath')]
+    if (project.hasProperty('doltForce')) args += ['--force']
 }
 
-tasks.register('daltonFeature', JavaExec) {
-    group = 'dalton'
-    description = 'Forward to the Dalton CLI feature command. sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
+tasks.register('doltFeature', JavaExec) {
+    group = 'dolt'
+    description = 'Forward to the Dolt CLI feature command. sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
     classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
             dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
     )
-    mainClass = 'tools.dscode.dalton.DaltonCli'
-    args = ['dalton', 'feature']
-    args += [project.hasProperty('daltonFeature') ? project.property('daltonFeature') : 'put']
-    if (project.hasProperty('daltonPath')) args += [project.property('daltonPath')]
-    if (project.hasProperty('daltonText')) args += ['--text=' + project.property('daltonText')]
-    if (project.hasProperty('daltonFile')) args += ['--file=' + project.property('daltonFile')]
+    mainClass = 'tools.dscode.dolt.DoltCli'
+    args = ['dolt', 'feature']
+    args += [project.hasProperty('doltFeature') ? project.property('doltFeature') : 'put']
+    if (project.hasProperty('doltPath')) args += [project.property('doltPath')]
+    if (project.hasProperty('doltText')) args += ['--text=' + project.property('doltText')]
+    if (project.hasProperty('doltFile')) args += ['--file=' + project.property('doltFile')]
 }
 
-tasks.register('daltonEdit', JavaExec) {
-    group = 'dalton'
-    description = 'Forward to the Dalton edit CLI (category, file, glue, feature scenario/step). sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
+tasks.register('doltEdit', JavaExec) {
+    group = 'dolt'
+    description = 'Forward to the Dolt edit CLI (category, file, glue, feature scenario/step). sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
     classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
             dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
     )
-    mainClass = 'tools.dscode.dalton.DaltonCli'
-    args = ['dalton']
-    def editArgs = project.hasProperty('daltonArgs') ? project.property('daltonArgs').toString() : 'category,list'
+    mainClass = 'tools.dscode.dolt.DoltCli'
+    args = ['dolt']
+    def editArgs = project.hasProperty('doltArgs') ? project.property('doltArgs').toString() : 'category,list'
     args += editArgs.split(',')
-    if (project.hasProperty('daltonJson')) args += ['--json']
-    if (project.hasProperty('daltonPath')) args += ['--path=' + project.property('daltonPath')]
-    if (project.hasProperty('daltonId')) args += ['--id=' + project.property('daltonId')]
-    if (project.hasProperty('daltonText')) args += ['--text=' + project.property('daltonText')]
-    if (project.hasProperty('daltonFile')) args += ['--file=' + project.property('daltonFile')]
-    if (project.hasProperty('daltonConfirm')) args += ['--confirm']
-    if (project.hasProperty('daltonForce')) args += ['--force']
+    if (project.hasProperty('doltJson')) args += ['--json']
+    if (project.hasProperty('doltPath')) args += ['--path=' + project.property('doltPath')]
+    if (project.hasProperty('doltId')) args += ['--id=' + project.property('doltId')]
+    if (project.hasProperty('doltText')) args += ['--text=' + project.property('doltText')]
+    if (project.hasProperty('doltFile')) args += ['--file=' + project.property('doltFile')]
+    if (project.hasProperty('doltConfirm')) args += ['--confirm']
+    if (project.hasProperty('doltForce')) args += ['--force']
 }
 
 tasks.register('domengine', JavaExec) {
@@ -541,50 +541,50 @@ tasks.register('domengine', JavaExec) {
     args(forwarded)
 }
 
-tasks.register('daltonQuery', JavaExec) {
-    group = 'dalton'
-    description = 'Forward to a Dalton CLI read command. sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
+tasks.register('doltQuery', JavaExec) {
+    group = 'dolt'
+    description = 'Forward to a Dolt CLI read command. sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
     classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
             dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
     )
-    mainClass = 'tools.dscode.dalton.DaltonCli'
-    args = ['dalton']
-    def queryArgs = project.hasProperty('daltonArgs') ? project.property('daltonArgs').toString() : 'files,list'
+    mainClass = 'tools.dscode.dolt.DoltCli'
+    args = ['dolt']
+    def queryArgs = project.hasProperty('doltArgs') ? project.property('doltArgs').toString() : 'files,list'
     args += queryArgs.split(',')
-    if (project.hasProperty('daltonJson')) args += ['--json']
-    if (project.hasProperty('daltonFeaturePath')) args += ['--feature=' + project.property('daltonFeaturePath')]
-    if (project.hasProperty('daltonScenario')) args += ['--scenario=' + project.property('daltonScenario')]
+    if (project.hasProperty('doltJson')) args += ['--json']
+    if (project.hasProperty('doltFeaturePath')) args += ['--feature=' + project.property('doltFeaturePath')]
+    if (project.hasProperty('doltScenario')) args += ['--scenario=' + project.property('doltScenario')]
 }
 
-tasks.register('daltonHistory', JavaExec) {
-    group = 'dalton'
-    description = 'Forward to the Dalton CLI history command. sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
+tasks.register('doltHistory', JavaExec) {
+    group = 'dolt'
+    description = 'Forward to the Dolt CLI history command. sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
     classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
             dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
     )
-    mainClass = 'tools.dscode.dalton.DaltonCli'
-    args = ['dalton', 'history']
-    args += [project.hasProperty('daltonHistory') ? project.property('daltonHistory') : 'list']
-    if (project.hasProperty('daltonRun')) args += [project.property('daltonRun')]
-    if (project.hasProperty('daltonDays')) args += ['--days=' + project.property('daltonDays')]
-    if (project.hasProperty('daltonMaxBytes')) args += ['--max-bytes=' + project.property('daltonMaxBytes')]
+    mainClass = 'tools.dscode.dolt.DoltCli'
+    args = ['dolt', 'history']
+    args += [project.hasProperty('doltHistory') ? project.property('doltHistory') : 'list']
+    if (project.hasProperty('doltRun')) args += [project.property('doltRun')]
+    if (project.hasProperty('doltDays')) args += ['--days=' + project.property('doltDays')]
+    if (project.hasProperty('doltMaxBytes')) args += ['--max-bytes=' + project.property('doltMaxBytes')]
 }
 
-tasks.register('daltonRun', JavaExec) {
-    group = 'dalton'
-    description = 'Forward to the Dalton CLI run command. sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
+tasks.register('doltRun', JavaExec) {
+    group = 'dolt'
+    description = 'Forward to the Dolt CLI run command. sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
     classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
             dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
     )
-    mainClass = 'tools.dscode.dalton.DaltonCli'
-    args = ['dalton', 'run']
-    if (project.hasProperty('daltonTags')) args += ['--tags=' + project.property('daltonTags')]
-    if (project.hasProperty('daltonName')) args += ['--name=' + project.property('daltonName')]
-    if (project.hasProperty('daltonGlue')) args += ['--glue=' + project.property('daltonGlue')]
-    if (project.hasProperty('daltonDryRun')) args += ['--dry-run']
+    mainClass = 'tools.dscode.dolt.DoltCli'
+    args = ['dolt', 'run']
+    if (project.hasProperty('doltTags')) args += ['--tags=' + project.property('doltTags')]
+    if (project.hasProperty('doltName')) args += ['--name=' + project.property('doltName')]
+    if (project.hasProperty('doltGlue')) args += ['--glue=' + project.property('doltGlue')]
+    if (project.hasProperty('doltDryRun')) args += ['--dry-run']
     doFirst {
-        if (project.hasProperty('daltonDryRun')) return
-        def dir = file('.pickleball/dalton')
+        if (project.hasProperty('doltDryRun')) return
+        def dir = file('.pickleball/dolt')
         dir.mkdirs()
         def joined = sourceSets.test.runtimeClasspath.asPath
         if (joined.contains(' ')) joined = '"' + joined + '"'
@@ -592,10 +592,10 @@ tasks.register('daltonRun', JavaExec) {
     }
 }
 
-tasks.register('daltonRunClasspath') {
-    group = 'dalton'
-    description = 'Write the test runtime classpath used by warm dalton run. sqlite-jdbc is a published runtime dependency.'
-    def out = layout.buildDirectory.file('dalton-run-classpath.txt')
+tasks.register('doltRunClasspath') {
+    group = 'dolt'
+    description = 'Write the test runtime classpath used by warm dolt run. sqlite-jdbc is a published runtime dependency.'
+    def out = layout.buildDirectory.file('dolt-run-classpath.txt')
     outputs.file(out)
     doLast {
         def joined = sourceSets.test.runtimeClasspath.asPath

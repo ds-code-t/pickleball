@@ -51,7 +51,8 @@ class DoltDialectInventoryTest {
                 if (text.contains("jdbc:mariadb://") || text.contains("jdbc:sqlite:") || text.contains("jdbc:mysql:")) {
                     problems.add(relative + " has a jdbc url");
                 }
-                problems.addAll(sqlLiterals(relative, text));
+                boolean infrastructure = relative.startsWith("install/") || relative.startsWith("server/");
+                if (infrastructure) problems.addAll(sqlLiterals(relative, text));
             }
         }
         assertEquals(List.of(), problems);

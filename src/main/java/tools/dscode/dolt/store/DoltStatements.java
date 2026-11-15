@@ -2,7 +2,7 @@ package tools.dscode.dolt.store;
 
 import java.util.List;
 
-/** Ported Dolt SQL. Generated from the Dalton statements; SQLite still runs the product until P3. */
+/** Ported Dolt SQL. Generated from the Dolt statements; SQLite still runs the product until P3. */
 public final class DoltStatements {
     private DoltStatements() {}
 

@@ -18,7 +18,7 @@ The distribution arrow is an assembly input, not a Workbench-to-core Java depend
 
 Pickleball owns scenario execution semantics, Cucumber integration, DynamicControl/Gherkin execution, Mapping, browser/service behavior, the consumer-side Control Bridge, semantic hooks/breakpoints, Step Overrides, and woven Cucumber/AspectJ behavior.
 
-Workbench does not implement Dalton. The Dalton tab, the Tracking tab, the MCP tool `dalton`, and `DaltonCliForwarder` only build `java -jar <pickleball.jar> dalton ...`. The Dalton tab browses files, features, scenarios, steps, entities, and run history, shows conflicts, and runs status, hydrate, and extract. The Tracking tab forwards `dalton timeline`, `dalton query`, and `dalton retain`. Refresh and Latest open the newest page. Older and Newer page with `--before` and `--cursor`. From, To, Tag, Feature, Run, and Text are forwarded. Scrub, previous, next, play, pause, and speed walk those recorded beats. Open in Explorer jumps into the existing Explorer for that one run and shows a gap when the catalog has no match. It does not build a second player. The tab says: "Rewind is view-only over recorded history. It does not undo browser or service side effects." Status shows `enabled=<bool> source=<source>` from the CLI JSON (`enabled` and `enabledSource`). Feature text is saved with `dalton feature put --file`. An entity is saved with `dalton entity put --payload-file`. The Run button forwards `dalton run` and does not start a second engine. Labels are the human text (`edited=yes`, `scenarios=2`, `Entity Type id version N`). The tabs do not open SQLite and do not load Dalton classes. Gradle `daltonStatus`, `daltonHydrate`, `daltonExtract`, `daltonFeature`, `daltonQuery`, `daltonHistory`, and `daltonRun` do the same forward. Diagnostic reports stay on the existing reporting path.
+Workbench does not implement Dolt. The Dolt tab, the Tracking tab, the MCP tool `dolt`, and `DoltCliForwarder` only build `java -jar <pickleball.jar> dolt ...`. The Dolt tab browses files, features, scenarios, steps, entities, and run history, shows conflicts, and runs status, hydrate, and extract. The Tracking tab forwards `dolt timeline`, `dolt query`, and `dolt retain`. Refresh and Latest open the newest page. Older and Newer page with `--before` and `--cursor`. From, To, Tag, Feature, Run, and Text are forwarded. Scrub, previous, next, play, pause, and speed walk those recorded beats. Open in Explorer jumps into the existing Explorer for that one run and shows a gap when the catalog has no match. It does not build a second player. The tab says: "Rewind is view-only over recorded history. It does not undo browser or service side effects." Status shows `enabled=<bool> source=<source>` from the CLI JSON (`enabled` and `enabledSource`). Feature text is saved with `dolt feature put --file`. An entity is saved with `dolt entity put --payload-file`. The Run button forwards `dolt run` and does not start a second engine. Labels are the human text (`edited=yes`, `scenarios=2`, `Entity Type id version N`). The tabs do not open SQLite and do not load Dolt classes. Gradle `doltStatus`, `doltHydrate`, `doltExtract`, `doltFeature`, `doltQuery`, `doltHistory`, and `doltRun` do the same forward. Diagnostic reports stay on the existing reporting path.
 
 Workbench owns synchronization, `.pickleball/workbench/` disposable state, worker lifecycle, the protocol client, `WorkbenchLiveSession`, `WorkbenchServices` / `WorkbenchController`, MCP stdio, the headless live-scenario presentation model, and the Swing adapter. It does not import the worker entry point; it launches the protocol's class-name string on the captured consumer classpath.
 
@@ -722,17 +722,17 @@ A warm launch adds `-o` (Maven) or `--offline` (Gradle) once the project has com
 
 ## Editor
 
-The Editor tab adds, changes, and deletes element categories, configuration and data files, scenarios, scenario steps, and Java or JS/TS glue. Every button builds a `dalton` argument list and `DaltonCliForwarder` runs it. The tab does not open SQLite and does not load Dalton classes. MCP `dalton` and Gradle `daltonEdit` forward the same commands.
+The Editor tab adds, changes, and deletes element categories, configuration and data files, scenarios, scenario steps, and Java or JS/TS glue. Every button builds a `dolt` argument list and `DoltCliForwarder` runs it. The tab does not open SQLite and does not load Dolt classes. MCP `dolt` and Gradle `doltEdit` forward the same commands.
 
 | Surface | Command |
 |---|---|
-| Categories | `dalton category list\|show\|put\|remove` |
-| Files | `dalton file put\|delete\|show` |
-| Scenarios | `dalton feature scenario-add\|scenario-modify\|scenario-delete` |
-| Steps | `dalton feature step-add\|step-modify\|step-delete` |
-| Glue | `dalton glue list\|show\|put\|remove` |
+| Categories | `dolt category list\|show\|put\|remove` |
+| Files | `dolt file put\|delete\|show` |
+| Scenarios | `dolt feature scenario-add\|scenario-modify\|scenario-delete` |
+| Steps | `dolt feature step-add\|step-modify\|step-delete` |
+| Glue | `dolt glue list\|show\|put\|remove` |
 
-Deletes ask for confirmation, then pass `--confirm`. A conflict or an untracked database edit is refused unless `--force`. When Dalton is off the command writes the file. When Dalton is on, put sets `db_edited` and leaves the file until `dalton extract`. Scenario and step edits splice one region, keep comments outside it, normalize the indent of that region, and write valid Gherkin through `feature put`. `dalton scenario put` and `dalton step put` stay rejected. Java `@Given` / `@When` / `@Then` / `@And` / `@But` values stay one string literal. Files under `glue/js/` are source only; there is no JS/TS step runtime. A secret field must be a reference (`<name>` or `~MASK`). `pkb_dalton_log=edit` logs each edit, date-stamped, per entity, and size-capped.
+Deletes ask for confirmation, then pass `--confirm`. A conflict or an untracked database edit is refused unless `--force`. When Dolt is off the command writes the file. When Dolt is on, put sets `db_edited` and leaves the file until `dolt extract`. Scenario and step edits splice one region, keep comments outside it, normalize the indent of that region, and write valid Gherkin through `feature put`. `dolt scenario put` and `dolt step put` stay rejected. Java `@Given` / `@When` / `@Then` / `@And` / `@But` values stay one string literal. Files under `glue/js/` are source only; there is no JS/TS step runtime. A secret field must be a reference (`<name>` or `~MASK`). `pkb_dolt_log=edit` logs each edit, date-stamped, per entity, and size-capped.
 
 ## Java DOM engine
 

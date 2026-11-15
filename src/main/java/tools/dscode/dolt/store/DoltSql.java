@@ -10,7 +10,7 @@ import java.sql.Statement;
 import java.util.Locale;
 
 /**
- * Rewrites the Dalton SQLite statements onto the Dolt dialect at execution time.
+ * Rewrites the Dolt SQLite statements onto the Dolt dialect at execution time.
  * Callers keep their SQL text; the connection they receive from {@link DoltSession}
  * is this wrapper. {@code jdbc:sqlite} is not opened here.
  */

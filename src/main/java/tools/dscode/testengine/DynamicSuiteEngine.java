@@ -158,17 +158,17 @@ public final class DynamicSuiteEngine implements TestEngine {
         }
     }
 
-    /** Cucumber runs record executions when Dalton is on. Dalton off does not add a plugin. */
+    /** Cucumber runs record executions when Dolt is on. Dolt off does not add a plugin. */
     private static Map<String, String> trackingPlugins(Map<String, String> overlay) {
         LinkedHashMap<String, String> copy = new LinkedHashMap<>();
         if (overlay != null) copy.putAll(overlay);
         try {
-            if (!tools.dscode.dalton.DaltonConfig.enabled()) return copy;
+            if (!tools.dscode.dolt.DoltConfig.enabled()) return copy;
         } catch (RuntimeException failure) {
             return copy;
         }
         if (tools.dscode.engine.EngineConfig.nativeSelected()) return copy;
-        copy.put(PLUGIN_PROPERTY_NAME, tools.dscode.dalton.DaltonRunTrace.withPlugin(copy.get(PLUGIN_PROPERTY_NAME)));
+        copy.put(PLUGIN_PROPERTY_NAME, tools.dscode.engine.adapter.cucumber.DoltRunTracePlugin.withPlugin(copy.get(PLUGIN_PROPERTY_NAME)));
         return copy;
     }
 

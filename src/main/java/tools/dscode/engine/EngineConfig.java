@@ -6,7 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * Selects the execution engine. Precedence matches Dalton:
+ * Selects the execution engine. Precedence matches Dolt:
  * system property {@code pkb_engine}, else env {@code PKB_ENGINE},
  * else {@code engine.properties} {@code mode=}. Default is {@code native}.
  * {@code pkb_engine=cucumber} keeps the Cucumber adapter, which stays supported.
