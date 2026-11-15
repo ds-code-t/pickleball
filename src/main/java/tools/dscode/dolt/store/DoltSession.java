@@ -2,7 +2,10 @@ package tools.dscode.dolt.store;
 
 import tools.dscode.dolt.DoltLog;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -114,7 +117,12 @@ public final class DoltSession implements AutoCloseable {
     }
 
     public void transaction(String table, DoltDialect.SqlTask work) throws SQLException {
+        // Dolt commits by merging. Two transactions that store the same cell value both succeed,
+        // so SELECT FOR UPDATE does not keep a read-modify-write. One lock per branch and table does.
+        String lock = writeLock(binding.branch(), table);
         DoltDialect.retry(table, () -> {
+            String got = scalar("SELECT GET_LOCK(?, 30)", lock);
+            if (!"1".equals(got)) throw new SQLException("error: could not lock " + table);
             inTransaction = true;
             connection.setAutoCommit(false);
             try {
@@ -129,7 +137,16 @@ public final class DoltSession implements AutoCloseable {
                 throw failure;
             } finally {
                 inTransaction = false;
-                connection.setAutoCommit(true);
+                try {
+                    connection.setAutoCommit(true);
+                } catch (SQLException ignored) {
+                    // The commit or rollback already finished.
+                }
+                try {
+                    scalar("SELECT RELEASE_LOCK(?)", lock);
+                } catch (SQLException ignored) {
+                    // Closing the connection releases a leftover lock.
+                }
             }
         });
     }
@@ -191,5 +208,21 @@ public final class DoltSession implements AutoCloseable {
         if (sql == null) return "sql";
         Matcher matcher = TABLE.matcher(sql);
         return matcher.find() ? matcher.group(1) : "sql";
+    }
+
+    /** MySQL lock names are 64 characters. A long branch and table name is hashed. */
+    static String writeLock(String branch, String table) {
+        String name = "pkb:w:" + (branch == null ? "" : branch) + ":" + (table == null ? "" : table);
+        if (name.length() <= 64) return name;
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(name.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder("pkb:w:");
+            for (int index = 0; index < 16; index++) {
+                hex.append(String.format("%02x", digest[index] & 0xff));
+            }
+            return hex.toString();
+        } catch (NoSuchAlgorithmException failure) {
+            return "pkb:w:" + Integer.toHexString(name.hashCode());
+        }
     }
 }
