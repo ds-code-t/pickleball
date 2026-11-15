@@ -270,9 +270,27 @@ public class StepExtension extends StepData {
         return true;
     }
 
+    /** Passed finalizers emit nothing on the Cucumber path. Match that here. */
+    private void recordNativeStep() {
+        if (hasFinalizerAction()
+                && result != null
+                && result.getStatus() != io.cucumber.plugin.event.Status.FAILED
+                && result.getStatus() != io.cucumber.plugin.event.Status.UNDEFINED) {
+            return;
+        }
+        tools.dscode.engine.runtime.NativeStepTrace.record(this);
+    }
+
     public Result run() {
         if (pickleStepTestStep == null) {
-            return tools.dscode.engine.runtime.SharedStepRun.run(this);
+            // AFTER_STEP runs as this method returns. A held control-bridge pause
+            // executes later steps there. Cucumber emits the finish event before
+            // that hook, so the native trace must record this step first.
+            try {
+                return tools.dscode.engine.runtime.SharedStepRun.run(this);
+            } finally {
+                recordNativeStep();
+            }
         }
         attachPendingInlineChild();
         result = null;

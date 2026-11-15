@@ -966,6 +966,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-api/src/test/java/tools/dscode/control/bridge/ControlBridgePauseFirstAdoptTest.java`
 - `pickleball-control-api/src/test/java/tools/dscode/control/bridge/ControlBridgeStepResolverTest.java`
 - `pickleball-control-api/src/test/java/tools/dscode/control/bridge/DebuggerAddressTest.java`
+- `pickleball-control-api/src/test/java/tools/dscode/control/bridge/PausedRuntimeStepOrderTest.java`
 
 ## Neutral control protocol module
 
