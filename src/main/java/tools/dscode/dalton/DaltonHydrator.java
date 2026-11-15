@@ -119,6 +119,7 @@ public final class DaltonHydrator {
                     }
                 }
                 if (!options.dryRun()) {
+                    DaltonStepCatalog.refresh(connection, project, now);
                     DaltonGit.Snapshot git = DaltonGit.capture(project);
                     try (var statement = connection.prepareStatement("""
                             UPDATE provenance SET hydration_id = ?, last_hydrated_at = ?, schema_version = ?,

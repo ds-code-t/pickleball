@@ -15,7 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * shadow JAR. WAL and {@code busy_timeout} are set on every open.
  */
 public final class DaltonDatabase implements AutoCloseable {
-    public static final int SCHEMA_VERSION = 5;
+    public static final int SCHEMA_VERSION = 6;
     public static final String MISSING_DRIVER =
             "Dalton is enabled but org.xerial:sqlite-jdbc is not on the classpath. Add it as testRuntimeOnly / test scope or use the Gradle dalton* tasks. "
                     + "Dalton is on by default; add org.xerial:sqlite-jdbc or set pkb_dalton=false to run file-only.";
@@ -197,6 +197,76 @@ public final class DaltonDatabase implements AutoCloseable {
                         entity TEXT NOT NULL,
                         message TEXT NOT NULL,
                         FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE
+                    )
+                    """);
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS step_definitions (
+                        definition_id TEXT PRIMARY KEY,
+                        language TEXT NOT NULL,
+                        pattern TEXT NOT NULL,
+                        method_name TEXT,
+                        source_path TEXT NOT NULL,
+                        source_line INTEGER NOT NULL,
+                        content_hash TEXT NOT NULL,
+                        hydrated_at TEXT NOT NULL
+                    )
+                    """);
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS scenario_executions (
+                        exec_id TEXT PRIMARY KEY,
+                        run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE CASCADE,
+                        scenario_key TEXT NOT NULL,
+                        scenario_hash TEXT NOT NULL,
+                        examples_row INTEGER,
+                        started_at TEXT NOT NULL,
+                        finished_at TEXT,
+                        status TEXT NOT NULL,
+                        passed INTEGER NOT NULL DEFAULT 0,
+                        failed INTEGER NOT NULL DEFAULT 0
+                    )
+                    """);
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS step_executions (
+                        step_exec_id TEXT PRIMARY KEY,
+                        scenario_exec_id TEXT NOT NULL REFERENCES scenario_executions(exec_id) ON DELETE CASCADE,
+                        step_ord INTEGER NOT NULL,
+                        step_text TEXT NOT NULL,
+                        step_text_hash TEXT NOT NULL,
+                        definition_id TEXT REFERENCES step_definitions(definition_id),
+                        source_line INTEGER,
+                        started_at TEXT NOT NULL,
+                        finished_at TEXT,
+                        status TEXT NOT NULL
+                    )
+                    """);
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS entity_usages (
+                        usage_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        step_exec_id TEXT NOT NULL REFERENCES step_executions(step_exec_id) ON DELETE CASCADE,
+                        entity_type TEXT NOT NULL,
+                        entity_id TEXT NOT NULL,
+                        field TEXT,
+                        operation TEXT NOT NULL,
+                        value_ref TEXT,
+                        logged_at TEXT NOT NULL
+                    )
+                    """);
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS log_entity_links (
+                        log_id INTEGER NOT NULL REFERENCES run_logs(id) ON DELETE CASCADE,
+                        entity_type TEXT NOT NULL,
+                        entity_id TEXT NOT NULL,
+                        PRIMARY KEY (log_id, entity_type, entity_id)
+                    )
+                    """);
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS artifacts (
+                        artifact_id TEXT PRIMARY KEY,
+                        run_id TEXT REFERENCES runs(run_id) ON DELETE CASCADE,
+                        step_exec_id TEXT REFERENCES step_executions(step_exec_id) ON DELETE SET NULL,
+                        kind TEXT NOT NULL,
+                        path TEXT NOT NULL,
+                        retained_at TEXT NOT NULL
                     )
                     """);
         }

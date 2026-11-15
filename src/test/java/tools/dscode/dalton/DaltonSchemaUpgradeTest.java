@@ -6,12 +6,15 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** A database created with schema 4 opens, migrates, and keeps its rows. */
 class DaltonSchemaUpgradeTest {
@@ -53,11 +56,98 @@ class DaltonSchemaUpgradeTest {
                     + "VALUES ('features/one.feature', 'abc', x'616263', 1, 'feature', 't', 'abc', 0)");
         }
         try (DaltonDatabase database = DaltonDatabase.open(project)) {
-            assertEquals(5, database.schemaVersion());
+            assertEquals(6, database.schemaVersion());
             DaltonFiles.Row row = DaltonFiles.find(database.connection(), "features/one.feature");
             assertEquals("abc", new String(row.raw(), StandardCharsets.UTF_8));
             assertFalse(row.binaryRef());
             assertEquals("feature", row.sourceType());
+        }
+    }
+
+    @Test
+    void schemaFiveUpgradesInPlaceAndKeepsRows() throws Exception {
+        Path db = DaltonPaths.database(project);
+        Files.createDirectories(db.getParent());
+        try (Connection connection = DriverManager.getConnection(DaltonDatabase.jdbcUrl(db));
+             Statement statement = connection.createStatement()) {
+            statement.execute("""
+                    CREATE TABLE schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)
+                    """);
+            statement.execute("""
+                    CREATE TABLE files (
+                        path TEXT PRIMARY KEY,
+                        content_hash TEXT NOT NULL,
+                        raw_content BLOB NOT NULL,
+                        mtime INTEGER NOT NULL,
+                        source_type TEXT NOT NULL,
+                        last_hydrated_at TEXT NOT NULL,
+                        last_synced_hash TEXT NOT NULL,
+                        db_edited INTEGER NOT NULL DEFAULT 0,
+                        git_blob TEXT,
+                        binary_ref INTEGER NOT NULL DEFAULT 0,
+                        byte_size INTEGER
+                    )
+                    """);
+            statement.execute("""
+                    CREATE TABLE provenance (
+                        id INTEGER PRIMARY KEY CHECK (id = 1),
+                        schema_version INTEGER NOT NULL,
+                        hydration_id TEXT,
+                        last_hydrated_at TEXT,
+                        git_commit TEXT,
+                        git_branch TEXT,
+                        git_remote TEXT,
+                        github_repo TEXT,
+                        git_dirty INTEGER
+                    )
+                    """);
+            statement.execute("""
+                    CREATE TABLE runs (
+                        run_id TEXT PRIMARY KEY,
+                        started_at TEXT NOT NULL,
+                        finished_at TEXT,
+                        status TEXT NOT NULL,
+                        scenario TEXT NOT NULL,
+                        passed INTEGER NOT NULL DEFAULT 0,
+                        failed INTEGER NOT NULL DEFAULT 0,
+                        note TEXT NOT NULL
+                    )
+                    """);
+            statement.execute("INSERT INTO schema_meta(key, value) VALUES ('schema_version', '5')");
+            statement.execute("INSERT INTO provenance(id, schema_version, git_commit) VALUES (1, 5, 'abc123')");
+            statement.execute("INSERT INTO files(path, content_hash, raw_content, mtime, source_type, last_hydrated_at, last_synced_hash, db_edited, git_blob, binary_ref, byte_size) "
+                    + "VALUES ('features/kept.feature', 'abc', x'6b657074', 1, 'feature', 't', 'abc', 0, 'blob', 0, 4)");
+            statement.execute("INSERT INTO runs(run_id, started_at, status, scenario, passed, failed, note) "
+                    + "VALUES ('run-5', '2026-01-01T00:00:00Z', 'passed', 'Kept', 1, 0, '')");
+        }
+        try (DaltonDatabase database = DaltonDatabase.open(project)) {
+            assertEquals(6, database.schemaVersion());
+            DaltonFiles.Row row = DaltonFiles.find(database.connection(), "features/kept.feature");
+            assertEquals("kept", new String(row.raw(), StandardCharsets.UTF_8));
+            assertEquals("abc123", text(database, "SELECT git_commit FROM provenance WHERE id = 1"));
+            assertEquals("Kept", text(database, "SELECT scenario FROM runs WHERE run_id = 'run-5'"));
+            assertTrue(exists(database, "step_definitions"));
+            assertTrue(exists(database, "scenario_executions"));
+            assertTrue(exists(database, "step_executions"));
+            assertTrue(exists(database, "entity_usages"));
+            assertTrue(exists(database, "log_entity_links"));
+            assertTrue(exists(database, "artifacts"));
+            assertEquals("0", text(database, "SELECT COUNT(*) FROM step_definitions"));
+        }
+    }
+
+    private static boolean exists(DaltonDatabase database, String table) throws SQLException {
+        try (var statement = database.connection().createStatement();
+             ResultSet rows = statement.executeQuery(
+                     "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = '" + table + "'")) {
+            return rows.next();
+        }
+    }
+
+    private static String text(DaltonDatabase database, String sql) throws SQLException {
+        try (var statement = database.connection().createStatement();
+             ResultSet rows = statement.executeQuery(sql)) {
+            return rows.next() ? rows.getString(1) : "";
         }
     }
 }
