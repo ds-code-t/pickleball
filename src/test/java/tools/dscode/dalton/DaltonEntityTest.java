@@ -93,8 +93,8 @@ class DaltonEntityTest {
         IllegalArgumentException put = assertThrows(IllegalArgumentException.class, () ->
                 DaltonEntities.put(project, "Account", "ada", 1, "{\"password\":\"hunter2\"}"));
         assertTrue(put.getMessage().contains("secret reference"), put.getMessage());
-        if (Files.isRegularFile(DaltonPaths.database(project))) {
-            assertFalse(new String(Files.readAllBytes(DaltonPaths.database(project)), StandardCharsets.ISO_8859_1).contains("hunter2"));
+        if (DaltonPaths.ready(project)) {
+            assertFalse(DaltonDatabase.storedText(project).contains("hunter2"));
         }
 
         Path file = project.resolve("dalton-entities/Account/secret.entity");
@@ -115,7 +115,7 @@ class DaltonEntityTest {
                 assertEquals(0, rows.getInt(1));
             }
         }
-        assertFalse(new String(Files.readAllBytes(DaltonPaths.database(project)), StandardCharsets.ISO_8859_1).contains("hunter2"));
+        assertFalse(DaltonDatabase.storedText(project).contains("hunter2"));
     }
 
     @Test
@@ -185,7 +185,7 @@ class DaltonEntityTest {
             assertEquals(List.of("Ada", "<password:qaDb>"), on.reached(), on.report());
             assertTrue(on.reached().stream().noneMatch(value -> value.contains("hunter2")), on.report());
             assertTrue(on.events().stream().anyMatch(row -> row.equals("scenario PASSED Account fields reach the step")), on.report());
-            if (Files.isRegularFile(DaltonPaths.database(project))) {
+            if (DaltonPaths.ready(project)) {
                 DaltonEntities.Entity stored = DaltonEntities.get(project, "Account", "ada");
                 assertEquals(CANONICAL, stored.payloadJson());
                 assertTrue(stored.secretRefs().contains("<password:qaDb>"), stored.secretRefs());

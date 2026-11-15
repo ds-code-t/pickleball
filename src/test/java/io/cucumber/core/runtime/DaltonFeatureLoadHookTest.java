@@ -46,7 +46,7 @@ class DaltonFeatureLoadHookTest {
             System.setProperty("pkb_dalton_project", project.toString());
             DaltonRuntime.reset();
             FeaturePathLoadCache.load(List.of(), () -> DaltonFeatureLoadHookTest.class.getClassLoader(), List::of);
-            assertTrue(Files.isRegularFile(DaltonPaths.database(project)));
+            assertTrue(DaltonPaths.ready(project));
         } finally {
             if (previous == null) System.clearProperty("pkb_dalton");
             else System.setProperty("pkb_dalton", previous);

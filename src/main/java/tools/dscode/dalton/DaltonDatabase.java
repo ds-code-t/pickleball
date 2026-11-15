@@ -1,30 +1,29 @@
 package tools.dscode.dalton;
 
-import java.nio.file.Files;
+import tools.dscode.dolt.server.DoltServer;
+import tools.dscode.dolt.store.Binding;
+import tools.dscode.dolt.store.DoltConnections;
+import tools.dscode.dolt.store.DoltDialect;
+import tools.dscode.dolt.store.DoltJdbc;
+import tools.dscode.dolt.store.DoltSession;
+import tools.dscode.dolt.store.DoltSql;
+
 import java.nio.file.Path;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Embedded SQLite for the Dalton working copy. {@code org.xerial:sqlite-jdbc}
- * is a published runtime dependency and is still not shaded into the consumer
- * shadow JAR. WAL and {@code busy_timeout} are set on every open.
+ * Dolt working copy for the Dalton layer. The connection is a pooled MariaDB
+ * session on branch {@code main}. SQLite is not opened here.
  */
 public final class DaltonDatabase implements AutoCloseable {
-    public static final int SCHEMA_VERSION = 6;
-    public static final String MISSING_DRIVER =
-            "Dalton is enabled but org.xerial:sqlite-jdbc is not on the classpath. Add it as testRuntimeOnly / test scope or use the Gradle dalton* tasks. "
-                    + "Dalton is on by default; add org.xerial:sqlite-jdbc or set pkb_dalton=false to run file-only.";
-    static final String DRIVER = "org.sqlite.JDBC";
+    public static final int SCHEMA_VERSION = 1;
+    public static final String MISSING_DRIVER = DoltJdbc.MISSING_DRIVER;
 
     private final Connection connection;
     private final Path project;
-    /** One lock per database file so the first open finishes WAL setup before another connection exists. */
-    private static final ConcurrentHashMap<String, Object> OPEN_LOCKS = new ConcurrentHashMap<>();
 
     private DaltonDatabase(Connection connection, Path project) {
         this.connection = connection;
@@ -32,34 +31,28 @@ public final class DaltonDatabase implements AutoCloseable {
     }
 
     public static boolean driverPresent() {
-        try {
-            Class.forName(DRIVER);
-            return true;
-        } catch (ClassNotFoundException failure) {
-            return false;
-        }
+        return DoltJdbc.driverPresent();
     }
 
     public static DaltonDatabase open(Path project) throws SQLException {
-        if (!driverPresent()) {
-            throw new SQLException(MISSING_DRIVER);
-        }
-        Path db = DaltonPaths.database(project);
+        if (!driverPresent()) throw new SQLException(MISSING_DRIVER);
         try {
-            Files.createDirectories(db.getParent());
+            DaltonMigrate.auto(project);
+            DoltServer.retain(project);
+            DoltSession session = DoltConnections.borrow(project, Binding.main());
+            try {
+                DoltDialect.ensureSchema(session);
+                return new DaltonDatabase(DoltSql.wrap(session), project.toAbsolutePath().normalize());
+            } catch (SQLException | RuntimeException failure) {
+                session.close();
+                throw failure;
+            }
         } catch (java.io.IOException failure) {
-            throw new SQLException("Could not create " + DaltonPaths.display(project, db.getParent()), failure);
-        }
-        Object lock = OPEN_LOCKS.computeIfAbsent(db.toAbsolutePath().normalize().toString(), ignored -> new Object());
-        synchronized (lock) {
-            Connection connection = DriverManager.getConnection(jdbcUrl(db));
-            DaltonDatabase database = new DaltonDatabase(connection, project);
-            database.configure();
-            database.migrate();
-            return database;
+            throw new SQLException(failure.getMessage() == null ? "Dolt server did not start" : failure.getMessage(), failure);
         }
     }
 
+    /** Legacy SQLite file URL. Only migrate reads that file. The core does not. */
     public static String jdbcUrl(Path database) {
         String path = database.toAbsolutePath().normalize().toString().replace('\\', '/');
         return "jdbc:sqlite:" + path;
@@ -76,10 +69,36 @@ public final class DaltonDatabase implements AutoCloseable {
     public int schemaVersion() throws SQLException {
         try (Statement statement = connection.createStatement();
              ResultSet rows = statement.executeQuery(
-                     "SELECT value FROM schema_meta WHERE key = 'schema_version'")) {
-            if (!rows.next()) return 0;
-            return Integer.parseInt(rows.getString(1));
+                     "SELECT value FROM schema_meta WHERE `key` = 'dolt_schema'")) {
+            if (!rows.next() || rows.getString(1) == null) return 0;
+            return Integer.parseInt(rows.getString(1).trim());
         }
+    }
+
+    /** Text columns of the store, so tests can prove a secret was not written. */
+    public static String storedText(Path project) throws SQLException {
+        if (!DaltonPaths.ready(project)) return "";
+        StringBuilder text = new StringBuilder();
+        String[] queries = {
+                "SELECT payload_json FROM entities",
+                "SELECT secret_refs FROM entities",
+                "SELECT note FROM runs",
+                "SELECT message FROM run_logs",
+                "SELECT value_ref FROM entity_usages",
+                "SELECT CAST(raw_content AS CHAR) FROM files"
+        };
+        try (DaltonDatabase database = open(project);
+             Statement statement = database.connection().createStatement()) {
+            for (String sql : queries) {
+                try (ResultSet rows = statement.executeQuery(sql)) {
+                    while (rows.next()) {
+                        String value = rows.getString(1);
+                        if (value != null) text.append(value).append('\n');
+                    }
+                }
+            }
+        }
+        return text.toString();
     }
 
     public String pragma(String name) throws SQLException {

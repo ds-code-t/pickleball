@@ -1,5 +1,6 @@
 package tools.dscode.dalton;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
@@ -20,6 +21,16 @@ public final class DaltonPaths {
 
     public static Path database(Path project) {
         return root(project).resolve(DATABASE_FILE);
+    }
+
+    /** Dolt data directory. Present once the server has initialized the repository. */
+    public static Path store(Path project) {
+        return project.toAbsolutePath().normalize().resolve(".pickleball").resolve("dolt").resolve("data");
+    }
+
+    public static boolean ready(Path project) {
+        if (project == null) return false;
+        return Files.isDirectory(store(project).resolve("pickleball").resolve(".dolt"));
     }
 
     public static Path log(Path project) {

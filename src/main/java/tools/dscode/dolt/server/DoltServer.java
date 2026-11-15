@@ -3,6 +3,7 @@ package tools.dscode.dolt.server;
 import tools.dscode.dolt.DoltLog;
 import tools.dscode.dolt.install.DoltInstaller;
 import tools.dscode.dolt.install.DoltReleaseCatalog;
+import tools.dscode.dolt.store.DoltConnections;
 import tools.dscode.dolt.store.DoltJdbc;
 
 import java.io.IOException;
@@ -56,6 +57,32 @@ public final class DoltServer {
         }
     }
 
+    private static final java.util.Set<Path> PROJECTS = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /**
+     * Keeps one project's server and stops the others that have no checked-out
+     * connection. Tests open a server per temp directory; this drops the previous one.
+     */
+    public static void retain(Path project) {
+        if (project == null) return;
+        Path root = project.toAbsolutePath().normalize();
+        java.util.List<Path> others = new java.util.ArrayList<>();
+        for (Path known : PROJECTS) {
+            if (!known.equals(root)) others.add(known);
+        }
+        PROJECTS.add(root);
+        for (Path other : others) {
+            if (DoltConnections.inUse(other)) continue;
+            PROJECTS.remove(other);
+            DoltConnections.closeProject(other);
+            try {
+                stop(other);
+            } catch (IOException ignored) {
+                // A server that already exited still leaves the next open correct.
+            }
+        }
+    }
+
     private DoltServer() {
     }
 
@@ -72,6 +99,7 @@ public final class DoltServer {
     }
 
     public static ServerInfo ensure(Path project) throws IOException {
+        retain(project);
         if (!driverPresent()) throw new IOException(MISSING_DRIVER);
         Path home = home(project);
         Files.createDirectories(home);
@@ -104,6 +132,7 @@ public final class DoltServer {
                     return ready.reused(true);
                 }
                 clearStale(project);
+                DoltInstaller.requireInstalled(project);
                 launchSupervisor(project);
                 while (System.nanoTime() < deadline) {
                     ServerInfo started = probe(project, 2_000);

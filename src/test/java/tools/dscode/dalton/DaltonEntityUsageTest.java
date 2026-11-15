@@ -80,7 +80,7 @@ class DaltonEntityUsageTest {
             assertEquals("write", rows.get(3).operation());
             assertEquals("~MASK;", rows.get(3).valueRef());
             assertTrue(rows.stream().noneMatch(row -> "Ada".equals(row.valueRef()) || row.valueRef().contains("hunter2")));
-            String db = Files.readString(DaltonPaths.database(project), StandardCharsets.ISO_8859_1);
+            String db = DaltonDatabase.storedText(project);
             assertFalse(db.contains("hunter2-cleartext"), db);
         } finally {
             restore("pkb_dalton", previous);

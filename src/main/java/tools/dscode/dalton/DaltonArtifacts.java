@@ -73,7 +73,7 @@ public final class DaltonArtifacts {
     }
 
     public static List<Artifact> list(Path project, String runId) throws SQLException {
-        if (project == null || runId == null || !Files.isRegularFile(DaltonPaths.database(project))) return List.of();
+        if (project == null || runId == null || !DaltonPaths.ready(project)) return List.of();
         try (DaltonDatabase database = DaltonDatabase.open(project);
              PreparedStatement statement = database.connection().prepareStatement("""
                      SELECT artifact_id, run_id, step_exec_id, kind, path, retained_at

@@ -1,5 +1,7 @@
 package tools.dscode.dalton;
 
+import tools.dscode.dolt.store.DoltDialect;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -55,7 +57,7 @@ public final class DaltonHydrator {
         DaltonDiscovery discovery = DaltonDiscovery.load(project);
         List<DaltonSources.Found> sources = scan.found();
         int ignored = scan.skipped().size();
-        boolean present = Files.isRegularFile(DaltonPaths.database(project));
+        boolean present = DaltonPaths.ready(project);
         if (options.dryRun() && !present) {
             return new Result(sources.size(), 0, 0, 0, true, List.of(), List.of(), ignored);
         }
@@ -120,22 +122,6 @@ public final class DaltonHydrator {
                 }
                 if (!options.dryRun()) {
                     DaltonStepCatalog.refresh(connection, project, now);
-                    DaltonGit.Snapshot git = DaltonGit.capture(project);
-                    try (var statement = connection.prepareStatement("""
-                            UPDATE provenance SET hydration_id = ?, last_hydrated_at = ?, schema_version = ?,
-                                git_commit = ?, git_branch = ?, git_remote = ?, github_repo = ?, git_dirty = ?
-                            WHERE id = 1
-                            """)) {
-                        statement.setString(1, UUID.randomUUID().toString());
-                        statement.setString(2, now);
-                        statement.setInt(3, DaltonDatabase.SCHEMA_VERSION);
-                        statement.setString(4, git.commit());
-                        statement.setString(5, git.branch());
-                        statement.setString(6, git.remote());
-                        statement.setString(7, git.githubRepo());
-                        statement.setInt(8, git.available() && git.dirty() ? 1 : 0);
-                        statement.executeUpdate();
-                    }
                     connection.commit();
                 } else {
                     connection.rollback();
@@ -145,6 +131,27 @@ public final class DaltonHydrator {
                 throw failure;
             } finally {
                 connection.setAutoCommit(true);
+            }
+            if (!options.dryRun() && DoltDialect.sourceDirty(connection)) {
+                DaltonGit.Snapshot git = DaltonGit.capture(project);
+                try (var statement = connection.prepareStatement("""
+                        UPDATE provenance SET hydration_id = ?, last_hydrated_at = ?, schema_version = ?,
+                            git_commit = ?, git_branch = ?, git_remote = ?, github_repo = ?, git_dirty = ?
+                        WHERE id = 1
+                        """)) {
+                    statement.setString(1, UUID.randomUUID().toString());
+                    statement.setString(2, now);
+                    statement.setInt(3, DaltonDatabase.SCHEMA_VERSION);
+                    statement.setString(4, git.commit());
+                    statement.setString(5, git.branch());
+                    statement.setString(6, git.remote());
+                    statement.setString(7, git.githubRepo());
+                    statement.setInt(8, git.available() && git.dirty() ? 1 : 0);
+                    statement.executeUpdate();
+                }
+                String sha = git.available() && git.commit() != null && !git.commit().isBlank()
+                        ? git.commit() : "unknown";
+                DoltDialect.commitHydrate(connection, sha, git.available() && git.dirty());
             }
             DaltonLog.log(project, "hydrate", "files",
                     (options.dryRun() ? "dry-run " : "") + "inserted=" + inserted + " updated=" + updated

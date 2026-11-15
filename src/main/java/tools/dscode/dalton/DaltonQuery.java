@@ -79,7 +79,7 @@ public final class DaltonQuery {
     }
 
     public static boolean databasePresent(Path project) {
-        return Files.isRegularFile(DaltonPaths.database(project));
+        return DaltonPaths.ready(project);
     }
 
     public static List<FileSummary> files(Path project) throws SQLException {

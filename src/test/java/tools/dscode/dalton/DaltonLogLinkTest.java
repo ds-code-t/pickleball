@@ -37,7 +37,7 @@ class DaltonLogLinkTest {
                 "--project=" + project);
         assertEquals(0, plain.code, plain.err);
         assertTrue(DaltonHistory.links(project, "text-only").isEmpty());
-        String db = Files.readString(DaltonPaths.database(project), StandardCharsets.ISO_8859_1);
+        String db = DaltonDatabase.storedText(project);
         assertTrue(db.contains("opened the account Account#ada"));
         assertFalse(db.contains("hunter2"));
     }

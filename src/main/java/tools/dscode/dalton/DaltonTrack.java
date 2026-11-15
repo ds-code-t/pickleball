@@ -73,7 +73,7 @@ public final class DaltonTrack {
         instant(filter.to(), "--to");
         Cursor after = cursor(filter.cursor(), "--cursor");
         Cursor before = cursor(filter.before(), "--before");
-        if (project == null || !Files.isRegularFile(DaltonPaths.database(project))) {
+        if (project == null || !DaltonPaths.ready(project)) {
             return new Page(List.of(), 0, filter.offset());
         }
         try (DaltonDatabase database = DaltonDatabase.open(project)) {

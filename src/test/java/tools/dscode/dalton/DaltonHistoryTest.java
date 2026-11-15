@@ -92,9 +92,8 @@ class DaltonHistoryTest {
                 "--note=password=hunter2", "--project=" + project);
         assertEquals(1, rejected.code, rejected.out);
         assertTrue(rejected.err.contains("secret"), rejected.err);
-        if (Files.isRegularFile(DaltonPaths.database(project))) {
-            assertFalse(new String(Files.readAllBytes(DaltonPaths.database(project)), StandardCharsets.ISO_8859_1)
-                    .contains("hunter2"));
+        if (DaltonPaths.ready(project)) {
+            assertFalse(DaltonDatabase.storedText(project).contains("hunter2"));
         }
         Capture allowed = run("dalton", "history", "record", "secret-run",
                 "--note=password=<password:qaDb>", "--project=" + project);

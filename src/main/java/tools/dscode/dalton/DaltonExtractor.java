@@ -43,7 +43,7 @@ public final class DaltonExtractor {
     }
 
     public static Result extract(Path project, Options options) throws IOException, SQLException {
-        if (!Files.isRegularFile(DaltonPaths.database(project))) {
+        if (!DaltonPaths.ready(project)) {
             return new Result(0, 0, 0, List.of(), List.of());
         }
         if (!DaltonDatabase.driverPresent()) {

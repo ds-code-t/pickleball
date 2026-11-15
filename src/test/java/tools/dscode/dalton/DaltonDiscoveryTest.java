@@ -157,7 +157,7 @@ class DaltonDiscoveryTest {
     }
 
     private DaltonFiles.Row row(String path) throws Exception {
-        if (!Files.isRegularFile(DaltonPaths.database(project))) return null;
+        if (!DaltonPaths.ready(project)) return null;
         try (DaltonDatabase database = DaltonDatabase.open(project)) {
             return DaltonFiles.find(database.connection(), path);
         }

@@ -34,6 +34,35 @@ public final class DoltConnections {
         return new DoltSession(root, binding, connection, pool);
     }
 
+    public static boolean inUse(java.nio.file.Path project) {
+        String prefix = project.toAbsolutePath().normalize() + "|";
+        for (var entry : POOLS.entrySet()) {
+            if (!entry.getKey().startsWith(prefix)) continue;
+            Pool pool = entry.getValue();
+            synchronized (pool) {
+                if (pool.open > pool.idle.size()) return true;
+            }
+        }
+        return false;
+    }
+
+    public static void closeProject(java.nio.file.Path project) {
+        String prefix = project.toAbsolutePath().normalize() + "|";
+        java.util.List<String> keys = new java.util.ArrayList<>();
+        for (String key : POOLS.keySet()) {
+            if (key.startsWith(prefix)) keys.add(key);
+        }
+        for (String key : keys) {
+            Pool pool = POOLS.remove(key);
+            if (pool == null) continue;
+            synchronized (pool) {
+                Held held;
+                while ((held = pool.idle.pollFirst()) != null) closeQuiet(held.connection);
+                pool.open = 0;
+            }
+        }
+    }
+
     public static void closeAll() {
         for (Pool pool : POOLS.values()) {
             synchronized (pool) {

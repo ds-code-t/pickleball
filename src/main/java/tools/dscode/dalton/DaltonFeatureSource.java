@@ -23,7 +23,7 @@ public final class DaltonFeatureSource {
         List<String> keys = keys(uri);
         if (keys.isEmpty()) return null;
         Path project = DaltonConfig.project();
-        if (!Files.isRegularFile(DaltonPaths.database(project))) return null;
+        if (!DaltonPaths.ready(project)) return null;
         try (DaltonDatabase database = DaltonDatabase.open(project)) {
             for (String key : keys) {
                 DaltonFiles.Row row = DaltonFiles.find(database.connection(), key);
@@ -46,7 +46,7 @@ public final class DaltonFeatureSource {
     public static String cacheSuffix() {
         if (!DaltonConfig.enabled()) return null;
         Path project = DaltonConfig.project();
-        if (!Files.isRegularFile(DaltonPaths.database(project))) return "missing";
+        if (!DaltonPaths.ready(project)) return "missing";
         try (DaltonDatabase database = DaltonDatabase.open(project);
              Statement statement = database.connection().createStatement()) {
             String hydration = "";

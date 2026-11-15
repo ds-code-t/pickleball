@@ -151,7 +151,7 @@ class DaltonExecuteFromDbTest {
             DaltonRuntime.reset();
             DaltonScenarioHarness.Outcome fromDb = runSample();
             assertPassed(fromDb, "Pay Ada", "amount is 10");
-            assertTrue(Files.isRegularFile(DaltonPaths.database(project)));
+            assertTrue(DaltonPaths.ready(project));
             assertEquals(feature, Files.readString(file));
 
             String rewritten = feature

@@ -4,19 +4,22 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.nio.file.Files;
-import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** A database created with schema 4 opens, migrates, and keeps its rows. */
+/**
+ * A SQLite schema-4 or schema-5 database is migrated by rehydrate.
+ * Unedited rows come from the files. Edited rows are imported. Run history is dropped.
+ */
 class DaltonSchemaUpgradeTest {
     @TempDir
     Path project;
@@ -25,6 +28,10 @@ class DaltonSchemaUpgradeTest {
     void previousSchemaUpgradesInPlace() throws Exception {
         Path db = DaltonPaths.database(project);
         Files.createDirectories(db.getParent());
+        String disk = "Feature: From disk\n  Scenario: Kept\n    * ASSERT: \"1\" equals \"1\"\n";
+        Path feature = project.resolve("features/one.feature");
+        Files.createDirectories(feature.getParent());
+        Files.writeString(feature, disk, StandardCharsets.UTF_8);
         try (Connection connection = DriverManager.getConnection(DaltonDatabase.jdbcUrl(db));
              Statement statement = connection.createStatement()) {
             statement.execute("""
@@ -56,11 +63,13 @@ class DaltonSchemaUpgradeTest {
                     + "VALUES ('features/one.feature', 'abc', x'616263', 1, 'feature', 't', 'abc', 0)");
         }
         try (DaltonDatabase database = DaltonDatabase.open(project)) {
-            assertEquals(6, database.schemaVersion());
+            assertEquals(1, database.schemaVersion());
             DaltonFiles.Row row = DaltonFiles.find(database.connection(), "features/one.feature");
-            assertEquals("abc", new String(row.raw(), StandardCharsets.UTF_8));
-            assertFalse(row.binaryRef());
+            assertEquals(disk, new String(row.raw(), StandardCharsets.UTF_8));
+            assertFalse(new String(row.raw(), StandardCharsets.UTF_8).equals("abc"));
+            assertFalse(row.edited());
             assertEquals("feature", row.sourceType());
+            assertTrue(Files.isRegularFile(db));
         }
     }
 
@@ -116,16 +125,16 @@ class DaltonSchemaUpgradeTest {
             statement.execute("INSERT INTO schema_meta(key, value) VALUES ('schema_version', '5')");
             statement.execute("INSERT INTO provenance(id, schema_version, git_commit) VALUES (1, 5, 'abc123')");
             statement.execute("INSERT INTO files(path, content_hash, raw_content, mtime, source_type, last_hydrated_at, last_synced_hash, db_edited, git_blob, binary_ref, byte_size) "
-                    + "VALUES ('features/kept.feature', 'abc', x'6b657074', 1, 'feature', 't', 'abc', 0, 'blob', 0, 4)");
+                    + "VALUES ('features/kept.feature', 'abc', x'6b657074', 1, 'feature', 't', 'abc', 1, 'blob', 0, 4)");
             statement.execute("INSERT INTO runs(run_id, started_at, status, scenario, passed, failed, note) "
                     + "VALUES ('run-5', '2026-01-01T00:00:00Z', 'passed', 'Kept', 1, 0, '')");
         }
         try (DaltonDatabase database = DaltonDatabase.open(project)) {
-            assertEquals(6, database.schemaVersion());
+            assertEquals(1, database.schemaVersion());
             DaltonFiles.Row row = DaltonFiles.find(database.connection(), "features/kept.feature");
             assertEquals("kept", new String(row.raw(), StandardCharsets.UTF_8));
-            assertEquals("abc123", text(database, "SELECT git_commit FROM provenance WHERE id = 1"));
-            assertEquals("Kept", text(database, "SELECT scenario FROM runs WHERE run_id = 'run-5'"));
+            assertTrue(row.edited());
+            assertEquals("0", text(database, "SELECT COUNT(*) FROM runs"));
             assertTrue(exists(database, "step_definitions"));
             assertTrue(exists(database, "scenario_executions"));
             assertTrue(exists(database, "step_executions"));
@@ -133,13 +142,15 @@ class DaltonSchemaUpgradeTest {
             assertTrue(exists(database, "log_entity_links"));
             assertTrue(exists(database, "artifacts"));
             assertEquals("0", text(database, "SELECT COUNT(*) FROM step_definitions"));
+            assertTrue(Files.isRegularFile(db));
         }
     }
 
     private static boolean exists(DaltonDatabase database, String table) throws SQLException {
         try (var statement = database.connection().createStatement();
              ResultSet rows = statement.executeQuery(
-                     "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = '" + table + "'")) {
+                     "SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = '"
+                             + table + "'")) {
             return rows.next();
         }
     }

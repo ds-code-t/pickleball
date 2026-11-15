@@ -46,6 +46,7 @@ public final class DoltCli {
             }
             case "install" -> DoltInstaller.cli(tokens, stdout, stderr);
             case "server" -> DoltServer.cli(tokens, stdout, stderr);
+            case "migrate" -> tools.dscode.dalton.DaltonMigrate.cli(tokens, stdout, stderr);
             default -> {
                 stderr.println("error: Unknown Dolt command: " + command);
                 stderr.println("fix: pickleball dolt help");
@@ -58,6 +59,7 @@ public final class DoltCli {
         return """
                 Usage: pickleball dolt install [--check] [--force] [--dir=<path>] [--project=<dir>]
                 Usage: pickleball dolt server start|stop|status [--json] [--project=<dir>]
+                Usage: pickleball dolt migrate [--dry-run] [--remove-legacy] [--project=<dir>]
                 Pickleball dolt commands are Pickleball's layer. They are not the Dolt binary.
                 """;
     }

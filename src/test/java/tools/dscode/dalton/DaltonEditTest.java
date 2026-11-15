@@ -123,8 +123,8 @@ class DaltonEditTest {
         write(PATH, ORIGINAL);
         assertEquals(0, run("dalton", "hydrate", "--project=" + project).code);
         byte[] original = Files.readAllBytes(project.resolve(PATH));
-        try (Connection connection = DriverManager.getConnection(DaltonDatabase.jdbcUrl(DaltonPaths.database(project)));
-             Statement statement = connection.createStatement()) {
+        try (DaltonDatabase database = DaltonDatabase.open(project);
+             Statement statement = database.connection().createStatement()) {
             statement.execute("UPDATE files SET content_hash = 'untracked', raw_content = X'616263' WHERE path = '" + PATH + "'");
         }
         Capture hydrate = run("dalton", "hydrate", "--project=" + project);
@@ -209,8 +209,8 @@ class DaltonEditTest {
 
     private List<String> column(String sql) throws Exception {
         List<String> values = new ArrayList<>();
-        try (Connection connection = DriverManager.getConnection(DaltonDatabase.jdbcUrl(DaltonPaths.database(project)));
-             Statement statement = connection.createStatement();
+        try (DaltonDatabase database = DaltonDatabase.open(project);
+             Statement statement = database.connection().createStatement();
              ResultSet rows = statement.executeQuery(sql)) {
             while (rows.next()) values.add(rows.getString(1));
         }

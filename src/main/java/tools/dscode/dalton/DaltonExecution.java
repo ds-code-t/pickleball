@@ -92,7 +92,7 @@ public final class DaltonExecution {
     }
 
     public static List<StepRow> steps(Path project, String runId) throws SQLException {
-        if (!Files.isRegularFile(DaltonPaths.database(project))) return List.of();
+        if (!DaltonPaths.ready(project)) return List.of();
         try (DaltonDatabase database = DaltonDatabase.open(project);
              PreparedStatement statement = database.connection().prepareStatement("""
                      SELECT s.step_exec_id, s.scenario_exec_id, e.run_id, s.step_ord, s.step_text, s.definition_id, s.status

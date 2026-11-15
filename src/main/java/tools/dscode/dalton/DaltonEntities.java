@@ -111,7 +111,7 @@ public final class DaltonEntities {
     }
 
     public static List<Usage> usages(Path project) throws SQLException {
-        if (project == null || !Files.isRegularFile(DaltonPaths.database(project))) return List.of();
+        if (project == null || !DaltonPaths.ready(project)) return List.of();
         try (DaltonDatabase database = DaltonDatabase.open(project);
              PreparedStatement statement = database.connection().prepareStatement("""
                      SELECT usage_id, step_exec_id, entity_type, entity_id, field, operation, value_ref, logged_at
@@ -246,14 +246,14 @@ public final class DaltonEntities {
     }
 
     public static Entity get(Path project, String type, String id) throws SQLException {
-        if (!Files.isRegularFile(DaltonPaths.database(project))) return null;
+        if (!DaltonPaths.ready(project)) return null;
         try (DaltonDatabase database = DaltonDatabase.open(project)) {
             return find(database.connection(), type, id);
         }
     }
 
     public static List<Entity> list(Path project) throws SQLException {
-        if (!Files.isRegularFile(DaltonPaths.database(project))) return List.of();
+        if (!DaltonPaths.ready(project)) return List.of();
         try (DaltonDatabase database = DaltonDatabase.open(project);
              PreparedStatement statement = database.connection().prepareStatement(
                      "SELECT entity_type, entity_id, version, payload_json, secret_refs, source_file, content_hash FROM entities ORDER BY entity_type, entity_id");
@@ -375,7 +375,7 @@ public final class DaltonEntities {
 
     private static Entity readForLookup(String type, String id) throws SQLException, IOException {
         Path project = DaltonConfig.project();
-        if (Files.isRegularFile(DaltonPaths.database(project))) {
+        if (DaltonPaths.ready(project)) {
             Entity stored = get(project, type, id);
             if (stored != null) return stored;
         }

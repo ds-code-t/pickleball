@@ -82,6 +82,35 @@ class DaltonDriverMissingTest {
         assertFalse(Files.exists(DaltonPaths.root(project)));
     }
 
+    @Test
+    void missingBinaryFailsBeforeAStoreIsCreated() throws Exception {
+        String bin = System.getProperty("pkb_dolt_bin");
+        String auto = System.getProperty("pkb_dolt_auto_install");
+        try {
+            System.setProperty("pkb_dolt_bin", project.resolve("missing-dolt").toString());
+            System.setProperty("pkb_dolt_auto_install", "false");
+            Result hydrate = javaFull(List.of(
+                    "-Dpkb_dolt_bin=" + project.resolve("missing-dolt"),
+                    "-Dpkb_dolt_auto_install=false",
+                    "-Dpkb_dalton_project=" + project,
+                    "tools.dscode.dalton.DaltonCli",
+                    "dalton",
+                    "hydrate",
+                    "--project=" + project));
+            assertEquals(1, hydrate.code, hydrate.out + hydrate.err);
+            assertTrue(hydrate.err.contains("Dolt 2.7.3 is not installed and could not be downloaded"), hydrate.err);
+            assertFalse(DaltonPaths.ready(project));
+        } finally {
+            restore("pkb_dolt_bin", bin);
+            restore("pkb_dolt_auto_install", auto);
+        }
+    }
+
+    private static void restore(String key, String value) {
+        if (value == null) System.clearProperty(key);
+        else System.setProperty(key, value);
+    }
+
     private Result probe(String enabled) throws Exception {
         Path source = project.resolve("DaltonDriverProbe.java");
         Files.writeString(source, """
@@ -114,6 +143,15 @@ class DaltonDriverMissingTest {
                 project.toString()));
     }
 
+    private Result javaFull(List<String> args) throws Exception {
+        List<String> command = new ArrayList<>();
+        command.add(java());
+        command.add("-cp");
+        command.add(System.getProperty("java.class.path"));
+        command.addAll(args);
+        return process(command);
+    }
+
     private Result java(List<String> args) throws Exception {
         return java(null, args);
     }
@@ -144,6 +182,7 @@ class DaltonDriverMissingTest {
         StringBuilder filtered = new StringBuilder();
         for (String entry : System.getProperty("java.class.path").split(separator)) {
             if (entry.toLowerCase(Locale.ROOT).contains("sqlite")) continue;
+            if (entry.toLowerCase(Locale.ROOT).contains("mariadb")) continue;
             if (filtered.length() > 0) filtered.append(separator);
             filtered.append(entry);
         }

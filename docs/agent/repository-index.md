@@ -581,6 +581,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/dalton/DaltonHistory.java`
 - `src/main/java/tools/dscode/dalton/DaltonHydrator.java`
 - `src/main/java/tools/dscode/dalton/DaltonLog.java`
+- `src/main/java/tools/dscode/dalton/DaltonMigrate.java`
 - `src/main/java/tools/dscode/dalton/DaltonPaths.java`
 - `src/main/java/tools/dscode/dalton/DaltonQuery.java`
 - `src/main/java/tools/dscode/dalton/DaltonRun.java`
@@ -609,6 +610,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/dolt/store/DoltDialect.java`
 - `src/main/java/tools/dscode/dolt/store/DoltJdbc.java`
 - `src/main/java/tools/dscode/dolt/store/DoltSession.java`
+- `src/main/java/tools/dscode/dolt/store/DoltSql.java`
 - `src/main/java/tools/dscode/dolt/store/DoltStatements.java`
 - `src/main/java/tools/dscode/dolt/store/DoltStore.java`
 - `src/main/java/tools/dscode/engine/adapter/CucumberAdapterRun.java`
@@ -869,6 +871,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/dalton/DaltonSecretsTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonStepDefinitionCatalogTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonTimelineTest.java`
+- `src/test/java/tools/dscode/dalton/DoltFreshCloneTest.java`
+- `src/test/java/tools/dscode/dalton/DoltHydrateCommitTest.java`
+- `src/test/java/tools/dscode/dalton/DoltLegacyMigrationTest.java`
 - `src/test/java/tools/dscode/dalton/FileEditTest.java`
 - `src/test/java/tools/dscode/dalton/GherkinRewriteTest.java`
 - `src/test/java/tools/dscode/dalton/GlueEditTest.java`

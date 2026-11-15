@@ -114,7 +114,7 @@ public final class DaltonCli {
                 Usage: dalton timeline [--from=<iso>] [--to=<iso>] [--entity=Type#id] [--tag=<tag>] [--feature=<path>] [--run=<run-id>] [--text=<log text>] [--cursor=<cursor>] [--before=<cursor>] [--latest] [--limit=N] [--offset=N] [--json] [--project=<dir>]
                 Usage: dalton retain [--days=N] [--max-bytes=N] [--project=<dir>]
                 Usage: dalton run [--project=<dir>] [--dry-run] [--tags=<expr>] [--name=<text>] [--glue=<packages>] [--engine]
-                Files stay the source of truth. The database is .pickleball/dalton/dalton.db and is gitignored.
+                Files stay the source of truth. The working copy is .pickleball/dolt/data and is gitignored.
                 status and hydrate --dry-run do not create a database when it is missing.
                 hydrate copies features, configs, calls, components, resource maps, templates, and dalton-entities/*.entity files.
                 A .feature file also stores scenarios, steps, tags, docstrings, and data tables. The original bytes stay in the file row.
@@ -127,7 +127,7 @@ public final class DaltonCli {
                 extract copies stored file bytes back to disk and does not reformat them. hydrate-out is the same command. An unedited row is left untouched. A deleted file is not recreated unless that row was edited or --force is set.
                 history stores a run summary in the database. It does not change diagnostic reports or pkb_reportretention. --from copies outcome and counts from a run-index.json file and links screenshot files under that directory. Those files are not deleted or rewritten. --link=Type#id writes log_entity_links for that log row. The message text is not scanned. retain drops runs older than --days and then the oldest runs until the note, scenario, and message bytes fit --max-bytes. Retaining a run does not delete the diagnostic report files. dalton retain is that same retain.
                 dalton query and dalton timeline read linked executions, usages, log links, and artifacts. They do not create a database. --json is one object with command, count, total, limit, offset, then rows or events. Keys stay in that order. total is the full filtered count on every page, including a --cursor page. timeline --cursor resumes after the previous event. timeline --before rewinds to the page before that cursor. timeline --latest is the newest page. --tag, --feature, --run, and --text filter by tag, feature path, run id, and log or step text. --feature keeps step and usage rows whose scenario key contains that path. --tag keeps step and usage rows for a scenario whose tags match, by file path and scenario line, and a Scenario Outline example row still belongs to that outline. An Examples tag matches only that Examples block, from its Examples line to the next Examples block or the next scenario. A feature tag matches every scenario in that file. A log row stores the run's scenario name, not a scenario path, so a tag or feature filter does not keep it by key. A blank scenario name is stored blank and is not replaced with the scenario key, so a tag or feature filter still does not keep that log row. A timeline run row stays when that run touched a match. A run row has no scenario path. Rewind is view-only over recorded history. It does not undo browser or service side effects.
-                sqlite-jdbc is a published runtime dependency (scope runtime, not shaded into the consumer shadow JAR). When Dalton is enabled and that driver is missing, status, hydrate, extract, and the auto-hydrate hook fail with: Dalton is enabled but org.xerial:sqlite-jdbc is not on the classpath. Add it as testRuntimeOnly / test scope or use the Gradle dalton* tasks. They do not fall back to the files. Gradle dalton* tasks put the driver on their own classpath.
+                sqlite-jdbc stays for pickleball dolt migrate and the diagnostic index. The Dolt store uses org.mariadb.jdbc:mariadb-java-client. When the store is enabled and that driver is missing, status, hydrate, extract, and the auto-hydrate hook fail with the driver message and do not fall back to the files.
                 feature put writes that .feature text into the database. It sets db_edited, leaves last_synced_hash, and replaces the stored scenarios, steps, tags, docstrings, and data tables in the same transaction. Bad Gherkin is rejected and the previous rows stay. The file is not changed until dalton extract. Use --file for multiline text. dalton scenario put and dalton step put are rejected. A database row whose content hash moved while db_edited is still 0 is an untracked DB edit. hydrate reports it and will not overwrite it unless --force is set.
                 category, file, glue, and feature scenario-add, scenario-modify, scenario-delete, step-add, step-modify, and step-delete are the shared edit model. --json prints one object with ok, command, family, action, dalton, path, id, dbEdited, conflict, confirmRequired, applied, items, text, message, error, and fix. remove and delete require --confirm and do not write without it. Validation runs before a write. A conflict or an untracked DB edit on that path is refused unless --force is set. When Dalton is off the command writes the file and does not open the database. When Dalton is on, put uses the same db_edited write as feature put. Set pkb_dalton_log=edit to log each edit. The log is date-stamped, per entity, and size-capped.
                 entity put uses that same write, so the entity file row and the entity table stay together.
@@ -175,7 +175,7 @@ public final class DaltonCli {
             int maxBytes = integer(option(tokens, "--max-bytes="), DaltonHistory.maxBytes());
             DaltonHistory.RetainResult result = DaltonHistory.retain(project, days, maxBytes);
             out.println(result.line());
-            boolean present = Files.isRegularFile(DaltonPaths.database(project));
+            boolean present = DaltonPaths.ready(project);
             out.println("database " + (present ? "present" : "missing"));
             out.println("reports kept");
             return 0;
@@ -238,9 +238,9 @@ public final class DaltonCli {
             out.println("error: " + failure.getMessage());
             return 1;
         }
-        Path db = DaltonPaths.database(project);
+        Path db = DaltonPaths.store(project);
         String shown = DaltonPaths.display(project, db);
-        boolean present = Files.isRegularFile(db);
+        boolean present = DaltonPaths.ready(project);
         boolean driver = DaltonDatabase.driverPresent();
         String enabledLine = "enabled=" + enabled + " source=" + source;
         if (!driver && enabled) {
@@ -266,7 +266,7 @@ public final class DaltonCli {
             } else {
                 out.println(enabledLine);
                 out.println("Dalton database missing: " + shown);
-                if (!driver) out.println("sqlite-jdbc is not on the classpath");
+                if (!driver) out.println("store driver is not on the classpath");
                 printGit(out, project, null);
                 printSkips(out, skipped);
             }
@@ -275,7 +275,7 @@ public final class DaltonCli {
         if (!driver) {
             out.println(enabledLine);
             out.println("Dalton database missing: " + shown);
-            out.println("sqlite-jdbc is not on the classpath");
+            out.println("store driver is not on the classpath");
             printSkips(out, skipped);
             return 1;
         }
@@ -287,12 +287,14 @@ public final class DaltonCli {
             int runs = count(database, "SELECT COUNT(*) FROM runs");
             int conflicts = DaltonQuery.conflicts(project, database.connection()).size();
             int binaryRefs = count(database, "SELECT COUNT(*) FROM files WHERE binary_ref = 1");
+            String hydrateCommit = tools.dscode.dolt.store.DoltDialect.lastHydrateCommit(database.connection());
             if (json) {
                 out.println("{\"database\":\"present\",\"path\":\"" + jsonEscape(shown) + "\",\"schemaVersion\":"
                         + version + ",\"files\":" + files + ",\"scenarios\":" + scenarios
                         + ",\"entities\":" + entities + ",\"runs\":" + runs
                         + ",\"conflicts\":" + conflicts + ",\"driver\":true,\"enabled\":" + enabled
                         + ",\"enabledSource\":\"" + jsonEscape(source) + "\",\"binaryRefs\":" + binaryRefs
+                        + ",\"hydrateCommit\":\"" + jsonEscape(hydrateCommit) + "\""
                         + gitJson(project, database) + skipJson(skipped));
             } else {
                 out.println(enabledLine);
@@ -306,6 +308,7 @@ public final class DaltonCli {
                 printGit(out, project, database);
                 printSkips(out, skipped);
                 out.println("database " + shown);
+                out.println("hydrate commit " + hydrateCommit);
             }
             return 0;
         } catch (SQLException failure) {
@@ -394,7 +397,7 @@ public final class DaltonCli {
             out.println(result.line());
             for (String notice : result.notices()) err.println(notice);
             for (String conflict : result.conflictPaths()) err.println("conflict: " + conflict);
-            boolean present = Files.isRegularFile(DaltonPaths.database(project));
+            boolean present = DaltonPaths.ready(project);
             out.println("database " + (present ? "present" : "missing"));
             return result.conflicts() > 0 ? 1 : 0;
         } catch (Exception failure) {
@@ -414,7 +417,7 @@ public final class DaltonCli {
             DaltonExtractor.Result result = DaltonExtractor.extract(project, new DaltonExtractor.Options(paths, force));
             out.println(result.line());
             for (String conflict : result.conflictPaths()) err.println("conflict: " + conflict);
-            boolean present = Files.isRegularFile(DaltonPaths.database(project));
+            boolean present = DaltonPaths.ready(project);
             out.println("database " + (present ? "present" : "missing"));
             return result.conflicts() > 0 ? 1 : 0;
         } catch (Exception failure) {
@@ -725,7 +728,7 @@ public final class DaltonCli {
                     int maxBytes = integer(option(tokens, "--max-bytes="), DaltonHistory.maxBytes());
                     DaltonHistory.RetainResult result = DaltonHistory.retain(project, days, maxBytes);
                     out.println(result.line());
-                    boolean present = Files.isRegularFile(DaltonPaths.database(project));
+                    boolean present = DaltonPaths.ready(project);
                     out.println("database " + (present ? "present" : "missing"));
                     yield 0;
                 }
@@ -826,7 +829,7 @@ public final class DaltonCli {
                 case "remove" -> {
                     String type = arg(tokens, 2);
                     String id = arg(tokens, 3);
-                    if (!Files.isRegularFile(DaltonPaths.database(project))) {
+                    if (!DaltonPaths.ready(project)) {
                         err.println("error: entity not found: " + type + " " + id);
                         yield 1;
                     }

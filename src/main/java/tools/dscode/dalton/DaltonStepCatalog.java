@@ -71,6 +71,8 @@ public final class DaltonStepCatalog {
             foundByKey.computeIfAbsent(stableKey(definition), ignored -> new ArrayList<>()).add(definition);
         }
         List<Stored> existing = stored(connection);
+        Map<String, Stored> existingById = new LinkedHashMap<>();
+        for (Stored row : existing) existingById.put(row.id(), row);
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO step_definitions(
                     definition_id, language, pattern, method_name, source_path, source_line, content_hash, hydrated_at, removed)
@@ -85,7 +87,12 @@ public final class DaltonStepCatalog {
                     hydrated_at = excluded.hydrated_at,
                     removed = 0
                 """)) {
+            int queued = 0;
             for (Definition definition : found) {
+                Stored prior = existingById.get(definition.id());
+                if (prior != null && !prior.removed() && prior.contentHash().equals(definition.contentHash())) {
+                    continue;
+                }
                 statement.setString(1, definition.id());
                 statement.setString(2, definition.language());
                 statement.setString(3, definition.pattern());
@@ -95,8 +102,9 @@ public final class DaltonStepCatalog {
                 statement.setString(7, definition.contentHash());
                 statement.setString(8, hydratedAt);
                 statement.addBatch();
+                queued++;
             }
-            if (!found.isEmpty()) statement.executeBatch();
+            if (queued > 0) statement.executeBatch();
         }
         try (PreparedStatement move = connection.prepareStatement(
                 "UPDATE step_executions SET definition_id = ? WHERE definition_id = ?")) {
@@ -142,25 +150,27 @@ public final class DaltonStepCatalog {
         return definition.language() + "\u001f" + definition.pattern() + "\u001f" + definition.sourcePath();
     }
 
-    private record Stored(String id, String key) {
+    private record Stored(String id, String key, String contentHash, boolean removed) {
     }
 
     private static List<Stored> stored(Connection connection) throws SQLException {
         List<Stored> rows = new ArrayList<>();
         try (PreparedStatement statement = connection.prepareStatement(
-                     "SELECT definition_id, language, pattern, source_path FROM step_definitions");
+                     "SELECT definition_id, language, pattern, source_path, content_hash, removed FROM step_definitions");
              ResultSet result = statement.executeQuery()) {
             while (result.next()) {
                 rows.add(new Stored(
                         result.getString(1),
-                        result.getString(2) + "\u001f" + result.getString(3) + "\u001f" + result.getString(4)));
+                        result.getString(2) + "\u001f" + result.getString(3) + "\u001f" + result.getString(4),
+                        result.getString(5) == null ? "" : result.getString(5),
+                        result.getInt(6) != 0));
             }
         }
         return rows;
     }
 
     public static List<Definition> list(Path project) throws SQLException {
-        if (!Files.isRegularFile(DaltonPaths.database(project))) return List.of();
+        if (!DaltonPaths.ready(project)) return List.of();
         try (DaltonDatabase database = DaltonDatabase.open(project);
              PreparedStatement statement = database.connection().prepareStatement("""
                      SELECT definition_id, language, pattern, method_name, source_path, source_line, content_hash

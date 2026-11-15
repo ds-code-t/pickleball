@@ -89,7 +89,9 @@ public final class DoltInstaller {
 
     public static Resolved requireInstalled(Path project) throws IOException {
         Resolved resolved = resolve();
-        if (resolved.found()) return resolved;
+        if (resolved.found() && resolved.path() != null && Files.isRegularFile(resolved.path())) {
+            return resolved;
+        }
         if (!autoInstall()) {
             throw offline(project, "pkb_dolt_auto_install=false");
         }

@@ -36,8 +36,23 @@ public final class DoltJdbc {
 
     public static Connection open(int port, String database, int timeoutMs) throws SQLException {
         if (!driverPresent()) throw new SQLException(MISSING_DRIVER);
+        quietDriver();
         DriverManager.setLoginTimeout(Math.max(1, timeoutMs / 1000));
         return DriverManager.getConnection(url(port, database, timeoutMs));
+    }
+
+    /** The driver logs every statement at DEBUG. That text is not a scenario line. */
+    private static void quietDriver() {
+        try {
+            Class<?> level = Class.forName("ch.qos.logback.classic.Level");
+            Object warn = level.getField("WARN").get(null);
+            Object logger = Class.forName("org.slf4j.LoggerFactory")
+                    .getMethod("getLogger", String.class)
+                    .invoke(null, "org.mariadb");
+            logger.getClass().getMethod("setLevel", level).invoke(logger, warn);
+        } catch (ReflectiveOperationException ignored) {
+            // No logback binding. The driver stays at its default level.
+        }
     }
 
     public static boolean selectOne(int port, int timeoutMs) throws SQLException {

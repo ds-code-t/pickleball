@@ -88,7 +88,7 @@ class DaltonLinkedTrackingSmokeTest {
             assertTrue(query.out.contains("\"operation\":\"write\""), query.out);
             assertFalse(timeline.out.contains(SECRET), timeline.out);
             assertFalse(query.out.contains(SECRET), query.out);
-            String database = Files.readString(DaltonPaths.database(project), StandardCharsets.ISO_8859_1);
+            String database = DaltonDatabase.storedText(project);
             assertFalse(database.contains(SECRET), "cleartext secret stored");
             String log = Files.readString(DaltonPaths.log(project), StandardCharsets.UTF_8);
             assertFalse(log.contains(SECRET), log);
@@ -171,7 +171,7 @@ class DaltonLinkedTrackingSmokeTest {
             assertNotEquals(firstRun, secondRun);
             assertEquals(1, count(configured, "SELECT COUNT(*) FROM runs WHERE run_id = '" + firstRun + "' AND status = 'PASSED'"));
             assertEquals(1, count(configured, "SELECT COUNT(*) FROM runs WHERE run_id = '" + secondRun + "' AND status = 'FAILED'"));
-            assertFalse(Files.exists(project.resolve(".pickleball/dalton/dalton.db"))
+            assertFalse(DaltonPaths.ready(project)
                     && count(project, "SELECT COUNT(*) FROM runs WHERE run_id = '" + firstRun + "'") > 0);
             String timeline = run("dalton", "timeline", "--json", "--project=" + configured).out;
             assertTrue(timeline.contains(firstRun), timeline);

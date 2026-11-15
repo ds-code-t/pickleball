@@ -217,7 +217,7 @@ class DaltonExecutionRecordingTest {
             assertEquals(Status.PASSED, result.status(), result.message());
             assertFalse(DaltonExecution.steps(configured, "configured-run").isEmpty());
             assertFalse(Files.exists(other.resolve(".pickleball/dalton/dalton.db")));
-            assertTrue(Files.isRegularFile(configured.resolve(".pickleball/dalton/dalton.db")));
+            assertTrue(DaltonPaths.ready(configured));
         } finally {
             restore("pkb_dalton_track", track);
             restore("pkb_run_id", run);
@@ -311,7 +311,7 @@ class DaltonExecutionRecordingTest {
                          SELECT r.run_id, r.status, e.scenario_key
                          FROM runs r
                          JOIN scenario_executions e ON e.run_id = r.run_id
-                         ORDER BY r.rowid, e.examples_row
+                         ORDER BY r.started_at, r.run_id, e.examples_row
                          """)) {
                 while (rows.next()) {
                     runIds.add(rows.getString(1));

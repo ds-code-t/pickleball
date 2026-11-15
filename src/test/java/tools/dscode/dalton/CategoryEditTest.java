@@ -129,7 +129,7 @@ class CategoryEditTest {
                 "--text=name: Badge\nbase: //from-db\n", "--json", "--project=" + project);
         assertEquals(0, put.code, put.err);
         assertFalse(Files.exists(project.resolve("dalton-entities/ElementCategory/Badge.yaml")));
-        assertTrue(Files.exists(DaltonPaths.database(project)));
+        assertTrue(DaltonPaths.ready(project));
         ExecutionDictionary dict = new ExecutionDictionary() {};
         ProjectElementCategories.load(dict, project);
         assertTrue(dict.getFinalCategoryXPathy("Badge").getXpath().contains("from-db"));

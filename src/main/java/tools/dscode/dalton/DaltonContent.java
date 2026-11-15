@@ -119,7 +119,7 @@ public final class DaltonContent {
     public static boolean delete(Path project, String relativePath) throws SQLException, java.io.IOException {
         String path = DaltonPaths.normalizeRelative(relativePath);
         boolean removed = false;
-        if (java.nio.file.Files.isRegularFile(DaltonPaths.database(project))) {
+        if (DaltonPaths.ready(project)) {
             try (DaltonDatabase database = DaltonDatabase.open(project)) {
                 Connection connection = database.connection();
                 connection.setAutoCommit(false);

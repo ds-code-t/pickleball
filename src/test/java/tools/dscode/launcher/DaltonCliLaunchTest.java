@@ -28,7 +28,7 @@ class DaltonCliLaunchTest {
         );
         assertEquals(0, code, stderr.toString(StandardCharsets.UTF_8));
         String out = stdout.toString(StandardCharsets.UTF_8);
-        assertTrue(out.contains("Dalton database missing: .pickleball/dalton/dalton.db"), out);
+        assertTrue(out.contains("Dalton database missing: .pickleball/dolt/data"), out);
         assertFalse(Files.exists(project.resolve(".pickleball")));
         assertEquals(-1, PickleballWorkbenchLauncher.dispatchDaltonIfAny(
                 new String[] {"help"},

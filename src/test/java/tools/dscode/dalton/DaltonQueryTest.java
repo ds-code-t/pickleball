@@ -126,8 +126,8 @@ class DaltonQueryTest {
     void conflictsReportUntrackedAndBothSides() throws Exception {
         write("features/pay.feature", FEATURE);
         assertEquals(0, run("dalton", "hydrate", "--project=" + project).code);
-        try (var connection = DriverManager.getConnection(DaltonDatabase.jdbcUrl(DaltonPaths.database(project)));
-             Statement statement = connection.createStatement()) {
+        try (var database = DaltonDatabase.open(project);
+             Statement statement = database.connection().createStatement()) {
             statement.execute("UPDATE files SET content_hash = 'untracked' WHERE path = 'features/pay.feature'");
         }
         Capture untracked = run("dalton", "conflicts", "--json", "--project=" + project);

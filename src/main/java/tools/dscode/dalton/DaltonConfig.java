@@ -6,12 +6,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * Dalton is on unless it is turned off. Precedence: {@code pkb_dalton}
- * system property, then {@code PKB_DALTON}, then {@code dalton.properties}
- * {@code enabled=} or {@code pkb_dalton=} when that key is present, otherwise
- * the default is on. Accepted values are {@code true|false|yes|no|on|off|1|0}.
+ * The Dolt store is on unless it is turned off. Precedence: {@code pkb_dolt}
+ * system property, then {@code PKB_DOLT}, then {@code dolt.properties}
+ * {@code enabled=} or {@code pkb_dolt=} when that key is present, then the
+ * same checks for {@code pkb_dalton} / {@code PKB_DALTON} / {@code dalton.properties}.
+ * The default is on. Accepted values are {@code true|false|yes|no|on|off|1|0}.
  * Anything else fails at first use. Files stay the Git source of truth;
- * {@code .pickleball/dalton/dalton.db} is the working copy.
+ * {@code .pickleball/dolt/data} is the working copy.
  */
 public final class DaltonConfig {
     public static final String ACCEPTED = "true|false|yes|no|on|off|1|0";
@@ -20,7 +21,10 @@ public final class DaltonConfig {
     }
 
     public static Path project() {
-        String override = System.getProperty("pkb_dalton_project");
+        String override = System.getProperty("pkb_dolt_project");
+        if (override == null || override.isBlank()) {
+            override = System.getProperty("pkb_dalton_project");
+        }
         if (override != null && !override.isBlank()) {
             return Path.of(override.trim()).toAbsolutePath().normalize();
         }
@@ -62,6 +66,18 @@ public final class DaltonConfig {
     }
 
     private static Decision decide(Path project) {
+        String doltProperty = System.getProperty("pkb_dolt");
+        if (doltProperty != null && !doltProperty.isBlank()) {
+            return new Decision(parse(doltProperty, "pkb_dolt"), "property");
+        }
+        String doltEnv = System.getenv("PKB_DOLT");
+        if (doltEnv != null && !doltEnv.isBlank()) {
+            return new Decision(parse(doltEnv, "PKB_DOLT"), "env");
+        }
+        String doltFile = namedFileValue(project, "dolt.properties", "pkb_dolt");
+        if (doltFile != null) {
+            return new Decision(parse(doltFile, "dolt.properties"), "file");
+        }
         String property = System.getProperty("pkb_dalton");
         if (property != null && !property.isBlank()) {
             return new Decision(parse(property, "pkb_dalton"), "property");
@@ -70,7 +86,7 @@ public final class DaltonConfig {
         if (env != null && !env.isBlank()) {
             return new Decision(parse(env, "PKB_DALTON"), "env");
         }
-        String file = fileValue(project);
+        String file = namedFileValue(project, "dalton.properties", "pkb_dalton");
         if (file != null) {
             return new Decision(parse(file, "dalton.properties"), "file");
         }
@@ -83,10 +99,10 @@ public final class DaltonConfig {
         throw new IllegalArgumentException(key + " must be " + ACCEPTED + " but was '" + raw.trim() + "'");
     }
 
-    /** The {@code enabled} or {@code pkb_dalton} value, or null when the key is absent. */
-    private static String fileValue(Path project) {
+    /** The {@code enabled}, {@code pkb_dolt}, or {@code pkb_dalton} value, or null when the key is absent. */
+    private static String namedFileValue(Path project, String fileName, String keyName) {
         if (project == null) return null;
-        Path file = project.resolve("dalton.properties");
+        Path file = project.resolve(fileName);
         if (!Files.isRegularFile(file)) return null;
         try {
             for (String line : Files.readAllLines(file, StandardCharsets.UTF_8)) {
@@ -96,7 +112,7 @@ public final class DaltonConfig {
                 if (split < 0) continue;
                 String key = trimmed.substring(0, split).trim();
                 String value = trimmed.substring(split + 1).trim();
-                if ("enabled".equalsIgnoreCase(key) || "pkb_dalton".equalsIgnoreCase(key)) {
+                if ("enabled".equalsIgnoreCase(key) || keyName.equalsIgnoreCase(key)) {
                     return value;
                 }
             }

@@ -83,7 +83,7 @@ class DaltonDefaultOnTest {
                 "dalton", "status", "--project=" + project), null);
         assertEquals(1, child.code, child.out + child.err);
         assertTrue(child.out.contains(DaltonDatabase.MISSING_DRIVER), child.out);
-        assertTrue(child.out.contains("Dalton is on by default"), child.out);
+        assertTrue(child.out.contains("Dolt is on by default"), child.out);
         assertFalse(Files.exists(DaltonPaths.database(project)));
         assertFalse(Files.exists(DaltonPaths.root(project)));
     }
@@ -131,6 +131,7 @@ class DaltonDefaultOnTest {
         StringBuilder filtered = new StringBuilder();
         for (String entry : System.getProperty("java.class.path").split(separator)) {
             if (entry.toLowerCase(Locale.ROOT).contains("sqlite")) continue;
+            if (entry.toLowerCase(Locale.ROOT).contains("mariadb")) continue;
             if (filtered.length() > 0) filtered.append(separator);
             filtered.append(entry);
         }

@@ -146,7 +146,7 @@ public final class DaltonHistory {
 
     public static List<LinkRow> links(Path project, String id) throws SQLException {
         requireId(id);
-        if (!Files.isRegularFile(DaltonPaths.database(project))) return List.of();
+        if (!DaltonPaths.ready(project)) return List.of();
         try (DaltonDatabase database = DaltonDatabase.open(project);
              PreparedStatement statement = database.connection().prepareStatement("""
                      SELECT l.log_id, l.entity_type, l.entity_id
@@ -217,7 +217,7 @@ public final class DaltonHistory {
     }
 
     public static List<Run> list(Path project) throws SQLException {
-        if (!Files.isRegularFile(DaltonPaths.database(project))) return List.of();
+        if (!DaltonPaths.ready(project)) return List.of();
         try (DaltonDatabase database = DaltonDatabase.open(project);
              PreparedStatement statement = database.connection().prepareStatement(
                      "SELECT run_id, started_at, finished_at, status, scenario, passed, failed, note FROM runs ORDER BY started_at, run_id");
@@ -230,7 +230,7 @@ public final class DaltonHistory {
 
     public static Run find(Path project, String id) throws SQLException {
         requireId(id);
-        if (!Files.isRegularFile(DaltonPaths.database(project))) return null;
+        if (!DaltonPaths.ready(project)) return null;
         try (DaltonDatabase database = DaltonDatabase.open(project);
              PreparedStatement statement = database.connection().prepareStatement(
                      "SELECT run_id, started_at, finished_at, status, scenario, passed, failed, note FROM runs WHERE run_id = ?")) {
@@ -243,7 +243,7 @@ public final class DaltonHistory {
 
     public static List<LogLine> logs(Path project, String id) throws SQLException {
         requireId(id);
-        if (!Files.isRegularFile(DaltonPaths.database(project))) return List.of();
+        if (!DaltonPaths.ready(project)) return List.of();
         try (DaltonDatabase database = DaltonDatabase.open(project);
              PreparedStatement statement = database.connection().prepareStatement(
                      "SELECT id, logged_at, entity, message FROM run_logs WHERE run_id = ? ORDER BY id")) {
@@ -261,7 +261,7 @@ public final class DaltonHistory {
     public static RetainResult retain(Path project, int days, int maxBytes) throws SQLException {
         if (days < 0) throw new IllegalArgumentException("history days must be zero or greater");
         if (maxBytes < 0) throw new IllegalArgumentException("history max bytes must be zero or greater");
-        if (!Files.isRegularFile(DaltonPaths.database(project))) return new RetainResult(0, 0);
+        if (!DaltonPaths.ready(project)) return new RetainResult(0, 0);
         Instant cutoff = Instant.now().minus(Duration.ofDays(days));
         int removed = 0;
         try (DaltonDatabase database = DaltonDatabase.open(project)) {

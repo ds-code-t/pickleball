@@ -331,7 +331,20 @@ public final class DoltDialect {
         try {
             boolean created = false;
             for (String ddl : SOURCE_DDL) session.script(ddl);
-            if (!"1".equals(session.scalar("SELECT value FROM schema_meta WHERE `key` = 'dolt_schema'"))) {
+            String current = session.scalar("SELECT value FROM schema_meta WHERE `key` = 'dolt_schema'");
+            if (current != null && !current.isBlank()) {
+                int version;
+                try {
+                    version = Integer.parseInt(current.trim());
+                } catch (NumberFormatException failure) {
+                    version = 0;
+                }
+                if (version > SCHEMA_VERSION) {
+                    throw new SQLException("Dolt schema " + version + " is newer than this build ("
+                            + SCHEMA_VERSION + ")");
+                }
+            }
+            if (!"1".equals(current)) {
                 session.update(UPSERT_META, "dolt_schema", "1");
                 session.update(UPSERT_META, "schema_version", "1");
                 session.update(UPSERT_PROVENANCE, SCHEMA_VERSION);
@@ -396,6 +409,57 @@ public final class DoltDialect {
 
     public interface SqlTask {
         void run() throws SQLException;
+    }
+
+    public static boolean sourceDirty(java.sql.Connection connection) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM dolt_status WHERE table_name IN (" + sourceIn() + ")";
+        try (java.sql.Statement statement = connection.createStatement();
+             java.sql.ResultSet rows = statement.executeQuery(sql)) {
+            return rows.next() && rows.getLong(1) > 0;
+        }
+    }
+
+    /**
+     * Commits staged source tables only. Run-state tables stay unstaged.
+     * Returns false when those tables have no working-set changes.
+     */
+    public static boolean commitHydrate(java.sql.Connection connection, String gitSha, boolean dirty) throws SQLException {
+        if (!sourceDirty(connection)) return false;
+        String sha = gitSha == null || gitSha.isBlank() ? "unknown" : gitSha.replace("'", "");
+        String message = "hydrate " + sha + (dirty ? " dirty" : "");
+        try (java.sql.Statement statement = connection.createStatement()) {
+            statement.execute(doltAdd());
+            statement.execute("CALL DOLT_COMMIT('-m', '" + message + "')");
+        } catch (SQLException failure) {
+            if (!nothingToCommit(failure)) throw failure;
+            return false;
+        }
+        return true;
+    }
+
+    public static String lastHydrateCommit(java.sql.Connection connection) {
+        String sql = "SELECT commit_hash, message FROM dolt_log ORDER BY date DESC";
+        try (java.sql.Statement statement = connection.createStatement();
+             java.sql.ResultSet rows = statement.executeQuery(sql)) {
+            while (rows.next()) {
+                String message = rows.getString(2);
+                if (message != null && message.startsWith("hydrate ")) {
+                    return rows.getString(1) + " " + message;
+                }
+            }
+        } catch (SQLException failure) {
+            return "unavailable";
+        }
+        return "none";
+    }
+
+    private static String sourceIn() {
+        StringBuilder in = new StringBuilder();
+        for (String table : SOURCE_TABLES) {
+            if (!in.isEmpty()) in.append(", ");
+            in.append('\'').append(table).append('\'');
+        }
+        return in.toString();
     }
 
     private static String doltAdd() {
