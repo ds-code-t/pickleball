@@ -1304,15 +1304,55 @@ final class WorkbenchFrame extends JFrame {
             int index = rightTabs.indexOfTab("Explorer");
             if (index >= 0) rightTabs.setSelectedIndex(index);
         }
+        Consumer<String> explorer = diagnosticView == null ? null : this::pushDiagnosticState;
+        if (routeRecordedRun(runId, this::noteExplorer, explorer, diagnosticNavigator) == null) {
+            showDiagnosticRun(runId, 0);
+        }
+    }
+
+    /**
+     * Blank and not-ready opens report through {@code status}. An unknown id pushes the Explorer
+     * gap and leaves the status unchanged. A known id returns null so the frame replays it.
+     * {@code explorer} is the Explorer view: null when that view is absent.
+     */
+    static String routeRecordedRun(
+            String runId,
+            Consumer<String> status,
+            Consumer<String> explorer,
+            DiagnosticEvidenceNavigator navigator) {
         if (runId == null || runId.isBlank()) {
-            noteExplorer("Select a run with a run id first");
-            return;
+            status.accept("Select a run with a run id first");
+            return "";
         }
-        if (diagnosticView == null || diagnosticNavigator == null) {
-            noteExplorer("Explorer is not ready");
-            return;
+        if (explorer == null || navigator == null) {
+            status.accept("Explorer is not ready");
+            return "";
         }
-        showDiagnosticRun(runId, 0);
+        boolean known = navigator.catalogRuns().stream().anyMatch(run -> run.runId().equals(runId));
+        if (known) return null;
+        String json = unknownDiagnosticState(runId, navigator);
+        explorer.accept(json);
+        return json;
+    }
+
+    /** Gap JSON Explorer shows when Tracking opens a run the catalog does not have. */
+    static String unknownDiagnosticState(String runId, DiagnosticEvidenceNavigator navigator) {
+        List<Map<String, Object>> known = new ArrayList<>();
+        for (var run : navigator.catalogRuns()) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("runId", run.runId());
+            row.put("label", run.displayLabel());
+            row.put("outcome", run.outcome());
+            row.put("inProgress", run.inProgress());
+            row.put("selected", false);
+            known.add(row);
+        }
+        return WorkbenchWebJson.write(Map.of(
+                "runs", known,
+                "frames", List.of(),
+                "layers", List.of(),
+                "gap", unmatchedDiagnosticRun(runId)
+        ));
     }
 
     String explorerNotice() {
@@ -1346,22 +1386,7 @@ final class WorkbenchFrame extends JFrame {
                 .findFirst()
                 .orElse(null);
         if (selected == null) {
-            List<Map<String, Object>> known = new ArrayList<>();
-            for (var run : diagnosticNavigator.catalogRuns()) {
-                Map<String, Object> row = new LinkedHashMap<>();
-                row.put("runId", run.runId());
-                row.put("label", run.displayLabel());
-                row.put("outcome", run.outcome());
-                row.put("inProgress", run.inProgress());
-                row.put("selected", false);
-                known.add(row);
-            }
-            pushDiagnosticState(WorkbenchWebJson.write(Map.of(
-                    "runs", known,
-                    "frames", List.of(),
-                    "layers", List.of(),
-                    "gap", unmatchedDiagnosticRun(runId)
-            )));
+            pushDiagnosticState(unknownDiagnosticState(runId, diagnosticNavigator));
             return;
         }
         currentDiagnosticRunId = runId;

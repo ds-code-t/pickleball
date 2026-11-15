@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.workbench.dalton.DaltonBrowser;
 import tools.dscode.workbench.dalton.DaltonCliForwarder;
+import tools.dscode.workbench.diagnostics.DiagnosticEvidenceNavigator;
 
 import javax.swing.JButton;
 import javax.swing.JComboBox;
@@ -156,63 +157,22 @@ class WorkbenchTrackingForwarderTest {
         assertEquals("Select a run with a run id first", labelText(panel, ""));
         assertTrue(opened.isEmpty(), opened.toString());
 
-        WorkbenchFrame blank = frameWithStatusLabel();
-        SwingUtilities.invokeAndWait(() -> blank.openRecordedRun(""));
-        assertEquals("Select a run with a run id first", blank.explorerNotice());
-        assertEquals("Select a run with a run id first", statusLabel(blank).getText());
+        List<String> status = new ArrayList<>();
+        List<String> shown = new ArrayList<>();
+        DiagnosticEvidenceNavigator navigator = new DiagnosticEvidenceNavigator(project);
+        assertEquals("", WorkbenchFrame.routeRecordedRun("", status::add, shown::add, navigator));
+        assertEquals(List.of("Select a run with a run id first"), status);
+        assertTrue(shown.isEmpty(), shown.toString());
 
-        WorkbenchFrame unready = frameWithStatusLabel();
-        SwingUtilities.invokeAndWait(() -> unready.openRecordedRun("sample-run"));
-        assertEquals("Explorer is not ready", unready.explorerNotice());
-        assertEquals("Explorer is not ready", statusLabel(unready).getText());
-        assertEquals("", unready.lastDiagnosticState());
+        status.clear();
+        assertEquals("", WorkbenchFrame.routeRecordedRun("sample-run", status::add, null, null));
+        assertEquals(List.of("Explorer is not ready"), status);
 
-        WorkbenchFrame unknown = frameWithStatusLabel();
-        setField(unknown, "diagnosticNavigator", new tools.dscode.workbench.diagnostics.DiagnosticEvidenceNavigator(project));
-        setField(unknown, "diagnosticView", allocate(tools.dscode.workbench.ui.web.WebViewPanel.class));
-        SwingUtilities.invokeAndWait(() -> unknown.openRecordedRun("missing-run"));
-        assertTrue(unknown.lastDiagnosticState().contains("\"gap\":\"No retained diagnostic run matches missing-run\""),
-                unknown.lastDiagnosticState());
-        assertEquals("Ready", statusLabel(unknown).getText());
-    }
-
-    private static WorkbenchFrame frameWithStatusLabel() throws Exception {
-        WorkbenchFrame frame = bareFrame();
-        java.lang.reflect.Field field = WorkbenchFrame.class.getDeclaredField("activityLabel");
-        field.setAccessible(true);
-        java.lang.reflect.Field unsafeField = Class.forName("sun.misc.Unsafe").getDeclaredField("theUnsafe");
-        unsafeField.setAccessible(true);
-        Object unsafe = unsafeField.get(null);
-        long offset = (long) unsafe.getClass().getMethod("objectFieldOffset", java.lang.reflect.Field.class)
-                .invoke(unsafe, field);
-        unsafe.getClass().getMethod("putObject", Object.class, long.class, Object.class)
-                .invoke(unsafe, frame, offset, new JLabel("Ready"));
-        return frame;
-    }
-
-    private static JLabel statusLabel(WorkbenchFrame frame) throws Exception {
-        java.lang.reflect.Field field = WorkbenchFrame.class.getDeclaredField("activityLabel");
-        field.setAccessible(true);
-        return (JLabel) field.get(frame);
-    }
-
-    private static WorkbenchFrame bareFrame() throws Exception {
-        return allocate(WorkbenchFrame.class);
-    }
-
-    @SuppressWarnings("unchecked")
-    private static <T> T allocate(Class<T> type) throws Exception {
-        java.lang.reflect.Field unsafeField = Class.forName("sun.misc.Unsafe").getDeclaredField("theUnsafe");
-        unsafeField.setAccessible(true);
-        Object unsafe = unsafeField.get(null);
-        java.lang.reflect.Method allocate = unsafe.getClass().getMethod("allocateInstance", Class.class);
-        return (T) allocate.invoke(unsafe, type);
-    }
-
-    private static void setField(Object target, String name, Object value) throws Exception {
-        java.lang.reflect.Field field = target.getClass().getDeclaredField(name);
-        field.setAccessible(true);
-        field.set(target, value);
+        status.clear();
+        String gap = WorkbenchFrame.routeRecordedRun("missing-run", status::add, shown::add, navigator);
+        assertTrue(status.isEmpty(), status.toString());
+        assertEquals(gap, shown.get(0));
+        assertTrue(gap.contains("\"gap\":\"No retained diagnostic run matches missing-run\""), gap);
     }
 
     private static void click(Container panel, String title) throws Exception {
