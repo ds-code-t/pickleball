@@ -463,8 +463,9 @@ tasks.register('engineRun', JavaExec) {
 def doltForwardClasspath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
         dependencies.create('org.mariadb.jdbc:mariadb-java-client:3.5.11')
 )
-// The doltSandbox task is itself a project property. Read -PdoltSandbox from Gradle properties only.
-def doltSandboxName = providers.gradleProperty('doltSandbox')
+// A dolt* task is itself a project property. -Pdoltsomething must come from Gradle properties,
+// never project.hasProperty, or the task name is forwarded as the command.
+def doltProp = { String key -> providers.gradleProperty(key) }
 
 tasks.register('doltStatus', JavaExec) {
     group = 'dolt'
@@ -472,7 +473,7 @@ tasks.register('doltStatus', JavaExec) {
     classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     args = ['dolt', 'status']
-    if (doltSandboxName.isPresent()) args += ['--sandbox=' + doltSandboxName.get()]
+    if (doltProp('doltSandbox').isPresent()) args += ['--sandbox=' + doltProp('doltSandbox').get()]
 }
 
 tasks.register('doltHydrate', JavaExec) {
@@ -481,9 +482,9 @@ tasks.register('doltHydrate', JavaExec) {
     classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     args = ['dolt', 'hydrate']
-    if (project.hasProperty('doltPath')) args += ['--path=' + project.property('doltPath')]
-    if (project.hasProperty('doltForce')) args += ['--force']
-    if (doltSandboxName.isPresent()) args += ['--sandbox=' + doltSandboxName.get()]
+    if (doltProp('doltPath').isPresent()) args += ['--path=' + doltProp('doltPath').get()]
+    if (doltProp('doltForce').isPresent()) args += ['--force']
+    if (doltProp('doltSandbox').isPresent()) args += ['--sandbox=' + doltProp('doltSandbox').get()]
 }
 
 tasks.register('doltExtract', JavaExec) {
@@ -492,9 +493,9 @@ tasks.register('doltExtract', JavaExec) {
     classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     args = ['dolt', 'extract']
-    if (project.hasProperty('doltPath')) args += ['--path=' + project.property('doltPath')]
-    if (project.hasProperty('doltForce')) args += ['--force']
-    if (doltSandboxName.isPresent()) args += ['--sandbox=' + doltSandboxName.get()]
+    if (doltProp('doltPath').isPresent()) args += ['--path=' + doltProp('doltPath').get()]
+    if (doltProp('doltForce').isPresent()) args += ['--force']
+    if (doltProp('doltSandbox').isPresent()) args += ['--sandbox=' + doltProp('doltSandbox').get()]
 }
 
 tasks.register('doltFeature', JavaExec) {
@@ -503,11 +504,11 @@ tasks.register('doltFeature', JavaExec) {
     classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     args = ['dolt', 'feature']
-    args += [project.hasProperty('doltFeature') ? project.property('doltFeature') : 'put']
-    if (project.hasProperty('doltPath')) args += [project.property('doltPath')]
-    if (project.hasProperty('doltText')) args += ['--text=' + project.property('doltText')]
-    if (project.hasProperty('doltFile')) args += ['--file=' + project.property('doltFile')]
-    if (doltSandboxName.isPresent()) args += ['--sandbox=' + doltSandboxName.get()]
+    args += [doltProp('doltFeature').orElse('put').get()]
+    if (doltProp('doltPath').isPresent()) args += [doltProp('doltPath').get()]
+    if (doltProp('doltText').isPresent()) args += ['--text=' + doltProp('doltText').get()]
+    if (doltProp('doltFile').isPresent()) args += ['--file=' + doltProp('doltFile').get()]
+    if (doltProp('doltSandbox').isPresent()) args += ['--sandbox=' + doltProp('doltSandbox').get()]
 }
 
 tasks.register('doltEdit', JavaExec) {
@@ -516,16 +517,19 @@ tasks.register('doltEdit', JavaExec) {
     classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     args = ['dolt']
-    def editArgs = project.hasProperty('doltArgs') ? project.property('doltArgs').toString() : 'category,list'
-    args += editArgs.split(',')
-    if (project.hasProperty('doltJson')) args += ['--json']
-    if (project.hasProperty('doltPath')) args += ['--path=' + project.property('doltPath')]
-    if (project.hasProperty('doltId')) args += ['--id=' + project.property('doltId')]
-    if (project.hasProperty('doltText')) args += ['--text=' + project.property('doltText')]
-    if (project.hasProperty('doltFile')) args += ['--file=' + project.property('doltFile')]
-    if (project.hasProperty('doltConfirm')) args += ['--confirm']
-    if (project.hasProperty('doltForce')) args += ['--force']
-    if (doltSandboxName.isPresent()) args += ['--sandbox=' + doltSandboxName.get()]
+    def editArgs = doltProp('doltArgs').orElse('category,list').get()
+    editArgs.split(',').each { piece ->
+        def trimmed = piece == null ? '' : piece.toString().trim()
+        if (!trimmed.isEmpty()) args += [trimmed]
+    }
+    if (doltProp('doltJson').isPresent()) args += ['--json']
+    if (doltProp('doltPath').isPresent()) args += ['--path=' + doltProp('doltPath').get()]
+    if (doltProp('doltId').isPresent()) args += ['--id=' + doltProp('doltId').get()]
+    if (doltProp('doltText').isPresent()) args += ['--text=' + doltProp('doltText').get()]
+    if (doltProp('doltFile').isPresent()) args += ['--file=' + doltProp('doltFile').get()]
+    if (doltProp('doltConfirm').isPresent()) args += ['--confirm']
+    if (doltProp('doltForce').isPresent()) args += ['--force']
+    if (doltProp('doltSandbox').isPresent()) args += ['--sandbox=' + doltProp('doltSandbox').get()]
 }
 
 tasks.register('domengine', JavaExec) {
@@ -548,12 +552,15 @@ tasks.register('doltQuery', JavaExec) {
     classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     args = ['dolt']
-    def queryArgs = project.hasProperty('doltArgs') ? project.property('doltArgs').toString() : 'files,list'
-    args += queryArgs.split(',')
-    if (project.hasProperty('doltJson')) args += ['--json']
-    if (project.hasProperty('doltFeaturePath')) args += ['--feature=' + project.property('doltFeaturePath')]
-    if (project.hasProperty('doltScenario')) args += ['--scenario=' + project.property('doltScenario')]
-    if (doltSandboxName.isPresent()) args += ['--sandbox=' + doltSandboxName.get()]
+    def queryArgs = doltProp('doltArgs').orElse('files,list').get()
+    queryArgs.split(',').each { piece ->
+        def trimmed = piece == null ? '' : piece.toString().trim()
+        if (!trimmed.isEmpty()) args += [trimmed]
+    }
+    if (doltProp('doltJson').isPresent()) args += ['--json']
+    if (doltProp('doltFeaturePath').isPresent()) args += ['--feature=' + doltProp('doltFeaturePath').get()]
+    if (doltProp('doltScenario').isPresent()) args += ['--scenario=' + doltProp('doltScenario').get()]
+    if (doltProp('doltSandbox').isPresent()) args += ['--sandbox=' + doltProp('doltSandbox').get()]
 }
 
 tasks.register('doltHistory', JavaExec) {
@@ -562,11 +569,11 @@ tasks.register('doltHistory', JavaExec) {
     classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     args = ['dolt', 'history']
-    args += [project.hasProperty('doltHistory') ? project.property('doltHistory') : 'list']
-    if (project.hasProperty('doltRun')) args += [project.property('doltRun')]
-    if (project.hasProperty('doltDays')) args += ['--days=' + project.property('doltDays')]
-    if (project.hasProperty('doltMaxBytes')) args += ['--max-bytes=' + project.property('doltMaxBytes')]
-    if (doltSandboxName.isPresent()) args += ['--sandbox=' + doltSandboxName.get()]
+    args += [doltProp('doltHistory').orElse('list').get()]
+    if (doltProp('doltRun').isPresent()) args += [doltProp('doltRun').get()]
+    if (doltProp('doltDays').isPresent()) args += ['--days=' + doltProp('doltDays').get()]
+    if (doltProp('doltMaxBytes').isPresent()) args += ['--max-bytes=' + doltProp('doltMaxBytes').get()]
+    if (doltProp('doltSandbox').isPresent()) args += ['--sandbox=' + doltProp('doltSandbox').get()]
 }
 
 tasks.register('doltRun', JavaExec) {
@@ -575,12 +582,12 @@ tasks.register('doltRun', JavaExec) {
     classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     args = ['dolt', 'run']
-    if (project.hasProperty('doltTags')) args += ['--tags=' + project.property('doltTags')]
-    if (project.hasProperty('doltName')) args += ['--name=' + project.property('doltName')]
-    if (project.hasProperty('doltGlue')) args += ['--glue=' + project.property('doltGlue')]
-    if (project.hasProperty('doltDryRun')) args += ['--dry-run']
+    if (doltProp('doltTags').isPresent()) args += ['--tags=' + doltProp('doltTags').get()]
+    if (doltProp('doltName').isPresent()) args += ['--name=' + doltProp('doltName').get()]
+    if (doltProp('doltGlue').isPresent()) args += ['--glue=' + doltProp('doltGlue').get()]
+    if (doltProp('doltDryRun').isPresent()) args += ['--dry-run']
     systemProperty 'pkb_dolt_run_classpath', sourceSets.test.runtimeClasspath.asPath
-    if (doltSandboxName.isPresent()) args += ['--sandbox=' + doltSandboxName.get()]
+    if (doltProp('doltSandbox').isPresent()) args += ['--sandbox=' + doltProp('doltSandbox').get()]
 }
 
 tasks.register('doltInstall', JavaExec) {
@@ -589,10 +596,10 @@ tasks.register('doltInstall', JavaExec) {
     classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     args = ['dolt', 'install']
-    if (project.hasProperty('doltCheck')) args += ['--check']
-    if (project.hasProperty('doltForce')) args += ['--force']
-    if (project.hasProperty('doltDir')) args += ['--dir=' + project.property('doltDir')]
-    if (doltSandboxName.isPresent()) args += ['--sandbox=' + doltSandboxName.get()]
+    if (doltProp('doltCheck').isPresent()) args += ['--check']
+    if (doltProp('doltForce').isPresent()) args += ['--force']
+    if (doltProp('doltDir').isPresent()) args += ['--dir=' + doltProp('doltDir').get()]
+    if (doltProp('doltSandbox').isPresent()) args += ['--sandbox=' + doltProp('doltSandbox').get()]
 }
 
 tasks.register('doltServer', JavaExec) {
@@ -601,9 +608,9 @@ tasks.register('doltServer', JavaExec) {
     classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     args = ['dolt', 'server']
-    args += [project.hasProperty('doltServer') ? project.property('doltServer') : 'status']
-    if (project.hasProperty('doltJson')) args += ['--json']
-    if (doltSandboxName.isPresent()) args += ['--sandbox=' + doltSandboxName.get()]
+    args += [doltProp('doltServer').orElse('status').get()]
+    if (doltProp('doltJson').isPresent()) args += ['--json']
+    if (doltProp('doltSandbox').isPresent()) args += ['--sandbox=' + doltProp('doltSandbox').get()]
 }
 
 tasks.register('doltSandbox', JavaExec) {
@@ -612,11 +619,14 @@ tasks.register('doltSandbox', JavaExec) {
     classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     args = ['dolt', 'sandbox']
-    def sandboxArgs = project.hasProperty('doltArgs') ? project.property('doltArgs').toString() : 'list'
-    args += sandboxArgs.split(',')
-    if (project.hasProperty('doltJson')) args += ['--json']
-    if (project.hasProperty('doltForce')) args += ['--force']
-    if (doltSandboxName.isPresent()) args += ['--sandbox=' + doltSandboxName.get()]
+    def sandboxArgs = doltProp('doltArgs').orElse('list').get()
+    sandboxArgs.split(',').each { piece ->
+        def trimmed = piece == null ? '' : piece.toString().trim()
+        if (!trimmed.isEmpty()) args += [trimmed]
+    }
+    if (doltProp('doltJson').isPresent()) args += ['--json']
+    if (doltProp('doltForce').isPresent()) args += ['--force']
+    if (doltProp('doltSandbox').isPresent()) args += ['--sandbox=' + doltProp('doltSandbox').get()]
 }
 
 tasks.register('doltMigrate', JavaExec) {
@@ -625,9 +635,9 @@ tasks.register('doltMigrate', JavaExec) {
     classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     args = ['dolt', 'migrate']
-    if (project.hasProperty('doltDryRun')) args += ['--dry-run']
-    if (project.hasProperty('doltRemoveLegacy')) args += ['--remove-legacy']
-    if (doltSandboxName.isPresent()) args += ['--sandbox=' + doltSandboxName.get()]
+    if (doltProp('doltDryRun').isPresent()) args += ['--dry-run']
+    if (doltProp('doltRemoveLegacy').isPresent()) args += ['--remove-legacy']
+    if (doltProp('doltSandbox').isPresent()) args += ['--sandbox=' + doltProp('doltSandbox').get()]
 }
 
 tasks.register('doltRunClasspath', JavaExec) {
@@ -640,7 +650,7 @@ tasks.register('doltRunClasspath', JavaExec) {
     if (joined.contains(' ')) joined = '"' + joined + '"'
     environment 'PKB_DOLT_RUN_CLASSPATH_TEXT', joined
     args = ['dolt', 'run-classpath', '--out=' + out.get().asFile.absolutePath]
-    if (doltSandboxName.isPresent()) args += ['--sandbox=' + doltSandboxName.get()]
+    if (doltProp('doltSandbox').isPresent()) args += ['--sandbox=' + doltProp('doltSandbox').get()]
 }
 
 tasks.register('verifySqlitePackaging') {
