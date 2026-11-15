@@ -96,6 +96,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-snapshot-coverage-audit.md`
 - `docs/maintainer/3.0.0-workbench-edit-design.md`
 - `docs/maintainer/consumer-sim-harness.md`
+- `docs/maintainer/execution-path-audit-2026-11-15.md`
 - `docs/maintainer/guidance-goldens.md`
 - `docs/maintainer/locked-decisions-digest-2026-11-13.md`
 - `docs/maintainer/pointer-eval-harness.md`
