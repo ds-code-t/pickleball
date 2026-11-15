@@ -659,6 +659,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentsurface/PopupBridgeTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/PopupBrowserLocatorTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/PopupCleanupTest.java`
+- `src/test/java/tools/dscode/common/agentsurface/PopupHostCloseTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/PopupInputEventsTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/PopupLedgerTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/PopupLifecycleTest.java`

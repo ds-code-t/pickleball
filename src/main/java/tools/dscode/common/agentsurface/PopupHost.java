@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Map;
 
 /** Spawns or reuses the popup host process. */
@@ -64,6 +65,100 @@ public final class PopupHost {
         status.put("reused", false);
         status.put("ok", true);
         return status;
+    }
+
+    /**
+     * Writes one close row when none is stored, then waits for the host pid, the browser pid,
+     * and the profile directory to leave. The bound is about ten seconds.
+     */
+    public static boolean closeAndWait(Path project, String runId, Duration timeout) throws Exception {
+        Duration bound = timeout == null || timeout.isNegative() || timeout.isZero()
+                ? Duration.ofSeconds(10) : timeout;
+        if (!closed(project, runId)) {
+            PopupLedger.append(project, runId, "close", "", "", "", "", "", "");
+        }
+        long deadline = System.nanoTime() + bound.toNanos();
+        Path profile = PopupLog.popupDir(project, runId).resolve("profile");
+        while (true) {
+            if (quiet(project, runId, profile)) return true;
+            long now = System.nanoTime();
+            if (now >= deadline) break;
+            if (deadline - now < Duration.ofSeconds(2).toNanos()) stopHolders(project, runId, profile);
+            Thread.sleep(50);
+        }
+        stopHolders(project, runId, profile);
+        deleteTree(profile);
+        return quiet(project, runId, profile);
+    }
+
+    private static boolean closed(Path project, String runId) throws Exception {
+        for (PopupLedger.Row row : PopupLedger.read(project, runId)) {
+            if ("close".equals(row.op())) return true;
+        }
+        return false;
+    }
+
+    private static boolean quiet(Path project, String runId, Path profile) {
+        Map<String, Object> status = PopupStatus.read(project, runId);
+        boolean pidsGone = !alive(status.get("pid")) && !alive(status.get("browserPid"));
+        if (pidsGone) deleteTree(profile);
+        if (!Files.exists(profile) && (pidsGone || loggedExit(project, runId))) return true;
+        return false;
+    }
+
+    private static boolean loggedExit(Path project, String runId) {
+        Path log = PopupLog.popupDir(project, runId).resolve("popup.log");
+        if (!Files.isRegularFile(log)) return false;
+        try {
+            for (String line : Files.readAllLines(log)) {
+                if (line.contains(" lifecycle ") && line.endsWith(" exit")) return true;
+            }
+        } catch (Exception ignored) {
+            return false;
+        }
+        return false;
+    }
+
+    private static boolean alive(Object value) {
+        if (!(value instanceof Number number)) return false;
+        long id = number.longValue();
+        return id > 0 && ProcessHandle.of(id).isPresent();
+    }
+
+    private static void stopHolders(Path project, String runId, Path profile) {
+        Map<String, Object> status = PopupStatus.read(project, runId);
+        kill(status.get("browserPid"));
+        kill(status.get("pid"));
+        String marker = profile.toAbsolutePath().toString();
+        ProcessHandle.allProcesses().forEach(handle -> {
+            String command = handle.info().commandLine().orElse("");
+            if (!command.isEmpty() && command.contains(marker)) handle.destroyForcibly();
+        });
+    }
+
+    private static void kill(Object value) {
+        if (!(value instanceof Number number)) return;
+        long id = number.longValue();
+        if (id <= 0) return;
+        ProcessHandle.of(id).ifPresent(handle -> {
+            handle.descendants().forEach(ProcessHandle::destroyForcibly);
+            handle.destroyForcibly();
+        });
+    }
+
+    private static void deleteTree(Path root) {
+        if (!Files.exists(root)) return;
+        try (var walk = Files.walk(root)) {
+            walk.sorted(Comparator.reverseOrder()).forEach(path -> {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (Exception ignored) {
+                    // Chrome can still be releasing the profile. The next pass retries.
+                }
+            });
+        } catch (Exception ignored) {
+            // A walk that races a delete is retried by the caller.
+        }
     }
 
     public static boolean healthy(Map<String, Object> status) {

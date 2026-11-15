@@ -1,7 +1,7 @@
 package tools.dscode.common.agentsurface;
 
 import java.nio.file.Path;
-import java.util.Map;
+import java.time.Duration;
 
 /** Temporary CLI until the launcher routes popup-open, popup-status, and popup-close. */
 public final class PopupCli {
@@ -36,9 +36,11 @@ public final class PopupCli {
                     yield 0;
                 }
                 case "popup-close" -> {
-                    PopupLedger.append(project, runId, "close", "", "", "", "", "", "");
-                    System.out.println("{\"ok\":true,\"op\":\"popup-close\"}");
-                    yield 0;
+                    boolean exited = PopupHost.closeAndWait(project, runId, Duration.ofSeconds(10));
+                    System.out.println(exited
+                            ? "{\"ok\":true,\"op\":\"popup-close\",\"exited\":true}"
+                            : "{\"ok\":false,\"op\":\"popup-close\",\"exited\":false}");
+                    yield exited ? 0 : 1;
                 }
                 default -> {
                     System.err.println("unknown popup command: " + command);

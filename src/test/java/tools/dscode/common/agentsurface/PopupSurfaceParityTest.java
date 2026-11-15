@@ -3,12 +3,15 @@ package tools.dscode.common.agentsurface;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.common.agentcontrol.AgentControl;
 import tools.dscode.common.agentcontrol.PopupSurfaceBridge;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PopupSurfaceParityTest {
@@ -17,7 +20,18 @@ class PopupSurfaceParityTest {
 
     @AfterEach
     void clear() {
-        System.clearProperty("pkb_agent_popup");
+        try {
+            System.setProperty("pkb_agent_popup", "auto");
+            Optional<AgentControl.Result> closed = AgentSurfaceRouter.route(project, "parity", "popup-close", Map.of(), "a");
+            assertTrue(closed.isPresent());
+            assertEquals(Boolean.TRUE, closed.get().body().get("exited"));
+        } catch (RuntimeException failure) {
+            throw failure;
+        } catch (Exception failure) {
+            throw new IllegalStateException(failure);
+        } finally {
+            System.clearProperty("pkb_agent_popup");
+        }
     }
 
     @Test

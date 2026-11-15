@@ -12,6 +12,7 @@ import tools.dscode.common.agentsurface.PopupLog;
 import java.nio.file.Files;
 import java.security.MessageDigest;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.HexFormat;
 import java.util.Map;
 
@@ -44,19 +45,16 @@ class AgentSurfacePopupLiveTest {
             String rendered = waitRendered(project);
             assertTrue(rendered.contains(sha(html)), rendered);
             assertTrue(rendered.contains(sha(chat)), rendered);
-            PopupLedger.append(project, "live", "close", "", "", "", "", "", "");
+            assertTrue(PopupHost.closeAndWait(project, "live", Duration.ofSeconds(10)));
             long browserPid = opened.get("browserPid") instanceof Number number ? number.longValue() : -1;
-            long deadline = System.nanoTime() + java.time.Duration.ofSeconds(10).toNanos();
-            while (System.nanoTime() < deadline && browserPid > 0 && ProcessHandle.of(browserPid).isPresent()) {
-                Thread.sleep(100);
-            }
             assertFalse(browserPid > 0 && ProcessHandle.of(browserPid).isPresent(), "browser pid " + browserPid);
+            assertFalse(Files.exists(PopupLog.popupDir(project, "live").resolve("profile")));
         } finally {
             restore("pkb_agent_popup_browser", browser);
             restore("pkb_agent_popup_headless", headless);
             restore("pkb_agent_popup_on_top", onTop);
             try {
-                PopupLedger.append(project, "live", "close", "", "", "", "", "", "");
+                PopupHost.closeAndWait(project, "live", Duration.ofSeconds(2));
             } catch (Exception ignored) {
                 // The host may already be gone.
             }

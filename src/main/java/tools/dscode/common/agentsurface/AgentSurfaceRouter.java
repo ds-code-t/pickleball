@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.security.MessageDigest;
+import java.time.Duration;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -88,10 +89,11 @@ public final class AgentSurfaceRouter {
             return new AgentControl.Result(0, status);
         }
         if ("popup-close".equals(op)) {
-            PopupLedger.append(project, runId, "close", "", "", "", "", "", "");
+            boolean exited = PopupHost.closeAndWait(project, runId, Duration.ofSeconds(10));
             Map<String, Object> body = ok("Popup close recorded.");
             body.put("op", op);
             body.put("target", "popup");
+            body.put("exited", exited);
             return new AgentControl.Result(0, body);
         }
         if ("popup-open".equals(op)) {

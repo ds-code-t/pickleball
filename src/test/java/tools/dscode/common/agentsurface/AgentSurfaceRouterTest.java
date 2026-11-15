@@ -21,8 +21,22 @@ class AgentSurfaceRouterTest {
 
     @AfterEach
     void clear() {
-        System.clearProperty("pkb_agent_popup");
-        System.clearProperty("pkb_agent_session");
+        String mode = System.getProperty("pkb_agent_popup");
+        try {
+            if (mode == null || "off".equalsIgnoreCase(mode) || "false".equalsIgnoreCase(mode)) {
+                System.setProperty("pkb_agent_popup", "auto");
+            }
+            Optional<AgentControl.Result> closed = AgentSurfaceRouter.route(project, "r", "popup-close", Map.of(), "a");
+            assertTrue(closed.isPresent(), "popup-close did not run");
+            assertEquals(Boolean.TRUE, closed.get().body().get("exited"));
+        } catch (RuntimeException failure) {
+            throw failure;
+        } catch (Exception failure) {
+            throw new IllegalStateException(failure);
+        } finally {
+            System.clearProperty("pkb_agent_popup");
+            System.clearProperty("pkb_agent_session");
+        }
     }
 
     @Test
