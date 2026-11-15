@@ -36,6 +36,8 @@ final class DoltPanel extends JPanel {
     private final JComboBox<String> view = new JComboBox<>(new String[] {
             "Files", "Features", "Scenarios", "Steps", "Entities", "History"
     });
+    private final JComboBox<String> sandbox = new JComboBox<>(new String[] {"main"});
+    private final JTextField sandboxName = new JTextField(12);
     private final JTextField featurePath = new JTextField(28);
     private final JTextField scenario = new JTextField(12);
     private final JTextField entityType = new JTextField(10);
@@ -47,6 +49,10 @@ final class DoltPanel extends JPanel {
     private final JTextArea conflicts = new JTextArea(4, 20);
     private final JLabel status = new JLabel("Dolt");
     private final JButton refresh = WorkbenchTheme.flatButton("Refresh", "Read this view from the Dolt CLI");
+    private final JButton sandboxes = WorkbenchTheme.flatButton("Sandboxes", "dolt sandbox list");
+    private final JButton server = WorkbenchTheme.flatButton("Server", "dolt server status");
+    private final JButton createSandbox = WorkbenchTheme.flatButton("Create sandbox", "dolt sandbox create");
+    private final JButton dropSandbox = WorkbenchTheme.flatButton("Drop sandbox", "dolt sandbox drop");
     private final JButton load = WorkbenchTheme.flatButton("Load", "Show the feature text or entity");
     private final JButton saveFeature = WorkbenchTheme.accentButton("Save feature", "dolt feature put of the editor text");
     private final JButton saveEntity = WorkbenchTheme.flatButton("Save entity", "dolt entity put of the editor text");
@@ -68,6 +74,32 @@ final class DoltPanel extends JPanel {
         north.add(button("Conflicts", "dolt conflicts", () -> run(DoltBrowser.conflicts(), true)));
         north.add(button("Run", "dolt run", () -> run(DoltBrowser.run(false), false)));
         north.add(view);
+        north.add(new JLabel("Sandbox"));
+        north.add(sandbox);
+        north.add(new JLabel("Name"));
+        north.add(sandboxName);
+        north.add(sandboxes);
+        north.add(createSandbox);
+        north.add(dropSandbox);
+        north.add(server);
+        sandboxes.addActionListener(event -> run(DoltBrowser.sandboxList(), false));
+        createSandbox.addActionListener(event -> {
+            String name = sandboxName.getText().trim();
+            if (name.isEmpty()) {
+                status.setText("Sandbox name is required");
+                return;
+            }
+            run(DoltBrowser.sandboxCreate(name), false);
+        });
+        dropSandbox.addActionListener(event -> {
+            String name = sandboxName.getText().trim();
+            if (name.isEmpty() || "main".equals(name)) {
+                status.setText("Name a sandbox to drop");
+                return;
+            }
+            run(DoltBrowser.sandboxDrop(name), false);
+        });
+        server.addActionListener(event -> run(DoltBrowser.serverStatus(), false));
         north.add(new JLabel("Feature"));
         north.add(featurePath);
         north.add(new JLabel("Scenario"));
@@ -163,20 +195,22 @@ final class DoltPanel extends JPanel {
     }
 
     private void run(List<String> args, boolean conflictsView) {
+        List<String> forwarded = DoltBrowser.withSandbox(args, String.valueOf(sandbox.getSelectedItem()));
+        boolean sandboxList = args.size() >= 2 && "sandbox".equals(args.get(0)) && "list".equals(args.get(1));
         setBusy(true);
-        status.setText(String.join(" ", args));
+        status.setText(String.join(" ", forwarded));
         Path root = project.get();
         new SwingWorker<DoltCliForwarder.Result, Void>() {
             @Override
             protected DoltCliForwarder.Result doInBackground() {
-                return forwarder.run(root, args);
+                return forwarder.run(root, forwarded);
             }
 
             @Override
             protected void done() {
                 setBusy(false);
                 try {
-                    show(get(), conflictsView);
+                    show(get(), conflictsView, sandboxList);
                 } catch (Exception failure) {
                     status.setText("error: " + failure.getMessage());
                 }
@@ -184,8 +218,14 @@ final class DoltPanel extends JPanel {
         }.execute();
     }
 
-    private void show(DoltCliForwarder.Result result, boolean conflictsView) {
+    private void show(DoltCliForwarder.Result result, boolean conflictsView, boolean sandboxList) {
         String body = result.out() == null ? "" : result.out();
+        if (sandboxList && result.exit() == 0) {
+            Object selected = sandbox.getSelectedItem();
+            sandbox.removeAllItems();
+            for (String name : DoltBrowser.sandboxNames(body)) sandbox.addItem(name);
+            sandbox.setSelectedItem(selected == null ? "main" : selected);
+        }
         if (conflictsView || body.contains("\"conflicts\"")) {
             conflicts.setText(String.join("\n", DoltBrowser.labels(body)));
         } else {
@@ -236,5 +276,9 @@ final class DoltPanel extends JPanel {
         load.setEnabled(!busy);
         saveFeature.setEnabled(!busy);
         saveEntity.setEnabled(!busy);
+        sandboxes.setEnabled(!busy);
+        server.setEnabled(!busy);
+        createSandbox.setEnabled(!busy);
+        dropSandbox.setEnabled(!busy);
     }
 }

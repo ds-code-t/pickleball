@@ -50,6 +50,18 @@ class DoltCliForwarderTest {
     }
 
     @Test
+    void sandboxAndServerForwardAsCliArguments() {
+        Path jar = Path.of("pickleball.jar");
+        List<String> list = DoltCliForwarder.command(jar, project, List.of("sandbox", "list", "--json"));
+        assertEquals(List.of("sandbox", "list", "--json"), list.subList(4, 7));
+        List<String> server = DoltCliForwarder.command(jar, project, List.of("server", "status"));
+        assertEquals("server", server.get(4));
+        assertEquals("status", server.get(5));
+        List<String> compile = DoltCliForwarder.command(jar, project, List.of("glue", "compile", "--sandbox=left"));
+        assertEquals(List.of("glue", "compile", "--sandbox=left"), compile.subList(4, 7));
+    }
+
+    @Test
     void missingJarDoesNotInventADatabaseCommand() {
         DoltCliForwarder.Result result = DoltCliForwarder.run(project, List.of("hydrate", "--dry-run"), project.resolve("missing.jar"));
         assertEquals(1, result.exit());

@@ -1,6 +1,7 @@
 package tools.dscode.dolt;
 
 import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
@@ -89,6 +90,7 @@ public final class DoltCli {
                 case "timeline" -> trackCommand(project, tokens, true, stdout, stderr);
                 case "retain" -> retainCommand(project, tokens, stdout, stderr);
                 case "run" -> runCommand(project, tokens, stdout, stderr);
+                case "run-classpath" -> runClasspath(tokens, stdout, stderr);
                 default -> {
                     stderr.println("error: Unknown Dolt command: " + command);
                     stderr.println("fix: dolt help");
@@ -100,6 +102,37 @@ public final class DoltCli {
             stderr.println("fix: dolt help");
             return 1;
         }
+    }
+
+    private static int runClasspath(List<String> tokens, PrintStream stdout, PrintStream stderr) {
+        String out = "";
+        for (String token : tokens) {
+            if (token.startsWith("--out=")) out = token.substring("--out=".length());
+        }
+        if (out.isBlank()) {
+            stderr.println("error: dolt run-classpath needs --out=<file>");
+            stderr.println("fix: dolt run-classpath --out=build/dolt-run-classpath.txt");
+            return 2;
+        }
+        String text = System.getenv("PKB_DOLT_RUN_CLASSPATH_TEXT");
+        if (text == null || text.isBlank()) text = System.getProperty("pkb_dolt_run_classpath");
+        if (text == null || text.isBlank()) {
+            stderr.println("error: dolt run-classpath has no classpath text");
+            stderr.println("fix: set PKB_DOLT_RUN_CLASSPATH_TEXT or pkb_dolt_run_classpath");
+            return 1;
+        }
+        try {
+            Path destination = Path.of(out);
+            if (destination.getParent() != null) Files.createDirectories(destination.getParent());
+            if (!text.endsWith("\n")) text = text + "\n";
+            Files.writeString(destination, text, StandardCharsets.UTF_8);
+        } catch (java.io.IOException failure) {
+            stderr.println("error: " + failure.getMessage());
+            stderr.println("fix: dolt run-classpath --out=<writable-file>");
+            return 1;
+        }
+        stdout.println(out);
+        return 0;
     }
 
     public static String help() {
@@ -143,6 +176,7 @@ public final class DoltCli {
                 Usage: dolt timeline [--from=<iso>] [--to=<iso>] [--entity=Type#id] [--tag=<tag>] [--feature=<path>] [--run=<run-id>] [--text=<log text>] [--cursor=<cursor>] [--before=<cursor>] [--latest] [--limit=N] [--offset=N] [--json] [--project=<dir>]
                 Usage: dolt retain [--days=N] [--max-bytes=N] [--project=<dir>]
                 Usage: dolt run [--project=<dir>] [--dry-run] [--tags=<expr>] [--name=<text>] [--glue=<packages>] [--sandbox=<name>] [--engine]
+                Usage: dolt run-classpath --out=<file> [--project=<dir>]
                 Files stay the source of truth. The working copy is .pickleball/dolt/data and is gitignored.
                 status and hydrate --dry-run do not create a database when it is missing.
                 hydrate copies features, configs, calls, components, resource maps, templates, and dolt-entities/*.entity files.

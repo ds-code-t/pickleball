@@ -153,6 +153,38 @@ class DoltPanelTest {
         assertTrue(roots.stream().allMatch(project::equals));
     }
 
+    @Test
+    void sandboxPickerForwardsTheSelectedSandbox() throws Exception {
+        List<List<String>> forwarded = new ArrayList<>();
+        DoltPanel[] holder = new DoltPanel[1];
+        SwingUtilities.invokeAndWait(() -> holder[0] = new DoltPanel(() -> project, (root, args) -> {
+            forwarded.add(List.copyOf(args));
+            if (args.size() >= 2 && "sandbox".equals(args.get(0)) && "list".equals(args.get(1))) {
+                return new DoltCliForwarder.Result(0, "{\"sandboxes\":[{\"name\":\"left\"}]}", "", List.of());
+            }
+            if (args.size() >= 1 && "server".equals(args.get(0))) {
+                return new DoltCliForwarder.Result(0, "server running", "", List.of());
+            }
+            return new DoltCliForwarder.Result(0, "saved", "", List.of());
+        }));
+        DoltPanel panel = holder[0];
+        JLabel status = label(panel, "Dolt");
+        click(panel, "Sandboxes", status);
+        assertEquals(List.of("sandbox", "list", "--json"), forwarded.get(0));
+        JComboBox<?> sandbox = comboAt(panel, 1);
+        SwingUtilities.invokeAndWait(() -> sandbox.setSelectedItem("left"));
+        click(panel, "Status", status);
+        assertEquals(List.of("status", "--sandbox=left"), forwarded.get(1));
+        click(panel, "Server", status);
+        assertEquals(List.of("server", "status"), forwarded.get(2));
+        JTextField name = fieldAfter(panel, "Name");
+        SwingUtilities.invokeAndWait(() -> name.setText("left"));
+        click(panel, "Create sandbox", status);
+        assertEquals(List.of("sandbox", "create", "left"), forwarded.get(3));
+        click(panel, "Drop sandbox", status);
+        assertEquals(List.of("sandbox", "drop", "left"), forwarded.get(4));
+    }
+
     private static String body(List<String> args) {
         String key = String.join(" ", args);
         if (key.equals("status")) {
@@ -221,10 +253,19 @@ class DoltPanelTest {
 
     @SuppressWarnings("rawtypes")
     private static JComboBox<?> combo(Container root) {
+        return comboAt(root, 0);
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static JComboBox<?> comboAt(Container root, int index) {
+        int seen = 0;
         for (Component component : walk(root)) {
-            if (component instanceof JComboBox combo) return combo;
+            if (component instanceof JComboBox combo) {
+                if (seen == index) return combo;
+                seen++;
+            }
         }
-        throw new AssertionError("missing view");
+        throw new AssertionError("missing combo " + index);
     }
 
     private static JTextField fieldAfter(Container root, String title) {

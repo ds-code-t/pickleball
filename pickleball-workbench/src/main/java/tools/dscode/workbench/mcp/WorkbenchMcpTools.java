@@ -385,7 +385,7 @@ final class WorkbenchMcpTools {
                     return value == null ? Map.of("status", "UNAVAILABLE", "op", op) : value;
                 });
         add("dolt",
-                "Forward arguments to the pickleball dolt CLI, including query, timeline, and retain. Does not implement Dolt inside Workbench.",
+                "Forwards arguments to the pickleball dolt CLI, including server, sandbox, query, timeline, and retain. Does not open the store.",
                 schema(Map.of(
                         "args", Map.of(
                                 "type", "array",

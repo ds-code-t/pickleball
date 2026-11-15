@@ -22,7 +22,7 @@ payload: {"name":"Ada","password":"<password:qaDb>"}
 
 `type` matches `[A-Za-z][A-Za-z0-9_-]*`. `id` matches `[A-Za-z0-9][A-Za-z0-9_-]*` and does not contain `.` or `#`. `version` is an integer starting at 1. `payload` is one JSON object. Keys are not Gherkin.
 
-Commit the files you want Git to remember. Ignore a type directory in `.gitignore` when that type must stay local. Dolt does not choose for you. The database `.pickleball/dolt/data` is always gitignored.
+Commit the files you want Git to remember. Ignore a type directory in `.gitignore` when that type must stay local. Dolt does not choose for you. The database `.pickleball/dolt/data` is always gitignored. An entity put with `--sandbox=<name>` stays on that sandbox branch. `main` does not see it.
 
 `dolt hydrate` reads these files. Unchanged bytes are skipped. A secret field (`password`, `passwd`, `secret`, `token`, `api_key`, `api-key`, `apikey`, `credential`, `private_key`, `private-key`, plus any name in `secret-fields=`) whose value is not a `<...>` reference or a `~MASK;` value is rejected and is not copied into the database. `pkb_dolt_secret_fields` wins over the file. The database is not encrypted. A value of 32 or more characters with no spaces on a field that is not in that list prints `warn: high-entropy value on <field>` and is stored. The warning does not print the value.
 

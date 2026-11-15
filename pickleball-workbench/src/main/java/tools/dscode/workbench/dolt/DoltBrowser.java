@@ -112,6 +112,54 @@ public final class DoltBrowser {
         return List.of("conflicts", "--json");
     }
 
+    public static List<String> serverStatus() {
+        return List.of("server", "status");
+    }
+
+    public static List<String> sandboxList() {
+        return List.of("sandbox", "list", "--json");
+    }
+
+    public static List<String> sandboxCreate(String name) {
+        return List.of("sandbox", "create", name);
+    }
+
+    public static List<String> sandboxDrop(String name) {
+        return List.of("sandbox", "drop", name);
+    }
+
+    public static List<String> withSandbox(List<String> args, String sandbox) {
+        if (args == null || args.isEmpty()) return List.of();
+        if (sandbox == null || sandbox.isBlank() || "main".equals(sandbox)) return List.copyOf(args);
+        String command = args.get(0);
+        if ("sandbox".equals(command) || "server".equals(command) || "install".equals(command) || "migrate".equals(command)) {
+            return List.copyOf(args);
+        }
+        List<String> bound = new ArrayList<>(args);
+        bound.add("--sandbox=" + sandbox);
+        return List.copyOf(bound);
+    }
+
+    public static List<String> sandboxNames(String body) {
+        List<String> names = new ArrayList<>();
+        names.add("main");
+        String trimmed = body == null ? "" : body.trim();
+        if (!trimmed.startsWith("{")) return List.copyOf(names);
+        try {
+            JsonNode root = JSON.readTree(trimmed);
+            JsonNode array = root.get("sandboxes");
+            if (array != null && array.isArray()) {
+                for (JsonNode node : array) {
+                    String name = node.path("name").asText();
+                    if (!name.isBlank() && !names.contains(name)) names.add(name);
+                }
+            }
+        } catch (Exception ignored) {
+            return List.copyOf(names);
+        }
+        return List.copyOf(names);
+    }
+
     public static List<String> status() {
         return List.of("status");
     }

@@ -460,22 +460,22 @@ tasks.register('engineRun', JavaExec) {
     if (project.hasProperty('engineFeature')) args += ['--feature=' + project.property('engineFeature')]
 }
 
+def doltForwardClasspath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
+        dependencies.create('org.mariadb.jdbc:mariadb-java-client:3.5.11')
+)
+
 tasks.register('doltStatus', JavaExec) {
     group = 'dolt'
-    description = 'Forward to the Dolt CLI status command. sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
-    classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
-            dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
-    )
+    description = 'Forward to the Dolt CLI status command. The MariaDB JDBC driver is on this task classpath.'
+    classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     args = ['dolt', 'status']
 }
 
 tasks.register('doltHydrate', JavaExec) {
     group = 'dolt'
-    description = 'Forward to the Dolt CLI hydrate command. sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
-    classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
-            dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
-    )
+    description = 'Forward to the Dolt CLI hydrate command. The MariaDB JDBC driver is on this task classpath.'
+    classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     args = ['dolt', 'hydrate']
     if (project.hasProperty('doltPath')) args += ['--path=' + project.property('doltPath')]
@@ -484,10 +484,8 @@ tasks.register('doltHydrate', JavaExec) {
 
 tasks.register('doltExtract', JavaExec) {
     group = 'dolt'
-    description = 'Forward to the Dolt CLI extract command. sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
-    classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
-            dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
-    )
+    description = 'Forward to the Dolt CLI extract command. The MariaDB JDBC driver is on this task classpath.'
+    classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     args = ['dolt', 'extract']
     if (project.hasProperty('doltPath')) args += ['--path=' + project.property('doltPath')]
@@ -496,10 +494,8 @@ tasks.register('doltExtract', JavaExec) {
 
 tasks.register('doltFeature', JavaExec) {
     group = 'dolt'
-    description = 'Forward to the Dolt CLI feature command. sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
-    classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
-            dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
-    )
+    description = 'Forward to the Dolt CLI feature command. The MariaDB JDBC driver is on this task classpath.'
+    classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     args = ['dolt', 'feature']
     args += [project.hasProperty('doltFeature') ? project.property('doltFeature') : 'put']
@@ -510,10 +506,8 @@ tasks.register('doltFeature', JavaExec) {
 
 tasks.register('doltEdit', JavaExec) {
     group = 'dolt'
-    description = 'Forward to the Dolt edit CLI (category, file, glue, feature scenario/step). sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
-    classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
-            dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
-    )
+    description = 'Forward to the Dolt edit CLI (category, file, glue, feature scenario/step). The MariaDB JDBC driver is on this task classpath.'
+    classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     args = ['dolt']
     def editArgs = project.hasProperty('doltArgs') ? project.property('doltArgs').toString() : 'category,list'
@@ -543,10 +537,8 @@ tasks.register('domengine', JavaExec) {
 
 tasks.register('doltQuery', JavaExec) {
     group = 'dolt'
-    description = 'Forward to a Dolt CLI read command. sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
-    classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
-            dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
-    )
+    description = 'Forward to a Dolt CLI read command. The MariaDB JDBC driver is on this task classpath.'
+    classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     args = ['dolt']
     def queryArgs = project.hasProperty('doltArgs') ? project.property('doltArgs').toString() : 'files,list'
@@ -558,10 +550,8 @@ tasks.register('doltQuery', JavaExec) {
 
 tasks.register('doltHistory', JavaExec) {
     group = 'dolt'
-    description = 'Forward to the Dolt CLI history command. sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
-    classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
-            dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
-    )
+    description = 'Forward to the Dolt CLI history command. The MariaDB JDBC driver is on this task classpath.'
+    classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     args = ['dolt', 'history']
     args += [project.hasProperty('doltHistory') ? project.property('doltHistory') : 'list']
@@ -572,10 +562,8 @@ tasks.register('doltHistory', JavaExec) {
 
 tasks.register('doltRun', JavaExec) {
     group = 'dolt'
-    description = 'Forward to the Dolt CLI run command. sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
-    classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
-            dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
-    )
+    description = 'Forward to the Dolt CLI run command. The MariaDB JDBC driver is on this task classpath.'
+    classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     args = ['dolt', 'run']
     if (project.hasProperty('doltTags')) args += ['--tags=' + project.property('doltTags')]
@@ -584,26 +572,71 @@ tasks.register('doltRun', JavaExec) {
     if (project.hasProperty('doltDryRun')) args += ['--dry-run']
     doFirst {
         if (project.hasProperty('doltDryRun')) return
-        def dir = file('.pickleball/dolt')
-        dir.mkdirs()
         def joined = sourceSets.test.runtimeClasspath.asPath
         if (joined.contains(' ')) joined = '"' + joined + '"'
-        new File(dir, 'classpath.cache').text = joined + '\n'
+        def cached = joined + '\n'
+        def cold = file('.pickleball/dolt')
+        cold.mkdirs()
+        new File(cold, 'classpath.cache').text = cached
+        def worker = file('.pickleball/dolt/sandboxes/main/worker')
+        worker.mkdirs()
+        new File(worker, 'classpath.cache').text = cached
     }
 }
 
-tasks.register('doltRunClasspath') {
+tasks.register('doltInstall', JavaExec) {
     group = 'dolt'
-    description = 'Write the test runtime classpath used by warm dolt run. sqlite-jdbc is a published runtime dependency.'
+    description = 'Forward to the Dolt CLI install command. The MariaDB JDBC driver is on this task classpath.'
+    classpath = doltForwardClasspath
+    mainClass = 'tools.dscode.dolt.DoltCli'
+    args = ['dolt', 'install']
+    if (project.hasProperty('doltCheck')) args += ['--check']
+    if (project.hasProperty('doltForce')) args += ['--force']
+    if (project.hasProperty('doltDir')) args += ['--dir=' + project.property('doltDir')]
+}
+
+tasks.register('doltServer', JavaExec) {
+    group = 'dolt'
+    description = 'Forward to the Dolt CLI server command. The MariaDB JDBC driver is on this task classpath.'
+    classpath = doltForwardClasspath
+    mainClass = 'tools.dscode.dolt.DoltCli'
+    args = ['dolt', 'server']
+    args += [project.hasProperty('doltServer') ? project.property('doltServer') : 'status']
+    if (project.hasProperty('doltJson')) args += ['--json']
+}
+
+tasks.register('doltSandbox', JavaExec) {
+    group = 'dolt'
+    description = 'Forward to the Dolt CLI sandbox command. The MariaDB JDBC driver is on this task classpath.'
+    classpath = doltForwardClasspath
+    mainClass = 'tools.dscode.dolt.DoltCli'
+    args = ['dolt', 'sandbox']
+    def sandboxArgs = project.hasProperty('doltArgs') ? project.property('doltArgs').toString() : 'list'
+    args += sandboxArgs.split(',')
+    if (project.hasProperty('doltJson')) args += ['--json']
+    if (project.hasProperty('doltForce')) args += ['--force']
+}
+
+tasks.register('doltMigrate', JavaExec) {
+    group = 'dolt'
+    description = 'Forward to the Dolt CLI migrate command. The MariaDB JDBC driver is on this task classpath.'
+    classpath = doltForwardClasspath
+    mainClass = 'tools.dscode.dolt.DoltCli'
+    args = ['dolt', 'migrate']
+    if (project.hasProperty('doltDryRun')) args += ['--dry-run']
+    if (project.hasProperty('doltRemoveLegacy')) args += ['--remove-legacy']
+}
+
+tasks.register('doltRunClasspath', JavaExec) {
+    group = 'dolt'
+    description = 'Forward to the Dolt CLI run-classpath command. The MariaDB JDBC driver is on this task classpath.'
+    classpath = doltForwardClasspath
+    mainClass = 'tools.dscode.dolt.DoltCli'
     def out = layout.buildDirectory.file('dolt-run-classpath.txt')
-    outputs.file(out)
-    doLast {
-        def joined = sourceSets.test.runtimeClasspath.asPath
-        if (joined.contains(' ')) joined = '"' + joined + '"'
-        def destination = out.get().asFile
-        destination.parentFile.mkdirs()
-        destination.text = joined + '\n'
-    }
+    def joined = sourceSets.test.runtimeClasspath.asPath
+    if (joined.contains(' ')) joined = '"' + joined + '"'
+    environment 'PKB_DOLT_RUN_CLASSPATH_TEXT', joined
+    args = ['dolt', 'run-classpath', '--out=' + out.get().asFile.absolutePath]
 }
 
 tasks.register('verifySqlitePackaging') {

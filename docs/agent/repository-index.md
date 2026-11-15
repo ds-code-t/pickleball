@@ -864,6 +864,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/dolt/DoltGitInfoTest.java`
 - `src/test/java/tools/dscode/dolt/DoltGlueCompileTest.java`
 - `src/test/java/tools/dscode/dolt/DoltGlueGapTest.java`
+- `src/test/java/tools/dscode/dolt/DoltGradleForwardTest.java`
 - `src/test/java/tools/dscode/dolt/DoltHistoryTest.java`
 - `src/test/java/tools/dscode/dolt/DoltHydrateCommitTest.java`
 - `src/test/java/tools/dscode/dolt/DoltHydrateTest.java`
