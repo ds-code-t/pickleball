@@ -142,7 +142,10 @@ class WorkbenchMcpServerTest {
             WorkbenchMcpTools tools = new WorkbenchMcpTools(fakeServices((method, args) -> null), JSON);
             Object value = tools.call("snapshot", Map.of("kind", "offline"));
             assertTrue(value instanceof Map<?, ?>);
-            assertTrue(String.valueOf(((Map<?, ?>) value).get("warnings")).contains("g3-producers-absent"));
+            Map<?, ?> body = (Map<?, ?>) value;
+            assertEquals("pickleball.composite-snapshot", body.get("schema"));
+            assertEquals(1, ((Number) body.get("version")).intValue());
+            assertTrue(String.valueOf(body.get("warnings")).contains("g3-producers-absent"));
         } finally {
             SnapshotCommand.dispatchClassName = dispatch;
             SnapshotCommand.producersClassName = producers;
