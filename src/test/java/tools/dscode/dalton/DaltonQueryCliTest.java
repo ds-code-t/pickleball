@@ -256,6 +256,58 @@ class DaltonQueryCliTest {
         assertFalse(outline.toString().contains("features/pay.feature|" + refund), outline.toString());
     }
 
+    @Test
+    void blankScenarioNameDoesNotLetALogRowMatchByKey() throws Exception {
+        Path feature = writePaySiblings();
+        assertEquals(0, run("dalton", "hydrate", "--project=" + project).code);
+        int pay = lineContaining(feature, "Scenario: Pay");
+        String dalton = System.getProperty("pkb_dalton");
+        String track = System.getProperty("pkb_dalton_track");
+        String runId = System.getProperty("pkb_run_id");
+        String root = System.getProperty("pkb_dalton_project");
+        try {
+            System.setProperty("pkb_dalton", "true");
+            System.setProperty("pkb_dalton_track", "true");
+            System.setProperty("pkb_run_id", "blank-name");
+            System.setProperty("pkb_dalton_project", project.toAbsolutePath().normalize().toString());
+            DaltonExecution.beforeStep(project, " ", "features/pay.feature", pay, "the total is 10", pay);
+            DaltonExecution.recordStep(project, new DaltonExecution.StepDraft(
+                    "null-name", "features/pay.feature|" + pay, null, null, null, 1,
+                    "the total is 10", pay, "PASSED", "2020-01-02T00:00:00Z", "2020-01-02T00:00:01Z"));
+            try (DaltonDatabase database = DaltonDatabase.open(project);
+                 java.sql.Statement statement = database.connection().createStatement()) {
+                assertEquals("", scalar(statement, "SELECT scenario FROM runs WHERE run_id = 'blank-name'"));
+                assertEquals("", scalar(statement, "SELECT scenario FROM runs WHERE run_id = 'null-name'"));
+                statement.executeUpdate(
+                        "INSERT INTO run_logs(run_id, logged_at, entity, message) VALUES ('blank-name', '2020-01-01T00:00:01Z', 'run', 'opened')");
+                statement.executeUpdate(
+                        "INSERT INTO log_entity_links(log_id, entity_type, entity_id) VALUES (last_insert_rowid(), 'Account', 'ada')");
+            }
+            JsonNode open = JSON.readTree(run("dalton", "timeline", "--json", "--project=" + project).out);
+            assertTrue(countKind(open.path("events"), "log") >= 1, open.toString());
+
+            JsonNode featureRows = JSON.readTree(run("dalton", "query", "--feature=features/pay.feature", "--json", "--project=" + project).out);
+            assertEquals(0, countKind(featureRows.path("rows"), "log"), featureRows.toString());
+            assertTrue(countKind(featureRows.path("rows"), "step") >= 1, featureRows.toString());
+
+            JsonNode tagged = JSON.readTree(run("dalton", "query", "--tag=@fast", "--json", "--project=" + project).out);
+            assertEquals(0, countKind(tagged.path("rows"), "log"), tagged.toString());
+
+            JsonNode timeline = JSON.readTree(run("dalton", "timeline", "--tag=@fast", "--json", "--project=" + project).out);
+            assertEquals(0, countKind(timeline.path("events"), "log"), timeline.toString());
+            assertTrue(countKind(timeline.path("events"), "run") >= 1, timeline.toString());
+            assertFalse(timeline.toString().contains("\"scenarioKey\":\"features/pay.feature|" + pay + "\",\"stepExecId\":\"\",\"stepText\":\"\""),
+                    timeline.toString());
+        } finally {
+            restore("pkb_dalton", dalton);
+            restore("pkb_dalton_track", track);
+            restore("pkb_run_id", runId);
+            restore("pkb_dalton_project", root);
+            DaltonExecution.finishScenario("PASSED");
+        }
+    }
+
+
     private Path writePaySiblings() throws Exception {
         Files.createDirectories(project.resolve("features"));
         Path feature = project.resolve("features/pay.feature");
@@ -351,6 +403,20 @@ class DaltonQueryCliTest {
             }
         }
     }
+
+    private static String scalar(java.sql.Statement statement, String sql) throws Exception {
+        try (java.sql.ResultSet rows = statement.executeQuery(sql)) {
+            assertTrue(rows.next(), sql);
+            String value = rows.getString(1);
+            return value == null ? "" : value;
+        }
+    }
+
+    private static void restore(String key, String value) {
+        if (value == null) System.clearProperty(key);
+        else System.setProperty(key, value);
+    }
+
 
     private static int countKind(JsonNode events, String kind) {
         int count = 0;

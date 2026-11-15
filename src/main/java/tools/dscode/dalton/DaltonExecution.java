@@ -75,7 +75,7 @@ public final class DaltonExecution {
             connection.setAutoCommit(false);
             try {
                 String definition = match(connection, text);
-                ensureRun(connection, runId, started, finished, draft.scenarioName() == null ? scenarioKey : draft.scenarioName());
+                ensureRun(connection, runId, started, finished, recordedScenario(draft.scenarioName()));
                 ensureScenario(connection, execId, runId, scenarioKey, scenarioHash, draft.examplesRow(), started, status);
                 writeStep(connection, stepId, execId, draft.stepOrd(), text, hash, definition, draft.sourceLine(), started, finished, status);
                 recount(connection, execId, runId, finished);
@@ -145,7 +145,7 @@ public final class DaltonExecution {
                 Connection connection = database.connection();
                 connection.setAutoCommit(false);
                 try {
-                    ensureRun(connection, active.runId, active.started, now, active.scenarioName);
+                    ensureRun(connection, active.runId, active.started, now, active.recordedScenario);
                     ensureScenario(connection, active.execId, active.runId, active.scenarioKey, active.scenarioHash(),
                             active.examplesRow, active.started, "RUNNING");
                     writeStep(connection, stepExec, active.execId, ord, text, hash, match(connection, text),
@@ -226,7 +226,7 @@ public final class DaltonExecution {
             recordStep(root, new StepDraft(
                     active.runId,
                     active.scenarioKey,
-                    active.scenarioName,
+                    active.recordedScenario,
                     null,
                     active.examplesRow,
                     ord,
@@ -388,15 +388,20 @@ public final class DaltonExecution {
     private static Active active(Path project, String scenarioName, String uri, int scenarioLine, Integer examplesRow) {
         Active active = ACTIVE.get();
         String key = scenarioKey(uri, scenarioLine);
-        String name = scenarioName == null || scenarioName.isBlank() ? key : scenarioName;
+        String recorded = recordedScenario(scenarioName);
+        String name = recorded.isEmpty() ? key : recorded;
         if (active != null && project.equals(active.project)
                 && Objects.equals(active.examplesRow, examplesRow)
                 && (key.equals(active.scenarioKey) || name.equals(active.scenarioName))) {
             return active;
         }
-        Active created = new Active(project, runId(), name, key, examplesRow);
+        Active created = new Active(project, runId(), name, key, examplesRow, recorded);
         ACTIVE.set(created);
         return created;
+    }
+
+    private static String recordedScenario(String scenarioName) {
+        return scenarioName == null || scenarioName.isBlank() ? "" : scenarioName;
     }
 
     private static void ensureRun(Connection connection, String runId, String started, String finished, String scenario) throws SQLException {
@@ -600,6 +605,7 @@ public final class DaltonExecution {
         private final String runId;
         private final String scenarioName;
         private final String scenarioKey;
+        private final String recordedScenario;
         private final String execId;
         private final Integer examplesRow;
         private final String started = Instant.now().toString();
@@ -609,12 +615,13 @@ public final class DaltonExecution {
         private String current;
         private String currentText;
 
-        private Active(Path project, String runId, String scenarioName, String scenarioKey, Integer examplesRow) {
+        private Active(Path project, String runId, String scenarioName, String scenarioKey, Integer examplesRow, String recordedScenario) {
             this.project = project;
             this.runId = runId;
             this.scenarioName = scenarioName;
             this.scenarioKey = scenarioKey;
             this.examplesRow = examplesRow;
+            this.recordedScenario = recordedScenario == null ? "" : recordedScenario;
             this.execId = executionId(runId, scenarioKey, examplesRow);
         }
 
