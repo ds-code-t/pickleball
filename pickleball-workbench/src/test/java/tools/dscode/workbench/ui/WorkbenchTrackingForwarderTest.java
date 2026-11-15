@@ -139,6 +139,59 @@ class WorkbenchTrackingForwarderTest {
         assertFalse(Files.exists(project.resolve(".pickleball/dalton/dalton.db")));
     }
 
+    @Test
+    void openInExplorerReportsBlankUnknownAndUnready() throws Exception {
+        String body = """
+                {"command":"timeline","count":1,"total":1,"limit":50,"offset":0,"cursor":"c","events":[
+                  {"at":"2020-01-01T00:00:00Z","kind":"run","id":"blank","runId":"","status":"PASSED","scenarioKey":"","stepExecId":"","stepText":"","definitionId":"","entityType":"","entityId":"","field":"","operation":"","valueRef":"","message":"","path":""}
+                ]}
+                """;
+        List<String> opened = new ArrayList<>();
+        TrackingPanel[] holder = new TrackingPanel[1];
+        SwingUtilities.invokeAndWait(() -> holder[0] = new TrackingPanel(() -> project, (root, args) ->
+                new DaltonCliForwarder.Result(0, body, "", List.of()), opened::add));
+        TrackingPanel panel = holder[0];
+        click(panel, "Refresh");
+        click(panel, "Open in Explorer");
+        assertEquals("Select a run with a run id first", labelText(panel, ""));
+        assertTrue(opened.isEmpty(), opened.toString());
+
+        WorkbenchFrame blank = bareFrame();
+        SwingUtilities.invokeAndWait(() -> blank.openRecordedRun(""));
+        assertEquals("Select a run with a run id first", blank.explorerNotice());
+
+        WorkbenchFrame unready = bareFrame();
+        SwingUtilities.invokeAndWait(() -> unready.openRecordedRun("sample-run"));
+        assertEquals("Explorer is not ready", unready.explorerNotice());
+        assertEquals("", unready.lastDiagnosticState());
+
+        WorkbenchFrame unknown = bareFrame();
+        setField(unknown, "diagnosticNavigator", new tools.dscode.workbench.diagnostics.DiagnosticEvidenceNavigator(project));
+        setField(unknown, "diagnosticView", allocate(tools.dscode.workbench.ui.web.WebViewPanel.class));
+        SwingUtilities.invokeAndWait(() -> unknown.openRecordedRun("missing-run"));
+        assertTrue(unknown.lastDiagnosticState().contains("\"gap\":\"No retained diagnostic run matches missing-run\""),
+                unknown.lastDiagnosticState());
+    }
+
+    private static WorkbenchFrame bareFrame() throws Exception {
+        return allocate(WorkbenchFrame.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> T allocate(Class<T> type) throws Exception {
+        java.lang.reflect.Field unsafeField = Class.forName("sun.misc.Unsafe").getDeclaredField("theUnsafe");
+        unsafeField.setAccessible(true);
+        Object unsafe = unsafeField.get(null);
+        java.lang.reflect.Method allocate = unsafe.getClass().getMethod("allocateInstance", Class.class);
+        return (T) allocate.invoke(unsafe, type);
+    }
+
+    private static void setField(Object target, String name, Object value) throws Exception {
+        java.lang.reflect.Field field = target.getClass().getDeclaredField(name);
+        field.setAccessible(true);
+        field.set(target, value);
+    }
+
     private static void click(Container panel, String title) throws Exception {
         JButton button = button(panel, title);
         SwingUtilities.invokeAndWait(button::doClick);
@@ -146,6 +199,7 @@ class WorkbenchTrackingForwarderTest {
         while (System.nanoTime() < deadline) {
             String text = labelText(panel, "Tracking");
             if (text.startsWith("exit 0") || text.startsWith("2020-") || text.startsWith("explorer ")
+                    || text.startsWith("Select a run") || text.startsWith("Explorer is not ready")
                     || "paused".equals(text) || text.startsWith("play ")) return;
             Thread.sleep(20);
         }

@@ -176,6 +176,10 @@ final class TrackingPanel extends JPanel {
             return;
         }
         String runId = beats.get(index).runId();
+        if (runId == null || runId.isBlank()) {
+            status.setText("Select a run with a run id first");
+            return;
+        }
         status.setText("explorer " + runId);
         openExplorer.accept(runId);
     }

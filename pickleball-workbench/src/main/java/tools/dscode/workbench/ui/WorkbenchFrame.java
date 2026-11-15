@@ -126,6 +126,8 @@ final class WorkbenchFrame extends JFrame {
     private final JLabel readinessLabel = new JLabel("Loading status...");
     private final JLabel playerStatusLabel = new JLabel("Stopped");
     private final JLabel activityLabel = new JLabel("Ready");
+    private String explorerNotice = "";
+    private String lastDiagnosticState = "";
     private final LongWork longWork = new LongWork();
     private final ExecutorService loadExecutor = Executors.newSingleThreadExecutor(LongWork::thread);
     private final JPanel workBanner = new JPanel(new BorderLayout());
@@ -1302,7 +1304,33 @@ final class WorkbenchFrame extends JFrame {
             int index = rightTabs.indexOfTab("Explorer");
             if (index >= 0) rightTabs.setSelectedIndex(index);
         }
-        if (runId != null && !runId.isBlank()) showDiagnosticRun(runId, 0);
+        if (runId == null || runId.isBlank()) {
+            noteExplorer("Select a run with a run id first");
+            return;
+        }
+        if (diagnosticView == null || diagnosticNavigator == null) {
+            noteExplorer("Explorer is not ready");
+            return;
+        }
+        showDiagnosticRun(runId, 0);
+    }
+
+    String explorerNotice() {
+        return explorerNotice == null ? "" : explorerNotice;
+    }
+
+    String lastDiagnosticState() {
+        return lastDiagnosticState == null ? "" : lastDiagnosticState;
+    }
+
+    private void noteExplorer(String text) {
+        explorerNotice = text == null ? "" : text;
+        if (activityLabel != null) activityLabel.setText(explorerNotice);
+    }
+
+    private void pushDiagnosticState(String json) {
+        lastDiagnosticState = json == null ? "" : json;
+        if (diagnosticView != null) diagnosticView.evalJsonCall("window.setDiagnosticState", lastDiagnosticState);
     }
 
     /** Status shown on Explorer when Tracking opens a run the catalog does not have. */
@@ -1328,7 +1356,7 @@ final class WorkbenchFrame extends JFrame {
                 row.put("selected", false);
                 known.add(row);
             }
-            diagnosticView.evalJsonCall("window.setDiagnosticState", WorkbenchWebJson.write(Map.of(
+            pushDiagnosticState(WorkbenchWebJson.write(Map.of(
                     "runs", known,
                     "frames", List.of(),
                     "layers", List.of(),
