@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -26,6 +27,7 @@ class DoltSandboxWorkerTest {
 
     @AfterEach
     void releaseSandbox() {
+        DoltScope.clear();
         DoltScope.bind(Binding.sandbox("alpha"));
         DoltRun.stop(project);
         DoltScope.clear();
@@ -37,7 +39,13 @@ class DoltSandboxWorkerTest {
     @Timeout(value = 180, unit = TimeUnit.SECONDS)
     void eachSandboxHasItsOwnWorkerAndReusesIt() throws Exception {
         Files.createDirectories(project.resolve("features"));
-        Files.writeString(project.resolve("features/pay.feature"), "Feature: Pay\n  Scenario: Ada\n    * INFO: amount is 1\n");
+        Files.writeString(project.resolve("features/pay.feature"), """
+                Feature: Pay
+                  @dolt-worker
+                  Scenario: Ada
+                    * INFO: amount is 1
+                    * ASSERT: "1" equals "1"
+                """);
         assertEquals(0, cli("dolt", "hydrate", "--project=" + project).code);
         DoltScope.clear();
         assertEquals(0, cli("dolt", "sandbox", "create", "alpha", "--project=" + project).code);
@@ -49,27 +57,41 @@ class DoltSandboxWorkerTest {
         Files.createDirectories(alphaWorker);
         Files.writeString(alphaWorker.resolve(DoltRun.FINGERPRINT), fingerprint);
         System.setProperty("pkb_dolt_run_classpath", System.getProperty("java.class.path"));
+        List<String> selection = workerSelection();
 
-        DoltRun.Outcome main = DoltRun.execute(project, List.of("-Dpkb_tags=@dolt-worker-matches-nothing"), false);
-        assertEquals(1, main.exit(), main.out() + main.err());
-        assertTrue(!main.reused());
+        DoltRun.Outcome main = DoltRun.execute(project, selection, false);
+        assertEquals(0, main.exit(), main.out() + main.err());
+        assertFalse(main.reused());
         long mainPid = pid(project.resolve(".pickleball/dolt/sandboxes/main/worker/warm.txt"));
 
         Capture first = child();
-        assertEquals(1, first.code, first.out + first.err);
-        assertTrue(first.out.contains("reused=false") || first.err.contains("reused=false") || !first.out.contains("reused=true"),
-                first.out + first.err);
+        assertEquals(0, first.code, first.out + first.err);
+        assertTrue(first.out.contains("reused=false"), first.out + first.err);
+        assertFalse(first.out.contains("reused=true"), first.out + first.err);
+        assertTrue(first.out.contains("scenario PASSED Ada"), first.out);
         long alphaPid = pid(alphaWorker.resolve("warm.txt"));
         assertNotEquals(mainPid, alphaPid);
 
-        DoltRun.Outcome again = DoltRun.execute(project, List.of("-Dpkb_tags=@dolt-worker-matches-nothing"), false);
+        DoltRun.Outcome again = DoltRun.execute(project, selection, false);
+        assertEquals(0, again.exit(), again.out() + again.err());
         assertTrue(again.reused(), again.out() + again.err());
         assertEquals(mainPid, pid(project.resolve(".pickleball/dolt/sandboxes/main/worker/warm.txt")));
 
         Capture second = child();
-        assertEquals(1, second.code, second.out + second.err);
-        assertTrue((second.out + second.err).contains("reused=true"), second.out + second.err);
+        assertEquals(0, second.code, second.out + second.err);
+        assertTrue(second.out.contains("reused=true"), second.out + second.err);
+        assertFalse(second.out.contains("reused=false"), second.out + second.err);
         assertEquals(alphaPid, pid(alphaWorker.resolve("warm.txt")));
+    }
+
+    private List<String> workerSelection() {
+        return List.of(
+                "-Dpkb_tags=@dolt-worker",
+                "-Dpkb_glue=tools.dscode.coredefinitions",
+                "-Dpkb_features=wd-file:" + project.resolve("features").toAbsolutePath().normalize(),
+                "-Dpkb_loglevel=error",
+                "-Dpkb_parallel=1",
+                "-Dcucumber.execution.parallel.enabled=false");
     }
 
     private Capture child() throws Exception {
@@ -82,7 +104,12 @@ class DoltSandboxWorkerTest {
         command.add("dolt");
         command.add("run");
         command.add("--sandbox=alpha");
-        command.add("--tags=@dolt-worker-matches-nothing");
+        command.add("--tags=@dolt-worker");
+        command.add("--glue=tools.dscode.coredefinitions");
+        command.add("-Dpkb_features=wd-file:" + project.resolve("features").toAbsolutePath().normalize());
+        command.add("-Dpkb_loglevel=error");
+        command.add("-Dpkb_parallel=1");
+        command.add("-Dcucumber.execution.parallel.enabled=false");
         command.add("--project=" + project.toAbsolutePath());
         Process process = new ProcessBuilder(command).start();
         StringBuilder out = new StringBuilder();
