@@ -385,7 +385,7 @@ final class WorkbenchMcpTools {
                     return value == null ? Map.of("status", "UNAVAILABLE", "op", op) : value;
                 });
         add("dalton",
-                "Forward arguments to the pickleball dalton CLI, including query, timeline, and retain. Query and timeline accept --tag, --feature, --run, --text, --from, and --to. Timeline also accepts --cursor, --before, and --latest. Does not implement Dalton inside Workbench.",
+                "Forward arguments to the pickleball dalton CLI, including query, timeline, and retain. Does not implement Dalton inside Workbench.",
                 schema(Map.of(
                         "args", Map.of(
                                 "type", "array",
