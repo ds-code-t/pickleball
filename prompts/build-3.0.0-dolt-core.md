@@ -4,7 +4,7 @@ You are Grok Build. Replace Pickleball's SQLite-backed "Dalton" layer with the D
 
 - **Repo:** https://github.com/ds-code-t/pickleball
 - **Branch:** `3.0.0` only.
-- **Start SHA:** `START_SHA` (it adds the roadmap, the design and this prompt). Fetch the current tip of `origin/3.0.0`, which may be newer, and record the SHA you actually start from in the scoreboard.
+- **Start SHA:** `1c4bbd1cb1b08b5f78cefd694c5de1139befe423` (it adds the roadmap, the design and this prompt). Fetch the current tip of `origin/3.0.0`, which may be newer, and record the SHA you actually start from in the scoreboard.
 
 ## Decision you are implementing (Dan, 2026-11-15)
 
