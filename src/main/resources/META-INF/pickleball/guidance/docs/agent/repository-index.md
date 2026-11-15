@@ -797,12 +797,15 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/dolt/DoltParseTest.java`
 - `src/test/java/tools/dscode/dolt/DoltQueryCliTest.java`
 - `src/test/java/tools/dscode/dolt/DoltQueryTest.java`
+- `src/test/java/tools/dscode/dolt/DoltRunClasspathRefreshTest.java`
 - `src/test/java/tools/dscode/dolt/DoltRunProbe.java`
 - `src/test/java/tools/dscode/dolt/DoltRunTest.java`
 - `src/test/java/tools/dscode/dolt/DoltSandboxBindingTest.java`
 - `src/test/java/tools/dscode/dolt/DoltSandboxCliTest.java`
+- `src/test/java/tools/dscode/dolt/DoltSandboxHardenTest.java`
 - `src/test/java/tools/dscode/dolt/DoltSandboxIsolationTest.java`
 - `src/test/java/tools/dscode/dolt/DoltSandboxPruneTest.java`
+- `src/test/java/tools/dscode/dolt/DoltSandboxRunStateTest.java`
 - `src/test/java/tools/dscode/dolt/DoltSandboxWorkerTest.java`
 - `src/test/java/tools/dscode/dolt/DoltScenarioHarness.java`
 - `src/test/java/tools/dscode/dolt/DoltSchemaUpgradeTest.java`
@@ -822,6 +825,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/dolt/store/DoltDialectTrapsTest.java`
 - `src/test/java/tools/dscode/dolt/store/DoltSchemaTest.java`
 - `src/test/java/tools/dscode/dolt/store/DoltStoreFixture.java`
+- `src/test/java/tools/dscode/dolt/store/LegacySqliteFixture.java`
 - `src/test/java/tools/dscode/dolt/usage/LookupProbe.java`
 - `src/test/java/tools/dscode/engine/adapter/NativeSuiteHookTest.java`
 - `src/test/java/tools/dscode/engine/adapter/SuiteHookSteps.java`
