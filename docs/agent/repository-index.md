@@ -87,6 +87,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-engine-defects-design.md`
 - `docs/maintainer/3.0.0-engine-design.md`
 - `docs/maintainer/3.0.0-java-dom-design.md`
+- `docs/maintainer/3.0.0-linked-tracking-design.md`
 - `docs/maintainer/3.0.0-locked-decisions-design.md`
 - `docs/maintainer/3.0.0-locked-decisions-prior-audit.md`
 - `docs/maintainer/3.0.0-locked-decisions-sweep.md`
@@ -118,6 +119,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/roadmaps/3.0.0-decouple-round3-roadmap.md`
 - `docs/roadmaps/3.0.0-engine-defects-roadmap.md`
 - `docs/roadmaps/3.0.0-java-dom-roadmap.md`
+- `docs/roadmaps/3.0.0-linked-tracking-roadmap.md`
 - `docs/roadmaps/3.0.0-locked-G1-protocol.md`
 - `docs/roadmaps/3.0.0-locked-G2-query.md`
 - `docs/roadmaps/3.0.0-locked-G3-snapshot.md`
