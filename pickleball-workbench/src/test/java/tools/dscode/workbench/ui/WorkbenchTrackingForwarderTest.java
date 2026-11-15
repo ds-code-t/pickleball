@@ -23,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Headless Tracking tab. The forwarder stands in for the dalton CLI process. */
@@ -173,6 +174,48 @@ class WorkbenchTrackingForwarderTest {
         assertTrue(status.isEmpty(), status.toString());
         assertEquals(gap, shown.get(0));
         assertTrue(gap.contains("\"gap\":\"No retained diagnostic run matches missing-run\""), gap);
+    }
+
+    @Test
+    void knownCatalogRunReplaysWithoutAPushAndStatusReachesTheLabel() throws Exception {
+        Path root = project.resolve("reports/diagnostic-runs");
+        Files.createDirectories(root);
+        Files.writeString(root.resolve("run-catalog.json"), """
+                {"runs":[{"runId":"kept-run","outcome":"PASSED"}]}
+                """);
+        DiagnosticEvidenceNavigator navigator = new DiagnosticEvidenceNavigator(project);
+        List<String> status = new ArrayList<>();
+        List<String> shown = new ArrayList<>();
+        assertNull(WorkbenchFrame.routeRecordedRun("kept-run", status::add, shown::add, navigator));
+        assertTrue(status.isEmpty(), status.toString());
+        assertTrue(shown.isEmpty(), shown.toString());
+
+        String other = WorkbenchFrame.routeRecordedRun("other-run", status::add, shown::add, navigator);
+        assertTrue(status.isEmpty(), status.toString());
+        assertEquals(other, shown.get(0));
+        assertTrue(other.contains("\"gap\":\"No retained diagnostic run matches other-run\""), other);
+
+        JLabel[] label = new JLabel[1];
+        List<String> notice = new ArrayList<>();
+        List<String> pushed = new ArrayList<>();
+        SwingUtilities.invokeAndWait(() -> label[0] = new JLabel("Ready"));
+        SwingUtilities.invokeAndWait(() -> {
+            assertEquals("", WorkbenchFrame.deliverRecordedRun(
+                    "kept-run", label[0], null, navigator, notice::add, pushed::add));
+            assertEquals("Explorer is not ready", label[0].getText());
+        });
+        assertEquals(List.of("Explorer is not ready"), notice);
+        assertTrue(pushed.isEmpty(), pushed.toString());
+
+        notice.clear();
+        SwingUtilities.invokeAndWait(() -> {
+            label[0].setText("Ready");
+            assertEquals("", WorkbenchFrame.deliverRecordedRun(
+                    " ", label[0], null, navigator, notice::add, pushed::add));
+            assertEquals("Select a run with a run id first", label[0].getText());
+        });
+        assertEquals(List.of("Select a run with a run id first"), notice);
+        assertTrue(pushed.isEmpty(), pushed.toString());
     }
 
     private static void click(Container panel, String title) throws Exception {

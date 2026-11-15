@@ -1304,10 +1304,29 @@ final class WorkbenchFrame extends JFrame {
             int index = rightTabs.indexOfTab("Explorer");
             if (index >= 0) rightTabs.setSelectedIndex(index);
         }
-        Consumer<String> explorer = diagnosticView == null ? null : this::pushDiagnosticState;
-        if (routeRecordedRun(runId, this::noteExplorer, explorer, diagnosticNavigator) == null) {
+        if (deliverRecordedRun(runId, activityLabel, diagnosticView, diagnosticNavigator,
+                text -> explorerNotice = text, this::pushDiagnosticState) == null) {
             showDiagnosticRun(runId, 0);
         }
+    }
+
+    /**
+     * Frame wiring for Open in Explorer. Status text is written on the visible label.
+     * A missing Explorer view is not ready. A known catalog id returns null and pushes
+     * nothing, so the frame replays that run.
+     */
+    static String deliverRecordedRun(
+            String runId,
+            JLabel activityLabel,
+            WebViewPanel diagnosticView,
+            DiagnosticEvidenceNavigator navigator,
+            Consumer<String> notice,
+            Consumer<String> push) {
+        return routeRecordedRun(runId, text -> {
+            String shown = text == null ? "" : text;
+            if (notice != null) notice.accept(shown);
+            if (activityLabel != null) activityLabel.setText(shown);
+        }, diagnosticView == null ? null : push, navigator);
     }
 
     /**
@@ -1361,11 +1380,6 @@ final class WorkbenchFrame extends JFrame {
 
     String lastDiagnosticState() {
         return lastDiagnosticState == null ? "" : lastDiagnosticState;
-    }
-
-    private void noteExplorer(String text) {
-        explorerNotice = text == null ? "" : text;
-        if (activityLabel != null) activityLabel.setText(explorerNotice);
     }
 
     private void pushDiagnosticState(String json) {
