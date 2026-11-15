@@ -84,6 +84,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/2.1.19-workbench-expansion-ideas.md`
 - `docs/maintainer/2.1.19-workbench-expansion-roadmap.md`
 - `docs/maintainer/3.0.0-dalton-design.md`
+- `docs/maintainer/3.0.0-dolt-core-design.md`
 - `docs/maintainer/3.0.0-engine-defects-design.md`
 - `docs/maintainer/3.0.0-engine-design.md`
 - `docs/maintainer/3.0.0-java-dom-design.md`
@@ -119,6 +120,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/roadmaps/3.0.0-dalton-roadmap.md`
 - `docs/roadmaps/3.0.0-dalton-round2-roadmap.md`
 - `docs/roadmaps/3.0.0-decouple-round3-roadmap.md`
+- `docs/roadmaps/3.0.0-dolt-core-roadmap.md`
 - `docs/roadmaps/3.0.0-engine-defects-roadmap.md`
 - `docs/roadmaps/3.0.0-java-dom-roadmap.md`
 - `docs/roadmaps/3.0.0-linked-tracking-roadmap.md`

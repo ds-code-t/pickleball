@@ -1,5 +1,7 @@
 # Dolt isolation analysis (2026-11-15)
 
+> **Decision (2026-11-15, Dan):** Dan chose the Dolt core. Pickleball 3.0.0's core becomes Dolt-backed, Dolt branches are the sandbox mechanism, and the Dalton name is removed without aliases. This overrides the recommendation in sections 1, 9, 11 and 12 below. The analysis is kept as history; the decided design is `docs/maintainer/3.0.0-dolt-core-design.md` and the plan is `docs/roadmaps/3.0.0-dolt-core-roadmap.md`.
+
 **Analyzed SHA:** `ca811fe8791c5054627a08f1142107bccdcaf3e2` (`origin/3.0.0`, "AGENTS: record one-spine, multiple-adapters execution philosophy")
 **Kind:** read-only analysis. This file gives findings and recommendations. It does not describe implemented behavior, and nothing here changes product code. Where this file and `AGENTS.md` or the guides disagree about behavior, the guides and the code win. The decision is the maintainer's.
 **Question:** should Dalton's working copy be replaced by, or backed by, [Dolt](https://www.dolthub.com/), so an agent or test can branch, change a Java step definition, a feature file, or data, and run a closed project state without touching other agents? Git stays the source of truth and the only thing synced to GitHub.
