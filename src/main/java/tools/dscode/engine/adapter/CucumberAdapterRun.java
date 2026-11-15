@@ -35,6 +35,7 @@ public final class CucumberAdapterRun {
 
     public static RunResult run(Path featureFile, String gluePackage) {
         synchronized (RECORD) {
+            io.cucumber.core.runner.GlobalState.replaceForTopLevelRun();
             RECORD.setLength(0);
             String featureRoot = "wd-file:" + featureFile.toAbsolutePath().getParent();
             String[] previousFeatures = new String[1];

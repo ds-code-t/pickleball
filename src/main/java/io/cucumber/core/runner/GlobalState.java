@@ -108,6 +108,22 @@ public class GlobalState {
         }
     }
 
+    /**
+     * A top-level Cucumber adapter run has to own nested-step events.
+     * A native suite leaves its runner and thread test case installed.
+     * Pickle steps then publish on that bus, and this run's plugins never see them.
+     */
+    public static void replaceForTopLevelRun() {
+        synchronized (GlobalState.class) {
+            globalRunner = null;
+            globalCachingGlue = null;
+            gluePrepared = false;
+        }
+        ConcurrentHashMap<String, Object> local = tools.dscode.registry.GlobalRegistry.LOCAL.get();
+        local.remove(tools.dscode.registry.GlobalRegistry.normalizeKey(TestCase.class.getName()));
+        local.remove(tools.dscode.registry.GlobalRegistry.normalizeKey(TestCaseState.class.getName()));
+    }
+
 
     public static Runner getGlobalRunner() {
         return globalRunner;
