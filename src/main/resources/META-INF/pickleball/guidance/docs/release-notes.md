@@ -97,7 +97,7 @@ The control-bridge pause for "Paused runtime supports retry-friendly investigati
 
 ### Regression Fix-back 3
 
-`TrackingPanel.getText()` is Swing, the same as the other Workbench panels, and is on the DOM-access allowlist. The guard patterns are unchanged. The help goldens list `popup-open`, `popup-status`, and `popup-close` on the agent line, on the `all:` line, and as help pages. Those commands were already in `help`. Breaking-change list stays empty.
+`TrackingPanel.getText()` is Swing, the same as the other Workbench panels, and is on the DOM-access allowlist. The guard patterns are unchanged. The help goldens list `popup-open`, `popup-status`, and `popup-close` on the agent line, on the `all:` line, and as help pages. Those commands were already in `help`. A finished diagnostic run is not an active run id: `DiagnosticRuntime.finishRun` drops the reporter, and `runId` is empty when diagnostic mode is off or that reporter is finished. A later Dalton run mints its own id. Breaking-change list stays empty.
 
 ## 2.2.0
 

@@ -119,11 +119,17 @@ public final class DiagnosticRuntime {
     }
 
     public static synchronized void finishRun() {
-        if (reporter != null) reporter.finishRun();
+        DiagnosticReporter current = reporter;
+        if (current != null) {
+            current.finishRun();
+            if (reporter == current) reporter = null;
+        }
     }
 
     public static String runId() {
-        return reporter == null ? "" : reporter.runId();
+        DiagnosticReporter current = reporter;
+        if (current == null || !DIAGNOSTIC_MODE || current.isFinished()) return "";
+        return current.runId();
     }
 
     public static Path runRoot() {
