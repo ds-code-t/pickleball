@@ -134,6 +134,11 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         long threadId = Thread.currentThread().threadId();
         ScenarioLane lane = lanes.computeIfAbsent(threadId, ScenarioLane::new);
         lane.adoptIfEmpty(scenario);
+        // The lane used to be created on the first hook, which is also where
+        // pause-first was armed. Publishing early must still arm that pause,
+        // or an isolate worker runs the scenario and exits before the bridge
+        // handshake finishes.
+        armPauseFirst(lane);
     }
 
     @Override
@@ -146,12 +151,7 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         ScenarioLane lane = lanes.get(threadId);
         if (lane == null && GlobalState.getCurrentScenarioState() != null) {
             lane = lanes.computeIfAbsent(threadId, ScenarioLane::new);
-            if (pauseNextScenario.compareAndSet(true, false)) {
-                lane.requestPause(
-                        nextPauseLeaseSeconds.getAndSet(DEFAULT_PAUSE_LEASE_SECONDS),
-                        nextPauseFuture.getAndSet(null)
-                );
-            }
+            armPauseFirst(lane);
         }
         if (lane == null) {
             return ControlDecision.CONTINUE;
@@ -174,6 +174,15 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
             lane.pauseAtHook();
         }
         return ControlDecision.CONTINUE;
+    }
+
+    private void armPauseFirst(ScenarioLane lane) {
+        if (pauseNextScenario.compareAndSet(true, false)) {
+            lane.requestPause(
+                    nextPauseLeaseSeconds.getAndSet(DEFAULT_PAUSE_LEASE_SECONDS),
+                    nextPauseFuture.getAndSet(null)
+            );
+        }
     }
 
     ControlBridgeStatus status() {
