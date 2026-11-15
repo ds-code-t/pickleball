@@ -11,6 +11,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -70,6 +71,20 @@ class DoltServerLifecycleTest {
         DoltCli.execute(new String[]{"dolt", "server", "status", "--json", "--project=" + project},
                 new PrintStream(stoppedOut, true, StandardCharsets.UTF_8), new PrintStream(new ByteArrayOutputStream()));
         assertEquals("{\"running\":false}", stoppedOut.toString(StandardCharsets.UTF_8).trim());
+    }
+
+    @Test
+    void coldStartPrintsElapsedMillis() throws Exception {
+        long started = System.nanoTime();
+        DoltServer.ServerInfo info = DoltServer.ensure(project);
+        long millis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
+        assertTrue(info.running());
+        assertTrue(info.port() > 0);
+        assertFalse(info.reused());
+        Path out = Path.of("build", "dolt-server-start-ms.txt");
+        Files.createDirectories(out.getParent());
+        Files.writeString(out, Long.toString(millis), StandardCharsets.UTF_8);
+        System.out.println("DOLT_SERVER_START_MS=" + millis);
     }
 
     @Test

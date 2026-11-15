@@ -42,6 +42,13 @@ jobs:
         shell: bash
         run: ./gradlew --no-daemon doltInstall
 
+      - name: Targeted Dolt server start
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon :test --tests tools.dscode.dolt.server.DoltServerLifecycleTest.coldStartPrintsElapsedMillis
+          echo "DOLT_SERVER_START_MS=$(tr -d '\r' < build/dolt-server-start-ms.txt)"
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -102,6 +109,12 @@ jobs:
 
       - name: Install Dolt 2.7.3
         run: ./gradlew --no-daemon doltInstall
+
+      - name: Targeted Dolt server start
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon :test --tests tools.dscode.dolt.server.DoltServerLifecycleTest.coldStartPrintsElapsedMillis
+          echo "DOLT_SERVER_START_MS=$(tr -d '\r' < build/dolt-server-start-ms.txt)"
 
       - name: Install Chrome for Testing
         shell: bash
