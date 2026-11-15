@@ -123,10 +123,30 @@ class WorkbenchMcpServerTest {
         WorkbenchMcpTools tools = new WorkbenchMcpTools(fakeServices((method, args) -> null), JSON);
         Object value = tools.call("snapshot", Map.of("kind", "offline"));
         assertTrue(value instanceof Map<?, ?> map && "pickleball.composite-snapshot".equals(map.get("schema")));
-        assertEquals(1, ((Map<?, ?>) value).get("version"));
-        assertTrue(String.valueOf(((Map<?, ?>) value).get("warnings")).contains("g3-producers-absent"));
+        Map<?, ?> body = (Map<?, ?>) value;
+        assertEquals(1, ((Number) body.get("version")).intValue());
+        assertTrue(body.containsKey("premap"), String.valueOf(body));
+        assertTrue(body.containsKey("nodes"), String.valueOf(body));
+        assertFalse(String.valueOf(body.get("warnings")).contains("g3-producers-absent"), String.valueOf(body));
         Object listed = tools.call("surfaces", Map.of());
         assertTrue(String.valueOf(listed).contains("html-write"));
+    }
+
+    @Test
+    void snapshotCommandPlaceholderWhenDispatchIsAbsent() {
+        String dispatch = SnapshotCommand.dispatchClassName;
+        String producers = SnapshotCommand.producersClassName;
+        try {
+            SnapshotCommand.dispatchClassName = "missing.SnapshotDispatch";
+            SnapshotCommand.producersClassName = "missing.SnapshotProducers";
+            WorkbenchMcpTools tools = new WorkbenchMcpTools(fakeServices((method, args) -> null), JSON);
+            Object value = tools.call("snapshot", Map.of("kind", "offline"));
+            assertTrue(value instanceof Map<?, ?>);
+            assertTrue(String.valueOf(((Map<?, ?>) value).get("warnings")).contains("g3-producers-absent"));
+        } finally {
+            SnapshotCommand.dispatchClassName = dispatch;
+            SnapshotCommand.producersClassName = producers;
+        }
     }
 
     @Test

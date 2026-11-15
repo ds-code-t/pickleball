@@ -11,58 +11,92 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Workbench {@code snapshot} command. Calls G3 when those classes are visible
- * at runtime and returns their JSON unchanged. Otherwise a schema-shaped placeholder.
- * This module does not compile against dom-engine or the root runtime.
+ * Workbench {@code snapshot} command. Calls {@code SnapshotDispatch.render(JsonNode)}
+ * when that class is visible, then {@code SnapshotProducers.page} only when the
+ * dispatch class is absent and a page method can take these arguments. Otherwise
+ * a schema-shaped placeholder. This module does not compile against dom-engine.
  */
 final class SnapshotCommand {
     private static final ObjectMapper JSON = new ObjectMapper();
+    /** Class-name seam so a test can hide the dispatch class without dropping the jar. */
+    static String dispatchClassName = "dev.domengine.mcp.SnapshotDispatch";
+    static String producersClassName = "tools.dscode.common.seleniumextensions.SnapshotProducers";
 
     private SnapshotCommand() {
     }
 
     static Map<String, Object> render(Map<String, Object> arguments) {
-        Object produced = call("dev.domengine.snapshot.CompositeSnapshots", arguments);
-        if (produced == null) produced = call("tools.dscode.common.seleniumextensions.SnapshotProducers", arguments);
+        Object produced = callDispatch(arguments);
+        if (produced == null) produced = callProducersPage(arguments);
         if (produced != null) return asMap(produced);
         return placeholder(arguments);
     }
 
-    private static Object call(String className, Map<String, Object> arguments) {
+    private static Object callDispatch(Map<String, Object> arguments) {
         Class<?> type;
         try {
-            type = Class.forName(className);
+            type = Class.forName(dispatchClassName);
         } catch (ClassNotFoundException failure) {
             return null;
         }
-        String kind = kind(arguments, className.endsWith("SnapshotProducers") ? "page" : "offline");
-        Method method = null;
-        for (Method candidate : type.getMethods()) {
-            if (candidate.getName().equals(kind) && Modifier.isStatic(candidate.getModifiers())) {
-                method = candidate;
-                break;
-            }
-        }
-        if (method == null) {
+        Method method;
+        try {
+            method = type.getMethod("render", JsonNode.class);
+        } catch (NoSuchMethodException failure) {
             throw new IllegalStateException(
-                    "error: " + className + "." + kind + " is missing.\n"
-                            + "fix: Call CompositeSnapshots.browser, desktop, or offline, or SnapshotProducers.page.");
+                    "error: " + dispatchClassName + ".render(JsonNode) is missing.\n"
+                            + "fix: Call SnapshotDispatch.render, not an overload chosen by name.",
+                    failure);
+        }
+        if (!Modifier.isStatic(method.getModifiers())) {
+            throw new IllegalStateException(
+                    "error: " + dispatchClassName + ".render(JsonNode) is not static.\n"
+                            + "fix: Call the public static SnapshotDispatch.render method.");
         }
         try {
-            Object value = method.getParameterCount() == 0 ? method.invoke(null) : method.invoke(null, adapt(method, arguments));
-            return value;
-        } catch (IllegalArgumentException failure) {
-            throw new IllegalArgumentException(
-                    "error: snapshot arguments do not match " + className + "." + kind + ".\n"
-                            + "fix: Pass the arguments that method declares. The command does not rebuild the snapshot.",
-                    failure);
+            return method.invoke(null, JSON.valueToTree(arguments == null ? Map.of() : arguments));
         } catch (ReflectiveOperationException failure) {
             Throwable cause = failure.getCause() == null ? failure : failure.getCause();
             throw new IllegalStateException(
-                    "error: " + className + "." + kind + " failed: " + cause.getMessage() + "\n"
+                    "error: " + dispatchClassName + ".render failed: " + cause.getMessage() + "\n"
                             + "fix: Read the producer error.",
                     cause);
         }
+    }
+
+    private static Object callProducersPage(Map<String, Object> arguments) {
+        Class<?> type;
+        try {
+            type = Class.forName(producersClassName);
+        } catch (ClassNotFoundException failure) {
+            return null;
+        }
+        Method method = null;
+        for (Method candidate : type.getMethods()) {
+            if (!candidate.getName().equals("page") || !Modifier.isStatic(candidate.getModifiers())) continue;
+            if (!adaptable(candidate)) continue;
+            method = candidate;
+            break;
+        }
+        if (method == null) return null;
+        try {
+            return method.getParameterCount() == 0 ? method.invoke(null) : method.invoke(null, adapt(method, arguments));
+        } catch (ReflectiveOperationException failure) {
+            Throwable cause = failure.getCause() == null ? failure : failure.getCause();
+            throw new IllegalStateException(
+                    "error: " + producersClassName + ".page failed: " + cause.getMessage() + "\n"
+                            + "fix: Read the producer error.",
+                    cause);
+        }
+    }
+
+    private static boolean adaptable(Method method) {
+        for (Class<?> type : method.getParameterTypes()) {
+            if (type != String.class && !Map.class.isAssignableFrom(type) && !JsonNode.class.isAssignableFrom(type)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static Object[] adapt(Method method, Map<String, Object> arguments) {
@@ -82,13 +116,6 @@ final class SnapshotCommand {
             }
         }
         return params;
-    }
-
-    private static String kind(Map<String, Object> arguments, String fallback) {
-        Object kind = arguments == null ? null : arguments.get("kind");
-        if (kind != null && !String.valueOf(kind).isBlank()) return String.valueOf(kind);
-        if (arguments != null && (arguments.get("session") != null || arguments.get("cdp") != null)) return "browser";
-        return fallback;
     }
 
     private static String first(Map<String, Object> arguments, String... keys) {

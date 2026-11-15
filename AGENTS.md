@@ -440,7 +440,7 @@ Chrome, Chromium, and Edge use CDP. Firefox uses BiDi, or a logged Selenium fall
 
 ## Snapshots and pre-mapping
 
-A composite snapshot is the page-level artifact: screenshot, source, structure, paths, a viewport map, and a pre-map. The pre-map is core. `CompositeSnapshotBuilder.build` always runs `PreMapBuilder`. There is no flag to skip it. The per-element capture is an element snapshot.
+A composite snapshot is the page-level artifact: screenshot, source, structure, paths, a viewport map, and a pre-map. The pre-map is core. `CompositeSnapshotBuilder.build` always runs `PreMapBuilder`. There is no flag to skip it. The per-element capture is an element snapshot. Workbench MCP `snapshot` does not compile against dom-engine. It calls `SnapshotDispatch.render(JsonNode)` by reflection. When that class is absent it calls `SnapshotProducers.page` only if every parameter is String, Map, or JsonNode, and otherwise returns the schema-shaped placeholder.
 
 `PreMapLookup.installed()` is the live session lookup, not a pass-through. A session query reads that pre-map. A miss rebuilds from the tree the query already holds and does not call `DOM.getDocument` again. `--explain` shows `premap: hit` or `premap: rebuilt <ms>`. `Query` asks `candidates` once per searchable stage. `--rank affinity` ranks relatives. `--strict` resolves one match and lists candidates when the match is ambiguous.
 
