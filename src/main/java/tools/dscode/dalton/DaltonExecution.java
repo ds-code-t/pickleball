@@ -308,6 +308,58 @@ public final class DaltonExecution {
         return RUN_STAMP.format(Instant.now()) + "-" + UUID.randomUUID().toString().substring(0, 8);
     }
 
+    /** True while this thread still has an open tracked scenario. */
+    static boolean activePresent() {
+        return ACTIVE.get() != null;
+    }
+
+    /**
+     * One top-level {@code PickleballEngine.run}. A self-minted id is set for the
+     * call, including a diagnostic reporter that starts during it, then removed.
+     * A caller-set {@code pkb_run_id}, an active diagnostic id, and a nested run
+     * are left alone.
+     */
+    public static final class RunLease {
+        private final String previous;
+        private final boolean restore;
+
+        private RunLease(String previous, boolean restore) {
+            this.previous = previous;
+            this.restore = restore;
+        }
+
+        public static RunLease open(boolean topLevel) {
+            if (!topLevel) return idle();
+            String previous = System.getProperty("pkb_run_id");
+            if (previous != null && !previous.isBlank()) return idle();
+            String diagnostic = tools.dscode.common.reporting.diagnostic.DiagnosticRuntime.runId();
+            if (diagnostic != null && !diagnostic.isBlank()) return idle();
+            if (!trackingWithoutRunId()) return idle();
+            System.setProperty("pkb_run_id", newRunId());
+            return new RunLease(previous, true);
+        }
+
+        private static RunLease idle() {
+            return new RunLease(null, false);
+        }
+
+        public void close() {
+            if (!restore) return;
+            if (previous == null) System.clearProperty("pkb_run_id");
+            else System.setProperty("pkb_run_id", previous);
+        }
+    }
+
+    private static boolean trackingWithoutRunId() {
+        try {
+            if (!DaltonConfig.enabled()) return false;
+        } catch (RuntimeException failure) {
+            return false;
+        }
+        String track = System.getProperty("pkb_dalton_track");
+        return track != null && !track.isBlank() && DaltonConfig.truthy(track);
+    }
+
     static String runId() {
         String raw = System.getProperty("pkb_run_id");
         if (raw != null && !raw.isBlank()) {

@@ -53,6 +53,8 @@ public final class NativeScenarioRun {
             EngineOptions options,
             Pickle source
     ) {
+        ScenarioTrackCloser tracked = ScenarioTrackCloser.open(source);
+        try {
         if (ExecutionContext.current() == null && CurrentScenarioState.currentScenarioState.get() == null) {
             MappingProcessor.resetCommonMaps();
         }
@@ -237,10 +239,43 @@ public final class NativeScenarioRun {
             outcome = new ScenarioResult(Status.FAILED, outcome.name(), outcome.steps(), scenarioFailure);
         }
         if (scenarioFailed) FAILURE.set(scenarioThrowable);
+        tracked.status(outcome.status());
         return outcome;
+        } finally {
+            tracked.close();
+        }
     }
 
     private record Seen(EngineStep step, StepExtension frame) {
+    }
+
+    /**
+     * The direct native API closes its tracked scenario. The suite path passes a
+     * pickle and finishes later, so the plugin status stays authoritative.
+     */
+    private static final class ScenarioTrackCloser {
+        private final boolean close;
+        private boolean closed;
+        private Status status = Status.FAILED;
+
+        private ScenarioTrackCloser(boolean close) {
+            this.close = close;
+        }
+
+        static ScenarioTrackCloser open(Pickle source) {
+            boolean apiCall = source == null && ExecutionContext.current() == null;
+            return new ScenarioTrackCloser(apiCall);
+        }
+
+        void status(Status status) {
+            if (status != null) this.status = status;
+        }
+
+        void close() {
+            if (!close || closed) return;
+            closed = true;
+            tools.dscode.dalton.DaltonExecution.finishScenario(status.name());
+        }
     }
 
     private static void installExamples(CurrentScenarioState state, EngineScenario scenario) {

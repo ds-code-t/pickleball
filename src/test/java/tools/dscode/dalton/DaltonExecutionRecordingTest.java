@@ -270,6 +270,90 @@ class DaltonExecutionRecordingTest {
         }
     }
 
+    @Test
+    void repeatedInProcessEngineRunsDoNotMerge() throws Exception {
+        String track = System.getProperty("pkb_dalton_track");
+        String run = System.getProperty("pkb_run_id");
+        String root = System.getProperty("pkb_dalton_project");
+        String pass = """
+                Feature: Pay
+                  Scenario: Pay Ada
+                    * ASSERT: "10" equals "10"
+                """;
+        String fail = """
+                Feature: Pay
+                  Scenario: Pay Ada
+                    * ASSERT: "10" equals "11"
+                """;
+        try {
+            System.setProperty("pkb_dalton_track", "true");
+            System.clearProperty("pkb_run_id");
+            System.setProperty("pkb_dalton_project", project.toAbsolutePath().normalize().toString());
+            RunResult first = PickleballEngine.run(pass, EngineOptions.of().project(project));
+            assertEquals(Status.PASSED, first.status(), first.message());
+            assertFalse(DaltonExecution.activePresent());
+            assertEquals(null, System.getProperty("pkb_run_id"));
+            RunResult second = PickleballEngine.run(fail, EngineOptions.of().project(project));
+            assertEquals(Status.FAILED, second.status(), second.message());
+            assertFalse(DaltonExecution.activePresent());
+            assertEquals(null, System.getProperty("pkb_run_id"));
+            RunResult third = PickleballEngine.run(pass, EngineOptions.of().project(project));
+            assertEquals(Status.PASSED, third.status(), third.message());
+            assertFalse(DaltonExecution.activePresent());
+            assertEquals(null, System.getProperty("pkb_run_id"));
+
+            List<String> runIds = new java.util.ArrayList<>();
+            List<String> statuses = new java.util.ArrayList<>();
+            List<String> keys = new java.util.ArrayList<>();
+            try (DaltonDatabase database = DaltonDatabase.open(project);
+                 Statement statement = database.connection().createStatement();
+                 ResultSet rows = statement.executeQuery("""
+                         SELECT r.run_id, r.status, e.scenario_key
+                         FROM runs r
+                         JOIN scenario_executions e ON e.run_id = r.run_id
+                         ORDER BY r.rowid, e.examples_row
+                         """)) {
+                while (rows.next()) {
+                    runIds.add(rows.getString(1));
+                    statuses.add(rows.getString(2));
+                    keys.add(rows.getString(3));
+                }
+            }
+            assertEquals(List.of("PASSED", "FAILED", "PASSED"), statuses, runIds.toString());
+            assertEquals(3, runIds.stream().distinct().count(), runIds.toString());
+            assertTrue(keys.get(0).startsWith("memory:"), keys.toString());
+            assertEquals(keys.get(0), keys.get(2), keys.toString());
+            assertEquals(1, DaltonExecution.steps(project, runIds.get(0)).size());
+            assertEquals(1, DaltonExecution.steps(project, runIds.get(1)).size());
+            assertEquals(1, DaltonExecution.steps(project, runIds.get(2)).size());
+
+            System.setProperty("pkb_run_id", "caller-x");
+            RunResult fourth = PickleballEngine.run(pass, EngineOptions.of().project(project));
+            assertEquals(Status.PASSED, fourth.status(), fourth.message());
+            assertEquals("caller-x", System.getProperty("pkb_run_id"));
+            assertFalse(DaltonExecution.activePresent());
+            assertEquals(1, DaltonExecution.steps(project, "caller-x").size());
+            try (DaltonDatabase database = DaltonDatabase.open(project);
+                 Statement statement = database.connection().createStatement();
+                 ResultSet rows = statement.executeQuery(
+                         "SELECT COUNT(*) FROM scenario_executions WHERE run_id = 'caller-x'")) {
+                assertTrue(rows.next());
+                assertEquals(1, rows.getInt(1));
+            }
+            try (DaltonDatabase database = DaltonDatabase.open(project);
+                 Statement statement = database.connection().createStatement();
+                 ResultSet rows = statement.executeQuery("SELECT COUNT(*) FROM runs")) {
+                assertTrue(rows.next());
+                assertEquals(4, rows.getInt(1));
+            }
+        } finally {
+            restore("pkb_dalton_track", track);
+            restore("pkb_run_id", run);
+            restore("pkb_dalton_project", root);
+            DaltonExecution.finishScenario("PASSED");
+        }
+    }
+
     private static String property(List<String> properties, String prefix) {
         return properties.stream().filter(item -> item.startsWith(prefix)).findFirst().orElseThrow()
                 .substring(prefix.length());
