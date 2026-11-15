@@ -97,7 +97,7 @@ The control-bridge pause for "Paused runtime supports retry-friendly investigati
 
 ### Regression Fix-back 3
 
-`TrackingPanel.getText()` is Swing, the same as the other Workbench panels, and is on the DOM-access allowlist. The guard patterns are unchanged. Breaking-change list stays empty.
+`TrackingPanel.getText()` is Swing, the same as the other Workbench panels, and is on the DOM-access allowlist. The guard patterns are unchanged. The help goldens list `popup-open`, `popup-status`, and `popup-close` on the agent line, on the `all:` line, and as help pages. Those commands were already in `help`. Breaking-change list stays empty.
 
 ## 2.2.0
 
