@@ -66,6 +66,9 @@ public final class DaltonCli {
                 case "scenario", "scenarios" -> scenarios(project, tokens, json(tokens), stdout, stderr);
                 case "step", "steps" -> steps(project, tokens, json(tokens), stdout, stderr);
                 case "conflicts" -> conflicts(project, json(tokens), stdout, stderr);
+                case "query" -> trackCommand(project, tokens, false, stdout, stderr);
+                case "timeline" -> trackCommand(project, tokens, true, stdout, stderr);
+                case "retain" -> retainCommand(project, tokens, stdout, stderr);
                 case "run" -> runCommand(project, tokens, stdout, stderr);
                 default -> {
                     stderr.println("error: Unknown Dalton command: " + command);
@@ -107,6 +110,9 @@ public final class DaltonCli {
                 Usage: dalton scenarios list [--feature=<relative-path>] [--project=<dir>] [--json]
                 Usage: dalton steps list [--feature=<relative-path>] [--scenario=<ord-or-name>] [--project=<dir>] [--json]
                 Usage: dalton conflicts [--project=<dir>] [--json]
+                Usage: dalton query [--entity=Type#id] [--field=<name>] [--step-def=<definition-id>] [--scenario=<key>] [--status=<status>] [--from=<iso>] [--to=<iso>] [--limit=N] [--offset=N] [--json] [--project=<dir>]
+                Usage: dalton timeline [--from=<iso>] [--to=<iso>] [--entity=Type#id] [--cursor=<cursor>] [--limit=N] [--offset=N] [--json] [--project=<dir>]
+                Usage: dalton retain [--days=N] [--max-bytes=N] [--project=<dir>]
                 Usage: dalton run [--project=<dir>] [--dry-run] [--tags=<expr>] [--name=<text>] [--glue=<packages>] [--engine]
                 Files stay the source of truth. The database is .pickleball/dalton/dalton.db and is gitignored.
                 status and hydrate --dry-run do not create a database when it is missing.
@@ -119,7 +125,8 @@ public final class DaltonCli {
                 entity export writes a changed entity back to its file. It is extract limited to dalton-entities/. It refuses when the file and the database both changed. --force overwrites the file from the stored bytes.
                 entity use records a read, write, or mention on the active tracked step or on --step. value-ref is stored only when it is a reference such as <password:qaDb>, <entity:Type#id.field>, or ~MASK;. Any other text is stored as ~MASK;. A lookup during a tracked step records operation=read the same way and does not open a database when no step is active.
                 extract copies stored file bytes back to disk and does not reformat them. hydrate-out is the same command. An unedited row is left untouched. A deleted file is not recreated unless that row was edited or --force is set.
-                history stores a run summary in the database. It does not change diagnostic reports or pkb_reportretention. --from copies outcome and counts from a run-index.json file and links screenshot files under that directory. Those files are not deleted or rewritten. --link=Type#id writes log_entity_links for that log row. The message text is not scanned. retain drops runs older than --days and then the oldest runs until the note, scenario, and message bytes fit --max-bytes. Retaining a run does not delete the diagnostic report files.
+                history stores a run summary in the database. It does not change diagnostic reports or pkb_reportretention. --from copies outcome and counts from a run-index.json file and links screenshot files under that directory. Those files are not deleted or rewritten. --link=Type#id writes log_entity_links for that log row. The message text is not scanned. retain drops runs older than --days and then the oldest runs until the note, scenario, and message bytes fit --max-bytes. Retaining a run does not delete the diagnostic report files. dalton retain is that same retain.
+                dalton query and dalton timeline read linked executions, usages, log links, and artifacts. They do not create a database. --json is one object with command, count, total, limit, offset, then rows or events. Keys stay in that order. timeline --cursor resumes after the previous event. Rewind is view-only over recorded history. It does not undo browser or service side effects.
                 sqlite-jdbc is a published runtime dependency (scope runtime, not shaded into the consumer shadow JAR). When Dalton is enabled and that driver is missing, status, hydrate, extract, and the auto-hydrate hook fail with: Dalton is enabled but org.xerial:sqlite-jdbc is not on the classpath. Add it as testRuntimeOnly / test scope or use the Gradle dalton* tasks. They do not fall back to the files. Gradle dalton* tasks put the driver on their own classpath.
                 feature put writes that .feature text into the database. It sets db_edited, leaves last_synced_hash, and replaces the stored scenarios, steps, tags, docstrings, and data tables in the same transaction. Bad Gherkin is rejected and the previous rows stay. The file is not changed until dalton extract. Use --file for multiline text. dalton scenario put and dalton step put are rejected. A database row whose content hash moved while db_edited is still 0 is an untracked DB edit. hydrate reports it and will not overwrite it unless --force is set.
                 category, file, glue, and feature scenario-add, scenario-modify, scenario-delete, step-add, step-modify, and step-delete are the shared edit model. --json prints one object with ok, command, family, action, dalton, path, id, dbEdited, conflict, confirmRequired, applied, items, text, message, error, and fix. remove and delete require --confirm and do not write without it. Validation runs before a write. A conflict or an untracked DB edit on that path is refused unless --force is set. When Dalton is off the command writes the file and does not open the database. When Dalton is on, put uses the same db_edited write as feature put. Set pkb_dalton_log=edit to log each edit. The log is date-stamped, per entity, and size-capped.
@@ -128,6 +135,49 @@ public final class DaltonCli {
                 Discovery reads include, exclude, max-file-size (default 1048576), and binary-policy (default skip) from dalton.properties. System properties pkb_dalton_include, pkb_dalton_exclude, pkb_dalton_max_file_size, and pkb_dalton_binary_policy win over that file. An empty include keeps the fixed directories. Exclude is added to the defaults, which already skip .git, target, build, .pickleball, and common binary extensions. A file over the size limit, or a binary by extension or by a null byte or a high control-byte ratio, is ignored. dalton status prints skipped and up to five sample lines and does not create a database. Hydrate prints ignored= for those files. --path still applies the limits. --path --force is the only bypass. hash-only stores a binary as a reference row (empty raw content, sha256, git blob, byte size) and extract reports binary_ref_changed when the file on disk no longer matches. Set pkb_dalton_log=discover,git,binary to log each reason.
                 dalton run executes from the database on a warm JVM. It sets pkb_dalton=true and uses the pickleball-test-engine, the same engine as a normal run. --tags, --name, and --glue become pkb_tags, pkb_name, and pkb_glue. It prints one line per scenario (`scenario PASSED|FAILED <name>`) and one line per step (`step PASSED|FAILED <text>`). Java glue is fingerprinted by path, size, and modification time. A change compiles once with mvnw test-compile or gradlew testClasses, then restarts the worker. The classpath is pkb_dalton_run_classpath or the Workbench classpath.cache. --dry-run prints the plan and writes nothing. Full Gradle or Maven remains the CI build. Set pkb_dalton_log=run to log the worker. --engine forwards the same selection to the native engine CLI and does not start the Cucumber runner.
                 """;
+    }
+
+    private static int trackCommand(Path project, List<String> tokens, boolean timeline, PrintStream out, PrintStream err) {
+        try {
+            DaltonTrack.Filter filter = new DaltonTrack.Filter(
+                    option(tokens, "--entity="),
+                    option(tokens, "--field="),
+                    option(tokens, "--step-def="),
+                    option(tokens, "--scenario="),
+                    option(tokens, "--status="),
+                    option(tokens, "--from="),
+                    option(tokens, "--to="),
+                    option(tokens, "--cursor="),
+                    integer(option(tokens, "--limit="), 50),
+                    integer(option(tokens, "--offset="), 0));
+            String body = timeline
+                    ? DaltonTrack.timeline(project, filter, json(tokens))
+                    : DaltonTrack.query(project, filter, json(tokens));
+            out.print(body);
+            if (!body.endsWith("\n")) out.println();
+            return 0;
+        } catch (Exception failure) {
+            err.println("error: " + (failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()));
+            err.println(timeline ? "fix: dalton timeline --json" : "fix: dalton query --json");
+            return 1;
+        }
+    }
+
+    private static int retainCommand(Path project, List<String> tokens, PrintStream out, PrintStream err) {
+        try {
+            int days = integer(option(tokens, "--days="), DaltonHistory.days());
+            int maxBytes = integer(option(tokens, "--max-bytes="), DaltonHistory.maxBytes());
+            DaltonHistory.RetainResult result = DaltonHistory.retain(project, days, maxBytes);
+            out.println(result.line());
+            boolean present = Files.isRegularFile(DaltonPaths.database(project));
+            out.println("database " + (present ? "present" : "missing"));
+            out.println("reports kept");
+            return 0;
+        } catch (Exception failure) {
+            err.println("error: " + failure.getMessage());
+            err.println("fix: dalton history retain");
+            return 1;
+        }
     }
 
     private static int runCommand(Path project, List<String> tokens, PrintStream out, PrintStream err) {

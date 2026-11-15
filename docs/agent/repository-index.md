@@ -586,6 +586,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/dalton/DaltonSecrets.java`
 - `src/main/java/tools/dscode/dalton/DaltonSources.java`
 - `src/main/java/tools/dscode/dalton/DaltonStepCatalog.java`
+- `src/main/java/tools/dscode/dalton/DaltonTrack.java`
 - `src/main/java/tools/dscode/dalton/EditRules.java`
 - `src/main/java/tools/dscode/dalton/FileRules.java`
 - `src/main/java/tools/dscode/dalton/GherkinRewrite.java`
@@ -837,6 +838,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/dalton/DaltonHydrateTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonLogLinkTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonParseTest.java`
+- `src/test/java/tools/dscode/dalton/DaltonQueryCliTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonQueryTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonRunProbe.java`
 - `src/test/java/tools/dscode/dalton/DaltonRunTest.java`
@@ -844,6 +846,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/dalton/DaltonSchemaUpgradeTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonSecretsTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonStepDefinitionCatalogTest.java`
+- `src/test/java/tools/dscode/dalton/DaltonTimelineTest.java`
 - `src/test/java/tools/dscode/dalton/FileEditTest.java`
 - `src/test/java/tools/dscode/dalton/GherkinRewriteTest.java`
 - `src/test/java/tools/dscode/dalton/GlueEditTest.java`
