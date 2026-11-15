@@ -156,21 +156,44 @@ class WorkbenchTrackingForwarderTest {
         assertEquals("Select a run with a run id first", labelText(panel, ""));
         assertTrue(opened.isEmpty(), opened.toString());
 
-        WorkbenchFrame blank = bareFrame();
+        WorkbenchFrame blank = frameWithStatusLabel();
         SwingUtilities.invokeAndWait(() -> blank.openRecordedRun(""));
         assertEquals("Select a run with a run id first", blank.explorerNotice());
+        assertEquals("Select a run with a run id first", statusLabel(blank).getText());
 
-        WorkbenchFrame unready = bareFrame();
+        WorkbenchFrame unready = frameWithStatusLabel();
         SwingUtilities.invokeAndWait(() -> unready.openRecordedRun("sample-run"));
         assertEquals("Explorer is not ready", unready.explorerNotice());
+        assertEquals("Explorer is not ready", statusLabel(unready).getText());
         assertEquals("", unready.lastDiagnosticState());
 
-        WorkbenchFrame unknown = bareFrame();
+        WorkbenchFrame unknown = frameWithStatusLabel();
         setField(unknown, "diagnosticNavigator", new tools.dscode.workbench.diagnostics.DiagnosticEvidenceNavigator(project));
         setField(unknown, "diagnosticView", allocate(tools.dscode.workbench.ui.web.WebViewPanel.class));
         SwingUtilities.invokeAndWait(() -> unknown.openRecordedRun("missing-run"));
         assertTrue(unknown.lastDiagnosticState().contains("\"gap\":\"No retained diagnostic run matches missing-run\""),
                 unknown.lastDiagnosticState());
+        assertEquals("Ready", statusLabel(unknown).getText());
+    }
+
+    private static WorkbenchFrame frameWithStatusLabel() throws Exception {
+        WorkbenchFrame frame = bareFrame();
+        java.lang.reflect.Field field = WorkbenchFrame.class.getDeclaredField("activityLabel");
+        field.setAccessible(true);
+        java.lang.reflect.Field unsafeField = Class.forName("sun.misc.Unsafe").getDeclaredField("theUnsafe");
+        unsafeField.setAccessible(true);
+        Object unsafe = unsafeField.get(null);
+        long offset = (long) unsafe.getClass().getMethod("objectFieldOffset", java.lang.reflect.Field.class)
+                .invoke(unsafe, field);
+        unsafe.getClass().getMethod("putObject", Object.class, long.class, Object.class)
+                .invoke(unsafe, frame, offset, new JLabel("Ready"));
+        return frame;
+    }
+
+    private static JLabel statusLabel(WorkbenchFrame frame) throws Exception {
+        java.lang.reflect.Field field = WorkbenchFrame.class.getDeclaredField("activityLabel");
+        field.setAccessible(true);
+        return (JLabel) field.get(frame);
     }
 
     private static WorkbenchFrame bareFrame() throws Exception {
