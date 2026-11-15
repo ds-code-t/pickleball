@@ -122,6 +122,20 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         this.eventRecorder = eventRecorder;
     }
 
+    /**
+     * The bridge is often started from inside a step, after BEFORE_STEP has
+     * already fired. Publish that scenario now so a pause can be requested
+     * before the step returns and the next hook is AFTER_STEP.
+     */
+    void adoptRunningScenario() {
+        if (closed) return;
+        CurrentScenarioState scenario = GlobalState.getCurrentScenarioState();
+        if (scenario == null) return;
+        long threadId = Thread.currentThread().threadId();
+        ScenarioLane lane = lanes.computeIfAbsent(threadId, ScenarioLane::new);
+        lane.adoptIfEmpty(scenario);
+    }
+
     @Override
     public ControlDecision onHook(ControlEvent event) {
         if (closed) {
@@ -144,8 +158,9 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         }
 
         lane.capture(event);
+        boolean breakpointPause = false;
         if (event.hook() != ControlHook.SCENARIO_END) {
-            applyBreakpoints(lane, event);
+            breakpointPause = applyBreakpoints(lane, event);
         }
 
         if (event.hook() == ControlHook.SCENARIO_END) {
@@ -155,7 +170,7 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         }
 
         lane.drainCommands();
-        if (lane.pauseRequested) {
+        if (lane.readyToPause(event.hook(), breakpointPause)) {
             lane.pauseAtHook();
         }
         return ControlDecision.CONTINUE;
@@ -225,6 +240,10 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
 
         CompletableFuture<ControlBridgeStatus> future = new CompletableFuture<>();
         lane.requestPause(lease, future);
+        // The bridge starts inside BEGIN, after BEFORE_STEP. Page-ready and
+        // driver hooks still run before AFTER_STEP. An external pause stays
+        // visible immediately and is taken on AFTER_STEP, not on those hooks.
+        lane.holdExternalPauseForAfterStep();
         return awaitPause(future, wait);
     }
 
@@ -591,13 +610,16 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         return size;
     }
 
-    private void applyBreakpoints(ScenarioLane lane, ControlEvent event) {
+    private boolean applyBreakpoints(ScenarioLane lane, ControlEvent event) {
+        boolean matched = false;
         for (BreakpointRule rule : breakpoints.values()) {
             if (!rule.matches(lane, event)) continue;
             rule.hit(lane.scenarioId);
             lane.requestPause(rule.leaseSeconds, null);
+            matched = true;
             if (rule.oneShot) breakpoints.remove(rule.id, rule);
         }
+        return matched;
     }
 
     private ControlBridgeBrowserPageResult browserPageOnScenarioThread(ScenarioLane lane) {
@@ -1162,10 +1184,21 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         private volatile String lastSignature;
         private volatile boolean paused;
         private volatile boolean pauseRequested;
+        /** External pause during a step. Driver and page-ready hooks must not take it. */
+        private volatile boolean externalPauseWaitsForAfterStep;
         private volatile long pauseDeadlineNanos;
         private volatile CompletableFuture<ControlBridgeStatus> pauseFuture;
 
         private ScenarioLane(long threadId) { this.threadId = threadId; }
+
+        private void adoptIfEmpty(CurrentScenarioState scenario) {
+            if (scenarioId != null) return;
+            scenarioId = scenario.id.toString();
+            scenarioName = scenario.scenarioName;
+            stepText = safeStepText(GlobalState.getRunningStep());
+            Phrase phrase = GlobalState.getRunningPhrase();
+            phraseText = phrase == null ? null : clipped(Objects.toString(phrase));
+        }
 
         private void capture(ControlEvent event) {
             CurrentScenarioState scenario = GlobalState.getCurrentScenarioState();
@@ -1192,6 +1225,17 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
             if (future != null) pauseFuture = future;
         }
 
+        private void holdExternalPauseForAfterStep() {
+            externalPauseWaitsForAfterStep = true;
+        }
+
+        private boolean readyToPause(ControlHook hook, boolean breakpointPause) {
+            if (!pauseRequested) return false;
+            if (breakpointPause) return true;
+            if (!externalPauseWaitsForAfterStep) return true;
+            return hook == ControlHook.AFTER_STEP;
+        }
+
         private void extendPause(int leaseSeconds) {
             pauseDeadlineNanos = System.nanoTime() + Duration.ofSeconds(leaseSeconds).toNanos();
         }
@@ -1200,10 +1244,12 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
             if (!paused && pauseFuture == future) {
                 pauseFuture = null;
                 pauseRequested = false;
+                externalPauseWaitsForAfterStep = false;
             }
         }
 
         private void pauseAtHook() {
+            externalPauseWaitsForAfterStep = false;
             paused = true;
             CompletableFuture<ControlBridgeStatus> future = pauseFuture;
             pauseFuture = null;
@@ -1234,12 +1280,14 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
 
         private void resume() {
             pauseRequested = false;
+            externalPauseWaitsForAfterStep = false;
             paused = false;
             commands.offer(ScenarioCommand.wakeup());
         }
 
         private void finish() {
             pauseRequested = false;
+            externalPauseWaitsForAfterStep = false;
             paused = false;
             CompletableFuture<ControlBridgeStatus> future = pauseFuture;
             pauseFuture = null;

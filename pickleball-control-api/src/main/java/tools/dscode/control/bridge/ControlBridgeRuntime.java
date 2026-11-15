@@ -120,6 +120,7 @@ final class ControlBridgeRuntime implements AutoCloseable {
             server.start();
             ControlRuntime.addObserver(eventRecorder);
             ControlRuntime.addObserver(coordinator);
+            coordinator.adoptRunningScenario();
             runtime.writeDescriptor();
             return runtime;
         } catch (Throwable failure) {

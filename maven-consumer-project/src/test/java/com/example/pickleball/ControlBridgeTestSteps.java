@@ -21,7 +21,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
@@ -347,9 +349,39 @@ public final class ControlBridgeTestSteps {
             }
             Thread.sleep(20);
         }
+        Throwable cause = joinClientFailure();
         throw new AssertionError(
                 "Pause was not requested before BEGIN returned for scenario " + scenarioId
+                        + clientDetail(),
+                cause
         );
+    }
+
+    /**
+     * The async client is the only place an HTTP, awaitScenario, or pause-POST
+     * failure is kept. Join it so that failure is the timeout's cause.
+     * A short wait only: a client blocked on this scenario thread must not deadlock the step.
+     */
+    private Throwable joinClientFailure() {
+        if (client == null) return null;
+        try {
+            client.get(2, TimeUnit.SECONDS);
+            return null;
+        } catch (TimeoutException ignored) {
+            return null;
+        } catch (ExecutionException failure) {
+            return failure.getCause() == null ? failure : failure.getCause();
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            return failure;
+        }
+    }
+
+    private String clientDetail() {
+        if (client == null) return "";
+        if (!client.isDone()) return " (async client still running)";
+        if (client.isCompletedExceptionally()) return "";
+        return " (async client finished without pauseRequested)";
     }
 
     private ControlBridgeScenarioStatus awaitScenario(String scenarioId) throws Exception {

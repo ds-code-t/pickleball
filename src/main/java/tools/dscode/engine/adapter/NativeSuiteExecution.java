@@ -1,7 +1,19 @@
 package tools.dscode.engine.adapter;
 
+import io.cucumber.core.backend.Backend;
+import io.cucumber.core.backend.Container;
+import io.cucumber.core.backend.DefaultObjectFactory;
+import io.cucumber.core.backend.Glue;
+import io.cucumber.core.backend.Lookup;
+import io.cucumber.core.backend.ObjectFactory;
+import io.cucumber.core.eventbus.EventBus;
+import io.cucumber.core.eventbus.RandomUuidGenerator;
+import io.cucumber.core.eventbus.UuidGenerator;
 import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.core.options.Constants;
+import io.cucumber.core.runner.Options;
+import io.cucumber.core.runner.Runner;
+import io.cucumber.core.snippets.SnippetType;
 import io.cucumber.plugin.ConcurrentEventListener;
 import io.cucumber.plugin.EventListener;
 import io.cucumber.plugin.event.EventHandler;
@@ -37,22 +49,27 @@ import tools.dscode.engine.parse.GherkinEngineParser;
 import tools.dscode.engine.runtime.NativeScenarioRun;
 
 import java.io.IOException;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 /**
@@ -84,6 +101,7 @@ public final class NativeSuiteExecution {
             String glue = setting(request, Constants.GLUE_PROPERTY_NAME, "pkb_glue");
             Bus bus = plugins(setting(request, Constants.PLUGIN_PROPERTY_NAME, "cucumber.plugin"));
             StepRegistry registry = registry(glue);
+            ensureCachingGlue(glue);
             Catalog catalog = new Catalog();
             EngineOptions options = EngineOptions.of().project(tools.dscode.engine.EngineConfig.project());
             walk(listener, root, tags, name, registry, catalog, options, bus);
@@ -219,6 +237,62 @@ public final class NativeSuiteExecution {
             }
         }
         return null;
+    }
+
+    /**
+     * Nested service calls still match through Cucumber's glue cache and read
+     * the runner event bus. The cucumber engine fills both from {@code Runner}.
+     * A native run does not, so install that runner before the first scenario.
+     */
+    private static void ensureCachingGlue(String glue) {
+        if (io.cucumber.core.runner.GlobalState.getGlobalRunner() != null
+                && io.cucumber.core.runner.GlobalState.getGlobalCachingGlue() != null) {
+            return;
+        }
+        try {
+            EventBus bus = new io.cucumber.core.runtime.TimeServiceEventBus(Clock.systemUTC(), UUID::randomUUID);
+            ObjectFactory factory = new DefaultObjectFactory();
+            Class<?> backendClass = Class.forName("io.cucumber.java.JavaBackend");
+            Constructor<?> backendCtor = backendClass.getDeclaredConstructor(Lookup.class, Container.class, Supplier.class);
+            backendCtor.setAccessible(true);
+            Backend backend = (Backend) backendCtor.newInstance(factory, factory, (Supplier<ClassLoader>) () -> {
+                ClassLoader loader = Thread.currentThread().getContextClassLoader();
+                return loader == null ? NativeSuiteExecution.class.getClassLoader() : loader;
+            });
+            Runner runner = new Runner(bus, List.of(backend), factory, new GlueOptions(glueUris(glue)));
+            io.cucumber.core.runner.GlobalState.setGlobalRunner(runner);
+            Object runnerGlue = tools.dscode.common.util.Reflect.getProperty(runner, "glue");
+            if (runnerGlue instanceof Glue installed) {
+                io.cucumber.core.runner.GlobalState.setGlobalCachingGlue(installed);
+            }
+            if (io.cucumber.core.runner.GlobalState.getGlobalRunner() == null
+                    || io.cucumber.core.runner.GlobalState.getGlobalCachingGlue() == null) {
+                throw new IllegalStateException("Native engine did not install the step runner.");
+            }
+        } catch (ReflectiveOperationException | URISyntaxException failure) {
+            throw new IllegalStateException("Native engine could not load step glue.", failure);
+        }
+    }
+
+    private static List<URI> glueUris(String glue) throws URISyntaxException {
+        LinkedHashSet<URI> uris = new LinkedHashSet<>();
+        uris.add(new URI("classpath", "/tools/dscode/coredefinitions", null));
+        String packages = glue == null ? "" : glue;
+        for (String part : packages.split(",")) {
+            URI uri = classpathPackage(part);
+            if (uri != null) uris.add(uri);
+        }
+        return new ArrayList<>(uris);
+    }
+
+    private static URI classpathPackage(String pkgOrPath) throws URISyntaxException {
+        if (pkgOrPath == null || pkgOrPath.isBlank()) return null;
+        String s = pkgOrPath.trim();
+        if (s.startsWith("classpath:")) s = s.substring("classpath:".length());
+        s = s.replace('.', '/');
+        if (!s.startsWith("/")) s = "/" + s;
+        if ("/".equals(s)) return null;
+        return new URI("classpath", s, null);
     }
 
     private static StepRegistry registry(String glue) {
@@ -547,6 +621,39 @@ public final class NativeSuiteExecution {
             for (EventHandler<?> handler : List.copyOf(list)) {
                 ((EventHandler<T>) handler).receive(event);
             }
+        }
+    }
+
+    private static final class GlueOptions implements Options {
+        private final List<URI> glue;
+
+        private GlueOptions(List<URI> glue) {
+            this.glue = List.copyOf(glue);
+        }
+
+        @Override
+        public List<URI> getGlue() {
+            return glue;
+        }
+
+        @Override
+        public boolean isDryRun() {
+            return false;
+        }
+
+        @Override
+        public SnippetType getSnippetType() {
+            return SnippetType.UNDERSCORE;
+        }
+
+        @Override
+        public Class<? extends ObjectFactory> getObjectFactoryClass() {
+            return DefaultObjectFactory.class;
+        }
+
+        @Override
+        public Class<? extends UuidGenerator> getUuidGeneratorClass() {
+            return RandomUuidGenerator.class;
         }
     }
 }

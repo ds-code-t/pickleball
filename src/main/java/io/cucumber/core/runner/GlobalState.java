@@ -126,10 +126,45 @@ public class GlobalState {
         if (gluePrepared) return globalCachingGlue;
         synchronized (GlobalState.class) {
             if (!gluePrepared) {
-                globalCachingGlue.prepareGlue(getOrSetGlobalLocale(getGherkinMessagesPickle()));
+                if (globalCachingGlue == null) return null;
+                Locale locale = getOrSetGlobalLocale(getGherkinMessagesPickle());
+                if (locale == null) locale = Locale.getDefault();
+                globalCachingGlue.prepareGlue(locale);
                 gluePrepared = true;
             }
             return globalCachingGlue;
+        }
+    }
+
+    /** Native runs have no Cucumber runner. Copy the installed cache onto the scenario when one exists. */
+    public static void attachCachingGlue(CurrentScenarioState state) {
+        if (state == null || state.cachingGlue != null) return;
+        CachingGlue glue = getGlobalCachingGlue();
+        if (glue != null) state.cachingGlue = glue;
+    }
+
+    /**
+     * Nested pickle steps still emit through {@link TestCaseState}.
+     * A native scenario has no Cucumber test case, so register one for this thread.
+     */
+    public static void installNativeTestCase(CurrentScenarioState state) {
+        if (state == null || state.pickle == null || getTestCaseState() != null) return;
+        EventBus bus = getGlobalEventBus();
+        if (bus == null) return;
+        try {
+            // Reflective construction skips TestCase_Constructor_StepExtensionsRewrite,
+            // which would replace the native scenario state.
+            java.lang.reflect.Constructor<TestCase> ctor = TestCase.class.getDeclaredConstructor(
+                    UUID.class, List.class, List.class, List.class, io.cucumber.core.gherkin.Pickle.class, boolean.class
+            );
+            ctor.setAccessible(true);
+            TestCase testCase = ctor.newInstance(UUID.randomUUID(), List.of(), List.of(), List.of(), state.pickle, false);
+            TestCaseState caseState = new TestCaseState(bus, UUID.randomUUID(), testCase);
+            tools.dscode.registry.GlobalRegistry.putLocal(TestCase.class.getName(), testCase);
+            tools.dscode.registry.GlobalRegistry.putLocal(TestCaseState.class.getName(), caseState);
+            state.scenarioRunner = getGlobalRunner();
+        } catch (ReflectiveOperationException failure) {
+            throw new IllegalStateException("Native engine could not install a test case.", failure);
         }
     }
 

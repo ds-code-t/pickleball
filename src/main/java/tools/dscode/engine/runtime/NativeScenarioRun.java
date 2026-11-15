@@ -75,6 +75,8 @@ public final class NativeScenarioRun {
         CurrentScenarioState state = source == null
                 ? new CurrentScenarioState(scenario.name(), scenario.name())
                 : new CurrentScenarioState(scenario.name(), scenario.name(), source);
+        io.cucumber.core.runner.GlobalState.attachCachingGlue(state);
+        io.cucumber.core.runner.GlobalState.installNativeTestCase(state);
         boolean diagnostic = source != null && DiagnosticRuntime.isDiagnostic();
         try {
             if (diagnostic) DiagnosticRuntime.startScenario(state);
