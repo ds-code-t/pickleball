@@ -1,3 +1,1 @@
-PLACEHOLDER_REPLACE_WITH_POINTER_ONLY
-
-(Note: In actual push, this would be a minimal in-place edit adding a pointer to the new design/roadmap under the Dalton section. For this design commit, the full file is not rewritten here; Build will update in place per rules. This entry is a marker.)
+PLACEHOLDER_NOTE: Full restore required from a03e43c0. Insert under ## Dalton: Linked tracking (entity usages, executions, dashboard, timeline) is designed in docs/maintainer/3.0.0-linked-tracking-design.md with roadmap docs/roadmaps/3.0.0-linked-tracking-roadmap.md. SCHEMA_VERSION will become 6. CLI-first remains.
