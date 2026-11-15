@@ -372,6 +372,12 @@ A functionality change is complete only when:
 
 ## Execution engine
 
+### One spine, multiple adapters
+
+Pickleball has one execution spine: the Dalton-backed execution core. CLI, Workbench, MCP, the native suite, feature files, and GUI/DOM triggers are adapters in front of it. After an adapter selects its input, every path uses the same engine, the same query definition dictionaries, and the same execution path. Adapters select input and forward; they do not own execution logic. New work extends the spine or a thin adapter, never a parallel path. Known gaps are tracked in `docs/maintainer/execution-path-audit-2026-11-15.md`.
+
+The Cucumber adapter (`pkb_engine=cucumber`) is the one side branch. It exists only for compatibility with legacy Cucumber and older Pickleball projects. It stays intentionally isolated and is not merged into the native engine.
+
 The default execution engine is native. `pkb_engine`, then `PKB_ENGINE`, then `engine.properties` `mode=` choose `native` or `cucumber`. `pkb_engine=cucumber` keeps the Cucumber adapter. An unrecognised value fails at first use. Gherkin syntax and step annotations do not change. Every Cucumber-core aspect is still required by the adapter, so none were retired.
 
 Pickleball-owned model types live in `tools.dscode.engine.model`: `EngineStep`, `EngineScenario`, `EngineFeature`, `Table`, `DocText`, `Status`, and `RunResult`. `CucumberModelConverter` is the adapter edge. A Cucumber run does not change when the adapter is selected.
