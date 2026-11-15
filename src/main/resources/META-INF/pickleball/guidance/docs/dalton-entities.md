@@ -38,7 +38,7 @@ The only new reference is:
 
 A scenario step receives that resolved field only when Dalton is on. With Dalton off, the step receives the reference text unchanged. A secret field stays the reference. `<entity:Account#ada.password>` reaches the step as `<password:qaDb>`, not as a password.
 
-With Dalton on, a missing database row is read from `dalton-entities/<Type>/<id>.entity` when that file is present. Resolution does not create a database.
+With Dalton on, a missing database row is read from `dalton-entities/<Type>/<id>.entity` when that file is present. Resolution does not create a database when no tracked step is active. During a tracked step, that read inserts `entity_usages` with operation `read`. `value_ref` is the secret reference when the field holds one (`<password:qaDb>` or `~MASK;`). Otherwise it is `<entity:Type#id.field>`. The resolved cleartext is not stored. `dalton entity use <type> <id>` records `write` or `mention` (or `read`) on `--step` or the active step. A `--value-ref` that is not a reference is stored as `~MASK;`.
 
 ## CLI
 
@@ -52,6 +52,8 @@ dalton entity put Account ada --payload-file=account.json
 dalton entity remove Account ada
 dalton entity export
 dalton entity export --force
+dalton entity use Account ada --field=name --operation=mention --step=<step-exec-id>
+dalton entity use Account ada --operation=write --value-ref=<password:qaDb>
 ```
 
 `dalton entity export` is `dalton extract` limited to `dalton-entities/`. It writes the stored file bytes. Those bytes stay the original file, comments included, until `dalton entity put`. A put stores the canonical form (`type`, `id`, `version`, and a compact payload with sorted keys) and export writes that. If the file was not edited in the database, the original bytes stay. If both the file and the database changed since the last sync, export prints `conflict: <path>` and does not overwrite. `--force` overwrites the file from the stored bytes. A deleted unedited file is not recreated.

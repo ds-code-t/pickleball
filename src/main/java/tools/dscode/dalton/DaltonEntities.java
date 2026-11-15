@@ -45,6 +45,96 @@ public final class DaltonEntities {
     ) {
     }
 
+    public record Usage(
+            long usageId,
+            String stepExecId,
+            String type,
+            String id,
+            String field,
+            String operation,
+            String valueRef,
+            String loggedAt
+    ) {
+    }
+
+    /**
+     * Records a read, write, or mention against a step execution.
+     * {@code valueRef} is stored only when it is already a reference; any other text becomes {@code ~MASK;}.
+     */
+    public static Usage note(
+            Path project,
+            String stepExecId,
+            String type,
+            String id,
+            String field,
+            String operation,
+            String valueRef
+    ) throws SQLException {
+        if (project == null) throw new IllegalArgumentException("entity usage needs a project");
+        String step = stepExecId == null || stepExecId.isBlank() ? activeStep() : stepExecId.trim();
+        if (step == null || step.isBlank()) {
+            throw new IllegalArgumentException("entity usage needs an active step or --step");
+        }
+        String kind = operation == null || operation.isBlank() ? "write" : operation.trim().toLowerCase(java.util.Locale.ROOT);
+        if (!kind.equals("read") && !kind.equals("write") && !kind.equals("mention")) {
+            throw new IllegalArgumentException("entity usage operation must be read, write, or mention");
+        }
+        requireType(type);
+        requireId(id);
+        String column = field == null || field.isBlank() ? null : field.trim();
+        String stored = maskRef(project, type, id, column, valueRef);
+        String now = Instant.now().toString();
+        long usageId;
+        try (DaltonDatabase database = DaltonDatabase.open(project)) {
+            Connection connection = database.connection();
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO entity_usages(step_exec_id, entity_type, entity_id, field, operation, value_ref, logged_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """)) {
+                statement.setString(1, step);
+                statement.setString(2, type);
+                statement.setString(3, id);
+                if (column == null) statement.setNull(4, java.sql.Types.VARCHAR);
+                else statement.setString(4, column);
+                statement.setString(5, kind);
+                statement.setString(6, stored);
+                statement.setString(7, now);
+                statement.executeUpdate();
+            }
+            try (PreparedStatement statement = connection.prepareStatement("SELECT last_insert_rowid()");
+                 ResultSet rows = statement.executeQuery()) {
+                usageId = rows.next() ? rows.getLong(1) : 0L;
+            }
+        }
+        DaltonLog.log(project, "track", type + "#" + id, kind + " " + stored);
+        return new Usage(usageId, step, type, id, column, kind, stored, now);
+    }
+
+    public static List<Usage> usages(Path project) throws SQLException {
+        if (project == null || !Files.isRegularFile(DaltonPaths.database(project))) return List.of();
+        try (DaltonDatabase database = DaltonDatabase.open(project);
+             PreparedStatement statement = database.connection().prepareStatement("""
+                     SELECT usage_id, step_exec_id, entity_type, entity_id, field, operation, value_ref, logged_at
+                     FROM entity_usages ORDER BY usage_id
+                     """);
+             ResultSet rows = statement.executeQuery()) {
+            List<Usage> found = new ArrayList<>();
+            while (rows.next()) {
+                found.add(new Usage(
+                        rows.getLong(1), rows.getString(2), rows.getString(3), rows.getString(4),
+                        rows.getString(5), rows.getString(6), rows.getString(7), rows.getString(8)));
+            }
+            return found;
+        }
+    }
+
+    static String maskRef(Path project, String type, String id, String field, String valueRef) {
+        if (valueRef != null && !valueRef.isBlank() && DaltonSecrets.reference(valueRef)) return valueRef.trim();
+        if (valueRef != null && !valueRef.isBlank()) return "~MASK;";
+        if (field != null && !field.isBlank() && DaltonSecrets.secretName(project, field)) return "~MASK;";
+        return "<entity:" + type + "#" + id + (field == null || field.isBlank() ? "" : "." + field) + ">";
+    }
+
     public record ExportResult(int written, int skipped, int conflicts, List<String> conflictPaths) {
         public ExportResult {
             conflictPaths = conflictPaths == null ? List.of() : List.copyOf(conflictPaths);
@@ -244,8 +334,9 @@ public final class DaltonEntities {
         try {
             Entity entity = readForLookup(type, id);
             if (entity == null) return null;
-            if (field == null || field.isBlank()) return entity.payloadJson();
-            return fieldValue(entity.payloadJson(), field);
+            Object value = field == null || field.isBlank() ? entity.payloadJson() : fieldValue(entity.payloadJson(), field);
+            rememberRead(type, id, field, value);
+            return value;
         } catch (RuntimeException | IOException | SQLException failure) {
             DaltonLog.log(DaltonConfig.project(), "entity", type + "#" + id, "lookup failed " + failure.getMessage());
             return null;
@@ -258,6 +349,28 @@ public final class DaltonEntities {
                 + "version: " + version + "\n"
                 + "payload: " + payloadJson + "\n";
         return text.getBytes(StandardCharsets.UTF_8);
+    }
+
+    private static void rememberRead(String type, String id, String field, Object value) {
+        DaltonRunContext.Frame frame = DaltonRunContext.current();
+        if (frame == null || frame.stepExecId() == null || frame.stepExecId().isBlank()) return;
+        try {
+            String text = value == null ? null : String.valueOf(value);
+            String stored = text != null && DaltonSecrets.reference(text)
+                    ? text.trim()
+                    : maskRef(frame.project(), type, id, field, null);
+            if (field != null && DaltonSecrets.secretName(frame.project(), field) && (text == null || !DaltonSecrets.reference(text))) {
+                stored = "~MASK;";
+            }
+            note(frame.project(), frame.stepExecId(), type, id, field, "read", stored);
+        } catch (RuntimeException | SQLException ignored) {
+            // A usage row must not change the step result.
+        }
+    }
+
+    private static String activeStep() {
+        DaltonRunContext.Frame frame = DaltonRunContext.current();
+        return frame == null ? null : frame.stepExecId();
     }
 
     private static Entity readForLookup(String type, String id) throws SQLException, IOException {

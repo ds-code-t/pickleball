@@ -94,6 +94,7 @@ public final class DaltonCli {
                 Usage: dalton entity put <type> <id> [--version=N] [--payload=<json>] [--payload-file=<path>] [--project=<dir>]
                 Usage: dalton entity remove <type> <id> [--force] [--project=<dir>]
                 Usage: dalton entity export [--force] [--project=<dir>]
+                Usage: dalton entity use <type> <id> [--field=<name>] [--operation=read|write|mention] [--value-ref=<reference>] [--step=<step-exec-id>] [--project=<dir>]
                 Usage: dalton feature put <relative-path> [--text=<gherkin>] [--file=<path>] [--project=<dir>]
                 Usage: dalton feature scenario-add|scenario-modify|scenario-delete|step-add|step-modify|step-delete --feature=<relative-path> [--name=<text>] [--scenario=<ord-or-name>] [--step=<ord>] [--keyword=<Given|When|Then|And|But|*>] [--text=<text>] [--file=<path>] [--confirm] [--force] [--json] [--project=<dir>]
                 Usage: dalton category list|show|put|remove [--id=<name>] [--text=<yaml>] [--file=<path>] [--confirm] [--force] [--json] [--project=<dir>]
@@ -116,6 +117,7 @@ public final class DaltonCli {
                 With that flag on, feature loading reads those database bytes. A path that is not in the database stays on the file. With the flag off, loading does not open the database.
                 Entity files are dalton-entities/<Type>/<id>.entity. The reference is <entity:Type#id.field>. Secret fields must be references such as <password:name> or ~MASK;, never cleartext. secret-fields= in dalton.properties, or pkb_dalton_secret_fields, adds names to that list. A long spaceless value on another field warns and is stored. The database is not encrypted.
                 entity export writes a changed entity back to its file. It is extract limited to dalton-entities/. It refuses when the file and the database both changed. --force overwrites the file from the stored bytes.
+                entity use records a read, write, or mention on the active tracked step or on --step. value-ref is stored only when it is a reference such as <password:qaDb>, <entity:Type#id.field>, or ~MASK;. Any other text is stored as ~MASK;. A lookup during a tracked step records operation=read the same way and does not open a database when no step is active.
                 extract copies stored file bytes back to disk and does not reformat them. hydrate-out is the same command. An unedited row is left untouched. A deleted file is not recreated unless that row was edited or --force is set.
                 history stores a run summary in the database. It does not change diagnostic reports or pkb_reportretention. --from copies outcome and counts from a run-index.json file. retain drops runs older than --days and then the oldest runs until the note, scenario, and message bytes fit --max-bytes.
                 sqlite-jdbc is a published runtime dependency (scope runtime, not shaded into the consumer shadow JAR). When Dalton is enabled and that driver is missing, status, hydrate, extract, and the auto-hydrate hook fail with: Dalton is enabled but org.xerial:sqlite-jdbc is not on the classpath. Add it as testRuntimeOnly / test scope or use the Gradle dalton* tasks. They do not fall back to the files. Gradle dalton* tasks put the driver on their own classpath.
@@ -766,6 +768,23 @@ public final class DaltonCli {
                     out.println(result.line());
                     for (String conflict : result.conflictPaths()) err.println("conflict: " + conflict);
                     yield result.conflicts() > 0 ? 1 : 0;
+                }
+                case "use" -> {
+                    String type = arg(tokens, 2);
+                    String id = arg(tokens, 3);
+                    DaltonEntities.Usage usage = DaltonEntities.note(
+                            project,
+                            option(tokens, "--step="),
+                            type,
+                            id,
+                            option(tokens, "--field="),
+                            option(tokens, "--operation="),
+                            option(tokens, "--value-ref="));
+                    out.println("usage " + usage.usageId() + " " + usage.operation() + " "
+                            + usage.type() + "#" + usage.id()
+                            + " field=" + (usage.field() == null ? "" : usage.field())
+                            + " ref=" + usage.valueRef());
+                    yield 0;
                 }
                 default -> {
                     err.println("error: Unknown Dalton entity command: " + action);
