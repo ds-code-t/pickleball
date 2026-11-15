@@ -24,6 +24,7 @@ class GherkinRewriteTest {
     @Test
     void addModifyAndDeleteKeepCommentsAndValidGherkin() throws Exception {
         Files.createDirectories(project.resolve("features"));
+        Files.writeString(project.resolve("dalton.properties"), "enabled=false\n");
         String original = """
                 # keep me
                 Feature: Pay
@@ -130,6 +131,94 @@ class GherkinRewriteTest {
 
         Capture direct = run("dalton", "feature", "put", "features/pay.feature", "--text=" + original, "--force", "--project=" + project);
         assertEquals(0, direct.code, direct.err);
+    }
+
+    @Test
+    void daltonOnRewritesTheDatabaseAndLeavesTheFile() throws Exception {
+        Files.writeString(project.resolve("dalton.properties"), "enabled=true\n");
+        Files.createDirectories(project.resolve("features"));
+        String original = """
+                # keep me
+                Feature: Pay
+
+                  @slow
+                  Scenario: One
+                    # note
+                    Given ready
+
+                  Scenario Outline: Rows
+                    Given <item>
+                    Examples:
+                      | item |
+                      | a    |
+                """;
+        Files.writeString(project.resolve("features/pay.feature"), original);
+        assertEquals(0, run("dalton", "hydrate", "--project=" + project).code);
+
+        Capture add = run("dalton", "feature", "scenario-add", "--feature=features/pay.feature", "--name=Two",
+                "--text=When later", "--json", "--project=" + project);
+        assertEquals(0, add.code, add.err);
+        assertEquals(original, Files.readString(project.resolve("features/pay.feature")));
+        String added = stored();
+        assertTrue(added.startsWith("# keep me\n"), added);
+        assertTrue(added.contains("Scenario: Two"), added);
+        assertTrue(added.contains("When later"), added);
+        assertTrue(JSON.readTree(add.out).path("dbEdited").asBoolean(), add.out);
+        assertNotNullParse(added);
+
+        Capture modify = run("dalton", "feature", "scenario-modify", "--feature=features/pay.feature",
+                "--scenario=One", "--name=Only", "--text=Then done", "--json", "--project=" + project);
+        assertEquals(0, modify.code, modify.err);
+        assertEquals(original, Files.readString(project.resolve("features/pay.feature")));
+        String modified = stored();
+        assertTrue(modified.contains("Scenario: Only"), modified);
+        assertFalse(modified.contains("Given ready"), modified);
+        assertTrue(modified.contains("# note"), modified);
+        assertTrue(modified.contains("Then done"), modified);
+        assertNotNullParse(modified);
+
+        Capture step = run("dalton", "feature", "step-add", "--feature=features/pay.feature",
+                "--scenario=Rows", "--keyword=And", "--text=checked", "--json", "--project=" + project);
+        assertEquals(0, step.code, step.err);
+        String stepped = stored();
+        int examples = stepped.indexOf("Examples:");
+        int checked = stepped.indexOf("And checked");
+        assertTrue(checked > 0 && examples > checked, stepped);
+        assertEquals(original, Files.readString(project.resolve("features/pay.feature")));
+        assertNotNullParse(stepped);
+
+        Capture changed = run("dalton", "feature", "step-modify", "--feature=features/pay.feature",
+                "--scenario=1", "--step=1", "--text=started", "--json", "--project=" + project);
+        assertEquals(0, changed.code, changed.err);
+        String afterStep = stored();
+        assertTrue(afterStep.contains("Then started"), afterStep);
+        assertFalse(afterStep.contains("Then done"), afterStep);
+        assertTrue(afterStep.contains("# note"), afterStep);
+        assertEquals(original, Files.readString(project.resolve("features/pay.feature")));
+
+        Capture removedStep = run("dalton", "feature", "step-delete", "--feature=features/pay.feature",
+                "--scenario=Only", "--step=1", "--confirm", "--json", "--project=" + project);
+        assertEquals(0, removedStep.code, removedStep.err);
+        String withoutStep = stored();
+        assertFalse(withoutStep.contains("Then started"), withoutStep);
+        assertTrue(withoutStep.contains("# note"), withoutStep);
+        assertTrue(withoutStep.contains("Scenario: Only"), withoutStep);
+        assertEquals(original, Files.readString(project.resolve("features/pay.feature")));
+
+        Capture removed = run("dalton", "feature", "scenario-delete", "--feature=features/pay.feature",
+                "--scenario=Only", "--confirm", "--json", "--project=" + project);
+        assertEquals(0, removed.code, removed.err);
+        String left = stored();
+        assertTrue(left.startsWith("# keep me\n"), left);
+        assertFalse(left.contains("Scenario: Only"), left);
+        assertFalse(left.contains("@slow"), left);
+        assertTrue(left.contains("Scenario Outline: Rows"), left);
+        assertNotNullParse(left);
+        assertEquals(original, Files.readString(project.resolve("features/pay.feature")));
+    }
+
+    private String stored() throws Exception {
+        return DaltonQuery.file(project, "features/pay.feature").text();
     }
 
     private static void assertNotNullParse(String text) {
