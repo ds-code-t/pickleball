@@ -76,6 +76,15 @@ public final class DaltonRunWorker {
             properties.add("-D" + DaltonRunTrace.ENABLED + "=true");
             properties.add("-D" + DaltonRunTrace.FILE + "=" + trace.toAbsolutePath().normalize());
         }
+        if (properties.stream().noneMatch(item -> item.startsWith("-Dpkb_dalton_track="))) {
+            properties.add("-Dpkb_dalton_track=true");
+        }
+        if (properties.stream().noneMatch(item -> item.startsWith("-Dpkb_run_id="))) {
+            properties.add("-Dpkb_run_id=dalton-run");
+        }
+        if (project != null && properties.stream().noneMatch(item -> item.startsWith("-Dpkb_dalton_project="))) {
+            properties.add("-Dpkb_dalton_project=" + Path.of(project).toAbsolutePath().normalize());
+        }
         int exit = WorkbenchDirectRun.run(project == null ? Path.of("") : Path.of(project), properties);
         writer.println("EXIT " + exit);
         if (trace != null && Files.isRegularFile(trace)) {

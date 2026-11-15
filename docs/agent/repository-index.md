@@ -565,6 +565,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/dalton/DaltonDiscovery.java`
 - `src/main/java/tools/dscode/dalton/DaltonEdit.java`
 - `src/main/java/tools/dscode/dalton/DaltonEntities.java`
+- `src/main/java/tools/dscode/dalton/DaltonExecution.java`
 - `src/main/java/tools/dscode/dalton/DaltonExtractor.java`
 - `src/main/java/tools/dscode/dalton/DaltonFeatureSource.java`
 - `src/main/java/tools/dscode/dalton/DaltonFiles.java`
@@ -577,6 +578,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/dalton/DaltonPaths.java`
 - `src/main/java/tools/dscode/dalton/DaltonQuery.java`
 - `src/main/java/tools/dscode/dalton/DaltonRun.java`
+- `src/main/java/tools/dscode/dalton/DaltonRunContext.java`
 - `src/main/java/tools/dscode/dalton/DaltonRuntime.java`
 - `src/main/java/tools/dscode/dalton/DaltonRunTrace.java`
 - `src/main/java/tools/dscode/dalton/DaltonRunWorker.java`
@@ -825,6 +827,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/dalton/DaltonEditContractTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonEditTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonEntityTest.java`
+- `src/test/java/tools/dscode/dalton/DaltonExecutionRecordingTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonExtractTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonFoundationTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonGitInfoTest.java`

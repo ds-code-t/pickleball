@@ -116,6 +116,15 @@ public final class NativeScenarioRun {
                     io.cucumber.core.runner.StepBase savedNext = frame.nextSibling;
                     frame.nextSibling = null;
                     context.pushStep(engineStep == null ? tools.dscode.engine.model.EngineStep.of("* ", frame.getStepText()) : engineStep);
+                    String stepText = engineStep == null ? frame.getStepText() : engineStep.text();
+                    int stepLine = engineStep == null || engineStep.location() == null ? 0 : engineStep.location().line();
+                    tools.dscode.dalton.DaltonExecution.beforeStep(
+                            options == null ? null : options.project(),
+                            scenario.name(),
+                            scenario.location() == null ? "" : scenario.location().uri(),
+                            scenario.location() == null ? 0 : scenario.location().line(),
+                            stepText,
+                            stepLine);
                     try {
                         state.runStep(frame);
                     } catch (Throwable thrown) {
@@ -130,6 +139,10 @@ public final class NativeScenarioRun {
                         NativeStepTrace.record(frame);
                         state.recordHardFailure(thrown);
                     } finally {
+                        String trackedStatus = frame.result == null || frame.result.getStatus() == null
+                                ? "PASSED"
+                                : frame.result.getStatus().name();
+                        tools.dscode.dalton.DaltonExecution.afterStep(trackedStatus);
                         frame.nextSibling = savedNext;
                         context.popStep();
                     }

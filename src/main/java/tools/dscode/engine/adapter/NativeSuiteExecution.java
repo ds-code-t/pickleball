@@ -158,6 +158,7 @@ public final class NativeSuiteExecution {
                     : result.message()))
                     : null;
             publish(bus, pickle, result, pluginStatus, error);
+            tools.dscode.dalton.DaltonExecution.finishScenario(pluginStatus.name());
             EngineLog.log(options.project(), "suite", pickle.getName(), pluginStatus.name());
             if (pluginStatus == Status.FAILED || pluginStatus == Status.UNDEFINED || pluginStatus == Status.AMBIGUOUS) {
                 return TestExecutionResult.failed(error == null ? new IllegalStateException(pluginStatus.name()) : error);
