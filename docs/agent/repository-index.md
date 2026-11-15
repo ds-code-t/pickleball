@@ -130,6 +130,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/roadmaps/3.0.0-locked-R4-dalton-rust-docs.md`
 - `docs/roadmaps/3.0.0-locked-R5-final-regression.md`
 - `docs/roadmaps/3.0.0-query-visual-roadmap.md`
+- `docs/roadmaps/3.0.0-regression-fixback-e5bffaef.md`
 - `docs/roadmaps/3.0.0-workbench-edit-roadmap.md`
 - `docs/service-call-scenarios.md`
 - `docs/snapshot.md`

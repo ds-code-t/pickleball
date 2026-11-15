@@ -95,6 +95,10 @@ Workbench launch capture keeps the first 256KB and the last 512KB of a run conso
 
 The control-bridge pause for "Paused runtime supports retry-friendly investigation and control" is requested before BEGIN returns, so both engines pause on AFTER_STEP of that step. Step order is still compared by position. Build provenance hashes the working-tree diff without loading it into the Gradle daemon. Generated `reports/` HTML and `report.xlsx` are no longer tracked. A capped launch console's byte view includes the head, the truncation marker, and the tail. Breaking-change list stays empty.
 
+### Regression Fix-back 3
+
+`TrackingPanel.getText()` is Swing, the same as the other Workbench panels, and is on the DOM-access allowlist. The guard patterns are unchanged. Breaking-change list stays empty.
+
 ## 2.2.0
 
 _No changes yet._

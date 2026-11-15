@@ -51,6 +51,7 @@ class DomAccessGuardTest {
             "pickleball-workbench/src/main/java/tools/dscode/workbench/ui/FeaturePickerPanel.java",
             "pickleball-workbench/src/main/java/tools/dscode/workbench/ui/RunVarOverridePanel.java",
             "pickleball-workbench/src/main/java/tools/dscode/workbench/ui/TerminalPanel.java",
+            "pickleball-workbench/src/main/java/tools/dscode/workbench/ui/TrackingPanel.java",
             "pickleball-workbench/src/main/java/tools/dscode/workbench/ui/WorkbenchFrame.java",
             "pickleball-workbench/src/main/java/tools/dscode/workbench/ui/web/WebViewPanel.java",
             "pickleball-workbench/src/main/java/tools/dscode/workbench/worker/WorkbenchWorkerManager.java",
