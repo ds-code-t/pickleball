@@ -159,7 +159,9 @@ dependencies {
     implementation 'org.postgresql:postgresql:42.7.7'
     implementation 'com.microsoft.sqlserver:mssql-jdbc:12.10.1.jre11'
     implementation 'com.oracle.database.jdbc:ojdbc11:23.7.0.25.01'
-    implementation 'org.mariadb.jdbc:mariadb-java-client:3.5.3'
+    // Newest 3.5.x on Maven Central at the Dolt-core P1 pin (3.5.11). Runtime POM scope.
+    // Not shaded. The Dolt core connects with this driver; JDBC service calls use it too.
+    runtimeOnly 'org.mariadb.jdbc:mariadb-java-client:3.5.11'
 
     // logging and reports
 //    api "com.aventstack:extentreports:5.1.2"
@@ -869,7 +871,7 @@ publishing {
                         d.appendNode('version', v)
                     }
 
-                    if (ga == 'org.xerial:sqlite-jdbc') {
+                    if (ga == 'org.xerial:sqlite-jdbc' || ga == 'org.mariadb.jdbc:mariadb-java-client') {
                         d.appendNode('scope', 'runtime')
                     } else {
                         d.appendNode('scope', 'compile')

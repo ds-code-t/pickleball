@@ -519,6 +519,13 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/dalton/GherkinRewrite.java`
 - `src/main/java/tools/dscode/dalton/GlueRules.java`
 - `src/main/java/tools/dscode/dalton/ProjectElementCategories.java`
+- `src/main/java/tools/dscode/dolt/DoltCli.java`
+- `src/main/java/tools/dscode/dolt/DoltLog.java`
+- `src/main/java/tools/dscode/dolt/install/DoltInstaller.java`
+- `src/main/java/tools/dscode/dolt/install/DoltPlatform.java`
+- `src/main/java/tools/dscode/dolt/install/DoltReleaseCatalog.java`
+- `src/main/java/tools/dscode/dolt/server/DoltServer.java`
+- `src/main/java/tools/dscode/dolt/server/DoltServerSupervisor.java`
 - `src/main/java/tools/dscode/engine/adapter/CucumberAdapterRun.java`
 - `src/main/java/tools/dscode/engine/adapter/NativeSuiteExecution.java`
 - `src/main/java/tools/dscode/engine/context/ExecutionContext.java`
@@ -611,6 +618,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/testengine/WorkspaceSeedMain.java`
 - `src/main/java/tools/dscode/Values.java`
 - `src/main/resources/META-INF/pickleball/configs/CHROME_HEADLESS.yaml`
+- `src/main/resources/META-INF/pickleball/dolt-release.properties`
 - `src/main/resources/META-INF/services/org.junit.platform.engine.TestEngine`
 - `src/main/resources/META-INF/services/org.junit.platform.launcher.LauncherSessionListener`
 - `src/main/resources/tools/dscode/browser/surface/bridge-mark.js`
@@ -781,6 +789,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/dalton/GlueEditTest.java`
 - `src/test/java/tools/dscode/dalton/usage/LookupProbe.java`
 - `src/test/java/tools/dscode/docs/CurrentDocsTest.java`
+- `src/test/java/tools/dscode/dolt/DoltPackagingTest.java`
+- `src/test/java/tools/dscode/dolt/install/DoltInstallerTest.java`
+- `src/test/java/tools/dscode/dolt/server/DoltJdbcBranchSpikeTest.java`
+- `src/test/java/tools/dscode/dolt/server/DoltServerLifecycleTest.java`
 - `src/test/java/tools/dscode/engine/adapter/NativeSuiteHookTest.java`
 - `src/test/java/tools/dscode/engine/adapter/SuiteHookSteps.java`
 - `src/test/java/tools/dscode/engine/context/ExecutionContextTest.java`
