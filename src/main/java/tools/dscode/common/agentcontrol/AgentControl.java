@@ -309,6 +309,17 @@ public final class AgentControl {
 
     private static Result overlay(Path project, String runId, Map<String, String> args) throws Exception {
         if (!present(args.get("text"))) return fail(2, "overlay requires --text");
+        String at = args.get("at");
+        if (present(at) && !at.trim().matches("auto|top|bottom|left|right|over")) {
+            return fail(2, "overlay --at must be auto, top, bottom, left, right, or over");
+        }
+        String theme = args.get("theme");
+        if (present(theme) && !theme.trim().matches("auto|light|dark")) {
+            return fail(2, "overlay --theme must be auto, light, or dark");
+        }
+        Map<String, String> look = new LinkedHashMap<>();
+        if (present(at)) look.put("at", at.trim());
+        if (present(theme)) look.put("theme", theme.trim());
         Map<String, Object> placed = PageSurfaces.place(
                 explicitPage(project, args),
                 "append",
@@ -321,9 +332,11 @@ public final class AgentControl {
                 args.get("geometry"),
                 AgentStore.root(project, runId),
                 integerOrNull(args.get("width")),
-                integerOrNull(args.get("height"))
+                integerOrNull(args.get("height")),
+                look
         );
         placed.put("ok", true);
+        if (present(at)) placed.put("at", at.trim());
         return new Result(0, placed);
     }
 
@@ -356,6 +369,9 @@ public final class AgentControl {
             y = arrow.y();
             width = arrow.width();
             height = arrow.height();
+            args = new LinkedHashMap<>(args);
+            String anchor = present(args.get("handle")) ? args.get("handle") : args.get("from");
+            if (present(anchor)) args.put("anchor", anchor.trim());
             handle = null;
             geometry = arrow.resolved()
                     ? "{\"visual_viewport_relative\":{\"x\":" + arrow.x() + ",\"y\":" + arrow.y()

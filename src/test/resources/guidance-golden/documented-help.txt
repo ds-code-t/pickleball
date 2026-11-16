@@ -147,7 +147,7 @@ Usage: open-scenario --feature=<path-or-name> --name=<scenario> [--example=<rows
 Usage: open-window --run-id=<id>
 
 # help overlay
-Usage: overlay --text=<html> [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--handle=<id>] [--geometry=<json>] [--html=<page>]
+Usage: overlay --text=<html> [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--handle=<id>] [--at=auto|top|bottom|left|right|over] [--theme=auto|light|dark] [--geometry=<json>] [--html=<page>]
 
 # help overlay-poll
 Usage: overlay-poll [--after=<next>] [--run-id=<id>]

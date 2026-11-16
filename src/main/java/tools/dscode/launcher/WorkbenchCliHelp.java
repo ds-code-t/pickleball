@@ -60,7 +60,7 @@ final class WorkbenchCliHelp {
             Map.entry("chat-poll", "Usage: chat-poll [--channel=<name>] [--id=<after>] [--wait=<seconds>] [--run-id=<id>]"),
             Map.entry("highlight", "Usage: highlight --handle=<id> (--preset=yellow|outline-red) [--style=<css>] [--html=<page>] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>]"),
             Map.entry("unhighlight", "Usage: unhighlight [--handle=<id>] [--html=<page>]"),
-            Map.entry("overlay", "Usage: overlay --text=<html> [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--handle=<id>] [--geometry=<json>] [--html=<page>]"),
+            Map.entry("overlay", "Usage: overlay --text=<html> [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--handle=<id>] [--at=auto|top|bottom|left|right|over] [--theme=auto|light|dark] [--geometry=<json>] [--html=<page>]"),
             Map.entry("overlay-poll", "Usage: overlay-poll [--after=<next>] [--run-id=<id>]"),
             Map.entry("overlay-remove", "Usage: overlay-remove --id=<id> [--html=<page>]"),
             Map.entry("label", "Usage: label --text=<label> [--handle=<id>] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--geometry=<json>] [--target=auto|page|popup|native] [--html=<page>]"),

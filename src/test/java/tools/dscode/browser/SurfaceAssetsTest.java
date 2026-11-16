@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SurfaceAssetsTest {
     @Test
     void loadsEachAssetAtItsHash() throws Exception {
-        assertEquals("8bf0e9ac3abdfc9a9abe4bc6ba06a80c28ed6151caebba92485c84d9156819b5", sha(SurfaceAssets.script("live-helper")));
+        assertEquals("b7bbc9df1c51377cfe25af5714f3d805b9154473dfe7a106ef426862c340a12c", sha(SurfaceAssets.script("live-helper")));
         assertEquals("5d6b24e641d70c4c252804b3d0bfae48f6170037434b6d43b2b8e2650c0821a7", sha(SurfaceAssets.script("bridge-mark")));
         assertEquals("ab8f90e2e4d04214af67e933ab190a0bfab7c89e57ba6cdfe5e10bd3eec6e29a", sha(SurfaceAssets.script("frame-mark")));
         assertEquals("afc0169aba6b94679a425b8b8868193583b8813e8bcf52fadf089389d7999c88", sha(SurfaceAssets.script("frame-restore")));
@@ -116,5 +116,15 @@ class SurfaceAssetsTest {
     private static String sha(String text) throws Exception {
         byte[] digest = MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8));
         return HexFormat.of().formatHex(digest);
+    }
+
+    @Test
+    void runtimeScriptLoads() {
+        String runtime = SurfaceAssets.script("pkb-runtime");
+        assertTrue(runtime.contains("window.__pkbUi = {"), "runtime does not expose __pkbUi");
+        assertTrue(runtime.contains("version: VERSION"), "runtime has no version");
+        assertTrue(runtime.contains("addEventListener") && runtime.contains("capture: true"), "runtime has no capture-phase scroll listener");
+        assertTrue(runtime.contains("ResizeObserver") && runtime.contains("MutationObserver"), "runtime does not observe resize and mutation");
+        assertSame(runtime, SurfaceAssets.script("PKB-RUNTIME"));
     }
 }

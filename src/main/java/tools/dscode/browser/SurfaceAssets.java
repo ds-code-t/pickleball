@@ -49,7 +49,8 @@ public final class SurfaceAssets {
     }
 
     /**
-     * Page-injection source. Names: {@code live-helper}, {@code bridge-mark}, {@code frame-mark}, {@code frame-restore}.
+     * Page-injection source. Names: {@code live-helper}, {@code bridge-mark}, {@code frame-mark}, {@code frame-restore},
+     * {@code pkb-runtime} (the tracker that keeps placements on their targets).
      */
     public static String script(String name) {
         String file = switch (scriptName(name)) {
@@ -57,6 +58,7 @@ public final class SurfaceAssets {
             case "bridge-mark" -> "bridge-mark.js";
             case "frame-mark" -> "frame-mark.js";
             case "frame-restore" -> "frame-restore.js";
+            case "pkb-runtime" -> "pkb-runtime.js";
             default -> throw unknownScript(name);
         };
         return load(file);
@@ -112,7 +114,7 @@ public final class SurfaceAssets {
     private static String scriptName(String name) {
         String key = token(name, unknownScript(name));
         return switch (key) {
-            case "live-helper", "bridge-mark", "frame-mark", "frame-restore" -> key;
+            case "live-helper", "bridge-mark", "frame-mark", "frame-restore", "pkb-runtime" -> key;
             default -> throw unknownScript(name);
         };
     }
@@ -131,7 +133,7 @@ public final class SurfaceAssets {
     private static IllegalArgumentException unknownScript(String name) {
         return new IllegalArgumentException(
                 "error: unknown surface script: " + name
-                        + "\nfix: Use live-helper, bridge-mark, frame-mark, or frame-restore.");
+                        + "\nfix: Use live-helper, bridge-mark, frame-mark, frame-restore, or pkb-runtime.");
     }
 
     private static String load(String file) {

@@ -114,6 +114,9 @@ if (op === 'remove' || op === 'cleanup') {
     });
   });
   if (op === 'cleanup') document.querySelectorAll('[data-pkb-style]').forEach(restoreStyle);
+  if (typeof window !== 'undefined' && window.__pkbUi) {
+    if (op === 'cleanup') window.__pkbUi.clear(); else window.__pkbUi.prune();
+  }
   if (op === 'remove' && removed === 0) return {ok:false, error:'unknown id'};
   return {ok:true, removed:removed};
 }
@@ -185,5 +188,15 @@ if (!window.__pkbOverlayBound) {
     if (!n) return;
     window.__pkbEvents.push({type:'input', id:n.getAttribute('data-pkb-id'), name:ev.target.name || '', value:ev.target.value || ''});
   }, true);
+}
+// The runtime (pkb-runtime.js) keeps a placement on its target through scroll, resize, zoom and re-render.
+var tracked = anchor;
+if (!tracked && spec.anchor) {
+  tracked = document.getElementById(spec.anchor)
+    || document.querySelector('[data-pkb-handle="' + CSS.escape(String(spec.anchor)) + '"]');
+}
+if (tracked && op === 'append' && spec.kind && spec.kind !== 'html' && host.isConnected
+    && typeof window !== 'undefined' && window.__pkbUi && window.__pkbUi.track) {
+  try { window.__pkbUi.track(host, tracked, spec); } catch (ignored) { /* placement stays static */ }
 }
 return {ok:true, id:spec.id, x:left, y:top};

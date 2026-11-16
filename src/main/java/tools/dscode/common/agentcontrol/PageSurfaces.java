@@ -68,6 +68,7 @@ final class PageSurfaces {
     }
 
     private static final String LIVE_HELPER = SurfaceAssets.script("live-helper");
+    private static final String RUNTIME = SurfaceAssets.script("pkb-runtime");
     private static final java.util.concurrent.ConcurrentHashMap<Integer, BrowserFacade> FACADES = new java.util.concurrent.ConcurrentHashMap<>();
     private static final java.util.Set<Integer> SURFACE_PROTOCOL = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private static final java.util.concurrent.ConcurrentLinkedQueue<Map<String, String>> PUSHED = new java.util.concurrent.ConcurrentLinkedQueue<>();
@@ -1165,7 +1166,25 @@ final class PageSurfaces {
         BrowserLog.warnOnce(
                 "page-surface-script",
                 "PageSurfaces used Selenium executeScript; no CDP or BiDi session");
+        if (tracksTarget(spec)) {
+            // Main-world fallback (D4): the runtime installs lazily, only for a placement that follows a target.
+            try {
+                executor.executeScript(RUNTIME);
+            } catch (RuntimeException failure) {
+                BrowserLog.warnOnce("page-surface-runtime", "page runtime did not install: " + failure.getMessage());
+            }
+        }
         return executor.executeScript(LIVE_HELPER, spec);
+    }
+
+    private static boolean tracksTarget(Map<String, Object> spec) {
+        Object kind = spec.get("kind");
+        boolean anchored = present(spec.get("handle")) || present(spec.get("anchor")) || present(spec.get("bridge"));
+        return "append".equals(spec.get("op")) && kind != null && !"html".equals(kind) && anchored;
+    }
+
+    private static boolean present(Object value) {
+        return value != null && !String.valueOf(value).isBlank();
     }
 
     private static void installSurface(WebDriver web, BrowserFacade facade) {
@@ -1224,7 +1243,8 @@ final class PageSurfaces {
         if (semi > 0 && LIVE_HELPER.substring(0, semi).contains("arguments[0]")) {
             body = LIVE_HELPER.substring(semi + 1);
         }
-        return "function(raw){ var spec = JSON.parse(raw);" + body + "}";
+        // The runtime is idempotent: a second install in the same document returns at once.
+        return "function(raw){ var spec = JSON.parse(raw);\n" + RUNTIME + "\n;" + body + "}";
     }
 
     private record ParsedColors(double[] content, double[] border, boolean unsupported) {}
@@ -1753,6 +1773,9 @@ final class PageSurfaces {
             if (extra.get("dim") != null) spec.put("dim", extra.get("dim"));
             if (extra.get("number") != null) spec.put("number", extra.get("number"));
             if (extra.get("direction") != null) spec.put("direction", extra.get("direction"));
+            if (extra.get("at") != null) spec.put("at", extra.get("at"));
+            if (extra.get("theme") != null) spec.put("theme", extra.get("theme"));
+            if (extra.get("anchor") != null) spec.put("anchor", extra.get("anchor"));
         }
         try {
             Object value = evaluateHelper(current, executor, spec);
