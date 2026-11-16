@@ -83,7 +83,7 @@ class DoltDriverMissingTest {
     }
 
     @Test
-    void missingBinaryFailsBeforeAStoreIsCreated() throws Exception {
+    void missingBinaryDoesNotBlockOpeningSqlite() throws Exception {
         String bin = System.getProperty("pkb_dolt_bin");
         String auto = System.getProperty("pkb_dolt_auto_install");
         try {
@@ -97,9 +97,9 @@ class DoltDriverMissingTest {
                     "dolt",
                     "hydrate",
                     "--project=" + project));
-            assertEquals(1, hydrate.code, hydrate.out + hydrate.err);
-            assertTrue(hydrate.err.contains("Dolt 2.7.3 is not installed and could not be downloaded"), hydrate.err);
-            assertFalse(DoltPaths.ready(project));
+            assertEquals(0, hydrate.code, hydrate.out + hydrate.err);
+            assertFalse(hydrate.err.contains("is not installed"), hydrate.err);
+            assertTrue(DoltPaths.ready(project));
         } finally {
             restore("pkb_dolt_bin", bin);
             restore("pkb_dolt_auto_install", auto);

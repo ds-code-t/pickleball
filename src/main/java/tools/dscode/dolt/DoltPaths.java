@@ -24,14 +24,29 @@ public final class DoltPaths {
         return LegacyNames.sqliteFile(project);
     }
 
-    /** Dolt data directory. Present once the server has initialized the repository. */
+    /** Embedded source database for main. */
+    public static Path mainDatabase(Path project) {
+        return root(project).resolve("main.db");
+    }
+
+    /** Project-level run history. Not referenced from a source database file. */
+    public static Path runState(Path project) {
+        return root(project).resolve("runstate.db");
+    }
+
+    /** Independent sandbox copy. */
+    public static Path sandboxDatabase(Path project, String name) {
+        return sandboxHome(project, name).resolve("source.db");
+    }
+
+    /** Live store file. Present once the embedded database has been created. */
     public static Path store(Path project) {
-        return project.toAbsolutePath().normalize().resolve(".pickleball").resolve("dolt").resolve("data");
+        return mainDatabase(project);
     }
 
     public static boolean ready(Path project) {
         if (project == null) return false;
-        return Files.isDirectory(store(project).resolve("pickleball").resolve(".dolt"));
+        return Files.isRegularFile(mainDatabase(project));
     }
 
     public static Path log(Path project) {

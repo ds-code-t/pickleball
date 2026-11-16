@@ -53,9 +53,8 @@ class DoltDialectTrapsTest {
 
     @Test
     void autoIncrementIdsAreNotContiguousAcrossBranches() throws Exception {
-        store.session().script("CREATE TABLE IF NOT EXISTS id_probe (id BIGINT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(32))");
-        store.session().script("CALL DOLT_ADD('id_probe')");
-        store.session().script("CALL DOLT_COMMIT('-m', 'id probe')");
+        store.session().script(
+                "CREATE TABLE IF NOT EXISTS id_probe (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)");
         long mainId = store.session().insertId("INSERT INTO id_probe(name) VALUES (?)", "main");
         store.createBranch("ids");
         long branchId;
@@ -77,20 +76,16 @@ class DoltDialectTrapsTest {
     @Test
     void insertIgnoreKeepsTheFirstRow() throws Exception {
         store.session().update("INSERT INTO schema_meta(`key`, value) VALUES ('once', 'a')");
-        store.session().update("INSERT IGNORE INTO schema_meta(`key`, value) VALUES ('once', 'b')");
+        store.session().update("INSERT OR IGNORE INTO schema_meta(`key`, value) VALUES ('once', 'b')");
         assertEquals("a", store.session().scalar("SELECT value FROM schema_meta WHERE `key` = ?", "once"));
     }
 
     @Test
-    void informationSchemaColumnsSeesLongblob() throws Exception {
-        assertEquals("raw_content", store.session().scalar("""
-                SELECT column_name FROM information_schema.columns
-                WHERE table_schema = DATABASE() AND table_name = 'files' AND column_name = 'raw_content'
-                """));
-        assertEquals("longblob", store.session().scalar("""
-                SELECT LOWER(data_type) FROM information_schema.columns
-                WHERE table_schema = DATABASE() AND table_name = 'files' AND column_name = 'raw_content'
-                """));
+    void pragmaTableInfoSeesBlob() throws Exception {
+        assertEquals("raw_content", store.session().scalar(
+                "SELECT name FROM pragma_table_info('files') WHERE name = 'raw_content'"));
+        assertEquals("blob", store.session().scalar(
+                "SELECT LOWER(type) FROM pragma_table_info('files') WHERE name = 'raw_content'"));
     }
 
     @Test
@@ -103,8 +98,35 @@ class DoltDialectTrapsTest {
                 + DoltDialect.taggedScenario("'features/login.feature|10'")
                 + " AND " + DoltDialect.tagLike("sc.tags");
         assertEquals("login", store.session().scalar(sql, "% @fast %"));
-        assertEquals("0", store.session().scalar("SELECT 'a' || 'b'"));
         assertEquals("ab", store.session().scalar("SELECT CONCAT('a', 'b')"));
+        for (String filter : DoltDialect.FILTERS) {
+            assertTrue(!filter.contains("||"), filter);
+        }
+    }
+
+    @Test
+    void upsertOnAViewIsRefused() throws Exception {
+        store.session().script("CREATE VIEW IF NOT EXISTS meta_view AS SELECT * FROM schema_meta");
+        SQLException failure = assertThrows(SQLException.class, () -> store.session().update(
+                "INSERT INTO meta_view(`key`, value) VALUES ('view-key', '1') "
+                        + "ON CONFLICT(`key`) DO UPDATE SET value = excluded.value"));
+        assertTrue(failure.getMessage() != null && !failure.getMessage().isBlank());
+    }
+
+    @Test
+    void forUpdateIsRefused() {
+        SQLException failure = assertThrows(SQLException.class, () -> store.session().scalar(
+                "SELECT value FROM schema_meta WHERE `key` = 'store_schema' FOR UPDATE"));
+        String message = failure.getMessage() == null ? "" : failure.getMessage().toLowerCase();
+        assertTrue(message.contains("syntax") || message.contains("near"), message);
+    }
+
+    @Test
+    void jsonObjectRefusesAMultiByteBlob() {
+        SQLException failure = assertThrows(SQLException.class, () -> store.session().scalar(
+                "SELECT json_object('raw', x'010203')"));
+        String message = failure.getMessage() == null ? "" : failure.getMessage().toLowerCase();
+        assertTrue(message.contains("blob"), message);
     }
 
     @Test
@@ -120,7 +142,7 @@ class DoltDialectTrapsTest {
     @Test
     void castAsSignedReadsTheScenarioLine() throws Exception {
         assertEquals("12", store.session().scalar("""
-                SELECT CAST(substr('features/a.feature|12', CHAR_LENGTH('features/a.feature') + 2) AS SIGNED)
+                SELECT CAST(substr('features/a.feature|12', length('features/a.feature') + 2) AS INTEGER)
                 """));
     }
 
@@ -131,8 +153,8 @@ class DoltDialectTrapsTest {
 
     @Test
     void likeEscapeMatchesALiteralUnderscore() throws Exception {
-        assertEquals("1", store.session().scalar("SELECT 'a_b' LIKE 'a\\\\_b' ESCAPE '\\\\'"));
-        assertEquals("0", store.session().scalar("SELECT 'axb' LIKE 'a\\\\_b' ESCAPE '\\\\'"));
+        assertEquals("1", store.session().scalar("SELECT 'a_b' LIKE 'a\\_b' ESCAPE '\\'"));
+        assertEquals("0", store.session().scalar("SELECT 'axb' LIKE 'a\\_b' ESCAPE '\\'"));
     }
 
     @Test
@@ -156,7 +178,7 @@ class DoltDialectTrapsTest {
                 INSERT INTO files(path, content_hash, raw_content, mtime, source_type, last_hydrated_at,
                     last_synced_hash, db_edited, git_blob, binary_ref, byte_size)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE raw_content = VALUES(raw_content), byte_size = VALUES(byte_size)
+                ON CONFLICT(path) DO UPDATE SET raw_content = excluded.raw_content, byte_size = excluded.byte_size
                 """, path, "h", raw, 1L, "feature", "t", "h", 0, null, 0, (long) raw.length);
     }
 }

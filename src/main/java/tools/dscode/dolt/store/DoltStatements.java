@@ -24,7 +24,7 @@ SELECT s.started_at AS at, 'step' AS kind, s.step_exec_id AS id, e.run_id AS run
                 FROM step_executions s
                 JOIN scenario_executions e ON e.exec_id = s.scenario_exec_id
                 UNION ALL
-                SELECT u.logged_at, 'usage', CAST(u.usage_id AS CHAR), e.run_id, s.status, e.scenario_key,
+                SELECT u.logged_at, 'usage', CAST(u.usage_id AS TEXT), e.run_id, s.status, e.scenario_key,
                        u.step_exec_id, s.step_text, COALESCE(s.definition_id, ''),
                        u.entity_type, u.entity_id, COALESCE(u.field, ''), u.operation, COALESCE(u.value_ref, ''),
                        '', '', 2
@@ -32,7 +32,7 @@ SELECT s.started_at AS at, 'step' AS kind, s.step_exec_id AS id, e.run_id AS run
                 JOIN step_executions s ON s.step_exec_id = u.step_exec_id
                 JOIN scenario_executions e ON e.exec_id = s.scenario_exec_id
                 UNION ALL
-                SELECT g.logged_at, 'log', CAST(l.log_id AS CHAR), g.run_id, runs.status, runs.scenario,
+                SELECT g.logged_at, 'log', CAST(l.log_id AS TEXT), g.run_id, runs.status, runs.scenario,
                        '', '', '',
                        l.entity_type, l.entity_id, '', '', '',
                        g.message, '', 3
@@ -56,25 +56,25 @@ SELECT s.step_exec_id, s.scenario_exec_id, e.run_id, s.step_ord, s.step_text, s.
             """
 INSERT INTO runs(run_id, started_at, finished_at, status, scenario, passed, failed, note, sandbox)
                 VALUES (?, ?, ?, 'RUNNING', ?, 0, 0, '', ?)
-                ON DUPLICATE KEY UPDATE finished_at = VALUES(finished_at), sandbox = VALUES(sandbox)
+                ON CONFLICT(run_id) DO UPDATE SET finished_at = excluded.finished_at, sandbox = excluded.sandbox
 """,
             """
 INSERT INTO scenario_executions(
                     exec_id, run_id, scenario_key, scenario_hash, examples_row, started_at, finished_at, status, passed, failed, sandbox)
                 VALUES (?, ?, ?, ?, ?, ?, NULL, ?, 0, 0, ?)
-                ON DUPLICATE KEY UPDATE scenario_hash = VALUES(scenario_hash), sandbox = VALUES(sandbox)
+                ON CONFLICT(exec_id) DO UPDATE SET scenario_hash = excluded.scenario_hash, sandbox = excluded.sandbox
 """,
             """
 INSERT INTO step_executions(
                     step_exec_id, scenario_exec_id, step_ord, step_text, step_text_hash, definition_id,
                     source_line, started_at, finished_at, status, sandbox)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE
-                    definition_id = VALUES(definition_id),
-                    status = VALUES(status),
-                    finished_at = VALUES(finished_at),
-                    source_line = COALESCE(VALUES(source_line), step_executions.source_line),
-                    sandbox = VALUES(sandbox)
+                ON CONFLICT(step_exec_id) DO UPDATE SET
+                    definition_id = excluded.definition_id,
+                    status = excluded.status,
+                    finished_at = excluded.finished_at,
+                    source_line = COALESCE(excluded.source_line, step_executions.source_line),
+                    sandbox = excluded.sandbox
 """,
             """
 SELECT COUNT(*) FROM step_executions s
@@ -110,10 +110,10 @@ SELECT definition_id, pattern FROM step_definitions
             """
 INSERT INTO artifacts(artifact_id, run_id, step_exec_id, kind, path, retained_at, sandbox)
                     VALUES (?, ?, ?, 'screenshot', ?, ?, ?)
-                    ON DUPLICATE KEY UPDATE
-                        step_exec_id = COALESCE(VALUES(step_exec_id), artifacts.step_exec_id),
-                        path = VALUES(path),
-                        sandbox = VALUES(sandbox)
+                    ON CONFLICT(artifact_id) DO UPDATE SET
+                        step_exec_id = COALESCE(excluded.step_exec_id, artifacts.step_exec_id),
+                        path = excluded.path,
+                        sandbox = excluded.sandbox
 """,
             """
 SELECT artifact_id, run_id, step_exec_id, kind, path, retained_at
@@ -148,14 +148,14 @@ SELECT path, source_type, db_edited, length(raw_content), content_hash, last_syn
 INSERT INTO step_definitions(
                     definition_id, language, pattern, method_name, source_path, source_line, content_hash, hydrated_at, removed)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
-                ON DUPLICATE KEY UPDATE
-                    language = VALUES(language),
-                    pattern = VALUES(pattern),
-                    method_name = VALUES(method_name),
-                    source_path = VALUES(source_path),
-                    source_line = VALUES(source_line),
-                    content_hash = VALUES(content_hash),
-                    hydrated_at = VALUES(hydrated_at),
+                ON CONFLICT(definition_id) DO UPDATE SET
+                    language = excluded.language,
+                    pattern = excluded.pattern,
+                    method_name = excluded.method_name,
+                    source_path = excluded.source_path,
+                    source_line = excluded.source_line,
+                    content_hash = excluded.content_hash,
+                    hydrated_at = excluded.hydrated_at,
                     removed = 0
 """,
             """
@@ -215,7 +215,7 @@ DELETE FROM entities WHERE source_file = ?
 DELETE FROM files WHERE path = ?
 """,
             """
-INSERT IGNORE INTO example_blocks(file_path, scenario_ord, ord, line, tags)
+INSERT OR IGNORE INTO example_blocks(file_path, scenario_ord, ord, line, tags)
                 VALUES (?, ?, ?, ?, ?)
 """,
             """
@@ -233,14 +233,14 @@ INSERT INTO schema_meta(key, value) VALUES ('example_blocks', '1')
             """
 INSERT INTO runs(run_id, started_at, finished_at, status, scenario, passed, failed, note, sandbox)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        ON DUPLICATE KEY UPDATE
-                            finished_at = VALUES(finished_at),
-                            status = VALUES(status),
-                            scenario = VALUES(scenario),
-                            passed = VALUES(passed),
-                            failed = VALUES(failed),
-                            note = VALUES(note),
-                            sandbox = VALUES(sandbox)
+                        ON CONFLICT(run_id) DO UPDATE SET
+                            finished_at = excluded.finished_at,
+                            status = excluded.status,
+                            scenario = excluded.scenario,
+                            passed = excluded.passed,
+                            failed = excluded.failed,
+                            note = excluded.note,
+                            sandbox = excluded.sandbox
 """,
             """
 SELECT l.log_id, l.entity_type, l.entity_id
@@ -250,7 +250,7 @@ SELECT l.log_id, l.entity_type, l.entity_id
                      ORDER BY l.log_id, l.entity_type, l.entity_id
 """,
             """
-INSERT IGNORE INTO log_entity_links(log_id, entity_type, entity_id, sandbox) VALUES (?, ?, ?, ?)
+INSERT OR IGNORE INTO log_entity_links(log_id, entity_type, entity_id, sandbox) VALUES (?, ?, ?, ?)
 """,
             """
 INSERT INTO run_logs(run_id, logged_at, entity, message, sandbox) VALUES (?, ?, ?, ?, ?)
@@ -306,13 +306,13 @@ SELECT usage_id, step_exec_id, entity_type, entity_id, field, operation, value_r
             """
 INSERT INTO entities(entity_type, entity_id, version, payload_json, secret_refs, source_file, content_hash, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE
-                    version = VALUES(version),
-                    payload_json = VALUES(payload_json),
-                    secret_refs = VALUES(secret_refs),
-                    source_file = VALUES(source_file),
-                    content_hash = VALUES(content_hash),
-                    updated_at = VALUES(updated_at)
+                ON CONFLICT(entity_type, entity_id) DO UPDATE SET
+                    version = excluded.version,
+                    payload_json = excluded.payload_json,
+                    secret_refs = excluded.secret_refs,
+                    source_file = excluded.source_file,
+                    content_hash = excluded.content_hash,
+                    updated_at = excluded.updated_at
 """,
             """
 SELECT entity_type, entity_id, version, payload_json, secret_refs, source_file, content_hash FROM entities ORDER BY entity_type, entity_id
@@ -326,17 +326,17 @@ SELECT entity_type, entity_id, version, payload_json, secret_refs, source_file, 
             """
 INSERT INTO files(path, content_hash, raw_content, mtime, source_type, last_hydrated_at, last_synced_hash, db_edited, git_blob, binary_ref, byte_size)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE
-                    content_hash = VALUES(content_hash),
-                    raw_content = VALUES(raw_content),
-                    mtime = VALUES(mtime),
-                    source_type = VALUES(source_type),
-                    last_hydrated_at = VALUES(last_hydrated_at),
-                    last_synced_hash = VALUES(last_synced_hash),
-                    db_edited = VALUES(db_edited),
-                    git_blob = VALUES(git_blob),
-                    binary_ref = VALUES(binary_ref),
-                    byte_size = VALUES(byte_size)
+                ON CONFLICT(path) DO UPDATE SET
+                    content_hash = excluded.content_hash,
+                    raw_content = excluded.raw_content,
+                    mtime = excluded.mtime,
+                    source_type = excluded.source_type,
+                    last_hydrated_at = excluded.last_hydrated_at,
+                    last_synced_hash = excluded.last_synced_hash,
+                    db_edited = excluded.db_edited,
+                    git_blob = excluded.git_blob,
+                    binary_ref = excluded.binary_ref,
+                    byte_size = excluded.byte_size
 """,
             """
 SELECT path, content_hash, raw_content, mtime, source_type, last_hydrated_at, last_synced_hash, db_edited, git_blob, binary_ref, byte_size FROM files

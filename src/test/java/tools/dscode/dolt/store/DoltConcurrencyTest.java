@@ -36,8 +36,6 @@ class DoltConcurrencyTest {
     @Test
     void parallelWritersOnOneBranchRetryAndSucceed() throws Exception {
         store.session().update(DoltDialect.UPSERT_META, "counter", "0");
-        store.session().script("CALL DOLT_ADD('schema_meta')");
-        store.session().script("CALL DOLT_COMMIT('-m', 'counter')");
         int threads = 8;
         ExecutorService pool = Executors.newFixedThreadPool(threads);
         List<Future<?>> futures = new ArrayList<>();
@@ -45,9 +43,9 @@ class DoltConcurrencyTest {
             futures.add(pool.submit(() -> {
                 try (DoltStore local = DoltStore.open(project, Binding.main())) {
                     local.session().transaction("schema_meta", () -> {
-                        local.session().scalar("SELECT value FROM schema_meta WHERE `key` = 'counter' FOR UPDATE");
+                        local.session().scalar("SELECT value FROM schema_meta WHERE `key` = 'counter'");
                         local.session().update("""
-                                UPDATE schema_meta SET value = CAST(CAST(value AS SIGNED) + 1 AS CHAR)
+                                UPDATE schema_meta SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT)
                                 WHERE `key` = 'counter'
                                 """);
                     });

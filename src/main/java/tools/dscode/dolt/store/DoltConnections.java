@@ -1,7 +1,6 @@
 package tools.dscode.dolt.store;
 
 import tools.dscode.dolt.DoltPaths;
-import tools.dscode.dolt.server.DoltServer;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -32,16 +31,56 @@ public final class DoltConnections {
 
     public static DoltSession borrow(java.nio.file.Path project, Binding binding) throws IOException, SQLException {
         java.nio.file.Path root = project.toAbsolutePath().normalize();
-        DoltServer.ServerInfo info = DoltServer.ensure(root);
-        String key = root + "|" + binding.branch();
-        Pool pool = POOLS.computeIfAbsent(key, ignored -> new Pool(info.port(), binding.databasePath()));
-        synchronized (pool) {
-            pool.port = info.port();
+        Binding chosen = binding == null ? Binding.main() : binding;
+        Path file = chosen.primary()
+                ? DoltPaths.mainDatabase(root)
+                : DoltPaths.sandboxDatabase(root, chosen.name());
+        if (!chosen.primary() && !Files.isRegularFile(file)) {
+            throw new SQLException("unknown sandbox " + chosen.name()
+                    + "\nfix: dolt sandbox create " + chosen.name());
         }
+        Files.createDirectories(file.getParent());
+        ensureRunState(root);
+        String key = root + "|" + chosen.branch();
+        Pool pool = POOLS.computeIfAbsent(key, ignored -> new Pool(file));
         Connection connection = take(pool);
-        remember(connection);
-        touchLease(root, binding.branch());
-        return new DoltSession(root, binding, connection, pool);
+        prepareSource(connection, DoltPaths.runState(root));
+        touchLease(root, chosen.branch());
+        return new DoltSession(root, chosen, connection, pool);
+    }
+
+    /** A writable connection to the shared run-state file. The caller returns it with {@link #giveBack}. */
+    public static Borrowed borrowRunState(java.nio.file.Path project) throws IOException, SQLException {
+        java.nio.file.Path root = project.toAbsolutePath().normalize();
+        Path file = DoltPaths.runState(root);
+        Files.createDirectories(file.getParent());
+        String key = root + "|runstate";
+        Pool pool = POOLS.computeIfAbsent(key, ignored -> new Pool(file));
+        return new Borrowed(take(pool), pool);
+    }
+
+    private static void ensureRunState(Path project) throws IOException, SQLException {
+        Borrowed borrowed = borrowRunState(project);
+        try (Statement statement = borrowed.connection().createStatement()) {
+            for (String ddl : DoltDialect.RUN_DDL) statement.execute(ddl);
+        } finally {
+            giveBack(borrowed.pool(), borrowed.connection());
+        }
+    }
+
+    private static void prepareSource(Connection connection, Path runState) throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            boolean attached = false;
+            try (ResultSet rows = statement.executeQuery("PRAGMA database_list")) {
+                while (rows.next()) {
+                    if ("rs".equalsIgnoreCase(rows.getString("name"))) attached = true;
+                }
+            }
+            if (!attached) {
+                String path = runState.toAbsolutePath().toString().replace("'", "''");
+                statement.execute("ATTACH DATABASE 'file:" + path + "?mode=ro' AS rs");
+            }
+        }
     }
 
     public static boolean inUse(java.nio.file.Path project) {
@@ -110,26 +149,6 @@ public final class DoltConnections {
     }
 
     private static boolean foreignProcess(Path project, String branch) {
-        String key = project.toAbsolutePath().normalize() + "|" + branch;
-        Pool pool = POOLS.get(key);
-        int port = pool == null ? 0 : pool.port;
-        if (port <= 0) {
-            Pool main = POOLS.get(project.toAbsolutePath().normalize() + "|main");
-            if (main != null) port = main.port;
-        }
-        if (port <= 0) return false;
-        try (Connection connection = DoltJdbc.open(port, "pickleball", 2_000);
-             Statement statement = connection.createStatement();
-             ResultSet rows = statement.executeQuery("SELECT ID, DB FROM information_schema.PROCESSLIST")) {
-            while (rows.next()) {
-                long id = rows.getLong(1);
-                if (OWN_CONNECTION_IDS.contains(id)) continue;
-                String db = rows.getString(2);
-                if (db != null && (db.equals(branch) || db.endsWith("/" + branch))) return true;
-            }
-        } catch (SQLException ignored) {
-            return false;
-        }
         return false;
     }
 
@@ -233,7 +252,7 @@ public final class DoltConnections {
                     continue;
                 }
                 if (pool.open < MAX) {
-                    Connection created = DoltJdbc.open(pool.port, pool.database, 5_000);
+                    Connection created = SqliteOpen.open(pool.file);
                     pool.open++;
                     return created;
                 }
@@ -279,14 +298,15 @@ public final class DoltConnections {
 
     static final class Pool {
         final ArrayDeque<Held> idle = new ArrayDeque<>();
-        final String database;
-        volatile int port;
+        final Path file;
         int open;
 
-        Pool(int port, String database) {
-            this.port = port;
-            this.database = database;
+        Pool(Path file) {
+            this.file = file;
         }
+    }
+
+    public record Borrowed(Connection connection, Pool pool) {
     }
 
     record Held(Connection connection, long returnedAt) {

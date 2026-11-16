@@ -86,12 +86,9 @@ public final class DoltSql {
         return rewrite(sql, null);
     }
 
-    /** SQLite text becomes Dolt text. Mixed run-state reads stay qualified onto main. */
+    /** SQLite text stays SQLite. Mixed joins are unqualified; run-state names resolve through the attachment. */
     public static String rewrite(String sql, Binding binding) {
-        String translated = translateBody(sql);
-        if (binding == null || binding.primary()) return translated;
-        if (classify(translated) == SqlKind.MIXED) return qualifyRunState(translated);
-        return translated;
+        return translateBody(sql);
     }
 
     private static String qualifyRunState(String sql) {
@@ -104,36 +101,10 @@ public final class DoltSql {
         return current;
     }
 
+    /** Product SQL is already SQLite. Quote the bare {@code key} identifier and leave the rest. */
     public static String translateBody(String sql) {
         if (sql == null) return null;
-        String trimmed = sql.strip();
-        String head = trimmed.toLowerCase(Locale.ROOT);
-        if (head.startsWith("create table") || head.startsWith("create index")
-                || head.startsWith("create unique") || head.startsWith("alter table")) {
-            return "SELECT 1";
-        }
-        if (head.startsWith("pragma")) {
-            return pragma(trimmed);
-        }
-        String rewritten = trimmed;
-        rewritten = rewritten.replaceAll("(?i)INSERT\\s+OR\\s+IGNORE", "INSERT IGNORE");
-        rewritten = rewritten.replaceAll("(?i)INSERT\\s+OR\\s+REPLACE", "REPLACE");
-        rewritten = rewritten.replaceAll(
-                "(?i)ON\\s+CONFLICT\\s*\\([^)]*\\)\\s*DO\\s+UPDATE\\s+SET", "ON DUPLICATE KEY UPDATE");
-        rewritten = rewritten.replaceAll("(?i)\\bexcluded\\.(\\w+)", "VALUES($1)");
-        rewritten = rewritten.replaceAll("(?i)\\blast_insert_rowid\\s*\\(\\s*\\)", "LAST_INSERT_ID()");
-        rewritten = rewritten.replaceAll("(?i)\\bAS\\s+INTEGER\\b", "AS SIGNED");
-        rewritten = rewritten.replaceAll("(?i)\\bAS\\s+TEXT\\b", "AS CHAR");
-        rewritten = rewritten.replaceAll(
-                "(?i)(\\w+(?:\\.\\w+)?)\\s*=\\s*(\\?|\\w+(?:\\.\\w+)?)\\s+COLLATE\\s+NOCASE",
-                "LOWER($1) = LOWER($2)");
-        rewritten = rewritten.replaceAll("(?i)\\s+COLLATE\\s+NOCASE", "");
-        rewritten = rewritten.replace("ESCAPE '\\'", "ESCAPE '\\\\'");
-        rewritten = rewritten.replaceAll("(?i)\\blength\\s*\\(", "CHAR_LENGTH(");
-        rewritten = sqliteMaster(rewritten);
-        rewritten = concat(rewritten);
-        rewritten = quoteKey(rewritten);
-        return rewritten;
+        return quoteKey(sql.strip());
     }
 
     private static String pragma(String sql) {
@@ -373,6 +344,21 @@ public final class DoltSql {
         return sql.strip().toLowerCase(Locale.ROOT).startsWith(word);
     }
 
+    static boolean runStatePragma(String sql) {
+        if (sql == null) return false;
+        String lower = sql.toLowerCase(Locale.ROOT);
+        if (!lower.contains("table_info")) return false;
+        for (String table : DoltDialect.RUN_STATE_TABLES) {
+            if (lower.contains("table_info(" + table) || lower.contains("table_info('" + table + "')")) return true;
+        }
+        return false;
+    }
+
+    /** A follow-up such as {@code last_insert_rowid()} must stay on the connection that wrote. */
+    private static boolean followUp(String sql) {
+        return sql != null && sql.toLowerCase(Locale.ROOT).contains("last_insert_rowid");
+    }
+
     enum SqlKind { RUN_STATE, MIXED, OTHER, NONE }
 
     static SqlKind classify(String sql) {
@@ -411,8 +397,8 @@ public final class DoltSql {
         final List<Statement> extras = new ArrayList<>();
         boolean closed;
         boolean lastOnMain;
-        DoltSession mainSession;
         Connection main;
+        DoltConnections.Pool mainPool;
 
         Router(DoltSession session) {
             this.session = session;
@@ -421,29 +407,26 @@ public final class DoltSql {
 
         Routed route(String original) throws SQLException {
             String translated = translateBody(original);
-            if (session.binding().primary()) {
-                lastOnMain = false;
-                return new Routed(delegate, translated);
-            }
             SqlKind kind = classify(translated);
-            if (kind == SqlKind.RUN_STATE || (kind == SqlKind.NONE && lastOnMain)) {
-                Connection mainConnection = main();
+            if (kind == SqlKind.RUN_STATE || runStatePragma(translated)
+                    || (kind == SqlKind.NONE && lastOnMain && followUp(translated))) {
+                Connection runState = main();
                 lastOnMain = true;
-                return new Routed(mainConnection, translated);
+                return new Routed(runState, translated);
             }
             lastOnMain = false;
-            if (kind == SqlKind.MIXED) return new Routed(delegate, qualifyRunState(translated));
             return new Routed(delegate, translated);
         }
 
         Connection main() throws SQLException {
             if (main != null) return main;
             try {
-                mainSession = DoltConnections.borrow(session.project(), Binding.main());
+                DoltConnections.Borrowed borrowed = DoltConnections.borrowRunState(session.project());
+                main = borrowed.connection();
+                mainPool = borrowed.pool();
             } catch (java.io.IOException failure) {
-                throw new SQLException(failure.getMessage() == null ? "Dolt server did not start" : failure.getMessage(), failure);
+                throw new SQLException(failure.getMessage() == null ? "run-state database did not open" : failure.getMessage(), failure);
             }
-            main = mainSession.connection();
             if (!delegate.getAutoCommit()) main.setAutoCommit(false);
             return main;
         }
@@ -464,8 +447,8 @@ public final class DoltSql {
                 } catch (SQLException ignored) {
                     // The pool replaces a connection that will not reset.
                 }
+                if (mainPool != null) DoltConnections.giveBack(mainPool, main);
             }
-            if (mainSession != null) mainSession.close();
             session.close();
         }
     }

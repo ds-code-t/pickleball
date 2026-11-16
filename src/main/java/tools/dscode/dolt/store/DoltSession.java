@@ -24,6 +24,8 @@ public final class DoltSession implements AutoCloseable {
     private final Binding binding;
     private final Connection connection;
     private final DoltConnections.Pool pool;
+    private Connection runState;
+    private DoltConnections.Pool runPool;
     private boolean closed;
     private boolean inTransaction;
 
@@ -52,7 +54,8 @@ public final class DoltSession implements AutoCloseable {
 
     public void script(String sql) throws SQLException {
         long started = System.nanoTime();
-        try (Statement statement = connection.createStatement()) {
+        Connection target = pick(sql);
+        try (Statement statement = target.createStatement()) {
             drain(statement, statement.execute(sql));
         } finally {
             log(sql, started);
@@ -62,7 +65,7 @@ public final class DoltSession implements AutoCloseable {
     /** Bound stored-procedure call. Arguments are parameters, never concatenated SQL. */
     public void call(String sql, Object... args) throws SQLException {
         long started = System.nanoTime();
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+        try (PreparedStatement statement = pick(sql).prepareStatement(sql)) {
             bind(statement, args);
             drain(statement, statement.execute());
         } finally {
@@ -81,7 +84,7 @@ public final class DoltSession implements AutoCloseable {
         long[] id = new long[1];
         DoltDialect.SqlTask task = () -> {
             long started = System.nanoTime();
-            try (PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            try (PreparedStatement statement = pick(sql).prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
                 bind(statement, args);
                 statement.executeUpdate();
                 try (ResultSet keys = statement.getGeneratedKeys()) {
@@ -104,7 +107,7 @@ public final class DoltSession implements AutoCloseable {
 
     public List<String> column(String sql, Object... args) throws SQLException {
         long started = System.nanoTime();
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+        try (PreparedStatement statement = pick(sql).prepareStatement(sql)) {
             bind(statement, args);
             try (ResultSet rows = statement.executeQuery()) {
                 List<String> values = new ArrayList<>();
@@ -117,18 +120,21 @@ public final class DoltSession implements AutoCloseable {
     }
 
     public void transaction(String table, DoltDialect.SqlTask work) throws SQLException {
-        // Dolt commits by merging. Two transactions that store the same cell value both succeed,
-        // so SELECT FOR UPDATE does not keep a read-modify-write. One lock per branch and table does.
-        String lock = writeLock(binding.branch(), table);
         DoltDialect.retry(table, () -> {
-            String got = scalar("SELECT GET_LOCK(?, 30)", lock);
-            if (!"1".equals(got)) throw new SQLException("error: could not lock " + table);
             inTransaction = true;
+            Connection run = runState();
             connection.setAutoCommit(false);
+            run.setAutoCommit(false);
             try {
                 work.run();
+                run.commit();
                 connection.commit();
             } catch (SQLException failure) {
+                try {
+                    run.rollback();
+                } catch (SQLException ignored) {
+                    // The original failure is the one the caller needs.
+                }
                 try {
                     connection.rollback();
                 } catch (SQLException ignored) {
@@ -138,14 +144,14 @@ public final class DoltSession implements AutoCloseable {
             } finally {
                 inTransaction = false;
                 try {
-                    connection.setAutoCommit(true);
+                    run.setAutoCommit(true);
                 } catch (SQLException ignored) {
                     // The commit or rollback already finished.
                 }
                 try {
-                    scalar("SELECT RELEASE_LOCK(?)", lock);
+                    connection.setAutoCommit(true);
                 } catch (SQLException ignored) {
-                    // Closing the connection releases a leftover lock.
+                    // The commit or rollback already finished.
                 }
             }
         });
@@ -155,12 +161,32 @@ public final class DoltSession implements AutoCloseable {
     public void close() {
         if (closed) return;
         closed = true;
+        if (runState != null) DoltConnections.giveBack(runPool, runState);
         DoltConnections.giveBack(pool, connection);
+    }
+
+    private Connection pick(String sql) throws SQLException {
+        if (DoltSql.classify(sql) == DoltSql.SqlKind.RUN_STATE || DoltSql.runStatePragma(sql)) {
+            return runState();
+        }
+        return connection;
+    }
+
+    private Connection runState() throws SQLException {
+        if (runState != null) return runState;
+        try {
+            DoltConnections.Borrowed borrowed = DoltConnections.borrowRunState(project);
+            runState = borrowed.connection();
+            runPool = borrowed.pool();
+            return runState;
+        } catch (java.io.IOException failure) {
+            throw new SQLException(failure.getMessage() == null ? "run-state database did not open" : failure.getMessage(), failure);
+        }
     }
 
     private int updateOnce(String sql, Object... args) throws SQLException {
         long started = System.nanoTime();
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+        try (PreparedStatement statement = pick(sql).prepareStatement(sql)) {
             bind(statement, args);
             return statement.executeUpdate();
         } finally {

@@ -27,17 +27,24 @@ class DoltDialectInventoryTest {
         String upper = joined.toUpperCase();
         for (String sql : all) {
             assertFalse(sql.contains("||"), sql);
-            assertFalse(sql.toUpperCase().contains("PRAGMA"), sql);
+            String shape = sql.toUpperCase();
+            assertFalse(shape.contains("ON DUPLICATE"), sql);
+            assertFalse(shape.contains("INSERT IGNORE"), sql);
+            assertFalse(shape.contains("INFORMATION_SCHEMA"), sql);
+            assertFalse(shape.contains("LONGBLOB"), sql);
+            assertFalse(shape.contains("AUTO_INCREMENT"), sql);
+            assertFalse(shape.contains("AS SIGNED"), sql);
+            assertFalse(shape.contains("AS CHAR"), sql);
         }
         assertTrue(upper.contains("CONCAT("), "CONCAT");
-        assertTrue(upper.contains("AS SIGNED"), "CAST AS SIGNED");
-        assertTrue(upper.contains("ON DUPLICATE KEY UPDATE"), "upsert");
-        assertTrue(upper.contains("INSERT IGNORE"), "insert ignore");
-        assertTrue(upper.contains("INFORMATION_SCHEMA.COLUMNS"), "columns");
-        assertTrue(upper.contains("LONGBLOB"), "longblob");
-        assertTrue(upper.contains("AUTO_INCREMENT"), "auto increment");
+        assertTrue(upper.contains("AS INTEGER"), "CAST AS INTEGER");
+        assertTrue(upper.contains("ON CONFLICT"), "upsert");
+        assertTrue(upper.contains("INSERT OR IGNORE"), "insert or ignore");
+        assertTrue(upper.contains("PRAGMA_TABLE_INFO"), "columns");
+        assertTrue(upper.contains("BLOB"), "blob");
+        assertTrue(upper.contains("AUTOINCREMENT"), "autoincrement");
         assertEquals(12, DoltDialect.TRANSACTIONS.size());
-        assertTrue(Files.readString(Path.of("src/main/java/tools/dscode/dolt/store/DoltDialect.java")).contains("dolt_schema"));
+        assertTrue(Files.readString(Path.of("src/main/java/tools/dscode/dolt/store/DoltDialect.java")).contains("store_schema"));
 
         Path root = Path.of("src/main/java/tools/dscode/dolt");
         assertTrue(Files.isDirectory(root), root.toAbsolutePath().toString());

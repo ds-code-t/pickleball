@@ -30,12 +30,12 @@ class DoltFoundationTest {
         assertTrue(DoltDatabase.driverPresent());
         try (DoltDatabase database = DoltDatabase.open(project)) {
             assertEquals(1, database.schemaVersion());
-            assertEquals("dolt", database.pragma("journal_mode"));
-            assertEquals("0", database.pragma("busy_timeout"));
+            assertEquals("wal", database.pragma("journal_mode"));
+            assertEquals("5000", database.pragma("busy_timeout"));
             assertEquals(Set.of(
                     "path", "content_hash", "raw_content", "mtime", "source_type",
                     "last_hydrated_at", "last_synced_hash", "db_edited",
-                    "git_blob", "binary_ref", "byte_size"
+                    "git_blob", "binary_ref", "byte_size", "location", "git_commit"
             ), columns(database, "files"));
             assertTrue(columns(database, "schema_meta").contains("key"));
             assertTrue(columns(database, "provenance").contains("schema_version"));
@@ -78,7 +78,7 @@ class DoltFoundationTest {
         try (DoltDatabase database = DoltDatabase.open(project);
              Statement statement = database.connection().createStatement()) {
             assertEquals(1, database.schemaVersion());
-            statement.execute("UPDATE schema_meta SET value = '99' WHERE `key` = 'dolt_schema'");
+            statement.execute("UPDATE schema_meta SET value = '99' WHERE `key` = 'store_schema'");
         }
         SQLException failure = assertThrows(SQLException.class, () -> DoltDatabase.open(project));
         assertTrue(failure.getMessage().contains("newer"), failure.getMessage());
@@ -99,7 +99,7 @@ class DoltFoundationTest {
     void statusOnMissingDatabaseDoesNotCreateOne() {
         Capture capture = run("dolt", "status", "--project=" + project);
         assertEquals(0, capture.code, capture.err);
-        assertTrue(capture.out.contains("Dolt database missing: .pickleball/dolt/data"), capture.out);
+        assertTrue(capture.out.contains("Dolt database missing: .pickleball/dolt/main.db"), capture.out);
         assertFalse(Files.exists(DoltPaths.database(project)));
         assertFalse(Files.exists(DoltPaths.root(project)));
     }

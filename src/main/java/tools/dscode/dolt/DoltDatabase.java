@@ -1,12 +1,11 @@
 package tools.dscode.dolt;
 
-import tools.dscode.dolt.server.DoltServer;
 import tools.dscode.dolt.store.Binding;
 import tools.dscode.dolt.store.DoltConnections;
 import tools.dscode.dolt.store.DoltDialect;
-import tools.dscode.dolt.store.DoltJdbc;
 import tools.dscode.dolt.store.DoltSession;
 import tools.dscode.dolt.store.DoltSql;
+import tools.dscode.dolt.store.SqliteOpen;
 
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -15,12 +14,12 @@ import java.sql.SQLException;
 import java.sql.Statement;
 
 /**
- * Dolt working copy for the Dolt layer. The connection is a pooled MariaDB
- * session on branch {@code main}. SQLite is not opened here.
+ * Embedded SQLite working copy. The connection is a pooled session on one
+ * database file. Opening it starts no process and opens no socket.
  */
 public final class DoltDatabase implements AutoCloseable {
     public static final int SCHEMA_VERSION = 1;
-    public static final String MISSING_DRIVER = DoltJdbc.MISSING_DRIVER;
+    public static final String MISSING_DRIVER = SqliteOpen.MISSING_DRIVER;
 
     private final Connection connection;
     private final Path project;
@@ -31,7 +30,7 @@ public final class DoltDatabase implements AutoCloseable {
     }
 
     public static boolean driverPresent() {
-        return DoltJdbc.driverPresent();
+        return SqliteOpen.driverPresent();
     }
 
     public static DoltDatabase open(Path project) throws SQLException {
@@ -43,27 +42,20 @@ public final class DoltDatabase implements AutoCloseable {
         Binding chosen = binding == null ? Binding.main() : binding;
         try {
             DoltMigrate.auto(project);
-            DoltServer.retain(project);
             try (DoltSession schema = DoltConnections.borrow(project, Binding.main())) {
                 DoltDialect.ensureSchema(schema);
-                if (!chosen.primary()) {
-                    String name = schema.scalar("SELECT name FROM sandboxes WHERE name = ?", chosen.name());
-                    if (name == null) {
-                        throw new SQLException("unknown sandbox " + chosen.name()
-                                + "\nfix: dolt sandbox create " + chosen.name());
-                    }
-                    schema.update(
-                            "UPDATE sandboxes SET last_used = ? WHERE name = ?",
-                            java.time.Instant.now().toString(),
-                            chosen.name());
+                if (!chosen.primary() && !java.nio.file.Files.isRegularFile(
+                        DoltPaths.sandboxDatabase(project, chosen.name()))) {
+                    throw new SQLException("unknown sandbox " + chosen.name()
+                            + "\nfix: dolt sandbox create " + chosen.name());
                 }
             }
             DoltSession session = DoltConnections.borrow(project, chosen);
             try {
                 if (!chosen.primary()) {
                     String active = session.scalar(DoltDialect.ACTIVE_BRANCH);
-                    if (active != null && !chosen.branch().equals(active)) {
-                        throw new SQLException("connection is on " + active + " not " + chosen.branch());
+                    if (active != null && !chosen.name().equals(active)) {
+                        throw new SQLException("connection is on " + active + " not " + chosen.name());
                     }
                 }
                 return new DoltDatabase(DoltSql.wrap(session), project.toAbsolutePath().normalize());
@@ -72,7 +64,7 @@ public final class DoltDatabase implements AutoCloseable {
                 throw failure;
             }
         } catch (java.io.IOException failure) {
-            throw new SQLException(failure.getMessage() == null ? "Dolt server did not start" : failure.getMessage(), failure);
+            throw new SQLException(failure.getMessage() == null ? "store did not open" : failure.getMessage(), failure);
         }
     }
 
@@ -87,7 +79,7 @@ public final class DoltDatabase implements AutoCloseable {
     public int schemaVersion() throws SQLException {
         try (Statement statement = connection.createStatement();
              ResultSet rows = statement.executeQuery(
-                     "SELECT value FROM schema_meta WHERE `key` = 'dolt_schema'")) {
+                     "SELECT value FROM schema_meta WHERE `key` = 'store_schema'")) {
             if (!rows.next() || rows.getString(1) == null) return 0;
             return Integer.parseInt(rows.getString(1).trim());
         }
@@ -103,7 +95,7 @@ public final class DoltDatabase implements AutoCloseable {
                 "SELECT note FROM runs",
                 "SELECT message FROM run_logs",
                 "SELECT value_ref FROM entity_usages",
-                "SELECT CAST(raw_content AS CHAR) FROM files"
+                "SELECT CAST(raw_content AS TEXT) FROM files"
         };
         try (DoltDatabase database = open(project);
              Statement statement = database.connection().createStatement()) {

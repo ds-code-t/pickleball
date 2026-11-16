@@ -150,7 +150,8 @@ class DoltSchemaUpgradeTest {
     private static boolean exists(DoltDatabase database, String table) throws SQLException {
         try (var statement = database.connection().createStatement();
              ResultSet rows = statement.executeQuery(
-                     "SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = '"
+                     "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = '"
+                             + table + "' UNION ALL SELECT 1 FROM rs.sqlite_master WHERE type = 'table' AND name = '"
                              + table + "'")) {
             return rows.next();
         }
