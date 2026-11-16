@@ -193,7 +193,7 @@ Platform and transport:
 | Host | `platform` | Live `transport` | Tree |
 |---|---|---|---|
 | Windows | `windows-uia` | `uia` | `WindowsUia.capture`. States `disabled`, `focused`, `offscreen`, `checked` (Toggle On), `expanded`. `LabeledBy` is `labeled-by` plus the label runtime id |
-| macOS | `macos-ax` | `ax` | `MacAccessibility.capture`. States from AXEnabled, AXFocused, AXValue on checkboxes and radios, AXExpanded, and AXOffScreen. `AXTitleUIElement` is resolved to a sibling `ax-path` and stored as `labeled-by` |
+| macOS | `macos-ax` | `ax` | `MacAccessibility.capture`. States from AXEnabled, AXFocused, AXValue on checkboxes and radios, AXExpanded, and AXOffScreen. `AXTitleUIElement` is resolved to a sibling `ax-path` and stored as `labeled-by`. The walk covers foreground apps (`background only` false), does not walk the items of a closed menu (a menu with no size), stops after 250 nodes (`walk-truncated`), and has a 60 second bound. Only a permission denial reports `AX unavailable`; any other osascript error reports `AX capture failed` |
 | Linux | `linux-atspi` | `atspi` | `AtSpi.capture`. `GetState` bits: enabled absent is `disabled`, checked, expanded, focused, and showing+visible both clear is `offscreen` (`displayed` false, reported as `hidden` because the schema state list has no `offscreen`). `GetRelationSet` types label-for and labelled-by |
 
 A fixture's platform follows `os.name` and its transport is `fixture`.
@@ -201,7 +201,7 @@ A fixture's platform follows `os.name` and its transport is `fixture`.
 Screenshot tools, in order:
 
 - Windows: PowerShell `System.Drawing.CopyFromScreen` after `SetProcessDPIAware`, so pixels match UIA physical coordinates.
-- macOS: `screencapture -x -R x,y,w,h -t png -`. `image_scale` is image pixels divided by AX points (2.0 on Retina). A black or empty PNG, or a `could not` / `permission` error, is `error: screen recording permission denied` with a `fix:` line. It does not fall through to Robot.
+- macOS: `screencapture -x -R x,y,w,h -t png <temp file>`, then the file is read and deleted (screencapture has no stdout mode). `image_scale` is image pixels divided by AX points (2.0 on Retina). A black or empty PNG, or a `could not` / `permission` error, is `error: screen recording permission denied` with a `fix:` line. It does not fall through to Robot.
 - Linux Wayland (`XDG_SESSION_TYPE=wayland` or `WAYLAND_DISPLAY`): `grim -g "x,y wxh" -`.
 - Linux X11: ImageMagick `import -window root -crop WxH+X+Y png:-`, then `xwd -root -silent` parsed in Java.
 
@@ -209,4 +209,4 @@ Screenshot tools, in order:
 
 When the native tool is missing and a display exists (`DISPLAY`, `WAYLAND_DISPLAY`, or Windows or macOS), the fallback is `java.awt.Robot` in a child JVM (`DesktopScreenshot robot x y width height`). That logs one WARN per run and reason: `desktop-shot fallback robot reason=native-tool-missing`. With no display and no tool the error is `error: desktop screenshot failed` and the `fix:` names grim, ImageMagick `import`, or `xwd`. A snapshot is not returned without a screenshot. Every capture subprocess has a 10 second timeout and its process tree is killed on timeout.
 
-The Windows live UIA step in `.github/workflows/agent-contract.yml` runs `SnapshotCoverageTest.liveDesktopWhenThePlatformExists` on `windows-latest`. The Linux job installs `at-spi2-core`, `xvfb`, and `imagemagick` and runs the desktop live snapshot under `xvfb-run`, then runs the Edge and Firefox live snapshot tests. macOS has no CI runner. `SnapshotCoverageTest` still emits a `macos-ax` fixture snapshot on every host. On a host with no display the live desktop test skips. A missing `microsoft-edge` or `firefox` binary skips that live test and does not fail the fixture matrix.
+The Windows live UIA step in `.github/workflows/agent-contract.yml` runs `SnapshotCoverageTest.liveDesktopWhenThePlatformExists` on `windows-latest`. The Linux job installs `at-spi2-core`, `xvfb`, and `imagemagick` and runs the desktop live snapshot under `xvfb-run`, then runs the Edge and Firefox live snapshot tests. The `macos` job runs `MacAccessibilityScriptTest`, which compiles every generated AppleScript with `osacompile`, and the live desktop snapshot, and fails if either skips. `SnapshotCoverageTest` still emits a `macos-ax` fixture snapshot on every host. On a host with no display the live desktop test skips. A missing `microsoft-edge` or `firefox` binary skips that live test and does not fail the fixture matrix.

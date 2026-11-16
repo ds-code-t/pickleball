@@ -782,6 +782,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentsurface/PopupLogTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/PopupOnTopTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/PopupRemovalKindTest.java`
+- `src/test/java/tools/dscode/common/agentsurface/PopupSandboxFallbackTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/PopupSurfaceParityTest.java`
 - `src/test/java/tools/dscode/common/assertions/AssertionClauseSplitterTest.java`
 - `src/test/java/tools/dscode/common/assertions/MultilineAssertFeatureTest.java`
@@ -1453,6 +1454,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/desktop/DesktopSnapshotTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/LiveDesktopSnapshotTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/LiveDesktopTest.java`
+- `dom-engine/src/test/java/dev/domengine/desktop/MacAccessibilityScriptTest.java`
 - `dom-engine/src/test/java/dev/domengine/DocumentWalkFixtureTest.java`
 - `dom-engine/src/test/java/dev/domengine/EngineLogTest.java`
 - `dom-engine/src/test/java/dev/domengine/FakeCdp.java`

@@ -47,8 +47,15 @@ public final class PopupHost {
         Path log = PopupLog.popupDir(project, runId).resolve("host.out");
         if (log.getParent() != null) Files.createDirectories(log.getParent());
         ProcessBuilder builder = new ProcessBuilder(command);
-        builder.redirectOutput(log.toFile());
-        builder.redirectError(ProcessBuilder.Redirect.appendTo(log.toFile()));
+        if (windows()) {
+            // Windows children inherit every inheritable handle. The host opens host.out itself
+            // (not inheritable) so the browser cannot keep it locked after close.
+            builder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
+            builder.redirectError(ProcessBuilder.Redirect.DISCARD);
+        } else {
+            builder.redirectOutput(log.toFile());
+            builder.redirectError(ProcessBuilder.Redirect.appendTo(log.toFile()));
+        }
         builder.redirectInput(ProcessBuilder.Redirect.PIPE);
         Process process = builder.start();
         process.getOutputStream().close();
@@ -80,7 +87,7 @@ public final class PopupHost {
         long deadline = System.nanoTime() + bound.toNanos();
         Path profile = PopupLog.popupDir(project, runId).resolve("profile");
         while (true) {
-            if (quiet(project, runId, profile)) return true;
+            if (quiet(project, runId, profile)) return released(project, runId, deadline);
             long now = System.nanoTime();
             if (now >= deadline) break;
             if (deadline - now < Duration.ofSeconds(2).toNanos()) stopHolders(project, runId, profile);
@@ -88,7 +95,40 @@ public final class PopupHost {
         }
         stopHolders(project, runId, profile);
         deleteTree(profile);
-        return quiet(project, runId, profile);
+        return quiet(project, runId, profile) && released(project, runId, System.nanoTime() + Duration.ofSeconds(2).toNanos());
+    }
+
+    /**
+     * On Windows a process that exited can hold its files for a moment. Waits, up to the deadline,
+     * until {@code host.out} and {@code browser.out} can be renamed. Other platforms return true.
+     */
+    private static boolean released(Path project, String runId, long deadline) throws InterruptedException {
+        if (!windows()) return true;
+        Path dir = PopupLog.popupDir(project, runId);
+        java.util.List<Path> files = java.util.List.of(dir.resolve("host.out"), dir.resolve("browser.out"));
+        while (true) {
+            boolean free = true;
+            for (Path file : files) free &= renameable(file);
+            if (free) return true;
+            if (System.nanoTime() >= deadline) return false;
+            Thread.sleep(50);
+        }
+    }
+
+    private static boolean renameable(Path file) {
+        if (!Files.exists(file)) return true;
+        Path aside = file.resolveSibling(file.getFileName() + ".release-check");
+        try {
+            Files.move(file, aside);
+            Files.move(aside, file);
+            return true;
+        } catch (Exception held) {
+            return false;
+        }
+    }
+
+    static boolean windows() {
+        return System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win");
     }
 
     private static boolean closed(Path project, String runId) throws Exception {
@@ -102,8 +142,11 @@ public final class PopupHost {
         Map<String, Object> status = PopupStatus.read(project, runId);
         boolean pidsGone = !alive(status.get("pid")) && !alive(status.get("browserPid"));
         if (pidsGone) deleteTree(profile);
-        if (!Files.exists(profile) && (pidsGone || loggedExit(project, runId))) return true;
-        return false;
+        if (Files.exists(profile)) return false;
+        // The host logs "exit" before its JVM ends, and that JVM still holds host.out. The log line
+        // counts only when the status has no host pid to watch.
+        if (status.get("pid") instanceof Number) return pidsGone;
+        return pidsGone || loggedExit(project, runId);
     }
 
     private static boolean loggedExit(Path project, String runId) {
@@ -122,7 +165,28 @@ public final class PopupHost {
     private static boolean alive(Object value) {
         if (!(value instanceof Number number)) return false;
         long id = number.longValue();
-        return id > 0 && ProcessHandle.of(id).isPresent();
+        if (id <= 0) return false;
+        var handle = ProcessHandle.of(id);
+        if (handle.isEmpty() || !handle.get().isAlive()) return false;
+        // A zombie this JVM started is about to be reaped by its own process reaper; wait for that.
+        // A zombie whose parent is another process (an orphan the init process has not reaped yet)
+        // never leaves on our account, so it counts as gone.
+        if (!zombie(id)) return true;
+        long self = ProcessHandle.current().pid();
+        return handle.get().parent().map(parent -> parent.pid() == self).orElse(false);
+    }
+
+    /** A Linux zombie has exited and only waits to be reaped. It holds no files and cannot be killed. */
+    static boolean zombie(long pid) {
+        Path stat = Path.of("/proc", Long.toString(pid), "stat");
+        if (!Files.isRegularFile(stat)) return false;
+        try {
+            String text = Files.readString(stat);
+            int close = text.lastIndexOf(')');
+            return close > 0 && close + 2 < text.length() && text.charAt(close + 2) == 'Z';
+        } catch (Exception failure) {
+            return false;
+        }
     }
 
     private static void stopHolders(Path project, String runId, Path profile) {

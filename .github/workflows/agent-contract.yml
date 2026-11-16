@@ -67,18 +67,19 @@ jobs:
             --tests tools.dscode.dolt.DoltSandboxPruneTest \
             --tests tools.dscode.dolt.DoltSandboxHardenTest
 
-      - name: Agent surface popup live (real Chromium, non-blocking; open close defect, see tech-debt)
-        continue-on-error: true
+      - name: Agent surface popup live (real Chromium, must not skip)
         shell: bash
         run: |
           set -euo pipefail
-          ./gradlew --no-daemon :test --tests tools.dscode.common.agentsurface.live.AgentSurfacePopupLiveTest
+          ./gradlew --no-daemon :test \
+            --tests tools.dscode.common.agentsurface.live.AgentSurfacePopupLiveTest
           report=build/test-results/test/TEST-tools.dscode.common.agentsurface.live.AgentSurfacePopupLiveTest.xml
           if grep -q '<skipped' "$report"; then
             echo "AgentSurfacePopupLiveTest skipped on ${RUNNER_OS}:"
             grep -A2 '<skipped' "$report" || true
             exit 1
           fi
+          grep -o 'popup warnings: [^<]*' "$report" | head -1 | sed "s/^/${RUNNER_OS} /" | tee -a "$GITHUB_STEP_SUMMARY" || true
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -178,26 +179,47 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ./gradlew --no-daemon :test --tests tools.dscode.common.agentsurface.live.AgentSurfacePopupLiveTest
+          ./gradlew --no-daemon :test \
+            --tests tools.dscode.common.agentsurface.live.AgentSurfacePopupLiveTest \
+            --tests tools.dscode.common.agentsurface.PopupHostCloseTest \
+            --tests tools.dscode.common.agentsurface.PopupSandboxFallbackTest
           report=build/test-results/test/TEST-tools.dscode.common.agentsurface.live.AgentSurfacePopupLiveTest.xml
           if grep -q '<skipped' "$report"; then
             echo "AgentSurfacePopupLiveTest skipped on ${RUNNER_OS}:"
             grep -A2 '<skipped' "$report" || true
             exit 1
           fi
+          grep -o 'popup warnings: [^<]*' "$report" | head -1 | sed "s/^/${RUNNER_OS} /" | tee -a "$GITHUB_STEP_SUMMARY" || true
 
-      - name: macOS desktop live snapshot
+      - name: macOS Accessibility probe (timing only)
+        if: always()
+        run: |
+          start=$(date +%s)
+          osascript -e 'tell application "System Events" to count (processes whose background only is false)' 2>&1 || true
+          echo "processes probe: $(( $(date +%s) - start )) s"
+          start=$(date +%s)
+          osascript -e 'tell application "System Events" to count UI elements of (first process whose frontmost is true)' 2>&1 || true
+          echo "front app UI elements probe: $(( $(date +%s) - start )) s"
+          start=$(date +%s)
+          osascript -e 'tell application "System Events" to tell (first process whose frontmost is true) to get {name, role of every UI element, size of every UI element}' 2>&1 || true
+          echo "front app roles probe: $(( $(date +%s) - start )) s"
+
+      - name: macOS desktop live snapshot (must not skip)
         if: always()
         run: |
           set -euo pipefail
-          ./gradlew --no-daemon :dom-engine:test --tests dev.domengine.snapshot.SnapshotCoverageTest.liveDesktopWhenThePlatformExists
-          report=dom-engine/build/test-results/test/TEST-dev.domengine.snapshot.SnapshotCoverageTest.xml
-          if grep -q '<skipped' "$report"; then
-            reason="$(grep -o '<skipped[^>]*' "$report" | head -1)"
-            echo "macOS desktop live snapshot skipped (hosted runners cannot grant Accessibility): ${reason}" | tee -a "$GITHUB_STEP_SUMMARY"
-          else
-            echo "macOS desktop live snapshot ran (macos-ax)" | tee -a "$GITHUB_STEP_SUMMARY"
-          fi
+          ./gradlew --no-daemon :dom-engine:test \
+            --tests dev.domengine.desktop.MacAccessibilityScriptTest \
+            --tests dev.domengine.snapshot.SnapshotCoverageTest.liveDesktopWhenThePlatformExists
+          for report in dom-engine/build/test-results/test/TEST-dev.domengine.desktop.MacAccessibilityScriptTest.xml \
+                        dom-engine/build/test-results/test/TEST-dev.domengine.snapshot.SnapshotCoverageTest.xml; do
+            if grep -q '<skipped' "$report"; then
+              echo "macOS desktop live snapshot must run, but a test skipped in ${report}:" | tee -a "$GITHUB_STEP_SUMMARY"
+              grep -A2 '<skipped' "$report" | tee -a "$GITHUB_STEP_SUMMARY" || true
+              exit 1
+            fi
+          done
+          echo "macOS desktop live snapshot ran (macos-ax); generated AppleScript compiles with osacompile" | tee -a "$GITHUB_STEP_SUMMARY"
 
   dom-engine-live:
     name: Java DOM live Chrome
@@ -321,18 +343,21 @@ jobs:
       - name: Java engine adapter live tests
         run: ./gradlew --no-daemon :test --tests tools.dscode.common.composite.live.*
 
-      - name: Agent surface popup live (real Chromium, non-blocking; open close defect, see tech-debt)
-        continue-on-error: true
+      - name: Agent surface popup live (real Chromium, must not skip)
         shell: bash
         run: |
           set -euo pipefail
-          ./gradlew --no-daemon :test --tests tools.dscode.common.agentsurface.live.AgentSurfacePopupLiveTest
+          ./gradlew --no-daemon :test \
+            --tests tools.dscode.common.agentsurface.live.AgentSurfacePopupLiveTest \
+            --tests tools.dscode.common.agentsurface.PopupHostCloseTest \
+            --tests tools.dscode.common.agentsurface.PopupSandboxFallbackTest
           report=build/test-results/test/TEST-tools.dscode.common.agentsurface.live.AgentSurfacePopupLiveTest.xml
           if grep -q '<skipped' "$report"; then
             echo "AgentSurfacePopupLiveTest skipped on ${RUNNER_OS}:"
             grep -A2 '<skipped' "$report" || true
             exit 1
           fi
+          grep -o 'popup warnings: [^<]*' "$report" | head -1 | sed "s/^/${RUNNER_OS} /" | tee -a "$GITHUB_STEP_SUMMARY" || true
 
       - name: Consumer @dom-composite on native and cucumber
         env:

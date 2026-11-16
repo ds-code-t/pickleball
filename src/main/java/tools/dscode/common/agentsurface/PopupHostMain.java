@@ -13,6 +13,7 @@ import java.util.Optional;
 /** Out-of-process popup host. One process per project and run id. */
 public final class PopupHostMain {
     private static final ObjectMapper JSON = new ObjectMapper();
+    static final long SANDBOX_RETRY_WINDOW_MS = 15_000;
 
     private PopupHostMain() {
     }
@@ -28,8 +29,35 @@ public final class PopupHostMain {
             else if (arg.startsWith("--owner-kind=")) ownerKind = arg.substring("--owner-kind=".length());
             else if (arg.startsWith("--owner-pid=")) ownerPid = Long.parseLong(arg.substring("--owner-pid=".length()));
         }
-        int code = serve(project, runId, ownerKind, ownerPid);
+        redirectOwnOutput(PopupLog.popupDir(project, runId).resolve("host.out"));
+        int code;
+        try {
+            code = serve(project, runId, ownerKind, ownerPid);
+        } catch (Throwable failure) {
+            failure.printStackTrace();
+            code = 1;
+        }
+        System.out.flush();
+        System.err.flush();
         if (code != 0) System.exit(code);
+    }
+
+    /**
+     * On Windows {@link PopupHost#open} gives the host no output file, and the host opens
+     * {@code host.out} itself. A handle the JVM opens is not inheritable, so the browser and its
+     * children cannot keep {@code host.out} locked after the host exits.
+     */
+    private static void redirectOwnOutput(Path hostOut) {
+        if (!PopupHost.windows()) return;
+        try {
+            Files.createDirectories(hostOut.getParent());
+            java.io.PrintStream stream = new java.io.PrintStream(
+                    new java.io.FileOutputStream(hostOut.toFile(), true), true, java.nio.charset.StandardCharsets.UTF_8);
+            System.setOut(stream);
+            System.setErr(stream);
+        } catch (Exception ignored) {
+            // Output stays discarded. The popup log still records the lifecycle.
+        }
     }
 
     public static int serve(Path project, String runId, String ownerKind, long ownerPid) throws Exception {
@@ -47,6 +75,8 @@ public final class PopupHostMain {
         Process browser = null;
         try {
             int[] origin = PopupConfig.origin(PopupConfig.width(), PopupConfig.height());
+            boolean noSandbox = PopupConfig.noSandbox();
+            Path browserOut = PopupHost.windows() ? null : dir.resolve("browser.out");
             List<String> argv = PopupLauncher.argv(
                     located.path().get(),
                     bridge.baseUrl(),
@@ -55,8 +85,10 @@ public final class PopupHostMain {
                     PopupConfig.height(),
                     origin[0],
                     origin[1],
-                    PopupConfig.headless());
-            browser = PopupLauncher.start(argv, dir.resolve("host.out"));
+                    PopupConfig.headless(),
+                    noSandbox);
+            browser = PopupLauncher.start(argv, browserOut);
+            long launchedAt = System.currentTimeMillis();
             PopupOnTop.Attempt onTop = PopupConfig.onTop()
                     ? PopupOnTop.apply(browser.pid())
                     : new PopupOnTop.Attempt(false, "off", "pkb_agent_popup_on_top=false", List.of());
@@ -68,6 +100,23 @@ public final class PopupHostMain {
             long seen = 0;
             while (true) {
                 Thread.sleep(200);
+                if (!browser.isAlive() && !noSandbox && System.currentTimeMillis() - launchedAt < SANDBOX_RETRY_WINDOW_MS
+                        && PopupLauncher.sandboxFailure(browserOut)) {
+                    // Chrome for Testing and other unpackaged builds exit at once when the Linux sandbox
+                    // cannot start. Relaunch once without it so the popup still opens.
+                    PopupLog.warn(project, runId, "sandbox-unavailable",
+                            "browser exited with code " + browser.exitValue() + " because its sandbox could not start; relaunching with --no-sandbox: " + PopupLauncher.sandboxLine(browserOut));
+                    noSandbox = true;
+                    PopupLauncher.destroyTree(browser);
+                    delete(profile);
+                    Files.createDirectories(profile);
+                    argv = PopupLauncher.argv(located.path().get(), bridge.baseUrl(), profile, PopupConfig.width(), PopupConfig.height(),
+                            origin[0], origin[1], PopupConfig.headless(), true);
+                    browser = PopupLauncher.start(argv, browserOut);
+                    launchedAt = System.currentTimeMillis();
+                    write(dir.resolve("host.json"), state(project, runId, ownerKind, ownerPid, bridge.port(), bridge.token(), browser.pid(), "open", false, onTop));
+                    continue;
+                }
                 if (!browser.isAlive()) {
                     write(dir.resolve("host.json"), state(project, runId, ownerKind, ownerPid, bridge.port(), bridge.token(), browser.pid(), "closed-by-user", false, onTop));
                     break;
@@ -81,6 +130,7 @@ public final class PopupHostMain {
                 }
                 if (System.currentTimeMillis() - last >= PopupConfig.idleMillis()) break;
                 cap(dir.resolve("host.out"));
+                if (browserOut != null) cap(browserOut);
             }
         } finally {
             if (browser != null) PopupLauncher.destroyTree(browser);
