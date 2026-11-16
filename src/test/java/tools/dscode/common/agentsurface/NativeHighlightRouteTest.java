@@ -46,4 +46,38 @@ class NativeHighlightRouteTest {
             NativeHighlight.queries = query -> "{}";
         }
     }
+
+    @Test
+    void borderQueryUsesTheSameBoundsAsHighlight() throws Exception {
+        NativeHighlight.queries = query -> "{\"x\":2,\"y\":3,\"width\":44,\"height\":15}";
+        try {
+            var result = AgentSurfaceRouter.route(project, "nat", "border", Map.of(
+                    "target", "native", "query", "role=button"), "a").orElseThrow();
+            assertEquals(44, result.body().get("width"));
+            assertEquals(15, result.body().get("height"));
+            assertEquals("resolved", result.body().get("boundsSource"));
+            assertEquals("native", result.body().get("target"));
+            assertEquals("border", result.body().get("kind"));
+            if (Boolean.FALSE.equals(result.body().get("drawn"))) assertEquals("headless", result.body().get("reason"));
+        } finally {
+            NativeHighlight.queries = query -> "{}";
+        }
+    }
+
+    @Test
+    void arrowNativeUsesRememberedEndpoints() throws Exception {
+        tools.dscode.common.agentcontrol.AgentControl.rememberBounds("from-h", 0, 0, 10, 10);
+        tools.dscode.common.agentcontrol.AgentControl.rememberBounds("to-h", 40, 20, 10, 10);
+        try {
+            var result = AgentSurfaceRouter.route(project, "nat", "arrow", Map.of(
+                    "target", "native", "from", "from-h", "to", "to-h"), "a").orElseThrow();
+            assertEquals("native", result.body().get("target"));
+            assertEquals("resolved", result.body().get("boundsSource"));
+            assertEquals("arrow", result.body().get("kind"));
+            assertTrue(((Number) result.body().get("width")).intValue() > 0);
+        } finally {
+            tools.dscode.common.agentcontrol.AgentControl.clearRememberedGeometry();
+            NativeHighlight.queries = query -> "{}";
+        }
+    }
 }

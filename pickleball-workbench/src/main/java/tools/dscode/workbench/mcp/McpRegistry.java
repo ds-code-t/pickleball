@@ -89,7 +89,7 @@ public final class McpRegistry {
                 "surfaces",
                 "Page-surface operations. With no op, lists them. With op, forwards to AgentControl.",
                 schema(Map.of(
-                        "op", stringProperty("html-write, html-replace, html-insert, html-remove, html-cleanup, overlay, overlay-poll, overlay-remove, highlight, or unhighlight."),
+                        "op", stringProperty("html-write, html-replace, html-insert, html-remove, html-cleanup, overlay, overlay-poll, overlay-remove, highlight, unhighlight, label, unlabel, border, unborder, arrow, unarrow, step-badge, unstep-badge, magnifier, unmagnifier, spotlight, or unspotlight."),
                         "html", stringProperty("Structural HTML for a write, replace, or insert."),
                         "handle", stringProperty("Optional target handle.")
                 )),
@@ -101,7 +101,10 @@ public final class McpRegistry {
                                 "entry", "mcp",
                                 "commands", List.of(
                                         "html-write", "html-replace", "html-insert", "html-remove", "html-cleanup",
-                                        "overlay", "overlay-poll", "overlay-remove", "highlight", "unhighlight"));
+                                        "overlay", "overlay-poll", "overlay-remove", "highlight", "unhighlight",
+                                        "label", "unlabel", "border", "unborder",
+                                        "arrow", "unarrow", "step-badge", "unstep-badge",
+                                        "magnifier", "unmagnifier", "spotlight", "unspotlight"));
                     }
                     Object value = services.agentCommand(String.valueOf(op), strings(arguments));
                     return value == null ? Map.of("status", "UNAVAILABLE", "op", String.valueOf(op)) : value;

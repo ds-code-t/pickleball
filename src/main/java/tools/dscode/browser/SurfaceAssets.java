@@ -15,6 +15,12 @@ public final class SurfaceAssets {
     public static final String HTML_SENTENCE = "agent-injected HTML; a person did not author this node";
     public static final String OVERLAY_SENTENCE = "agent-injected overlay; a person did not author this UI";
     public static final String STYLE_SENTENCE = "agent style; a person did not author this highlight";
+    public static final String LABEL_SENTENCE = "agent-injected label; a person did not author this label";
+    public static final String BORDER_SENTENCE = "agent-injected border; a person did not author this border";
+    public static final String ARROW_SENTENCE = "agent-injected arrow; a person did not author this arrow";
+    public static final String STEP_SENTENCE = "agent-injected step badge; a person did not author this badge";
+    public static final String MAGNIFIER_SENTENCE = "agent-injected magnifier; a person did not author this magnifier";
+    public static final String SPOTLIGHT_SENTENCE = "agent-injected spotlight; a person did not author this dim";
 
     private static final String ROOT = "/tools/dscode/browser/surface/";
     private static final Map<String, String> CACHE = new ConcurrentHashMap<>();
@@ -22,7 +28,7 @@ public final class SurfaceAssets {
     private SurfaceAssets() {
     }
 
-    /** Host markup for {@code html}, {@code overlay}, {@code highlight}, {@code instructions}, or {@code diagram}. */
+    /** Host markup for a surface kind. {@code instructions} and {@code diagram} use the html host. */
     public static String html(String kind) {
         return load(asset(kind, "html"));
     }
@@ -35,6 +41,8 @@ public final class SurfaceAssets {
     /**
      * Script for the same kinds. {@code html}, {@code overlay}, {@code instructions}, and {@code diagram}
      * share the surface event script. {@code highlight} does not install a listener.
+     * {@code label}, {@code border}, {@code arrow}, {@code step}, {@code magnifier}, and {@code spotlight}
+     * share that same event script.
      */
     public static String js(String kind) {
         return load(asset(kind, "js"));
@@ -60,13 +68,19 @@ public final class SurfaceAssets {
             case "html" -> HTML_SENTENCE;
             case "overlay" -> OVERLAY_SENTENCE;
             case "highlight" -> STYLE_SENTENCE;
+            case "label" -> LABEL_SENTENCE;
+            case "border" -> BORDER_SENTENCE;
+            case "arrow" -> ARROW_SENTENCE;
+            case "step" -> STEP_SENTENCE;
+            case "magnifier" -> MAGNIFIER_SENTENCE;
+            case "spotlight" -> SPOTLIGHT_SENTENCE;
             default -> throw unknownKind(kind);
         };
     }
 
     private static String asset(String kind, String extension) {
         String canon = canonical(kind);
-        if ("js".equals(extension) && ("html".equals(canon) || "overlay".equals(canon))) {
+        if ("js".equals(extension) && ("html".equals(canon) || "overlay".equals(canon) || visual(canon))) {
             return "surface-events.js";
         }
         return canon + "." + extension;
@@ -78,7 +92,20 @@ public final class SurfaceAssets {
             case "html", "instructions", "diagram" -> "html";
             case "overlay" -> "overlay";
             case "highlight", "style" -> "highlight";
+            case "label" -> "label";
+            case "border" -> "border";
+            case "arrow" -> "arrow";
+            case "step", "step-badge" -> "step";
+            case "magnifier" -> "magnifier";
+            case "spotlight" -> "spotlight";
             default -> throw unknownKind(kind);
+        };
+    }
+
+    private static boolean visual(String canon) {
+        return switch (canon) {
+            case "label", "border", "arrow", "step", "magnifier", "spotlight" -> true;
+            default -> false;
         };
     }
 
@@ -98,7 +125,7 @@ public final class SurfaceAssets {
     private static IllegalArgumentException unknownKind(String kind) {
         return new IllegalArgumentException(
                 "error: unknown surface kind: " + kind
-                        + "\nfix: Use html, overlay, highlight, instructions, or diagram.");
+                        + "\nfix: Use html, overlay, highlight, label, border, arrow, step, magnifier, spotlight, instructions, or diagram.");
     }
 
     private static IllegalArgumentException unknownScript(String name) {

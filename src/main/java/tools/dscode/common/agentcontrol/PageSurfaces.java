@@ -55,6 +55,7 @@ final class PageSurfaces {
     private static final Map<String, int[]> GEOMETRY = new java.util.concurrent.ConcurrentHashMap<>();
     private static final Map<String, int[]> BOUNDS = new java.util.concurrent.ConcurrentHashMap<>();
     private static final ThreadLocal<int[]> PLACED_SIZE = new ThreadLocal<>();
+    private static final ThreadLocal<Map<String, String>> VISUAL_EXTRA = new ThreadLocal<>();
     private static final java.util.Set<String> CDP_HIGHLIGHTS = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     private record Focus(WebDriver driver, String tab) {
@@ -366,25 +367,31 @@ final class PageSurfaces {
     }
 
     static Map<String, Object> place(Path page, String op, String handle, String where, String rawHtml, String kind, Integer x, Integer y, String geometryJson, Path ledger, Integer width, Integer height) throws IOException {
-        String sentence = "overlay".equals(kind) ? OVERLAY_SENTENCE : HTML_SENTENCE;
+        return place(page, op, handle, where, rawHtml, kind, x, y, geometryJson, ledger, width, height, Map.of());
+    }
+
+    static Map<String, Object> place(Path page, String op, String handle, String where, String rawHtml, String kind, Integer x, Integer y, String geometryJson, Path ledger, Integer width, Integer height, Map<String, String> extras) throws IOException {
+        boolean overlay = "overlay".equals(kind);
+        boolean visual = overlay || VisualKinds.is(kind);
+        String sentence = visual || "html".equals(kind) ? SurfaceAssets.sentence(kind) : HTML_SENTENCE;
         boolean stripped = rawHtml != null && !rawHtml.equals(neutralize(rawHtml));
         String html = labelElements(neutralize(rawHtml), kind, sentence);
-        SurfaceBox.View box = "overlay".equals(kind) ? chooseBox(handle, geometryJson, x, y, width, height) : null;
-        int[] point = "overlay".equals(kind)
+        SurfaceBox.View box = visual ? chooseBox(handle, geometryJson, x, y, width, height) : null;
+        int[] point = visual
                 ? (box == null ? null : new int[]{box.x(), box.y()})
                 : visualPoint(geometryJson, x, y);
         boolean liveOnly = page == null;
         if (liveOnly && managed().isEmpty()) {
             throw new IllegalStateException("no live browser; " + kind + " was not applied");
         }
-        if ("overlay".equals(kind) && liveOnly && handle != null && !handle.isBlank() && !resolved(handle)) {
+        if (visual && liveOnly && handle != null && !handle.isBlank() && !resolved(handle)) {
             throw new IllegalArgumentException("unknown handle: " + handle);
         }
-        if ("overlay".equals(kind) && point == null && page != null) {
-            throw new IllegalArgumentException("overlay needs a visual-viewport box or x and y");
+        if (visual && point == null && page != null) {
+            throw new IllegalArgumentException(kind + " needs a visual-viewport box or x and y");
         }
-        if ("overlay".equals(kind) && point == null && page == null) {
-            throw new IllegalArgumentException("overlay needs a target or a visual-viewport box");
+        if (visual && point == null && page == null) {
+            throw new IllegalArgumentException(kind + " needs a target or a visual-viewport box");
         }
         WebDriver destination = driver;
         String destinationTab = focusedTab == null ? "" : focusedTab;
@@ -396,7 +403,7 @@ final class PageSurfaces {
         String id = allocateId(idStore(page, ledger, destination, destinationTab));
         int left = point == null ? 0 : point[0];
         int top = point == null ? 0 : point[1];
-        String css = overlayCss(kind, point, box);
+        String css = overlay ? overlayCss(kind, point, box) : (visual ? VisualKinds.css(kind, point[0], point[1], box, extras) : "");
         String block = "<!--pkb-start:" + id + "--><div data-pkb-id=\"" + id + "\" data-pkb-agent=\"agent_injected\" data-pkb-kind=\""
                 + kind + "\" data-pkb-sentence=\"" + sentence + "\""
                 + (css.isBlank() ? "" : " style=\"" + css + "\"")
@@ -420,13 +427,17 @@ final class PageSurfaces {
             write(page, updated);
             if (undo != null) rememberUndo(page, id, undo);
         }
-        if (box != null && box.sized()) PLACED_SIZE.set(new int[]{box.width(), box.height()});
+        int[] painted = visual && !overlay ? VisualKinds.paintedSize(kind, box) : null;
+        if (overlay && box != null && box.sized()) PLACED_SIZE.set(new int[]{box.width(), box.height()});
+        else if (painted != null) PLACED_SIZE.set(painted);
         else PLACED_SIZE.remove();
+        VISUAL_EXTRA.set(extras == null ? Map.of() : extras);
         LiveResult live;
         try {
             live = runLive(op, handle, where, css, html, kind, sentence, id, measure, point == null ? null : left, point == null ? null : top);
         } finally {
             PLACED_SIZE.remove();
+            VISUAL_EXTRA.remove();
         }
         if (liveOnly && !live.ok()) {
             throw new IllegalStateException(live.error() == null ? "live " + op + " did not resolve " + handle : live.error());
@@ -435,9 +446,14 @@ final class PageSurfaces {
         String digest = sha(html);
         rememberPlacement(page, ledger, id, digest, summary);
         String sizeNote = box != null && box.sized() ? " width=" + box.width() + " height=" + box.height() + " boundsSource=" + box.source() : "";
-        CompositeLog.info("html".equals(kind) ? "html" : "overlay", op + " id=" + id + " sha=" + digest + " summary=" + summary + sizeNote);
+        String entity = switch (kind) {
+            case "html" -> "html";
+            case "overlay" -> "overlay";
+            default -> VisualKinds.is(kind) ? kind : "html";
+        };
+        CompositeLog.info(entity, op + " id=" + id + " sha=" + digest + " summary=" + summary + sizeNote);
         Map<String, Object> body = labeled(
-                "overlay".equals(kind) ? List.of("agent_injected", "overlay") : List.of("agent_injected"),
+                visual ? List.of("agent_injected", kind) : List.of("agent_injected"),
                 sentence
         );
         body.put("id", id);
@@ -449,7 +465,7 @@ final class PageSurfaces {
         body.put("scriptStripped", stripped);
         body.put("x", live.x() != null ? live.x() : (point == null ? null : left));
         body.put("y", live.y() != null ? live.y() : (point == null ? null : top));
-        if ("overlay".equals(kind)) {
+        if (overlay) {
             boolean viewed = (geometryJson != null && !geometryJson.isBlank())
                     || lookupGeometry(handle) != null
                     || (box != null && "resolved".equals(box.source()));
@@ -461,6 +477,16 @@ final class PageSurfaces {
             } else {
                 if (width != null) body.put("width", width);
                 if (height != null) body.put("height", height);
+            }
+        } else if (visual) {
+            boolean viewed = (geometryJson != null && !geometryJson.isBlank())
+                    || lookupGeometry(handle) != null
+                    || (box != null && "resolved".equals(box.source()));
+            body.put("placement", viewed ? "visual-viewport-relative" : "caller");
+            body.put("boundsSource", box == null ? "none" : box.source());
+            if (painted != null) {
+                body.put("width", painted[0]);
+                body.put("height", painted[1]);
             }
         }
         return body;
@@ -1657,6 +1683,13 @@ final class PageSurfaces {
         if (placedSize != null) {
             spec.put("width", placedSize[0]);
             spec.put("height", placedSize[1]);
+        }
+        Map<String, String> extra = VISUAL_EXTRA.get();
+        if (extra != null) {
+            if (extra.get("zoom") != null) spec.put("zoom", extra.get("zoom"));
+            if (extra.get("dim") != null) spec.put("dim", extra.get("dim"));
+            if (extra.get("number") != null) spec.put("number", extra.get("number"));
+            if (extra.get("direction") != null) spec.put("direction", extra.get("direction"));
         }
         try {
             Object value = evaluateHelper(current, executor, spec);

@@ -119,6 +119,15 @@ if (spec.kind === 'overlay') {
     host.style.maxWidth = '280px';
   }
 } else if (spec.css) host.setAttribute('style', spec.css);
+if (spec.kind === 'magnifier' && anchor) {
+  var zoom = spec.zoom == null || spec.zoom === '' ? 2 : spec.zoom;
+  var clone = anchor.cloneNode(true);
+  if (clone.removeAttribute) clone.removeAttribute('id');
+  clone.style.transform = 'scale(' + zoom + ')';
+  clone.style.transformOrigin = '0 0';
+  host.textContent = '';
+  host.appendChild(clone);
+}
 if (op === 'replace' && anchor) {
   window.__pkbUndo = window.__pkbUndo || {};
   window.__pkbUndo[spec.id] = anchor.outerHTML;

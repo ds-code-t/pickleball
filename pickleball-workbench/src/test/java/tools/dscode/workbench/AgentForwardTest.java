@@ -86,6 +86,30 @@ class AgentForwardTest {
     }
 
     @Test
+    void labelBorderArrowStepMagnifierAndSpotlightOnlyForward() {
+        AtomicReference<String> op = new AtomicReference<>();
+        WorkbenchServices services = fake((method, values) -> {
+            if (!"agentCommand".equals(method)) return null;
+            op.set(String.valueOf(values[0]));
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("ok", true);
+            body.put("id", "pkb-9");
+            body.put("sentence", "forwarded");
+            return body;
+        });
+        WorkbenchSessionActions actions = new WorkbenchSessionActions(services);
+        for (String command : List.of(
+                "label", "unlabel", "border", "unborder",
+                "arrow", "unarrow", "step-badge", "unstep-badge",
+                "magnifier", "unmagnifier", "spotlight", "unspotlight")) {
+            Map<String, Object> forwarded = actions.dispatch(command, Map.of("text", "Name", "id", "pkb-9"));
+            assertEquals(command, op.get());
+            assertEquals(true, forwarded.get("ok"));
+            assertEquals("forwarded", forwarded.get("sentence"));
+        }
+    }
+
+    @Test
     void overlayIsRemovedWhenTheWorkerStopsOrTheWindowCloses(@TempDir Path temp) {
         WorkbenchServices services = fake((method, values) -> {
             if ("projectRoot".equals(method)) return temp;

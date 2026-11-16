@@ -63,6 +63,18 @@ final class WorkbenchCliHelp {
             Map.entry("overlay", "Usage: overlay --text=<html> [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--handle=<id>] [--geometry=<json>] [--html=<page>]"),
             Map.entry("overlay-poll", "Usage: overlay-poll [--run-id=<id>]"),
             Map.entry("overlay-remove", "Usage: overlay-remove --id=<id> [--html=<page>]"),
+            Map.entry("label", "Usage: label --text=<label> [--handle=<id>] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--geometry=<json>] [--target=auto|page|popup|native] [--html=<page>]"),
+            Map.entry("unlabel", "Usage: unlabel --id=<id> [--html=<page>]"),
+            Map.entry("border", "Usage: border [--text=<html>] [--handle=<id>] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--color=<color>] [--style=<css>] [--target=auto|page|popup|native] [--html=<page>]"),
+            Map.entry("unborder", "Usage: unborder --id=<id> [--html=<page>]"),
+            Map.entry("arrow", "Usage: arrow (--from=<handle> --to=<handle> | --handle=<id> --direction=up|down|left|right | --x=<px> --y=<px> --direction=up|down|left|right) [--target=auto|page|popup|native] [--html=<page>]"),
+            Map.entry("unarrow", "Usage: unarrow --id=<id> [--html=<page>]"),
+            Map.entry("step-badge", "Usage: step-badge --number=<n> [--text=<caption>] [--handle=<id>] [--x=<px>] [--y=<px>] [--target=auto|page|popup|native] [--html=<page>]"),
+            Map.entry("unstep-badge", "Usage: unstep-badge --id=<id> [--html=<page>]"),
+            Map.entry("magnifier", "Usage: magnifier [--text=<caption>] [--zoom=<1-8>] [--handle=<id>] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--target=auto|page|popup|native] [--html=<page>]"),
+            Map.entry("unmagnifier", "Usage: unmagnifier --id=<id> [--html=<page>]"),
+            Map.entry("spotlight", "Usage: spotlight [--dim=<0-1>] [--handle=<id>] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--target=auto|page|popup|native] [--html=<page>]"),
+            Map.entry("unspotlight", "Usage: unspotlight --id=<id> [--html=<page>]"),
             Map.entry("html-write", "Usage: html-write --text=<html> [--html=<page>]"),
             Map.entry("html-replace", "Usage: html-replace --handle=<id> --text=<html> [--html=<page>]"),
             Map.entry("html-insert", "Usage: html-insert --handle=<id> --text=<html> [--where=before|after] [--html=<page>]"),
@@ -145,7 +157,7 @@ final class WorkbenchCliHelp {
         text.append("coordination: short-log note inbox finish presence post history gc-runs gc-versions use-version export-guidance\n");
         text.append("descriptors: session list | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>\n");
         text.append("page: inspect-page find-element\n");
-        text.append("agent: observe launch windows tabs chat-send chat-history chat-poll highlight unhighlight overlay overlay-poll overlay-remove html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close capture-scenario\n");
+        text.append("agent: observe launch windows tabs chat-send chat-history chat-poll highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close capture-scenario\n");
         text.append("retrieval: query runs | query get | query query | query search | query props | query errors | query tail\n");
         text.append("controller: sync worker-check live-check ui mcp session\n");
         text.append("all:");

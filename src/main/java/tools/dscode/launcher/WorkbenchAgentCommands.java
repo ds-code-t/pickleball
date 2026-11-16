@@ -133,6 +133,9 @@ public final class WorkbenchAgentCommands {
                      "chat-send", "chat-history", "chat-poll",
                      "highlight", "unhighlight",
                      "overlay", "overlay-poll", "overlay-remove",
+                     "label", "unlabel", "border", "unborder",
+                     "arrow", "unarrow", "step-badge", "unstep-badge",
+                     "magnifier", "unmagnifier", "spotlight", "unspotlight",
                      "html-write", "html-replace", "html-insert", "html-remove", "html-cleanup",
                      "popup-open", "popup-status", "popup-close",
                      "capture-scenario" -> agentControl(parsed, safeOut, safeErr);
@@ -1881,6 +1884,15 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "query");
         copyFlag(args, parsed, "on-top");
         copyFlag(args, parsed, "headless");
+        copyFlag(args, parsed, "color");
+        copyFlag(args, parsed, "number");
+        copyFlag(args, parsed, "zoom");
+        copyFlag(args, parsed, "direction");
+        copyFlag(args, parsed, "dim");
+        if ("arrow".equals(parsed.command())) {
+            if (parsed.coordination().inboxFrom() != null) args.put("from", parsed.coordination().inboxFrom());
+            if (parsed.coordination().inboxTo() != null) args.put("to", parsed.coordination().inboxTo());
+        }
         if (parsed.coordination().text() != null) args.put("text", parsed.coordination().text());
         if (parsed.coordination().limit() != null) args.put("limit", parsed.coordination().limit().toString());
         if (parsed.coordination().id() != null) args.put("id", parsed.coordination().id());

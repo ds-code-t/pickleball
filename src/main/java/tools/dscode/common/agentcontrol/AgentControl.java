@@ -96,6 +96,9 @@ public final class AgentControl {
                 case "overlay" -> overlay(project, runId, values);
                 case "overlay-poll" -> overlayPoll(project, runId);
                 case "overlay-remove" -> remove(project, runId, values, "overlay");
+                case "label", "border", "arrow", "step-badge", "magnifier", "spotlight" -> visual(project, runId, op, values);
+                case "unlabel", "unborder", "unarrow", "unstep-badge", "unmagnifier", "unspotlight" ->
+                        remove(project, runId, values, VisualKinds.kind(op));
                 case "html-write" -> html(project, runId, values, "append");
                 case "html-replace" -> html(project, runId, values, "replace");
                 case "html-insert" -> html(project, runId, values, "insert");
@@ -308,6 +311,65 @@ public final class AgentControl {
                 integerOrNull(args.get("height"))
         );
         placed.put("ok", true);
+        return new Result(0, placed);
+    }
+
+    private static Result visual(Path project, String runId, String op, Map<String, String> args) throws Exception {
+        String kind = VisualKinds.kind(op);
+        String text = args.get("text");
+        String handle = args.get("handle");
+        Integer x = integerOrNull(args.get("x"));
+        Integer y = integerOrNull(args.get("y"));
+        Integer width = integerOrNull(args.get("width"));
+        Integer height = integerOrNull(args.get("height"));
+        String geometry = args.get("geometry");
+        if ("label".equals(kind) && !present(text)) return fail(2, "label requires --text");
+        if ("step".equals(kind)) text = VisualKinds.stepMarkup(args.get("number"), text);
+        if ("magnifier".equals(kind)) {
+            text = VisualKinds.magnifierMarkup(text, args.get("zoom"));
+            args = new LinkedHashMap<>(args);
+            args.put("zoom", VisualKinds.zoom(args.get("zoom")));
+        }
+        if ("spotlight".equals(kind)) {
+            String dim = VisualKinds.dim(args.get("dim"));
+            args = new LinkedHashMap<>(args);
+            args.put("dim", dim);
+            if (!present(text)) text = "";
+        }
+        if ("arrow".equals(kind)) {
+            VisualKinds.Arrow arrow = VisualKinds.arrow(args);
+            text = arrow.svg();
+            x = arrow.x();
+            y = arrow.y();
+            width = arrow.width();
+            height = arrow.height();
+            handle = null;
+            geometry = arrow.resolved()
+                    ? "{\"visual_viewport_relative\":{\"x\":" + arrow.x() + ",\"y\":" + arrow.y()
+                    + ",\"width\":" + arrow.width() + ",\"height\":" + arrow.height() + "}}"
+                    : null;
+        }
+        if ("border".equals(kind) && text == null) text = "";
+        Map<String, Object> placed = PageSurfaces.place(
+                explicitPage(project, args),
+                "append",
+                handle,
+                args.get("where"),
+                text,
+                kind,
+                x,
+                y,
+                geometry,
+                AgentStore.root(project, runId),
+                width,
+                height,
+                args
+        );
+        placed.put("ok", true);
+        if ("arrow".equals(kind)) placed.put("direction", args.get("direction") == null ? "" : args.get("direction"));
+        if ("step".equals(kind)) placed.put("number", Integer.parseInt(args.get("number").trim()));
+        if ("magnifier".equals(kind)) placed.put("zoom", args.get("zoom"));
+        if ("spotlight".equals(kind)) placed.put("dim", args.get("dim"));
         return new Result(0, placed);
     }
 
