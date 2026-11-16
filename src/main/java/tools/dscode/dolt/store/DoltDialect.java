@@ -511,7 +511,6 @@ public final class DoltDialect {
      * There is no server commit. Returns false when nothing changed.
      */
     public static boolean commitHydrate(java.sql.Connection connection, String gitSha, boolean dirty) throws SQLException {
-        if (!sourceDirty(connection)) return false;
         String sha = gitSha == null || gitSha.isBlank() ? "unknown" : gitSha.replace("'", "");
         String label = sha + (dirty ? " dirty" : "");
         try (java.sql.Statement statement = connection.createStatement()) {

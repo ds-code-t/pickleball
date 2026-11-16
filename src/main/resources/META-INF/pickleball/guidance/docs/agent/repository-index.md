@@ -808,7 +808,6 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/dolt/DoltGlueGapTest.java`
 - `src/test/java/tools/dscode/dolt/DoltGradleForwardTest.java`
 - `src/test/java/tools/dscode/dolt/DoltHistoryTest.java`
-- `src/test/java/tools/dscode/dolt/DoltHydrateCommitTest.java`
 - `src/test/java/tools/dscode/dolt/DoltHydrateTest.java`
 - `src/test/java/tools/dscode/dolt/DoltLegacyMigrationTest.java`
 - `src/test/java/tools/dscode/dolt/DoltLinkedTrackingSmokeTest.java`
@@ -850,6 +849,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/dolt/store/DoltStoreFixture.java`
 - `src/test/java/tools/dscode/dolt/store/LegacySqliteFixture.java`
 - `src/test/java/tools/dscode/dolt/store/RunStateRouterTest.java`
+- `src/test/java/tools/dscode/dolt/StoreGenerationTest.java`
 - `src/test/java/tools/dscode/dolt/usage/LookupProbe.java`
 - `src/test/java/tools/dscode/engine/adapter/NativeSuiteHookTest.java`
 - `src/test/java/tools/dscode/engine/adapter/SuiteHookSteps.java`

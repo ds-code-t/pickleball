@@ -371,7 +371,8 @@ public final class DoltCli {
                 printGit(out, project, database);
                 printSkips(out, skipped);
                 out.println("database " + shown);
-                out.println("hydrate commit " + hydrateCommit);
+                out.println("store=embedded");
+                out.println("hydrate generation " + hydrateCommit);
             }
             return 0;
         } catch (SQLException failure) {

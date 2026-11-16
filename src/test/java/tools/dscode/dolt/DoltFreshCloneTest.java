@@ -30,7 +30,7 @@ class DoltFreshCloneTest {
         assertTrue(DoltPaths.ready(project));
         try (DoltDatabase database = DoltDatabase.open(project)) {
             assertEquals(1, database.schemaVersion());
-            assertEquals("dolt", database.pragma("journal_mode"));
+            assertEquals("wal", database.pragma("journal_mode"));
         }
     }
 

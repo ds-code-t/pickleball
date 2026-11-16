@@ -132,7 +132,7 @@ public final class DoltHydrator {
             } finally {
                 connection.setAutoCommit(true);
             }
-            if (!options.dryRun() && DoltDialect.sourceDirty(connection)) {
+            if (!options.dryRun() && inserted + updated > 0) {
                 DoltGit.Snapshot git = DoltGit.capture(project);
                 try (var statement = connection.prepareStatement("""
                         UPDATE provenance SET hydration_id = ?, last_hydrated_at = ?, schema_version = ?,

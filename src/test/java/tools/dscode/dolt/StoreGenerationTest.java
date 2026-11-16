@@ -14,36 +14,39 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class DoltHydrateCommitTest {
+/** Replaces {@code DoltHydrateCommitTest}: generations, not server commits. */
+class StoreGenerationTest {
     @TempDir
     Path project;
 
     @Test
-    void secondHydrateDoesNotCommitWhenNothingChanged() throws Exception {
+    void secondHydrateDoesNotBumpGenerationWhenNothingChanged() throws Exception {
         Path feature = project.resolve("features/one.feature");
         Files.createDirectories(feature.getParent());
         Files.writeString(feature, "Feature: One\n  Scenario: A\n    * ASSERT: \"1\" equals \"1\"\n",
                 StandardCharsets.UTF_8);
         DoltHydrator.Result first = DoltHydrator.hydrate(project, DoltHydrator.Options.full());
         assertEquals(0, first.conflicts());
-        String commit;
-        int count;
+        String label;
+        int generation;
         try (DoltDatabase database = DoltDatabase.open(project)) {
-            commit = DoltDialect.lastHydrateCommit(database.connection());
-            count = countHydrate(database);
+            label = DoltDialect.lastHydrateCommit(database.connection());
+            generation = generation(database);
         }
-        assertTrue(commit.startsWith("hydrate ") || commit.contains(" hydrate "), commit);
-        assertFalse("none".equals(commit), commit);
+        assertTrue(label.matches("[1-9][0-9]* \\S.*"), label);
+        assertFalse(label.contains("hydrate commit"), label);
         DoltHydrator.Result second = DoltHydrator.hydrate(project, DoltHydrator.Options.full());
         assertEquals(0, second.conflicts());
+        assertEquals(0, second.inserted());
+        assertEquals(0, second.updated());
         try (DoltDatabase database = DoltDatabase.open(project)) {
-            assertEquals(commit, DoltDialect.lastHydrateCommit(database.connection()));
-            assertEquals(count, countHydrate(database));
+            assertEquals(label, DoltDialect.lastHydrateCommit(database.connection()));
+            assertEquals(generation, generation(database));
         }
     }
 
     @Test
-    void statusShowsTheLastHydrateCommit() throws Exception {
+    void statusShowsTheHydrateGeneration() throws Exception {
         Path feature = project.resolve("features/one.feature");
         Files.createDirectories(feature.getParent());
         Files.writeString(feature, "Feature: One\n", StandardCharsets.UTF_8);
@@ -57,16 +60,19 @@ class DoltHydrateCommitTest {
                 new java.io.PrintStream(java.io.OutputStream.nullOutputStream()));
         assertEquals(0, code);
         String out = stdout.toString(StandardCharsets.UTF_8);
-        assertTrue(out.contains("hydrate commit "), out);
-        assertTrue(out.contains("hydrate "), out);
-        assertFalse(out.contains("hydrate commit none"), out);
+        assertTrue(out.contains("store=embedded"), out);
+        assertTrue(out.contains("hydrate generation "), out);
+        assertFalse(out.contains("hydrate commit"), out);
+        assertFalse(out.contains("hydrate generation none"), out);
+        assertFalse(out.contains("hydrate generation 0 "), out);
+        assertFalse(out.contains("hydrate generation unavailable"), out);
     }
 
-    private static int countHydrate(DoltDatabase database) throws Exception {
+    private static int generation(DoltDatabase database) throws Exception {
         try (Statement statement = database.connection().createStatement();
              ResultSet rows = statement.executeQuery(
-                     "SELECT COUNT(*) FROM dolt_log WHERE message LIKE 'hydrate %'")) {
-            return rows.next() ? rows.getInt(1) : 0;
+                     "SELECT CAST(value AS INTEGER) FROM schema_meta WHERE `key` = 'hydrate_generation'")) {
+            return rows.next() ? rows.getInt(1) : -1;
         }
     }
 }
