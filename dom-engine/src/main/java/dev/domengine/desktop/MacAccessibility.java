@@ -18,6 +18,8 @@ final class MacAccessibility {
 
     static String captureScript() {
         return """
+                property nodeBudget : 600
+
                 on clean(value)
                   set value to value as text
                   set AppleScript's text item delimiters to {tab, return, linefeed}
@@ -41,9 +43,10 @@ final class MacAccessibility {
                 end parentOf
 
                 on dump(el, depth, pathText)
-                  if depth > 12 then
+                  if depth > 12 or nodeBudget < 1 then
                     return "TRUNCATED" & linefeed
                   end if
+                  set nodeBudget to nodeBudget - 1
                   set r to "unknown"
                   set n to ""
                   set x to 0
@@ -128,6 +131,9 @@ final class MacAccessibility {
                   return lineText & moreText
                 end dump
 
+                try
+                  set nodeBudget to (system attribute "DESKTOP_AX_MAX_NODES") as integer
+                end try
                 set output to "NODE" & tab & "0" & tab & "desktop" & tab & "0" & tab & "0" & tab & "0" & tab & "0" & tab & "" & tab & "Desktop" & linefeed
                 tell application "System Events"
                   set indexNum to 1
@@ -241,7 +247,8 @@ final class MacAccessibility {
 
     static DomNode capture(String windowName) {
         requireMac();
-        NativeDesktop.CommandResult result = osascript(captureScript(), Map.of(), CAPTURE_TIMEOUT_SECONDS);
+        NativeDesktop.CommandResult result = osascript(captureScript(),
+                Map.of("DESKTOP_AX_MAX_NODES", Integer.toString(MAX_NODES)), CAPTURE_TIMEOUT_SECONDS);
         // Only a denied Accessibility permission means AX is unavailable. A script error or a
         // timeout is a capture failure, so it is not mistaken for a missing platform.
         if (result.timedOut()) throw new CdpException("AX capture failed: osascript timed out after " + CAPTURE_TIMEOUT_SECONDS + " s");
@@ -284,6 +291,11 @@ final class MacAccessibility {
 
     /** A full System Events walk of every foreground app takes longer than one click or type. */
     static final int CAPTURE_TIMEOUT_SECONDS = 60;
+    /**
+     * Every AX attribute read is one Apple Event, so a full walk of every app does not finish in
+     * time. The walk stops after this many nodes and marks the tree {@code walk-truncated}.
+     */
+    static final int MAX_NODES = 600;
 
     private static NativeDesktop.CommandResult osascript(String source, Map<String, String> env) {
         return osascript(source, env, NativeDesktop.DEFAULT_TIMEOUT_SECONDS);

@@ -70,6 +70,8 @@ class MacAccessibilityScriptTest {
         assertTrue(MacAccessibility.clickScript().contains(filtered));
         assertTrue(MacAccessibility.typeScript().contains(filtered));
         assertTrue(MacAccessibility.CAPTURE_TIMEOUT_SECONDS > NativeDesktop.DEFAULT_TIMEOUT_SECONDS);
+        assertTrue(MacAccessibility.captureScript().contains("nodeBudget < 1"), "the walk has a node budget");
+        assertTrue(MacAccessibility.MAX_NODES > 0);
     }
 
     @Test

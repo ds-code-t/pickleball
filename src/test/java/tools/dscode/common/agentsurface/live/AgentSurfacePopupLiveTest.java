@@ -42,7 +42,7 @@ class AgentSurfacePopupLiveTest {
             PopupLedger.append(project, "live", "append", "instructions", "note", "", html, "", "");
             PopupLedger.append(project, "live", "chat", "chat", "", "", chat, "", "");
             PopupSurfaceBridge.sendChat(project, "live", "run", "human", chat);
-            String rendered = waitRendered(project);
+            String rendered = waitRendered(project, sha(html), sha(chat));
             assertTrue(rendered.contains(sha(html)), () -> "rendered=" + rendered + " " + hostDiagnostics(project));
             assertTrue(rendered.contains(sha(chat)), () -> "rendered=" + rendered + " " + hostDiagnostics(project));
             boolean exited = PopupHost.closeAndWait(project, "live", Duration.ofSeconds(10));
@@ -50,6 +50,7 @@ class AgentSurfacePopupLiveTest {
             long browserPid = opened.get("browserPid") instanceof Number number ? number.longValue() : -1;
             assertFalse(browserPid > 0 && ProcessHandle.of(browserPid).isPresent(), "browser pid " + browserPid);
             assertFalse(Files.exists(PopupLog.popupDir(project, "live").resolve("profile")));
+            System.out.println("popup warnings: " + PopupLog.warnings(project, "live"));
         } finally {
             restore("pkb_agent_popup_browser", browser);
             restore("pkb_agent_popup_headless", headless);
@@ -62,13 +63,14 @@ class AgentSurfacePopupLiveTest {
         }
     }
 
-    private static String waitRendered(Path project) throws Exception {
+    /** Waits up to 20 seconds until every expected pane text has rendered. Panes can render in any order. */
+    private static String waitRendered(Path project, String... shas) throws Exception {
         Path file = PopupLog.popupDir(project, "live").resolve("rendered.jsonl");
         long deadline = System.nanoTime() + java.time.Duration.ofSeconds(20).toNanos();
         while (System.nanoTime() < deadline) {
             if (Files.isRegularFile(file)) {
                 String text = Files.readString(file);
-                if (text.contains("textSha256") && !text.contains("\"textSha256\":\"\"")) return text;
+                if (java.util.Arrays.stream(shas).allMatch(text::contains)) return text;
             }
             Thread.sleep(100);
         }
