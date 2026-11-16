@@ -83,9 +83,12 @@ class SnapshotCoverageTest {
             assumeTrue(display, "no display");
         }
         CliResult attached = DomEngineMain.dispatch(List.of("desktop", "attach", "--id", "cov-live", "--live"));
-        if (attached.exit() != 0 && (attached.stderr().contains("unavailable")
-                || attached.stderr().contains("permission")
-                || attached.stderr().contains("AT-SPI"))) {
+        // On macOS only a denied Accessibility permission may skip; an AppleScript error must fail.
+        boolean platformMissing = "macos".equals(family)
+                ? attached.stderr().contains("permission")
+                : attached.stderr().contains("unavailable") || attached.stderr().contains("permission")
+                        || attached.stderr().contains("AT-SPI");
+        if (attached.exit() != 0 && platformMissing) {
             assumeTrue(false, attached.stderr());
         }
         assertEquals(0, attached.exit(), attached.stderr());

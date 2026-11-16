@@ -107,7 +107,13 @@ public final class NativeDesktop {
         return run(command, Map.of());
     }
 
+    static final int DEFAULT_TIMEOUT_SECONDS = 8;
+
     static CommandResult run(List<String> command, Map<String, String> env) {
+        return run(command, env, DEFAULT_TIMEOUT_SECONDS);
+    }
+
+    static CommandResult run(List<String> command, Map<String, String> env, int timeoutSeconds) {
         ProcessBuilder builder = new ProcessBuilder(command);
         builder.redirectErrorStream(true);
         if (env != null) builder.environment().putAll(env);
@@ -123,7 +129,7 @@ public final class NativeDesktop {
             }, "desktop-cmd");
             reader.setDaemon(true);
             reader.start();
-            boolean finished = process.waitFor(8, TimeUnit.SECONDS);
+            boolean finished = process.waitFor(Math.max(1, timeoutSeconds), TimeUnit.SECONDS);
             if (!finished) {
                 process.destroyForcibly();
                 reader.join(1000);
