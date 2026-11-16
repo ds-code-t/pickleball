@@ -7,6 +7,7 @@ on:
       - master
       - 2.2.0
       - 3.0.0
+      - 3.0.0-embedded-store
   workflow_dispatch:
 
 permissions:
@@ -31,6 +32,15 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+
+      - name: Embedded store spike
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon :test \
+            --tests tools.dscode.store.spike.EmbeddedStoreSpikeTest \
+            --tests tools.dscode.store.spike.EmbeddedMultiProcessTest
+          grep -h 'STORE_' build/test-results/test/TEST-tools.dscode.store.spike.*.xml | head -40 >> "$GITHUB_STEP_SUMMARY" || true
 
       - name: Cache Dolt 2.7.3
         uses: actions/cache@v4
@@ -132,6 +142,15 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+
+      - name: Embedded store spike
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon :test \
+            --tests tools.dscode.store.spike.EmbeddedStoreSpikeTest \
+            --tests tools.dscode.store.spike.EmbeddedMultiProcessTest
+          grep -h 'STORE_' build/test-results/test/TEST-tools.dscode.store.spike.*.xml | head -40 >> "$GITHUB_STEP_SUMMARY" || true
 
       - name: Cache Dolt 2.7.3
         uses: actions/cache@v4
@@ -237,6 +256,15 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+
+      - name: Embedded store spike
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon :test \
+            --tests tools.dscode.store.spike.EmbeddedStoreSpikeTest \
+            --tests tools.dscode.store.spike.EmbeddedMultiProcessTest
+          grep -h 'STORE_' build/test-results/test/TEST-tools.dscode.store.spike.*.xml | head -40 >> "$GITHUB_STEP_SUMMARY" || true
 
       - name: Cache Dolt 2.7.3
         uses: actions/cache@v4

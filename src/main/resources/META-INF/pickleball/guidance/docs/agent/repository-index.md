@@ -915,6 +915,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/scenarioobject/ScenarioObjectHookTest.java`
 - `src/test/java/tools/dscode/scenarioobject/ScenarioObjectSteps.java`
 - `src/test/java/tools/dscode/ScenarioObjectTest.java`
+- `src/test/java/tools/dscode/store/spike/EmbeddedMultiProcessTest.java`
+- `src/test/java/tools/dscode/store/spike/EmbeddedNativeProbe.java`
+- `src/test/java/tools/dscode/store/spike/EmbeddedStoreSpikeTest.java`
 - `src/test/java/tools/dscode/testengine/CucumberNameFilterTest.java`
 - `src/test/java/tools/dscode/testengine/CucumberPluginPublishTest.java`
 - `src/test/java/tools/dscode/testengine/DriverDownloadRedactionTest.java`
