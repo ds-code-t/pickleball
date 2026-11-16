@@ -88,6 +88,28 @@ class DoltServerLifecycleTest {
     }
 
     @Test
+    void coldStartUnderAPathWithSpaces() throws Exception {
+        Path spaced = project.resolve("dir with spaces").resolve("my project");
+        Files.createDirectories(spaced);
+        try {
+            long started = System.nanoTime();
+            DoltServer.ServerInfo info = DoltServer.ensure(spaced);
+            long millis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
+            assertTrue(info.running());
+            assertFalse(info.reused());
+            assertTrue(DoltServer.selectOne(info.port(), 2000));
+            assertTrue(Files.isDirectory(spaced.resolve(".pickleball/dolt")), "store not under the spaced project");
+            Path out = Path.of("build", "dolt-server-start-spaces-ms.txt");
+            Files.createDirectories(out.getParent());
+            Files.writeString(out, Long.toString(millis), StandardCharsets.UTF_8);
+            System.out.println("DOLT_SERVER_START_SPACES_MS=" + millis);
+        } finally {
+            DoltServer.stop(spaced);
+        }
+        assertFalse(DoltServer.status(spaced).running());
+    }
+
+    @Test
     void staleServerJsonIsReplaced() throws Exception {
         Path home = DoltServer.home(project);
         Files.createDirectories(home);

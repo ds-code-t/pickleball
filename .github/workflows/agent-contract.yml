@@ -46,8 +46,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ./gradlew --no-daemon :test --tests tools.dscode.dolt.server.DoltServerLifecycleTest.coldStartPrintsElapsedMillis
+          ./gradlew --no-daemon :test \
+            --tests tools.dscode.dolt.server.DoltServerLifecycleTest.coldStartPrintsElapsedMillis \
+            --tests tools.dscode.dolt.server.DoltServerLifecycleTest.coldStartUnderAPathWithSpaces
           echo "DOLT_SERVER_START_MS=$(tr -d '\r' < build/dolt-server-start-ms.txt)"
+          echo "DOLT_SERVER_START_SPACES_MS=$(tr -d '\r' < build/dolt-server-start-spaces-ms.txt)"
+          echo "${RUNNER_OS} Dolt server start: $(tr -d '\r' < build/dolt-server-start-ms.txt) ms; path with spaces: $(tr -d '\r' < build/dolt-server-start-spaces-ms.txt) ms" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Targeted Dolt sandbox, run-state, and isolation
         shell: bash
@@ -138,9 +142,12 @@ jobs:
       - name: Targeted Dolt server start
         run: |
           set -euo pipefail
-          ./gradlew --no-daemon :test --tests tools.dscode.dolt.server.DoltServerLifecycleTest.coldStartPrintsElapsedMillis
+          ./gradlew --no-daemon :test \
+            --tests tools.dscode.dolt.server.DoltServerLifecycleTest.coldStartPrintsElapsedMillis \
+            --tests tools.dscode.dolt.server.DoltServerLifecycleTest.coldStartUnderAPathWithSpaces
           echo "DOLT_SERVER_START_MS=$(tr -d '\r' < build/dolt-server-start-ms.txt)"
-          echo "macOS Dolt server start: $(tr -d '\r' < build/dolt-server-start-ms.txt) ms" >> "$GITHUB_STEP_SUMMARY"
+          echo "DOLT_SERVER_START_SPACES_MS=$(tr -d '\r' < build/dolt-server-start-spaces-ms.txt)"
+          echo "${RUNNER_OS} Dolt server start: $(tr -d '\r' < build/dolt-server-start-ms.txt) ms; path with spaces: $(tr -d '\r' < build/dolt-server-start-spaces-ms.txt) ms" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Targeted Dolt sandbox, run-state, and isolation
         run: |
