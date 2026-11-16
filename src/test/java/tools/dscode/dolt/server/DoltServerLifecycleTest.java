@@ -107,6 +107,35 @@ class DoltServerLifecycleTest {
             DoltServer.stop(spaced);
         }
         assertFalse(DoltServer.status(spaced).running());
+        // Windows keeps a directory while any process still has it as its working directory or
+        // holds a file in it. The spaced tree must become deletable once stop returns.
+        Path top = project.resolve("dir with spaces");
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+        java.io.IOException last = null;
+        while (System.nanoTime() < deadline) {
+            try {
+                deleteTree(top);
+                last = null;
+                break;
+            } catch (java.io.IOException failure) {
+                last = failure;
+                Thread.sleep(250);
+            }
+        }
+        if (last != null) {
+            String survivors = ProcessHandle.allProcesses()
+                    .filter(handle -> handle.info().commandLine().map(line -> line.contains("my project")).orElse(false))
+                    .map(handle -> handle.pid() + " " + handle.info().commandLine().orElse(""))
+                    .reduce("", (left, right) -> left + "\n" + right);
+            throw new AssertionError("spaced project still locked 30 s after stop: " + last + " survivors:" + survivors, last);
+        }
+    }
+
+    private static void deleteTree(Path root) throws java.io.IOException {
+        if (!Files.exists(root)) return;
+        try (var walk = Files.walk(root)) {
+            for (Path path : walk.sorted(java.util.Comparator.reverseOrder()).toList()) Files.deleteIfExists(path);
+        }
     }
 
     @Test

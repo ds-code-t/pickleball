@@ -18,6 +18,6 @@ The session, in order:
 
 Each stage prints `stage=<name> exit=<code> seconds=<n>` and must finish inside the budget in the script. `record.json` for the compiled run must be `PASSED` and `finish` must set `stoppedAt`. Timings are also written to `maven-consumer-project/.pickleball/consumer-sim-timings.json`.
 
-Push and pull-request CI runs the harness only on Windows, in `.github/workflows/agent-contract.yml` (job `windows`). That job also checks the repository index and the agent contract, then `publishToMavenLocal -x test` and `scripts/consumer_sim.ps1` (PowerShell, `mvnw.cmd`). Job `gate` depends only on `windows`. There is no Linux or macOS CI job. Linux is verified locally on the maintainer box with JDK 21 (`/opt/jdk/jdk-21.0.13+9` in the sandbox, `/home/box/jdk/jdk-21.0.13+9` on the maintainer machine). macOS testing is tech debt. See `docs/maintainer/tech-debt.md`.
+Push and pull-request CI runs the harness only on Windows, in `.github/workflows/agent-contract.yml` (job `windows`). That job also checks the repository index and the agent contract, then `publishToMavenLocal -x test` and `scripts/consumer_sim.ps1` (PowerShell, `mvnw.cmd`). Job `gate` depends on `windows`, `macos`, and `dom-engine-live`. The `macos` and Linux `dom-engine-live` jobs run targeted tests only and do not run this harness. Linux is also verified locally on the maintainer box with JDK 21 (`/opt/jdk/jdk-21.0.13+9` in the sandbox, `/home/box/jdk/jdk-21.0.13+9` on the maintainer machine). See `docs/maintainer/tech-debt.md`.
 
 A normal `mvn test` does not run this script.

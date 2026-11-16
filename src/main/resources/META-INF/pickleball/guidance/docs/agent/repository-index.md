@@ -674,6 +674,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/io/cucumber/core/runtime/DoltExecuteFromDbTest.java`
 - `src/test/java/io/cucumber/core/runtime/DoltFeatureLoadHookTest.java`
 - `src/test/java/io/cucumber/core/runtime/FeaturePathLoadCacheTest.java`
+- `src/test/java/tools/dscode/architecture/CucumberBoundaryTest.java`
 - `src/test/java/tools/dscode/browser/AgentBoundaryTest.java`
 - `src/test/java/tools/dscode/browser/BidiAdapterTest.java`
 - `src/test/java/tools/dscode/browser/CdpAdapterTest.java`
@@ -701,6 +702,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentsurface/PopupLifecycleTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/PopupLogTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/PopupOnTopTest.java`
+- `src/test/java/tools/dscode/common/agentsurface/PopupRemovalKindTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/PopupSurfaceParityTest.java`
 - `src/test/java/tools/dscode/common/assertions/AssertionClauseSplitterTest.java`
 - `src/test/java/tools/dscode/common/assertions/MultilineAssertFeatureTest.java`
@@ -935,6 +937,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/testsupport/CappedTestConsole.java`
 - `src/test/java/tools/dscode/untilpass/UntilPassBrowserSteps.java`
 - `src/test/java/tools/dscode/untilpass/UntilPassChromeLookupTest.java`
+- `src/test/resources/architecture/cucumber-runtime-allowlist.txt`
 - `src/test/resources/element-batch/edge.html`
 - `src/test/resources/element-snapshot/fixture.html`
 - `src/test/resources/element-state/states.html`

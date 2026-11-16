@@ -185,7 +185,16 @@ jobs:
 
       - name: macOS desktop live snapshot
         if: always()
-        run: ./gradlew --no-daemon :dom-engine:test --tests dev.domengine.snapshot.SnapshotCoverageTest.liveDesktopWhenThePlatformExists
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon :dom-engine:test --tests dev.domengine.snapshot.SnapshotCoverageTest.liveDesktopWhenThePlatformExists
+          report=dom-engine/build/test-results/test/TEST-dev.domengine.snapshot.SnapshotCoverageTest.xml
+          if grep -q '<skipped' "$report"; then
+            reason="$(grep -o '<skipped[^>]*' "$report" | head -1)"
+            echo "macOS desktop live snapshot skipped (hosted runners cannot grant Accessibility): ${reason}" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "macOS desktop live snapshot ran (macos-ax)" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
 
   dom-engine-live:
     name: Java DOM live Chrome
@@ -367,7 +376,7 @@ jobs:
         run: ./gradlew --no-daemon :test --tests tools.dscode.common.seleniumextensions.LiveFirefoxSnapshotTest
 
   gate:
-    needs: [windows, dom-engine-live]
+    needs: [windows, macos, dom-engine-live]
     if: always()
     runs-on: windows-latest
     steps:
@@ -393,8 +402,9 @@ jobs:
         shell: bash
         run: ./gradlew --no-daemon doltInstall
 
-      - name: Block the release unless Windows and live Chrome passed
+      - name: Block the release unless Windows, macOS, and live Chrome passed
         shell: bash
         run: |
           test "${{ needs.windows.result }}" = "success"
+          test "${{ needs.macos.result }}" = "success"
           test "${{ needs.dom-engine-live.result }}" = "success"
