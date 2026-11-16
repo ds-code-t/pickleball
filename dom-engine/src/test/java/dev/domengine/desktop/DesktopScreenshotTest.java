@@ -89,6 +89,37 @@ class DesktopScreenshotTest {
     }
 
     @Test
+    void macCaptureReadsTheFileScreencaptureWrote() throws Exception {
+        BufferedImage white = new BufferedImage(4, 2, BufferedImage.TYPE_INT_RGB);
+        for (int x = 0; x < 4; x++) for (int y = 0; y < 2; y++) white.setRGB(x, y, Color.WHITE.getRGB());
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ImageIO.write(white, "png", out);
+        byte[] png = out.toByteArray();
+        List<List<String>> commands = new ArrayList<>();
+        DesktopScreenshot.Shot shot = DesktopScreenshot.capture(
+                new DesktopScreenshot.Rect(0, 0, 2, 1),
+                (command, timeout) -> {
+                    commands.add(command);
+                    try {
+                        java.nio.file.Files.write(java.nio.file.Path.of(command.get(command.size() - 1)), png);
+                    } catch (java.io.IOException failure) {
+                        throw new java.io.UncheckedIOException(failure);
+                    }
+                    return new DesktopScreenshot.Result(0, new byte[0], "", false);
+                },
+                Map.of(),
+                "macos",
+                "");
+        assertEquals(1, commands.size());
+        assertEquals("screencapture", commands.get(0).get(0));
+        assertFalse(commands.get(0).contains("-"), "screencapture has no stdout mode: " + commands.get(0));
+        assertFalse(java.nio.file.Files.exists(java.nio.file.Path.of(commands.get(0).get(commands.get(0).size() - 1))), "temp file removed");
+        assertEquals(4, shot.width());
+        assertEquals(2.0, shot.scale(), 0);
+        assertEquals("screencapture", shot.tool());
+    }
+
+    @Test
     void blackMacCaptureIsPermissionDenied() throws Exception {
         BufferedImage black = new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB);
         black.setRGB(0, 0, Color.BLACK.getRGB());

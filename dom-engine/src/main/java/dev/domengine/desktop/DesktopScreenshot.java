@@ -67,6 +67,12 @@ public final class DesktopScreenshot {
             Attempt robot = runOne(robotCommand(rect), used);
             if (robot.shot != null) return robot.shot;
         }
+        if ("macos".equals(family)) {
+            throw new CdpException(
+                    "error: desktop screenshot failed\n"
+                            + "fix: Allow Screen Recording for this terminal in System Settings and run in a logged-in session. screencapture said: "
+                            + NativeDesktop.oneLine(taken.detail));
+        }
         throw new CdpException(
                 "error: desktop screenshot failed\n"
                         + "fix: Install grim on Wayland, ImageMagick import or xwd on X11, or capture on a display.");
@@ -75,9 +81,7 @@ public final class DesktopScreenshot {
     static List<String> command(String os, String session, Rect rect) {
         String family = os == null ? "" : os;
         if ("windows".equals(family)) return List.of("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", windowsScript(rect));
-        if ("macos".equals(family)) {
-            return List.of("screencapture", "-x", "-R", rect.x + "," + rect.y + "," + rect.width + "," + rect.height, "-t", "png", "-");
-        }
+        if ("macos".equals(family)) return macCommand(rect, "screen.png");
         if ("wayland".equals(session)) {
             return List.of("grim", "-g", rect.x + "," + rect.y + " " + rect.width + "x" + rect.height, "-");
         }
@@ -85,6 +89,42 @@ public final class DesktopScreenshot {
                 "import", "-window", "root", "-crop",
                 rect.width + "x" + rect.height + "+" + rect.x + "+" + rect.y, "png:-"
         );
+    }
+
+    /**
+     * screencapture has no stdout mode: {@code -} is taken as a file named {@code -}, so the old
+     * command returned no bytes on macOS. It writes to a file and the caller reads it.
+     */
+    static List<String> macCommand(Rect rect, String file) {
+        return List.of("screencapture", "-x", "-R", rect.x + "," + rect.y + "," + rect.width + "," + rect.height, "-t", "png", file);
+    }
+
+    private static Attempt attemptMac(Rect rect, Runner runner) {
+        Path file = null;
+        try {
+            file = java.nio.file.Files.createTempFile("domengine-screen-", ".png");
+            java.nio.file.Files.deleteIfExists(file);
+            Result result = runner.run(macCommand(rect, file.toString()), TIMEOUT);
+            if (result == null) return new Attempt(null, "", null);
+            byte[] png = result.stdout != null && result.stdout.length >= 8 && result.stdout[0] == (byte) 0x89
+                    ? result.stdout
+                    : java.nio.file.Files.isRegularFile(file) ? java.nio.file.Files.readAllBytes(file) : new byte[0];
+            if (result.timedOut || result.exit != 0 || png.length < 8 || png[0] != (byte) 0x89) {
+                return new Attempt(null, result.text, png);
+            }
+            int[] size = pngSize(png);
+            return new Attempt(new Shot(png, size[0], size[1], scale(rect.width, size[0]), "screencapture"), result.text, png);
+        } catch (java.io.IOException failure) {
+            return new Attempt(null, failure.getMessage(), null);
+        } finally {
+            if (file != null) {
+                try {
+                    java.nio.file.Files.deleteIfExists(file);
+                } catch (java.io.IOException ignored) {
+                    // A temp file left behind is harmless.
+                }
+            }
+        }
     }
 
     static byte[] xwdToPng(byte[] xwd, Rect crop) {
@@ -146,6 +186,7 @@ public final class DesktopScreenshot {
                     Integer.parseInt(args[3]), Integer.parseInt(args[4])
             );
             System.out.write(robotPng(rect));
+            System.out.flush();
             return;
         }
         System.err.println("usage: DesktopScreenshot robot x y width height");
@@ -153,6 +194,7 @@ public final class DesktopScreenshot {
     }
 
     private static Attempt attemptNative(String os, String session, Rect rect, Runner runner) {
+        if ("macos".equals(os)) return attemptMac(rect, runner);
         Attempt first = runOne(command(os, session, rect), runner);
         if (first.shot != null) return first;
         if ("linux".equals(os) && !"wayland".equals(session)) {
