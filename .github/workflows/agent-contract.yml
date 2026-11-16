@@ -200,6 +200,9 @@ jobs:
           start=$(date +%s)
           osascript -e 'tell application "System Events" to count UI elements of (first process whose frontmost is true)' 2>&1 || true
           echo "front app UI elements probe: $(( $(date +%s) - start )) s"
+          start=$(date +%s)
+          osascript -e 'tell application "System Events" to tell (first process whose frontmost is true) to get {name, role of every UI element, size of every UI element}' 2>&1 || true
+          echo "front app roles probe: $(( $(date +%s) - start )) s"
 
       - name: macOS desktop live snapshot (must not skip)
         if: always()

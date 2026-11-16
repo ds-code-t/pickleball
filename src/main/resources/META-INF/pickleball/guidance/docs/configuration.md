@@ -674,13 +674,14 @@ Parallel runs share one loopback Dolt sql-server. `pickleball dolt sandbox creat
 | `pkb_agent_popup` | `auto` | `off` keeps today's page behaviour. `auto` uses the popup for a desktop session and the page when a browser page is open. `always` also mirrors chat, and sends handle-less HTML and overlays, to the popup during a browser session. `false`/`no`/`0` mean `off`. `true`/`on`/`1` mean `always`. |
 | `pkb_agent_popup_browser` | unset | First browser probe. Then `PKB_AGENT_POPUP_BROWSER`, then `DOMENGINE_CHROME`, then the per-OS install list. |
 | `pkb_agent_popup_headless` | false | Adds `--headless=new` for tests and CI. |
+| `pkb_agent_popup_no_sandbox` | false | Adds `--no-sandbox` from the first launch. Unset, the host adds it only after a launch that exits with a sandbox error. |
 | `pkb_agent_popup_on_top` | true | Tries the OS always-on-top call. `false` skips it. |
 | `pkb_agent_popup_size` | `420x640` | `width,height` or `widthxheight`. |
 | `pkb_agent_popup_position` | `right` | `right`, `left`, or `<x>,<y>` in screen pixels. |
 | `pkb_agent_popup_idle_minutes` | 30 | Minutes with no new ledger row before the host exits. A decimal is allowed. |
 | `pkb_agent_popup_log` | off | `true`, `all`, or `lifecycle,browser,ontop,bridge,route,highlight,ledger`. |
 | `pkb_agent_popup_log_entity` | all | Limits log lines to a run id or handle. |
-| `pkb_agent_popup_log_max_bytes` | 1048576 | Cap for `popup.log` and `host.out`. Minimum 64. |
+| `pkb_agent_popup_log_max_bytes` | 1048576 | Cap for `popup.log`, `host.out`, and `browser.out`. Minimum 64. |
 
 Env names are the same keys in upper case (`PKB_AGENT_POPUP`, `PKB_AGENT_POPUP_HEADLESS`, and the rest). A system property wins over the environment variable.
 

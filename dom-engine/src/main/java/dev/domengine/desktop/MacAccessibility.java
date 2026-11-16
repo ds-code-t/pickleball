@@ -18,7 +18,7 @@ final class MacAccessibility {
 
     static String captureScript() {
         return """
-                property nodeBudget : 600
+                property nodeBudget : 250
 
                 on clean(value)
                   set value to value as text
@@ -106,7 +106,7 @@ final class MacAccessibility {
                     end try
                     try
                       set checkedFlag to value of attribute "AXValue" of el
-                      if (role of el as text) is "AXCheckBox" or (role of el as text) is "AXRadioButton" then
+                      if r is "AXCheckBox" or r is "AXRadioButton" then
                         if checkedFlag is 1 or checkedFlag is true then set states to states & ",checked"
                       end if
                     end try
@@ -118,15 +118,21 @@ final class MacAccessibility {
                     end try
                     set lineText to lineText & "STATE" & tab & pathText & tab & states & linefeed
                     set moreText to ""
-                    try
-                      set kids to UI elements of el
-                      set indexNum to 1
-                      repeat with kid in kids
-                        set childPath to pathText & "/" & indexNum
-                        set moreText to moreText & my dump(kid, depth + 1, childPath)
-                        set indexNum to indexNum + 1
-                      end repeat
-                    end try
+                    -- A closed menu has no size. Its items are not on screen, and walking every
+                    -- menu item of every menu bar costs thousands of Apple Events.
+                    set walkKids to true
+                    if (r is "AXMenu" or r is "AXMenuItem") and (w = 0 or h = 0) then set walkKids to false
+                    if walkKids then
+                      try
+                        set kids to UI elements of el
+                        set indexNum to 1
+                        repeat with kid in kids
+                          set childPath to pathText & "/" & indexNum
+                          set moreText to moreText & my dump(kid, depth + 1, childPath)
+                          set indexNum to indexNum + 1
+                        end repeat
+                      end try
+                    end if
                   end tell
                   return lineText & moreText
                 end dump
@@ -295,7 +301,7 @@ final class MacAccessibility {
      * Every AX attribute read is one Apple Event, so a full walk of every app does not finish in
      * time. The walk stops after this many nodes and marks the tree {@code walk-truncated}.
      */
-    static final int MAX_NODES = 600;
+    static final int MAX_NODES = 250;
 
     private static NativeDesktop.CommandResult osascript(String source, Map<String, String> env) {
         return osascript(source, env, NativeDesktop.DEFAULT_TIMEOUT_SECONDS);
