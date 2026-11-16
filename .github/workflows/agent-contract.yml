@@ -49,6 +49,18 @@ jobs:
           ./gradlew --no-daemon :test --tests tools.dscode.dolt.server.DoltServerLifecycleTest.coldStartPrintsElapsedMillis
           echo "DOLT_SERVER_START_MS=$(tr -d '\r' < build/dolt-server-start-ms.txt)"
 
+      - name: Targeted Dolt sandbox, run-state, and isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon :test \
+            --tests tools.dscode.dolt.DoltSandboxCliTest \
+            --tests tools.dscode.dolt.DoltSandboxBindingTest \
+            --tests tools.dscode.dolt.DoltSandboxRunStateTest \
+            --tests tools.dscode.dolt.DoltSandboxIsolationTest \
+            --tests tools.dscode.dolt.DoltSandboxWorkerTest \
+            --tests tools.dscode.dolt.DoltSandboxPruneTest
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -115,6 +127,17 @@ jobs:
           set -euo pipefail
           ./gradlew --no-daemon :test --tests tools.dscode.dolt.server.DoltServerLifecycleTest.coldStartPrintsElapsedMillis
           echo "DOLT_SERVER_START_MS=$(tr -d '\r' < build/dolt-server-start-ms.txt)"
+
+      - name: Targeted Dolt sandbox, run-state, and isolation
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon :test \
+            --tests tools.dscode.dolt.DoltSandboxCliTest \
+            --tests tools.dscode.dolt.DoltSandboxBindingTest \
+            --tests tools.dscode.dolt.DoltSandboxRunStateTest \
+            --tests tools.dscode.dolt.DoltSandboxIsolationTest \
+            --tests tools.dscode.dolt.DoltSandboxWorkerTest \
+            --tests tools.dscode.dolt.DoltSandboxPruneTest
 
       - name: Install Chrome for Testing
         shell: bash
