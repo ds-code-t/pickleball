@@ -850,6 +850,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/dolt/store/LegacySqliteFixture.java`
 - `src/test/java/tools/dscode/dolt/store/RunStateRouterTest.java`
 - `src/test/java/tools/dscode/dolt/StoreGenerationTest.java`
+- `src/test/java/tools/dscode/dolt/StoreHandles.java`
 - `src/test/java/tools/dscode/dolt/usage/LookupProbe.java`
 - `src/test/java/tools/dscode/engine/adapter/NativeSuiteHookTest.java`
 - `src/test/java/tools/dscode/engine/adapter/SuiteHookSteps.java`

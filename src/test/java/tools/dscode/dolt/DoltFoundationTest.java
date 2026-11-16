@@ -1,7 +1,10 @@
 package tools.dscode.dolt;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+
+import tools.dscode.dolt.store.DoltConnections;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -24,6 +27,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class DoltFoundationTest {
     @TempDir
     Path project;
+
+    @AfterEach
+    void releaseStoreFiles() throws Exception {
+        DoltConnections.closeProject(project);
+        StoreHandles.assertReleased(project);
+    }
 
     @Test
     void schemaCreateAndMigrateUsesWalAndBusyTimeout() throws Exception {

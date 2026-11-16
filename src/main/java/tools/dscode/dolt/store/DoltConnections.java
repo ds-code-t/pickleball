@@ -11,13 +11,17 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Per-JVM pool keyed by project and branch. At most four connections.
  * Idle connections older than 60 seconds are closed on borrow and return.
- * No extra pool library.
+ * When nothing is borrowed, the pool closes those connections and checkpoints
+ * WAL so the database files can be deleted. No extra pool library.
  */
 public final class DoltConnections {
     public static final int MAX = 4;
@@ -177,60 +181,46 @@ public final class DoltConnections {
     public static void closeBranch(java.nio.file.Path project, String branch) {
         String key = project.toAbsolutePath().normalize() + "|" + branch;
         Pool pool = POOLS.remove(key);
-        if (pool != null) {
-            synchronized (pool) {
-                int borrowed = pool.open - pool.idle.size();
-                Held held;
-                while ((held = pool.idle.pollFirst()) != null) closeQuiet(held.connection);
-                pool.open = Math.max(0, borrowed);
-            }
-        }
+        if (pool != null) releaseEvery(pool);
         clearOwnLease(project, branch);
     }
 
     public static void closeProject(java.nio.file.Path project) {
+        if (project == null) return;
         String prefix = project.toAbsolutePath().normalize() + "|";
-        java.util.List<String> keys = new java.util.ArrayList<>();
+        List<String> keys = new ArrayList<>();
         for (String key : POOLS.keySet()) {
             if (key.startsWith(prefix)) keys.add(key);
         }
         for (String key : keys) {
             Pool pool = POOLS.remove(key);
-            if (pool == null) continue;
-            synchronized (pool) {
-                Held held;
-                while ((held = pool.idle.pollFirst()) != null) closeQuiet(held.connection);
-                pool.open = 0;
-            }
+            if (pool != null) releaseEvery(pool);
         }
     }
 
     public static void closeAll() {
-        for (Pool pool : POOLS.values()) {
-            synchronized (pool) {
-                Held held;
-                while ((held = pool.idle.pollFirst()) != null) closeQuiet(held.connection);
-                pool.open = 0;
-            }
-        }
+        List<Pool> pools = new ArrayList<>(POOLS.values());
         POOLS.clear();
+        for (Pool pool : pools) releaseEvery(pool);
     }
 
     static void giveBack(Pool pool, Connection connection) {
         synchronized (pool) {
             evict(pool);
+            if (connection == null) {
+                if (fullyIdle(pool)) releaseIdle(pool);
+                pool.notifyAll();
+                return;
+            }
             boolean live = false;
             try {
-                live = connection != null && !connection.isClosed() && connection.isValid(1);
+                live = !connection.isClosed() && connection.isValid(1);
             } catch (SQLException ignored) {
                 live = false;
             }
-            if (!live) {
-                closeQuiet(connection);
-                if (pool.open > 0) pool.open--;
-            } else {
-                pool.idle.addLast(new Held(connection, System.currentTimeMillis()));
-            }
+            if (!live) retire(pool, connection);
+            else pool.idle.addLast(new Held(connection, System.currentTimeMillis()));
+            if (fullyIdle(pool)) releaseIdle(pool);
             pool.notifyAll();
         }
     }
@@ -247,12 +237,12 @@ public final class DoltConnections {
                     } catch (SQLException ignored) {
                         // fall through and replace it
                     }
-                    closeQuiet(held.connection);
-                    if (pool.open > 0) pool.open--;
+                    retire(pool, held.connection);
                     continue;
                 }
                 if (pool.open < MAX) {
                     Connection created = SqliteOpen.open(pool.file);
+                    pool.live.add(created);
                     pool.open++;
                     return created;
                 }
@@ -273,8 +263,123 @@ public final class DoltConnections {
         Held held;
         while ((held = pool.idle.peekFirst()) != null && held.returnedAt < cutoff) {
             pool.idle.pollFirst();
-            closeQuiet(held.connection);
+            retire(pool, held.connection);
+        }
+    }
+
+    private static boolean fullyIdle(Pool pool) {
+        return pool.live.size() == pool.idle.size();
+    }
+
+    /** Drops one connection. Checkpoints WAL when it was the last handle on the file. */
+    private static void retire(Pool pool, Connection connection) {
+        pool.live.remove(connection);
+        if (pool.open > 0) pool.open--;
+        releaseConnection(connection, pool.live.isEmpty());
+    }
+
+    private static void releaseIdle(Pool pool) {
+        List<Connection> closing = new ArrayList<>();
+        Held held;
+        while ((held = pool.idle.pollFirst()) != null) {
+            pool.live.remove(held.connection);
             if (pool.open > 0) pool.open--;
+            closing.add(held.connection);
+        }
+        finish(closing);
+    }
+
+    private static void releaseEvery(Pool pool) {
+        synchronized (pool) {
+            pool.idle.clear();
+            List<Connection> closing = new ArrayList<>(pool.live);
+            pool.live.clear();
+            pool.open = 0;
+            finish(closing);
+            pool.notifyAll();
+        }
+    }
+
+    private static void finish(List<Connection> closing) {
+        for (int index = 0; index < closing.size(); index++) {
+            releaseConnection(closing.get(index), index == closing.size() - 1);
+        }
+    }
+
+    /**
+     * Detaches extra databases, checkpoints WAL on the last handle, and closes
+     * the connection. sqlite-jdbc finalizes leftover statements inside {@code close}.
+     */
+    private static void releaseConnection(Connection connection, boolean last) {
+        if (connection == null) return;
+        try {
+            if (connection.isClosed()) return;
+            forget(connection);
+            try {
+                if (!connection.getAutoCommit()) {
+                    connection.rollback();
+                    connection.setAutoCommit(true);
+                }
+            } catch (SQLException ignored) {
+                // A connection that cannot leave a transaction is still closed below.
+            }
+            List<String> attached = attachedNames(connection);
+            if (last) checkpointAttached(connection, attached);
+            for (String name : attached) detach(connection, name);
+            if (last) checkpointMain(connection);
+            connection.close();
+        } catch (SQLException ignored) {
+            try {
+                connection.close();
+            } catch (SQLException ignoredAgain) {
+                // A closed connection is the state we wanted.
+            }
+        }
+    }
+
+    private static List<String> attachedNames(Connection connection) {
+        List<String> names = new ArrayList<>();
+        try (Statement statement = connection.createStatement();
+             ResultSet rows = statement.executeQuery("PRAGMA database_list")) {
+            while (rows.next()) {
+                String name = rows.getString("name");
+                if (name == null) continue;
+                if (name.equalsIgnoreCase("main") || name.equalsIgnoreCase("temp")) continue;
+                if (name.matches("[A-Za-z_][A-Za-z0-9_]*")) names.add(name);
+            }
+        } catch (SQLException ignored) {
+            // A connection that cannot list databases is still closed by the caller.
+        }
+        return names;
+    }
+
+    private static void checkpointAttached(Connection connection, List<String> attached) {
+        try (Statement statement = connection.createStatement()) {
+            for (String name : attached) {
+                try {
+                    statement.execute("PRAGMA " + name + ".wal_checkpoint(TRUNCATE)");
+                } catch (SQLException ignored) {
+                    // A read-only attach may refuse a checkpoint. Detach still drops its lock.
+                }
+            }
+        } catch (SQLException ignored) {
+            // The main checkpoint and close still run.
+        }
+    }
+
+    private static void detach(Connection connection, String name) {
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("DETACH DATABASE " + name);
+        } catch (SQLException ignored) {
+            // Detach is best-effort. Closing the connection drops the attach.
+        }
+    }
+
+    private static void checkpointMain(Connection connection) {
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("PRAGMA wal_checkpoint(TRUNCATE)");
+        } catch (SQLException ignored) {
+            // Close still releases the handle. A later open checkpoints again.
         }
     }
 
@@ -286,18 +391,9 @@ public final class DoltConnections {
         }
     }
 
-    private static void closeQuiet(Connection connection) {
-        forget(connection);
-        if (connection == null) return;
-        try {
-            connection.close();
-        } catch (SQLException ignored) {
-            // A closed connection is the state we wanted.
-        }
-    }
-
     static final class Pool {
         final ArrayDeque<Held> idle = new ArrayDeque<>();
+        final Set<Connection> live = new HashSet<>();
         final Path file;
         int open;
 

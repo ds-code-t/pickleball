@@ -1,5 +1,6 @@
 package tools.dscode.dolt;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -11,6 +12,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import tools.dscode.dolt.store.DoltConnections;
 import tools.dscode.dolt.store.LegacySqliteFixture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -24,6 +26,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class DoltSchemaUpgradeTest {
     @TempDir
     Path project;
+
+    @AfterEach
+    void releaseStoreFiles() throws Exception {
+        DoltConnections.closeProject(project);
+        StoreHandles.assertReleased(project);
+    }
 
     @Test
     void previousSchemaUpgradesInPlace() throws Exception {
