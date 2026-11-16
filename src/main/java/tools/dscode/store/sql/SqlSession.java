@@ -125,19 +125,11 @@ public final class SqlSession implements AutoCloseable {
             run.setAutoCommit(false);
             try {
                 work.run();
-                run.commit();
+                commitIdle(run);
                 connection.commit();
             } catch (SQLException failure) {
-                try {
-                    run.rollback();
-                } catch (SQLException ignored) {
-                    // The original failure is the one the caller needs.
-                }
-                try {
-                    connection.rollback();
-                } catch (SQLException ignored) {
-                    // The original failure is the one the caller needs.
-                }
+                rollbackIdle(run);
+                rollbackIdle(connection);
                 throw failure;
             } finally {
                 inTransaction = false;
@@ -153,6 +145,32 @@ public final class SqlSession implements AutoCloseable {
                 }
             }
         });
+    }
+
+    /**
+     * A connection with {@code setAutoCommit(false)} and no statement has no
+     * SQLite transaction on some hosts. Committing it then fails with
+     * {@code cannot commit - no transaction is active}.
+     */
+    private static void commitIdle(Connection connection) throws SQLException {
+        try {
+            connection.commit();
+        } catch (SQLException failure) {
+            if (!inactive(failure)) throw failure;
+        }
+    }
+
+    private static void rollbackIdle(Connection connection) {
+        try {
+            connection.rollback();
+        } catch (SQLException ignored) {
+            // The original failure is the one the caller needs.
+        }
+    }
+
+    private static boolean inactive(SQLException failure) {
+        String message = failure.getMessage() == null ? "" : failure.getMessage().toLowerCase(java.util.Locale.ROOT);
+        return message.contains("no transaction is active");
     }
 
     @Override
