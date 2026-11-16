@@ -462,7 +462,7 @@ In-page surfaces live in `tools.dscode.common.agentcontrol`. The popup lives in 
 
 `highlight --target=native`, and a desktop highlight that already has bounds, draws four 3 px `#ff2d55` strips from `--x --y --width --height` or from the bounds on `--query` JSON. HiDPI uses `GraphicsConfiguration.getDefaultTransform()`. A headless runtime returns `drawn=false` `reason=headless`. The caption goes to the popup Instructions pane. The Workbench caption window is used only when the result says `popup=false`. Channel, discovery, and the routing table are in `docs/direct-control-handoff.md`.
 
-Visual in-page components stay on this spine. The contract is `docs/roadmaps/3.0.0-visual-components-roadmap.md` (label, border, arrow, numbered step badge, magnifier, spotlight, overlay width and height). Baseline: `SurfaceAssets` kinds are html, overlay, and highlight; overlay does not store width or height; `PageSurfaces.highlight` ignores x, y, width, and height; `rememberGeometry` stores only a point.
+Visual in-page components stay on this spine. The contract is `docs/roadmaps/3.0.0-visual-components-roadmap.md` (label, border, arrow, numbered step badge, magnifier, spotlight, overlay width and height). `PageSurfaces.highlight` ignores x, y, width, and height. `rememberGeometry` stores only a point. Overlay `--width` and `--height` are stored and used only when no resolved element box is available. A resolved box (visual-viewport width and height, or the same width and height on the native query path) is the box. The overlay callout colors, border, and padding stay fixed.
 
 ## Workbench
 

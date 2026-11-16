@@ -35,9 +35,27 @@ public final class AgentControl {
         PageSurfaces.rememberGeometry(handle, x, y);
     }
 
-    /** Query-time owner. Not inferred again from global focus when the box is stored. */
+    /** Query-time owner. Not inferred again from global focus when the point is stored. */
     public static void rememberGeometry(String handle, double x, double y, WebDriver owner, String tab) {
         PageSurfaces.rememberGeometry(handle, x, y, owner, tab);
+    }
+
+    /** Resolved element box. Separate from the point stored by {@link #rememberGeometry}. */
+    public static void rememberBounds(String handle, double x, double y, double width, double height) {
+        PageSurfaces.rememberBounds(handle, x, y, width, height);
+    }
+
+    public static void rememberBounds(String handle, double x, double y, double width, double height, WebDriver owner, String tab) {
+        PageSurfaces.rememberBounds(handle, x, y, width, height, owner, tab);
+    }
+
+    /** Point previously stored by {@link #rememberGeometry}, or null. */
+    public static int[] rememberedPoint(String handle) {
+        return PageSurfaces.rememberedPoint(handle);
+    }
+
+    public static void clearRememberedGeometry() {
+        PageSurfaces.clearGeometry();
     }
 
     /** Binds browser and tab onto the handle itself, including hits with no visual geometry. */
@@ -285,7 +303,9 @@ public final class AgentControl {
                 integerOrNull(args.get("x")),
                 integerOrNull(args.get("y")),
                 args.get("geometry"),
-                AgentStore.root(project, runId)
+                AgentStore.root(project, runId),
+                integerOrNull(args.get("width")),
+                integerOrNull(args.get("height"))
         );
         placed.put("ok", true);
         return new Result(0, placed);

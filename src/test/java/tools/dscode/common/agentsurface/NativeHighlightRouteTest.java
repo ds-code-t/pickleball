@@ -30,4 +30,20 @@ class NativeHighlightRouteTest {
             NativeHighlight.queries = query -> "{}";
         }
     }
+
+    @Test
+    void overlayQueryUsesTheSameBoundsAsHighlight() throws Exception {
+        NativeHighlight.queries = query -> "{\"x\":2,\"y\":3,\"width\":44,\"height\":15}";
+        try {
+            var result = AgentSurfaceRouter.route(project, "nat", "overlay", Map.of(
+                    "target", "native", "query", "role=button", "text", "q"), "a").orElseThrow();
+            assertEquals(44, result.body().get("width"));
+            assertEquals(15, result.body().get("height"));
+            assertEquals("resolved", result.body().get("boundsSource"));
+            assertEquals("native", result.body().get("target"));
+            if (Boolean.FALSE.equals(result.body().get("drawn"))) assertEquals("headless", result.body().get("reason"));
+        } finally {
+            NativeHighlight.queries = query -> "{}";
+        }
+    }
 }

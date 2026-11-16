@@ -162,9 +162,16 @@ public final class AgentSurfaceRouter {
     }
 
     private static AgentControl.Result nativeHighlight(Path project, String runId, String op, Map<String, String> args) throws Exception {
-        if ("unhighlight".equals(op)) {
+        if ("unhighlight".equals(op) || "overlay-remove".equals(op)) {
             String id = text(args.get("id"), args.get("handle"), "native");
             Map<String, Object> body = NativeHighlight.hide(id);
+            body.put("ok", true);
+            body.put("target", "native");
+            body.put("op", op);
+            return new AgentControl.Result(0, body);
+        }
+        if ("overlay".equals(op)) {
+            Map<String, Object> body = NativeOverlay.show(project, runId, args);
             body.put("ok", true);
             body.put("target", "native");
             body.put("op", op);
@@ -203,7 +210,9 @@ public final class AgentSurfaceRouter {
         else target = target.trim().toLowerCase();
         if ("page".equals(target)) return new Decision("page", "explicit-page", false);
         if ("popup".equals(target)) return new Decision("popup", "explicit-popup", true);
-        if ("native".equals(target)) return new Decision(highlightOp(op) ? "native" : "page", "explicit-native", false);
+        if ("native".equals(target)) {
+            return new Decision(nativeOp(op) ? "native" : "page", "explicit-native", false);
+        }
         boolean desktop = desktop(project, runId, args);
         boolean filePage = present(args.get("html")) || present(args.get("page"));
         if (filePage && "auto".equals(target)) return new Decision("page", "explicit-html-file", false);
@@ -213,6 +222,9 @@ public final class AgentSurfaceRouter {
             if (highlightOp(op)) return new Decision("page", "always-highlight-stays-on-page", false);
             if (present(args.get("handle"))) return new Decision("page", "handle-anchored", false);
             return new Decision("popup", "always-unanchored", true);
+        }
+        if (desktop && "overlay".equals(op) && (bounds(args) || present(args.get("query")))) {
+            return new Decision("native", "desktop-bounds", false);
         }
         if ("chat-send".equals(op) || "overlay-poll".equals(op) || op.startsWith("html-") || op.startsWith("overlay")) {
             return new Decision("popup", "desktop", openFor(mode, args));
@@ -252,6 +264,10 @@ public final class AgentSurfaceRouter {
 
     private static boolean highlightOp(String op) {
         return "highlight".equals(op) || "unhighlight".equals(op);
+    }
+
+    private static boolean nativeOp(String op) {
+        return highlightOp(op) || "overlay".equals(op) || "overlay-remove".equals(op);
     }
 
     private static String pane(Map<String, String> args, String kind) {

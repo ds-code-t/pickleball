@@ -112,7 +112,12 @@ if (spec.kind === 'overlay') {
   host.style.background = '#fffef2';
   host.style.border = '2px solid #222';
   host.style.padding = '8px';
-  host.style.maxWidth = '280px';
+  if (spec.width != null && spec.width !== '' && spec.height != null && spec.height !== '') {
+    host.style.width = spec.width + 'px';
+    host.style.height = spec.height + 'px';
+  } else {
+    host.style.maxWidth = '280px';
+  }
 } else if (spec.css) host.setAttribute('style', spec.css);
 if (op === 'replace' && anchor) {
   window.__pkbUndo = window.__pkbUndo || {};

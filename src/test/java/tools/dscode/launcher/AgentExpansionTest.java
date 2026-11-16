@@ -3,6 +3,7 @@ package tools.dscode.launcher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.common.composite.CompositeRuntime;
+import tools.dscode.common.agentcontrol.AgentControl;
 import tools.dscode.common.agentcontrol.LaunchTemplates;
 import tools.dscode.common.agentcontrol.ObserveEvents;
 import tools.dscode.common.agentcontrol.ScenarioCapture;
@@ -202,6 +203,85 @@ class AgentExpansionTest {
         assertTrue(html.contains("click here"), html);
         assertFalse(html.contains("<script"), html);
         assertTrue(html.contains("left:12px"), html);
+    }
+
+    @Test
+    void overlayStoresWidthAndResolvedBoundsWin() throws Exception {
+        Path page = page();
+        Capture stored = agent(
+                "overlay", temp.toString(), "--html=" + page, "--text=sized",
+                "--x=3", "--y=4", "--width=40", "--height=16", "--target=page"
+        );
+        assertEquals(0, stored.code, stored.err);
+        assertTrue(stored.out.contains("\"width\":40"), stored.out);
+        assertTrue(stored.out.contains("\"height\":16"), stored.out);
+        assertTrue(stored.out.contains("\"boundsSource\":\"stored\""), stored.out);
+        assertTrue(stored.out.contains("#fffef2") || Files.readString(page).contains("#fffef2"));
+        String html = Files.readString(page);
+        assertTrue(html.contains("width:40px"), html);
+        assertTrue(html.contains("height:16px"), html);
+        assertTrue(html.contains("background:#fffef2"), html);
+
+        Capture geometry = agent(
+                "overlay", temp.toString(), "--html=" + page, "--text=geom",
+                "--width=9", "--height=9", "--target=page",
+                "--geometry={\"visual_viewport_relative\":{\"x\":5,\"y\":6,\"width\":70,\"height\":18}}"
+        );
+        assertEquals(0, geometry.code, geometry.err);
+        assertTrue(geometry.out.contains("\"width\":70"), geometry.out);
+        assertTrue(geometry.out.contains("\"boundsSource\":\"resolved\""), geometry.out);
+        assertTrue(Files.readString(page).contains("left:5px"), Files.readString(page));
+        assertTrue(Files.readString(page).contains("width:70px"), Files.readString(page));
+
+        AgentControl.rememberBounds("save", 11, 12, 80, 22);
+        try {
+            AgentControl.Result result = AgentControl.execute(temp, "ovb", "overlay", Map.of(
+                    "text", "box",
+                    "handle", "save",
+                    "html", page.toString(),
+                    "target", "page",
+                    "x", "1",
+                    "y", "2",
+                    "width", "9",
+                    "height", "9"
+            ), List.of(), "a");
+            assertEquals(0, result.exit(), String.valueOf(result.body()));
+            assertEquals(80, result.body().get("width"));
+            assertEquals(22, result.body().get("height"));
+            assertEquals("resolved", result.body().get("boundsSource"));
+            assertEquals(11, result.body().get("x"));
+            assertTrue(Files.readString(page).contains("width:80px"));
+        } finally {
+            AgentControl.clearRememberedGeometry();
+        }
+
+        AgentControl.rememberGeometry("only-point", 8.4, 9.6);
+        try {
+            int[] point = AgentControl.rememberedPoint("only-point");
+            assertEquals(2, point.length);
+            assertEquals(8, point[0]);
+            assertEquals(10, point[1]);
+        } finally {
+            AgentControl.clearRememberedGeometry();
+        }
+
+        Capture ignored = agent(
+                "highlight", temp.toString(), "--handle=save", "--preset=yellow",
+                "--html=" + page, "--x=1", "--y=2", "--width=50", "--height=60", "--target=page"
+        );
+        assertEquals(0, ignored.code, ignored.err);
+        assertFalse(Files.readString(page).contains("width:50px"), Files.readString(page));
+
+        AgentControl.Result nativeBox = AgentControl.execute(temp, "nat", "overlay", Map.of(
+                "target", "native", "text", "cap", "x", "8", "y", "9", "width", "30", "height", "12"
+        ), List.of(), "a");
+        assertEquals(0, nativeBox.exit(), String.valueOf(nativeBox.body()));
+        assertEquals("native", nativeBox.body().get("target"));
+        assertEquals(30, nativeBox.body().get("width"));
+        assertEquals("stored", nativeBox.body().get("boundsSource"));
+        if (Boolean.FALSE.equals(nativeBox.body().get("drawn"))) {
+            assertEquals("headless", nativeBox.body().get("reason"));
+        }
     }
 
     @Test

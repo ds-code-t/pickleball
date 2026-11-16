@@ -103,6 +103,55 @@ class LiveChromeCdpTest {
     }
 
     @Test
+    void overlayUsesTheCdpBoxAndIgnoresStoredSize() throws Exception {
+        String binary = chromeBinary();
+        Assumptions.assumeTrue(binary != null, "skipped: no Chrome binary on this machine");
+        browser = open(binary);
+        browser.get("data:text/html,<!doctype html><button id='save' style='width:80px;height:24px'>Save</button>");
+        PageSurfaces.manage(browser, "chrome-headless-quiet", false);
+        assertTrue(PageSurfaces.focus(browser), "page focus");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> model = (Map<String, Object>) browser.executeCdpCommand(
+                "DOM.getBoxModel", Map.of("nodeId", nodeId(browser, "#save")));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> boxModel = (Map<String, Object>) model.get("model");
+        @SuppressWarnings("unchecked")
+        List<Object> quad = (List<Object>) boxModel.get("border");
+        double left = ((Number) quad.get(0)).doubleValue();
+        double top = ((Number) quad.get(1)).doubleValue();
+        double right = ((Number) quad.get(2)).doubleValue();
+        double bottom = ((Number) quad.get(5)).doubleValue();
+        int width = (int) Math.round(right - left);
+        int height = (int) Math.round(bottom - top);
+        assertTrue(width > 0 && height > 0, width + "x" + height);
+        String handle = "save";
+        PageSurfaces.rememberBounds(handle, left, top, width, height, browser, browser.getWindowHandle());
+        Map<String, Object> placed = PageSurfaces.place(
+                null, "append", handle, null, "here", "overlay", 1, 2, null, null, 9, 9);
+        assertEquals("resolved", placed.get("boundsSource"), placed.toString());
+        assertEquals(width, placed.get("width"));
+        assertEquals(height, placed.get("height"));
+        Object liveWidth = ((JavascriptExecutor) browser).executeScript(
+                "var n=document.querySelector('[data-pkb-kind=overlay]'); return n ? n.style.width : ''");
+        assertEquals(width + "px", String.valueOf(liveWidth), placed.toString());
+        int[] point = PageSurfaces.rememberedPoint(handle);
+        assertEquals(null, point);
+    }
+
+    private static int nodeId(ChromeDriver browser, String selector) {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> document = (Map<String, Object>) browser.executeCdpCommand(
+                "DOM.getDocument", Map.of("depth", 1, "pierce", false));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> root = (Map<String, Object>) document.get("root");
+        int rootId = ((Number) root.get("nodeId")).intValue();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> found = (Map<String, Object>) browser.executeCdpCommand(
+                "DOM.querySelector", Map.of("nodeId", rootId, "selector", selector));
+        return ((Number) found.get("nodeId")).intValue();
+    }
+
+    @Test
     void cleanupHidesHighlightOnAFreshCdpSession() throws Exception {
         String binary = chromeBinary();
         Assumptions.assumeTrue(binary != null, "skipped: no Chrome binary on this machine");
