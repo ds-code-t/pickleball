@@ -59,7 +59,8 @@ jobs:
             --tests tools.dscode.dolt.DoltSandboxRunStateTest \
             --tests tools.dscode.dolt.DoltSandboxIsolationTest \
             --tests tools.dscode.dolt.DoltSandboxWorkerTest \
-            --tests tools.dscode.dolt.DoltSandboxPruneTest
+            --tests tools.dscode.dolt.DoltSandboxPruneTest \
+            --tests tools.dscode.dolt.DoltSandboxHardenTest
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -137,7 +138,8 @@ jobs:
             --tests tools.dscode.dolt.DoltSandboxRunStateTest \
             --tests tools.dscode.dolt.DoltSandboxIsolationTest \
             --tests tools.dscode.dolt.DoltSandboxWorkerTest \
-            --tests tools.dscode.dolt.DoltSandboxPruneTest
+            --tests tools.dscode.dolt.DoltSandboxPruneTest \
+            --tests tools.dscode.dolt.DoltSandboxHardenTest
 
       - name: Install Chrome for Testing
         shell: bash

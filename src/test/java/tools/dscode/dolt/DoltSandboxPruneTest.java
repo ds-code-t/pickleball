@@ -108,6 +108,10 @@ class DoltSandboxPruneTest {
             assertTrue(rows.next(), "history stays without --with-history");
         }
 
+        DoltScope.clear();
+        DoltScope.bind(Binding.sandbox("linbox"));
+        DoltRun.stop(project);
+        DoltScope.clear();
         Capture withHistory = cli("dolt", "sandbox", "prune", "--older-than=1h", "--owner=lin",
                 "--with-history", "--project=" + project);
         assertEquals(0, withHistory.code, withHistory.err);

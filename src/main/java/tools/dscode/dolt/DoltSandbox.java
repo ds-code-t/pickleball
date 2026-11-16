@@ -261,10 +261,13 @@ public final class DoltSandbox {
             out.println("dry-run " + victims.size());
             return 0;
         }
+        int dropped = 0;
         for (Row row : victims) {
             Binding binding = Binding.sandbox(row.name());
             if (DoltConnections.branchInUse(project, binding.branch())) {
-                DoltConnections.closeBranch(project, binding.branch());
+                out.println("skipped " + row.name() + " in use");
+                DoltLog.log(project, "sandbox", row.name(), row.name(), "prune skipped in use");
+                continue;
             }
             try (DoltStore store = DoltStore.open(project, Binding.main())) {
                 DoltSession session = store.session();
@@ -290,11 +293,12 @@ public final class DoltSandbox {
             deleteTree(DoltPaths.sandboxHome(project, row.name()));
             out.println("dropped " + row.name());
             DoltLog.log(project, "sandbox", row.name(), row.name(), history ? "prune history" : "prune");
+            dropped++;
         }
         try (DoltStore store = DoltStore.open(project, Binding.main())) {
             store.session().script("CALL DOLT_GC()");
         }
-        out.println("gc " + victims.size());
+        out.println("gc " + dropped);
         return 0;
     }
 
