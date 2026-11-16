@@ -11,7 +11,7 @@ import tools.dscode.control.protocol.WindowDriver;
 import tools.dscode.control.protocol.ControlBridgeStepResolution;
 import tools.dscode.workbench.WorkbenchSessionActions;
 import tools.dscode.workbench.catalog.CatalogTargetResolver;
-import tools.dscode.workbench.dolt.DoltCliForwarder;
+import tools.dscode.workbench.store.StoreCliForwarder;
 import tools.dscode.workbench.catalog.ConsumerFeatureCatalog;
 import tools.dscode.workbench.catalog.JavaGlueIndex;
 import tools.dscode.workbench.diagnostics.DiagnosticEvidenceNavigator;
@@ -588,10 +588,10 @@ final class WorkbenchFrame extends JFrame {
         rightTabs.addTab("Terminal", terminal);
         rightTabs.addTab("Explorer", diagnosticsPanel());
         rightTabs.addTab("Report", reportPanel());
-        rightTabs.addTab("Dolt", new DoltPanel(() -> controller.projectRoot()));
+        rightTabs.addTab("Store", new StorePanel(() -> controller.projectRoot()));
         rightTabs.addTab("Tracking", new TrackingPanel(
                 () -> controller.projectRoot(),
-                DoltCliForwarder::run,
+                StoreCliForwarder::run,
                 this::openRecordedRun));
         rightTabs.addTab("Editor", new EditPanel(() -> controller.projectRoot()));
         rightTabs.addTab("Logs", new LogPanel(() -> controller.projectRoot()));

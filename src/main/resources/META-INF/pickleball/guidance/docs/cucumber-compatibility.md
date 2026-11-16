@@ -76,7 +76,7 @@ Cucumber CLI `--tags` / `--name` / `--glue` projection can overlay ordinary and 
 
 ## Native engine CLI
 
-`engine run` and `engine step` run ordinary glue from text, a step list, a file, or a Dolt row. They do not start Cucumber. Gradle `engineRun`, Workbench, and MCP `engine` only forward to that CLI. A normal JUnit run uses the native engine. Set `pkb_engine=cucumber` (or `PKB_ENGINE`, or `engine.properties` `mode=cucumber`) to select the Cucumber adapter. The default is `native`, and the adapter stays available.
+`engine run` and `engine step` run ordinary glue from text, a step list, a file, or a Store row. They do not start Cucumber. Gradle `engineRun`, Workbench, and MCP `engine` only forward to that CLI. A normal JUnit run uses the native engine. Set `pkb_engine=cucumber` (or `PKB_ENGINE`, or `engine.properties` `mode=cucumber`) to select the Cucumber adapter. The default is `native`, and the adapter stays available.
 
 `pkb_engine=cucumber` still selects the adapter. The adapter remains supported, and the Cucumber aspects it uses stay in place.
 
@@ -84,7 +84,7 @@ Cucumber CLI `--tags` / `--name` / `--glue` projection can overlay ordinary and 
 
 Cucumber is an isolated legacy adapter. Gherkin syntax libraries (`io.cucumber.gherkin`, `io.cucumber.messages`, cucumber-expressions, tag-expressions, datatable, docstring, and the step annotations) stay allowed everywhere, because Gherkin syntax and step annotations do not change. `CucumberBoundaryTest` enforces the rest:
 
-- The core spine imports nothing from `io.cucumber`: `tools.dscode.dolt`, `engine.model`, `engine.source`, `engine.parity`, `browser`, `common.agentcontrol`, `common.agentsurface`, `common.composite`, `common.domoperations`, `common.browseroperations`, `common.seleniumextensions`, `common.servicecalls`, `common.trace`, `common.runtime`, `registry`, `release`, `parallelutilities`, and the Workbench, DOM engine, and control protocol modules.
+- The core spine imports nothing from `io.cucumber`: `tools.dscode.store`, `engine.model`, `engine.source`, `engine.parity`, `browser`, `common.agentcontrol`, `common.agentsurface`, `common.composite`, `common.domoperations`, `common.browseroperations`, `common.seleniumextensions`, `common.servicecalls`, `common.trace`, `common.runtime`, `registry`, `release`, `parallelutilities`, and the Workbench, DOM engine, and control protocol modules.
 - The Cucumber listener stays in `tools.dscode.engine.adapter.cucumber`, and the `io.cucumber.*` overlay under `src/main/java/io/cucumber` is the adapter itself.
 - Any other main file that imports a Cucumber runtime type (`io.cucumber.core`, `io.cucumber.plugin`, `io.cucumber.junit`, `io.cucumber.java.Scenario`) is listed in `src/test/resources/architecture/cucumber-runtime-allowlist.txt`. A new file fails the test. A listed file that no longer imports one also fails, so the list only shrinks.
 

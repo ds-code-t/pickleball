@@ -47,9 +47,9 @@ jobs:
         run: |
           set -euo pipefail
           ./gradlew --no-daemon :test \
-            --tests tools.dscode.dolt.EmbeddedStoreOpenTest \
-            --tests tools.dscode.dolt.NoRuntimeDownloadTest \
-            --tests tools.dscode.dolt.StoreFileReleaseTest
+            --tests tools.dscode.store.EmbeddedStoreOpenTest \
+            --tests tools.dscode.store.NoRuntimeDownloadTest \
+            --tests tools.dscode.store.StoreFileReleaseTest
           echo "STORE_OPEN_MS=$(tr -d '\r' < build/store-open-ms.txt)"
           echo "STORE_OPEN_SPACES_MS=$(tr -d '\r' < build/store-open-spaces-ms.txt)"
           echo "${RUNNER_OS} store open: $(tr -d '\r' < build/store-open-ms.txt) ms; path with spaces: $(tr -d '\r' < build/store-open-spaces-ms.txt) ms" >> "$GITHUB_STEP_SUMMARY"
@@ -59,15 +59,15 @@ jobs:
         run: |
           set -euo pipefail
           ./gradlew --no-daemon :test \
-            --tests tools.dscode.dolt.store.DoltDialectInventoryTest \
-            --tests tools.dscode.dolt.store.DoltDialectTrapsTest \
-            --tests tools.dscode.dolt.store.DoltSchemaTest \
-            --tests tools.dscode.dolt.DoltSchemaUpgradeTest \
-            --tests tools.dscode.dolt.DoltFoundationTest \
-            --tests tools.dscode.dolt.store.DoltConcurrencyTest \
-            --tests tools.dscode.dolt.DoltDriverMissingTest \
-            --tests tools.dscode.dolt.store.ChangeLogTriggerTest \
-            --tests tools.dscode.dolt.store.RunStateRouterTest
+            --tests tools.dscode.store.sql.StoreDialectInventoryTest \
+            --tests tools.dscode.store.sql.StoreDialectTrapsTest \
+            --tests tools.dscode.store.sql.StoreSchemaTest \
+            --tests tools.dscode.store.StoreSchemaUpgradeTest \
+            --tests tools.dscode.store.StoreFoundationTest \
+            --tests tools.dscode.store.sql.StoreConcurrencyTest \
+            --tests tools.dscode.store.StoreDriverMissingTest \
+            --tests tools.dscode.store.sql.ChangeLogTriggerTest \
+            --tests tools.dscode.store.sql.RunStateRouterTest
 
       - name: Agent surface popup live (real Chromium, must not skip)
         shell: bash
@@ -119,7 +119,7 @@ jobs:
         run: .\gradlew.bat --no-daemon :dom-engine:test --tests dev.domengine.snapshot.SnapshotCoverageTest.liveDesktopWhenThePlatformExists
 
   macos:
-    name: macOS targeted Dolt and core
+    name: macOS targeted Store and core
     runs-on: macos-latest
     timeout-minutes: 60
     steps:
@@ -148,9 +148,9 @@ jobs:
         run: |
           set -euo pipefail
           ./gradlew --no-daemon :test \
-            --tests tools.dscode.dolt.EmbeddedStoreOpenTest \
-            --tests tools.dscode.dolt.NoRuntimeDownloadTest \
-            --tests tools.dscode.dolt.StoreFileReleaseTest
+            --tests tools.dscode.store.EmbeddedStoreOpenTest \
+            --tests tools.dscode.store.NoRuntimeDownloadTest \
+            --tests tools.dscode.store.StoreFileReleaseTest
           echo "STORE_OPEN_MS=$(tr -d '\r' < build/store-open-ms.txt)"
           echo "STORE_OPEN_SPACES_MS=$(tr -d '\r' < build/store-open-spaces-ms.txt)"
           echo "${RUNNER_OS} store open: $(tr -d '\r' < build/store-open-ms.txt) ms; path with spaces: $(tr -d '\r' < build/store-open-spaces-ms.txt) ms" >> "$GITHUB_STEP_SUMMARY"
@@ -159,15 +159,15 @@ jobs:
         run: |
           set -euo pipefail
           ./gradlew --no-daemon :test \
-            --tests tools.dscode.dolt.store.DoltDialectInventoryTest \
-            --tests tools.dscode.dolt.store.DoltDialectTrapsTest \
-            --tests tools.dscode.dolt.store.DoltSchemaTest \
-            --tests tools.dscode.dolt.DoltSchemaUpgradeTest \
-            --tests tools.dscode.dolt.DoltFoundationTest \
-            --tests tools.dscode.dolt.store.DoltConcurrencyTest \
-            --tests tools.dscode.dolt.DoltDriverMissingTest \
-            --tests tools.dscode.dolt.store.ChangeLogTriggerTest \
-            --tests tools.dscode.dolt.store.RunStateRouterTest
+            --tests tools.dscode.store.sql.StoreDialectInventoryTest \
+            --tests tools.dscode.store.sql.StoreDialectTrapsTest \
+            --tests tools.dscode.store.sql.StoreSchemaTest \
+            --tests tools.dscode.store.StoreSchemaUpgradeTest \
+            --tests tools.dscode.store.StoreFoundationTest \
+            --tests tools.dscode.store.sql.StoreConcurrencyTest \
+            --tests tools.dscode.store.StoreDriverMissingTest \
+            --tests tools.dscode.store.sql.ChangeLogTriggerTest \
+            --tests tools.dscode.store.sql.RunStateRouterTest
 
       - name: Targeted core agent surface and Cucumber boundary
         run: |
@@ -255,9 +255,9 @@ jobs:
         run: |
           set -euo pipefail
           ./gradlew --no-daemon :test \
-            --tests tools.dscode.dolt.EmbeddedStoreOpenTest \
-            --tests tools.dscode.dolt.NoRuntimeDownloadTest \
-            --tests tools.dscode.dolt.StoreFileReleaseTest
+            --tests tools.dscode.store.EmbeddedStoreOpenTest \
+            --tests tools.dscode.store.NoRuntimeDownloadTest \
+            --tests tools.dscode.store.StoreFileReleaseTest
           echo "STORE_OPEN_MS=$(tr -d '\r' < build/store-open-ms.txt)"
           echo "STORE_OPEN_SPACES_MS=$(tr -d '\r' < build/store-open-spaces-ms.txt)"
           echo "${RUNNER_OS} store open: $(tr -d '\r' < build/store-open-ms.txt) ms; path with spaces: $(tr -d '\r' < build/store-open-spaces-ms.txt) ms" >> "$GITHUB_STEP_SUMMARY"
@@ -266,15 +266,15 @@ jobs:
         run: |
           set -euo pipefail
           ./gradlew --no-daemon :test \
-            --tests tools.dscode.dolt.store.DoltDialectInventoryTest \
-            --tests tools.dscode.dolt.store.DoltDialectTrapsTest \
-            --tests tools.dscode.dolt.store.DoltSchemaTest \
-            --tests tools.dscode.dolt.DoltSchemaUpgradeTest \
-            --tests tools.dscode.dolt.DoltFoundationTest \
-            --tests tools.dscode.dolt.store.DoltConcurrencyTest \
-            --tests tools.dscode.dolt.DoltDriverMissingTest \
-            --tests tools.dscode.dolt.store.ChangeLogTriggerTest \
-            --tests tools.dscode.dolt.store.RunStateRouterTest
+            --tests tools.dscode.store.sql.StoreDialectInventoryTest \
+            --tests tools.dscode.store.sql.StoreDialectTrapsTest \
+            --tests tools.dscode.store.sql.StoreSchemaTest \
+            --tests tools.dscode.store.StoreSchemaUpgradeTest \
+            --tests tools.dscode.store.StoreFoundationTest \
+            --tests tools.dscode.store.sql.StoreConcurrencyTest \
+            --tests tools.dscode.store.StoreDriverMissingTest \
+            --tests tools.dscode.store.sql.ChangeLogTriggerTest \
+            --tests tools.dscode.store.sql.RunStateRouterTest
 
       - name: Install Chrome for Testing
         shell: bash

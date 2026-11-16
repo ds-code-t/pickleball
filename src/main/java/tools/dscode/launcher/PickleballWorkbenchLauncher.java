@@ -69,9 +69,9 @@ public final class PickleballWorkbenchLauncher {
             if (logs != 0) exitProcess(logs);
             return;
         }
-        int dolt = dispatchDoltIfAny(args, System.out, System.err);
-        if (dolt >= 0) {
-            if (dolt != 0) exitProcess(dolt);
+        int store = dispatchDoltIfAny(args, System.out, System.err);
+        if (store >= 0) {
+            if (store != 0) exitProcess(store);
             return;
         }
         if (WorkbenchCliHelp.isHelpRequest(args)) {
@@ -119,13 +119,13 @@ public final class PickleballWorkbenchLauncher {
     }
 
     /**
-     * Pickleball's dolt commands are a core CLI, not a Workbench verb.
-     * Returns {@code -1} when {@code args} are not a {@code dolt} invocation.
-     * This is not the Dolt binary.
+     * Pickleball's store commands are a core CLI, not a Workbench verb.
+     * Returns {@code -1} when {@code args} are not a {@code store} invocation.
+     * This is not the Store binary.
      */
     static int dispatchDoltIfAny(String[] args, PrintStream out, PrintStream err) {
-        if (!tools.dscode.dolt.DoltCli.handles(args)) return -1;
-        return tools.dscode.dolt.DoltCli.execute(args, out, err);
+        if (!tools.dscode.store.StoreCli.handles(args)) return -1;
+        return tools.dscode.store.StoreCli.execute(args, out, err);
     }
 
     /**

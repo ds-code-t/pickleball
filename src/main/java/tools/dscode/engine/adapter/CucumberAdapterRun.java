@@ -12,8 +12,8 @@ import io.cucumber.plugin.event.TestCaseStarted;
 import io.cucumber.plugin.event.TestStep;
 import io.cucumber.plugin.event.TestStepFinished;
 import tools.dscode.common.reporting.logging.Level;
-import tools.dscode.dolt.DoltConfig;
-import tools.dscode.engine.adapter.cucumber.DoltRunTracePlugin;
+import tools.dscode.store.StoreConfig;
+import tools.dscode.engine.adapter.cucumber.StoreRunTracePlugin;
 import tools.dscode.engine.model.RunResult;
 import tools.dscode.engine.model.ScenarioResult;
 import tools.dscode.engine.model.Status;
@@ -68,7 +68,7 @@ public final class CucumberAdapterRun {
                     };
             io.cucumber.core.runtime.Runtime.Builder runtimeBuilder = Runtime.builder()
                     .withRuntimeOptions(options.build());
-            if (DoltConfig.enabled()) runtimeBuilder.withAdditionalPlugins(recorder, new DoltRunTracePlugin());
+            if (StoreConfig.enabled()) runtimeBuilder.withAdditionalPlugins(recorder, new StoreRunTracePlugin());
             else runtimeBuilder.withAdditionalPlugins(recorder);
             Runtime runtime = runtimeBuilder.build();
             // Block conditionals log at DEBUG. INFO drops their finish events.

@@ -41,7 +41,7 @@ prompts/heavy-3.0.0-locked-G4-surfaces-dalton-rust.md
 prompts/heavy-3.0.0-locked-decisions-sweep.md
 prompts/heavy-3.0.0-locked-roadmaps.md
 scripts/rename-history-allowlist.txt
-src/main/java/tools/dscode/dolt/LegacyNames.java
+src/main/java/tools/dscode/store/LegacyNames.java
 src/main/resources/META-INF/pickleball/guidance/docs/agent/repository-index.md
 src/main/resources/META-INF/pickleball/guidance/docs/release-notes.md
-src/test/java/tools/dscode/dolt/LegacyNamesTest.java
+src/test/java/tools/dscode/store/LegacyNamesTest.java

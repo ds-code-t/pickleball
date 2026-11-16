@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CurrentDocsTest {
     private static final Pattern RUST = Pattern.compile("(?i)\\brust\\b");
     private static final Pattern OPT_IN = Pattern.compile("(?i)opt-in");
-    private static final Pattern DOLT = Pattern.compile("(?i)dolt");
+    private static final Pattern STORE = Pattern.compile("(?i)store");
     private static final Pattern ENGINE_RUST = Pattern.compile("pkb_composite_engine=rust");
     private static final Pattern HOME = Pattern.compile("COMPOSITE_HOME");
     private static final Pattern NATIVE = Pattern.compile("composite-native");
@@ -80,13 +80,13 @@ class CurrentDocsTest {
     }
 
     private static void optInNextToDolt(String rel, String text, List<String> hits) {
-        List<Integer> dolt = starts(DOLT, text);
+        List<Integer> store = starts(STORE, text);
         List<Integer> optIn = starts(OPT_IN, text);
-        for (int d : dolt) {
+        for (int d : store) {
             for (int o : optIn) {
                 if (Math.abs(d - o) <= OPT_IN_WINDOW) {
                     int line = text.substring(0, Math.min(d, o)).split("\n", -1).length;
-                    hits.add(rel + ":" + line + ": opt-in next to Dolt");
+                    hits.add(rel + ":" + line + ": opt-in next to Store");
                     return;
                 }
             }

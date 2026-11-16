@@ -9,7 +9,7 @@ import tools.dscode.control.protocol.SecretRedactor;
 import tools.dscode.control.protocol.ControlBridgeMappingSnapshot;
 import tools.dscode.control.protocol.DiagnosticQuery;
 import tools.dscode.workbench.WorkbenchServices;
-import tools.dscode.workbench.dolt.DoltCliForwarder;
+import tools.dscode.workbench.store.StoreCliForwarder;
 import tools.dscode.workbench.engine.DomEngineCliForwarder;
 import tools.dscode.workbench.engine.EngineCliForwarder;
 import tools.dscode.workbench.nav.WorkbenchGoLink;
@@ -384,12 +384,12 @@ final class WorkbenchMcpTools {
                     Object value = services.agentCommand(op, forwarded);
                     return value == null ? Map.of("status", "UNAVAILABLE", "op", op) : value;
                 });
-        add("dolt",
-                "Forwards arguments to the pickleball dolt CLI, including server, sandbox, query, timeline, and retain. Does not open the store.",
+        add("store",
+                "Forwards arguments to the pickleball store CLI, including server, sandbox, query, timeline, and retain. Does not open the store.",
                 schema(Map.of(
                         "args", Map.of(
                                 "type", "array",
-                                "description", "Arguments after dolt. Example: [\"status\"], [\"query\", \"--entity=Account#ada\", \"--tag=@pay\", \"--feature=features/pay.feature\", \"--run=sample-run\", \"--text=total\", \"--json\"], [\"timeline\", \"--latest\", \"--json\"], [\"timeline\", \"--before=<cursor>\", \"--json\"], [\"retain\", \"--days=30\"], [\"files\", \"list\", \"--json\"], [\"run\", \"--dry-run\"].",
+                                "description", "Arguments after store. Example: [\"status\"], [\"query\", \"--entity=Account#ada\", \"--tag=@pay\", \"--feature=features/pay.feature\", \"--run=sample-run\", \"--text=total\", \"--json\"], [\"timeline\", \"--latest\", \"--json\"], [\"timeline\", \"--before=<cursor>\", \"--json\"], [\"retain\", \"--days=30\"], [\"files\", \"list\", \"--json\"], [\"run\", \"--dry-run\"].",
                                 "items", Map.of("type", "string")
                         )
                 ), "args"),
@@ -434,12 +434,12 @@ final class WorkbenchMcpTools {
                 if (item != null && !String.valueOf(item).isBlank()) args.add(String.valueOf(item));
             }
         } else if (rawArgs != null) {
-            throw new IllegalArgumentException("error: dolt requires args as a list of strings.\nfix: Pass {\"args\":[\"status\"]}.");
+            throw new IllegalArgumentException("error: store requires args as a list of strings.\nfix: Pass {\"args\":[\"status\"]}.");
         }
         if (args.isEmpty()) {
-            throw new IllegalArgumentException("error: dolt requires args.\nfix: Pass {\"args\":[\"status\"]}.");
+            throw new IllegalArgumentException("error: store requires args.\nfix: Pass {\"args\":[\"status\"]}.");
         }
-        DoltCliForwarder.Result result = DoltCliForwarder.run(services.projectRoot(), args);
+        StoreCliForwarder.Result result = StoreCliForwarder.run(services.projectRoot(), args);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("exit", result.exit());
         body.put("out", result.out());

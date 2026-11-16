@@ -1,12 +1,12 @@
 package tools.dscode.engine;
 
-import tools.dscode.dolt.DoltScope;
+import tools.dscode.store.StoreScope;
 import tools.dscode.engine.context.ExecutionContext;
 import tools.dscode.engine.model.EngineScenario;
 import tools.dscode.engine.model.RunResult;
 import tools.dscode.engine.model.ScenarioResult;
 import tools.dscode.engine.model.StepResult;
-import tools.dscode.engine.source.DoltScenarioSource;
+import tools.dscode.engine.source.StoreScenarioSource;
 import tools.dscode.engine.source.FileScenarioSource;
 import tools.dscode.engine.source.ScenarioSource;
 
@@ -69,10 +69,10 @@ public final class EngineCli {
     public static String help() {
         return """
                 Usage: engine help
-                Usage: engine run [--project=<dir>] [--text=<gherkin>] [--file=<path>] [--steps=<line>] [--glue=<class>] [--name=<scenario>] [--dolt] [--sandbox=<name>] [--feature=<path>]
+                Usage: engine run [--project=<dir>] [--text=<gherkin>] [--file=<path>] [--steps=<line>] [--glue=<class>] [--name=<scenario>] [--store] [--sandbox=<name>] [--feature=<path>]
                 Usage: engine step --text=<step> [--argument=<text>] [--glue=<class>] [--project=<dir>]
                 The engine runs steps without Cucumber. --text and --steps do not read a feature file.
-                --dolt reads feature bytes from the Dolt store at .pickleball/dolt/data. --glue is a glue class name.
+                --store reads feature bytes from the Store store at .pickleball/store/data. --glue is a glue class name.
                 Workbench, MCP, and Gradle forward this command and do not run steps themselves.
                 Logging: pkb_engine_log=run (or all). pkb_engine_log_entity limits lines. pkb_engine_log_max_bytes caps .pickleball/engine/engine.log.
                 The JUnit suite uses the native engine unless pkb_engine=cucumber (else PKB_ENGINE, else engine.properties mode=cucumber). pkb_engine=cucumber keeps the adapter.
@@ -80,7 +80,7 @@ public final class EngineCli {
     }
 
     private static int run(List<String> tokens, PrintStream out, PrintStream err) throws Exception {
-        DoltScope.bindCommand(tokens);
+        StoreScope.bindCommand(tokens);
         Path project = project(tokens);
         EngineOptions options = options(tokens, project);
         ScenarioSource source = source(tokens, project);
@@ -102,7 +102,7 @@ public final class EngineCli {
             return 2;
         }
         Path project = project(tokens);
-        DoltScope.bindCommand(tokens);
+        StoreScope.bindCommand(tokens);
         try (ExecutionContext context = ExecutionContext.open(EngineScenario.of("step", List.of()))) {
             context.resource("glue", options(tokens, project).glue());
             StepResult result = PickleballEngine.runStep(text, value(tokens, "--argument"), context);
@@ -112,8 +112,8 @@ public final class EngineCli {
     }
 
     private static ScenarioSource source(List<String> tokens, Path project) {
-        if (has(tokens, "--dolt")) {
-            return new DoltScenarioSource(project, value(tokens, "--feature"));
+        if (has(tokens, "--store")) {
+            return new StoreScenarioSource(project, value(tokens, "--feature"));
         }
         String file = value(tokens, "--file");
         if (file != null) return new FileScenarioSource(project.resolve(file));

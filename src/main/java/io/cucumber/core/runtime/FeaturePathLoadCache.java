@@ -85,15 +85,15 @@ public final class FeaturePathLoadCache {
         if (bypass || resource == null) {
             return original.get();
         }
-        tools.dscode.dolt.DoltRuntime.beforeFeatureLoad();
+        tools.dscode.store.StoreRuntime.beforeFeatureLoad();
         java.net.URI uri = resource.getUri();
-        byte[] fromDb = tools.dscode.dolt.DoltFeatureSource.bytesFor(uri);
+        byte[] fromDb = tools.dscode.store.StoreFeatureSource.bytesFor(uri);
         ClassLoader loader = Thread.currentThread().getContextClassLoader();
         if (loader == null) {
             loader = FeaturePathLoadCache.class.getClassLoader();
         }
         long[] stat = stat(uri, loader);
-        String token = fromDb == null ? "" : tools.dscode.dolt.DoltHashes.sha256(fromDb);
+        String token = fromDb == null ? "" : tools.dscode.store.StoreHashes.sha256(fromDb);
         if (stat != null) {
             ResourceCached cached = RESOURCE_CACHE.get(uri);
             if (cached != null && cached.size == stat[0] && cached.modified == stat[1] && token.equals(cached.token)) {
@@ -112,7 +112,7 @@ public final class FeaturePathLoadCache {
     }
 
     static List<Feature> load(List<URI> paths, Supplier<ClassLoader> classLoader, Supplier<List<Feature>> original) {
-        tools.dscode.dolt.DoltRuntime.beforeFeatureLoad();
+        tools.dscode.store.StoreRuntime.beforeFeatureLoad();
         if (bypass) {
             return original.get();
         }
@@ -255,7 +255,7 @@ public final class FeaturePathLoadCache {
     }
 
     private static byte[] read(URI uri, ClassLoader loader) {
-        byte[] fromDb = tools.dscode.dolt.DoltFeatureSource.bytesFor(uri);
+        byte[] fromDb = tools.dscode.store.StoreFeatureSource.bytesFor(uri);
         if (fromDb != null) {
             return fromDb;
         }
@@ -286,11 +286,11 @@ public final class FeaturePathLoadCache {
         }
         Collections.sort(rows);
         String fileStamp = String.join("\n", rows);
-        String suffix = tools.dscode.dolt.DoltFeatureSource.cacheSuffix();
+        String suffix = tools.dscode.store.StoreFeatureSource.cacheSuffix();
         if (suffix == null) {
             return fileStamp;
         }
-        return fileStamp + "\ndolt:" + suffix;
+        return fileStamp + "\nstore:" + suffix;
     }
 
     private static Optional<Feature> parseBytes(URI uri, byte[] body) {
