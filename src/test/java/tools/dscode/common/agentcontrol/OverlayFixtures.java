@@ -67,6 +67,29 @@ public final class OverlayFixtures implements AutoCloseable {
         return new ChromeDriver(options);
     }
 
+    /**
+     * Saves a PNG of the page under {@code PKB_OVERLAY_SHOTS} when that variable names a directory.
+     * Without it nothing is written; the screenshots are for a person checking the look.
+     */
+    public static void shot(ChromeDriver browser, String name) {
+        String dir = System.getenv("PKB_OVERLAY_SHOTS");
+        if (dir == null || dir.isBlank() || browser == null) return;
+        try {
+            Path folder = Path.of(dir.trim());
+            Files.createDirectories(folder);
+            byte[] png = browser.getScreenshotAs(org.openqa.selenium.OutputType.BYTES);
+            Files.write(folder.resolve(name + ".png"), png);
+        } catch (Exception ignored) {
+            // A screenshot is evidence for a person, never a test result.
+        }
+    }
+
+    /** Emulates {@code prefers-color-scheme}; {@code null} clears it. */
+    public static void colorScheme(ChromeDriver browser, String scheme) {
+        browser.executeCdpCommand("Emulation.setEmulatedMedia", java.util.Map.of(
+                "features", java.util.List.of(java.util.Map.of("name", "prefers-color-scheme", "value", scheme == null ? "" : scheme))));
+    }
+
     public static String chromeBinary() {
         for (String pinned : new String[]{System.getenv("PKB_CHROME_BINARY"), System.getenv("CHROME_BINARY"),
                 System.getProperty("pickleball.chrome.binary"), System.getenv("DOMENGINE_CHROME")}) {

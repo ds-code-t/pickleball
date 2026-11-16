@@ -20,6 +20,31 @@ function node() {
   if (marked) return marked;
   return null;
 }
+// Pages that require Trusted Types reject plain innerHTML. The HTML is already neutralized in Java,
+// so a named policy passes it through; if the page forbids new policies the text is shown instead.
+function setHtml(el, html) {
+  var text = html || '';
+  if (typeof window !== 'undefined' && window.trustedTypes && window.trustedTypes.createPolicy) {
+    if (window.__pkbPolicy === undefined) {
+      try {
+        window.__pkbPolicy = window.trustedTypes.createPolicy('pkb-surface', {createHTML: function(s) { return s; }});
+      } catch (refused) {
+        window.__pkbPolicy = null;
+      }
+    }
+    if (window.__pkbPolicy) {
+      el.innerHTML = window.__pkbPolicy.createHTML(text);
+      return;
+    }
+    try {
+      el.innerHTML = text;
+    } catch (blocked) {
+      el.textContent = text;
+    }
+    return;
+  }
+  el.innerHTML = text;
+}
 function mark(el, kind, sentence) {
   if (!el || el.nodeType !== 1) return;
   el.setAttribute('data-pkb-agent', 'agent_injected');
@@ -81,7 +106,7 @@ if (op === 'remove' || op === 'cleanup') {
     nodes.forEach(function(el) {
       if (undo) {
         var tpl = document.createElement('template');
-        tpl.innerHTML = undo;
+        setHtml(tpl, undo);
         el.replaceWith(tpl.content);
         delete window.__pkbUndo[id];
       } else el.remove();
@@ -96,7 +121,7 @@ if (spec.handle && !node()) {
   return {ok:false, error:'unknown handle'};
 }
 var host = document.createElement('div');
-host.innerHTML = spec.html || '';
+setHtml(host, spec.html || '');
 markTree(host, spec.kind, spec.sentence);
 var anchor = node();
 var left = spec.x;

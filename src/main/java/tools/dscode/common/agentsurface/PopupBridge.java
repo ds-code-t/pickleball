@@ -120,8 +120,14 @@ public final class PopupBridge implements AutoCloseable {
             }
             if ("POST".equals(method) && "/chat".equals(path)) {
                 String text = bodyFields(exchange).getOrDefault("text", "");
-                PopupSurfaceBridge.sendChat(project, runId, "run", "human", text);
-                send(exchange, 200, "application/json", "{\"ok\":true}");
+                if (text == null || text.isBlank()) {
+                    send(exchange, 400, "application/json", "{\"ok\":false,\"error\":\"empty\"}");
+                    return;
+                }
+                Map<String, Object> stored = PopupSurfaceBridge.sendChat(project, runId, "run", "human", "", text);
+                // The human line is echoed through the same ledger the agent lines use, so the pane shows it.
+                PopupLedger.append(project, runId, "chat", "chat", "", "", text, "human", "");
+                send(exchange, 200, "application/json", JSON.writeValueAsString(Map.of("ok", true, "id", String.valueOf(stored.get("id")))));
                 return;
             }
             if ("POST".equals(method) && "/input".equals(path)) {
@@ -156,6 +162,10 @@ public final class PopupBridge implements AutoCloseable {
         exchange.sendResponseHeaders(200, 0);
         long after = longOrZero(exchange.getRequestHeaders().getFirst("Last-Event-ID"));
         try (OutputStream out = exchange.getResponseBody()) {
+            // Long-poll SSE: the response ends after a batch or 15 s, and EventSource reconnects with
+            // Last-Event-ID after this retry delay. The page must not close the source on that end.
+            out.write("retry: 250\n\n".getBytes(StandardCharsets.UTF_8));
+            out.flush();
             long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(15);
             while (System.nanoTime() < deadline) {
                 boolean wrote = false;

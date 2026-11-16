@@ -30,11 +30,10 @@ public final class AgentChatPanel extends JPanel {
         JPanel row = new JPanel(new BorderLayout());
         row.add(input, BorderLayout.CENTER);
         JButton send = new JButton("Send");
-        send.addActionListener(event -> {
-            send(actions, input.getText(), null, "human");
-            input.setText("");
-            show(history(actions, 50));
-        });
+        java.awt.event.ActionListener submit = event -> submit(actions);
+        send.addActionListener(submit);
+        // Enter in the field sends, the same as the button.
+        input.addActionListener(submit);
         row.add(send, BorderLayout.EAST);
         openPopup.addActionListener(event -> {
             Map<String, Object> opened = openPopup(actions, selectedRun(actions, null));
@@ -47,6 +46,25 @@ public final class AgentChatPanel extends JPanel {
         Timer timer = new Timer(1000, event -> show(poll(actions, "")));
         timer.setRepeats(true);
         timer.start();
+    }
+
+    /** Sends the field text as the human. A blank field sends nothing; a refusal is shown in the status line. */
+    void submit(WorkbenchSessionActions actions) {
+        String text = input.getText();
+        if (text == null || text.isBlank()) return;
+        Map<String, Object> result = send(actions, text, null, "human");
+        Object status = result == null ? null : result.get("status");
+        if (result != null && ("REFUSED".equals(status) || Boolean.FALSE.equals(result.get("ok")))) {
+            Object reason = result.get("reason") != null ? result.get("reason") : result.get("error");
+            popupStatus.setText("not sent: " + (reason == null ? String.valueOf(status) : reason));
+            return;
+        }
+        input.setText("");
+        show(history(actions, 50));
+    }
+
+    JTextField inputField() {
+        return input;
     }
 
     public static Map<String, Object> send(WorkbenchSessionActions actions, String text, String runId, String source) {

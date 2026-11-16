@@ -1,7 +1,6 @@
 package tools.dscode.common.agentsurface.live;
 
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -66,7 +65,6 @@ class PopupChatLiveTest {
 
     /** Audit item 2, cause 2: the stream ended after the first batch and the page never listened again. */
     @Test
-    @Disabled("P1: audit item 2 cause 2 (stream ends, page stops listening)")
     void secondAgentMessageArrivesAfterTheFirstBatch() throws Exception {
         open("popup-stream");
         PopupLedger.append(project, "popup-stream", "chat", "chat", "", "", "first agent line", "", "");
@@ -79,7 +77,6 @@ class PopupChatLiveTest {
 
     /** Audit item 2, cause 1: Enter stored the message but the pane never showed it. */
     @Test
-    @Disabled("P1: audit item 2 cause 1 (human message not echoed)")
     void humanMessageEchoesInThePane() throws Exception {
         open("popup-echo");
         WebElement input = browser.findElement(By.id("text"));
@@ -96,5 +93,37 @@ class PopupChatLiveTest {
         assertTrue(waitFor(() -> chatText().contains("hello from a human"), 3000),
                 "the human message was stored but not shown: " + chatText());
         assertFalse(String.valueOf(browser.executeScript("return document.getElementById('text').value")).contains("hello"));
+        PopupLedger.append(project, "popup-echo", "chat", "chat", "", "", "Got it. Next, open Settings.", "", "");
+        assertTrue(waitFor(() -> chatText().contains("open Settings"), 5000), chatText());
+        OverlayFixtures.shot(browser, "p1-popup-enter-echo-light");
+        OverlayFixtures.colorScheme(browser, "dark");
+        OverlayFixtures.shot(browser, "p1-popup-enter-echo-dark");
+    }
+
+    @Test
+    void sendButtonStaysDisabledForABlankMessage() throws Exception {
+        open("popup-blank");
+        WebElement input = browser.findElement(By.id("text"));
+        WebElement send = browser.findElement(By.id("send"));
+        assertFalse(send.isEnabled(), "Send is enabled for an empty field");
+        input.sendKeys("   ");
+        assertFalse(send.isEnabled(), "Send is enabled for a blank field");
+        input.sendKeys(Keys.ENTER);
+        Thread.sleep(500);
+        assertFalse(Files.exists(project.resolve(".pickleball/runs/popup-blank/agent/chat/run.jsonl")));
+        input.sendKeys("x");
+        assertTrue(send.isEnabled());
+        input.sendKeys(Keys.chord(Keys.SHIFT, Keys.ENTER), "y");
+        assertTrue(String.valueOf(browser.executeScript("return document.getElementById('text').value")).contains("\n"),
+                "Shift+Enter did not add a new line");
+        send.click();
+        Path chat = project.resolve(".pickleball/runs/popup-blank/agent/chat/run.jsonl");
+        assertTrue(waitFor(() -> {
+            try {
+                return Files.isRegularFile(chat) && Files.readString(chat).contains("x\\ny");
+            } catch (Exception failure) {
+                return false;
+            }
+        }, 5000), "Send did not store the two-line message");
     }
 }

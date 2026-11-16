@@ -772,10 +772,15 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentcontrol/FallbackLogTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/IsolatedWorldTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/LiveChromeCdpTest.java`
+- `src/test/java/tools/dscode/common/agentcontrol/OverlayFixtures.java`
+- `src/test/java/tools/dscode/common/agentcontrol/OverlayPollCursorTest.java`
+- `src/test/java/tools/dscode/common/agentcontrol/OverlayRuntimeLiveTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/SurfaceIdChild.java`
 - `src/test/java/tools/dscode/common/agentsurface/AgentSurfaceRouterTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/live/AgentSurfacePopupLiveTest.java`
+- `src/test/java/tools/dscode/common/agentsurface/live/PopupChatLiveTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/NativeHighlightRouteTest.java`
+- `src/test/java/tools/dscode/common/agentsurface/PopupBridgeChatTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/PopupBridgeTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/PopupBrowserLocatorTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/PopupCleanupTest.java`
@@ -1032,6 +1037,13 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/resources/META-INF/services/org.junit.platform.launcher.LauncherSessionListener`
 - `src/test/resources/META-INF/services/org.junit.platform.launcher.TestExecutionListener`
 - `src/test/resources/multiline-assert/multiline-assert.feature`
+- `src/test/resources/overlay/basic.html`
+- `src/test/resources/overlay/basic.js`
+- `src/test/resources/overlay/nested-scroll.html`
+- `src/test/resources/overlay/spa.html`
+- `src/test/resources/overlay/spa.js`
+- `src/test/resources/overlay/strict-csp.css`
+- `src/test/resources/overlay/strict-csp.html`
 - `src/test/resources/position/ordinals.html`
 - `src/test/resources/scenario-object/scenario-object.feature`
 - `src/test/resources/suite-hooks/suite-hook.feature`
@@ -1347,6 +1359,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/sync/WorkbenchSynchronizerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/sync/WorkbenchSyncPlannerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/terminal/WorkerLogBufferTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/AgentChatPanelEnterTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/AgentChatPanelPopupTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/ConfigTabModelTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/DoltPanelTest.java`

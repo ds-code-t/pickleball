@@ -574,6 +574,14 @@ final class PageSurfaces {
         ChatLog.send(project, runId, "overlay", "system", "", "overlay input " + event.getOrDefault("type", "") + " " + event.getOrDefault("id", ""));
     }
 
+    /** Events after the first {@code after} stored events. The cursor is the stored event count. */
+    static List<Map<String, Object>> pollInput(Path project, String runId, int after) throws IOException {
+        List<Map<String, Object>> all = pollInput(project, runId);
+        if (after <= 0) return all;
+        if (after >= all.size()) return List.of();
+        return List.copyOf(all.subList(after, all.size()));
+    }
+
     static List<Map<String, Object>> pollInput(Path project, String runId) throws IOException {
         drainLiveInputs(project, runId);
         Path file = AgentStore.root(project, runId).resolve("overlay-events.jsonl");
@@ -719,6 +727,7 @@ final class PageSurfaces {
                     throw new IllegalStateException("tab switch failed");
                 }
                 if (!resetTop(managed.driver)) throw new IllegalStateException("top document reset failed");
+                drainIsolated(project, runId, managed.driver);
                 drainTab(project, runId, managed.driver);
                 for (String frame : framesFor(managed.driver, tab)) {
                     if (!enterFrame(managed.driver, frame)) throw new IllegalStateException("frame entry failed");
@@ -730,6 +739,41 @@ final class PageSurfaces {
             }
         }
     }
+
+    /**
+     * On a CDP or BiDi session the surface helper runs in the {@code pkb-surface} isolated world, and
+     * its listeners queue events in that world's own {@code window}. Those are drained in the same
+     * world; the main-world queue is read by {@link #drainTab}.
+     */
+    private static void drainIsolated(Path project, String runId, WebDriver web) throws IOException {
+        BrowserFacade facade;
+        try {
+            facade = directPage(web);
+        } catch (RuntimeException failure) {
+            return;
+        }
+        if (facade == null) return;
+        Object value;
+        try {
+            value = facade.evaluateIsolated("pkb-surface", DRAIN_ISOLATED, "drain");
+        } catch (RuntimeException failure) {
+            CompositeLog.info("overlay", "isolated input poll skipped " + failure.getMessage());
+            return;
+        }
+        if (!(value instanceof String text) || text.isBlank()) return;
+        for (Object item : AgentStore.JSON.readValue(text, List.class)) {
+            if (item instanceof Map<?, ?> map) {
+                Map<String, String> event = new LinkedHashMap<>();
+                map.forEach((key, raw) -> {
+                    if (key != null && raw != null) event.put(String.valueOf(key), String.valueOf(raw));
+                });
+                recordInput(project, runId, event);
+            }
+        }
+    }
+
+    private static final String DRAIN_ISOLATED =
+            "function(reason){ var e = window.__pkbEvents || []; window.__pkbEvents = []; return JSON.stringify(e); }";
 
     private static void drainTab(Path project, String runId, WebDriver web) throws IOException {
         if (!(web instanceof JavascriptExecutor executor)) return;
@@ -1126,7 +1170,8 @@ final class PageSurfaces {
 
     private static void installSurface(WebDriver web, BrowserFacade facade) {
         if (!SURFACE_PROTOCOL.add(System.identityHashCode(web))) return;
-        facade.addPreload(SurfaceAssets.js("html"));
+        // Same world as the helper, so one set of listeners queues events where drainIsolated reads them.
+        facade.addPreloadIn(SurfaceAssets.js("html"), "pkb-surface");
         facade.addBinding("pkbSurface", (name, payload) -> PUSHED.add(bindingEvent(name, payload)));
     }
 

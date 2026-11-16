@@ -2,17 +2,27 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agent surface</title>
 <link rel="stylesheet" href="assets/agent-surface-popup.css">
 </head>
 <body>
-<main>
-<section id="chat" data-pane="chat"></section>
-<section id="instructions" data-pane="instructions"></section>
-<section id="diagram" data-pane="diagram"></section>
-<form id="composer">
-<input id="text" name="text" autocomplete="off">
-<button type="submit">Send</button>
+<main class="pkb-card">
+<header class="pkb-head">
+<span class="pkb-dot" id="status" title="connecting"></span>
+<strong class="pkb-title">Agent</strong>
+<nav class="pkb-tabs" role="tablist">
+<button type="button" role="tab" data-tab="chat" aria-selected="true">Chat</button>
+<button type="button" role="tab" data-tab="instructions" aria-selected="false">Steps</button>
+<button type="button" role="tab" data-tab="diagram" aria-selected="false">Diagram</button>
+</nav>
+</header>
+<section id="chat" data-pane="chat" class="pkb-pane pkb-chat" role="log" aria-live="polite"></section>
+<section id="instructions" data-pane="instructions" class="pkb-pane" hidden></section>
+<section id="diagram" data-pane="diagram" class="pkb-pane" hidden></section>
+<form id="composer" class="pkb-composer" autocomplete="off">
+<textarea id="text" name="text" rows="1" placeholder="Message the agent (Enter to send, Shift+Enter for a new line)" aria-label="Message"></textarea>
+<button type="submit" id="send" disabled>Send</button>
 </form>
 </main>
 <script src="assets/agent-surface-popup.js"></script>

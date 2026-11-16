@@ -3,7 +3,6 @@ package tools.dscode.common.agentcontrol;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openqa.selenium.By;
@@ -74,7 +73,6 @@ class OverlayRuntimeLiveTest {
 
     /** Audit "input capture": clicks on a CDP-placed overlay landed in the isolated world and were never drained. */
     @Test
-    @Disabled("P1: audit input capture (isolated-world events never drained)")
     void clickOnCdpPlacedOverlayIsDrained() throws Exception {
         load("basic.html");
         remember("save");
@@ -94,7 +92,6 @@ class OverlayRuntimeLiveTest {
 
     /** Audit item 6: the cached isolated-world context dies on a same-tab navigation. */
     @Test
-    @Disabled("P1: audit item 6 (stale isolated-world context after navigation)")
     void placementAfterSameTabNavigationSucceeds() throws Exception {
         load("basic.html");
         remember("save");

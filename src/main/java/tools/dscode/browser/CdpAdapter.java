@@ -110,19 +110,48 @@ public final class CdpAdapter implements BrowserFacade {
     @Override
     public Object evaluateIsolated(String worldName, String fn, Object... args) {
         String world = worldName == null || worldName.isBlank() ? "pkb" : worldName;
+        JsonNode result;
+        try {
+            result = evaluateIn(world, fn, args);
+        } catch (RuntimeException failure) {
+            // A navigation in the same tab destroys the isolated world. The cached context id is
+            // then dead, so the world is created again once for the new document.
+            if (!staleContext(failure)) throw failure;
+            worlds.remove(world);
+            rootFrame = null;
+            BrowserLog.info("cdp", "isolated world " + world + " was stale; created again");
+            result = evaluateIn(world, fn, args);
+        }
+        JsonNode remote = result.path("result");
+        if (result.path("exceptionDetails").isObject()) {
+            JsonNode details = result.path("exceptionDetails");
+            String thrown = details.path("exception").path("description").asText(details.path("text").asText(""));
+            String first = thrown.lines().findFirst().orElse("");
+            throw new IllegalStateException(
+                    "error: isolated evaluate failed in " + world + (first.isBlank() ? "" : ": " + first) + ".\n"
+                            + "fix: The function must be an expression or a function declaration.");
+        }
+        return JsonRpc.value(remote.get("value"));
+    }
+
+    private JsonNode evaluateIn(String world, String fn, Object... args) {
         int context = worlds.computeIfAbsent(world, this::createWorld);
         Map<String, Object> params = new LinkedHashMap<>();
         params.put("expression", expression(fn, args));
         params.put("contextId", context);
         params.put("returnByValue", true);
-        JsonNode result = rpc.call("Runtime.evaluate", params);
-        JsonNode remote = result.path("result");
-        if (result.path("exceptionDetails").isObject()) {
-            throw new IllegalStateException(
-                    "error: isolated evaluate failed in " + world + ".\n"
-                            + "fix: The function must be an expression or a function declaration.");
+        return rpc.call("Runtime.evaluate", params);
+    }
+
+    static boolean staleContext(RuntimeException failure) {
+        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+            String message = cause.getMessage();
+            if (message != null && (message.contains("Cannot find context with specified id")
+                    || message.contains("Execution context was destroyed"))) {
+                return true;
+            }
         }
-        return JsonRpc.value(remote.get("value"));
+        return false;
     }
 
     @Override
@@ -131,6 +160,24 @@ public final class CdpAdapter implements BrowserFacade {
             throw new IllegalArgumentException("error: preload script is null.\nfix: Pass the script text.");
         }
         rpc.call("Page.addScriptToEvaluateOnNewDocument", Map.of("source", script));
+    }
+
+    @Override
+    public String addPreloadIn(String script, String world) {
+        if (script == null) {
+            throw new IllegalArgumentException("error: preload script is null.\nfix: Pass the script text.");
+        }
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("source", script);
+        if (world != null && !world.isBlank()) params.put("worldName", world);
+        JsonNode result = rpc.call("Page.addScriptToEvaluateOnNewDocument", params);
+        return result == null ? "" : result.path("identifier").asText("");
+    }
+
+    @Override
+    public void removePreload(String identifier) {
+        if (identifier == null || identifier.isBlank()) return;
+        rpc.call("Page.removeScriptToEvaluateOnNewDocument", Map.of("identifier", identifier));
     }
 
     @Override

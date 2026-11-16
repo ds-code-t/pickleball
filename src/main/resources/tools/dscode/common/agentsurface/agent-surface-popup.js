@@ -2,6 +2,28 @@
   var params = new URLSearchParams(location.search);
   var token = params.get("t") || "";
   var last = 0;
+  var echoes = [];
+  var chat = document.getElementById("chat");
+  var status = document.getElementById("status");
+  var input = document.getElementById("text");
+  var sendButton = document.getElementById("send");
+
+  function url(path) {
+    return path + (path.indexOf("?") >= 0 ? "&" : "?") + "t=" + encodeURIComponent(token);
+  }
+
+  function post(path, body) {
+    return fetch(url(path), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+  }
+
+  function setStatus(state) {
+    status.setAttribute("data-state", state);
+    status.title = state === "live" ? "connected" : state === "retry" ? "reconnecting" : "connecting";
+  }
 
   function pane(name) {
     return document.getElementById(name === "diagram" ? "diagram" : name === "chat" ? "chat" : "instructions");
@@ -15,11 +37,7 @@
   function ack(row) {
     var text = row.html || "";
     var send = function (digest) {
-      fetch("/rendered?t=" + encodeURIComponent(token), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ seq: row.seq, pane: row.pane, handle: row.handle || "", textSha256: digest })
-      });
+      post("/rendered", { seq: row.seq, pane: row.pane, handle: row.handle || "", textSha256: digest }).catch(function () {});
     };
     if (window.crypto && crypto.subtle && window.TextEncoder) {
       crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)).then(function (buf) {
@@ -33,6 +51,36 @@
     send(row.textSha256 || "");
   }
 
+  function nearBottom() {
+    return chat.scrollHeight - chat.scrollTop - chat.clientHeight < 48;
+  }
+
+  function time(at) {
+    var date = at ? new Date(at) : new Date();
+    if (isNaN(date.getTime())) date = new Date();
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+
+  function bubble(text, from, at, state) {
+    var stick = nearBottom();
+    var line = document.createElement("div");
+    line.className = "pkb-msg";
+    line.setAttribute("data-from", from);
+    if (state) line.setAttribute("data-state", state);
+    var meta = document.createElement("span");
+    meta.className = "pkb-meta";
+    meta.textContent = (from === "human" ? "You" : from === "system" ? "System" : "Agent") + " \u00b7 " + time(at);
+    var body = document.createElement("span");
+    body.className = "pkb-body";
+    body.textContent = text;
+    line.appendChild(meta);
+    line.appendChild(body);
+    chat.appendChild(line);
+    if (stick || from === "human") chat.scrollTop = chat.scrollHeight;
+    if (from !== "human" && !isActive("chat")) badge("chat");
+    return line;
+  }
+
   var loadedSurface = {};
 
   function kindOf(row) {
@@ -43,9 +91,6 @@
   function ensureSurface(kind) {
     if (loadedSurface[kind]) return;
     loadedSurface[kind] = true;
-    var script = document.createElement("script");
-    script.src = "assets/surface/" + kind + ".js?t=" + encodeURIComponent(token);
-    document.body.appendChild(script);
   }
 
   function mount(row) {
@@ -55,7 +100,7 @@
     var kind = kindOf(row);
     var link = document.createElement("link");
     link.rel = "stylesheet";
-    link.href = "assets/surface/" + kind + ".css?t=" + encodeURIComponent(token);
+    link.href = url("assets/surface/" + kind + ".css");
     var body = document.createElement("div");
     body.className = "pkb-surface";
     body.innerHTML = row.html || "";
@@ -66,6 +111,8 @@
   }
 
   function apply(row) {
+    if (row.seq && row.seq <= last) return;
+    if (row.seq) last = row.seq;
     var target = pane(row.pane || "instructions");
     if (!target) return;
     if (row.op === "cleanup") {
@@ -75,9 +122,11 @@
       return;
     }
     if (row.op === "chat") {
-      var line = document.createElement("p");
-      line.textContent = row.html || "";
-      document.getElementById("chat").appendChild(line);
+      var from = row.codes === "human" ? "human" : row.codes === "system" ? "system" : "agent";
+      var text = row.html || "";
+      var echoed = from === "human" ? echoes.indexOf(text) : -1;
+      if (echoed >= 0) echoes.splice(echoed, 1);
+      else bubble(text, from, row.at);
       ack(row);
       return;
     }
@@ -99,56 +148,144 @@
     } else {
       target.appendChild(holder);
     }
+    if (target.id !== "chat" && !isActive(target.id)) badge(target.id);
     ack(row);
   }
 
+  // EventSource reconnects by itself with Last-Event-ID after the server ends a batch.
+  // Closing it here is what made the page go deaf after the first batch.
   function connect() {
     if (!window.EventSource) {
-      poll();
+      pollLoop(500);
       return;
     }
-    var source = new EventSource("/events?t=" + encodeURIComponent(token));
+    var source = new EventSource(url("/events"));
+    source.onopen = function () { setStatus("live"); };
     source.onmessage = function (event) {
-      var row = JSON.parse(event.data);
-      if (row.seq) last = row.seq;
-      apply(row);
+      setStatus("live");
+      try {
+        apply(JSON.parse(event.data));
+      } catch (failure) {
+        // A malformed row is skipped; the next one still renders.
+      }
     };
     source.onerror = function () {
-      source.close();
-      poll();
+      // CONNECTING is the normal long-poll reconnect between batches; only CLOSED is a real drop.
+      if (source.readyState === EventSource.CLOSED) {
+        setStatus("retry");
+        setTimeout(connect, 1000);
+      }
     };
   }
 
-  function poll() {
-    fetch("/poll?t=" + encodeURIComponent(token) + "&after=" + last)
+  function pollLoop(delay) {
+    fetch(url("/poll?after=" + last))
       .then(function (response) { return response.json(); })
       .then(function (rows) {
-        rows.forEach(function (row) {
-          if (row.seq > last) last = row.seq;
-          apply(row);
-        });
+        setStatus("live");
+        rows.forEach(apply);
+        setTimeout(function () { pollLoop(500); }, 500);
+      })
+      .catch(function () {
+        setStatus("retry");
+        setTimeout(function () { pollLoop(Math.min(delay * 2, 5000)); }, delay);
       });
+  }
+
+  function refreshSend() {
+    sendButton.disabled = input.value.trim() === "";
+    input.style.height = "auto";
+    input.style.height = Math.min(input.scrollHeight, 120) + "px";
+  }
+
+  function deliver(text, line) {
+    line.setAttribute("data-state", "pending");
+    var old = line.querySelector(".pkb-retry");
+    if (old) old.remove();
+    echoes.push(text);
+    post("/chat", { text: text })
+      .then(function (response) {
+        if (!response.ok) throw new Error("status " + response.status);
+        line.removeAttribute("data-state");
+      })
+      .catch(function () {
+        var at = echoes.indexOf(text);
+        if (at >= 0) echoes.splice(at, 1);
+        line.setAttribute("data-state", "failed");
+        var retry = document.createElement("button");
+        retry.type = "button";
+        retry.className = "pkb-retry";
+        retry.textContent = "Retry";
+        retry.addEventListener("click", function () { deliver(text, line); });
+        line.querySelector(".pkb-meta").appendChild(retry);
+      });
+  }
+
+  function submit() {
+    var text = input.value.trim();
+    if (!text) return;
+    var line = bubble(text, "human", null, "pending");
+    input.value = "";
+    refreshSend();
+    deliver(text, line);
   }
 
   document.getElementById("composer").addEventListener("submit", function (event) {
     event.preventDefault();
-    var input = document.getElementById("text");
-    fetch("/chat?t=" + encodeURIComponent(token), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: input.value })
-    });
-    input.value = "";
+    submit();
+  });
+  input.addEventListener("input", refreshSend);
+  input.addEventListener("keydown", function (event) {
+    if (event.key === "Enter" && !event.shiftKey && !event.isComposing && event.keyCode !== 229) {
+      event.preventDefault();
+      submit();
+    }
   });
 
+  function isActive(name) {
+    var tab = document.querySelector("[data-tab='" + name + "']");
+    return tab && tab.getAttribute("aria-selected") === "true";
+  }
+
+  function badge(name) {
+    var tab = document.querySelector("[data-tab='" + name + "']");
+    if (!tab) return;
+    var mark = tab.querySelector(".pkb-badge");
+    if (!mark) {
+      mark = document.createElement("span");
+      mark.className = "pkb-badge";
+      mark.textContent = "\u25cf";
+      tab.appendChild(mark);
+    }
+  }
+
+  function show(name) {
+    document.querySelectorAll("[data-tab]").forEach(function (tab) {
+      var on = tab.getAttribute("data-tab") === name;
+      tab.setAttribute("aria-selected", on ? "true" : "false");
+      if (on) {
+        var mark = tab.querySelector(".pkb-badge");
+        if (mark) mark.remove();
+      }
+    });
+    ["chat", "instructions", "diagram"].forEach(function (id) {
+      document.getElementById(id).hidden = id !== name;
+    });
+    document.getElementById("composer").hidden = name !== "chat";
+  }
+
+  document.querySelectorAll("[data-tab]").forEach(function (tab) {
+    tab.addEventListener("click", function () { show(tab.getAttribute("data-tab")); });
+  });
+
+  // Only agent-placed elements report input; ordinary clicks in the popup are not events.
   document.body.addEventListener("click", function (event) {
-    var id = event.target && event.target.id ? event.target.id : "";
-    fetch("/input?t=" + encodeURIComponent(token), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "click", id: id, value: "" })
-    });
+    var placed = event.target && event.target.closest ? event.target.closest("[data-pkb-id]") : null;
+    if (!placed) return;
+    post("/input", { type: "click", id: placed.getAttribute("data-pkb-id"), value: "" }).catch(function () {});
   });
 
+  setStatus("connecting");
+  refreshSend();
   connect();
 }());

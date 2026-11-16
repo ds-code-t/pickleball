@@ -94,7 +94,7 @@ public final class AgentControl {
                 case "highlight" -> highlight(project, runId, values);
                 case "unhighlight" -> unhighlight(project, runId, values);
                 case "overlay" -> overlay(project, runId, values);
-                case "overlay-poll" -> overlayPoll(project, runId);
+                case "overlay-poll" -> overlayPoll(project, runId, values);
                 case "overlay-remove" -> remove(project, runId, values, "overlay");
                 case "label", "border", "arrow", "step-badge", "magnifier", "spotlight" -> visual(project, runId, op, values);
                 case "unlabel", "unborder", "unarrow", "unstep-badge", "unmagnifier", "unspotlight" ->
@@ -262,9 +262,22 @@ public final class AgentControl {
 
     private static Result chatPoll(Path project, String runId, Map<String, String> args) throws Exception {
         String after = present(args.get("after")) ? args.get("after") : args.get("id");
+        long waitMillis = 0;
+        if (present(args.get("wait"))) {
+            try {
+                waitMillis = Math.min(25_000L, Math.max(0L, (long) (Double.parseDouble(args.get("wait").trim()) * 1000)));
+            } catch (NumberFormatException failure) {
+                return fail(2, "chat-poll --wait is seconds, up to 25");
+            }
+        }
+        long deadline = System.nanoTime() + waitMillis * 1_000_000L;
         List<Map<String, Object>> messages = new ArrayList<>();
-        for (ChatLog.Message message : ChatLog.poll(project, runId, args.get("channel"), after)) {
-            messages.add(ChatLog.toMap(message));
+        while (true) {
+            for (ChatLog.Message message : ChatLog.poll(project, runId, args.get("channel"), after)) {
+                messages.add(ChatLog.toMap(message));
+            }
+            if (!messages.isEmpty() || System.nanoTime() >= deadline) break;
+            Thread.sleep(200);
         }
         Map<String, Object> body = ok("Chat messages after the given id.");
         body.put("count", messages.size());
@@ -373,11 +386,27 @@ public final class AgentControl {
         return new Result(0, placed);
     }
 
-    private static Result overlayPoll(Path project, String runId) throws Exception {
-        List<Map<String, Object>> events = PageSurfaces.pollInput(project, runId);
-        Map<String, Object> body = ok("Forwarded overlay clicks and form inputs.");
+    private static Result overlayPoll(Path project, String runId, Map<String, String> args) throws Exception {
+        if (!present(args.get("after"))) {
+            List<Map<String, Object>> events = PageSurfaces.pollInput(project, runId);
+            Map<String, Object> body = ok("Forwarded overlay clicks and form inputs.");
+            body.put("count", events.size());
+            body.put("events", events);
+            return new Result(0, body);
+        }
+        int after;
+        try {
+            after = Integer.parseInt(args.get("after").trim());
+        } catch (NumberFormatException failure) {
+            return fail(2, "overlay-poll --after must be a whole number (the next value from the last poll)");
+        }
+        List<Map<String, Object>> all = PageSurfaces.pollInput(project, runId);
+        List<Map<String, Object>> events = after <= 0 ? all
+                : after >= all.size() ? List.of() : List.copyOf(all.subList(after, all.size()));
+        Map<String, Object> body = ok("Overlay events after the cursor.");
         body.put("count", events.size());
         body.put("events", events);
+        body.put("next", all.size());
         return new Result(0, body);
     }
 
