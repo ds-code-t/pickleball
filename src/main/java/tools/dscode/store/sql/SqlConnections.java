@@ -3,9 +3,12 @@ package tools.dscode.store.sql;
 import tools.dscode.store.StorePaths;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.nio.channels.OverlappingFileLockException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -28,6 +31,7 @@ public final class SqlConnections {
     static final long IDLE_MS = 60_000;
 
     private static final ConcurrentHashMap<String, Pool> POOLS = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<Path, HeldLease> LEASES = new ConcurrentHashMap<>();
 
     private SqlConnections() {
     }
@@ -48,7 +52,7 @@ public final class SqlConnections {
         Pool pool = POOLS.computeIfAbsent(key, ignored -> new Pool(file));
         Connection connection = take(pool);
         prepareSource(connection, StorePaths.runState(root));
-        touchLease(root, chosen.branch());
+        touchLease(root, chosen);
         return new SqlSession(root, chosen, connection, pool);
     }
 
@@ -102,7 +106,8 @@ public final class SqlConnections {
         if (branch == null || branch.isBlank()) return false;
         java.nio.file.Path root = project.toAbsolutePath().normalize();
         if (localBorrowed(root, branch)) return true;
-        return foreignLease(root, branch);
+        if (!branch.startsWith("sbx-")) return false;
+        return foreignLock(root, branch.substring(4));
     }
 
     private static boolean localBorrowed(java.nio.file.Path project, String branch) {
@@ -114,47 +119,79 @@ public final class SqlConnections {
         }
     }
 
-    static Path leaseDirectory(Path project, String branch) {
-        String safe = branch.replace('\\', '/').replace("/", "_");
-        return StorePaths.root(project).resolve("branch-lease").resolve(safe);
+    /** Exclusive OS lock at {@code sandboxes/<name>/lease/<pid>.lock} while this JVM uses the sandbox. */
+    private static void touchLease(Path project, Binding binding) {
+        if (binding == null || binding.primary()) return;
+        Path database = StorePaths.sandboxDatabase(project, binding.name()).toAbsolutePath().normalize();
+        LEASES.computeIfAbsent(database, ignored -> openLease(project, binding.name()));
     }
 
-    private static void touchLease(Path project, String branch) {
+    private static HeldLease openLease(Path project, String name) {
+        Path file = StorePaths.sandboxHome(project, name).resolve("lease")
+                .resolve(ProcessHandle.current().pid() + ".lock");
         try {
-            Path file = leaseDirectory(project, branch).resolve(Long.toString(ProcessHandle.current().pid()));
             Files.createDirectories(file.getParent());
-            Files.writeString(file, Long.toString(System.currentTimeMillis()), StandardCharsets.UTF_8);
-        } catch (IOException ignored) {
-            // A lease that cannot be written does not block the caller.
+            FileChannel channel = FileChannel.open(file, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+            FileLock lock = channel.lock();
+            return new HeldLease(channel, lock, file);
+        } catch (IOException failure) {
+            throw new IllegalStateException("sandbox lease did not lock: " + name, failure);
         }
     }
 
-    private static boolean foreignLease(Path project, String branch) {
-        Path dir = leaseDirectory(project, branch);
+    /** True when another process holds a lease. A lock whose owner is gone is deleted. */
+    private static boolean foreignLock(Path project, String name) {
+        Path dir = StorePaths.sandboxHome(project, name).resolve("lease");
         if (!Files.isDirectory(dir)) return false;
-        long self = ProcessHandle.current().pid();
+        String ours = ProcessHandle.current().pid() + ".lock";
         try (var stream = Files.list(dir)) {
             for (Path lease : stream.toList()) {
-                long pid;
+                if (!lease.getFileName().toString().endsWith(".lock")) continue;
+                if (ours.equals(lease.getFileName().toString())) continue;
+                if (lockedByOther(lease)) return true;
                 try {
-                    pid = Long.parseLong(lease.getFileName().toString());
-                } catch (NumberFormatException ignored) {
-                    continue;
+                    Files.deleteIfExists(lease);
+                } catch (IOException ignored) {
+                    // A stale file that cannot be removed is not a live lease.
                 }
-                if (pid == self) continue;
-                if (ProcessHandle.of(pid).isPresent()) return true;
             }
         } catch (IOException ignored) {
-            return false;
+            return true;
         }
         return false;
+    }
+
+    private static boolean lockedByOther(Path lease) {
+        try (FileChannel channel = FileChannel.open(lease, StandardOpenOption.WRITE)) {
+            FileLock lock = channel.tryLock();
+            if (lock == null) return true;
+            lock.release();
+            return false;
+        } catch (OverlappingFileLockException ours) {
+            return false;
+        } catch (IOException busy) {
+            return true;
+        }
+    }
+
+    private static void releaseLeaseFor(Pool pool) {
+        if (pool == null || pool.file == null) return;
+        HeldLease lease = LEASES.remove(pool.file.toAbsolutePath().normalize());
+        if (lease != null) lease.close();
+    }
+
+    private static void releaseLease(Path project, String branch) {
+        if (branch == null || !branch.startsWith("sbx-")) return;
+        Path database = StorePaths.sandboxDatabase(project, branch.substring(4)).toAbsolutePath().normalize();
+        HeldLease lease = LEASES.remove(database);
+        if (lease != null) lease.close();
     }
 
     public static void closeBranch(java.nio.file.Path project, String branch) {
         String key = project.toAbsolutePath().normalize() + "|" + branch;
         Pool pool = POOLS.remove(key);
         if (pool != null) releaseEvery(pool);
-        clearOwnLease(project, branch);
+        releaseLease(project, branch);
     }
 
     public static void closeProject(java.nio.file.Path project) {
@@ -259,6 +296,7 @@ public final class SqlConnections {
             closing.add(held.connection);
         }
         finish(closing);
+        releaseLeaseFor(pool);
     }
 
     private static void releaseEvery(Pool pool) {
@@ -268,6 +306,7 @@ public final class SqlConnections {
             pool.live.clear();
             pool.open = 0;
             finish(closing);
+            releaseLeaseFor(pool);
             pool.notifyAll();
         }
     }
@@ -354,11 +393,23 @@ public final class SqlConnections {
         }
     }
 
-    private static void clearOwnLease(java.nio.file.Path project, String branch) {
-        try {
-            Files.deleteIfExists(leaseDirectory(project, branch).resolve(Long.toString(ProcessHandle.current().pid())));
-        } catch (IOException ignored) {
-            // A leftover lease for a dead pid is ignored.
+    private record HeldLease(FileChannel channel, FileLock lock, Path file) {
+        void close() {
+            try {
+                if (lock != null && lock.isValid()) lock.release();
+            } catch (IOException ignored) {
+                // The process exit drops an OS lock that release refused.
+            }
+            try {
+                if (channel != null && channel.isOpen()) channel.close();
+            } catch (IOException ignored) {
+                // Closing the channel is what drops the lock on some hosts.
+            }
+            try {
+                Files.deleteIfExists(file);
+            } catch (IOException ignored) {
+                // A leftover lock file with no holder is ignored on the next check.
+            }
         }
     }
 

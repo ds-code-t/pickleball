@@ -77,9 +77,10 @@ class StoreSandboxPruneTest {
         }
 
         String old = Instant.now().minus(3, ChronoUnit.DAYS).toString();
+        age(project, "oldbox", old);
+        age(project, "linbox", old);
         try (StoreDatabase database = StoreDatabase.open(project);
              Statement statement = database.connection().createStatement()) {
-            statement.execute("UPDATE sandboxes SET last_used = '" + old + "' WHERE name IN ('oldbox', 'linbox')");
             statement.execute("INSERT INTO runs(run_id, started_at, status, scenario, note, sandbox) "
                     + "VALUES ('kept', '" + old + "', 'passed', 'Ada', '', 'oldbox')");
         }
@@ -94,10 +95,10 @@ class StoreSandboxPruneTest {
         assertFalse(dry.out.contains("fresh"), dry.out);
         assertTrue(Files.exists(oldHome.resolve("marker.txt")));
 
-        Capture pruned = cli("store", "sandbox", "prune", "--older-than=1h", "--owner=ada", "--project=" + project);
+        Capture pruned = cli("store", "sandbox", "prune", "--older-than=1h", "--owner=ada", "--vacuum", "--project=" + project);
         assertEquals(0, pruned.code, pruned.err);
         assertTrue(pruned.out.contains("dropped oldbox"), pruned.out);
-        assertTrue(pruned.out.contains("gc "), pruned.out);
+        assertTrue(pruned.out.contains("vacuum "), pruned.out);
         assertFalse(Files.exists(oldHome));
         Capture listed = cli("store", "sandbox", "list", "--project=" + project);
         assertTrue(listed.out.contains("fresh"), listed.out);
@@ -127,6 +128,59 @@ class StoreSandboxPruneTest {
              var rows = statement.executeQuery("SELECT run_id FROM runs WHERE run_id = 'kept'")) {
             assertTrue(rows.next());
         }
+
+        assertEquals(0, cli("store", "sandbox", "create", "busybox", "--owner=ada", "--project=" + project).code);
+        StoreScope.clear();
+        age(project, "busybox", Instant.now().minus(3, ChronoUnit.DAYS).toString());
+        Process holder = hold(project, "busybox");
+        try {
+            Capture held = cli("store", "sandbox", "prune", "--older-than=1h", "--owner=ada", "--project=" + project);
+            assertEquals(0, held.code, held.err);
+            assertTrue(held.out.contains("skipped busybox in use"), held.out);
+            assertFalse(held.out.contains("dropped busybox"), held.out);
+        } finally {
+            holder.getOutputStream().close();
+            if (!holder.waitFor(30, java.util.concurrent.TimeUnit.SECONDS)) holder.destroyForcibly();
+        }
+        Capture afterHold = cli("store", "sandbox", "prune", "--older-than=1h", "--owner=ada", "--project=" + project);
+        assertEquals(0, afterHold.code, afterHold.err);
+        assertTrue(afterHold.out.contains("dropped busybox"), afterHold.out);
+    }
+
+    private static void age(Path project, String name, String when) throws Exception {
+        try (SqlStore store = SqlStore.open(project, Binding.sandbox(name))) {
+            store.session().update(
+                    "INSERT INTO _pkb_branch(`key`, value) VALUES ('last_used', ?) "
+                            + "ON CONFLICT(`key`) DO UPDATE SET value = excluded.value",
+                    when);
+        }
+        StoreScope.clear();
+    }
+
+    private static Process hold(Path project, String name) throws Exception {
+        Path err = Files.createTempFile("store-hold-", ".err");
+        Process process = new ProcessBuilder(StoreTestProcesses.java(java.util.List.of(
+                "-cp", System.getProperty("java.class.path"),
+                StoreSandboxHardenTest.class.getName() + "$Hold",
+                project.toAbsolutePath().toString(), name)))
+                .redirectError(err.toFile())
+                .start();
+        try (var reader = new java.io.BufferedReader(new java.io.InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+            long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(60);
+            while (System.nanoTime() < deadline) {
+                if (!reader.ready()) {
+                    if (!process.isAlive()) {
+                        throw new IllegalStateException("holder exited " + process.exitValue() + " " + Files.readString(err));
+                    }
+                    Thread.sleep(50);
+                    continue;
+                }
+                String line = reader.readLine();
+                if (line != null && line.startsWith("HOLDING ")) return process;
+            }
+        }
+        process.destroyForcibly();
+        throw new IllegalStateException("holder did not start " + Files.readString(err));
     }
 
     private Capture cli(String... args) {

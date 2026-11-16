@@ -861,6 +861,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/store/LegacyNamesTest.java`
 - `src/test/java/tools/dscode/store/NoRuntimeDownloadTest.java`
 - `src/test/java/tools/dscode/store/RenameGateTest.java`
+- `src/test/java/tools/dscode/store/SandboxCreateTimingTest.java`
+- `src/test/java/tools/dscode/store/SandboxIndependenceTest.java`
 - `src/test/java/tools/dscode/store/spike/EmbeddedMultiProcessTest.java`
 - `src/test/java/tools/dscode/store/spike/EmbeddedNativeProbe.java`
 - `src/test/java/tools/dscode/store/spike/EmbeddedStoreSpikeTest.java`

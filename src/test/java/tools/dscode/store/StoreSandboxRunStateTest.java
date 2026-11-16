@@ -7,6 +7,7 @@ import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.store.sql.Binding;
 import tools.dscode.store.sql.SqlDialect;
 import tools.dscode.store.sql.SqlStore;
+import tools.dscode.store.sql.SqliteOpen;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -14,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -96,21 +98,25 @@ class StoreSandboxRunStateTest {
         StoreScope.clear();
         try (SqlStore store = SqlStore.open(project, Binding.main())) {
             for (String table : SqlDialect.RUN_STATE_TABLES) {
-                String count = "sandboxes".equals(table)
-                        ? store.session().scalar("SELECT COUNT(*) FROM sandboxes WHERE name = 'alpha'")
-                        : store.session().scalar("SELECT COUNT(*) FROM " + table + " WHERE sandbox = 'alpha'");
+                if ("sandboxes".equals(table)) {
+                    assertTrue(java.nio.file.Files.isRegularFile(StorePaths.sandboxDatabase(project, "alpha")), table);
+                    assertEquals("0", store.session().scalar("SELECT COUNT(*) FROM sandboxes WHERE name = 'alpha'"),
+                            "no central sandbox registry");
+                    continue;
+                }
+                String count = store.session().scalar("SELECT COUNT(*) FROM " + table + " WHERE sandbox = 'alpha'");
                 assertNotEquals("0", count, table);
             }
         }
-        try (SqlStore store = SqlStore.open(project, Binding.sandbox("alpha"))) {
+        try (var connection = SqliteOpen.open(StorePaths.sandboxDatabase(project, "alpha"));
+             Statement statement = connection.createStatement()) {
             for (String table : SqlDialect.RUN_STATE_TABLES) {
-                try {
-                    String count = store.session().scalar("SELECT COUNT(*) FROM " + table);
-                    assertEquals("0", count, table);
+                try (var rows = statement.executeQuery("SELECT COUNT(*) FROM " + table)) {
+                    assertTrue(rows.next(), table);
+                    assertEquals(0, rows.getInt(1), table);
                 } catch (SQLException missing) {
                     String message = missing.getMessage() == null ? "" : missing.getMessage().toLowerCase();
-                    assertTrue(message.contains(table) || message.contains("not found") || message.contains("exist"),
-                            missing.getMessage());
+                    assertTrue(message.contains(table) || message.contains("no such table"), missing.getMessage());
                 }
             }
         }

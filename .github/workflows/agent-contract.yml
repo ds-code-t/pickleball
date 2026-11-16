@@ -69,6 +69,26 @@ jobs:
             --tests tools.dscode.store.sql.ChangeLogTriggerTest \
             --tests tools.dscode.store.sql.RunStateRouterTest
 
+      - name: Embedded store sandboxes
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon :test \
+            --tests tools.dscode.store.StoreSandboxCliTest \
+            --tests tools.dscode.store.StoreSandboxBindingTest \
+            --tests tools.dscode.store.StoreSandboxRunStateTest \
+            --tests tools.dscode.store.StoreSandboxIsolationTest \
+            --tests tools.dscode.store.StoreSandboxWorkerTest \
+            --tests tools.dscode.store.StoreSandboxPruneTest \
+            --tests tools.dscode.store.StoreSandboxHardenTest \
+            --tests tools.dscode.store.StoreGlueCompileTest \
+            --tests tools.dscode.store.StoreGlueGapTest \
+            --tests tools.dscode.store.StoreRunClasspathRefreshTest \
+            --tests tools.dscode.store.SandboxIndependenceTest \
+            --tests tools.dscode.store.SandboxCreateTimingTest \
+            --tests tools.dscode.store.StoreFileReleaseTest
+          grep -h 'SANDBOX_CREATE_MS' build/test-results/test/TEST-tools.dscode.store.SandboxCreateTimingTest.xml | head -20 >> "$GITHUB_STEP_SUMMARY" || true
+
       - name: Agent surface popup live (real Chromium, must not skip)
         shell: bash
         run: |
@@ -168,6 +188,26 @@ jobs:
             --tests tools.dscode.store.StoreDriverMissingTest \
             --tests tools.dscode.store.sql.ChangeLogTriggerTest \
             --tests tools.dscode.store.sql.RunStateRouterTest
+
+      - name: Embedded store sandboxes
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon :test \
+            --tests tools.dscode.store.StoreSandboxCliTest \
+            --tests tools.dscode.store.StoreSandboxBindingTest \
+            --tests tools.dscode.store.StoreSandboxRunStateTest \
+            --tests tools.dscode.store.StoreSandboxIsolationTest \
+            --tests tools.dscode.store.StoreSandboxWorkerTest \
+            --tests tools.dscode.store.StoreSandboxPruneTest \
+            --tests tools.dscode.store.StoreSandboxHardenTest \
+            --tests tools.dscode.store.StoreGlueCompileTest \
+            --tests tools.dscode.store.StoreGlueGapTest \
+            --tests tools.dscode.store.StoreRunClasspathRefreshTest \
+            --tests tools.dscode.store.SandboxIndependenceTest \
+            --tests tools.dscode.store.SandboxCreateTimingTest \
+            --tests tools.dscode.store.StoreFileReleaseTest
+          grep -h 'SANDBOX_CREATE_MS' build/test-results/test/TEST-tools.dscode.store.SandboxCreateTimingTest.xml | head -20 >> "$GITHUB_STEP_SUMMARY" || true
 
       - name: Targeted core agent surface and Cucumber boundary
         run: |
@@ -275,6 +315,26 @@ jobs:
             --tests tools.dscode.store.StoreDriverMissingTest \
             --tests tools.dscode.store.sql.ChangeLogTriggerTest \
             --tests tools.dscode.store.sql.RunStateRouterTest
+
+      - name: Embedded store sandboxes
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon :test \
+            --tests tools.dscode.store.StoreSandboxCliTest \
+            --tests tools.dscode.store.StoreSandboxBindingTest \
+            --tests tools.dscode.store.StoreSandboxRunStateTest \
+            --tests tools.dscode.store.StoreSandboxIsolationTest \
+            --tests tools.dscode.store.StoreSandboxWorkerTest \
+            --tests tools.dscode.store.StoreSandboxPruneTest \
+            --tests tools.dscode.store.StoreSandboxHardenTest \
+            --tests tools.dscode.store.StoreGlueCompileTest \
+            --tests tools.dscode.store.StoreGlueGapTest \
+            --tests tools.dscode.store.StoreRunClasspathRefreshTest \
+            --tests tools.dscode.store.SandboxIndependenceTest \
+            --tests tools.dscode.store.SandboxCreateTimingTest \
+            --tests tools.dscode.store.StoreFileReleaseTest
+          grep -h 'SANDBOX_CREATE_MS' build/test-results/test/TEST-tools.dscode.store.SandboxCreateTimingTest.xml | head -20 >> "$GITHUB_STEP_SUMMARY" || true
 
       - name: Install Chrome for Testing
         shell: bash

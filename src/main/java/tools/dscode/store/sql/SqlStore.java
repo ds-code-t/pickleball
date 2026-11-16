@@ -10,6 +10,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.Map;
 
 /** Opens one bound session. Schema is created on main before the session is returned. */
 public final class SqlStore implements AutoCloseable {
@@ -46,12 +47,21 @@ public final class SqlStore implements AutoCloseable {
 
     /** Copies main into an independent sandbox database. */
     public void createBranch(String sandboxName) throws SQLException {
+        createBranch(sandboxName, Map.of());
+    }
+
+    /**
+     * Copies main into an independent sandbox file. Branch metadata is written
+     * into that copy before anything opens {@code source.db}.
+     */
+    public void createBranch(String sandboxName, Map<String, String> meta) throws SQLException {
         Binding check = Binding.sandbox(sandboxName);
         if (!binding.primary()) throw new SQLException("error: create a sandbox branch from main");
         Path target = StorePaths.sandboxDatabase(project, check.name());
         if (Files.exists(target)) {
             throw new SQLException("error: sandbox " + check.name() + " already exists");
         }
+        String now = Instant.now().toString();
         Path tmp = target.resolveSibling("source.db.tmp");
         try {
             Files.createDirectories(target.getParent());
@@ -67,12 +77,14 @@ public final class SqlStore implements AutoCloseable {
                 try (Statement statement = branched.createStatement()) {
                     statement.execute("DELETE FROM _pkb_changes");
                     writeBranch(statement, "name", check.name());
-                    writeBranch(statement, "created_at", Instant.now().toString());
-                    writeBranch(statement, "created_from_commit", "");
-                    writeBranch(statement, "created_from_dirty", "0");
-                    writeBranch(statement, "owner", "");
-                    writeBranch(statement, "ttl", "");
+                    writeBranch(statement, "created_at", now);
+                    writeBranch(statement, "created_from_commit", meta(meta, "created_from_commit"));
+                    writeBranch(statement, "created_from_dirty", meta(meta, "created_from_dirty").isBlank()
+                            ? "0" : meta(meta, "created_from_dirty"));
+                    writeBranch(statement, "owner", meta(meta, "owner"));
+                    writeBranch(statement, "ttl", meta(meta, "ttl").isBlank() ? "24h" : meta(meta, "ttl"));
                     writeBranch(statement, "store_schema", "1");
+                    writeBranch(statement, "last_used", now);
                     statement.execute("DELETE FROM _pkb_base");
                     statement.execute("""
                             INSERT INTO _pkb_base(tbl, pk, base_hash, location, git_commit)
@@ -95,6 +107,12 @@ public final class SqlStore implements AutoCloseable {
                 // The moved file is already gone. A leftover temp is retried on the next create.
             }
         }
+    }
+
+    private static String meta(Map<String, String> meta, String key) {
+        if (meta == null) return "";
+        String value = meta.get(key);
+        return value == null ? "" : value;
     }
 
     private static void writeBranch(Statement statement, String key, String value) throws SQLException {

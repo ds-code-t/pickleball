@@ -4,25 +4,30 @@ import tools.dscode.store.sql.Binding;
 import tools.dscode.store.sql.SqlConnections;
 import tools.dscode.store.sql.SqlSession;
 import tools.dscode.store.sql.SqlStore;
+import tools.dscode.store.sql.SqliteOpen;
 
-import tools.dscode.store.sql.SqlDialect;
-
+import java.io.IOException;
 import java.io.PrintStream;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.regex.Pattern;
+import java.util.Map;
 
-/** {@code pickleball store sandbox}. Metadata stays on main. Edits stay on {@code sbx-<name>}. */
+/** {@code pickleball store sandbox}. Each sandbox is its own SQLite file. Nothing in it points at main. */
 public final class StoreSandbox {
-    private static final Pattern COMMIT = Pattern.compile("[0-9a-zA-Z]{6,64}");
-
     private StoreSandbox() {
     }
 
@@ -63,27 +68,28 @@ public final class StoreSandbox {
         String ttl = suppliedTtl == null || suppliedTtl.isBlank() ? "24h" : suppliedTtl;
         parseDuration(ttl);
         String from = value(tokens, "--from=");
-        if (from != null && !from.isBlank() && !COMMIT.matcher(from).matches()) {
+        if (from != null && !from.isBlank() && !"main".equals(from)) {
             throw new IllegalArgumentException(
-                    "sandbox --from must be a commit hash\nfix: store sandbox create " + name + " --from=<hash>");
+                    "sandbox --from must be main\nfix: store sandbox create " + name
+                            + " from main, or extract a sandbox and hydrate it");
         }
-        String now = Instant.now().toString();
-        try (SqlStore store = SqlStore.open(project, Binding.main())) {
-            SqlSession session = store.session();
-            withSandboxesLock(session, () -> {
-                if (session.scalar("SELECT name FROM sandboxes WHERE name = ?", name) != null) {
-                    throw new IllegalStateException("sandbox already exists: " + name + "\nfix: store sandbox list");
-                }
-                if (from == null || from.isBlank()) store.createBranch(name);
-                else session.call("CALL DOLT_BRANCH(?, ?)", binding.branch(), from);
-                String base = from == null || from.isBlank() ? head(session) : from;
-                session.transaction("sandboxes", () -> {
-                    session.script("SELECT name FROM sandboxes FOR UPDATE");
-                    session.update(
-                            "INSERT INTO sandboxes(name, owner, base_commit, created, last_used, ttl, sandbox) VALUES (?, ?, ?, ?, ?, ?, '')",
-                            name, owner, base == null ? "" : base, now, now, ttl);
-                });
-            });
+        if (Files.isRegularFile(StorePaths.sandboxDatabase(project, name))) {
+            throw new IllegalStateException("sandbox already exists: " + name + "\nfix: store sandbox list");
+        }
+        StoreGit.Snapshot git = StoreGit.capture(project);
+        Map<String, String> meta = new LinkedHashMap<>();
+        meta.put("owner", owner);
+        meta.put("ttl", ttl);
+        meta.put("created_from_commit", git.commit() == null ? "" : git.commit());
+        meta.put("created_from_dirty", git.dirty() ? "1" : "0");
+        Path lockFile = StorePaths.root(project).resolve("locks").resolve("sandboxes.lock");
+        try (FileLockHold ignored = lockFile(lockFile)) {
+            if (Files.isRegularFile(StorePaths.sandboxDatabase(project, name))) {
+                throw new IllegalStateException("sandbox already exists: " + name + "\nfix: store sandbox list");
+            }
+            try (SqlStore store = SqlStore.open(project, Binding.main())) {
+                store.createBranch(name, meta);
+            }
         }
         StoreLog.log(project, "sandbox", name, name, "create owner=" + owner + " ttl=" + ttl);
         out.println("sandbox " + name + " branch " + binding.branch());
@@ -101,7 +107,8 @@ public final class StoreSandbox {
                 body.append("{\"name\":\"").append(escape(row.name())).append("\",\"owner\":\"")
                         .append(escape(row.owner())).append("\",\"baseCommit\":\"").append(escape(row.base()))
                         .append("\",\"created\":\"").append(escape(row.created())).append("\",\"lastUsed\":\"")
-                        .append(escape(row.lastUsed())).append("\",\"ttl\":\"").append(escape(row.ttl())).append("\"}");
+                        .append(escape(row.lastUsed())).append("\",\"ttl\":\"").append(escape(row.ttl()))
+                        .append("\",\"inUse\":").append(row.inUse()).append('}');
             }
             body.append("]}");
             out.println(body);
@@ -110,7 +117,8 @@ public final class StoreSandbox {
         out.println("sandboxes " + rows.size());
         for (Row row : rows) {
             out.println(row.name() + " owner=" + row.owner() + " base=" + row.base()
-                    + " created=" + row.created() + " lastUsed=" + row.lastUsed() + " ttl=" + row.ttl());
+                    + " created=" + row.created() + " lastUsed=" + row.lastUsed() + " ttl=" + row.ttl()
+                    + " inUse=" + row.inUse());
         }
         return 0;
     }
@@ -129,24 +137,21 @@ public final class StoreSandbox {
 
     private static int diff(Path project, List<String> tokens, boolean json, PrintStream out) throws Exception {
         String name = positional(tokens, 2, "sandbox diff needs a name");
-        Binding binding = Binding.sandbox(name);
+        Binding.sandbox(name);
         require(project, name);
         touch(project, name);
         String only = value(tokens, "--table=");
         List<String> tables = only == null || only.isBlank()
-                ? List.of("files", "entities", "feature_docs", "step_definitions", "scenarios", "steps")
+                ? List.of("files", "entities")
                 : List.of(only);
         List<String> lines = new ArrayList<>();
-        try (SqlStore store = SqlStore.open(project, binding)) {
+        try (SqlStore store = SqlStore.open(project, Binding.sandbox(name))) {
             SqlSession session = store.session();
             for (String table : tables) {
-                if (!table.matches("[a-z_]+")) throw new IllegalArgumentException("unknown diff table: " + table);
-                try {
-                    List<String> values = session.column(diffSql(table));
-                    for (String value : values) lines.add(table + " " + (value == null ? "" : value));
-                } catch (java.sql.SQLException failure) {
-                    // A table with no working diff has no rows. A missing diff table is the same.
+                if (!table.equals("files") && !table.equals("entities")) {
+                    throw new IllegalArgumentException("unknown diff table: " + table);
                 }
+                lines.addAll(diffTable(session, table));
             }
         }
         StoreLog.log(project, "sandbox", name, name, "diff " + lines.size());
@@ -167,9 +172,40 @@ public final class StoreSandbox {
         return 0;
     }
 
+    private static List<String> diffTable(SqlSession session, String table) throws SQLException {
+        Map<String, String> base = new LinkedHashMap<>();
+        try (var statement = session.connection().prepareStatement(
+                "SELECT pk, base_hash FROM _pkb_base WHERE tbl = ? ORDER BY pk")) {
+            statement.setString(1, table);
+            try (var result = statement.executeQuery()) {
+                while (result.next()) base.put(result.getString(1), result.getString(2) == null ? "" : result.getString(2));
+            }
+        }
+        Map<String, String> current = new LinkedHashMap<>();
+        String sql = "files".equals(table)
+                ? "SELECT path, content_hash FROM files ORDER BY path"
+                : "SELECT entity_type || '#' || entity_id, content_hash FROM entities ORDER BY 1";
+        try (var statement = session.connection().createStatement();
+             var result = statement.executeQuery(sql)) {
+            while (result.next()) {
+                current.put(result.getString(1), result.getString(2) == null ? "" : result.getString(2));
+            }
+        }
+        List<String> lines = new ArrayList<>();
+        for (var entry : current.entrySet()) {
+            String key = entry.getKey();
+            if (!base.containsKey(key)) lines.add(table + " insert " + key + " " + entry.getValue());
+            else if (!base.get(key).equals(entry.getValue())) lines.add(table + " update " + key + " " + entry.getValue());
+        }
+        for (var entry : base.entrySet()) {
+            if (!current.containsKey(entry.getKey())) lines.add(table + " delete " + entry.getKey() + " " + entry.getValue());
+        }
+        return lines;
+    }
+
     private static int extract(Path project, List<String> tokens, PrintStream out) throws Exception {
         String name = positional(tokens, 2, "sandbox extract needs a name");
-        Binding binding = Binding.sandbox(name);
+        Binding.sandbox(name);
         String to = value(tokens, "--to=");
         if (to == null || to.isBlank()) {
             throw new IllegalArgumentException("sandbox extract needs --to\nfix: store sandbox extract " + name + " --to=<dir>");
@@ -179,19 +215,26 @@ public final class StoreSandbox {
         if (!dest.isAbsolute()) dest = project.resolve(dest);
         dest = dest.toAbsolutePath().normalize();
         Path root = project.toAbsolutePath().normalize();
-        if ((dest.equals(root) || root.startsWith(dest)) && !tokens.contains("--into-project") && dest.equals(root)) {
+        if (dest.equals(root) && !tokens.contains("--into-project")) {
             throw new IllegalArgumentException("extract into the project root needs --into-project\nfix: store sandbox extract "
                     + name + " --to=<dir>");
         }
         int written = 0;
         List<PlannedFile> planned = new ArrayList<>();
-        try (SqlStore store = SqlStore.open(project, binding)) {
+        try (SqlStore store = SqlStore.open(project, Binding.sandbox(name))) {
             try (var statement = store.session().connection().createStatement();
-                 var rows = statement.executeQuery("SELECT path, raw_content FROM files ORDER BY path")) {
+                 var rows = statement.executeQuery(
+                         "SELECT path, raw_content, binary_ref, content_hash FROM files ORDER BY path")) {
                 while (rows.next()) {
                     String path = rows.getString(1);
                     byte[] body = rows.getBytes(2);
+                    boolean reference = rows.getInt(3) != 0;
+                    String hash = rows.getString(4);
                     if (path == null) continue;
+                    if (reference) {
+                        noticeReference(project, path, hash, out);
+                        continue;
+                    }
                     planned.add(planFile(dest, path, body));
                 }
             }
@@ -203,7 +246,7 @@ public final class StoreSandbox {
                 writtenFiles.add(writeFile(item, createdDirectories));
                 written++;
             }
-        } catch (java.io.IOException failure) {
+        } catch (IOException failure) {
             restore(writtenFiles, createdDirectories);
             throw failure;
         }
@@ -211,6 +254,14 @@ public final class StoreSandbox {
         StoreLog.log(project, "sandbox", name, name, "extract files=" + written);
         out.println("extracted " + name + " files=" + written + " to=" + dest);
         return 0;
+    }
+
+    private static void noticeReference(Path project, String path, String hash, PrintStream out) throws IOException {
+        Path disk = project.resolve(path);
+        byte[] existing = Files.isRegularFile(disk) ? Files.readAllBytes(disk) : new byte[0];
+        if (!StoreHashes.sha256(existing).equals(hash == null ? "" : hash)) {
+            out.println("binary_ref_changed " + path);
+        }
     }
 
     /** A refused path is decided before any destination file is created or replaced. */
@@ -234,7 +285,7 @@ public final class StoreSandbox {
      * Writes through a sibling temp file and a move, so a failed write never leaves a
      * partial destination file. Directories this call creates are recorded for restore.
      */
-    private static WrittenFile writeFile(PlannedFile item, List<Path> createdDirectories) throws java.io.IOException {
+    private static WrittenFile writeFile(PlannedFile item, List<Path> createdDirectories) throws IOException {
         boolean existed = Files.isRegularFile(item.file());
         byte[] previous = existed ? Files.readAllBytes(item.file()) : null;
         Path parent = item.file().getParent();
@@ -264,14 +315,14 @@ public final class StoreSandbox {
             try {
                 if (item.existed()) Files.write(item.file(), item.previous());
                 else Files.deleteIfExists(item.file());
-            } catch (java.io.IOException ignored) {
+            } catch (IOException ignored) {
                 // The original write failure is the one the caller needs.
             }
         }
         for (int index = createdDirectories.size() - 1; index >= 0; index--) {
             try {
                 Files.deleteIfExists(createdDirectories.get(index));
-            } catch (java.io.IOException ignored) {
+            } catch (IOException ignored) {
                 // A directory that is not empty was not only ours.
             }
         }
@@ -291,18 +342,12 @@ public final class StoreSandbox {
         if (SqlConnections.branchInUse(project, binding.branch()) && !force) {
             throw new IllegalStateException("sandbox " + name + " is in use\nfix: store sandbox drop " + name + " --force");
         }
-        if (force) SqlConnections.closeBranch(project, binding.branch());
-        try (SqlStore store = SqlStore.open(project, Binding.main())) {
-            SqlSession session = store.session();
-            withSandboxesLock(session, () -> {
-                session.call("CALL DOLT_BRANCH('-D', ?)", binding.branch());
-                session.transaction("sandboxes", () -> {
-                    session.scalar("SELECT name FROM sandboxes WHERE name = ? FOR UPDATE", name);
-                    session.update("DELETE FROM sandboxes WHERE name = ?", name);
-                });
-            });
+        SqlConnections.closeBranch(project, binding.branch());
+        if (!deleteSandbox(project, name)) {
+            out.println("pending-delete " + name);
+            StoreLog.log(project, "sandbox", name, name, "drop pending-delete");
+            return 0;
         }
-        deleteTree(StorePaths.sandboxHome(project, name));
         StoreLog.log(project, "sandbox", name, name, "drop force=" + force);
         out.println("dropped " + name);
         return 0;
@@ -311,10 +356,12 @@ public final class StoreSandbox {
     private static int prune(Path project, List<String> tokens, PrintStream out) throws Exception {
         boolean dry = tokens.contains("--dry-run");
         boolean history = tokens.contains("--with-history");
+        boolean vacuum = tokens.contains("--vacuum");
         String owner = value(tokens, "--owner=");
         String older = value(tokens, "--older-than=");
         Duration olderThan = older == null ? null : parseDuration(older);
         Instant now = Instant.now();
+        retryPending(project, out, dry);
         List<Row> victims = new ArrayList<>();
         for (Row row : rows(project)) {
             if (owner != null && !owner.equals(row.owner())) continue;
@@ -336,103 +383,160 @@ public final class StoreSandbox {
                 StoreLog.log(project, "sandbox", row.name(), row.name(), "prune skipped in use");
                 continue;
             }
-            try (SqlStore store = SqlStore.open(project, Binding.main())) {
-                SqlSession session = store.session();
-                withSandboxesLock(session, () -> {
-                    try {
-                        session.call("CALL DOLT_BRANCH('-D', ?)", binding.branch());
-                    } catch (SQLException failure) {
-                        // A branch that is already gone still loses its metadata.
-                    }
-                    session.transaction("sandboxes", () -> {
-                        session.update("DELETE FROM sandboxes WHERE name = ?", row.name());
-                        if (history) {
-                            session.update("DELETE FROM runs WHERE sandbox = ?", row.name());
-                            for (String table : List.of(
-                                    "run_logs", "scenario_executions", "step_executions",
-                                    "entity_usages", "log_entity_links", "artifacts")) {
-                                session.update("DELETE FROM " + table + " WHERE sandbox = ?", row.name());
-                            }
-                        }
-                    });
-                });
+            if (history) deleteHistory(project, row.name());
+            SqlConnections.closeBranch(project, binding.branch());
+            if (!deleteSandbox(project, row.name())) {
+                out.println("pending-delete " + row.name());
+                StoreLog.log(project, "sandbox", row.name(), row.name(), "prune pending-delete");
+                continue;
             }
-            deleteTree(StorePaths.sandboxHome(project, row.name()));
             out.println("dropped " + row.name());
             StoreLog.log(project, "sandbox", row.name(), row.name(), history ? "prune history" : "prune");
             dropped++;
         }
-        try (SqlStore store = SqlStore.open(project, Binding.main())) {
-            store.session().script("CALL DOLT_GC()");
+        if (vacuum || freePageRatio(project) > 0.25d) {
+            vacuumMain(project);
+            out.println("vacuum " + dropped);
         }
-        out.println("gc " + dropped);
         return 0;
     }
 
-    private static void withSandboxesLock(SqlSession session, SqlDialect.SqlTask work) throws Exception {
-        work.run();
+    private static void retryPending(Path project, PrintStream out, boolean dry) throws Exception {
+        Path root = StorePaths.root(project).resolve("sandboxes");
+        if (!Files.isDirectory(root)) return;
+        List<Path> homes;
+        try (var stream = Files.list(root)) {
+            homes = stream.filter(dir -> Files.isRegularFile(dir.resolve("pending-delete"))).toList();
+        }
+        for (Path home : homes) {
+            String name = home.getFileName().toString();
+            if (!name.matches("[a-z0-9][a-z0-9-]{0,47}")) continue;
+            if (dry) {
+                out.println("dry-run drop " + name);
+                continue;
+            }
+            if (SqlConnections.branchInUse(project, Binding.sandbox(name).branch())) {
+                out.println("pending-delete " + name);
+                continue;
+            }
+            SqlConnections.closeBranch(project, Binding.sandbox(name).branch());
+            if (deleteSandbox(project, name)) out.println("dropped " + name);
+            else out.println("pending-delete " + name);
+        }
     }
 
-    private static String diffSql(String table) {
-        return switch (table) {
-            case "files", "feature_docs", "step_definitions", "scenarios", "steps" ->
-                    "SELECT to_path FROM dolt_diff_" + table + " WHERE to_commit = 'WORKING'";
-            case "entities" ->
-                    "SELECT CONCAT(to_entity_type, '#', to_entity_id) FROM dolt_diff_entities WHERE to_commit = 'WORKING'";
-            default -> "SELECT to_commit FROM dolt_diff_" + table + " WHERE to_commit = 'WORKING'";
-        };
+    private static void deleteHistory(Path project, String name) throws Exception {
+        try (SqlStore store = SqlStore.open(project, Binding.main())) {
+            SqlSession session = store.session();
+            session.update("DELETE FROM runs WHERE sandbox = ?", name);
+            for (String table : List.of(
+                    "run_logs", "scenario_executions", "step_executions",
+                    "entity_usages", "log_entity_links", "artifacts")) {
+                session.update("DELETE FROM " + table + " WHERE sandbox = ?", name);
+            }
+            session.update("DELETE FROM sandboxes WHERE name = ?", name);
+        }
+    }
+
+    private static boolean deleteSandbox(Path project, String name) throws IOException {
+        Path home = StorePaths.sandboxHome(project, name);
+        Path database = home.resolve("source.db");
+        boolean free = tools.dscode.store.sql.StoreFiles.awaitRelease(database, tools.dscode.store.sql.StoreFiles.RELEASE_MS,
+                tools.dscode.store.sql.StoreFiles::renameProbe)
+                && tools.dscode.store.sql.StoreFiles.awaitRelease(Path.of(database.toString() + "-wal"),
+                tools.dscode.store.sql.StoreFiles.RELEASE_MS, tools.dscode.store.sql.StoreFiles::renameProbe)
+                && tools.dscode.store.sql.StoreFiles.awaitRelease(Path.of(database.toString() + "-shm"),
+                tools.dscode.store.sql.StoreFiles.RELEASE_MS, tools.dscode.store.sql.StoreFiles::renameProbe);
+        if (!free) {
+            Files.createDirectories(home);
+            Files.writeString(home.resolve("pending-delete"), database.toAbsolutePath().normalize() + "\n");
+            return false;
+        }
+        deleteTree(home);
+        return true;
+    }
+
+    private static double freePageRatio(Path project) {
+        Path database = StorePaths.mainDatabase(project);
+        if (!Files.isRegularFile(database)) return 0;
+        try (Connection connection = SqliteOpen.open(database);
+             Statement statement = connection.createStatement()) {
+            long pages = pragma(statement, "page_count");
+            long free = pragma(statement, "freelist_count");
+            if (pages <= 0) return 0;
+            return (double) free / (double) pages;
+        } catch (SQLException failure) {
+            return 0;
+        }
+    }
+
+    private static long pragma(Statement statement, String name) throws SQLException {
+        try (ResultSet rows = statement.executeQuery("PRAGMA " + name)) {
+            return rows.next() ? rows.getLong(1) : 0L;
+        }
+    }
+
+    private static void vacuumMain(Path project) throws Exception {
+        Path database = StorePaths.mainDatabase(project);
+        if (!Files.isRegularFile(database)) return;
+        SqlConnections.closeBranch(project, Binding.main().branch());
+        try (Connection connection = SqliteOpen.open(database);
+             Statement statement = connection.createStatement()) {
+            statement.execute("VACUUM");
+        }
     }
 
     private static List<Row> rows(Path project) throws Exception {
-        if (!StorePaths.ready(project)) return List.of();
+        Path root = StorePaths.root(project).resolve("sandboxes");
+        if (!Files.isDirectory(root)) return List.of();
         List<Row> rows = new ArrayList<>();
-        try (SqlStore store = SqlStore.open(project, Binding.main())) {
-            try (var statement = store.session().connection().prepareStatement(
-                    "SELECT name, owner, base_commit, created, last_used, ttl FROM sandboxes ORDER BY name");
-                 var result = statement.executeQuery()) {
-                while (result.next()) {
-                    rows.add(new Row(
-                            result.getString(1), result.getString(2), result.getString(3),
-                            result.getString(4), result.getString(5), result.getString(6)));
-                }
-            }
+        List<Path> homes;
+        try (var stream = Files.list(root)) {
+            homes = stream.filter(dir -> Files.isRegularFile(dir.resolve("source.db"))).toList();
+        }
+        for (Path home : homes) {
+            String name = home.getFileName().toString();
+            if (!name.matches("[a-z0-9][a-z0-9-]{0,47}")) continue;
+            rows.add(readRow(project, name));
         }
         rows.sort(Comparator.comparing(Row::name));
         return rows;
     }
 
-    private static void require(Path project, String name) throws Exception {
-        Binding.sandbox(name);
-        if (!StorePaths.ready(project)) {
-            throw new IllegalArgumentException("unknown sandbox " + name + "\nfix: store sandbox create " + name);
+    private static Row readRow(Path project, String name) throws Exception {
+        Map<String, String> values = new LinkedHashMap<>();
+        try (SqlStore store = SqlStore.open(project, Binding.sandbox(name));
+             var statement = store.session().connection().createStatement();
+             var result = statement.executeQuery("SELECT `key`, value FROM _pkb_branch")) {
+            while (result.next()) values.put(result.getString(1), result.getString(2) == null ? "" : result.getString(2));
         }
-        try (SqlStore store = SqlStore.open(project, Binding.main())) {
-            String found = store.session().scalar("SELECT name FROM sandboxes WHERE name = ?", name);
-            if (found == null) {
-                throw new IllegalArgumentException("unknown sandbox " + name + "\nfix: store sandbox create " + name);
-            }
+        String created = values.getOrDefault("created_at", "");
+        String used = values.getOrDefault("last_used", created);
+        boolean inUse = SqlConnections.branchInUse(project, Binding.sandbox(name).branch());
+        return new Row(
+                name,
+                values.getOrDefault("owner", ""),
+                values.getOrDefault("created_from_commit", ""),
+                created,
+                used.isBlank() ? created : used,
+                values.getOrDefault("ttl", "24h"),
+                inUse);
+    }
+
+    private static void require(Path project, String name) {
+        Binding.sandbox(name);
+        if (!Files.isRegularFile(StorePaths.sandboxDatabase(project, name))) {
+            throw new IllegalArgumentException("unknown sandbox " + name + "\nfix: store sandbox create " + name);
         }
     }
 
     private static void touch(Path project, String name) throws Exception {
-        try (SqlStore store = SqlStore.open(project, Binding.main())) {
+        String now = Instant.now().toString();
+        try (SqlStore store = SqlStore.open(project, Binding.sandbox(name))) {
             store.session().update(
-                    "UPDATE sandboxes SET last_used = ? WHERE name = ?",
-                    Instant.now().toString(), name);
-        }
-    }
-
-    private static String head(SqlSession session) {
-        try {
-            String hash = session.scalar("SELECT HASHOF('HEAD')");
-            if (hash != null && !hash.isBlank()) return hash;
-        } catch (java.sql.SQLException ignored) {
-            // Older shapes use dolt_log.
-        }
-        try {
-            return session.scalar("SELECT commit_hash FROM dolt_log LIMIT 1");
-        } catch (java.sql.SQLException failure) {
-            return "";
+                    "INSERT INTO _pkb_branch(`key`, value) VALUES ('last_used', ?) "
+                            + "ON CONFLICT(`key`) DO UPDATE SET value = excluded.value",
+                    now);
         }
     }
 
@@ -452,7 +556,7 @@ public final class StoreSandbox {
         return Duration.ofHours(number);
     }
 
-    private static void deleteTree(Path root) throws java.io.IOException {
+    private static void deleteTree(Path root) throws IOException {
         if (!Files.exists(root)) return;
         try (var walk = Files.walk(root)) {
             List<Path> paths = walk.sorted(Comparator.reverseOrder()).toList();
@@ -494,6 +598,37 @@ public final class StoreSandbox {
         return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
-    private record Row(String name, String owner, String base, String created, String lastUsed, String ttl) {
+    private static FileLockHold lockFile(Path file) throws IOException {
+        if (file.getParent() != null) Files.createDirectories(file.getParent());
+        FileChannel channel = FileChannel.open(file, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+        try {
+            FileLock lock = channel.lock();
+            return new FileLockHold(channel, lock);
+        } catch (IOException failure) {
+            channel.close();
+            throw failure;
+        }
+    }
+
+    private static final class FileLockHold implements AutoCloseable {
+        private final FileChannel channel;
+        private final FileLock lock;
+
+        private FileLockHold(FileChannel channel, FileLock lock) {
+            this.channel = channel;
+            this.lock = lock;
+        }
+
+        @Override
+        public void close() throws IOException {
+            try {
+                if (lock != null && lock.isValid()) lock.release();
+            } finally {
+                channel.close();
+            }
+        }
+    }
+
+    private record Row(String name, String owner, String base, String created, String lastUsed, String ttl, boolean inUse) {
     }
 }

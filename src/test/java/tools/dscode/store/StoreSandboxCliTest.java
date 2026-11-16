@@ -90,6 +90,44 @@ class StoreSandboxCliTest {
     }
 
     @Test
+    void sandboxLoggingIsOffByDefaultDateStampedAndCapped() throws Exception {
+        Files.createDirectories(project.resolve("features"));
+        Files.writeString(project.resolve("features/pay.feature"), """
+                Feature: Pay
+                  Scenario: Ada
+                    * INFO: amount is 1
+                """);
+        String previous = System.getProperty("pkb_store_log");
+        String previousMax = System.getProperty("pkb_store_log_max_bytes");
+        try {
+            System.clearProperty("pkb_store_log");
+            assertEquals(0, cli("store", "hydrate", "--project=" + project).code);
+            StoreScope.clear();
+            assertEquals(0, cli("store", "sandbox", "create", "alpha", "--project=" + project).code);
+            assertFalse(Files.exists(StorePaths.log(project)));
+            System.setProperty("pkb_store_log", "sandbox");
+            assertEquals(0, cli("store", "sandbox", "use", "alpha", "--project=" + project).code);
+            String text = Files.readString(StorePaths.log(project), StandardCharsets.UTF_8);
+            assertTrue(text.contains(" sandbox "), text);
+            assertTrue(text.contains("use"), text);
+            assertEquals('2', text.charAt(0), text);
+            System.setProperty("pkb_store_log_max_bytes", "80");
+            StoreLog.log(project, "sandbox", "alpha", "alpha", "x".repeat(200));
+            assertTrue(Files.size(StorePaths.log(project)) <= 80);
+            System.setProperty("pkb_store_log", "off");
+            long size = Files.size(StorePaths.log(project));
+            StoreLog.log(project, "sandbox", "alpha", "alpha", "again");
+            assertEquals(size, Files.size(StorePaths.log(project)));
+        } finally {
+            if (previous == null) System.clearProperty("pkb_store_log");
+            else System.setProperty("pkb_store_log", previous);
+            if (previousMax == null) System.clearProperty("pkb_store_log_max_bytes");
+            else System.setProperty("pkb_store_log_max_bytes", previousMax);
+            StoreScope.clear();
+        }
+    }
+
+    @Test
     void extractRefusesABadPathBeforeWritingAnyFile() throws Exception {
         Files.createDirectories(project.resolve("features"));
         Files.writeString(project.resolve("features/pay.feature"), """

@@ -42,17 +42,16 @@ class StoreSandboxHardenTest {
         Capture injected = cli("store", "sandbox", "create", "beta",
                 "--from=abcd'; DROP TABLE sandboxes; --", "--project=" + project);
         assertEquals(1, injected.code, injected.out);
-        assertTrue(injected.err.contains("commit hash"), injected.err);
+        assertTrue(injected.err.contains("main"), injected.err);
         Capture listed = cli("store", "sandbox", "list", "--project=" + project);
         assertFalse(listed.out.contains("beta"), listed.out);
 
-        String hash;
-        try (SqlStore store = SqlStore.open(project, Binding.main())) {
-            hash = store.session().scalar("SELECT commit_hash FROM dolt_log ORDER BY date DESC LIMIT 1");
-        }
-        assertTrue(hash != null && hash.length() >= 6, hash);
-        Capture created = cli("store", "sandbox", "create", "beta", "--from=" + hash, "--project=" + project);
-        assertEquals(0, created.code, created.err + " hash=" + hash);
+        Capture other = cli("store", "sandbox", "create", "beta", "--from=abc123def", "--project=" + project);
+        assertEquals(1, other.code, other.err);
+        assertTrue(other.err.contains("main"), other.err);
+
+        Capture created = cli("store", "sandbox", "create", "beta", "--from=main", "--project=" + project);
+        assertEquals(0, created.code, created.err);
         StoreScope.clear();
 
         String marker = "pkb-store-nope-" + UUID.randomUUID();
@@ -85,18 +84,14 @@ class StoreSandboxHardenTest {
         StoreScope.clear();
         assertEquals(0, cli("store", "sandbox", "create", "held", "--project=" + project).code);
         StoreScope.clear();
-        Process sleeper = pauseProcess();
+        Process holder = holdProcess(project, "held");
         try {
-            Path lease = project.resolve(".pickleball/store/branch-lease/sbx-held")
-                    .resolve(Long.toString(sleeper.pid()));
-            Files.createDirectories(lease.getParent());
-            Files.writeString(lease, "1");
             Capture busy = cli("store", "sandbox", "drop", "held", "--project=" + project);
-            assertEquals(1, busy.code, busy.out);
+            assertEquals(1, busy.code, busy.out + busy.err);
             assertTrue(busy.err.contains("in use"), busy.err);
         } finally {
-            sleeper.destroyForcibly();
-            sleeper.waitFor(10, TimeUnit.SECONDS);
+            holder.getOutputStream().close();
+            if (!holder.waitFor(30, TimeUnit.SECONDS)) holder.destroyForcibly();
         }
         Capture dropped = cli("store", "sandbox", "drop", "held", "--project=" + project);
         assertEquals(0, dropped.code, dropped.err);
@@ -114,9 +109,13 @@ class StoreSandboxHardenTest {
         Process holder = holdProcess(project, "busy");
         try {
             String old = Instant.now().minus(3, ChronoUnit.DAYS).toString();
-            try (var store = tools.dscode.store.sql.SqlStore.open(project, tools.dscode.store.sql.Binding.main())) {
-                store.session().update("UPDATE sandboxes SET last_used = ? WHERE name = 'busy'", old);
+            try (var store = tools.dscode.store.sql.SqlStore.open(project, tools.dscode.store.sql.Binding.sandbox("busy"))) {
+                store.session().update(
+                        "INSERT INTO _pkb_branch(`key`, value) VALUES ('last_used', ?) "
+                                + "ON CONFLICT(`key`) DO UPDATE SET value = excluded.value",
+                        old);
             }
+            StoreScope.clear();
             Capture busy = cli("store", "sandbox", "drop", "busy", "--project=" + project);
             assertEquals(1, busy.code, busy.out + busy.err);
             assertTrue(busy.err.contains("in use"), busy.err);
