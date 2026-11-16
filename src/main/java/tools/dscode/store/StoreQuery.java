@@ -109,7 +109,14 @@ public final class StoreQuery {
         try (StoreDatabase database = StoreDatabase.open(project)) {
             StoreFiles.Row row = StoreFiles.find(database.connection(), path);
             if (row == null) return null;
-            byte[] raw = row.raw() == null ? new byte[0] : row.raw();
+            byte[] raw;
+            try {
+                raw = StoreRefs.read(project, row);
+            } catch (StoreRefs.Unavailable missing) {
+                throw new SQLException(missing.getMessage() + "\n" + missing.fix(), missing);
+            } catch (java.io.IOException failure) {
+                throw new SQLException(failure.getMessage() == null ? "large file unreadable" : failure.getMessage(), failure);
+            }
             String text = utf8(raw);
             return new FileDetail(
                     new FileSummary(row.path(), row.sourceType(), row.edited(), raw.length, row.contentHash(), row.lastSyncedHash()),

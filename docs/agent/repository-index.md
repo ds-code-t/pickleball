@@ -677,6 +677,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/store/StoreMigrate.java`
 - `src/main/java/tools/dscode/store/StorePaths.java`
 - `src/main/java/tools/dscode/store/StoreQuery.java`
+- `src/main/java/tools/dscode/store/StoreRefs.java`
 - `src/main/java/tools/dscode/store/StoreRun.java`
 - `src/main/java/tools/dscode/store/StoreRunContext.java`
 - `src/main/java/tools/dscode/store/StoreRuntime.java`
@@ -932,6 +933,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/store/FileEditTest.java`
 - `src/test/java/tools/dscode/store/GherkinRewriteTest.java`
 - `src/test/java/tools/dscode/store/GlueEditTest.java`
+- `src/test/java/tools/dscode/store/LargeFileBranchCopyTest.java`
+- `src/test/java/tools/dscode/store/LargeFileReferenceTest.java`
 - `src/test/java/tools/dscode/store/LegacyNamesTest.java`
 - `src/test/java/tools/dscode/store/NoRuntimeDownloadTest.java`
 - `src/test/java/tools/dscode/store/RenameGateTest.java`

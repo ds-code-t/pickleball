@@ -73,22 +73,39 @@ public final class StoreContent {
         byte[] body = raw == null ? new byte[0] : raw;
         validate(project, normalized, sourceType, body);
         StoreFiles.Row existing = StoreFiles.find(connection, normalized);
+        if (existing != null && existing.binaryRef() && StoreHashes.sha256(body).equals(existing.contentHash())) {
+            return existing;
+        }
         String synced = existing == null || existing.lastSyncedHash() == null ? "" : existing.lastSyncedHash();
         String hydratedAt = now == null ? Instant.now().toString() : now;
+        boolean wasReference = existing != null && (existing.binaryRef()
+                || "binary".equals(existing.sourceType())
+                || "binary-ref".equals(existing.sourceType()));
+        String type = wasReference ? "binary" : sourceType;
         StoreFiles.Row row = new StoreFiles.Row(
                 normalized,
                 StoreHashes.sha256(body),
                 body,
                 System.currentTimeMillis(),
-                sourceType,
+                type,
                 hydratedAt,
                 synced,
-                true
+                true,
+                StoreHashes.gitBlob(body),
+                false,
+                body.length,
+                "db",
+                ""
         );
         StoreFiles.upsert(connection, row);
-        StoreGherkin.store(connection, project, normalized, sourceType, body);
-        if (StoreEntities.isRecord(normalized, sourceType)) {
-            StoreEntities.store(connection, project, normalized, body);
+        if (wasReference && existing.binaryRef()) {
+            StoreLog.log(project, "refs", normalized, "owned bytes=" + body.length);
+        }
+        if (!"binary".equals(type)) {
+            StoreGherkin.store(connection, project, normalized, sourceType, body);
+            if (StoreEntities.isRecord(normalized, sourceType)) {
+                StoreEntities.store(connection, project, normalized, body);
+            }
         }
         return row;
     }

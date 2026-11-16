@@ -80,7 +80,7 @@ public final class SqlStore implements AutoCloseable {
                             """);
                     statement.execute("""
                             INSERT INTO _pkb_base(tbl, pk, base_hash, location, git_commit)
-                            SELECT 'entities', concat(entity_type, '#', entity_id), content_hash, 'db', '' FROM entities
+                            SELECT 'entities', entity_type || '#' || entity_id, content_hash, 'db', '' FROM entities
                             """);
                     statement.execute("PRAGMA wal_checkpoint(TRUNCATE)");
                 }

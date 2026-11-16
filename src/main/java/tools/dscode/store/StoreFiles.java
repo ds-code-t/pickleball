@@ -23,8 +23,27 @@ public final class StoreFiles {
             boolean edited,
             String gitBlob,
             boolean binaryRef,
-            long byteSize
+            long byteSize,
+            String location,
+            String gitCommit
     ) {
+        public Row(
+                String path,
+                String contentHash,
+                byte[] raw,
+                long mtime,
+                String sourceType,
+                String lastHydratedAt,
+                String lastSyncedHash,
+                boolean edited,
+                String gitBlob,
+                boolean binaryRef,
+                long byteSize
+        ) {
+            this(path, contentHash, raw, mtime, sourceType, lastHydratedAt, lastSyncedHash, edited,
+                    gitBlob, binaryRef, byteSize, binaryRef ? path : "db", "");
+        }
+
         public Row(
                 String path,
                 String contentHash,
@@ -38,12 +57,17 @@ public final class StoreFiles {
             this(path, contentHash, raw, mtime, sourceType, lastHydratedAt, lastSyncedHash, edited,
                     null, false, raw == null ? 0L : raw.length);
         }
+
+        public Row {
+            if (location == null || location.isBlank()) location = "db";
+            if (gitCommit == null) gitCommit = "";
+        }
     }
 
     public static Map<String, Row> index(Connection connection) throws SQLException {
         Map<String, Row> rows = new LinkedHashMap<>();
         try (PreparedStatement statement = connection.prepareStatement(
-                "SELECT path, content_hash, raw_content, mtime, source_type, last_hydrated_at, last_synced_hash, db_edited, git_blob, binary_ref, byte_size FROM files");
+                "SELECT path, content_hash, raw_content, mtime, source_type, last_hydrated_at, last_synced_hash, db_edited, git_blob, binary_ref, byte_size, location, git_commit FROM files");
              ResultSet result = statement.executeQuery()) {
             while (result.next()) {
                 Row row = read(result);
@@ -55,7 +79,7 @@ public final class StoreFiles {
 
     public static Row find(Connection connection, String path) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(
-                "SELECT path, content_hash, raw_content, mtime, source_type, last_hydrated_at, last_synced_hash, db_edited, git_blob, binary_ref, byte_size FROM files WHERE path = ?")) {
+                "SELECT path, content_hash, raw_content, mtime, source_type, last_hydrated_at, last_synced_hash, db_edited, git_blob, binary_ref, byte_size, location, git_commit FROM files WHERE path = ?")) {
             statement.setString(1, path);
             try (ResultSet result = statement.executeQuery()) {
                 return result.next() ? read(result) : null;
@@ -65,8 +89,8 @@ public final class StoreFiles {
 
     public static void upsert(Connection connection, Row row) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement("""
-                INSERT INTO files(path, content_hash, raw_content, mtime, source_type, last_hydrated_at, last_synced_hash, db_edited, git_blob, binary_ref, byte_size)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO files(path, content_hash, raw_content, mtime, source_type, last_hydrated_at, last_synced_hash, db_edited, git_blob, binary_ref, byte_size, location, git_commit)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(path) DO UPDATE SET
                     content_hash = excluded.content_hash,
                     raw_content = excluded.raw_content,
@@ -77,7 +101,9 @@ public final class StoreFiles {
                     db_edited = excluded.db_edited,
                     git_blob = excluded.git_blob,
                     binary_ref = excluded.binary_ref,
-                    byte_size = excluded.byte_size
+                    byte_size = excluded.byte_size,
+                    location = excluded.location,
+                    git_commit = excluded.git_commit
                 """)) {
             statement.setString(1, row.path());
             statement.setString(2, row.contentHash());
@@ -90,6 +116,8 @@ public final class StoreFiles {
             statement.setString(9, row.gitBlob());
             statement.setInt(10, row.binaryRef() ? 1 : 0);
             statement.setLong(11, row.byteSize());
+            statement.setString(12, row.location());
+            statement.setString(13, row.gitCommit());
             statement.executeUpdate();
         }
     }
@@ -98,6 +126,9 @@ public final class StoreFiles {
         byte[] raw = result.getBytes(3);
         long byteSize = result.getLong(11);
         if (result.wasNull()) byteSize = raw == null ? 0L : raw.length;
+        String location = result.getString(12);
+        String gitCommit = result.getString(13);
+        if (result.wasNull()) gitCommit = "";
         return new Row(
                 result.getString(1),
                 result.getString(2),
@@ -109,7 +140,9 @@ public final class StoreFiles {
                 result.getInt(8) != 0,
                 result.getString(9),
                 result.getInt(10) != 0,
-                byteSize
+                byteSize,
+                location,
+                gitCommit
         );
     }
 }

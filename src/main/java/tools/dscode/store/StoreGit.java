@@ -80,6 +80,52 @@ public final class StoreGit {
         return blobs;
     }
 
+    /** Blob ids at {@code HEAD}. Empty when this directory is not a repository. */
+    public record Head(String commit, Map<String, String> blobs) {
+        public Head {
+            commit = commit == null ? "" : commit;
+            blobs = blobs == null ? Map.of() : Map.copyOf(blobs);
+        }
+
+        public static Head empty() {
+            return new Head("", Map.of());
+        }
+
+        public String blob(String path) {
+            if (path == null || blobs.isEmpty()) return null;
+            return blobs.get(path.replace('\\', '/'));
+        }
+    }
+
+    public static Head head(Path project) {
+        Path root = project == null ? Path.of("").toAbsolutePath() : project.toAbsolutePath().normalize();
+        Command commit = run(root, 5, "git", "rev-parse", "HEAD");
+        if (commit.code != 0) return Head.empty();
+        Command listed = run(root, 5, "git", "ls-tree", "-r", "HEAD");
+        Map<String, String> blobs = new LinkedHashMap<>();
+        if (listed.code == 0) {
+            for (String line : listed.out.split("\n")) {
+                if (line.isBlank()) continue;
+                int tab = line.indexOf('\t');
+                if (tab < 0) continue;
+                String meta = line.substring(0, tab).trim();
+                String path = line.substring(tab + 1).trim().replace('\\', '/');
+                String[] parts = meta.split("\\s+");
+                if (parts.length >= 3 && !path.isEmpty()) blobs.put(path, parts[2]);
+            }
+        }
+        return new Head(trim(commit.out), blobs);
+    }
+
+    /** {@code git cat-file blob}. Null when git or the blob is missing. Bytes are not decoded. */
+    public static byte[] catFile(Path project, String blob) {
+        if (blob == null || !blob.matches("[0-9a-fA-F]{4,64}")) return null;
+        Path root = project == null ? Path.of("").toAbsolutePath() : project.toAbsolutePath().normalize();
+        Bytes command = runBytes(root, 5, "git", "cat-file", "blob", blob);
+        if (command.timedOut || command.code != 0 || command.out == null) return null;
+        return command.out;
+    }
+
     public static String stripUserInfo(String remote) {
         if (remote == null || remote.isBlank()) return "";
         return remote.replaceFirst("://[^/@\\s]+@", "://");
@@ -137,6 +183,16 @@ public final class StoreGit {
     }
 
     static Command run(Path project, int seconds, String... command) {
+        Bytes bytes = runBytes(project, seconds, command);
+        String out = bytes.out == null ? "" : new String(bytes.out, StandardCharsets.UTF_8);
+        String err = bytes.err == null ? "" : new String(bytes.err, StandardCharsets.UTF_8);
+        return new Command(bytes.code, out, err, bytes.timedOut);
+    }
+
+    private record Bytes(int code, byte[] out, byte[] err, boolean timedOut) {
+    }
+
+    private static Bytes runBytes(Path project, int seconds, String... command) {
         Process process = null;
         try {
             ProcessBuilder builder = new ProcessBuilder(List.of(command));
@@ -161,14 +217,15 @@ public final class StoreGit {
             if (!finished) {
                 process.destroyForcibly();
                 process.waitFor(2, TimeUnit.SECONDS);
-                return new Command(-1, "", "timed out", true);
+                return new Bytes(-1, new byte[0], "timed out".getBytes(StandardCharsets.UTF_8), true);
             }
             outThread.join(1000);
             errThread.join(1000);
-            return new Command(process.exitValue(), out.toString(StandardCharsets.UTF_8), err.toString(StandardCharsets.UTF_8), false);
+            return new Bytes(process.exitValue(), out.toByteArray(), err.toByteArray(), false);
         } catch (Exception failure) {
             if (process != null) process.destroyForcibly();
-            return new Command(-1, "", failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage(), false);
+            String message = failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
+            return new Bytes(-1, new byte[0], message.getBytes(StandardCharsets.UTF_8), false);
         }
     }
 

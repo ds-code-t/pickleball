@@ -324,8 +324,8 @@ DELETE FROM entities WHERE entity_type = ? AND entity_id = ?
 SELECT entity_type, entity_id, version, payload_json, secret_refs, source_file, content_hash FROM entities WHERE entity_type = ? AND entity_id = ?
 """,
             """
-INSERT INTO files(path, content_hash, raw_content, mtime, source_type, last_hydrated_at, last_synced_hash, db_edited, git_blob, binary_ref, byte_size)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO files(path, content_hash, raw_content, mtime, source_type, last_hydrated_at, last_synced_hash, db_edited, git_blob, binary_ref, byte_size, location, git_commit)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(path) DO UPDATE SET
                     content_hash = excluded.content_hash,
                     raw_content = excluded.raw_content,
@@ -336,13 +336,15 @@ INSERT INTO files(path, content_hash, raw_content, mtime, source_type, last_hydr
                     db_edited = excluded.db_edited,
                     git_blob = excluded.git_blob,
                     binary_ref = excluded.binary_ref,
-                    byte_size = excluded.byte_size
+                    byte_size = excluded.byte_size,
+                    location = excluded.location,
+                    git_commit = excluded.git_commit
 """,
             """
-SELECT path, content_hash, raw_content, mtime, source_type, last_hydrated_at, last_synced_hash, db_edited, git_blob, binary_ref, byte_size FROM files
+SELECT path, content_hash, raw_content, mtime, source_type, last_hydrated_at, last_synced_hash, db_edited, git_blob, binary_ref, byte_size, location, git_commit FROM files
 """,
             """
-SELECT path, content_hash, raw_content, mtime, source_type, last_hydrated_at, last_synced_hash, db_edited, git_blob, binary_ref, byte_size FROM files WHERE path = ?
+SELECT path, content_hash, raw_content, mtime, source_type, last_hydrated_at, last_synced_hash, db_edited, git_blob, binary_ref, byte_size, location, git_commit FROM files WHERE path = ?
 """,
             """
 SELECT hydration_id FROM provenance WHERE id = 1

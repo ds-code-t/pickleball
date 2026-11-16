@@ -55,6 +55,7 @@ public final class StoreHydrator {
         boolean bypassLimits = options.force() && !options.paths().isEmpty();
         StoreSources.Scan scan = StoreSources.scan(project, options.paths(), bypassLimits);
         StoreDiscovery discovery = StoreDiscovery.load(project);
+        StoreGit.Head head = StoreGit.head(project);
         List<StoreSources.Found> sources = scan.found();
         int ignored = scan.skipped().size();
         boolean present = StorePaths.ready(project);
@@ -81,10 +82,15 @@ public final class StoreHydrator {
                     long mtime = Files.getLastModifiedTime(source.file()).toMillis();
                     StoreFiles.Row row = existing.get(source.path());
                     if (row == null) {
-                        inserted++;
-                        if (!options.dryRun()) {
-                            writeSource(connection, project, discovery, source, raw, hash, mtime, now);
+                        StoreRefs.Decision decision = StoreRefs.decide(
+                                project, discovery, source.path(), source.sourceType(), raw, hash, mtime, now, head, bypassLimits);
+                        if (decision.skip()) {
+                            ignored++;
+                            StoreLog.log(project, "discover", source.path(), decision.skipReason());
+                            continue;
                         }
+                        inserted++;
+                        if (!options.dryRun()) persist(connection, project, decision.row());
                         continue;
                     }
                     if (StoreContent.untracked(row) && !options.force()) {
@@ -117,7 +123,15 @@ public final class StoreHydrator {
                     }
                     updated++;
                     if (!options.dryRun()) {
-                        writeSource(connection, project, discovery, source, raw, hash, mtime, now);
+                        StoreRefs.Decision decision = StoreRefs.decide(
+                                project, discovery, source.path(), source.sourceType(), raw, hash, mtime, now, head, bypassLimits);
+                        if (decision.skip()) {
+                            ignored++;
+                            updated--;
+                            StoreLog.log(project, "discover", source.path(), decision.skipReason());
+                            continue;
+                        }
+                        persist(connection, project, decision.row());
                     }
                 }
                 if (!options.dryRun()) {
@@ -160,35 +174,17 @@ public final class StoreHydrator {
         }
     }
 
-    private static void writeSource(
-            java.sql.Connection connection,
-            Path project,
-            StoreDiscovery discovery,
-            StoreSources.Found source,
-            byte[] raw,
-            String hash,
-            long mtime,
-            String now
-    ) throws java.sql.SQLException {
-        byte[] body = raw == null ? new byte[0] : raw;
-        String kind = discovery.binaryKind(source.file());
-        boolean binaryRef = kind != null && discovery.hashOnly();
-        byte[] stored = binaryRef ? new byte[0] : body;
-        String sourceType = binaryRef ? "binary-ref" : source.sourceType();
-        String gitBlob = StoreHashes.gitBlob(body);
-        if (!binaryRef && StoreEntities.isRecord(source.path(), source.sourceType())) {
-            StoreEntities.parseRecord(project, body);
-        }
-        StoreFiles.upsert(connection, new StoreFiles.Row(
-                source.path(), hash, stored, mtime, sourceType, now, hash, false,
-                gitBlob, binaryRef, body.length));
-        if (binaryRef) {
-            StoreLog.log(project, "binary", source.path(), "binary-ref " + kind + " bytes=" + body.length);
+    private static void persist(java.sql.Connection connection, Path project, StoreFiles.Row row) throws java.sql.SQLException {
+        StoreFiles.upsert(connection, row);
+        if (row.binaryRef()) {
+            StoreLog.log(project, "refs", row.path(), "reference bytes=" + row.byteSize() + " commit=" + row.gitCommit());
             return;
         }
-        StoreGherkin.store(connection, project, source.path(), source.sourceType(), body);
-        if (StoreEntities.isRecord(source.path(), source.sourceType())) {
-            StoreEntities.store(connection, project, source.path(), body);
+        if ("binary".equals(row.sourceType())) return;
+        byte[] body = row.raw() == null ? new byte[0] : row.raw();
+        StoreGherkin.store(connection, project, row.path(), row.sourceType(), body);
+        if (StoreEntities.isRecord(row.path(), row.sourceType())) {
+            StoreEntities.store(connection, project, row.path(), body);
         }
     }
 }

@@ -141,15 +141,17 @@ class StoreDiscoveryTest {
             restore("pkb_store_max_file_size", previous);
         }
 
-        write("store.properties", "binary-policy=hash-only\n");
+        write("store.properties", "binary-policy=include\n");
         Files.write(project.resolve("features/noise.dat"), new byte[] {0, 9});
-        Capture hashOnly = run("store", "status", "--project=" + project);
-        assertFalse(hashOnly.out.contains("hash-only is not implemented"), hashOnly.out);
-        Capture stored = run("store", "hydrate", "--project=" + project);
-        assertEquals(0, stored.code, stored.out + stored.err);
+        Capture included = run("store", "hydrate", "--project=" + project);
+        assertEquals(0, included.code, included.out + included.err);
         StoreFiles.Row noise = row("features/noise.dat");
-        assertTrue(noise != null && noise.binaryRef(), String.valueOf(noise));
-        assertEquals(0, noise.raw().length);
+        assertTrue(noise != null && !noise.binaryRef(), String.valueOf(noise));
+        assertEquals(2, noise.raw().length);
+
+        write("store.properties", "binary-policy=hash-only\n");
+        Capture hashOnly = run("store", "status", "--project=" + project);
+        assertTrue(hashOnly.out.contains("binary-policy hash-only is not supported"), hashOnly.out);
 
         write("store.properties", "binary-policy=keep\n");
         Capture unknown = run("store", "status", "--project=" + project);

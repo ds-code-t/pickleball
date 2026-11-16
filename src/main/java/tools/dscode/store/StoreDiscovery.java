@@ -16,7 +16,10 @@ import java.util.regex.Pattern;
  */
 public final class StoreDiscovery {
     public static final long DEFAULT_MAX_BYTES = 1024L * 1024L;
+    /** A binary at least this big can be a Git reference. {@code 0} means every binary. */
+    public static final long DEFAULT_LARGE_BYTES = 262144L;
     public static final String BINARY_SKIP = "skip";
+    public static final String BINARY_INCLUDE = "include";
     static final List<String> DEFAULT_EXCLUDES = List.of(
             "**/.git/**",
             "**/target/**",
@@ -36,12 +39,14 @@ public final class StoreDiscovery {
     private final List<String> includes;
     private final List<String> excludes;
     private final long maxBytes;
+    private final long largeFileBytes;
     private final String binaryPolicy;
 
-    private StoreDiscovery(List<String> includes, List<String> excludes, long maxBytes, String binaryPolicy) {
+    private StoreDiscovery(List<String> includes, List<String> excludes, long maxBytes, long largeFileBytes, String binaryPolicy) {
         this.includes = includes;
         this.excludes = excludes;
         this.maxBytes = maxBytes;
+        this.largeFileBytes = largeFileBytes;
         this.binaryPolicy = binaryPolicy;
     }
 
@@ -51,10 +56,13 @@ public final class StoreDiscovery {
         List<String> extraExcludes = split(first(setting("pkb_store_exclude", "PKB_STORE_EXCLUDE"), file.get("exclude")));
         List<String> excludes = new ArrayList<>(DEFAULT_EXCLUDES);
         excludes.addAll(extraExcludes);
-        long max = parseSize(first(setting("pkb_store_max_file_size", "PKB_STORE_MAX_FILE_SIZE"), file.get("max-file-size")));
+        long max = parseSize(first(setting("pkb_store_max_file_size", "PKB_STORE_MAX_FILE_SIZE"), file.get("max-file-size")),
+                DEFAULT_MAX_BYTES, false);
+        long large = parseSize(first(setting("pkb_store_large_file_bytes", "PKB_STORE_LARGE_FILE_BYTES"), file.get("large-file-bytes")),
+                DEFAULT_LARGE_BYTES, true);
         String policy = first(setting("pkb_store_binary_policy", "PKB_STORE_BINARY_POLICY"), file.get("binary-policy"));
         if (policy == null || policy.isBlank()) policy = BINARY_SKIP;
-        return new StoreDiscovery(includes, excludes, max, policy.trim().toLowerCase(Locale.ROOT));
+        return new StoreDiscovery(includes, excludes, max, large, policy.trim().toLowerCase(Locale.ROOT));
     }
 
     public boolean defaultIncludes() {
@@ -69,8 +77,12 @@ public final class StoreDiscovery {
         return maxBytes;
     }
 
-    public boolean hashOnly() {
-        return "hash-only".equals(binaryPolicy);
+    public long largeFileBytes() {
+        return largeFileBytes;
+    }
+
+    public boolean includeBinaries() {
+        return BINARY_INCLUDE.equals(binaryPolicy);
     }
 
     /** Null when the file is text. Otherwise the binary reason (extension or content). */
@@ -84,9 +96,10 @@ public final class StoreDiscovery {
     /** Null means keep the file. {@code relativePath} uses {@code /}. */
     public String skipReason(String relativePath, Path file) {
         String relative = relativePath.replace('\\', '/');
+        boolean include = includeBinaries();
         for (String exclude : excludes) {
             if (glob(exclude, relative) || directoryHit(relative, exclude)) {
-                if (hashOnly() && binaryExtensionGlob(exclude)) continue;
+                if (include && binaryExtensionGlob(exclude)) continue;
                 return "exclude " + exclude;
             }
         }
@@ -96,19 +109,21 @@ public final class StoreDiscovery {
         } catch (IOException failure) {
             return "unreadable";
         }
-        if (size > maxBytes) return "size " + size + " > " + maxBytes;
         String extension = extension(file.getFileName().toString());
-        if (BINARY_EXTENSIONS.contains(extension)) {
-            if (!hashOnly()) return "binary extension " + extension;
-        } else if (!BINARY_SKIP.equals(binaryPolicy) && !"hash-only".equals(binaryPolicy)) {
-            return "binary-policy " + binaryPolicy + " is not supported; skipped";
+        boolean extensionBinary = BINARY_EXTENSIONS.contains(extension);
+        String sniffed = extensionBinary ? null : sniff(file);
+        boolean binary = extensionBinary || (sniffed != null && !"unreadable".equals(sniffed));
+        if ("unreadable".equals(sniffed)) return "unreadable";
+        // A reference stores no bytes, so max-file-size does not apply until hydrate knows it is not one.
+        if (size > maxBytes && !(include && binary && size >= largeFileBytes)) {
+            return "size " + size + " > " + maxBytes;
         }
-        String sniffed = sniff(file);
-        if (sniffed != null) {
-            if (hashOnly()) return null;
-            return "binary " + sniffed;
+        if (!binary) return null;
+        if (include) return null;
+        if (BINARY_SKIP.equals(binaryPolicy)) {
+            return extensionBinary ? "binary extension " + extension : "binary " + sniffed;
         }
-        return null;
+        return "binary-policy " + binaryPolicy + " is not supported; skipped";
     }
 
     private static boolean binaryExtensionGlob(String exclude) {
@@ -189,8 +204,8 @@ public final class StoreDiscovery {
         return name.substring(dot).toLowerCase(Locale.ROOT);
     }
 
-    private static long parseSize(String raw) {
-        if (raw == null || raw.isBlank()) return DEFAULT_MAX_BYTES;
+    private static long parseSize(String raw, long fallback, boolean allowZero) {
+        if (raw == null || raw.isBlank()) return fallback;
         String value = raw.trim().toUpperCase(Locale.ROOT);
         long factor = 1;
         if (value.endsWith("MIB")) {
@@ -208,10 +223,11 @@ public final class StoreDiscovery {
         }
         try {
             long parsed = Long.parseLong(value);
-            if (parsed < 1) return DEFAULT_MAX_BYTES;
+            if (parsed < 0) return fallback;
+            if (parsed == 0) return allowZero ? 0L : fallback;
             return parsed * factor;
         } catch (NumberFormatException failure) {
-            return DEFAULT_MAX_BYTES;
+            return fallback;
         }
     }
 
