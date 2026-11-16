@@ -128,6 +128,47 @@ class DoltSandboxCliTest {
         assertFalse(Files.exists(outside));
     }
 
+    @Test
+    void extractUndoesEarlierFilesWhenALaterWriteFails() throws Exception {
+        Files.createDirectories(project.resolve("features"));
+        Files.writeString(project.resolve("features/pay.feature"), """
+                Feature: Pay
+                  Scenario: Ada
+                    * INFO: amount is 1
+                """);
+        Capture hydrated = cli("dolt", "hydrate", "--project=" + project);
+        assertEquals(0, hydrated.code, hydrated.err);
+        DoltScope.clear();
+        Capture created = cli("dolt", "sandbox", "create", "alpha", "--project=" + project);
+        assertEquals(0, created.code, created.err);
+        DoltScope.clear();
+        try (DoltStore store = DoltStore.open(project, Binding.sandbox("alpha"))) {
+            for (String path : new String[] {"a/b.txt", "a/b.txt/c.txt"}) {
+                store.session().update(
+                        """
+                        INSERT INTO files(path, content_hash, raw_content, mtime, source_type, last_hydrated_at, last_synced_hash, db_edited)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        path,
+                        "abc",
+                        "body".getBytes(StandardCharsets.UTF_8),
+                        0L,
+                        "feature",
+                        "t",
+                        "abc",
+                        1);
+            }
+        }
+        DoltScope.clear();
+        Path outside = project.resolve("sibling");
+        Capture failed = cli("dolt", "sandbox", "extract", "alpha", "--to=" + outside, "--project=" + project);
+        assertEquals(1, failed.code, failed.out + failed.err);
+        assertFalse(failed.out.contains("extracted alpha"), failed.out);
+        assertFalse(Files.exists(outside.resolve("a/b.txt")));
+        assertFalse(Files.exists(outside.resolve("a")));
+        assertFalse(Files.exists(outside));
+    }
+
     private Capture cli(String... args) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();

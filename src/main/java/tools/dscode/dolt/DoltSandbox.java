@@ -197,13 +197,14 @@ public final class DoltSandbox {
             }
         }
         List<WrittenFile> writtenFiles = new ArrayList<>();
+        List<Path> createdDirectories = new ArrayList<>();
         try {
             for (PlannedFile item : planned) {
-                writtenFiles.add(writeFile(item));
+                writtenFiles.add(writeFile(item, createdDirectories));
                 written++;
             }
         } catch (java.io.IOException failure) {
-            restore(writtenFiles);
+            restore(writtenFiles, createdDirectories);
             throw failure;
         }
         touch(project, name);
@@ -229,16 +230,35 @@ public final class DoltSandbox {
         return new PlannedFile(file, body == null ? new byte[0] : body);
     }
 
-    private static WrittenFile writeFile(PlannedFile item) throws java.io.IOException {
+    /**
+     * Writes through a sibling temp file and a move, so a failed write never leaves a
+     * partial destination file. Directories this call creates are recorded for restore.
+     */
+    private static WrittenFile writeFile(PlannedFile item, List<Path> createdDirectories) throws java.io.IOException {
         boolean existed = Files.isRegularFile(item.file());
         byte[] previous = existed ? Files.readAllBytes(item.file()) : null;
         Path parent = item.file().getParent();
-        if (parent != null) Files.createDirectories(parent);
-        Files.write(item.file(), item.body());
+        if (parent != null) {
+            List<Path> missing = new ArrayList<>();
+            for (Path cursor = parent; cursor != null && !Files.exists(cursor); cursor = cursor.getParent()) {
+                missing.add(0, cursor);
+            }
+            for (Path directory : missing) {
+                Files.createDirectory(directory);
+                createdDirectories.add(directory);
+            }
+        }
+        Path temp = item.file().resolveSibling(item.file().getFileName() + ".pkb-extract.tmp");
+        try {
+            Files.write(temp, item.body());
+            Files.move(temp, item.file(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        } finally {
+            Files.deleteIfExists(temp);
+        }
         return new WrittenFile(item.file(), previous, existed);
     }
 
-    private static void restore(List<WrittenFile> written) {
+    private static void restore(List<WrittenFile> written, List<Path> createdDirectories) {
         for (int index = written.size() - 1; index >= 0; index--) {
             WrittenFile item = written.get(index);
             try {
@@ -246,6 +266,13 @@ public final class DoltSandbox {
                 else Files.deleteIfExists(item.file());
             } catch (java.io.IOException ignored) {
                 // The original write failure is the one the caller needs.
+            }
+        }
+        for (int index = createdDirectories.size() - 1; index >= 0; index--) {
+            try {
+                Files.deleteIfExists(createdDirectories.get(index));
+            } catch (java.io.IOException ignored) {
+                // A directory that is not empty was not only ours.
             }
         }
     }
