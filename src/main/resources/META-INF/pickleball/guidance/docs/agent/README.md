@@ -80,6 +80,10 @@ python scripts/sync_consumer_guidance.py
 
 `docs` is the canonical guidance source. `sync_consumer_guidance.py` refreshes the Markdown mirror under `src/main/resources/META-INF/pickleball/guidance` packaged in the Maven artifact.
 
+## Visual browser components
+
+In-page arrows, numbered step badges, magnifier, spotlight, standalone border, and label are agent commands on the one `AgentControl` spine. Overlay width and height are stored and a resolved element box wins. The contract, CLI verbs, native-versus-page difference, and cleanup rules are in `docs/roadmaps/3.0.0-visual-components-roadmap.md` and `docs/dynamic-control-api.md`. Step badges are painted on the page. They do not edit Gherkin.
+
 Checks:
 
 ```shell
