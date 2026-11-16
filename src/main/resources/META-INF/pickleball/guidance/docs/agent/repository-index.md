@@ -838,6 +838,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/dolt/LegacyNamesTest.java`
 - `src/test/java/tools/dscode/dolt/RenameGateTest.java`
 - `src/test/java/tools/dscode/dolt/server/DoltJdbcBranchSpikeTest.java`
+- `src/test/java/tools/dscode/dolt/server/DoltJournalReleaseTest.java`
 - `src/test/java/tools/dscode/dolt/server/DoltServerLifecycleTest.java`
 - `src/test/java/tools/dscode/dolt/store/DoltConcurrencyTest.java`
 - `src/test/java/tools/dscode/dolt/store/DoltDialectInventoryTest.java`

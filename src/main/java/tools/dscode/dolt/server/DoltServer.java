@@ -181,8 +181,66 @@ public final class DoltServer {
         if (!doltGone) dolt.destroyForcibly();
         if (!supervisorGone) awaitExit(supervisor, 3_000);
         if (!doltGone) awaitExit(dolt, 3_000);
+        if (windows()) {
+            Path journal = journal(project);
+            long waitStarted = System.nanoTime();
+            boolean released = awaitJournalRelease(journal, JOURNAL_RELEASE_MS, DoltServer::journalFree);
+            long waited = (System.nanoTime() - waitStarted) / 1_000_000L;
+            DoltLog.log(project, "server", Long.toString(info.pid()),
+                    "journal " + (released ? "released" : "still held") + " after " + waited + " ms");
+        }
         Files.deleteIfExists(home(project).resolve("server.json"));
         DoltLog.log(project, "server", Long.toString(info.pid()), "stopped");
+    }
+
+    /** Upper bound {@link #stop} waits on Windows for the journal handle after the server exits. */
+    static final long JOURNAL_RELEASE_MS = 15_000L;
+
+    /** Probe that throws while the journal file is still held by a process. */
+    @FunctionalInterface
+    interface JournalProbe {
+        void check(Path journal) throws IOException;
+    }
+
+    static Path journal(Path project) {
+        return dataDir(project).resolve("pickleball").resolve(".dolt").resolve("noms").resolve("journal.idx");
+    }
+
+    /**
+     * Windows can keep a stopped sql-server's mapped journal referenced for a moment after the
+     * process object is signaled, so the project directory stays locked. Waits up to
+     * {@code timeoutMs} for the probe to pass. True when the journal is free or absent; false
+     * when it is still held at the deadline. Never throws for a held journal.
+     */
+    static boolean awaitJournalRelease(Path journal, long timeoutMs, JournalProbe probe) {
+        if (journal == null || !Files.isRegularFile(journal)) return true;
+        long deadline = System.nanoTime() + Math.max(0L, timeoutMs) * 1_000_000L;
+        while (true) {
+            try {
+                probe.check(journal);
+                return true;
+            } catch (IOException busy) {
+                if (!Files.isRegularFile(journal)) return true;
+            }
+            if (System.nanoTime() >= deadline) return false;
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
+    }
+
+    /** Renames the journal aside and back. Windows refuses the rename while another process holds it. */
+    static void journalFree(Path journal) throws IOException {
+        Path aside = journal.resolveSibling("journal.idx.release-check");
+        Files.move(journal, aside);
+        Files.move(aside, journal);
+    }
+
+    private static boolean windows() {
+        return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
     }
 
     public static void touchLease(Path project) throws IOException {
