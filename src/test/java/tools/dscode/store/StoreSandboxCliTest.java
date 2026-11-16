@@ -28,6 +28,14 @@ class StoreSandboxCliTest {
     }
 
     @Test
+    void helpNamesMainAndVacuum() {
+        String help = StoreCli.help();
+        assertTrue(help.contains("sandbox create <name> [--from=main]"), help);
+        assertFalse(help.contains("--from=<commit>"), help);
+        assertTrue(help.contains("--vacuum"), help);
+    }
+
+    @Test
     void createListUseDiffExtractAndDrop() throws Exception {
         Files.createDirectories(project.resolve("features"));
         Files.writeString(project.resolve("features/pay.feature"), """

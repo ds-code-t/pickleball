@@ -136,13 +136,13 @@ public final class StoreCli {
     public static String help() {
         return """
                 Usage: store migrate [--dry-run] [--remove-legacy] [--project=<dir>]
-                Usage: store sandbox create <name> [--from=<commit>] [--owner=<id>] [--ttl=<duration>] [--project=<dir>]
+                Usage: store sandbox create <name> [--from=main] [--owner=<id>] [--ttl=<duration>] [--project=<dir>]
                 Usage: store sandbox list [--json] [--project=<dir>]
                 Usage: store sandbox use <name> [--project=<dir>]
                 Usage: store sandbox diff <name> [--table=<t>] [--json] [--project=<dir>]
                 Usage: store sandbox extract <name> --to=<dir> [--into-project] [--project=<dir>]
                 Usage: store sandbox drop <name> [--force] [--project=<dir>]
-                Usage: store sandbox prune [--older-than=<duration>] [--owner=<id>] [--dry-run] [--with-history] [--project=<dir>]
+                Usage: store sandbox prune [--older-than=<duration>] [--owner=<id>] [--dry-run] [--with-history] [--vacuum] [--project=<dir>]
                 Usage: store status [--project=<dir>] [--json]
                 Usage: store hydrate [--project=<dir>] [--path=<relative>] [--force] [--dry-run]
                 Usage: store extract [--project=<dir>] [--path=<relative>] [--force]
