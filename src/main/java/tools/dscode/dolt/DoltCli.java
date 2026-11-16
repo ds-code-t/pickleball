@@ -60,8 +60,6 @@ public final class DoltCli {
                     stdout.print(help());
                     yield 0;
                 }
-                case "install" -> tools.dscode.dolt.install.DoltInstaller.cli(tokens, stdout, stderr);
-                case "server" -> tools.dscode.dolt.server.DoltServer.cli(tokens, stdout, stderr);
                 case "migrate" -> DoltMigrate.cli(tokens, stdout, stderr);
                 case "sandbox" -> DoltSandbox.execute(project, tokens, stdout, stderr);
                 case "status" -> status(project, json(tokens), stdout);
@@ -137,8 +135,6 @@ public final class DoltCli {
 
     public static String help() {
         return """
-                Usage: dolt install [--check] [--force] [--dir=<path>] [--project=<dir>]
-                Usage: dolt server start|stop|status [--json] [--project=<dir>]
                 Usage: dolt migrate [--dry-run] [--remove-legacy] [--project=<dir>]
                 Usage: dolt sandbox create <name> [--from=<commit>] [--owner=<id>] [--ttl=<duration>] [--project=<dir>]
                 Usage: dolt sandbox list [--json] [--project=<dir>]
@@ -177,7 +173,7 @@ public final class DoltCli {
                 Usage: dolt retain [--days=N] [--max-bytes=N] [--project=<dir>]
                 Usage: dolt run [--project=<dir>] [--dry-run] [--tags=<expr>] [--name=<text>] [--glue=<packages>] [--sandbox=<name>] [--engine]
                 Usage: dolt run-classpath --out=<file> [--project=<dir>]
-                Files stay the source of truth. The working copy is .pickleball/dolt/data and is gitignored.
+                Files stay the source of truth. The working copy is .pickleball/dolt/main.db and is gitignored. Opening it starts no process and downloads nothing.
                 status and hydrate --dry-run do not create a database when it is missing.
                 hydrate copies features, configs, calls, components, resource maps, templates, and dolt-entities/*.entity files.
                 A .feature file also stores scenarios, steps, tags, docstrings, and data tables. The original bytes stay in the file row.
@@ -190,7 +186,7 @@ public final class DoltCli {
                 extract copies stored file bytes back to disk and does not reformat them. hydrate-out is the same command. An unedited row is left untouched. A deleted file is not recreated unless that row was edited or --force is set.
                 history stores a run summary in the database. It does not change diagnostic reports or pkb_reportretention. --from copies outcome and counts from a run-index.json file and links screenshot files under that directory. Those files are not deleted or rewritten. --link=Type#id writes log_entity_links for that log row. The message text is not scanned. retain drops runs older than --days and then the oldest runs until the note, scenario, and message bytes fit --max-bytes. Retaining a run does not delete the diagnostic report files. dolt retain is that same retain.
                 dolt query and dolt timeline read linked executions, usages, log links, and artifacts. They do not create a database. --json is one object with command, count, total, limit, offset, then rows or events. Keys stay in that order. total is the full filtered count on every page, including a --cursor page. timeline --cursor resumes after the previous event. timeline --before rewinds to the page before that cursor. timeline --latest is the newest page. --tag, --feature, --run, and --text filter by tag, feature path, run id, and log or step text. --feature keeps step and usage rows whose scenario key contains that path. --tag keeps step and usage rows for a scenario whose tags match, by file path and scenario line, and a Scenario Outline example row still belongs to that outline. An Examples tag matches only that Examples block, from its Examples line to the next Examples block or the next scenario. A feature tag matches every scenario in that file. A log row stores the run's scenario name, not a scenario path, so a tag or feature filter does not keep it by key. A blank scenario name is stored blank and is not replaced with the scenario key, so a tag or feature filter still does not keep that log row. A timeline run row stays when that run touched a match. A run row has no scenario path. Rewind is view-only over recorded history. It does not undo browser or service side effects.
-                sqlite-jdbc stays for pickleball dolt migrate and the diagnostic index. The Dolt store uses org.mariadb.jdbc:mariadb-java-client. When the store is enabled and that driver is missing, status, hydrate, extract, and the auto-hydrate hook fail with the driver message and do not fall back to the files.
+                The store driver is org.xerial:sqlite-jdbc:3.47.2.0. When the store is enabled and that driver is missing, status, hydrate, extract, and the auto-hydrate hook fail with the driver message and do not fall back to the files. A missing native library can be pointed at an executable directory with -Dorg.sqlite.tmpdir. Nothing is downloaded.
                 feature put writes that .feature text into the database. It sets db_edited, leaves last_synced_hash, and replaces the stored scenarios, steps, tags, docstrings, and data tables in the same transaction. Bad Gherkin is rejected and the previous rows stay. The file is not changed until dolt extract. Use --file for multiline text. dolt scenario put and dolt step put are rejected. A database row whose content hash moved while db_edited is still 0 is an untracked DB edit. hydrate reports it and will not overwrite it unless --force is set.
                 category, file, glue, and feature scenario-add, scenario-modify, scenario-delete, step-add, step-modify, and step-delete are the shared edit model. --json prints one object with ok, command, family, action, dolt, path, id, dbEdited, conflict, confirmRequired, applied, items, text, message, error, and fix. remove and delete require --confirm and do not write without it. Validation runs before a write. A conflict or an untracked DB edit on that path is refused unless --force is set. When Dolt is off the command writes the file and does not open the database. When Dolt is on, put uses the same db_edited write as feature put. Set pkb_dolt_log=edit to log each edit. The log is date-stamped, per entity, and size-capped.
                 entity put uses that same write, so the entity file row and the entity table stay together.

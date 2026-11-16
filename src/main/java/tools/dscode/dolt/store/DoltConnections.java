@@ -28,7 +28,6 @@ public final class DoltConnections {
     static final long IDLE_MS = 60_000;
 
     private static final ConcurrentHashMap<String, Pool> POOLS = new ConcurrentHashMap<>();
-    private static final Set<Long> OWN_CONNECTION_IDS = ConcurrentHashMap.newKeySet();
 
     private DoltConnections() {
     }
@@ -103,8 +102,7 @@ public final class DoltConnections {
         if (branch == null || branch.isBlank()) return false;
         java.nio.file.Path root = project.toAbsolutePath().normalize();
         if (localBorrowed(root, branch)) return true;
-        if (foreignLease(root, branch)) return true;
-        return foreignProcess(root, branch);
+        return foreignLease(root, branch);
     }
 
     private static boolean localBorrowed(java.nio.file.Path project, String branch) {
@@ -127,7 +125,7 @@ public final class DoltConnections {
             Files.createDirectories(file.getParent());
             Files.writeString(file, Long.toString(System.currentTimeMillis()), StandardCharsets.UTF_8);
         } catch (IOException ignored) {
-            // A missing lease still leaves PROCESSLIST as the cross-process check.
+            // A lease that cannot be written does not block the caller.
         }
     }
 
@@ -150,32 +148,6 @@ public final class DoltConnections {
             return false;
         }
         return false;
-    }
-
-    private static boolean foreignProcess(Path project, String branch) {
-        return false;
-    }
-
-    private static void remember(Connection connection) {
-        try (Statement statement = connection.createStatement();
-             ResultSet rows = statement.executeQuery("SELECT CONNECTION_ID()")) {
-            if (rows.next()) OWN_CONNECTION_IDS.add(rows.getLong(1));
-        } catch (SQLException ignored) {
-            // PROCESSLIST exclusion is best-effort. The lease file is the other signal.
-        }
-    }
-
-    private static void forget(Connection connection) {
-        if (connection == null) return;
-        try {
-            if (connection.isClosed()) return;
-            try (Statement statement = connection.createStatement();
-                 ResultSet rows = statement.executeQuery("SELECT CONNECTION_ID()")) {
-                if (rows.next()) OWN_CONNECTION_IDS.remove(rows.getLong(1));
-            }
-        } catch (SQLException ignored) {
-            // A dead connection is already gone from the server.
-        }
     }
 
     public static void closeBranch(java.nio.file.Path project, String branch) {
@@ -314,7 +286,6 @@ public final class DoltConnections {
         if (connection == null) return;
         try {
             if (connection.isClosed()) return;
-            forget(connection);
             try {
                 if (!connection.getAutoCommit()) {
                     connection.rollback();

@@ -112,10 +112,6 @@ public final class DoltBrowser {
         return List.of("conflicts", "--json");
     }
 
-    public static List<String> serverStatus() {
-        return List.of("server", "status");
-    }
-
     public static List<String> sandboxList() {
         return List.of("sandbox", "list", "--json");
     }
@@ -132,7 +128,7 @@ public final class DoltBrowser {
         if (args == null || args.isEmpty()) return List.of();
         if (sandbox == null || sandbox.isBlank() || "main".equals(sandbox)) return List.copyOf(args);
         String command = args.get(0);
-        if ("sandbox".equals(command) || "server".equals(command) || "install".equals(command) || "migrate".equals(command)) {
+        if ("sandbox".equals(command) || "migrate".equals(command)) {
             return List.copyOf(args);
         }
         List<String> bound = new ArrayList<>(args);

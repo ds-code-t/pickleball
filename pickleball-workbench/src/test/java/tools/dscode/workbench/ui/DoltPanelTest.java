@@ -162,9 +162,6 @@ class DoltPanelTest {
             if (args.size() >= 2 && "sandbox".equals(args.get(0)) && "list".equals(args.get(1))) {
                 return new DoltCliForwarder.Result(0, "{\"sandboxes\":[{\"name\":\"left\"}]}", "", List.of());
             }
-            if (args.size() >= 1 && "server".equals(args.get(0))) {
-                return new DoltCliForwarder.Result(0, "server running", "", List.of());
-            }
             return new DoltCliForwarder.Result(0, "saved", "", List.of());
         }));
         DoltPanel panel = holder[0];
@@ -175,14 +172,12 @@ class DoltPanelTest {
         SwingUtilities.invokeAndWait(() -> sandbox.setSelectedItem("left"));
         click(panel, "Status", status);
         assertEquals(List.of("status", "--sandbox=left"), forwarded.get(1));
-        click(panel, "Server", status);
-        assertEquals(List.of("server", "status"), forwarded.get(2));
         JTextField name = fieldAfter(panel, "Name");
         SwingUtilities.invokeAndWait(() -> name.setText("left"));
         click(panel, "Create sandbox", status);
-        assertEquals(List.of("sandbox", "create", "left"), forwarded.get(3));
+        assertEquals(List.of("sandbox", "create", "left"), forwarded.get(2));
         click(panel, "Drop sandbox", status);
-        assertEquals(List.of("sandbox", "drop", "left"), forwarded.get(4));
+        assertEquals(List.of("sandbox", "drop", "left"), forwarded.get(3));
     }
 
     private static String body(List<String> args) {

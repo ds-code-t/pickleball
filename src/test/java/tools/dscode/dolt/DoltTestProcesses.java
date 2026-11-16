@@ -1,7 +1,7 @@
 package tools.dscode.dolt;
 
-import tools.dscode.dolt.server.DoltServer;
 import tools.dscode.dolt.store.DoltConnections;
+import tools.dscode.dolt.store.StoreFiles;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -12,22 +12,20 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Process hygiene for Dolt tests that run on Windows. A live sql-server, supervisor,
- * or child JVM keeps files and its working directory locked there, so {@code @TempDir}
- * cleanup fails unless the test stops them and waits for the exit first. Child JVM
- * arguments go through an argument file because the test classpath is longer than
- * the Windows command line.
+ * Process hygiene for store tests that run on Windows. A child JVM keeps files
+ * and its working directory locked there, so {@code @TempDir} cleanup fails
+ * unless the test stops it and waits for the exit first. Child JVM arguments
+ * go through an argument file because the test classpath is longer than the
+ * Windows command line.
  */
 final class DoltTestProcesses {
     private DoltTestProcesses() {
     }
 
     /**
-     * Closes this JVM's pools for the project, then stops its server and supervisor and waits for both.
-     * Any other {@code dolt} process this JVM started (directly or through a supervisor) is ended too and
-     * awaited. The snapshot is taken before the stop, because an orphaned server is no longer reachable
-     * as a descendant once its supervisor is gone. On Windows it then waits up to 15 seconds for the
-     * store journal handle to be released; if it is still held, this fails with the live Dolt processes.
+     * Closes this JVM's pools for the project, ends any {@code dolt} child this JVM started,
+     * and waits for the SQLite files to be renameable. A file still held at the deadline fails
+     * the test with the marker contents.
      */
     static void release(Path project) throws IOException {
         if (project == null) return;
@@ -35,55 +33,38 @@ final class DoltTestProcesses {
                 .filter(handle -> command(handle).contains("dolt"))
                 .toList();
         DoltConnections.closeProject(project);
-        DoltServer.stop(project);
-        for (ProcessHandle handle : spawned) DoltServer.terminate(handle, 5_000);
-        if (windows()) requireJournalReleased(project, spawned);
+        for (ProcessHandle handle : spawned) terminate(handle, 5_000);
+        if (!StoreFiles.releaseProject(project, StoreFiles.RELEASE_MS)) {
+            throw new AssertionError("store files still held: " + Files.readString(StoreFiles.pendingDelete(project)));
+        }
     }
 
-    private static void requireJournalReleased(Path project, List<ProcessHandle> spawned) {
-        Path journal = DoltServer.dataDir(project).resolve("pickleball/.dolt/noms/journal.idx");
-        if (!Files.isRegularFile(journal)) return;
-        Path moved = journal.resolveSibling("journal.idx.release-check");
-        // Windows can keep a killed process's mapped journal referenced for a moment after the
-        // process object is signaled. Wait (bounded) for that handle to go before teardown.
-        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(15);
-        IOException locked = null;
-        while (true) {
-            try {
-                Files.move(journal, moved);
-                Files.move(moved, journal);
-                return;
-            } catch (IOException busy) {
-                locked = busy;
-            }
-            if (System.nanoTime() > deadline) break;
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException interrupted) {
-                Thread.currentThread().interrupt();
-                break;
-            }
+    private static boolean terminate(ProcessHandle handle, long graceMillis) {
+        if (handle == null) return true;
+        if (handle.pid() == ProcessHandle.current().pid()) return false;
+        if (handle.isAlive()) handle.destroy();
+        if (awaitExit(handle, graceMillis)) return true;
+        handle.destroyForcibly();
+        return awaitExit(handle, 5_000);
+    }
+
+    private static boolean awaitExit(ProcessHandle handle, long millis) {
+        if (handle == null) return true;
+        try {
+            handle.onExit().get(Math.max(0, millis), java.util.concurrent.TimeUnit.MILLISECONDS);
+            return true;
+        } catch (java.util.concurrent.TimeoutException timedOut) {
+            return false;
+        } catch (java.util.concurrent.ExecutionException failure) {
+            return !handle.isAlive();
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            return !handle.isAlive();
         }
-        StringBuilder live = new StringBuilder();
-        ProcessHandle.allProcesses()
-                .filter(handle -> command(handle).contains("dolt"))
-                .forEach(handle -> live.append("\n  pid=").append(handle.pid())
-                        .append(" parent=").append(handle.parent().map(ProcessHandle::pid).orElse(-1L))
-                        .append(" alive=").append(handle.isAlive())
-                        .append(" start=").append(handle.info().startInstant().map(Object::toString).orElse("?"))
-                        .append(" command=").append(handle.info().command().orElse("?")));
-        StringBuilder swept = new StringBuilder();
-        for (ProcessHandle handle : spawned) swept.append(' ').append(handle.pid());
-        throw new AssertionError("Dolt journal still locked after stop: " + journal + " (" + locked + ")"
-                + "\nswept dolt descendants:" + swept + "\nlive dolt processes:" + live);
     }
 
     private static String command(ProcessHandle handle) {
         return handle.info().command().orElse("").toLowerCase(Locale.ROOT);
-    }
-
-    private static boolean windows() {
-        return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
     }
 
     /**

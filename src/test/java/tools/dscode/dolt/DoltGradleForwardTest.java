@@ -20,12 +20,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Realizes every Gradle {@code dolt*} task and reads the arguments Gradle would pass.
  * A task name is a project property, so {@code project.hasProperty} would forward
- * {@code task ':doltServer'} when {@code -P} is absent.
+ * {@code task ':doltHistory'} when {@code -P} is absent.
  */
 class DoltGradleForwardTest {
     private static final List<String> TASKS = List.of(
             "doltStatus", "doltHydrate", "doltExtract", "doltFeature", "doltHistory", "doltQuery",
-            "doltRun", "doltRunClasspath", "doltEdit", "doltInstall", "doltServer", "doltSandbox", "doltMigrate"
+            "doltRun", "doltRunClasspath", "doltEdit", "doltSandbox", "doltMigrate"
     );
 
     @Test
@@ -40,8 +40,6 @@ class DoltGradleForwardTest {
         assertEquals(List.of("dolt", "files", "list"), plain.get("doltQuery"));
         assertEquals(List.of("dolt", "history", "list"), plain.get("doltHistory"));
         assertEquals(List.of("dolt", "run"), plain.get("doltRun"));
-        assertEquals(List.of("dolt", "install"), plain.get("doltInstall"));
-        assertEquals(List.of("dolt", "server", "status"), plain.get("doltServer"));
         assertEquals(List.of("dolt", "sandbox", "list"), plain.get("doltSandbox"));
         assertEquals(List.of("dolt", "migrate"), plain.get("doltMigrate"));
         assertOut(plain.get("doltRunClasspath"), null);
@@ -57,7 +55,6 @@ class DoltGradleForwardTest {
                 "-PdoltRun=run-42",
                 "-PdoltDays=4",
                 "-PdoltMaxBytes=100",
-                "-PdoltServer=stop",
                 "-PdoltJson=1",
                 "-PdoltArgs=diff,alpha",
                 "-PdoltId=ada",
@@ -80,8 +77,6 @@ class DoltGradleForwardTest {
         assertEquals(List.of("dolt", "diff", "alpha", "--json", "--feature=features/pay.feature", "--scenario=Ada", "--sandbox=alpha"), set.get("doltQuery"));
         assertEquals(List.of("dolt", "history", "show", "run-42", "--days=4", "--max-bytes=100", "--sandbox=alpha"), set.get("doltHistory"));
         assertEquals(List.of("dolt", "run", "--tags=@pay", "--name=Ada", "--glue=tools.dscode.coredefinitions", "--dry-run", "--sandbox=alpha"), set.get("doltRun"));
-        assertEquals(List.of("dolt", "install", "--check", "--force", "--dir=/tmp/bins", "--sandbox=alpha"), set.get("doltInstall"));
-        assertEquals(List.of("dolt", "server", "stop", "--json", "--sandbox=alpha"), set.get("doltServer"));
         assertEquals(List.of("dolt", "sandbox", "diff", "alpha", "--json", "--force", "--sandbox=alpha"), set.get("doltSandbox"));
         assertEquals(List.of("dolt", "migrate", "--dry-run", "--remove-legacy", "--sandbox=alpha"), set.get("doltMigrate"));
         assertOut(set.get("doltRunClasspath"), "--sandbox=alpha");

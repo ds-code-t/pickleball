@@ -370,19 +370,7 @@ public final class DoltSandbox {
     }
 
     private static void withSandboxesLock(DoltSession session, DoltDialect.SqlTask work) throws Exception {
-        String got = session.scalar("SELECT GET_LOCK('pkb:sandboxes', 30)");
-        if (!"1".equals(got)) {
-            throw new IllegalStateException("sandboxes lock was not acquired\nfix: retry dolt sandbox");
-        }
-        try {
-            work.run();
-        } finally {
-            try {
-                session.scalar("SELECT RELEASE_LOCK('pkb:sandboxes')");
-            } catch (SQLException ignored) {
-                // Closing the connection releases a leftover lock.
-            }
-        }
+        work.run();
     }
 
     private static String diffSql(String table) {

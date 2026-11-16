@@ -1,7 +1,6 @@
 package tools.dscode.dolt;
 
 import tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner;
-import tools.dscode.dolt.server.DoltServer;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -128,8 +127,8 @@ public final class DoltRun {
             // Wait for the exit: on Windows a live worker still locks its logs and the project directory.
             ProcessHandle.of(warm.pid()).ifPresent(handle -> {
                 if (handle.pid() == ProcessHandle.current().pid()) return;
-                if (graceful && DoltServer.awaitExit(handle, 5_000)) return;
-                DoltServer.terminate(handle, 10_000);
+                if (graceful && awaitExit(handle, 5_000)) return;
+                terminate(handle, 10_000);
             });
         } catch (Exception ignored) {
             // Stopping a missing worker is not a run failure.
@@ -505,6 +504,31 @@ public final class DoltRun {
             return MessageDigest.getInstance("SHA-256");
         } catch (Exception failure) {
             throw new IllegalStateException(failure);
+        }
+    }
+
+    private static boolean terminate(ProcessHandle handle, long graceMillis) {
+        if (handle == null) return true;
+        if (handle.pid() == ProcessHandle.current().pid()) return false;
+        if (handle.isAlive()) handle.destroy();
+        if (awaitExit(handle, graceMillis)) return true;
+        handle.destroyForcibly();
+        return awaitExit(handle, 5_000);
+    }
+
+    /** Waits on the process object. On Windows {@code isAlive} can flip before the handles close. */
+    private static boolean awaitExit(ProcessHandle handle, long millis) {
+        if (handle == null) return true;
+        try {
+            handle.onExit().get(Math.max(0, millis), TimeUnit.MILLISECONDS);
+            return true;
+        } catch (java.util.concurrent.TimeoutException timedOut) {
+            return false;
+        } catch (java.util.concurrent.ExecutionException failure) {
+            return !handle.isAlive();
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            return !handle.isAlive();
         }
     }
 

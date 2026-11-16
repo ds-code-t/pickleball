@@ -1,8 +1,6 @@
 package tools.dscode.dolt;
 
 import tools.dscode.dolt.DoltLog;
-import tools.dscode.dolt.install.DoltInstaller;
-
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.FileVisitResult;
@@ -66,7 +64,7 @@ public final class DoltMigrate {
     public static int cli(List<String> tokens, PrintStream out, PrintStream err) {
         PrintStream stdout = out == null ? System.out : out;
         PrintStream stderr = err == null ? System.err : err;
-        Path project = DoltInstaller.project(tokens);
+        Path project = project(tokens);
         boolean dryRun = tokens.contains("--dry-run");
         boolean removeLegacy = tokens.contains("--remove-legacy");
         try {
@@ -207,5 +205,14 @@ public final class DoltMigrate {
                 return FileVisitResult.CONTINUE;
             }
         });
+    }
+
+    private static Path project(List<String> tokens) {
+        for (String token : tokens) {
+            if (token.startsWith("--project=")) {
+                return Path.of(token.substring("--project=".length())).toAbsolutePath().normalize();
+            }
+        }
+        return Path.of("").toAbsolutePath().normalize();
     }
 }

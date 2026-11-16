@@ -139,8 +139,6 @@ class DoltHistoryTest {
         assertTrue(gradle.contains("tasks.register('doltEdit'"), excerpt(gradle, "tasks.register('doltEdit'"));
         assertTrue(gradle.contains("tasks.register('doltQuery'"), excerpt(gradle, "tasks.register('doltQuery'"));
         assertTrue(gradle.contains("tasks.register('doltRun'"), excerpt(gradle, "tasks.register('doltRun'"));
-        assertTrue(gradle.contains("tasks.register('doltInstall'"), excerpt(gradle, "tasks.register('doltInstall'"));
-        assertTrue(gradle.contains("tasks.register('doltServer'"), excerpt(gradle, "tasks.register('doltServer'"));
         assertTrue(gradle.contains("tasks.register('doltSandbox'"), excerpt(gradle, "tasks.register('doltSandbox'"));
         assertTrue(gradle.contains("tasks.register('doltMigrate'"), excerpt(gradle, "tasks.register('doltMigrate'"));
         assertTrue(gradle.contains("tasks.register('doltRunClasspath', JavaExec)"), excerpt(gradle, "tasks.register('doltRunClasspath'"));
@@ -153,7 +151,7 @@ class DoltHistoryTest {
             forwards++;
             cursor += needle.length();
         }
-        assertEquals(13, forwards, excerpt(gradle, needle));
+        assertEquals(11, forwards, excerpt(gradle, needle));
         assertTrue(gradle.contains("args = ['dolt', 'status']"), excerpt(gradle, "args = ['dolt', 'status']"));
         assertTrue(gradle.contains("args = ['dolt', 'hydrate']"), excerpt(gradle, "args = ['dolt', 'hydrate']"));
         assertTrue(gradle.contains("args = ['dolt', 'extract']"), excerpt(gradle, "args = ['dolt', 'extract']"));

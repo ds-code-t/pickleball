@@ -42,27 +42,17 @@ jobs:
             --tests tools.dscode.store.spike.EmbeddedMultiProcessTest
           grep -h 'STORE_' build/test-results/test/TEST-tools.dscode.store.spike.*.xml | head -40 >> "$GITHUB_STEP_SUMMARY" || true
 
-      - name: Cache Dolt 2.7.3
-        uses: actions/cache@v4
-        with:
-          path: ~/.pickleball/tools/dolt
-          key: dolt-2.7.3-${{ runner.os }}-${{ runner.arch }}
-
-      - name: Install Dolt 2.7.3
-        shell: bash
-        run: ./gradlew --no-daemon doltInstall
-
-      - name: Targeted Dolt server start
+      - name: Embedded store open
         shell: bash
         run: |
           set -euo pipefail
           ./gradlew --no-daemon :test \
-            --tests tools.dscode.dolt.server.DoltServerLifecycleTest.coldStartPrintsElapsedMillis \
-            --tests tools.dscode.dolt.server.DoltServerLifecycleTest.coldStartUnderAPathWithSpaces \
-            --tests tools.dscode.dolt.server.DoltJournalReleaseTest
-          echo "DOLT_SERVER_START_MS=$(tr -d '\r' < build/dolt-server-start-ms.txt)"
-          echo "DOLT_SERVER_START_SPACES_MS=$(tr -d '\r' < build/dolt-server-start-spaces-ms.txt)"
-          echo "${RUNNER_OS} Dolt server start: $(tr -d '\r' < build/dolt-server-start-ms.txt) ms; path with spaces: $(tr -d '\r' < build/dolt-server-start-spaces-ms.txt) ms" >> "$GITHUB_STEP_SUMMARY"
+            --tests tools.dscode.dolt.EmbeddedStoreOpenTest \
+            --tests tools.dscode.dolt.NoRuntimeDownloadTest \
+            --tests tools.dscode.dolt.StoreFileReleaseTest
+          echo "STORE_OPEN_MS=$(tr -d '\r' < build/store-open-ms.txt)"
+          echo "STORE_OPEN_SPACES_MS=$(tr -d '\r' < build/store-open-spaces-ms.txt)"
+          echo "${RUNNER_OS} store open: $(tr -d '\r' < build/store-open-ms.txt) ms; path with spaces: $(tr -d '\r' < build/store-open-spaces-ms.txt) ms" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Embedded store seam
         shell: bash
@@ -154,25 +144,16 @@ jobs:
             --tests tools.dscode.store.spike.EmbeddedMultiProcessTest
           grep -h 'STORE_' build/test-results/test/TEST-tools.dscode.store.spike.*.xml | head -40 >> "$GITHUB_STEP_SUMMARY" || true
 
-      - name: Cache Dolt 2.7.3
-        uses: actions/cache@v4
-        with:
-          path: ~/.pickleball/tools/dolt
-          key: dolt-2.7.3-${{ runner.os }}-${{ runner.arch }}
-
-      - name: Install Dolt 2.7.3
-        run: ./gradlew --no-daemon doltInstall
-
-      - name: Targeted Dolt server start
+      - name: Embedded store open
         run: |
           set -euo pipefail
           ./gradlew --no-daemon :test \
-            --tests tools.dscode.dolt.server.DoltServerLifecycleTest.coldStartPrintsElapsedMillis \
-            --tests tools.dscode.dolt.server.DoltServerLifecycleTest.coldStartUnderAPathWithSpaces \
-            --tests tools.dscode.dolt.server.DoltJournalReleaseTest
-          echo "DOLT_SERVER_START_MS=$(tr -d '\r' < build/dolt-server-start-ms.txt)"
-          echo "DOLT_SERVER_START_SPACES_MS=$(tr -d '\r' < build/dolt-server-start-spaces-ms.txt)"
-          echo "${RUNNER_OS} Dolt server start: $(tr -d '\r' < build/dolt-server-start-ms.txt) ms; path with spaces: $(tr -d '\r' < build/dolt-server-start-spaces-ms.txt) ms" >> "$GITHUB_STEP_SUMMARY"
+            --tests tools.dscode.dolt.EmbeddedStoreOpenTest \
+            --tests tools.dscode.dolt.NoRuntimeDownloadTest \
+            --tests tools.dscode.dolt.StoreFileReleaseTest
+          echo "STORE_OPEN_MS=$(tr -d '\r' < build/store-open-ms.txt)"
+          echo "STORE_OPEN_SPACES_MS=$(tr -d '\r' < build/store-open-spaces-ms.txt)"
+          echo "${RUNNER_OS} store open: $(tr -d '\r' < build/store-open-ms.txt) ms; path with spaces: $(tr -d '\r' < build/store-open-spaces-ms.txt) ms" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Embedded store seam
         run: |
@@ -270,20 +251,16 @@ jobs:
             --tests tools.dscode.store.spike.EmbeddedMultiProcessTest
           grep -h 'STORE_' build/test-results/test/TEST-tools.dscode.store.spike.*.xml | head -40 >> "$GITHUB_STEP_SUMMARY" || true
 
-      - name: Cache Dolt 2.7.3
-        uses: actions/cache@v4
-        with:
-          path: ~/.pickleball/tools/dolt
-          key: dolt-2.7.3-${{ runner.os }}-${{ runner.arch }}
-
-      - name: Install Dolt 2.7.3
-        run: ./gradlew --no-daemon doltInstall
-
-      - name: Targeted Dolt server start
+      - name: Embedded store open
         run: |
           set -euo pipefail
-          ./gradlew --no-daemon :test --tests tools.dscode.dolt.server.DoltServerLifecycleTest.coldStartPrintsElapsedMillis
-          echo "DOLT_SERVER_START_MS=$(tr -d '\r' < build/dolt-server-start-ms.txt)"
+          ./gradlew --no-daemon :test \
+            --tests tools.dscode.dolt.EmbeddedStoreOpenTest \
+            --tests tools.dscode.dolt.NoRuntimeDownloadTest \
+            --tests tools.dscode.dolt.StoreFileReleaseTest
+          echo "STORE_OPEN_MS=$(tr -d '\r' < build/store-open-ms.txt)"
+          echo "STORE_OPEN_SPACES_MS=$(tr -d '\r' < build/store-open-spaces-ms.txt)"
+          echo "${RUNNER_OS} store open: $(tr -d '\r' < build/store-open-ms.txt) ms; path with spaces: $(tr -d '\r' < build/store-open-spaces-ms.txt) ms" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Embedded store seam
         run: |
@@ -454,16 +431,6 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
-
-      - name: Cache Dolt 2.7.3
-        uses: actions/cache@v4
-        with:
-          path: ~/.pickleball/tools/dolt
-          key: dolt-2.7.3-${{ runner.os }}-${{ runner.arch }}
-
-      - name: Install Dolt 2.7.3
-        shell: bash
-        run: ./gradlew --no-daemon doltInstall
 
       - name: Block the release unless Windows, macOS, and live Chrome passed
         shell: bash

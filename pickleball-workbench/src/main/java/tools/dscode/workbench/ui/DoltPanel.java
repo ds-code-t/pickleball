@@ -50,7 +50,6 @@ final class DoltPanel extends JPanel {
     private final JLabel status = new JLabel("Dolt");
     private final JButton refresh = WorkbenchTheme.flatButton("Refresh", "Read this view from the Dolt CLI");
     private final JButton sandboxes = WorkbenchTheme.flatButton("Sandboxes", "dolt sandbox list");
-    private final JButton server = WorkbenchTheme.flatButton("Server", "dolt server status");
     private final JButton createSandbox = WorkbenchTheme.flatButton("Create sandbox", "dolt sandbox create");
     private final JButton dropSandbox = WorkbenchTheme.flatButton("Drop sandbox", "dolt sandbox drop");
     private final JButton load = WorkbenchTheme.flatButton("Load", "Show the feature text or entity");
@@ -81,7 +80,6 @@ final class DoltPanel extends JPanel {
         north.add(sandboxes);
         north.add(createSandbox);
         north.add(dropSandbox);
-        north.add(server);
         sandboxes.addActionListener(event -> run(DoltBrowser.sandboxList(), false));
         createSandbox.addActionListener(event -> {
             String name = sandboxName.getText().trim();
@@ -99,7 +97,6 @@ final class DoltPanel extends JPanel {
             }
             run(DoltBrowser.sandboxDrop(name), false);
         });
-        server.addActionListener(event -> run(DoltBrowser.serverStatus(), false));
         north.add(new JLabel("Feature"));
         north.add(featurePath);
         north.add(new JLabel("Scenario"));
@@ -277,7 +274,6 @@ final class DoltPanel extends JPanel {
         saveFeature.setEnabled(!busy);
         saveEntity.setEnabled(!busy);
         sandboxes.setEnabled(!busy);
-        server.setEnabled(!busy);
         createSandbox.setEnabled(!busy);
         dropSandbox.setEnabled(!busy);
     }

@@ -159,9 +159,6 @@ dependencies {
     implementation 'org.postgresql:postgresql:42.7.7'
     implementation 'com.microsoft.sqlserver:mssql-jdbc:12.10.1.jre11'
     implementation 'com.oracle.database.jdbc:ojdbc11:23.7.0.25.01'
-    // Newest 3.5.x on Maven Central at the Dolt-core P1 pin (3.5.11). Runtime POM scope.
-    // Not shaded. The Dolt core connects with this driver; JDBC service calls use it too.
-    runtimeOnly 'org.mariadb.jdbc:mariadb-java-client:3.5.11'
 
     // logging and reports
 //    api "com.aventstack:extentreports:5.1.2"
@@ -460,16 +457,14 @@ tasks.register('engineRun', JavaExec) {
     if (project.hasProperty('engineFeature')) args += ['--feature=' + project.property('engineFeature')]
 }
 
-def doltForwardClasspath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
-        dependencies.create('org.mariadb.jdbc:mariadb-java-client:3.5.11')
-)
+def doltForwardClasspath = sourceSets.main.runtimeClasspath
 // A dolt* task is itself a project property. -Pdoltsomething must come from Gradle properties,
 // never project.hasProperty, or the task name is forwarded as the command.
 def doltProp = { String key -> providers.gradleProperty(key) }
 
 tasks.register('doltStatus', JavaExec) {
     group = 'dolt'
-    description = 'Forward to the Dolt CLI status command. The MariaDB JDBC driver is on this task classpath.'
+    description = 'Forward to the Dolt CLI status command. The store driver is already on the runtime classpath.'
     classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     args = ['dolt', 'status']
@@ -478,7 +473,7 @@ tasks.register('doltStatus', JavaExec) {
 
 tasks.register('doltHydrate', JavaExec) {
     group = 'dolt'
-    description = 'Forward to the Dolt CLI hydrate command. The MariaDB JDBC driver is on this task classpath.'
+    description = 'Forward to the Dolt CLI hydrate command. The store driver is already on the runtime classpath.'
     classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     args = ['dolt', 'hydrate']
@@ -489,7 +484,7 @@ tasks.register('doltHydrate', JavaExec) {
 
 tasks.register('doltExtract', JavaExec) {
     group = 'dolt'
-    description = 'Forward to the Dolt CLI extract command. The MariaDB JDBC driver is on this task classpath.'
+    description = 'Forward to the Dolt CLI extract command. The store driver is already on the runtime classpath.'
     classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     args = ['dolt', 'extract']
@@ -500,7 +495,7 @@ tasks.register('doltExtract', JavaExec) {
 
 tasks.register('doltFeature', JavaExec) {
     group = 'dolt'
-    description = 'Forward to the Dolt CLI feature command. The MariaDB JDBC driver is on this task classpath.'
+    description = 'Forward to the Dolt CLI feature command. The store driver is already on the runtime classpath.'
     classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     args = ['dolt', 'feature']
@@ -513,7 +508,7 @@ tasks.register('doltFeature', JavaExec) {
 
 tasks.register('doltEdit', JavaExec) {
     group = 'dolt'
-    description = 'Forward to the Dolt edit CLI (category, file, glue, feature scenario/step). The MariaDB JDBC driver is on this task classpath.'
+    description = 'Forward to the Dolt edit CLI (category, file, glue, feature scenario/step). The store driver is already on the runtime classpath.'
     classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     args = ['dolt']
@@ -548,7 +543,7 @@ tasks.register('domengine', JavaExec) {
 
 tasks.register('doltQuery', JavaExec) {
     group = 'dolt'
-    description = 'Forward to a Dolt CLI read command. The MariaDB JDBC driver is on this task classpath.'
+    description = 'Forward to a Dolt CLI read command. The store driver is already on the runtime classpath.'
     classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     args = ['dolt']
@@ -565,7 +560,7 @@ tasks.register('doltQuery', JavaExec) {
 
 tasks.register('doltHistory', JavaExec) {
     group = 'dolt'
-    description = 'Forward to the Dolt CLI history command. The MariaDB JDBC driver is on this task classpath.'
+    description = 'Forward to the Dolt CLI history command. The store driver is already on the runtime classpath.'
     classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     args = ['dolt', 'history']
@@ -578,7 +573,7 @@ tasks.register('doltHistory', JavaExec) {
 
 tasks.register('doltRun', JavaExec) {
     group = 'dolt'
-    description = 'Forward to the Dolt CLI run command. The MariaDB JDBC driver is on this task classpath.'
+    description = 'Forward to the Dolt CLI run command.'
     classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     args = ['dolt', 'run']
@@ -590,32 +585,9 @@ tasks.register('doltRun', JavaExec) {
     if (doltProp('doltSandbox').isPresent()) args += ['--sandbox=' + doltProp('doltSandbox').get()]
 }
 
-tasks.register('doltInstall', JavaExec) {
-    group = 'dolt'
-    description = 'Forward to the Dolt CLI install command. The MariaDB JDBC driver is on this task classpath.'
-    classpath = doltForwardClasspath
-    mainClass = 'tools.dscode.dolt.DoltCli'
-    args = ['dolt', 'install']
-    if (doltProp('doltCheck').isPresent()) args += ['--check']
-    if (doltProp('doltForce').isPresent()) args += ['--force']
-    if (doltProp('doltDir').isPresent()) args += ['--dir=' + doltProp('doltDir').get()]
-    if (doltProp('doltSandbox').isPresent()) args += ['--sandbox=' + doltProp('doltSandbox').get()]
-}
-
-tasks.register('doltServer', JavaExec) {
-    group = 'dolt'
-    description = 'Forward to the Dolt CLI server command. The MariaDB JDBC driver is on this task classpath.'
-    classpath = doltForwardClasspath
-    mainClass = 'tools.dscode.dolt.DoltCli'
-    args = ['dolt', 'server']
-    args += [doltProp('doltServer').orElse('status').get()]
-    if (doltProp('doltJson').isPresent()) args += ['--json']
-    if (doltProp('doltSandbox').isPresent()) args += ['--sandbox=' + doltProp('doltSandbox').get()]
-}
-
 tasks.register('doltSandbox', JavaExec) {
     group = 'dolt'
-    description = 'Forward to the Dolt CLI sandbox command. The MariaDB JDBC driver is on this task classpath.'
+    description = 'Forward to the Dolt CLI sandbox command. The store driver is already on the runtime classpath.'
     classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     args = ['dolt', 'sandbox']
@@ -631,7 +603,7 @@ tasks.register('doltSandbox', JavaExec) {
 
 tasks.register('doltMigrate', JavaExec) {
     group = 'dolt'
-    description = 'Forward to the Dolt CLI migrate command. The MariaDB JDBC driver is on this task classpath.'
+    description = 'Forward to the Dolt CLI migrate command. The store driver is already on the runtime classpath.'
     classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     args = ['dolt', 'migrate']
@@ -642,7 +614,7 @@ tasks.register('doltMigrate', JavaExec) {
 
 tasks.register('doltRunClasspath', JavaExec) {
     group = 'dolt'
-    description = 'Forward to the Dolt CLI run-classpath command. The MariaDB JDBC driver is on this task classpath.'
+    description = 'Forward to the Dolt CLI run-classpath command. The store driver is already on the runtime classpath.'
     classpath = doltForwardClasspath
     mainClass = 'tools.dscode.dolt.DoltCli'
     def out = layout.buildDirectory.file('dolt-run-classpath.txt')
@@ -918,7 +890,7 @@ publishing {
                         d.appendNode('version', v)
                     }
 
-                    if (ga == 'org.xerial:sqlite-jdbc' || ga == 'org.mariadb.jdbc:mariadb-java-client') {
+                    if (ga == 'org.xerial:sqlite-jdbc') {
                         d.appendNode('scope', 'runtime')
                     } else {
                         d.appendNode('scope', 'compile')

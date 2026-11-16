@@ -28,7 +28,7 @@ class DoltCliLaunchTest {
         );
         assertEquals(0, code, stderr.toString(StandardCharsets.UTF_8));
         String out = stdout.toString(StandardCharsets.UTF_8);
-        assertTrue(out.contains("Dolt database missing: .pickleball/dolt/data"), out);
+        assertTrue(out.contains("Dolt database missing: .pickleball/dolt/main.db"), out);
         assertFalse(Files.exists(project.resolve(".pickleball")));
         assertEquals(-1, PickleballWorkbenchLauncher.dispatchDoltIfAny(
                 new String[] {"help"},
