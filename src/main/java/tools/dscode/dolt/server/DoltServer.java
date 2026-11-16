@@ -170,24 +170,17 @@ public final class DoltServer {
         }
         ProcessHandle supervisor = ProcessHandle.of(info.supervisorPid()).orElse(null);
         ProcessHandle dolt = ProcessHandle.of(info.pid()).orElse(null);
+        boolean ownDolt = dolt != null && looksLike(dolt, "dolt");
         if (supervisor != null && supervisor.isAlive()) supervisor.destroy();
-        if (dolt != null && dolt.isAlive() && looksLike(dolt, "dolt")) dolt.destroy();
-        long deadline = System.nanoTime() + 10_000_000_000L;
-        while (System.nanoTime() < deadline) {
-            boolean supervisorAlive = supervisor != null && supervisor.isAlive();
-            boolean doltAlive = dolt != null && dolt.isAlive();
-            if (!supervisorAlive && !doltAlive) break;
-            sleep(100);
-        }
-        if (supervisor != null && supervisor.isAlive()) supervisor.destroyForcibly();
-        if (dolt != null && dolt.isAlive() && looksLike(dolt, "dolt")) dolt.destroyForcibly();
-        deadline = System.nanoTime() + 3_000_000_000L;
-        while (System.nanoTime() < deadline) {
-            boolean supervisorAlive = supervisor != null && supervisor.isAlive();
-            boolean doltAlive = dolt != null && dolt.isAlive();
-            if (!supervisorAlive && !doltAlive) break;
-            sleep(100);
-        }
+        if (ownDolt && dolt.isAlive()) dolt.destroy();
+        // isAlive turns false once Windows records an exit code, which can be before the
+        // process has closed its files. awaitExit waits on the process object itself.
+        boolean supervisorGone = awaitExit(supervisor, 10_000);
+        boolean doltGone = !ownDolt || awaitExit(dolt, 10_000);
+        if (!supervisorGone) supervisor.destroyForcibly();
+        if (!doltGone) dolt.destroyForcibly();
+        if (!supervisorGone) awaitExit(supervisor, 3_000);
+        if (!doltGone) awaitExit(dolt, 3_000);
         Files.deleteIfExists(home(project).resolve("server.json"));
         DoltLog.log(project, "server", Long.toString(info.pid()), "stopped");
     }
@@ -268,9 +261,9 @@ public final class DoltServer {
      * project afterwards need the exit, not only the signal.
      */
     public static boolean terminate(ProcessHandle handle, long graceMillis) {
-        if (handle == null || !handle.isAlive()) return true;
+        if (handle == null) return true;
         if (handle.pid() == ProcessHandle.current().pid()) return false;
-        handle.destroy();
+        if (handle.isAlive()) handle.destroy();
         if (awaitExit(handle, graceMillis)) return true;
         handle.destroyForcibly();
         return awaitExit(handle, 5_000);
@@ -278,15 +271,20 @@ public final class DoltServer {
 
     /** Waits up to {@code millis} for the process to exit and reports whether it did. */
     public static boolean awaitExit(ProcessHandle handle, long millis) {
-        if (handle == null || !handle.isAlive()) return true;
+        if (handle == null) return true;
+        // No isAlive shortcut: on Windows it can report false before the process object
+        // is signaled and its handles are closed. onExit waits on that signal.
         try {
             handle.onExit().get(Math.max(0, millis), java.util.concurrent.TimeUnit.MILLISECONDS);
-        } catch (java.util.concurrent.TimeoutException | java.util.concurrent.ExecutionException ignored) {
-            // isAlive below is the answer.
+            return true;
+        } catch (java.util.concurrent.TimeoutException timedOut) {
+            return false;
+        } catch (java.util.concurrent.ExecutionException failure) {
+            return !handle.isAlive();
         } catch (InterruptedException failure) {
             Thread.currentThread().interrupt();
+            return !handle.isAlive();
         }
-        return !handle.isAlive();
     }
 
     private static void launchSupervisor(Path project) throws IOException {
