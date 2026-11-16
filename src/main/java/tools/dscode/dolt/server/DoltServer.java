@@ -250,17 +250,43 @@ public final class DoltServer {
     private static void clearStale(Path project) throws IOException {
         ServerInfo info = readInfo(project);
         if (info == null) return;
-        ProcessHandle dolt = ProcessHandle.of(info.pid()).orElse(null);
-        if (dolt != null && dolt.isAlive() && looksLike(dolt, "dolt")) {
-            dolt.destroy();
-            sleep(200);
-            if (dolt.isAlive()) dolt.destroyForcibly();
-        }
+        // The supervisor goes first so its watch loop cannot delete the next server.json.
         ProcessHandle supervisor = ProcessHandle.of(info.supervisorPid()).orElse(null);
         if (supervisor != null && supervisor.isAlive() && looksLike(supervisor, "java")) {
-            supervisor.destroy();
+            terminate(supervisor, 2_000);
+        }
+        ProcessHandle dolt = ProcessHandle.of(info.pid()).orElse(null);
+        if (dolt != null && dolt.isAlive() && looksLike(dolt, "dolt")) {
+            terminate(dolt, 2_000);
         }
         Files.deleteIfExists(home(project).resolve("server.json"));
+    }
+
+    /**
+     * Ends a process and waits until it has exited. On Windows a live process keeps
+     * its open files and working directory locked, so callers that delete the
+     * project afterwards need the exit, not only the signal.
+     */
+    public static boolean terminate(ProcessHandle handle, long graceMillis) {
+        if (handle == null || !handle.isAlive()) return true;
+        if (handle.pid() == ProcessHandle.current().pid()) return false;
+        handle.destroy();
+        if (awaitExit(handle, graceMillis)) return true;
+        handle.destroyForcibly();
+        return awaitExit(handle, 5_000);
+    }
+
+    /** Waits up to {@code millis} for the process to exit and reports whether it did. */
+    public static boolean awaitExit(ProcessHandle handle, long millis) {
+        if (handle == null || !handle.isAlive()) return true;
+        try {
+            handle.onExit().get(Math.max(0, millis), java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (java.util.concurrent.TimeoutException | java.util.concurrent.ExecutionException ignored) {
+            // isAlive below is the answer.
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+        }
+        return !handle.isAlive();
     }
 
     private static void launchSupervisor(Path project) throws IOException {

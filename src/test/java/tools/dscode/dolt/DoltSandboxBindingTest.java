@@ -23,9 +23,10 @@ class DoltSandboxBindingTest {
     Path project;
 
     @AfterEach
-    void releaseSandbox() {
+    void releaseSandbox() throws Exception {
         DoltScope.clear();
         System.clearProperty("pkb_dolt_sandbox");
+        DoltTestProcesses.release(project);
     }
 
     @Test
@@ -83,7 +84,6 @@ class DoltSandboxBindingTest {
     private String child(String property, String env, String flag) throws Exception {
         Files.deleteIfExists(project.resolve(".pickleball/dolt/dolt.log"));
         List<String> command = new java.util.ArrayList<>();
-        command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
         command.add("-Dpkb_dolt_log=query");
         if (property != null) command.add("-Dpkb_dolt_sandbox=" + property);
         command.add("-cp");
@@ -95,7 +95,7 @@ class DoltSandboxBindingTest {
         command.add("features/pay.feature");
         command.add("--project=" + project.toAbsolutePath());
         if (flag != null) command.add("--sandbox=" + flag);
-        ProcessBuilder builder = new ProcessBuilder(command);
+        ProcessBuilder builder = new ProcessBuilder(DoltTestProcesses.java(command));
         if (env != null) builder.environment().put("PKB_DOLT_SANDBOX", env);
         else builder.environment().remove("PKB_DOLT_SANDBOX");
         Process process = builder.start();

@@ -26,7 +26,7 @@ class DoltSandboxIsolationTest {
     Path project;
 
     @AfterEach
-    void releaseSandbox() {
+    void releaseSandbox() throws Exception {
         for (String name : new String[] {"left", "right", "main"}) {
             DoltScope.clear();
             if (!"main".equals(name)) DoltScope.bind(Binding.sandbox(name));
@@ -34,6 +34,7 @@ class DoltSandboxIsolationTest {
         }
         DoltScope.clear();
         System.clearProperty("pkb_dolt_run_classpath");
+        DoltTestProcesses.release(project);
     }
 
     @Test
@@ -237,13 +238,12 @@ class DoltSandboxIsolationTest {
 
     private Capture capture(List<String> args) throws Exception {
         List<String> command = new ArrayList<>();
-        command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
         command.add("-Dpkb_dolt_run_classpath=" + System.getProperty("java.class.path"));
         command.add("-cp");
         command.add(System.getProperty("java.class.path"));
         command.add("tools.dscode.dolt.DoltCli");
         command.addAll(args.stream().map(String::valueOf).toList());
-        Process process = new ProcessBuilder(command).start();
+        Process process = new ProcessBuilder(DoltTestProcesses.java(command)).start();
         StringBuilder out = new StringBuilder();
         StringBuilder err = new StringBuilder();
         Thread stdout = Thread.ofVirtual().start(() -> drain(process.getInputStream(), out));

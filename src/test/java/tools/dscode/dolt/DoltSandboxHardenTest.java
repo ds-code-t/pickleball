@@ -15,7 +15,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Locale;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -28,8 +28,9 @@ class DoltSandboxHardenTest {
     Path project;
 
     @AfterEach
-    void release() {
+    void release() throws Exception {
         DoltScope.clear();
+        DoltTestProcesses.release(project);
     }
 
     @Test
@@ -95,6 +96,7 @@ class DoltSandboxHardenTest {
             assertTrue(busy.err.contains("in use"), busy.err);
         } finally {
             sleeper.destroyForcibly();
+            sleeper.waitFor(10, TimeUnit.SECONDS);
         }
         Capture dropped = cli("dolt", "sandbox", "drop", "held", "--project=" + project);
         assertEquals(0, dropped.code, dropped.err);
@@ -134,15 +136,15 @@ class DoltSandboxHardenTest {
     }
 
     private static Process pauseProcess() throws Exception {
-        return new ProcessBuilder(javaBin().toString(), "-cp", System.getProperty("java.class.path"),
-                DoltSandboxHardenTest.class.getName() + "$Pause").start();
+        return new ProcessBuilder(DoltTestProcesses.java(List.of("-cp", System.getProperty("java.class.path"),
+                DoltSandboxHardenTest.class.getName() + "$Pause"))).start();
     }
 
     private static Process holdProcess(Path project, String name) throws Exception {
         Path err = Files.createTempFile("dolt-hold-", ".err");
-        Process process = new ProcessBuilder(javaBin().toString(), "-cp", System.getProperty("java.class.path"),
+        Process process = new ProcessBuilder(DoltTestProcesses.java(List.of("-cp", System.getProperty("java.class.path"),
                 DoltSandboxHardenTest.class.getName() + "$Hold",
-                project.toAbsolutePath().toString(), name)
+                project.toAbsolutePath().toString(), name)))
                 .redirectError(err.toFile())
                 .start();
         String line = "";
@@ -162,11 +164,6 @@ class DoltSandboxHardenTest {
         }
         process.destroyForcibly();
         throw new IllegalStateException("holder did not start: " + line + " " + Files.readString(err));
-    }
-
-    private static Path javaBin() {
-        String file = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win") ? "java.exe" : "java";
-        return Path.of(System.getProperty("java.home"), "bin", file);
     }
 
     /** Stays alive so a lease file can name a live pid. No shell `sleep`, so Windows can run it. */

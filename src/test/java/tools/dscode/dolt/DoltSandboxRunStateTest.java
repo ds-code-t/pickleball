@@ -27,13 +27,14 @@ class DoltSandboxRunStateTest {
     Path project;
 
     @AfterEach
-    void release() {
+    void release() throws Exception {
         DoltScope.clear();
         DoltScope.bind(Binding.sandbox("alpha"));
         DoltRun.stop(project);
         DoltScope.clear();
         DoltRun.stop(project);
         System.clearProperty("pkb_dolt_run_classpath");
+        DoltTestProcesses.release(project);
     }
 
     @Test

@@ -26,13 +26,14 @@ class DoltSandboxWorkerTest {
     Path project;
 
     @AfterEach
-    void releaseSandbox() {
+    void releaseSandbox() throws Exception {
         DoltScope.clear();
         DoltScope.bind(Binding.sandbox("alpha"));
         DoltRun.stop(project);
         DoltScope.clear();
         DoltRun.stop(project);
         System.clearProperty("pkb_dolt_run_classpath");
+        DoltTestProcesses.release(project);
     }
 
     @Test
@@ -96,7 +97,6 @@ class DoltSandboxWorkerTest {
 
     private Capture child() throws Exception {
         List<String> command = new ArrayList<>();
-        command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
         command.add("-Dpkb_dolt_run_classpath=" + System.getProperty("java.class.path"));
         command.add("-cp");
         command.add(System.getProperty("java.class.path"));
@@ -111,7 +111,7 @@ class DoltSandboxWorkerTest {
         command.add("-Dpkb_parallel=1");
         command.add("-Dcucumber.execution.parallel.enabled=false");
         command.add("--project=" + project.toAbsolutePath());
-        Process process = new ProcessBuilder(command).start();
+        Process process = new ProcessBuilder(DoltTestProcesses.java(command)).start();
         StringBuilder out = new StringBuilder();
         StringBuilder err = new StringBuilder();
         Thread stdout = Thread.ofVirtual().start(() -> drain(process.getInputStream(), out));

@@ -1,6 +1,7 @@
 package tools.dscode.dolt;
 
 import tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner;
+import tools.dscode.dolt.server.DoltServer;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -116,13 +117,19 @@ public final class DoltRun {
         if (!Files.isRegularFile(file)) return;
         try {
             Warm warm = readWarm(file);
+            boolean asked = false;
             try {
                 send(root, "STOP\n", Duration.ofSeconds(3));
+                asked = true;
             } catch (Exception ignored) {
                 // The process may already be gone.
             }
+            boolean graceful = asked;
+            // Wait for the exit: on Windows a live worker still locks its logs and the project directory.
             ProcessHandle.of(warm.pid()).ifPresent(handle -> {
-                if (handle.pid() != ProcessHandle.current().pid()) handle.destroy();
+                if (handle.pid() == ProcessHandle.current().pid()) return;
+                if (graceful && DoltServer.awaitExit(handle, 5_000)) return;
+                DoltServer.terminate(handle, 10_000);
             });
         } catch (Exception ignored) {
             // Stopping a missing worker is not a run failure.

@@ -22,8 +22,9 @@ class DoltSandboxCliTest {
     Path project;
 
     @AfterEach
-    void releaseSandbox() {
+    void releaseSandbox() throws Exception {
         DoltScope.clear();
+        DoltTestProcesses.release(project);
     }
 
     @Test

@@ -26,13 +26,14 @@ class DoltSandboxPruneTest {
     Path project;
 
     @AfterEach
-    void releaseSandbox() {
+    void releaseSandbox() throws Exception {
         DoltScope.clear();
         DoltScope.bind(Binding.sandbox("linbox"));
         DoltRun.stop(project);
         DoltScope.clear();
         DoltRun.stop(project);
         System.clearProperty("pkb_dolt_run_classpath");
+        DoltTestProcesses.release(project);
     }
 
     @Test
