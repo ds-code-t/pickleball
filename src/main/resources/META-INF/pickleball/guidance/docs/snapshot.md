@@ -201,7 +201,7 @@ A fixture's platform follows `os.name` and its transport is `fixture`.
 Screenshot tools, in order:
 
 - Windows: PowerShell `System.Drawing.CopyFromScreen` after `SetProcessDPIAware`, so pixels match UIA physical coordinates.
-- macOS: `screencapture -x -R x,y,w,h -t png -`. `image_scale` is image pixels divided by AX points (2.0 on Retina). A black or empty PNG, or a `could not` / `permission` error, is `error: screen recording permission denied` with a `fix:` line. It does not fall through to Robot.
+- macOS: `screencapture -x -R x,y,w,h -t png <temp file>`, then the file is read and deleted (screencapture has no stdout mode). `image_scale` is image pixels divided by AX points (2.0 on Retina). A black or empty PNG, or a `could not` / `permission` error, is `error: screen recording permission denied` with a `fix:` line. It does not fall through to Robot.
 - Linux Wayland (`XDG_SESSION_TYPE=wayland` or `WAYLAND_DISPLAY`): `grim -g "x,y wxh" -`.
 - Linux X11: ImageMagick `import -window root -crop WxH+X+Y png:-`, then `xwd -root -silent` parsed in Java.
 
