@@ -811,6 +811,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/dolt/DoltSchemaUpgradeTest.java`
 - `src/test/java/tools/dscode/dolt/DoltSecretsTest.java`
 - `src/test/java/tools/dscode/dolt/DoltStepDefinitionCatalogTest.java`
+- `src/test/java/tools/dscode/dolt/DoltTestProcesses.java`
 - `src/test/java/tools/dscode/dolt/DoltTimelineTest.java`
 - `src/test/java/tools/dscode/dolt/FileEditTest.java`
 - `src/test/java/tools/dscode/dolt/GherkinRewriteTest.java`
