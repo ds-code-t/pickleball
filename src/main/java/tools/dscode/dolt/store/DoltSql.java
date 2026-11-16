@@ -20,7 +20,10 @@ import java.util.regex.Pattern;
  */
 public final class DoltSql {
     private static final Pattern TABLE_REF = Pattern.compile(
-            "(?i)(?:\\bfrom|\\bjoin|\\binto|\\bupdate|\\btable)\\s+(`?)([a-zA-Z0-9_]+)\\1");
+            "(?i)(?:\\bfrom|\\bjoin|\\binto|\\btable)\\s+(`?)([a-zA-Z0-9_]+)\\1");
+    /** {@code UPDATE table SET}. An assignment in {@code ON DUPLICATE KEY UPDATE col} is not a table. */
+    private static final Pattern UPDATE_REF = Pattern.compile(
+            "(?i)\\bupdate\\s+(`?)([a-zA-Z0-9_]+)\\1\\s+set\\b");
 
     private DoltSql() {
     }
@@ -381,6 +384,13 @@ public final class DoltSql {
         while (matcher.find()) {
             any = true;
             String table = matcher.group(2).toLowerCase(Locale.ROOT);
+            if (DoltDialect.RUN_STATE_TABLES.contains(table)) run = true;
+            else other = true;
+        }
+        Matcher updates = UPDATE_REF.matcher(sql);
+        while (updates.find()) {
+            any = true;
+            String table = updates.group(2).toLowerCase(Locale.ROOT);
             if (DoltDialect.RUN_STATE_TABLES.contains(table)) run = true;
             else other = true;
         }

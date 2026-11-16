@@ -4,6 +4,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import tools.dscode.dolt.store.Binding;
+import tools.dscode.dolt.store.DoltStore;
+
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
@@ -83,6 +86,45 @@ class DoltSandboxCliTest {
         Capture after = cli("dolt", "sandbox", "list", "--project=" + project);
         assertEquals(0, after.code, after.err);
         assertTrue(after.out.contains("sandboxes 0"), after.out);
+    }
+
+    @Test
+    void extractRefusesABadPathBeforeWritingAnyFile() throws Exception {
+        Files.createDirectories(project.resolve("features"));
+        Files.writeString(project.resolve("features/pay.feature"), """
+                Feature: Pay
+                  Scenario: Ada
+                    * INFO: amount is 1
+                """);
+        Capture hydrated = cli("dolt", "hydrate", "--project=" + project);
+        assertEquals(0, hydrated.code, hydrated.err);
+        DoltScope.clear();
+        Capture created = cli("dolt", "sandbox", "create", "alpha", "--project=" + project);
+        assertEquals(0, created.code, created.err);
+        DoltScope.clear();
+        try (DoltStore store = DoltStore.open(project, Binding.sandbox("alpha"))) {
+            store.session().update(
+                    """
+                    INSERT INTO files(path, content_hash, raw_content, mtime, source_type, last_hydrated_at, last_synced_hash, db_edited)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    "zzz/../out.txt",
+                    "abc",
+                    "nope".getBytes(StandardCharsets.UTF_8),
+                    0L,
+                    "feature",
+                    "t",
+                    "abc",
+                    1);
+        }
+        DoltScope.clear();
+        Path outside = project.resolve("sibling");
+        Capture refused = cli("dolt", "sandbox", "extract", "alpha", "--to=" + outside, "--project=" + project);
+        assertEquals(1, refused.code, refused.out + refused.err);
+        assertTrue(refused.err.contains("extract refused zzz/../out.txt"), refused.err);
+        assertFalse(Files.exists(outside.resolve("features/pay.feature")));
+        assertFalse(Files.exists(outside.resolve("features")));
+        assertFalse(Files.exists(outside));
     }
 
     private Capture cli(String... args) {
