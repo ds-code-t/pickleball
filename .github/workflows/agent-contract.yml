@@ -97,6 +97,63 @@ jobs:
         shell: pwsh
         run: .\gradlew.bat --no-daemon :dom-engine:test --tests dev.domengine.snapshot.SnapshotCoverageTest.liveDesktopWhenThePlatformExists
 
+  macos:
+    name: macOS targeted Dolt and core
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Cache Dolt 2.7.3
+        uses: actions/cache@v4
+        with:
+          path: ~/.pickleball/tools/dolt
+          key: dolt-2.7.3-${{ runner.os }}-${{ runner.arch }}
+
+      - name: Install Dolt 2.7.3
+        run: ./gradlew --no-daemon doltInstall
+
+      - name: Targeted Dolt server start
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon :test --tests tools.dscode.dolt.server.DoltServerLifecycleTest.coldStartPrintsElapsedMillis
+          echo "DOLT_SERVER_START_MS=$(tr -d '\r' < build/dolt-server-start-ms.txt)"
+          echo "macOS Dolt server start: $(tr -d '\r' < build/dolt-server-start-ms.txt) ms" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Targeted Dolt sandbox, run-state, and isolation
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon :test \
+            --tests tools.dscode.dolt.DoltSandboxCliTest \
+            --tests tools.dscode.dolt.DoltSandboxBindingTest \
+            --tests tools.dscode.dolt.DoltSandboxRunStateTest \
+            --tests tools.dscode.dolt.DoltSandboxIsolationTest \
+            --tests tools.dscode.dolt.DoltSandboxWorkerTest \
+            --tests tools.dscode.dolt.DoltSandboxPruneTest \
+            --tests tools.dscode.dolt.DoltSandboxHardenTest
+
+      - name: Targeted core agent surface
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon :test \
+            --tests tools.dscode.common.agentsurface.AgentSurfaceRouterTest \
+            --tests tools.dscode.common.agentsurface.NativeHighlightRouteTest \
+            --tests tools.dscode.browser.SurfaceAssetsTest
+
+      - name: macOS desktop live snapshot
+        if: always()
+        run: ./gradlew --no-daemon :dom-engine:test --tests dev.domengine.snapshot.SnapshotCoverageTest.liveDesktopWhenThePlatformExists
+
   dom-engine-live:
     name: Java DOM live Chrome
     runs-on: ubuntu-latest
