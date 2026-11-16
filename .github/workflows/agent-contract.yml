@@ -62,6 +62,18 @@ jobs:
             --tests tools.dscode.dolt.DoltSandboxPruneTest \
             --tests tools.dscode.dolt.DoltSandboxHardenTest
 
+      - name: Agent surface popup live (real Chromium, must not skip)
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon :test --tests tools.dscode.common.agentsurface.live.AgentSurfacePopupLiveTest
+          report=build/test-results/test/TEST-tools.dscode.common.agentsurface.live.AgentSurfacePopupLiveTest.xml
+          if grep -q '<skipped' "$report"; then
+            echo "AgentSurfacePopupLiveTest skipped on ${RUNNER_OS}:"
+            grep -A2 '<skipped' "$report" || true
+            exit 1
+          fi
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -142,13 +154,27 @@ jobs:
             --tests tools.dscode.dolt.DoltSandboxPruneTest \
             --tests tools.dscode.dolt.DoltSandboxHardenTest
 
-      - name: Targeted core agent surface
+      - name: Targeted core agent surface and Cucumber boundary
         run: |
           set -euo pipefail
           ./gradlew --no-daemon :test \
+            --tests 'tools.dscode.architecture.*' \
+            --tests tools.dscode.common.agentsurface.PopupRemovalKindTest \
             --tests tools.dscode.common.agentsurface.AgentSurfaceRouterTest \
             --tests tools.dscode.common.agentsurface.NativeHighlightRouteTest \
             --tests tools.dscode.browser.SurfaceAssetsTest
+
+      - name: Agent surface popup live (real Chromium, must not skip)
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon :test --tests tools.dscode.common.agentsurface.live.AgentSurfacePopupLiveTest
+          report=build/test-results/test/TEST-tools.dscode.common.agentsurface.live.AgentSurfacePopupLiveTest.xml
+          if grep -q '<skipped' "$report"; then
+            echo "AgentSurfacePopupLiveTest skipped on ${RUNNER_OS}:"
+            grep -A2 '<skipped' "$report" || true
+            exit 1
+          fi
 
       - name: macOS desktop live snapshot
         if: always()
@@ -275,6 +301,18 @@ jobs:
 
       - name: Java engine adapter live tests
         run: ./gradlew --no-daemon :test --tests tools.dscode.common.composite.live.*
+
+      - name: Agent surface popup live (real Chromium, must not skip)
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon :test --tests tools.dscode.common.agentsurface.live.AgentSurfacePopupLiveTest
+          report=build/test-results/test/TEST-tools.dscode.common.agentsurface.live.AgentSurfacePopupLiveTest.xml
+          if grep -q '<skipped' "$report"; then
+            echo "AgentSurfacePopupLiveTest skipped on ${RUNNER_OS}:"
+            grep -A2 '<skipped' "$report" || true
+            exit 1
+          fi
 
       - name: Consumer @dom-composite on native and cucumber
         env:

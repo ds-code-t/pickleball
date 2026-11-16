@@ -155,6 +155,21 @@ class WorkbenchMcpServerTest {
     }
 
     @Test
+    void surfacesSchemaDescribesEveryForwardedVisualArgument() {
+        Map<String, Object> properties = McpRegistry.surfaceProperties();
+        for (String key : List.of("op", "text", "handle", "id", "html", "x", "y", "width", "height", "geometry",
+                "where", "number", "zoom", "dim", "direction", "from", "to", "color", "style", "preset", "target", "pane")) {
+            assertTrue(properties.containsKey(key), key + " missing from the surfaces schema " + properties.keySet());
+            Map<?, ?> property = (Map<?, ?>) properties.get(key);
+            String description = String.valueOf(property.get("description"));
+            assertFalse(description.contains("\n"), key + " " + description);
+            assertTrue(description.length() <= 300, key + " " + description.length());
+        }
+        assertEquals(List.of("number", "string"), ((Map<?, ?>) properties.get("zoom")).get("type"));
+        assertTrue(String.valueOf(((Map<?, ?>) properties.get("html")).get("description")).contains("page file"));
+    }
+
+    @Test
     void snapshotCommandPlaceholderWhenDispatchIsAbsent() {
         String dispatch = SnapshotCommand.dispatchClassName;
         String producers = SnapshotCommand.producersClassName;

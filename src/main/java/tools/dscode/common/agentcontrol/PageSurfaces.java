@@ -400,7 +400,8 @@ final class PageSurfaces {
             destination = selected.driver();
             destinationTab = selected.tab();
         }
-        String id = allocateId(idStore(page, ledger, destination, destinationTab));
+        Path idFile = idStore(page, ledger, destination, destinationTab);
+        String id = allocateId(idFile);
         int left = point == null ? 0 : point[0];
         int top = point == null ? 0 : point[1];
         String css = overlay ? overlayCss(kind, point, box) : (visual ? VisualKinds.css(kind, point[0], point[1], box, extras) : "");
@@ -444,7 +445,11 @@ final class PageSurfaces {
         }
         String summary = html.length() > 80 ? html.substring(0, 80) : html;
         String digest = sha(html);
-        rememberPlacement(page, ledger, id, digest, summary);
+        rememberPlacement(page, ledger, id, digest, summary, kind);
+        if (idFile != null && !idFile.equals(page == null ? null : placeFile(page))
+                && !idFile.equals(ledger == null ? null : ledger.resolve("placements.json"))) {
+            writePlacement(idFile, id, digest, summary, kind);
+        }
         String sizeNote = box != null && box.sized() ? " width=" + box.width() + " height=" + box.height() + " boundsSource=" + box.source() : "";
         String entity = switch (kind) {
             case "html" -> "html";
@@ -511,6 +516,7 @@ final class PageSurfaces {
         String sentence = visual ? SurfaceAssets.sentence(kind) : HTML_SENTENCE;
         if (id == null || id.isBlank()) throw new IllegalArgumentException("missing id");
         Placement placement = placement(page, ledger, id);
+        VisualKinds.requireRemovalKind(id, placedKind(page, ledger, id), kind);
         if (page != null && Files.isRegularFile(page)) {
             String undo = undo(page, id);
             String html = read(page);
@@ -2163,7 +2169,7 @@ final class PageSurfaces {
         return page.resolveSibling(page.getFileName() + ".undo.json");
     }
 
-    private record Placement(String sha, String summary) {
+    private record Placement(String sha, String summary, String kind) {
     }
 
     private static final Map<String, Placement> PLACED = new LinkedHashMap<>();
@@ -2172,10 +2178,10 @@ final class PageSurfaces {
         PLACED.clear();
     }
 
-    private static void rememberPlacement(Path page, Path ledger, String id, String sha, String summary) throws IOException {
-        PLACED.put(id, new Placement(sha, summary));
-        writePlacement(page == null ? null : placeFile(page), id, sha, summary);
-        writePlacement(ledger == null ? null : ledger.resolve("placements.json"), id, sha, summary);
+    private static void rememberPlacement(Path page, Path ledger, String id, String sha, String summary, String kind) throws IOException {
+        PLACED.put(id, new Placement(sha, summary, kind == null ? "" : kind));
+        writePlacement(page == null ? null : placeFile(page), id, sha, summary, kind);
+        writePlacement(ledger == null ? null : ledger.resolve("placements.json"), id, sha, summary, kind);
     }
 
     private static Placement placement(Path page, Path ledger, String id) throws IOException {
@@ -2184,6 +2190,26 @@ final class PageSurfaces {
         Placement fromPage = readPlacement(page == null ? null : placeFile(page), id);
         if (fromPage != null) return fromPage;
         return readPlacement(ledger == null ? null : ledger.resolve("placements.json"), id);
+    }
+
+    /**
+     * Kind recorded for this id in the id store of the page that owns it: the page file's
+     * place record, or the focused live page's id store. Blank when no kind was recorded.
+     */
+    private static String placedKind(Path page, Path ledger, String id) {
+        try {
+            Path store;
+            if (page != null) {
+                store = placeFile(page);
+            } else {
+                Selected selected = selectDestination(null);
+                store = idStore(null, ledger, selected.driver(), selected.tab());
+            }
+            Placement placed = readPlacement(store, id);
+            return placed == null ? "" : placed.kind;
+        } catch (IOException | RuntimeException unreadable) {
+            return "";
+        }
     }
 
     private static Path placeFile(Path page) {
@@ -2426,7 +2452,7 @@ final class PageSurfaces {
     }
 
     static void recordSurface(Path file, String id, String sha, String summary) throws IOException {
-        writePlacement(file, id, sha, summary);
+        writePlacement(file, id, sha, summary, null);
     }
 
     static String sentence(String kind) {
@@ -2449,13 +2475,14 @@ final class PageSurfaces {
         return FRAME_RESTORE;
     }
 
-    private static void writePlacement(Path file, String id, String sha, String summary) throws IOException {
+    private static void writePlacement(Path file, String id, String sha, String summary, String kind) throws IOException {
         if (file == null) return;
         withSurfaceLock(file, () -> {
             ObjectNode root = readObject(file);
             ObjectNode row = root.putObject(id);
             row.put("sha256", sha);
             row.put("summary", summary);
+            if (kind != null && !kind.isBlank()) row.put("kind", kind);
             if (file.getParent() != null) Files.createDirectories(file.getParent());
             AgentStore.JSON.writeValue(file.toFile(), root);
         });
@@ -2465,7 +2492,7 @@ final class PageSurfaces {
         if (file == null || !Files.isRegularFile(file)) return null;
         JsonNode row = AgentStore.JSON.readTree(file.toFile()).path(id);
         if (!row.isObject()) return null;
-        return new Placement(row.path("sha256").asText(""), row.path("summary").asText(""));
+        return new Placement(row.path("sha256").asText(""), row.path("summary").asText(""), row.path("kind").asText(""));
     }
 
     private static ObjectNode readObject(Path file) throws IOException {

@@ -35,6 +35,27 @@ public final class VisualKinds {
         return kind(op) != null;
     }
 
+    /** Verb that removes a placement of this kind. */
+    public static String removalVerb(String kind) {
+        return switch (kind == null ? "" : kind) {
+            case "step" -> "unstep-badge";
+            case "overlay" -> "overlay-remove";
+            case "highlight" -> "unhighlight";
+            case "html", "style" -> "html-remove";
+            default -> "un" + kind;
+        };
+    }
+
+    /**
+     * Refuses an {@code un*} verb whose kind does not match the placement the id names.
+     * A blank placed kind (an older ledger row, or a placement with no recorded kind) is allowed.
+     */
+    public static void requireRemovalKind(String id, String placedKind, String wanted) {
+        if (!is(wanted) || placedKind == null || placedKind.isBlank() || placedKind.equals(wanted)) return;
+        throw new IllegalArgumentException("id " + id + " is a " + placedKind + ", not a " + wanted
+                + "; use " + removalVerb(placedKind) + " --id=" + id);
+    }
+
     public static boolean removal(String op) {
         return op != null && op.startsWith("un") && kind(op) != null;
     }
