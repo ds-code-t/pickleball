@@ -26,8 +26,8 @@ final class DoltTestProcesses {
      * Closes this JVM's pools for the project, then stops its server and supervisor and waits for both.
      * Any other {@code dolt} process this JVM started (directly or through a supervisor) is ended too and
      * awaited. The snapshot is taken before the stop, because an orphaned server is no longer reachable
-     * as a descendant once its supervisor is gone. On Windows, when the store journal is still locked
-     * afterwards, this fails with the live Dolt processes so the cause is in the test report.
+     * as a descendant once its supervisor is gone. On Windows it then waits up to 15 seconds for the
+     * store journal handle to be released; if it is still held, this fails with the live Dolt processes.
      */
     static void release(Path project) throws IOException {
         if (project == null) return;
@@ -44,23 +44,38 @@ final class DoltTestProcesses {
         Path journal = DoltServer.dataDir(project).resolve("pickleball/.dolt/noms/journal.idx");
         if (!Files.isRegularFile(journal)) return;
         Path moved = journal.resolveSibling("journal.idx.release-check");
-        try {
-            Files.move(journal, moved);
-            Files.move(moved, journal);
-        } catch (IOException locked) {
-            StringBuilder live = new StringBuilder();
-            ProcessHandle.allProcesses()
-                    .filter(handle -> command(handle).contains("dolt"))
-                    .forEach(handle -> live.append("\n  pid=").append(handle.pid())
-                            .append(" parent=").append(handle.parent().map(ProcessHandle::pid).orElse(-1L))
-                            .append(" alive=").append(handle.isAlive())
-                            .append(" start=").append(handle.info().startInstant().map(Object::toString).orElse("?"))
-                            .append(" command=").append(handle.info().command().orElse("?")));
-            StringBuilder swept = new StringBuilder();
-            for (ProcessHandle handle : spawned) swept.append(' ').append(handle.pid());
-            throw new AssertionError("Dolt journal still locked after stop: " + journal + " (" + locked + ")"
-                    + "\nswept dolt descendants:" + swept + "\nlive dolt processes:" + live);
+        // Windows can keep a killed process's mapped journal referenced for a moment after the
+        // process object is signaled. Wait (bounded) for that handle to go before teardown.
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(15);
+        IOException locked = null;
+        while (true) {
+            try {
+                Files.move(journal, moved);
+                Files.move(moved, journal);
+                return;
+            } catch (IOException busy) {
+                locked = busy;
+            }
+            if (System.nanoTime() > deadline) break;
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                break;
+            }
         }
+        StringBuilder live = new StringBuilder();
+        ProcessHandle.allProcesses()
+                .filter(handle -> command(handle).contains("dolt"))
+                .forEach(handle -> live.append("\n  pid=").append(handle.pid())
+                        .append(" parent=").append(handle.parent().map(ProcessHandle::pid).orElse(-1L))
+                        .append(" alive=").append(handle.isAlive())
+                        .append(" start=").append(handle.info().startInstant().map(Object::toString).orElse("?"))
+                        .append(" command=").append(handle.info().command().orElse("?")));
+        StringBuilder swept = new StringBuilder();
+        for (ProcessHandle handle : spawned) swept.append(' ').append(handle.pid());
+        throw new AssertionError("Dolt journal still locked after stop: " + journal + " (" + locked + ")"
+                + "\nswept dolt descendants:" + swept + "\nlive dolt processes:" + live);
     }
 
     private static String command(ProcessHandle handle) {
