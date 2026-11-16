@@ -94,6 +94,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-locked-decisions-prior-audit.md`
 - `docs/maintainer/3.0.0-locked-decisions-sweep.md`
 - `docs/maintainer/3.0.0-locked-groups-plan.md`
+- `docs/maintainer/3.0.0-overlay-polish-audit.md`
 - `docs/maintainer/3.0.0-query-visual-design.md`
 - `docs/maintainer/3.0.0-snapshot-coverage-audit.md`
 - `docs/maintainer/3.0.0-workbench-edit-design.md`
@@ -135,6 +136,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/roadmaps/3.0.0-locked-R3-snapshot-premap.md`
 - `docs/roadmaps/3.0.0-locked-R4-dalton-rust-docs.md`
 - `docs/roadmaps/3.0.0-locked-R5-final-regression.md`
+- `docs/roadmaps/3.0.0-overlay-polish-roadmap.md`
 - `docs/roadmaps/3.0.0-query-visual-roadmap.md`
 - `docs/roadmaps/3.0.0-regression-fixback-e5bffaef.md`
 - `docs/roadmaps/3.0.0-visual-components-roadmap.md`

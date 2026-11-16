@@ -466,6 +466,8 @@ Visual in-page components stay on this spine. The contract is `docs/roadmaps/3.0
 
 Label, border, arrow, step badge, magnifier, and spotlight are first-class `SurfaceAssets` kinds and CLI verbs (`label`/`unlabel`, `border`/`unborder`, `arrow`/`unarrow`, `step-badge`/`unstep-badge`, `magnifier`/`unmagnifier`, `spotlight`/`unspotlight`). They use the same spine, the same resolved box, and the same cleanup. A step badge is a page badge, not a Gherkin edit. Native draws the rectangle and stores the caption; the HTML callout, arrow shaft, magnified clone, and page dim are in-page. Logging entities: `label`, `border`, `arrow`, `step`, `magnifier`, `spotlight`. The close-out pointer is `docs/agent/README.md` and `docs/roadmaps/workbench-cli-inventory.json`.
 
+An approved polish of these surfaces, not yet implemented, fixes the popup and Workbench chat (Enter/Send, echo, a stream that stays open), adds one shadow-DOM page runtime that tracks targets through scroll containers, resize, zoom and DOM changes without blocking them, an in-page draggable and resizable panel, guided numbered steps, reload re-injection, and a compact `ui`/`ui-poll`/`ui-catalog` agent toolbox: audit `docs/maintainer/3.0.0-overlay-polish-audit.md`, roadmap `docs/roadmaps/3.0.0-overlay-polish-roadmap.md`.
+
 Visual-component verify (coordinator): step badge and magnifier text is escaped; a live magnifier copy is inert and has no ids, names, inline handlers, or scripts; `un*` logs under its own entity; a native `un*` with no id hides `native-<kind>`; scenario end hides every native rectangle. Tests: `AgentExpansionTest`, `NativeHighlightRouteTest`, `NativeHighlightBoxTest`, `LiveChromeCdpTest`.
 
 ## Workbench
