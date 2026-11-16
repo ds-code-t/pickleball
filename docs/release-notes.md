@@ -53,6 +53,8 @@ The bullets below describe the old Dalton CLI. They are not current 3.0.0 behavi
 
 **Round 2:** Adds a real DB edit path (`dalton feature put` with Gherkin validation, re-projection, and `db_edited` flags), CLI query surface for GUI, discovery include/exclude/size/binary config, loud failure when sqlite-jdbc is missing for consumers, Workbench GUI browse/edit (CLI-only), a warm `dalton run` fast path, and `secret-fields=` for extra secret names. The database is not encrypted. File watcher is out of scope.
 
+### Native engine
+
 The native execution engine is shipped. Scenarios and steps come from files, the Dalton database, in-memory text, or steps written at runtime. Cucumber is the compatibility adapter and produces the same results. Gherkin syntax and step annotations do not change. The phase record below is history; the default engine is native.
 
 - Phase 1 adds a Pickleball-owned model (`EngineFeature`, `EngineScenario`, `EngineStep`, `Table`, `DocText`, `Status`) and converters to Cucumber messages, pickles, data tables, and doc strings. Nothing in a Cucumber run changes.

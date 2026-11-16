@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.dolt.store.Binding;
+import tools.dscode.dolt.store.DoltDialect;
 import tools.dscode.dolt.store.DoltStore;
 
 import java.io.ByteArrayOutputStream;
@@ -17,6 +18,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** A sandbox run records its name on main and does not write run-state on the branch. */
@@ -68,21 +70,47 @@ class DoltSandboxRunStateTest {
         assertEquals(0, ran.code, ran.out + ran.err);
         assertTrue(ran.out.contains("scenario PASSED Ada"), ran.out);
         DoltScope.clear();
+        String step;
         try (DoltStore store = DoltStore.open(project, Binding.main())) {
-            String count = store.session().scalar("SELECT COUNT(*) FROM runs WHERE sandbox = 'alpha'");
-            assertNotEquals("0", count, "main has no sandbox=alpha run");
-            String blank = store.session().scalar(
-                    "SELECT COUNT(*) FROM runs WHERE sandbox = 'alpha' AND (sandbox IS NULL OR sandbox = '')");
-            assertEquals("0", blank);
+            step = store.session().scalar(
+                    "SELECT step_exec_id FROM step_executions WHERE sandbox = 'alpha' ORDER BY step_ord LIMIT 1");
+        }
+        assertNotNull(step, "main has no sandbox=alpha step");
+        Path report = project.resolve("reports/alpha");
+        Files.createDirectories(report);
+        Files.writeString(report.resolve("run-index.json"), """
+                {"runId":"alpha-shot","startedAt":"2026-11-15T00:00:00Z","outcome":"passed","scenarios":[{"name":"Ada"}],"counts":{"passed":1,"failed":0}}
+                """);
+        Files.write(report.resolve("shot.png"), new byte[] {(byte) 0x89, 0x50, 0x4e, 0x47});
+        Capture noted = cli(
+                "dolt", "history", "record", "--from=reports/alpha",
+                "--message=noted", "--link=Customer#ada",
+                "--sandbox=alpha", "--project=" + project);
+        assertEquals(0, noted.code, noted.out + noted.err);
+        Capture usage = cli(
+                "dolt", "entity", "use", "Customer", "ada",
+                "--step=" + step, "--operation=read",
+                "--sandbox=alpha", "--project=" + project);
+        assertEquals(0, usage.code, usage.out + usage.err);
+        DoltScope.clear();
+        try (DoltStore store = DoltStore.open(project, Binding.main())) {
+            for (String table : DoltDialect.RUN_STATE_TABLES) {
+                String count = "sandboxes".equals(table)
+                        ? store.session().scalar("SELECT COUNT(*) FROM sandboxes WHERE name = 'alpha'")
+                        : store.session().scalar("SELECT COUNT(*) FROM " + table + " WHERE sandbox = 'alpha'");
+                assertNotEquals("0", count, table);
+            }
         }
         try (DoltStore store = DoltStore.open(project, Binding.sandbox("alpha"))) {
-            try {
-                String count = store.session().scalar("SELECT COUNT(*) FROM runs");
-                assertEquals("0", count, "sbx-alpha has run rows");
-            } catch (SQLException missing) {
-                String message = missing.getMessage() == null ? "" : missing.getMessage().toLowerCase();
-                assertTrue(message.contains("runs") || message.contains("not found") || message.contains("exist"),
-                        missing.getMessage());
+            for (String table : DoltDialect.RUN_STATE_TABLES) {
+                try {
+                    String count = store.session().scalar("SELECT COUNT(*) FROM " + table);
+                    assertEquals("0", count, table);
+                } catch (SQLException missing) {
+                    String message = missing.getMessage() == null ? "" : missing.getMessage().toLowerCase();
+                    assertTrue(message.contains(table) || message.contains("not found") || message.contains("exist"),
+                            missing.getMessage());
+                }
             }
         }
     }

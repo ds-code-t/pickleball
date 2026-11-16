@@ -184,6 +184,7 @@ public final class DoltSandbox {
                     + name + " --to=<dir>");
         }
         int written = 0;
+        List<PlannedFile> planned = new ArrayList<>();
         try (DoltStore store = DoltStore.open(project, binding)) {
             try (var statement = store.session().connection().createStatement();
                  var rows = statement.executeQuery("SELECT path, raw_content FROM files ORDER BY path")) {
@@ -191,29 +192,68 @@ public final class DoltSandbox {
                     String path = rows.getString(1);
                     byte[] body = rows.getBytes(2);
                     if (path == null) continue;
-                    String relative;
-                    try {
-                        relative = DoltPaths.normalizeRelative(path);
-                    } catch (IllegalArgumentException refused) {
-                        throw new IllegalArgumentException(
-                                "extract refused " + path + "\nfix: store a relative path without ..");
-                    }
-                    Path file = dest.resolve(relative).normalize();
-                    if (!file.startsWith(dest)) {
-                        throw new IllegalArgumentException(
-                                "extract refused " + path + "\nfix: store a relative path without ..");
-                    }
-                    Path parent = file.getParent();
-                    if (parent != null) Files.createDirectories(parent);
-                    Files.write(file, body == null ? new byte[0] : body);
-                    written++;
+                    planned.add(planFile(dest, path, body));
                 }
             }
+        }
+        List<WrittenFile> writtenFiles = new ArrayList<>();
+        try {
+            for (PlannedFile item : planned) {
+                writtenFiles.add(writeFile(item));
+                written++;
+            }
+        } catch (java.io.IOException failure) {
+            restore(writtenFiles);
+            throw failure;
         }
         touch(project, name);
         DoltLog.log(project, "sandbox", name, name, "extract files=" + written);
         out.println("extracted " + name + " files=" + written + " to=" + dest);
         return 0;
+    }
+
+    /** A refused path is decided before any destination file is created or replaced. */
+    private static PlannedFile planFile(Path dest, String path, byte[] body) {
+        String relative;
+        try {
+            relative = DoltPaths.normalizeRelative(path);
+        } catch (IllegalArgumentException refused) {
+            throw new IllegalArgumentException(
+                    "extract refused " + path + "\nfix: store a relative path without ..");
+        }
+        Path file = dest.resolve(relative).normalize();
+        if (!file.startsWith(dest)) {
+            throw new IllegalArgumentException(
+                    "extract refused " + path + "\nfix: store a relative path without ..");
+        }
+        return new PlannedFile(file, body == null ? new byte[0] : body);
+    }
+
+    private static WrittenFile writeFile(PlannedFile item) throws java.io.IOException {
+        boolean existed = Files.isRegularFile(item.file());
+        byte[] previous = existed ? Files.readAllBytes(item.file()) : null;
+        Path parent = item.file().getParent();
+        if (parent != null) Files.createDirectories(parent);
+        Files.write(item.file(), item.body());
+        return new WrittenFile(item.file(), previous, existed);
+    }
+
+    private static void restore(List<WrittenFile> written) {
+        for (int index = written.size() - 1; index >= 0; index--) {
+            WrittenFile item = written.get(index);
+            try {
+                if (item.existed()) Files.write(item.file(), item.previous());
+                else Files.deleteIfExists(item.file());
+            } catch (java.io.IOException ignored) {
+                // The original write failure is the one the caller needs.
+            }
+        }
+    }
+
+    private record PlannedFile(Path file, byte[] body) {
+    }
+
+    private record WrittenFile(Path file, byte[] previous, boolean existed) {
     }
 
     private static int drop(Path project, List<String> tokens, PrintStream out) throws Exception {
