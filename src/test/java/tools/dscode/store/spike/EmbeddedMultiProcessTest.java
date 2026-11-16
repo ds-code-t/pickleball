@@ -43,8 +43,13 @@ class EmbeddedMultiProcessTest {
         List<Process> children = new ArrayList<>();
         for (int worker = 0; worker < PROCESSES; worker++) {
             Path times = dir.resolve("times-" + worker + ".txt");
+            // Each JVM extracts its own library. A shared temp dir lets one
+            // process delete a sibling's sqlitejdbc.dll on Windows.
+            Path nativeDir = dir.resolve("sqlite-native-" + worker);
+            Files.createDirectories(nativeDir);
             List<String> command = List.of(
                     Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                    "-Dorg.sqlite.tmpdir=" + nativeDir.toAbsolutePath(),
                     "-cp",
                     System.getProperty("java.class.path"),
                     EmbeddedMultiProcessTest.class.getName(),
