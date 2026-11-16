@@ -19,7 +19,7 @@ public final class NativeHighlightBox {
     public record Drawn(boolean drawn, String reason, String id) {
     }
 
-    public static Drawn show(String id, int x, int y, int width, int height) {
+    public static synchronized Drawn show(String id, int x, int y, int width, int height) {
         String key = id == null || id.isBlank() ? "native" : id;
         if (GraphicsEnvironment.isHeadless()) return new Drawn(false, "headless", key);
         double scale = scale();
@@ -33,7 +33,7 @@ public final class NativeHighlightBox {
         return new Drawn(true, "", key);
     }
 
-    public static Drawn hide(String id) {
+    public static synchronized Drawn hide(String id) {
         String key = id == null || id.isBlank() ? "native" : id;
         Strip[] windows = SHOWN.remove(key);
         if (windows != null) {
@@ -41,6 +41,23 @@ public final class NativeHighlightBox {
         }
         if (GraphicsEnvironment.isHeadless()) return new Drawn(false, "headless", key);
         return new Drawn(windows != null, windows == null ? "absent" : "", key);
+    }
+
+    /** Hides every drawn box (scenario end). Returns the ids that were hidden. */
+    public static synchronized java.util.List<String> hideAll() {
+        java.util.List<String> ids = new java.util.ArrayList<>(SHOWN.keySet());
+        for (String id : ids) {
+            Strip[] windows = SHOWN.remove(id);
+            if (windows != null) {
+                for (Strip strip : windows) strip.hide();
+            }
+        }
+        return ids;
+    }
+
+    /** Ids of boxes currently drawn. Always empty when headless. */
+    public static synchronized java.util.Set<String> shown() {
+        return java.util.Set.copyOf(SHOWN.keySet());
     }
 
     public static Rectangle[] strips(int x, int y, int width, int height, double scale) {

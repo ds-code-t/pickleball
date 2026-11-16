@@ -72,6 +72,18 @@ public final class WorkbenchSessionActions {
             "overlay",
             "overlay-poll",
             "overlay-remove",
+            "label",
+            "unlabel",
+            "border",
+            "unborder",
+            "arrow",
+            "unarrow",
+            "step-badge",
+            "unstep-badge",
+            "magnifier",
+            "unmagnifier",
+            "spotlight",
+            "unspotlight",
             "html-write",
             "html-replace",
             "html-insert",
@@ -393,6 +405,9 @@ public final class WorkbenchSessionActions {
                  "chat-send", "chat-history", "chat-poll",
                  "highlight", "unhighlight",
                  "overlay", "overlay-poll", "overlay-remove",
+                 "label", "unlabel", "border", "unborder",
+                 "arrow", "unarrow", "step-badge", "unstep-badge",
+                 "magnifier", "unmagnifier", "spotlight", "unspotlight",
                  "html-write", "html-replace", "html-insert", "html-remove", "html-cleanup",
                  "popup-open", "popup-status", "popup-close",
                  "capture-scenario" -> forwardAgent(op, args);
@@ -452,11 +467,25 @@ public final class WorkbenchSessionActions {
     private Map<String, Object> forwardAgent(String op, Map<String, String> args) {
         Map<String, Object> result = services.agentCommand(op, args);
         if (result == null) return failed(op, "Agent command was not forwarded.");
-        if ("overlay".equals(op)) WorkbenchNativeOverlay.place(result);
-        if ("overlay-remove".equals(op) || "html-remove".equals(op) || "html-cleanup".equals(op)) {
+        if ("overlay".equals(op) || visualShow(op)) WorkbenchNativeOverlay.place(result);
+        if ("overlay-remove".equals(op) || "html-remove".equals(op) || "html-cleanup".equals(op) || visualRemoval(op)) {
             WorkbenchNativeOverlay.remove(result.get("id"));
         }
         return result;
+    }
+
+    private static boolean visualShow(String op) {
+        return switch (op == null ? "" : op) {
+            case "label", "border", "arrow", "step-badge", "magnifier", "spotlight" -> true;
+            default -> false;
+        };
+    }
+
+    private static boolean visualRemoval(String op) {
+        return switch (op == null ? "" : op) {
+            case "unlabel", "unborder", "unarrow", "unstep-badge", "unmagnifier", "unspotlight" -> true;
+            default -> false;
+        };
     }
 
     private Map<String, Object> pageQuery(String op, Map<String, String> args) {

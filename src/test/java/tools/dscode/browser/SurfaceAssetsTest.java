@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SurfaceAssetsTest {
     @Test
     void loadsEachAssetAtItsHash() throws Exception {
-        assertEquals("50f2de7998d2f726fe0b1f5c52205989fbec5e5354742e651803201c63b78b07", sha(SurfaceAssets.script("live-helper")));
+        assertEquals("8e454a18df9580abd7810a59562e4786f75b0e39f3bcbd708845b018295f6cfa", sha(SurfaceAssets.script("live-helper")));
         assertEquals("5d6b24e641d70c4c252804b3d0bfae48f6170037434b6d43b2b8e2650c0821a7", sha(SurfaceAssets.script("bridge-mark")));
         assertEquals("ab8f90e2e4d04214af67e933ab190a0bfab7c89e57ba6cdfe5e10bd3eec6e29a", sha(SurfaceAssets.script("frame-mark")));
         assertEquals("afc0169aba6b94679a425b8b8868193583b8813e8bcf52fadf089389d7999c88", sha(SurfaceAssets.script("frame-restore")));
@@ -41,6 +41,12 @@ class SurfaceAssetsTest {
         assertEquals(events, SurfaceAssets.js("html"));
         assertEquals(events, SurfaceAssets.js("instructions"));
         assertEquals(events, SurfaceAssets.js("diagram"));
+        assertEquals(events, SurfaceAssets.js("label"));
+        assertEquals(events, SurfaceAssets.js("border"));
+        assertEquals(events, SurfaceAssets.js("arrow"));
+        assertEquals(events, SurfaceAssets.js("step"));
+        assertEquals(events, SurfaceAssets.js("magnifier"));
+        assertEquals(events, SurfaceAssets.js("spotlight"));
         assertEquals(SurfaceAssets.html("html"), SurfaceAssets.html("instructions"));
         assertEquals(SurfaceAssets.html("html"), SurfaceAssets.html("HTML"));
         assertEquals(SurfaceAssets.css("html"), SurfaceAssets.css("diagram"));
@@ -64,6 +70,17 @@ class SurfaceAssetsTest {
         assertEquals("agent-injected overlay; a person did not author this UI", SurfaceAssets.sentence("overlay"));
         assertEquals("agent style; a person did not author this highlight", SurfaceAssets.sentence("highlight"));
         assertEquals(SurfaceAssets.sentence("highlight"), SurfaceAssets.sentence("style"));
+        assertEquals("agent-injected label; a person did not author this label", SurfaceAssets.sentence("label"));
+        assertEquals("agent-injected border; a person did not author this border", SurfaceAssets.sentence("border"));
+        assertEquals("agent-injected arrow; a person did not author this arrow", SurfaceAssets.sentence("arrow"));
+        assertEquals("agent-injected step badge; a person did not author this badge", SurfaceAssets.sentence("step"));
+        assertEquals(SurfaceAssets.sentence("step"), SurfaceAssets.sentence("step-badge"));
+        assertEquals("agent-injected magnifier; a person did not author this magnifier", SurfaceAssets.sentence("magnifier"));
+        assertEquals("agent-injected spotlight; a person did not author this dim", SurfaceAssets.sentence("spotlight"));
+        assertTrue(SurfaceAssets.css("label").contains("background: #111"));
+        assertTrue(SurfaceAssets.css("border").contains("#0a7a32"));
+        assertTrue(SurfaceAssets.css("spotlight").contains("9999px"));
+        assertFalse(SurfaceAssets.css("border").contains("left:"));
         assertSame(helper, SurfaceAssets.script("LIVE-HELPER"));
 
         assertEquals(helper, page("liveHelperSource"));

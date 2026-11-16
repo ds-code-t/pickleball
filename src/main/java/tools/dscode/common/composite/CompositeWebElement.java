@@ -116,6 +116,26 @@ public final class CompositeWebElement implements WebElement {
                     owner,
                     tab
             );
+            tools.dscode.common.agentcontrol.AgentControl.rememberBounds(
+                    this.handle,
+                    this.geometry.visualViewportRelative().x(),
+                    this.geometry.visualViewportRelative().y(),
+                    this.geometry.visualViewportRelative().width(),
+                    this.geometry.visualViewportRelative().height(),
+                    owner,
+                    tab
+            );
+        } else if (bounds != null && bounds.isObject() && bounds.has("width") && bounds.has("height")
+                && this.handle != null && !this.handle.isBlank()) {
+            tools.dscode.common.agentcontrol.AgentControl.rememberBounds(
+                    this.handle,
+                    bounds.path("x").asInt(0),
+                    bounds.path("y").asInt(0),
+                    bounds.path("width").asInt(0),
+                    bounds.path("height").asInt(0),
+                    owner,
+                    tab
+            );
         }
         if (this.geometry != null && this.geometry.scrollport() != null) {
             boolean content = this.geometry.scrollport().content() != null;

@@ -2,6 +2,7 @@ package tools.dscode.common.agentsurface;
 
 import tools.dscode.common.agentcontrol.AgentControl;
 import tools.dscode.common.agentcontrol.PopupSurfaceBridge;
+import tools.dscode.common.agentcontrol.VisualKinds;
 import tools.dscode.control.protocol.AgentSurfaceEnd;
 
 import java.io.IOException;
@@ -22,7 +23,10 @@ public final class AgentSurfaceRouter {
     private static final Set<String> SURFACE = Set.of(
             "chat-send", "overlay", "overlay-poll", "overlay-remove",
             "html-write", "html-replace", "html-insert", "html-remove", "html-cleanup",
-            "highlight", "unhighlight", "popup-open", "popup-status", "popup-close"
+            "highlight", "unhighlight", "popup-open", "popup-status", "popup-close",
+            "label", "unlabel", "border", "unborder",
+            "arrow", "unarrow", "step-badge", "unstep-badge",
+            "magnifier", "unmagnifier", "spotlight", "unspotlight"
     );
     private static final CopyOnWriteArrayList<HostRef> OPENED = new CopyOnWriteArrayList<>();
 
@@ -62,6 +66,13 @@ public final class AgentSurfaceRouter {
     }
 
     static void onScenarioEnd() {
+        // Native rectangles (highlight, overlay, and every visual kind) do not outlive the scenario.
+        try {
+            java.util.List<String> hidden = tools.dscode.control.protocol.surface.NativeHighlightBox.hideAll();
+            if (!hidden.isEmpty()) tools.dscode.common.composite.CompositeLog.info("highlight", "native scenario-end hidden=" + hidden);
+        } catch (RuntimeException ignored) {
+            // Scenario cleanup must not block the popup ledger cleanup below.
+        }
         for (HostRef host : OPENED) {
             try {
                 PopupLedger.append(host.project, host.runId, "cleanup", "", "", "", "", "", "");
@@ -122,14 +133,14 @@ public final class AgentSurfaceRouter {
             body.put("target", "popup");
             return new AgentControl.Result(0, body);
         }
-        String kind = op.startsWith("overlay") ? "overlay" : "html";
+        String kind = op.startsWith("overlay") ? "overlay" : VisualKinds.kind(op) != null ? VisualKinds.kind(op) : "html";
         String pane = pane(args, kind);
         String ledgerOp = switch (op) {
             case "html-replace" -> "replace";
             case "html-insert" -> "insert";
             case "html-remove", "overlay-remove" -> "remove";
             case "html-cleanup" -> "cleanup";
-            default -> "append";
+            default -> VisualKinds.removal(op) ? "remove" : "append";
         };
         String raw = args.get("text");
         String labeled = "";
@@ -162,9 +173,24 @@ public final class AgentSurfaceRouter {
     }
 
     private static AgentControl.Result nativeHighlight(Path project, String runId, String op, Map<String, String> args) throws Exception {
-        if ("unhighlight".equals(op)) {
-            String id = text(args.get("id"), args.get("handle"), "native");
+        if ("unhighlight".equals(op) || "overlay-remove".equals(op) || VisualKinds.removal(op)) {
+            String fallback = VisualKinds.removal(op) ? NativeVisual.defaultId(VisualKinds.kind(op)) : "native";
+            String id = text(args.get("id"), args.get("handle"), fallback);
             Map<String, Object> body = NativeHighlight.hide(id);
+            body.put("ok", true);
+            body.put("target", "native");
+            body.put("op", op);
+            return new AgentControl.Result(0, body);
+        }
+        if ("overlay".equals(op)) {
+            Map<String, Object> body = NativeOverlay.show(project, runId, args);
+            body.put("ok", true);
+            body.put("target", "native");
+            body.put("op", op);
+            return new AgentControl.Result(0, body);
+        }
+        if (VisualKinds.command(op)) {
+            Map<String, Object> body = NativeVisual.show(project, runId, VisualKinds.kind(op), args);
             body.put("ok", true);
             body.put("target", "native");
             body.put("op", op);
@@ -203,7 +229,9 @@ public final class AgentSurfaceRouter {
         else target = target.trim().toLowerCase();
         if ("page".equals(target)) return new Decision("page", "explicit-page", false);
         if ("popup".equals(target)) return new Decision("popup", "explicit-popup", true);
-        if ("native".equals(target)) return new Decision(highlightOp(op) ? "native" : "page", "explicit-native", false);
+        if ("native".equals(target)) {
+            return new Decision(nativeOp(op) ? "native" : "page", "explicit-native", false);
+        }
         boolean desktop = desktop(project, runId, args);
         boolean filePage = present(args.get("html")) || present(args.get("page"));
         if (filePage && "auto".equals(target)) return new Decision("page", "explicit-html-file", false);
@@ -214,7 +242,10 @@ public final class AgentSurfaceRouter {
             if (present(args.get("handle"))) return new Decision("page", "handle-anchored", false);
             return new Decision("popup", "always-unanchored", true);
         }
-        if ("chat-send".equals(op) || "overlay-poll".equals(op) || op.startsWith("html-") || op.startsWith("overlay")) {
+        if (desktop && nativeShow(op) && (bounds(args) || present(args.get("query")))) {
+            return new Decision("native", "desktop-bounds", false);
+        }
+        if ("chat-send".equals(op) || "overlay-poll".equals(op) || op.startsWith("html-") || op.startsWith("overlay") || VisualKinds.command(op)) {
             return new Decision("popup", "desktop", openFor(mode, args));
         }
         if (highlightOp(op) && (bounds(args) || present(args.get("query")))) {
@@ -252,6 +283,14 @@ public final class AgentSurfaceRouter {
 
     private static boolean highlightOp(String op) {
         return "highlight".equals(op) || "unhighlight".equals(op);
+    }
+
+    private static boolean nativeOp(String op) {
+        return highlightOp(op) || "overlay".equals(op) || "overlay-remove".equals(op) || VisualKinds.command(op);
+    }
+
+    private static boolean nativeShow(String op) {
+        return "overlay".equals(op) || (VisualKinds.command(op) && !VisualKinds.removal(op));
     }
 
     private static String pane(Map<String, String> args, String kind) {

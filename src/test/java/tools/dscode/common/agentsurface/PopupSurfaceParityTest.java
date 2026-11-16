@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PopupSurfaceParityTest {
@@ -52,6 +53,16 @@ class PopupSurfaceParityTest {
             String ledger = Files.readString(PopupLedger.file(project, "parity"));
             assertTrue(ledger.contains(escape(expected)), sample + " -> " + expected);
         }
+    }
+
+    @Test
+    void labelLedgerUsesTheLabelSentence() throws Exception {
+        System.setProperty("pkb_agent_popup", "auto");
+        AgentSurfaceRouter.route(project, "parity", "label", Map.of("text", "Name", "x", "1", "y", "2"), "a");
+        String ledger = Files.readString(PopupLedger.file(project, "parity"));
+        assertTrue(ledger.contains("agent-injected label"), ledger);
+        assertTrue(ledger.contains("Name"), ledger);
+        assertFalse(ledger.contains("<script"), ledger);
     }
 
     private static String escape(String html) {

@@ -5,6 +5,8 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
+import tools.dscode.browser.SurfaceAssets;
+
 /**
  * Public door into package-private surface helpers. G1 keeps those signatures;
  * this class is the only G4 file in the package.
@@ -25,6 +27,7 @@ public final class PopupSurfaceBridge {
     public static String sentence(String kind) {
         if ("overlay".equals(kind)) return PageSurfaces.OVERLAY_SENTENCE;
         if ("style".equals(kind)) return PageSurfaces.STYLE_SENTENCE;
+        if (kind != null && VisualKinds.is(kind)) return SurfaceAssets.sentence(kind);
         return PageSurfaces.HTML_SENTENCE;
     }
 

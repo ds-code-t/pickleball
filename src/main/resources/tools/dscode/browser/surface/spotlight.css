@@ -1,0 +1,7 @@
+.pkb-surface-spotlight {
+  position: fixed;
+  z-index: 2147483644;
+  background: transparent;
+  pointer-events: none;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
+}

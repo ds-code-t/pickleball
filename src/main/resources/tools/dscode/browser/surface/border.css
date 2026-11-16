@@ -1,0 +1,8 @@
+.pkb-surface-border {
+  position: fixed;
+  z-index: 2147483645;
+  background: transparent;
+  border: 3px solid #0a7a32;
+  box-sizing: border-box;
+  pointer-events: none;
+}

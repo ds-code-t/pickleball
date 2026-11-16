@@ -112,8 +112,34 @@ if (spec.kind === 'overlay') {
   host.style.background = '#fffef2';
   host.style.border = '2px solid #222';
   host.style.padding = '8px';
-  host.style.maxWidth = '280px';
+  if (spec.width != null && spec.width !== '' && spec.height != null && spec.height !== '') {
+    host.style.width = spec.width + 'px';
+    host.style.height = spec.height + 'px';
+  } else {
+    host.style.maxWidth = '280px';
+  }
 } else if (spec.css) host.setAttribute('style', spec.css);
+if (spec.kind === 'magnifier' && anchor) {
+  var zoom = spec.zoom == null || spec.zoom === '' ? 2 : spec.zoom;
+  var clone = anchor.cloneNode(true);
+  // The copy is a picture of the page node: no ids, names, inline handlers, scripts, or focus.
+  clone.querySelectorAll('script').forEach(function(s) { s.remove(); });
+  [clone].concat(Array.from(clone.querySelectorAll('*'))).forEach(function(el) {
+    if (!el.attributes) return;
+    Array.from(el.attributes).forEach(function(a) {
+      var n = a.name.toLowerCase();
+      if (n === 'id' || n === 'name' || n === 'for' || n === 'form' || n === 'tabindex' || n.indexOf('on') === 0) el.removeAttribute(a.name);
+    });
+  });
+  clone.setAttribute('inert', '');
+  clone.setAttribute('aria-hidden', 'true');
+  clone.style.transform = 'scale(' + zoom + ')';
+  clone.style.transformOrigin = '0 0';
+  clone.style.pointerEvents = 'none';
+  host.textContent = '';
+  host.appendChild(clone);
+  markTree(clone, spec.kind, spec.sentence);
+}
 if (op === 'replace' && anchor) {
   window.__pkbUndo = window.__pkbUndo || {};
   window.__pkbUndo[spec.id] = anchor.outerHTML;

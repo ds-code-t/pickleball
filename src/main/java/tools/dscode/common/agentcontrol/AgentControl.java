@@ -35,9 +35,27 @@ public final class AgentControl {
         PageSurfaces.rememberGeometry(handle, x, y);
     }
 
-    /** Query-time owner. Not inferred again from global focus when the box is stored. */
+    /** Query-time owner. Not inferred again from global focus when the point is stored. */
     public static void rememberGeometry(String handle, double x, double y, WebDriver owner, String tab) {
         PageSurfaces.rememberGeometry(handle, x, y, owner, tab);
+    }
+
+    /** Resolved element box. Separate from the point stored by {@link #rememberGeometry}. */
+    public static void rememberBounds(String handle, double x, double y, double width, double height) {
+        PageSurfaces.rememberBounds(handle, x, y, width, height);
+    }
+
+    public static void rememberBounds(String handle, double x, double y, double width, double height, WebDriver owner, String tab) {
+        PageSurfaces.rememberBounds(handle, x, y, width, height, owner, tab);
+    }
+
+    /** Point previously stored by {@link #rememberGeometry}, or null. */
+    public static int[] rememberedPoint(String handle) {
+        return PageSurfaces.rememberedPoint(handle);
+    }
+
+    public static void clearRememberedGeometry() {
+        PageSurfaces.clearGeometry();
     }
 
     /** Binds browser and tab onto the handle itself, including hits with no visual geometry. */
@@ -78,6 +96,9 @@ public final class AgentControl {
                 case "overlay" -> overlay(project, runId, values);
                 case "overlay-poll" -> overlayPoll(project, runId);
                 case "overlay-remove" -> remove(project, runId, values, "overlay");
+                case "label", "border", "arrow", "step-badge", "magnifier", "spotlight" -> visual(project, runId, op, values);
+                case "unlabel", "unborder", "unarrow", "unstep-badge", "unmagnifier", "unspotlight" ->
+                        remove(project, runId, values, VisualKinds.kind(op));
                 case "html-write" -> html(project, runId, values, "append");
                 case "html-replace" -> html(project, runId, values, "replace");
                 case "html-insert" -> html(project, runId, values, "insert");
@@ -285,9 +306,70 @@ public final class AgentControl {
                 integerOrNull(args.get("x")),
                 integerOrNull(args.get("y")),
                 args.get("geometry"),
-                AgentStore.root(project, runId)
+                AgentStore.root(project, runId),
+                integerOrNull(args.get("width")),
+                integerOrNull(args.get("height"))
         );
         placed.put("ok", true);
+        return new Result(0, placed);
+    }
+
+    private static Result visual(Path project, String runId, String op, Map<String, String> args) throws Exception {
+        String kind = VisualKinds.kind(op);
+        String text = args.get("text");
+        String handle = args.get("handle");
+        Integer x = integerOrNull(args.get("x"));
+        Integer y = integerOrNull(args.get("y"));
+        Integer width = integerOrNull(args.get("width"));
+        Integer height = integerOrNull(args.get("height"));
+        String geometry = args.get("geometry");
+        if ("label".equals(kind) && !present(text)) return fail(2, "label requires --text");
+        if ("step".equals(kind)) text = VisualKinds.stepMarkup(args.get("number"), text);
+        if ("magnifier".equals(kind)) {
+            text = VisualKinds.magnifierMarkup(text, args.get("zoom"));
+            args = new LinkedHashMap<>(args);
+            args.put("zoom", VisualKinds.zoom(args.get("zoom")));
+        }
+        if ("spotlight".equals(kind)) {
+            String dim = VisualKinds.dim(args.get("dim"));
+            args = new LinkedHashMap<>(args);
+            args.put("dim", dim);
+            if (!present(text)) text = "";
+        }
+        if ("arrow".equals(kind)) {
+            VisualKinds.Arrow arrow = VisualKinds.arrow(args);
+            text = arrow.svg();
+            x = arrow.x();
+            y = arrow.y();
+            width = arrow.width();
+            height = arrow.height();
+            handle = null;
+            geometry = arrow.resolved()
+                    ? "{\"visual_viewport_relative\":{\"x\":" + arrow.x() + ",\"y\":" + arrow.y()
+                    + ",\"width\":" + arrow.width() + ",\"height\":" + arrow.height() + "}}"
+                    : null;
+        }
+        if ("border".equals(kind) && text == null) text = "";
+        Map<String, Object> placed = PageSurfaces.place(
+                explicitPage(project, args),
+                "append",
+                handle,
+                args.get("where"),
+                text,
+                kind,
+                x,
+                y,
+                geometry,
+                AgentStore.root(project, runId),
+                width,
+                height,
+                args
+        );
+        placed.put("ok", true);
+        if ("arrow".equals(kind)) placed.put("direction", args.get("direction") == null ? "" : args.get("direction"));
+        if ("step".equals(kind)) placed.put("number", Integer.parseInt(args.get("number").trim()));
+        if ("magnifier".equals(kind)) placed.put("zoom", args.get("zoom"));
+        if ("spotlight".equals(kind)) placed.put("dim", args.get("dim"));
         return new Result(0, placed);
     }
 
@@ -319,7 +401,7 @@ public final class AgentControl {
 
     private static Result remove(Path project, String runId, Map<String, String> args, String kind) throws Exception {
         String id = present(args.get("id")) ? args.get("id") : args.get("handle");
-        Map<String, Object> removed = PageSurfaces.remove(explicitPage(project, args), id, AgentStore.root(project, runId));
+        Map<String, Object> removed = PageSurfaces.remove(explicitPage(project, args), id, AgentStore.root(project, runId), kind);
         removed.put("ok", true);
         removed.put("kind", kind);
         return new Result(0, removed);

@@ -53,6 +53,9 @@ final class PageSurfaces {
     private static final java.util.concurrent.ConcurrentHashMap<String, HandleOwner> HANDLE_OWNERS = new java.util.concurrent.ConcurrentHashMap<>();
     private static final ThreadLocal<Focus> THREAD_FOCUS = new ThreadLocal<>();
     private static final Map<String, int[]> GEOMETRY = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final Map<String, int[]> BOUNDS = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final ThreadLocal<int[]> PLACED_SIZE = new ThreadLocal<>();
+    private static final ThreadLocal<Map<String, String>> VISUAL_EXTRA = new ThreadLocal<>();
     private static final java.util.Set<String> CDP_HIGHLIGHTS = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     private record Focus(WebDriver driver, String tab) {
@@ -135,19 +138,44 @@ final class PageSurfaces {
         if (ref.frameId != null) bindFrame(webDriver, useTab, ref.frameId);
     }
 
-    /** Geometry view for a resolved handle. Visual-viewport x/y, not a page rect. */
+    /** Geometry view for a resolved handle. Visual-viewport point only, not width or height. */
     public static void rememberGeometry(String handle, double x, double y) {
         rememberGeometry(handle, x, y, driver, focusedTabOf(driver));
     }
 
     /**
-     * Stores the box and, when the query captured an owner, binds that frame
-     * to that driver. Does not guess from whichever browser is focused now.
+     * Stores only the visual-viewport point and, when the query captured an owner,
+     * binds that frame to that driver. Width and height are not kept here.
      */
     public static void rememberGeometry(String handle, double x, double y, WebDriver owner, String tab) {
         if (handle == null || handle.isBlank()) return;
         GEOMETRY.put(handle, new int[]{(int) Math.round(x), (int) Math.round(y)});
         if (owner != null) bindHandle(owner, tab, handle);
+    }
+
+    /** Resolved element box. Not written by {@link #rememberGeometry}. */
+    public static void rememberBounds(String handle, double x, double y, double width, double height) {
+        rememberBounds(handle, x, y, width, height, null, null);
+    }
+
+    public static void rememberBounds(String handle, double x, double y, double width, double height, WebDriver owner, String tab) {
+        if (handle == null || handle.isBlank()) return;
+        BOUNDS.put(handle, new int[]{
+                (int) Math.round(x), (int) Math.round(y), (int) Math.round(width), (int) Math.round(height)
+        });
+        if (owner != null) bindHandle(owner, tab, handle);
+    }
+
+    /** The point from {@link #rememberGeometry}, or null. Length is always 2. */
+    public static int[] rememberedPoint(String handle) {
+        if (handle == null || handle.isBlank()) return null;
+        int[] point = GEOMETRY.get(handle);
+        return point == null ? null : point.clone();
+    }
+
+    static void clearGeometry() {
+        GEOMETRY.clear();
+        BOUNDS.clear();
     }
 
     /** Driver whose debugger address owns this thread's engine session. No global-driver fallback. */
@@ -218,7 +246,7 @@ final class PageSurfaces {
         THREAD_FOCUS.remove();
         FRAME_LIST.clear();
         HANDLE_OWNERS.clear();
-        GEOMETRY.clear();
+        clearGeometry();
         CDP_HIGHLIGHTS.clear();
         HIGHLIGHT_SITES.clear();
         SURFACE_SITES.clear();
@@ -260,6 +288,11 @@ final class PageSurfaces {
     }
 
     static Map<String, Object> highlight(Path page, String handle, String preset, String style, Integer x, Integer y, Integer width, Integer height) throws IOException {
+        // x, y, width, and height are accepted and ignored. The node is painted by
+        // Overlay.highlightNode or by reversible DOM style, not by a caller box.
+        if (x != null || y != null || width != null || height != null) {
+            CompositeLog.trace("highlight", "ignored geometry");
+        }
         String css = presetCss(preset, style);
         boolean liveOnly = page == null;
         if (liveOnly && managed().isEmpty()) {
@@ -330,26 +363,35 @@ final class PageSurfaces {
     }
 
     static Map<String, Object> place(Path page, String op, String handle, String where, String rawHtml, String kind, Integer x, Integer y, String geometryJson, Path ledger) throws IOException {
-        String sentence = "overlay".equals(kind) ? OVERLAY_SENTENCE : HTML_SENTENCE;
+        return place(page, op, handle, where, rawHtml, kind, x, y, geometryJson, ledger, null, null);
+    }
+
+    static Map<String, Object> place(Path page, String op, String handle, String where, String rawHtml, String kind, Integer x, Integer y, String geometryJson, Path ledger, Integer width, Integer height) throws IOException {
+        return place(page, op, handle, where, rawHtml, kind, x, y, geometryJson, ledger, width, height, Map.of());
+    }
+
+    static Map<String, Object> place(Path page, String op, String handle, String where, String rawHtml, String kind, Integer x, Integer y, String geometryJson, Path ledger, Integer width, Integer height, Map<String, String> extras) throws IOException {
+        boolean overlay = "overlay".equals(kind);
+        boolean visual = overlay || VisualKinds.is(kind);
+        String sentence = visual || "html".equals(kind) ? SurfaceAssets.sentence(kind) : HTML_SENTENCE;
         boolean stripped = rawHtml != null && !rawHtml.equals(neutralize(rawHtml));
         String html = labelElements(neutralize(rawHtml), kind, sentence);
-        int[] point = visualPoint(geometryJson, x, y);
-        if ("overlay".equals(kind) && (geometryJson == null || geometryJson.isBlank())) {
-            int[] looked = lookupGeometry(handle);
-            if (looked != null) point = looked;
-        }
+        SurfaceBox.View box = visual ? chooseBox(handle, geometryJson, x, y, width, height) : null;
+        int[] point = visual
+                ? (box == null ? null : new int[]{box.x(), box.y()})
+                : visualPoint(geometryJson, x, y);
         boolean liveOnly = page == null;
         if (liveOnly && managed().isEmpty()) {
             throw new IllegalStateException("no live browser; " + kind + " was not applied");
         }
-        if ("overlay".equals(kind) && liveOnly && handle != null && !handle.isBlank() && !resolved(handle)) {
+        if (visual && liveOnly && handle != null && !handle.isBlank() && !resolved(handle)) {
             throw new IllegalArgumentException("unknown handle: " + handle);
         }
-        if ("overlay".equals(kind) && point == null && page != null) {
-            throw new IllegalArgumentException("overlay needs a visual-viewport box or x and y");
+        if (visual && point == null && page != null) {
+            throw new IllegalArgumentException(kind + " needs a visual-viewport box or x and y");
         }
-        if ("overlay".equals(kind) && point == null && page == null) {
-            throw new IllegalArgumentException("overlay needs a target or a visual-viewport box");
+        if (visual && point == null && page == null) {
+            throw new IllegalArgumentException(kind + " needs a target or a visual-viewport box");
         }
         WebDriver destination = driver;
         String destinationTab = focusedTab == null ? "" : focusedTab;
@@ -361,9 +403,7 @@ final class PageSurfaces {
         String id = allocateId(idStore(page, ledger, destination, destinationTab));
         int left = point == null ? 0 : point[0];
         int top = point == null ? 0 : point[1];
-        String css = "overlay".equals(kind) && point != null
-                ? "position:fixed;z-index:2147483646;left:" + left + "px;top:" + top + "px;background:#fffef2;border:2px solid #222;padding:8px;max-width:280px;"
-                : "";
+        String css = overlay ? overlayCss(kind, point, box) : (visual ? VisualKinds.css(kind, point[0], point[1], box, extras) : "");
         String block = "<!--pkb-start:" + id + "--><div data-pkb-id=\"" + id + "\" data-pkb-agent=\"agent_injected\" data-pkb-kind=\""
                 + kind + "\" data-pkb-sentence=\"" + sentence + "\""
                 + (css.isBlank() ? "" : " style=\"" + css + "\"")
@@ -387,16 +427,33 @@ final class PageSurfaces {
             write(page, updated);
             if (undo != null) rememberUndo(page, id, undo);
         }
-        LiveResult live = runLive(op, handle, where, css, html, kind, sentence, id, measure, point == null ? null : left, point == null ? null : top);
+        int[] painted = visual && !overlay ? VisualKinds.paintedSize(kind, box) : null;
+        if (overlay && box != null && box.sized()) PLACED_SIZE.set(new int[]{box.width(), box.height()});
+        else if (painted != null) PLACED_SIZE.set(painted);
+        else PLACED_SIZE.remove();
+        VISUAL_EXTRA.set(extras == null ? Map.of() : extras);
+        LiveResult live;
+        try {
+            live = runLive(op, handle, where, css, html, kind, sentence, id, measure, point == null ? null : left, point == null ? null : top);
+        } finally {
+            PLACED_SIZE.remove();
+            VISUAL_EXTRA.remove();
+        }
         if (liveOnly && !live.ok()) {
             throw new IllegalStateException(live.error() == null ? "live " + op + " did not resolve " + handle : live.error());
         }
         String summary = html.length() > 80 ? html.substring(0, 80) : html;
         String digest = sha(html);
         rememberPlacement(page, ledger, id, digest, summary);
-        CompositeLog.info("html".equals(kind) ? "html" : "overlay", op + " id=" + id + " sha=" + digest + " summary=" + summary);
+        String sizeNote = box != null && box.sized() ? " width=" + box.width() + " height=" + box.height() + " boundsSource=" + box.source() : "";
+        String entity = switch (kind) {
+            case "html" -> "html";
+            case "overlay" -> "overlay";
+            default -> VisualKinds.is(kind) ? kind : "html";
+        };
+        CompositeLog.info(entity, op + " id=" + id + " sha=" + digest + " summary=" + summary + sizeNote);
         Map<String, Object> body = labeled(
-                "overlay".equals(kind) ? List.of("agent_injected", "overlay") : List.of("agent_injected"),
+                visual ? List.of("agent_injected", kind) : List.of("agent_injected"),
                 sentence
         );
         body.put("id", id);
@@ -408,8 +465,29 @@ final class PageSurfaces {
         body.put("scriptStripped", stripped);
         body.put("x", live.x() != null ? live.x() : (point == null ? null : left));
         body.put("y", live.y() != null ? live.y() : (point == null ? null : top));
-        if ("overlay".equals(kind)) {
-            body.put("placement", geometryJson != null || lookupGeometry(handle) != null ? "visual-viewport-relative" : "caller");
+        if (overlay) {
+            boolean viewed = (geometryJson != null && !geometryJson.isBlank())
+                    || lookupGeometry(handle) != null
+                    || (box != null && "resolved".equals(box.source()));
+            body.put("placement", viewed ? "visual-viewport-relative" : "caller");
+            body.put("boundsSource", box == null ? "none" : box.source());
+            if (box != null && box.sized()) {
+                body.put("width", box.width());
+                body.put("height", box.height());
+            } else {
+                if (width != null) body.put("width", width);
+                if (height != null) body.put("height", height);
+            }
+        } else if (visual) {
+            boolean viewed = (geometryJson != null && !geometryJson.isBlank())
+                    || lookupGeometry(handle) != null
+                    || (box != null && "resolved".equals(box.source()));
+            body.put("placement", viewed ? "visual-viewport-relative" : "caller");
+            body.put("boundsSource", box == null ? "none" : box.source());
+            if (painted != null) {
+                body.put("width", painted[0]);
+                body.put("height", painted[1]);
+            }
         }
         return body;
     }
@@ -419,6 +497,18 @@ final class PageSurfaces {
     }
 
     static Map<String, Object> remove(Path page, String id, Path ledger) throws IOException {
+        return remove(page, id, ledger, "html");
+    }
+
+    /**
+     * Removes one placement. A visual kind (label, border, arrow, step, magnifier,
+     * spotlight) logs under its own {@code pkb_composite_log} entity and labels the
+     * result with its own sentence. Other kinds keep the {@code html} entity.
+     */
+    static Map<String, Object> remove(Path page, String id, Path ledger, String kind) throws IOException {
+        boolean visual = VisualKinds.is(kind);
+        String entity = visual ? kind : "html";
+        String sentence = visual ? SurfaceAssets.sentence(kind) : HTML_SENTENCE;
         if (id == null || id.isBlank()) throw new IllegalArgumentException("missing id");
         Placement placement = placement(page, ledger, id);
         if (page != null && Files.isRegularFile(page)) {
@@ -439,8 +529,8 @@ final class PageSurfaces {
         }
         String digest = placement == null ? "" : placement.sha;
         String summary = placement == null ? "" : placement.summary;
-        CompositeLog.info("html", "remove id=" + id + " sha=" + digest + " summary=" + summary);
-        Map<String, Object> body = labeled(List.of("agent_injected"), HTML_SENTENCE);
+        CompositeLog.info(entity, "remove id=" + id + " sha=" + digest + " summary=" + summary);
+        Map<String, Object> body = labeled(visual ? List.of("agent_injected", kind) : List.of("agent_injected"), sentence);
         body.put("id", id);
         body.put("removed", true);
         body.put("sha256", digest);
@@ -570,6 +660,45 @@ final class PageSurfaces {
         if (fromGeometry != null) return fromGeometry;
         if (x != null && y != null) return new int[]{x, y};
         return null;
+    }
+
+    static SurfaceBox.View chooseBox(String handle, String geometryJson, Integer x, Integer y, Integer width, Integer height) {
+        int[] json = geometryBox(geometryJson);
+        if (json != null && json[2] >= 0 && json[3] >= 0) {
+            return new SurfaceBox.View(json[0], json[1], json[2], json[3], "resolved");
+        }
+        int[] bounds = lookupBounds(handle);
+        if (bounds != null) {
+            return new SurfaceBox.View(bounds[0], bounds[1], bounds[2], bounds[3], "resolved");
+        }
+        int[] point = json == null ? null : new int[]{json[0], json[1]};
+        if (point == null && x != null && y != null) point = new int[]{x, y};
+        if (geometryJson == null || geometryJson.isBlank()) {
+            int[] looked = lookupGeometry(handle);
+            if (looked != null) point = looked;
+        }
+        if (point == null) return null;
+        boolean stored = width != null && height != null;
+        String source = stored ? "stored"
+                : (json != null || lookupGeometry(handle) != null ? "visual-viewport-relative" : "caller");
+        return new SurfaceBox.View(point[0], point[1], stored ? width : -1, stored ? height : -1, source);
+    }
+
+    private static String overlayCss(String kind, int[] point, SurfaceBox.View box) {
+        if (!"overlay".equals(kind) || point == null) return "";
+        String css = "position:fixed;z-index:2147483646;left:" + point[0] + "px;top:" + point[1]
+                + "px;background:#fffef2;border:2px solid #222;padding:8px;";
+        if (box != null && box.sized()) {
+            return css + "width:" + box.width() + "px;height:" + box.height() + "px;";
+        }
+        return css + "max-width:280px;";
+    }
+
+    private static int[] lookupBounds(String handle) {
+        if (handle == null || handle.isBlank()) return null;
+        int[] box = BOUNDS.get(handle);
+        if (box == null || box.length < 4 || box[2] < 0 || box[3] < 0) return null;
+        return box;
     }
 
     private static void drainLiveInputs(Path project, String runId) throws IOException {
@@ -1166,7 +1295,7 @@ final class PageSurfaces {
 
     private static boolean resolved(String handle) {
         if (handle == null || handle.isBlank()) return false;
-        if (GEOMETRY.containsKey(handle)) return true;
+        if (GEOMETRY.containsKey(handle) || BOUNDS.containsKey(handle)) return true;
         HandleRef ref = parseHandle(handle);
         return ref.frameId != null && frameOwner(HandleRef.parse(handle)) != null;
     }
@@ -1562,6 +1691,18 @@ final class PageSurfaces {
         }
         if (x != null) spec.put("x", x);
         if (y != null) spec.put("y", y);
+        int[] placedSize = PLACED_SIZE.get();
+        if (placedSize != null) {
+            spec.put("width", placedSize[0]);
+            spec.put("height", placedSize[1]);
+        }
+        Map<String, String> extra = VISUAL_EXTRA.get();
+        if (extra != null) {
+            if (extra.get("zoom") != null) spec.put("zoom", extra.get("zoom"));
+            if (extra.get("dim") != null) spec.put("dim", extra.get("dim"));
+            if (extra.get("number") != null) spec.put("number", extra.get("number"));
+            if (extra.get("direction") != null) spec.put("direction", extra.get("direction"));
+        }
         try {
             Object value = evaluateHelper(current, executor, spec);
             if (!(value instanceof Map<?, ?> map) || !Boolean.TRUE.equals(map.get("ok"))) {
@@ -1954,6 +2095,23 @@ final class PageSurfaces {
             }
             if (!box.isObject() || !box.has("x") || !box.has("y")) return null;
             return new int[]{box.path("x").asInt(), box.path("y").asInt()};
+        } catch (IOException failure) {
+            throw new IllegalArgumentException("geometry is not the visual-viewport object");
+        }
+    }
+
+    private static int[] geometryBox(String geometryJson) {
+        if (geometryJson == null || geometryJson.isBlank()) return null;
+        try {
+            JsonNode node = AgentStore.JSON.readTree(geometryJson);
+            JsonNode box = node.path("visual_viewport_relative");
+            if (!box.isObject() && node.path("geometry").isObject()) {
+                box = node.path("geometry").path("visual_viewport_relative");
+            }
+            if (!box.isObject() || !box.has("x") || !box.has("y")) return null;
+            int width = box.has("width") ? box.path("width").asInt() : -1;
+            int height = box.has("height") ? box.path("height").asInt() : -1;
+            return new int[]{box.path("x").asInt(), box.path("y").asInt(), width, height};
         } catch (IOException failure) {
             throw new IllegalArgumentException("geometry is not the visual-viewport object");
         }

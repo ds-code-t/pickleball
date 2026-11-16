@@ -179,7 +179,10 @@ public final class McpRegistry {
                 var commands = body.putArray("commands");
                 for (String name : List.of(
                         "html-write", "html-replace", "html-insert", "html-remove", "html-cleanup",
-                        "overlay", "overlay-poll", "overlay-remove", "highlight", "unhighlight")) {
+                        "overlay", "overlay-poll", "overlay-remove", "highlight", "unhighlight",
+                        "label", "unlabel", "border", "unborder",
+                        "arrow", "unarrow", "step-badge", "unstep-badge",
+                        "magnifier", "unmagnifier", "spotlight", "unspotlight")) {
                     commands.add(name);
                 }
                 return tool(Jsons.compact(body), false);

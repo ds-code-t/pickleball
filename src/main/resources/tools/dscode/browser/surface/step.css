@@ -1,0 +1,8 @@
+.pkb-surface-step {
+  position: fixed;
+  z-index: 2147483646;
+  background: #ff2d55;
+  color: #fff;
+  font: 700 12px sans-serif;
+  border-radius: 9px;
+}

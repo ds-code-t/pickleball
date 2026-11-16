@@ -11,10 +11,10 @@ session: isolate session-start execute-step status events stop kill open-scenari
 coordination: short-log note inbox finish presence post history gc-runs gc-versions use-version export-guidance
 descriptors: session list | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>
 page: inspect-page find-element
-agent: observe launch windows tabs chat-send chat-history chat-poll highlight unhighlight overlay overlay-poll overlay-remove html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close capture-scenario
+agent: observe launch windows tabs chat-send chat-history chat-poll highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close capture-scenario
 retrieval: query runs | query get | query query | query search | query props | query errors | query tail
 controller: sync worker-check live-check ui mcp session
-all: capture-scenario chat-history chat-poll chat-send close-window confirm diagnostic-run discover discover-hint events example execute-step export-guidance find-element finish from-here gc-runs gc-versions help highlight hint history html-cleanup html-insert html-remove html-replace html-write inbox insert-step inspect-page isolate kill launch live-check mcp note observe open-scenario open-window overlay overlay-poll overlay-remove pause plan play popup-close popup-open popup-status post presence query refresh resolve-runvars save session session-hold session-info session-list session-release session-start session-sync short-log show-run status stop sync tabs ui unhighlight update-step use-version validate windows worker-check worker-restart worker-start worker-stop workspace-edit workspace-seed workspace-show
+all: arrow border capture-scenario chat-history chat-poll chat-send close-window confirm diagnostic-run discover discover-hint events example execute-step export-guidance find-element finish from-here gc-runs gc-versions help highlight hint history html-cleanup html-insert html-remove html-replace html-write inbox insert-step inspect-page isolate kill label launch live-check magnifier mcp note observe open-scenario open-window overlay overlay-poll overlay-remove pause plan play popup-close popup-open popup-status post presence query refresh resolve-runvars save session session-hold session-info session-list session-release session-start session-sync short-log show-run spotlight status step-badge stop sync tabs ui unarrow unborder unhighlight unlabel unmagnifier unspotlight unstep-badge update-step use-version validate windows worker-check worker-restart worker-start worker-stop workspace-edit workspace-seed workspace-show
 
 # help capture-scenario
 Usage: capture-scenario [--url=<substring>] [--since=<epoch-ms>] [--until=<epoch-ms>] [--events=<file>] [--out=<feature>] [--run-id=<id>]
@@ -83,10 +83,10 @@ session: isolate session-start execute-step status events stop kill open-scenari
 coordination: short-log note inbox finish presence post history gc-runs gc-versions use-version export-guidance
 descriptors: session list | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>
 page: inspect-page find-element
-agent: observe launch windows tabs chat-send chat-history chat-poll highlight unhighlight overlay overlay-poll overlay-remove html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close capture-scenario
+agent: observe launch windows tabs chat-send chat-history chat-poll highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close capture-scenario
 retrieval: query runs | query get | query query | query search | query props | query errors | query tail
 controller: sync worker-check live-check ui mcp session
-all: capture-scenario chat-history chat-poll chat-send close-window confirm diagnostic-run discover discover-hint events example execute-step export-guidance find-element finish from-here gc-runs gc-versions help highlight hint history html-cleanup html-insert html-remove html-replace html-write inbox insert-step inspect-page isolate kill launch live-check mcp note observe open-scenario open-window overlay overlay-poll overlay-remove pause plan play popup-close popup-open popup-status post presence query refresh resolve-runvars save session session-hold session-info session-list session-release session-start session-sync short-log show-run status stop sync tabs ui unhighlight update-step use-version validate windows worker-check worker-restart worker-start worker-stop workspace-edit workspace-seed workspace-show
+all: arrow border capture-scenario chat-history chat-poll chat-send close-window confirm diagnostic-run discover discover-hint events example execute-step export-guidance find-element finish from-here gc-runs gc-versions help highlight hint history html-cleanup html-insert html-remove html-replace html-write inbox insert-step inspect-page isolate kill label launch live-check magnifier mcp note observe open-scenario open-window overlay overlay-poll overlay-remove pause plan play popup-close popup-open popup-status post presence query refresh resolve-runvars save session session-hold session-info session-list session-release session-start session-sync short-log show-run spotlight status step-badge stop sync tabs ui unarrow unborder unhighlight unlabel unmagnifier unspotlight unstep-badge update-step use-version validate windows worker-check worker-restart worker-start worker-stop workspace-edit workspace-seed workspace-show
 
 # help highlight
 Usage: highlight --handle=<id> (--preset=yellow|outline-red) [--style=<css>] [--html=<page>] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>]
@@ -127,6 +127,9 @@ Usage: isolate [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--runvar=key
 # help kill
 Usage: kill
 
+# help label
+Usage: label --text=<label> [--handle=<id>] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--geometry=<json>] [--target=auto|page|popup|native] [--html=<page>]
+
 # help launch
 Usage: launch --template=<name> [--arg=<chrome-arg>] [--start] [--run-id=<id>]
 Templates: chrome-headed-verbose, chrome-headed-quiet, chrome-headless-verbose, chrome-headless-quiet, edge-headed-quiet, edge-headless-quiet, chrome-headed-logs, chromium-headed-quiet. Args are added to the existing pkb_browser / Selenium Manager launch. Chromium uses that Chrome launcher. --start calls DriverConstruction.
@@ -144,7 +147,7 @@ Usage: open-scenario --feature=<path-or-name> --name=<scenario> [--example=<rows
 Usage: open-window --run-id=<id>
 
 # help overlay
-Usage: overlay --text=<html> [--x=<px>] [--y=<px>] [--handle=<id>] [--html=<page>]
+Usage: overlay --text=<html> [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--handle=<id>] [--geometry=<json>] [--html=<page>]
 
 # help overlay-poll
 Usage: overlay-poll [--run-id=<id>]

@@ -133,6 +133,28 @@ class WorkbenchMcpServerTest {
     }
 
     @Test
+    void surfacesListsAndForwardsEveryVisualVerbUnchanged() {
+        java.util.concurrent.atomic.AtomicReference<Object[]> seen = new java.util.concurrent.atomic.AtomicReference<>();
+        WorkbenchMcpTools tools = new WorkbenchMcpTools(fakeServices((method, args) -> {
+            if (!"agentCommand".equals(method)) return null;
+            seen.set(args);
+            return Map.of("ok", true, "forwarded", String.valueOf(args[0]));
+        }), JSON);
+        String listed = String.valueOf(tools.call("surfaces", Map.of()));
+        for (String verb : List.of("label", "unlabel", "border", "unborder", "arrow", "unarrow",
+                "step-badge", "unstep-badge", "magnifier", "unmagnifier", "spotlight", "unspotlight")) {
+            assertTrue(listed.contains(verb), verb + " missing from " + listed);
+            Object value = tools.call("surfaces", Map.of("op", verb, "handle", "save", "number", "3", "zoom", "2"));
+            assertEquals(verb, ((Map<?, ?>) value).get("forwarded"), String.valueOf(value));
+            assertEquals(verb, seen.get()[0]);
+            Map<?, ?> forwarded = (Map<?, ?>) seen.get()[1];
+            assertEquals("save", forwarded.get("handle"), String.valueOf(forwarded));
+            assertEquals("3", forwarded.get("number"), String.valueOf(forwarded));
+            assertEquals("2", forwarded.get("zoom"), String.valueOf(forwarded));
+        }
+    }
+
+    @Test
     void snapshotCommandPlaceholderWhenDispatchIsAbsent() {
         String dispatch = SnapshotCommand.dispatchClassName;
         String producers = SnapshotCommand.producersClassName;

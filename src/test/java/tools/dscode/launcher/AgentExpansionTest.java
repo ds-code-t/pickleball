@@ -3,6 +3,7 @@ package tools.dscode.launcher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.common.composite.CompositeRuntime;
+import tools.dscode.common.agentcontrol.AgentControl;
 import tools.dscode.common.agentcontrol.LaunchTemplates;
 import tools.dscode.common.agentcontrol.ObserveEvents;
 import tools.dscode.common.agentcontrol.ScenarioCapture;
@@ -205,6 +206,85 @@ class AgentExpansionTest {
     }
 
     @Test
+    void overlayStoresWidthAndResolvedBoundsWin() throws Exception {
+        Path page = page();
+        Capture stored = agent(
+                "overlay", temp.toString(), "--html=" + page, "--text=sized",
+                "--x=3", "--y=4", "--width=40", "--height=16", "--target=page"
+        );
+        assertEquals(0, stored.code, stored.err);
+        assertTrue(stored.out.contains("\"width\":40"), stored.out);
+        assertTrue(stored.out.contains("\"height\":16"), stored.out);
+        assertTrue(stored.out.contains("\"boundsSource\":\"stored\""), stored.out);
+        assertTrue(stored.out.contains("#fffef2") || Files.readString(page).contains("#fffef2"));
+        String html = Files.readString(page);
+        assertTrue(html.contains("width:40px"), html);
+        assertTrue(html.contains("height:16px"), html);
+        assertTrue(html.contains("background:#fffef2"), html);
+
+        Capture geometry = agent(
+                "overlay", temp.toString(), "--html=" + page, "--text=geom",
+                "--width=9", "--height=9", "--target=page",
+                "--geometry={\"visual_viewport_relative\":{\"x\":5,\"y\":6,\"width\":70,\"height\":18}}"
+        );
+        assertEquals(0, geometry.code, geometry.err);
+        assertTrue(geometry.out.contains("\"width\":70"), geometry.out);
+        assertTrue(geometry.out.contains("\"boundsSource\":\"resolved\""), geometry.out);
+        assertTrue(Files.readString(page).contains("left:5px"), Files.readString(page));
+        assertTrue(Files.readString(page).contains("width:70px"), Files.readString(page));
+
+        AgentControl.rememberBounds("save", 11, 12, 80, 22);
+        try {
+            AgentControl.Result result = AgentControl.execute(temp, "ovb", "overlay", Map.of(
+                    "text", "box",
+                    "handle", "save",
+                    "html", page.toString(),
+                    "target", "page",
+                    "x", "1",
+                    "y", "2",
+                    "width", "9",
+                    "height", "9"
+            ), List.of(), "a");
+            assertEquals(0, result.exit(), String.valueOf(result.body()));
+            assertEquals(80, result.body().get("width"));
+            assertEquals(22, result.body().get("height"));
+            assertEquals("resolved", result.body().get("boundsSource"));
+            assertEquals(11, result.body().get("x"));
+            assertTrue(Files.readString(page).contains("width:80px"));
+        } finally {
+            AgentControl.clearRememberedGeometry();
+        }
+
+        AgentControl.rememberGeometry("only-point", 8.4, 9.6);
+        try {
+            int[] point = AgentControl.rememberedPoint("only-point");
+            assertEquals(2, point.length);
+            assertEquals(8, point[0]);
+            assertEquals(10, point[1]);
+        } finally {
+            AgentControl.clearRememberedGeometry();
+        }
+
+        Capture ignored = agent(
+                "highlight", temp.toString(), "--handle=save", "--preset=yellow",
+                "--html=" + page, "--x=1", "--y=2", "--width=50", "--height=60", "--target=page"
+        );
+        assertEquals(0, ignored.code, ignored.err);
+        assertFalse(Files.readString(page).contains("width:50px"), Files.readString(page));
+
+        AgentControl.Result nativeBox = AgentControl.execute(temp, "nat", "overlay", Map.of(
+                "target", "native", "text", "cap", "x", "8", "y", "9", "width", "30", "height", "12"
+        ), List.of(), "a");
+        assertEquals(0, nativeBox.exit(), String.valueOf(nativeBox.body()));
+        assertEquals("native", nativeBox.body().get("target"));
+        assertEquals(30, nativeBox.body().get("width"));
+        assertEquals("stored", nativeBox.body().get("boundsSource"));
+        if (Boolean.FALSE.equals(nativeBox.body().get("drawn"))) {
+            assertEquals("headless", nativeBox.body().get("reason"));
+        }
+    }
+
+    @Test
     void covers_command_overlay_poll() throws Exception {
         Capture polled = agent("overlay-poll", temp.toString(), "--run-id=ov");
         assertEquals(0, polled.code, polled.err);
@@ -221,6 +301,225 @@ class AgentExpansionTest {
         assertEquals(0, removed.code, removed.err);
         assertTrue(removed.out.contains("\"removed\":true"), removed.out);
         assertFalse(Files.readString(page).contains("click here"));
+    }
+
+    @Test
+    void covers_command_label() throws Exception {
+        Path page = page();
+        Capture placed = agent(
+                "label", temp.toString(), "--html=" + page, "--text=Save name",
+                "--x=4", "--y=6", "--target=page"
+        );
+        assertEquals(0, placed.code, placed.err);
+        assertTrue(placed.out.contains("agent_injected"), placed.out);
+        assertTrue(placed.out.contains("agent-injected label"), placed.out);
+        assertTrue(placed.out.contains("\"kind\":\"label\""), placed.out);
+        String html = Files.readString(page);
+        assertTrue(html.contains("Save name"), html);
+        assertTrue(html.contains("data-pkb-kind=\"label\""), html);
+        assertTrue(html.contains("background:#111"), html);
+        assertTrue(html.contains("left:4px"), html);
+        Capture dirty = agent(
+                "label", temp.toString(), "--html=" + page, "--text=<b>ok</b><script>alert(1)</script>",
+                "--x=1", "--y=2", "--target=page"
+        );
+        assertEquals(0, dirty.code, dirty.err);
+        assertTrue(dirty.out.contains("\"scriptStripped\":true"), dirty.out);
+        assertFalse(Files.readString(page).contains("<script"), Files.readString(page));
+        Capture missing = agent("label", temp.toString(), "--html=" + page, "--x=1", "--y=1");
+        assertEquals(2, missing.code);
+        assertTrue(missing.err.contains("label requires --text"), missing.err);
+    }
+
+    @Test
+    void covers_command_unlabel() throws Exception {
+        Path page = page();
+        Capture placed = agent("label", temp.toString(), "--html=" + page, "--text=Gone", "--x=1", "--y=1");
+        assertEquals(0, placed.code, placed.err);
+        String id = placed.out.replaceAll("(?s).*\"id\":\"([^\"]+)\".*", "$1");
+        Capture removed = agent("unlabel", temp.toString(), "--html=" + page, "--id=" + id);
+        assertEquals(0, removed.code, removed.err);
+        assertTrue(removed.out.contains("\"removed\":true"), removed.out);
+        assertFalse(Files.readString(page).contains("Gone"), Files.readString(page));
+    }
+
+    @Test
+    void covers_command_border() throws Exception {
+        Path page = page();
+        Capture stored = agent(
+                "border", temp.toString(), "--html=" + page, "--x=2", "--y=3",
+                "--width=40", "--height=18", "--color=#123456", "--target=page"
+        );
+        assertEquals(0, stored.code, stored.err);
+        assertTrue(stored.out.contains("\"width\":40"), stored.out);
+        assertTrue(stored.out.contains("\"boundsSource\":\"stored\""), stored.out);
+        assertTrue(stored.out.contains("agent-injected border"), stored.out);
+        String html = Files.readString(page);
+        assertTrue(html.contains("border:3px solid #123456"), html);
+        assertTrue(html.contains("width:40px"), html);
+        assertTrue(html.contains("data-pkb-agent=\"agent_injected\""), html);
+
+        AgentControl.rememberBounds("save", 11, 12, 80, 22);
+        try {
+            AgentControl.Result result = AgentControl.execute(temp, "brd", "border", Map.of(
+                    "handle", "save",
+                    "html", page.toString(),
+                    "target", "page",
+                    "x", "1",
+                    "y", "2",
+                    "width", "9",
+                    "height", "9"
+            ), List.of(), "a");
+            assertEquals(0, result.exit(), String.valueOf(result.body()));
+            assertEquals(80, result.body().get("width"));
+            assertEquals(22, result.body().get("height"));
+            assertEquals("resolved", result.body().get("boundsSource"));
+            assertTrue(Files.readString(page).contains("left:11px"), Files.readString(page));
+            assertTrue(Files.readString(page).contains("width:80px"), Files.readString(page));
+        } finally {
+            AgentControl.clearRememberedGeometry();
+        }
+    }
+
+    @Test
+    void covers_command_unborder() throws Exception {
+        Path page = page();
+        Capture placed = agent("border", temp.toString(), "--html=" + page, "--x=1", "--y=1", "--width=10", "--height=8");
+        String id = placed.out.replaceAll("(?s).*\"id\":\"([^\"]+)\".*", "$1");
+        Capture removed = agent("unborder", temp.toString(), "--html=" + page, "--id=" + id);
+        assertEquals(0, removed.code, removed.err);
+        assertFalse(Files.readString(page).contains("data-pkb-kind=\"border\""), Files.readString(page));
+    }
+
+    @Test
+    void covers_command_arrow() throws Exception {
+        Path page = page();
+        Capture placed = agent(
+                "arrow", temp.toString(), "--html=" + page, "--x=10", "--y=20",
+                "--direction=right", "--target=page"
+        );
+        assertEquals(0, placed.code, placed.err);
+        assertTrue(placed.out.contains("\"kind\":\"arrow\""), placed.out);
+        assertTrue(placed.out.contains("agent-injected arrow"), placed.out);
+        String html = Files.readString(page);
+        assertTrue(html.contains("<svg"), html);
+        assertTrue(html.contains("pkb-arrowhead"), html);
+        assertTrue(html.contains("data-pkb-agent=\"agent_injected\""), html);
+        assertFalse(html.contains("<script"), html);
+
+        AgentControl.rememberBounds("from-h", 10, 10, 20, 20);
+        AgentControl.rememberBounds("to-h", 80, 40, 10, 10);
+        try {
+            AgentControl.Result result = AgentControl.execute(temp, "arw", "arrow", Map.of(
+                    "from", "from-h",
+                    "to", "to-h",
+                    "html", page.toString(),
+                    "target", "page"
+            ), List.of(), "a");
+            assertEquals(0, result.exit(), String.valueOf(result.body()));
+            assertEquals("resolved", result.body().get("boundsSource"));
+            assertTrue(Files.readString(page).contains("<line"), Files.readString(page));
+        } finally {
+            AgentControl.clearRememberedGeometry();
+        }
+    }
+
+    @Test
+    void covers_command_unarrow() throws Exception {
+        Path page = page();
+        Capture placed = agent("arrow", temp.toString(), "--html=" + page, "--x=4", "--y=4", "--direction=down");
+        String id = placed.out.replaceAll("(?s).*\"id\":\"([^\"]+)\".*", "$1");
+        Capture removed = agent("unarrow", temp.toString(), "--html=" + page, "--id=" + id);
+        assertEquals(0, removed.code, removed.err);
+        assertFalse(Files.readString(page).contains("<svg"), Files.readString(page));
+    }
+
+    @Test
+    void covers_command_step_badge() throws Exception {
+        Path page = page();
+        Capture placed = agent(
+                "step-badge", temp.toString(), "--html=" + page, "--number=3",
+                "--text=Save", "--x=8", "--y=9", "--target=page"
+        );
+        assertEquals(0, placed.code, placed.err);
+        assertTrue(placed.out.contains("\"number\":3"), placed.out);
+        assertTrue(placed.out.contains("agent-injected step badge"), placed.out);
+        String html = Files.readString(page);
+        assertTrue(html.contains(">3<"), html);
+        assertTrue(html.contains("Save"), html);
+        assertTrue(html.contains("#ff2d55"), html);
+        assertFalse(html.contains("Scenario"), html);
+        Capture bad = agent("step-badge", temp.toString(), "--html=" + page, "--text=no number", "--x=1", "--y=1");
+        assertEquals(2, bad.code);
+        assertTrue(bad.err.contains("--number"), bad.err);
+    }
+
+    @Test
+    void covers_command_unstep_badge() throws Exception {
+        Path page = page();
+        Capture placed = agent("step-badge", temp.toString(), "--html=" + page, "--number=1", "--x=1", "--y=1");
+        String id = placed.out.replaceAll("(?s).*\"id\":\"([^\"]+)\".*", "$1");
+        Capture removed = agent("unstep-badge", temp.toString(), "--html=" + page, "--id=" + id);
+        assertEquals(0, removed.code, removed.err);
+        assertFalse(Files.readString(page).contains("#ff2d55"), Files.readString(page));
+    }
+
+    @Test
+    void covers_command_magnifier() throws Exception {
+        Path page = page();
+        Capture placed = agent(
+                "magnifier", temp.toString(), "--html=" + page, "--text=detail",
+                "--zoom=2", "--x=5", "--y=6", "--width=90", "--height=90", "--target=page"
+        );
+        assertEquals(0, placed.code, placed.err);
+        assertTrue(placed.out.contains("\"zoom\":\"2.0\"") || placed.out.contains("\"zoom\":\"2\""), placed.out);
+        assertTrue(placed.out.contains("agent-injected magnifier"), placed.out);
+        String html = Files.readString(page);
+        assertTrue(html.contains("detail"), html);
+        assertTrue(html.contains("border-radius:50%"), html);
+        assertTrue(html.contains("scale(2"), html);
+        Capture bad = agent("magnifier", temp.toString(), "--html=" + page, "--zoom=12", "--x=1", "--y=1");
+        assertEquals(2, bad.code);
+        assertTrue(bad.err.contains("--zoom"), bad.err);
+    }
+
+    @Test
+    void covers_command_unmagnifier() throws Exception {
+        Path page = page();
+        Capture placed = agent("magnifier", temp.toString(), "--html=" + page, "--x=1", "--y=1");
+        String id = placed.out.replaceAll("(?s).*\"id\":\"([^\"]+)\".*", "$1");
+        Capture removed = agent("unmagnifier", temp.toString(), "--html=" + page, "--id=" + id);
+        assertEquals(0, removed.code, removed.err);
+        assertFalse(Files.readString(page).contains("border-radius:50%"), Files.readString(page));
+    }
+
+    @Test
+    void covers_command_spotlight() throws Exception {
+        Path page = page();
+        Capture placed = agent(
+                "spotlight", temp.toString(), "--html=" + page, "--dim=0.4",
+                "--x=3", "--y=4", "--width=70", "--height=30", "--target=page"
+        );
+        assertEquals(0, placed.code, placed.err);
+        assertTrue(placed.out.contains("\"dim\":\"0.4\""), placed.out);
+        assertTrue(placed.out.contains("agent-injected spotlight"), placed.out);
+        String html = Files.readString(page);
+        assertTrue(html.contains("box-shadow:0 0 0 9999px rgba(0,0,0,0.4)"), html);
+        assertTrue(html.contains("width:70px"), html);
+        assertTrue(html.contains("data-pkb-agent=\"agent_injected\""), html);
+        Capture cleaned = agent("html-cleanup", temp.toString(), "--html=" + page);
+        assertEquals(0, cleaned.code, cleaned.err);
+        assertFalse(Files.readString(page).contains("9999px"), Files.readString(page));
+    }
+
+    @Test
+    void covers_command_unspotlight() throws Exception {
+        Path page = page();
+        Capture placed = agent("spotlight", temp.toString(), "--html=" + page, "--x=1", "--y=1", "--width=20", "--height=10");
+        String id = placed.out.replaceAll("(?s).*\"id\":\"([^\"]+)\".*", "$1");
+        Capture removed = agent("unspotlight", temp.toString(), "--html=" + page, "--id=" + id);
+        assertEquals(0, removed.code, removed.err);
+        assertFalse(Files.readString(page).contains("9999px"), Files.readString(page));
     }
 
     @Test
@@ -302,6 +601,83 @@ class AgentExpansionTest {
         assertTrue(feature.contains("EXECUTE SERVICE CALL"), feature);
         assertFalse(feature.contains("consoleAPICalled"), feature);
         assertTrue(ScenarioCapture.feature(ObserveEvents.parse(Files.readString(events))).contains("EXECUTE SERVICE CALL"));
+    }
+
+    @Test
+    void step_badge_and_magnifier_text_is_escaped_not_markup() throws Exception {
+        Path page = page();
+        Capture step = agent(
+                "step-badge", temp.toString(), "--html=" + page, "--number=4",
+                "--text=<b>Go</b> & \"on\"", "--x=1", "--y=1", "--target=page"
+        );
+        assertEquals(0, step.code, step.err);
+        String html = Files.readString(page);
+        assertFalse(html.contains("<b>Go</b>"), html);
+        assertTrue(html.contains("&" + "lt;b&" + "gt;Go&" + "lt;/b&" + "gt;"), html);
+        assertTrue(html.contains("&" + "amp;"), html);
+        Capture zoomed = agent(
+                "magnifier", temp.toString(), "--html=" + page, "--text=<i>tiny</i>",
+                "--x=2", "--y=2", "--target=page"
+        );
+        assertEquals(0, zoomed.code, zoomed.err);
+        html = Files.readString(page);
+        assertFalse(html.contains("<i>tiny</i>"), html);
+        assertTrue(html.contains("&" + "lt;i&" + "gt;tiny"), html);
+    }
+
+    @Test
+    void every_visual_kind_logs_place_and_remove_under_its_own_entity() throws Exception {
+        CompositeRuntime.resetForTests();
+        Path logs = temp.resolve("logs");
+        String previousLog = System.getProperty("pkb_composite_log");
+        String previousDir = System.getProperty("pkb_composite_log_dir");
+        System.setProperty("pkb_composite_log", "label,border,arrow,step,magnifier,spotlight");
+        System.setProperty("pkb_composite_log_dir", logs.toString());
+        try {
+            Path page = page();
+            String[][] calls = {
+                    {"label", "unlabel", "label", "--text=Name"},
+                    {"border", "unborder", "border", "--width=10"},
+                    {"arrow", "unarrow", "arrow", "--direction=up"},
+                    {"step-badge", "unstep-badge", "step", "--number=1"},
+                    {"magnifier", "unmagnifier", "magnifier", "--zoom=2"},
+                    {"spotlight", "unspotlight", "spotlight", "--dim=0.3"},
+            };
+            for (String[] call : calls) {
+                Capture placed = agent(call[0], temp.toString(), "--html=" + page, "--x=5", "--y=40", "--height=10", call[3]);
+                assertEquals(0, placed.code, call[0] + " " + placed.err);
+                String id = placed.out.replaceAll("(?s).*\"id\":\"([^\"]+)\".*", "$1");
+                Capture removed = agent(call[1], temp.toString(), "--html=" + page, "--id=" + id);
+                assertEquals(0, removed.code, call[1] + " " + removed.err);
+                assertTrue(removed.out.contains("\"" + call[2] + "\""), removed.out);
+                String log = readLogs(logs);
+                assertTrue(log.contains("INFO " + call[2] + " append id=" + id), call[2] + " place line missing:\n" + log);
+                assertTrue(log.contains("INFO " + call[2] + " remove id=" + id), call[2] + " remove line missing:\n" + log);
+            }
+
+            System.setProperty("pkb_composite_log", "overlay");
+            String before = readLogs(logs);
+            Capture quiet = agent("label", temp.toString(), "--html=" + page, "--x=1", "--y=1", "--text=quiet");
+            assertEquals(0, quiet.code, quiet.err);
+            assertEquals(before, readLogs(logs), "label logged while only overlay was named");
+        } finally {
+            if (previousLog == null) System.clearProperty("pkb_composite_log");
+            else System.setProperty("pkb_composite_log", previousLog);
+            if (previousDir == null) System.clearProperty("pkb_composite_log_dir");
+            else System.setProperty("pkb_composite_log_dir", previousDir);
+        }
+    }
+
+    private static String readLogs(Path dir) throws Exception {
+        if (!Files.isDirectory(dir)) return "";
+        StringBuilder all = new StringBuilder();
+        try (var files = Files.list(dir)) {
+            for (Path file : files.sorted().toList()) {
+                assertTrue(file.getFileName().toString().matches("composite-\\d{4}-\\d{2}-\\d{2}\\.log(\\.1)?"), file.toString());
+                all.append(Files.readString(file));
+            }
+        }
+        return all.toString();
     }
 
     private Path page() throws Exception {
