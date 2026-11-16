@@ -1,87 +1,75 @@
 # Grok Build Prompt: Pickleball 3.0.0 Embedded Store
 
-You are Grok Build. Replace the Dolt sql-server layer under Pickleball's `dolt` commands with an embedded SQLite store, phase by phase, on branch `3.0.0`. Do not create a new repo. Do not do work outside the phases. This prompt is standalone; do not depend on chat history.
-
-**Only start when Dan has said to build it.** On 2026-11-15 Dan asked for the design and roadmap only.
+You are Grok Build. Replace Pickleball's Dolt sql-server layer with an embedded SQLite store, remove Dolt entirely, and rename `dolt` to `store`, phase by phase. This prompt is standalone; do not depend on chat history. Dan approved the build on 2026-11-16.
 
 - **Repo:** https://github.com/ds-code-t/pickleball
-- **Branch:** `3.0.0` only.
-- **Start SHA:** the commit that adds this prompt, `docs/maintainer/3.0.0-embedded-store-design.md` and `docs/roadmaps/3.0.0-embedded-store-roadmap.md` (written against `7666bae655006159b5ab896c4b53b470e8db22af`). Fetch the current tip of `origin/3.0.0`, which may be newer, and record the SHA you actually start from in the scoreboard.
-- **Toolchain:** JDK 21. Gradle wrapper. Every Gradle call is `timeout 600 ./gradlew --no-daemon …`. Never `./gradlew --stop`.
-
-## Decision you are implementing (Dan, 2026-11-15, about 10:37 PM MST)
-
-- Pickleball 3.0.0 currently runs a Dolt 2.7.3 `sql-server` as a child process, talks to it through the MariaDB JDBC driver, and downloads the Dolt binary at runtime from GitHub releases (about 38 to 42 MB per platform). Locked-down machines that can reach only Maven Central or a corporate mirror cannot get that binary. Dan wants a simplified, embedded, Java-only store built from existing libraries: no server, no runtime download, everything from Maven Central.
-- **Library:** SQLite through `org.xerial:sqlite-jdbc:3.47.2.0`, already a published runtime dependency (Apache-2.0, natives for all platforms inside the jar). H2, HSQLDB, Derby and DuckDB were rejected because they cannot serve several processes from one file without a server. The SQLite session extension is not compiled into `sqlite-jdbc` and has no Java API, so changesets are emulated with triggers. JGit was rejected because it versions files, not rows.
-- **Branching:** a sandbox is its own SQLite file, a `VACUUM INTO` snapshot of `main` (or of another sandbox) with its own change log. Later edits to `main` cannot leak into it. The overlay alternative (changed rows plus tombstones over an attached base) was rejected because SQLite refuses an upsert on a view and every view would need a base-version filter. A content-addressed blob sharing optimization is triggered only if measured criteria are missed (design section 6.4).
-- **Merge:** new `sandbox merge` with row-level three-way detection on `files` and `entities` (ancestor from the sandbox change log, base from `main` now plus `main`'s change log since `base_seq`, branch from the sandbox now). Derived tables are rebuilt, not merged. Policy `fail` (default), `branch-wins` or `base-wins`. One transaction. A JSON and text conflict report with hashes, never raw content.
-- **History:** run history, timeline and rewind already read run-state tables and port unchanged into `runstate.db`. The append-only change log replaces Dolt commit history, `dolt_diff`, `dolt_status` and hydrate commits (`hydrate_generation`).
-- **Concurrency:** WAL on every file, `busy_timeout=5000`, `BEGIN IMMEDIATE` for writes, 3 retries with jitter, hydrate and extract serialized by a file lock, leases as held `FileChannel` locks (the OS releases them when a process dies). Windows: close pools and wait up to 15 s for `.db`, `-wal` and `-shm` to be released before deleting.
-- **Removed:** the Dolt server, supervisor, installer, release catalog, MariaDB driver, CI install and cache steps. `dolt install` and `dolt server …` become aliases that print the embedded line and exit 0.
-- **Naming:** keep `pickleball dolt`, `pkb_dolt*`, `dolt.properties`, `dolt-entities/`, Gradle `dolt*`, MCP `dolt` and `.pickleball/dolt/` through E6. E7 renames to `store` with aliases for 3.0.x, **only if Dan approves**. Never reintroduce the pre-Dolt mis-transcribed name; leave `RenameGateTest`, `LegacyNames` and `scripts/rename-history-allowlist.txt` as they are.
-- **Migration:** from an existing Dolt store, rehydrate from files, and import DB-only edits, sandboxes and run-state through an already-installed Dolt binary's `dolt sql -r json` (never download). From the pre-Dolt SQLite working copy, keep today's rules.
-- **Out of scope:** the diagnostic-report SQLite index and its "SQLite index parity" CI; the held execution-path audit fixes F1 to F12.
+- **Work branch:** create `3.0.0-embedded-store` from `origin/3.0.0` (`git fetch origin && git checkout -b 3.0.0-embedded-store origin/3.0.0`) and push only there. **Do not merge into `3.0.0`**; the orchestrator merges after verification. Record the start SHA.
+- **Toolchain:** JDK 21, Gradle wrapper. Every Gradle call is `timeout 600 ./gradlew --no-daemon …`.
 
 ## Read first, in order
 
-1. `AGENTS.md` (whole file; `## Dolt`, "One spine, multiple adapters", "Public contracts").
-2. `docs/maintainer/3.0.0-embedded-store-design.md`: every decision, the evidence, and section 17 (verify in E1; write answers back).
-3. `docs/roadmaps/3.0.0-embedded-store-roadmap.md`: phases, functionality, docs, named tests, port tables, and the scoreboard you fill.
-4. `docs/maintainer/3.0.0-dolt-core-design.md` (sections 3 to 13: store seam, dialect table, sandboxes, concurrency, logging, adapters), `docs/maintainer/3.0.0-dolt-working-copy-design.md`, `docs/maintainer/3.0.0-linked-tracking-design.md`, `docs/maintainer/dolt-isolation-analysis-2026-11-15.md` (SQLite facts from before Dolt).
-5. `docs/configuration.md` (Dolt part), `docs/dolt-entities.md`, `docs/agent/feature-map.md`, `docs/release-notes.md`.
-6. The source: `src/main/java/tools/dscode/dolt/**` (start with `store/DoltStore.java`, `DoltSession.java`, `DoltConnections.java`, `DoltDialect.java`, `Binding.java`, then `DoltSandbox.java`, `DoltHydrator.java`, `DoltMigrate.java`, `DoltCli.java`), the `dolt*` Gradle tasks in `build.gradle`, `.github/workflows/agent-contract.yml`, and the Workbench `DoltCliForwarder`.
+1. `AGENTS.md` (whole file; the `## Dolt` section, "One spine, multiple adapters", "Public contracts").
+2. `docs/maintainer/3.0.0-embedded-store-design.md`: every decision, schema, rule and the section 16 items you answer in S1.
+3. `docs/roadmaps/3.0.0-embedded-store-roadmap.md`: phases S1 to S9, named tests, port tables, the CLI-first and logging checklist, the scoreboard you fill, and the verification checklist.
+4. The source: `src/main/java/tools/dscode/dolt/**` (start with `store/DoltStore.java`, `DoltSession.java`, `DoltConnections.java`, `DoltDialect.java`, `DoltStatements.java`, `Binding.java`, then `DoltSandbox.java`, `DoltHydrator.java`, `DoltDiscovery.java`, `DoltExtractor.java`, `DoltCli.java`), the `dolt*` tasks in `build.gradle`, `.github/workflows/agent-contract.yml`, and the Workbench `tools.dscode.workbench.dolt` package.
 
-Branch docs win over this prompt on repo facts. Dan's decision above wins over any older recommendation.
+Branch docs win over this prompt on repo facts. Dan's decisions below win over any older doc.
+
+## Dan's locked decisions
+
+1. **Independent branches.** Every sandbox is a fully independent, self-contained SQLite copy (`VACUUM INTO` from `main.db`, always from `main`). No reference to a parent, `main` or any other sandbox: no lineage, no overlay, no central registry. It records only `_pkb_branch` (name, created_at, created_from_commit, dirty flag, owner, ttl, store_schema) and `_pkb_base` (per `files` and `entities` row: base hash, location, Git commit at creation). Run-state is project-level history in one shared `runstate.db` with a `sandbox` column; no branch holds a pointer to it.
+2. **Large binaries are the only exception.** `pkb_store_binary_policy=skip|include` (default `skip`), `pkb_store_large_file_bytes` (default 262144; 0 = every binary), detection by extension and content sniff. A large binary whose bytes equal its Git blob is stored as a reference (`binary_ref=1`, `location`=path, hash, `git_blob`, `git_commit`, size, no bytes). Otherwise its bytes are stored. Read verifies the hash and falls back to `git cat-file blob <git_blob>`; if both fail, `error:` plus `fix:`. When a branch changes one, the bytes are copied into that branch's database (`binary_ref=0`, `location='db'`, `git_commit=''`) and it stops referencing.
+3. **Remove Dolt entirely.** Server, supervisor, installer, platform and release catalog, `DoltJdbc`, `dolt-release.properties`, ports, download and checksum code, `GET_LOCK`/`PROCESSLIST`, the MariaDB JDBC driver (build, POM, notices), `install` and `server` commands, Gradle `doltInstall`/`doltServer`, CI Dolt cache/install/server steps, removed settings (`pkb_dolt_bin`, `_auto_install`, `_port`, `_server_start_ms`, `_server_idle_minutes`, `_server_log_max_bytes`, `_tool_cache`). No import or migration from Dolt, no aliases, no shims, no warnings for old settings. Delete the Dolt-only docs listed in design 12.1 (Git keeps history).
+4. **Rename `dolt` → `store`, no aliases** (design section 11): `pickleball store`, `pkb_store*`/`PKB_STORE*`, `store.properties`, `store-entities/`, `.pickleball/store/`, `store.log`, `tools.dscode.store` and `tools.dscode.store.sql` (`Sql*` classes), every `Dolt*` class → `Store*`, Gradle `store*`, MCP `store`, Workbench Store tab and package, `docs/store-entities.md`, `scripts/time_store_run.py`. Old names are simply unknown.
+5. **`sandbox merge <name> [--policy=fail|branch-wins|main-wins] [--dry-run] [--drop] [--json]`**: three-way hash compare of `_pkb_base` vs `main` now vs the branch now on `files` and `entities`; branch unchanged → skip; main unchanged → apply; equal → converged; else conflict. Default `fail`: nothing written, JSON plus text-table report saved to `sandboxes/<name>/merge-<ISO>.json`, exit 1. Derived tables rebuilt; one `BEGIN IMMEDIATE` transaction; re-baseline `_pkb_base` after success. Reports show hashes only.
+6. **Keep:** `org.xerial:sqlite-jdbc:3.47.2.0` (no bump, no new dependency); `_pkb_changes` trigger change log plus `store changes` and `pkb_store_changes_days` (14); WAL, `busy_timeout=5000`, `BEGIN IMMEDIATE`, 3 retries with jitter; hydrate lock files; leases as held `FileChannel` locks; Windows 15 s release wait and `pending-delete`; sandboxes for parallel agents; Git as the only project sync; CLI-first; toggleable, per-capability, per-entity, ISO date-stamped, size-capped logging (`pkb_store_log`, `_log_entity`, `_log_max_bytes`); the opt-out `pkb_store=false` stays file-only; the pre-Dolt SQLite working-copy import (`store migrate`, `LegacySqlite`, `LegacyNames`).
+7. **Leftover gate** (S9; both must print nothing):
+   `git grep -niE 'dolt|mariadb' -- . ':(exclude)docs/release-notes.md' ':(exclude)docs/roadmaps/3.0.0-embedded-store-roadmap.md' ':(exclude)prompts/build-3.0.0-embedded-store.md'` and `git ls-files | grep -iE 'dolt|mariadb'`. Past release-note entries stay intact with one `Superseded:` line. Enforce it with `NoDoltLeftTest` (pattern built from pieces).
 
 ## Hard rules (every phase)
 
-- NEVER commit, push or merge to `master`, `2.2.0` or `2.1.19`. No tags, releases, publishing or force-push. Never run `./gradlew --stop`.
+- NEVER commit, push or merge to `master`, `2.2.0`, `2.1.19` or `3.0.0`. No tags, releases, publishing or force-push. Never run `./gradlew --stop`.
 - Keep Gherkin syntax unchanged. Cucumber step annotations stay single string literals with identical values.
-- Never weaken, skip or delete tests. A Dolt-only assertion is replaced by its embedded equivalent and listed in the phase's port table and scoreboard notes.
-- CLI-first: Workbench, MCP and Gradle only forward to the CLI. The Workbench never opens a database or loads core store classes.
-- No Cucumber types or syntax in `tools.dscode.dolt` (or `tools.dscode.store` after E7).
-- Opening and using the store starts no process, opens no socket and downloads nothing. No new dependency.
-- Logging for new code: toggleable, per-entity, ISO date-stamped, size-capped (`pkb_dolt_log`, `pkb_dolt_log_entity`, `pkb_dolt_log_max_bytes`).
-- No secrets in cleartext anywhere: rows, change logs, logs, diffs, merge reports, sandbox dumps, commits, prompts.
-- Docs are rewritten IN PLACE to describe what is implemented at each commit; history goes to `docs/release-notes.md`. Never replace or truncate `AGENTS.md` or `docs/agent/feature-map.md` wholesale; edit only changed paragraphs and compare `wc -c` before each push. Keep the `AGENTS.md` lines `verify_agent_contract.py` checks.
-- Regenerate `docs/agent/repository-index.md` only with `python3 scripts/refresh_agent_index.py`. Before every push: `python3 scripts/refresh_agent_index.py --check`, `python3 scripts/verify_agent_contract.py`, `python3 scripts/sync_consumer_guidance.py --check`. Remove `scripts/__pycache__`.
-- Exported guidance docs must not link to `docs/maintainer/`, `docs/roadmaps/` or `prompts/` paths; name them in words.
-- In current-behaviour docs, do not put the word "opt-in" near "Dolt" (`CurrentDocsTest`).
-- Never write placeholder or 0-byte files.
-- Do not open Grok chats or other paid assistant sessions for this work.
-- Push every green phase: `git fetch origin`, `git pull --rebase origin 3.0.0`, then `git push origin HEAD:3.0.0`. Never force. Check the Agent Contract CI run for that push and record it.
+- Never weaken, skip or delete tests. Renames keep tests. A test that exists only for Dolt-specific behavior is replaced by an equivalent store test from the roadmap port table, never just deleted. Record the Gradle test count in S1; it must not drop except by one-for-one replacements.
+- Do not touch dom-composite PRs #2 and #3. Do not move the Cucumber step model out of Cucumber's package. Do not fix the held audit items F1 to F12.
+- CLI-first: Workbench, MCP and Gradle only forward to the CLI. The Workbench never opens a database. No Cucumber types in the store packages.
+- Opening and using the store starts no process, opens no socket, downloads nothing.
+- No secrets in cleartext anywhere: rows, change log, branch tables, logs, reports, commits.
+- Docs rewritten IN PLACE to match each commit; history in `docs/release-notes.md`. Never replace or truncate `AGENTS.md` or `docs/agent/feature-map.md` wholesale; compare `wc -c` before each push. No effort estimates.
+- Before every push: `python3 scripts/refresh_agent_index.py` (regenerate), `python3 scripts/refresh_agent_index.py --check`, `python3 scripts/verify_agent_contract.py`, `python3 scripts/sync_consumer_guidance.py --check`; remove `scripts/__pycache__`. Exported guidance docs never link to `docs/maintainer/`, `docs/roadmaps/` or `prompts/`.
+- Never write placeholder or 0-byte files. Do not open other paid assistant sessions.
+- Small incremental pushes, at least one per phase: `git fetch origin`, `git pull --rebase origin 3.0.0-embedded-store`, `git push origin HEAD:3.0.0-embedded-store`. Never force. Check the Agent Contract and SQLite parity CI runs for each push and record them.
 
 ## Tests
 
-- After each phase run ONLY the targeted tests the roadmap names for it: `timeout 600 ./gradlew --no-daemon <module>:cleanTest <module>:test --tests <filter>`.
-- HELD until Dan asks: the full multi-module regression, `validate --all`, first-start timing, consumer-sim, and Maven `@all`. Do not run them.
+- After each phase run ONLY its targeted tests: `timeout 600 ./gradlew --no-daemon <module>:cleanTest <module>:test --tests <filter>` (root `:`, Workbench `:pickleball-workbench`).
+- HELD (do not run): the full multi-module regression, `validate --all`, first-start timing, consumer-sim, Maven `@all`.
 - Timing tests print their numbers and assert only a ceiling about ten times the design target.
-- A failed targeted test stops the ladder until it is fixed honestly.
+- A failed targeted test stops the ladder until it is fixed honestly. CI must be green on Linux, Windows and macOS.
 
-## Phases (details in the roadmap)
+## Phases (full detail in the roadmap; every phase mandatory, in order)
 
-- **E1** Spike and verification with `sqlite-jdbc` on Linux, Windows and macOS CI; record Dolt baselines; fill design sections 14, 15 and 17.
-- **E2** SQLite backend behind `DoltStore`; dialect port back to SQLite; run-state router; `store_schema=1`; change-log table and generated triggers.
-- **E3** Core on the embedded store by default; hydrate generations; migration from Dolt stores and the pre-Dolt SQLite copy.
-- **E4** Sandboxes as snapshot files: create, list, use, diff, extract, drop, prune; leases; Windows release wait.
-- **E5** `sandbox merge` with policies and the conflict report; `changes` command and retention; forwarding.
-- **E6** Remove the Dolt server, installer and MariaDB driver; aliases for `install` and `server`; CI without Dolt; store-open timing.
-- **E7** Rename to `store` with aliases, only if Dan approves.
-- **E8** Final docs and measurements.
+- **S1** First add `3.0.0-embedded-store` to `push.branches` in `.github/workflows/agent-contract.yml` and `sqlite-index.yml` (CI does not run on this branch otherwise). Spike: `sqlite-jdbc` facts on three OSes; fill design 15/16; record test count.
+- **S2** SQLite backend behind the store seam; dialect port; run-state router; `store_schema=1`; change log, `_pkb_branch`, `_pkb_base`, `files.location`/`git_commit`.
+- **S3** Core on the embedded store; hydrate generations; status line.
+- **S4** Remove Dolt entirely (code, driver, CI, resources, docs).
+- **S5** Rename `dolt` → `store` everywhere, no aliases.
+- **S6** Large-file references.
+- **S7** Independent sandboxes.
+- **S8** `sandbox merge` and `store changes`; forwarding.
+- **S9** `NoDoltLeftTest` and gate; design rewritten as-built; final docs; verification checklist.
 
 ## Completion
 
-Every phase except E7 is mandatory once started. Do not stop early, do not skip phases, and do not mark anything optional, deferred or "follow-up" unless the roadmap says so. Stop only on an honest test failure you cannot fix, a hard-rule violation, or a real blocker. Then report the blocker with what you tried.
-
-After each green phase: fill that phase's row in the roadmap scoreboard (status, full SHA, CI runs, test commands with counts, notes including any replaced assertions), commit, push to `3.0.0`, and continue to the next phase in the same session unless you are near your context limit, in which case say exactly where to resume.
+Every phase is mandatory. Do not stop early, do not skip or reorder phases, and do not mark anything optional, deferred, "follow-up" or "future work". Stop only on an honest test failure you cannot fix, a hard-rule violation, or a real blocker; report it with what you tried. After each green phase fill that phase's scoreboard row (status, full SHA, CI runs, test commands with counts, notes listing replaced tests), commit, push, and continue to the next phase in the same session. Only if you are near your context limit, say exactly where to resume. You are done only when S9's gate prints nothing and every roadmap verification checklist item is true.
 
 ## Every reply ends with a scoreboard
 
 ```
-Start SHA: <sha>   Current tip: <sha>
-Phases done: E1 ✅ E2 … (status per phase)
-Tests: <class> <run>/<failed> … per phase
+Start SHA: <sha>   Branch tip: <sha>   Branch: 3.0.0-embedded-store
+Phases: S1 ✅|🔄|⬜ … S9 (status each)
+Tests: <class> <run>/<failed> … (this phase) | total count <n> (S1 baseline <n>)
 Commits: <phase> <sha> …
-CI: <Agent Contract run> / <SQLite parity run>
-Blocker: none | <what, where, what you tried>
+CI: <Agent Contract run> / <SQLite parity run> (status)
+Blockers: none | <what, where, what you tried>
 ```
