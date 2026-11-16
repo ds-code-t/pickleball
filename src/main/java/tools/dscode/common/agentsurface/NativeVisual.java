@@ -16,13 +16,31 @@ import java.util.Map;
  * A headless runtime returns drawn=false reason=headless. An unsized box is not drawn.
  */
 public final class NativeVisual {
+    private static final Map<String, String> KINDS = new java.util.concurrent.ConcurrentHashMap<>();
+
     private NativeVisual() {
+    }
+
+    /** Kind the native rectangle with this id was drawn for, or blank when this process drew none. */
+    public static String kindOf(String id) {
+        return id == null ? "" : KINDS.getOrDefault(id, "");
+    }
+
+    /** Drops every kind record at scenario end, when every native rectangle is hidden. */
+    public static void forgetAll() {
+        KINDS.clear();
+    }
+
+    /** Drops the kind record once the rectangle is hidden. */
+    public static void forget(String id) {
+        if (id != null) KINDS.remove(id);
     }
 
     public static Map<String, Object> show(Path project, String runId, String kind, Map<String, String> args) throws Exception {
         SurfaceBox.View box = box(kind, args);
         if (box == null) throw new IllegalArgumentException(kind + " needs a target or a visual-viewport box");
         String id = text(args.get("id"), args.get("handle"), defaultId(kind));
+        KINDS.put(id, kind);
         NativeHighlightBox.Drawn drawn = box.sized()
                 ? NativeHighlightBox.show(id, box.x(), box.y(), box.width(), box.height())
                 : new NativeHighlightBox.Drawn(false, "no-size", id);

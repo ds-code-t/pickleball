@@ -344,6 +344,40 @@ class AgentExpansionTest {
     }
 
     @Test
+    void unVerbRefusesAPlacementOfAnotherKind() throws Exception {
+        Path page = page();
+        Capture placed = agent("border", temp.toString(), "--html=" + page, "--x=1", "--y=1", "--width=10", "--height=8");
+        assertEquals(0, placed.code, placed.err);
+        String id = placed.out.replaceAll("(?s).*\"id\":\"([^\"]+)\".*", "$1");
+        Capture wrong = agent("unlabel", temp.toString(), "--html=" + page, "--id=" + id);
+        assertEquals(2, wrong.code, wrong.out + wrong.err);
+        String message = wrong.out + wrong.err;
+        assertTrue(message.contains("is a border, not a label"), message);
+        assertTrue(message.contains("unborder --id=" + id), message);
+        assertTrue(Files.readString(page).contains("data-pkb-kind=\"border\""), Files.readString(page));
+        Capture stepWrong = agent("unstep-badge", temp.toString(), "--html=" + page, "--id=" + id);
+        assertEquals(2, stepWrong.code, stepWrong.out + stepWrong.err);
+        Capture right = agent("unborder", temp.toString(), "--html=" + page, "--id=" + id);
+        assertEquals(0, right.code, right.err);
+        assertFalse(Files.readString(page).contains("data-pkb-kind=\"border\""), Files.readString(page));
+    }
+
+    @Test
+    void unVerbRefusesAnOverlayAndNamesItsRemovalVerb() throws Exception {
+        Path page = page();
+        Capture placed = agent("label", temp.toString(), "--html=" + page, "--text=Keep", "--x=1", "--y=1");
+        assertEquals(0, placed.code, placed.err);
+        String id = placed.out.replaceAll("(?s).*\"id\":\"([^\"]+)\".*", "$1");
+        Capture wrong = agent("unspotlight", temp.toString(), "--html=" + page, "--id=" + id);
+        assertEquals(2, wrong.code, wrong.out + wrong.err);
+        assertTrue((wrong.out + wrong.err).contains("is a label, not a spotlight; use unlabel"), wrong.out + wrong.err);
+        assertTrue(Files.readString(page).contains("Keep"), Files.readString(page));
+        assertEquals("unstep-badge", tools.dscode.common.agentcontrol.VisualKinds.removalVerb("step"));
+        assertEquals("overlay-remove", tools.dscode.common.agentcontrol.VisualKinds.removalVerb("overlay"));
+        assertEquals("html-remove", tools.dscode.common.agentcontrol.VisualKinds.removalVerb("html"));
+    }
+
+    @Test
     void covers_command_border() throws Exception {
         Path page = page();
         Capture stored = agent(

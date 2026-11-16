@@ -2,7 +2,12 @@
 
 ## CI hosts
 
-Push and pull-request CI runs Windows only (`.github/workflows/agent-contract.yml` jobs `windows` and `gate`, and `.github/workflows/sqlite-index.yml`). Linux is verified locally on the maintainer box with JDK 21 before a release, not in GitHub Actions. macOS testing is tech debt: sqlite-jdbc ships a macOS native, and the parity tests do not run on a macOS runner. Add a macOS job back only when Actions minutes allow it. Do not treat a green Windows job as a macOS result.
+Push and pull-request CI (`.github/workflows/agent-contract.yml`) runs jobs `windows`, `macos`, `dom-engine-live` (Linux, live Chrome), and `gate`, plus `.github/workflows/sqlite-index.yml`. The repository is public, so the `macos` job costs no Actions minutes. `macos` runs only targeted tests: Dolt server start (also under a path with spaces), the Dolt sandbox, run-state, and isolation suites, `CucumberBoundaryTest`, the agent-surface routing tests, the live agent-surface popup, and the desktop live snapshot. It is not a full macOS regression. sqlite-jdbc parity tests still do not run on a macOS runner; that part stays tech debt. Do not treat a green Windows job as a macOS result.
+
+Open popup defects found by CI (the live popup step is non-blocking on Windows and Linux until they are fixed; it is required on macOS):
+
+- Windows (Agent Contract 43786203511): the popup rendered and `closeAndWait` returned true, but `@TempDir` cleanup could not delete `.pickleball/runs/live/agent/popup/host.out`. A process that inherited the host's stdout handle (likely a browser child) still held it after close.
+- Linux Chrome for Testing (Agent Contract 43785092717 and 43786203511): one run rendered but `closeAndWait` did not finish within 10 seconds; the next run did not render within 20 seconds. The same test passes on the maintainer box with Google Chrome and on macOS. `AgentSurfacePopupLiveTest` now prints status pids, the profile, surviving holders, and the `popup.log` tail when close does not finish.
 
 Items deferred from consumer retests and earlier roadmaps. Each entry has a short description, origin report, and rough value/cost. Speed-related items (validate dry-run #4, isolate start #15, index/compile overlap 3-overlap, Maven daemon/persistent resolve, parallel stages, seed overlap) have been moved to the 2.1.18 speed roadmap and are no longer tech debt for 2.1.18. See `docs/maintainer/2.1.18-speed-roadmap.md`.
 

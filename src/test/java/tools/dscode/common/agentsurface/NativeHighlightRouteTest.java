@@ -105,6 +105,21 @@ class NativeHighlightRouteTest {
     }
 
     @Test
+    void nativeUnVerbRefusesARectangleDrawnForAnotherKind() throws Exception {
+        AgentSurfaceRouter.route(project, "nat", "border", Map.of(
+                "target", "native", "id", "kind-a", "x", "1", "y", "1", "width", "20", "height", "10"), "a").orElseThrow();
+        IllegalArgumentException wrong = org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                () -> AgentSurfaceRouter.route(project, "nat", "unlabel", Map.of("target", "native", "id", "kind-a"), "a"));
+        assertTrue(wrong.getMessage().contains("is a border, not a label; use unborder"), wrong.getMessage());
+        if (!java.awt.GraphicsEnvironment.isHeadless()) {
+            assertTrue(tools.dscode.control.protocol.surface.NativeHighlightBox.shown().contains("kind-a"));
+        }
+        var right = AgentSurfaceRouter.route(project, "nat", "unborder", Map.of("target", "native", "id", "kind-a"), "a").orElseThrow();
+        assertEquals(0, right.exit(), String.valueOf(right.body()));
+        assertEquals(true, right.body().get("reversed"));
+    }
+
+    @Test
     void scenarioEndHidesEveryNativeBox() throws Exception {
         AgentSurfaceRouter.route(project, "nat", "border", Map.of(
                 "target", "native", "id", "end-a", "x", "1", "y", "1", "width", "20", "height", "10"), "a").orElseThrow();

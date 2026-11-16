@@ -88,6 +88,57 @@ class DoltServerLifecycleTest {
     }
 
     @Test
+    void coldStartUnderAPathWithSpaces() throws Exception {
+        Path spaced = project.resolve("dir with spaces").resolve("my project");
+        Files.createDirectories(spaced);
+        try {
+            long started = System.nanoTime();
+            DoltServer.ServerInfo info = DoltServer.ensure(spaced);
+            long millis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
+            assertTrue(info.running());
+            assertFalse(info.reused());
+            assertTrue(DoltServer.selectOne(info.port(), 2000));
+            assertTrue(Files.isDirectory(spaced.resolve(".pickleball/dolt")), "store not under the spaced project");
+            Path out = Path.of("build", "dolt-server-start-spaces-ms.txt");
+            Files.createDirectories(out.getParent());
+            Files.writeString(out, Long.toString(millis), StandardCharsets.UTF_8);
+            System.out.println("DOLT_SERVER_START_SPACES_MS=" + millis);
+        } finally {
+            DoltServer.stop(spaced);
+        }
+        assertFalse(DoltServer.status(spaced).running());
+        // Windows keeps a directory while any process still has it as its working directory or
+        // holds a file in it. The spaced tree must become deletable once stop returns.
+        Path top = project.resolve("dir with spaces");
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+        java.io.IOException last = null;
+        while (System.nanoTime() < deadline) {
+            try {
+                deleteTree(top);
+                last = null;
+                break;
+            } catch (java.io.IOException failure) {
+                last = failure;
+                Thread.sleep(250);
+            }
+        }
+        if (last != null) {
+            String survivors = ProcessHandle.allProcesses()
+                    .filter(handle -> handle.info().commandLine().map(line -> line.contains("my project")).orElse(false))
+                    .map(handle -> handle.pid() + " " + handle.info().commandLine().orElse(""))
+                    .reduce("", (left, right) -> left + "\n" + right);
+            throw new AssertionError("spaced project still locked 30 s after stop: " + last + " survivors:" + survivors, last);
+        }
+    }
+
+    private static void deleteTree(Path root) throws java.io.IOException {
+        if (!Files.exists(root)) return;
+        try (var walk = Files.walk(root)) {
+            for (Path path : walk.sorted(java.util.Comparator.reverseOrder()).toList()) Files.deleteIfExists(path);
+        }
+    }
+
+    @Test
     void staleServerJsonIsReplaced() throws Exception {
         Path home = DoltServer.home(project);
         Files.createDirectories(home);

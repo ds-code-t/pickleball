@@ -46,8 +46,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ./gradlew --no-daemon :test --tests tools.dscode.dolt.server.DoltServerLifecycleTest.coldStartPrintsElapsedMillis
+          ./gradlew --no-daemon :test \
+            --tests tools.dscode.dolt.server.DoltServerLifecycleTest.coldStartPrintsElapsedMillis \
+            --tests tools.dscode.dolt.server.DoltServerLifecycleTest.coldStartUnderAPathWithSpaces
           echo "DOLT_SERVER_START_MS=$(tr -d '\r' < build/dolt-server-start-ms.txt)"
+          echo "DOLT_SERVER_START_SPACES_MS=$(tr -d '\r' < build/dolt-server-start-spaces-ms.txt)"
+          echo "${RUNNER_OS} Dolt server start: $(tr -d '\r' < build/dolt-server-start-ms.txt) ms; path with spaces: $(tr -d '\r' < build/dolt-server-start-spaces-ms.txt) ms" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Targeted Dolt sandbox, run-state, and isolation
         shell: bash
@@ -61,6 +65,19 @@ jobs:
             --tests tools.dscode.dolt.DoltSandboxWorkerTest \
             --tests tools.dscode.dolt.DoltSandboxPruneTest \
             --tests tools.dscode.dolt.DoltSandboxHardenTest
+
+      - name: Agent surface popup live (real Chromium, non-blocking; open close defect, see tech-debt)
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon :test --tests tools.dscode.common.agentsurface.live.AgentSurfacePopupLiveTest
+          report=build/test-results/test/TEST-tools.dscode.common.agentsurface.live.AgentSurfacePopupLiveTest.xml
+          if grep -q '<skipped' "$report"; then
+            echo "AgentSurfacePopupLiveTest skipped on ${RUNNER_OS}:"
+            grep -A2 '<skipped' "$report" || true
+            exit 1
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -96,6 +113,89 @@ jobs:
         if: always()
         shell: pwsh
         run: .\gradlew.bat --no-daemon :dom-engine:test --tests dev.domengine.snapshot.SnapshotCoverageTest.liveDesktopWhenThePlatformExists
+
+  macos:
+    name: macOS targeted Dolt and core
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Cache Dolt 2.7.3
+        uses: actions/cache@v4
+        with:
+          path: ~/.pickleball/tools/dolt
+          key: dolt-2.7.3-${{ runner.os }}-${{ runner.arch }}
+
+      - name: Install Dolt 2.7.3
+        run: ./gradlew --no-daemon doltInstall
+
+      - name: Targeted Dolt server start
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon :test \
+            --tests tools.dscode.dolt.server.DoltServerLifecycleTest.coldStartPrintsElapsedMillis \
+            --tests tools.dscode.dolt.server.DoltServerLifecycleTest.coldStartUnderAPathWithSpaces
+          echo "DOLT_SERVER_START_MS=$(tr -d '\r' < build/dolt-server-start-ms.txt)"
+          echo "DOLT_SERVER_START_SPACES_MS=$(tr -d '\r' < build/dolt-server-start-spaces-ms.txt)"
+          echo "${RUNNER_OS} Dolt server start: $(tr -d '\r' < build/dolt-server-start-ms.txt) ms; path with spaces: $(tr -d '\r' < build/dolt-server-start-spaces-ms.txt) ms" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Targeted Dolt sandbox, run-state, and isolation
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon :test \
+            --tests tools.dscode.dolt.DoltSandboxCliTest \
+            --tests tools.dscode.dolt.DoltSandboxBindingTest \
+            --tests tools.dscode.dolt.DoltSandboxRunStateTest \
+            --tests tools.dscode.dolt.DoltSandboxIsolationTest \
+            --tests tools.dscode.dolt.DoltSandboxWorkerTest \
+            --tests tools.dscode.dolt.DoltSandboxPruneTest \
+            --tests tools.dscode.dolt.DoltSandboxHardenTest
+
+      - name: Targeted core agent surface and Cucumber boundary
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon :test \
+            --tests 'tools.dscode.architecture.*' \
+            --tests tools.dscode.common.agentsurface.PopupRemovalKindTest \
+            --tests tools.dscode.common.agentsurface.AgentSurfaceRouterTest \
+            --tests tools.dscode.common.agentsurface.NativeHighlightRouteTest \
+            --tests tools.dscode.browser.SurfaceAssetsTest
+
+      - name: Agent surface popup live (real Chromium, must not skip)
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon :test --tests tools.dscode.common.agentsurface.live.AgentSurfacePopupLiveTest
+          report=build/test-results/test/TEST-tools.dscode.common.agentsurface.live.AgentSurfacePopupLiveTest.xml
+          if grep -q '<skipped' "$report"; then
+            echo "AgentSurfacePopupLiveTest skipped on ${RUNNER_OS}:"
+            grep -A2 '<skipped' "$report" || true
+            exit 1
+          fi
+
+      - name: macOS desktop live snapshot
+        if: always()
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon :dom-engine:test --tests dev.domengine.snapshot.SnapshotCoverageTest.liveDesktopWhenThePlatformExists
+          report=dom-engine/build/test-results/test/TEST-dev.domengine.snapshot.SnapshotCoverageTest.xml
+          if grep -q '<skipped' "$report"; then
+            reason="$(grep -o '<skipped[^>]*' "$report" | head -1)"
+            echo "macOS desktop live snapshot skipped (hosted runners cannot grant Accessibility): ${reason}" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "macOS desktop live snapshot ran (macos-ax)" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
 
   dom-engine-live:
     name: Java DOM live Chrome
@@ -219,6 +319,19 @@ jobs:
       - name: Java engine adapter live tests
         run: ./gradlew --no-daemon :test --tests tools.dscode.common.composite.live.*
 
+      - name: Agent surface popup live (real Chromium, non-blocking; open close defect, see tech-debt)
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon :test --tests tools.dscode.common.agentsurface.live.AgentSurfacePopupLiveTest
+          report=build/test-results/test/TEST-tools.dscode.common.agentsurface.live.AgentSurfacePopupLiveTest.xml
+          if grep -q '<skipped' "$report"; then
+            echo "AgentSurfacePopupLiveTest skipped on ${RUNNER_OS}:"
+            grep -A2 '<skipped' "$report" || true
+            exit 1
+          fi
+
       - name: Consumer @dom-composite on native and cucumber
         env:
           PKB_COMPOSITE: "on"
@@ -265,7 +378,7 @@ jobs:
         run: ./gradlew --no-daemon :test --tests tools.dscode.common.seleniumextensions.LiveFirefoxSnapshotTest
 
   gate:
-    needs: [windows, dom-engine-live]
+    needs: [windows, macos, dom-engine-live]
     if: always()
     runs-on: windows-latest
     steps:
@@ -291,8 +404,9 @@ jobs:
         shell: bash
         run: ./gradlew --no-daemon doltInstall
 
-      - name: Block the release unless Windows and live Chrome passed
+      - name: Block the release unless Windows, macOS, and live Chrome passed
         shell: bash
         run: |
           test "${{ needs.windows.result }}" = "success"
+          test "${{ needs.macos.result }}" = "success"
           test "${{ needs.dom-engine-live.result }}" = "success"

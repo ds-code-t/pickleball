@@ -45,7 +45,8 @@ class AgentSurfacePopupLiveTest {
             String rendered = waitRendered(project);
             assertTrue(rendered.contains(sha(html)), rendered);
             assertTrue(rendered.contains(sha(chat)), rendered);
-            assertTrue(PopupHost.closeAndWait(project, "live", Duration.ofSeconds(10)));
+            boolean exited = PopupHost.closeAndWait(project, "live", Duration.ofSeconds(10));
+            assertTrue(exited, () -> closeDiagnostics(project));
             long browserPid = opened.get("browserPid") instanceof Number number ? number.longValue() : -1;
             assertFalse(browserPid > 0 && ProcessHandle.of(browserPid).isPresent(), "browser pid " + browserPid);
             assertFalse(Files.exists(PopupLog.popupDir(project, "live").resolve("profile")));
@@ -72,6 +73,43 @@ class AgentSurfacePopupLiveTest {
             Thread.sleep(100);
         }
         return Files.isRegularFile(file) ? Files.readString(file) : "";
+    }
+
+    /** What still holds the popup after close: status pids, profile, surviving processes, and the log tail. */
+    private static String closeDiagnostics(Path project) {
+        StringBuilder out = new StringBuilder("popup did not exit.");
+        try {
+            Map<String, Object> status = tools.dscode.common.agentsurface.PopupStatus.read(project, "live");
+            out.append(" status=").append(status);
+            for (String key : java.util.List.of("pid", "browserPid")) {
+                if (status.get(key) instanceof Number number) {
+                    var handle = ProcessHandle.of(number.longValue());
+                    out.append(" ").append(key).append(" alive=").append(handle.map(ProcessHandle::isAlive).orElse(false))
+                            .append(" cmd=").append(handle.flatMap(h -> h.info().commandLine()).orElse("?"));
+                }
+            }
+            Path dir = PopupLog.popupDir(project, "live");
+            Path profile = dir.resolve("profile");
+            out.append(" profileExists=").append(Files.exists(profile));
+            if (Files.isDirectory(profile)) {
+                try (var walk = Files.walk(profile, 2)) {
+                    out.append(" profileEntries=").append(walk.limit(20).map(path -> profile.relativize(path).toString()).toList());
+                }
+            }
+            String marker = profile.toString();
+            out.append(" holders=").append(ProcessHandle.allProcesses()
+                    .filter(handle -> handle.info().commandLine().map(line -> line.contains(marker)).orElse(false))
+                    .map(handle -> handle.pid() + ":" + handle.info().command().orElse("?"))
+                    .toList());
+            Path log = dir.resolve("popup.log");
+            if (Files.isRegularFile(log)) {
+                java.util.List<String> lines = Files.readAllLines(log);
+                out.append(" log=").append(lines.subList(Math.max(0, lines.size() - 15), lines.size()));
+            }
+        } catch (Exception failure) {
+            out.append(" diagnostics failed: ").append(failure);
+        }
+        return out.toString();
     }
 
     private static String sha(String text) throws Exception {

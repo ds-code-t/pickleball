@@ -36,6 +36,7 @@ prompts/build-3.0.0-linked-tracking-fixback1-addendum.md
 prompts/build-3.0.0-linked-tracking-fixback1.md
 prompts/build-3.0.0-linked-tracking-fixback2.md
 prompts/build-3.0.0-linked-tracking.md
+prompts/build-3.0.0-visual-components.md
 prompts/heavy-3.0.0-engine-defects.md
 prompts/heavy-3.0.0-locked-G1-protocol.md
 prompts/heavy-3.0.0-locked-G2-query.md

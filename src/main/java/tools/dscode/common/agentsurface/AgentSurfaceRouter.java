@@ -68,6 +68,7 @@ public final class AgentSurfaceRouter {
     static void onScenarioEnd() {
         // Native rectangles (highlight, overlay, and every visual kind) do not outlive the scenario.
         try {
+            NativeVisual.forgetAll();
             java.util.List<String> hidden = tools.dscode.control.protocol.surface.NativeHighlightBox.hideAll();
             if (!hidden.isEmpty()) tools.dscode.common.composite.CompositeLog.info("highlight", "native scenario-end hidden=" + hidden);
         } catch (RuntimeException ignored) {
@@ -142,6 +143,10 @@ public final class AgentSurfaceRouter {
             case "html-cleanup" -> "cleanup";
             default -> VisualKinds.removal(op) ? "remove" : "append";
         };
+        if (VisualKinds.removal(op)) {
+            String target = text(args.get("handle"), args.get("id"));
+            VisualKinds.requireRemovalKind(target, popupKind(project, runId, target), kind);
+        }
         String raw = args.get("text");
         String labeled = "";
         boolean stripped = false;
@@ -172,11 +177,32 @@ public final class AgentSurfaceRouter {
         return new AgentControl.Result(0, body);
     }
 
+    private static final java.util.regex.Pattern POPUP_KIND = java.util.regex.Pattern.compile("data-pkb-kind=\"([A-Za-z-]+)\"");
+
+    /** Kind of the popup append row with this sequence id, read from its labeled markup. Blank when unknown. */
+    static String popupKind(Path project, String runId, String id) {
+        if (id == null || !id.matches("\\d{1,18}")) return "";
+        try {
+            long seq = Long.parseLong(id);
+            for (PopupLedger.Row row : PopupLedger.read(project, runId)) {
+                if (row.seq() != seq) continue;
+                if ("remove".equals(row.op()) || "cleanup".equals(row.op())) return "";
+                java.util.regex.Matcher matcher = POPUP_KIND.matcher(row.html());
+                return matcher.find() ? matcher.group(1) : "";
+            }
+        } catch (Exception unreadable) {
+            return "";
+        }
+        return "";
+    }
+
     private static AgentControl.Result nativeHighlight(Path project, String runId, String op, Map<String, String> args) throws Exception {
         if ("unhighlight".equals(op) || "overlay-remove".equals(op) || VisualKinds.removal(op)) {
             String fallback = VisualKinds.removal(op) ? NativeVisual.defaultId(VisualKinds.kind(op)) : "native";
             String id = text(args.get("id"), args.get("handle"), fallback);
+            if (VisualKinds.removal(op)) VisualKinds.requireRemovalKind(id, NativeVisual.kindOf(id), VisualKinds.kind(op));
             Map<String, Object> body = NativeHighlight.hide(id);
+            NativeVisual.forget(id);
             body.put("ok", true);
             body.put("target", "native");
             body.put("op", op);
