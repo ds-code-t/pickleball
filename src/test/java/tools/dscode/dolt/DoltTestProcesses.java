@@ -22,11 +22,53 @@ final class DoltTestProcesses {
     private DoltTestProcesses() {
     }
 
-    /** Closes this JVM's pools for the project, then stops its server and supervisor and waits for both. */
+    /**
+     * Closes this JVM's pools for the project, then stops its server and supervisor and waits for both.
+     * Any other {@code dolt} process this JVM started (directly or through a supervisor) is ended too and
+     * awaited. The snapshot is taken before the stop, because an orphaned server is no longer reachable
+     * as a descendant once its supervisor is gone. On Windows, when the store journal is still locked
+     * afterwards, this fails with the live Dolt processes so the cause is in the test report.
+     */
     static void release(Path project) throws IOException {
         if (project == null) return;
+        List<ProcessHandle> spawned = ProcessHandle.current().descendants()
+                .filter(handle -> command(handle).contains("dolt"))
+                .toList();
         DoltConnections.closeProject(project);
         DoltServer.stop(project);
+        for (ProcessHandle handle : spawned) DoltServer.terminate(handle, 5_000);
+        if (windows()) requireJournalReleased(project, spawned);
+    }
+
+    private static void requireJournalReleased(Path project, List<ProcessHandle> spawned) {
+        Path journal = DoltServer.dataDir(project).resolve("pickleball/.dolt/noms/journal.idx");
+        if (!Files.isRegularFile(journal)) return;
+        Path moved = journal.resolveSibling("journal.idx.release-check");
+        try {
+            Files.move(journal, moved);
+            Files.move(moved, journal);
+        } catch (IOException locked) {
+            StringBuilder live = new StringBuilder();
+            ProcessHandle.allProcesses()
+                    .filter(handle -> command(handle).contains("dolt"))
+                    .forEach(handle -> live.append("\n  pid=").append(handle.pid())
+                            .append(" parent=").append(handle.parent().map(ProcessHandle::pid).orElse(-1L))
+                            .append(" alive=").append(handle.isAlive())
+                            .append(" start=").append(handle.info().startInstant().map(Object::toString).orElse("?"))
+                            .append(" command=").append(handle.info().command().orElse("?")));
+            StringBuilder swept = new StringBuilder();
+            for (ProcessHandle handle : spawned) swept.append(' ').append(handle.pid());
+            throw new AssertionError("Dolt journal still locked after stop: " + journal + " (" + locked + ")"
+                    + "\nswept dolt descendants:" + swept + "\nlive dolt processes:" + live);
+        }
+    }
+
+    private static String command(ProcessHandle handle) {
+        return handle.info().command().orElse("").toLowerCase(Locale.ROOT);
+    }
+
+    private static boolean windows() {
+        return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
     }
 
     /**
