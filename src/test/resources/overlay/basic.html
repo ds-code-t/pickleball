@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Overlay fixture: basic</title>
+<style>
+  body { font: 15px/1.4 system-ui, sans-serif; margin: 40px; min-height: 2400px; }
+  div { background: #fafafa; }
+  form { display: grid; gap: 12px; max-width: 360px; padding: 16px; border: 1px solid #ccc; }
+  label { display: grid; gap: 4px; }
+  #spacer { height: 0; }
+</style>
+</head>
+<body>
+<h1>Account</h1>
+<div id="spacer"></div>
+<form id="account" onsubmit="return false">
+  <label>Email <input id="email" name="email" type="email" autocomplete="email"></label>
+  <label>Password <input id="password" name="password" type="password" autocomplete="current-password"></label>
+  <label>Plan
+    <select id="plan" name="plan"><option value="">Choose</option><option value="pro">Pro</option></select>
+  </label>
+  <label><input id="terms" type="checkbox"> I agree</label>
+  <div id="save-slot"><button id="save" type="button" onclick="window.saved=(window.saved||0)+1">Save</button></div>
+</form>
+<p>
+  <button id="rerender" type="button">Re-render Save</button>
+  <button id="grow" type="button">Grow above</button>
+</p>
+<script src="basic.js"></script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Overlay fixture: nested scroll</title>
+<style>
+  body { font: 15px/1.4 system-ui, sans-serif; margin: 0; min-height: 2000px; }
+  header { position: sticky; top: 0; height: 48px; background: #234; color: #fff; padding: 12px; box-sizing: border-box; z-index: 5; }
+  #wrap { margin: 40px; transform-origin: 0 0; }
+  #outer { width: 520px; height: 300px; overflow: auto; border: 2px solid #888; }
+  #outer-content { height: 700px; padding: 20px; }
+  #inner { width: 420px; height: 200px; overflow: auto; border: 2px solid #49c; margin-top: 60px; }
+  #inner-content { height: 1200px; padding: 16px; }
+  #deep { margin-top: 300px; }
+</style>
+</head>
+<body>
+<header>Sticky header</header>
+<div id="wrap">
+  <div id="outer">
+    <div id="outer-content">
+      Outer scroll container
+      <div id="inner">
+        <div id="inner-content">
+          Inner scroll container
+          <button id="deep" type="button" onclick="window.deepClicked=(window.deepClicked||0)+1">Deep button</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
