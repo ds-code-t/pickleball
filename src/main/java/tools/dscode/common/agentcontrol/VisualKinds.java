@@ -225,7 +225,7 @@ public final class VisualKinds {
     }
 
     static String escape(String text) {
-        return text.replace("&", "&").replace("<", "<").replace(">", ">");
+        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
     }
 
     private static int whole(String value, String name) {

@@ -27,4 +27,19 @@ class NativeHighlightBoxTest {
         }
         NativeHighlightBox.hide("box");
     }
+
+    @Test
+    void hideAllClearsEveryDrawnBox() {
+        NativeHighlightBox.show("all-a", 10, 10, 30, 20);
+        NativeHighlightBox.show("all-b", 60, 10, 30, 20);
+        if (GraphicsEnvironment.isHeadless()) {
+            assertTrue(NativeHighlightBox.shown().isEmpty());
+            assertTrue(NativeHighlightBox.hideAll().isEmpty());
+        } else {
+            assertTrue(NativeHighlightBox.shown().containsAll(java.util.List.of("all-a", "all-b")));
+            assertTrue(NativeHighlightBox.hideAll().containsAll(java.util.List.of("all-a", "all-b")));
+            assertEquals("absent", NativeHighlightBox.hide("all-a").reason());
+        }
+        assertTrue(NativeHighlightBox.shown().isEmpty());
+    }
 }

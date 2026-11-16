@@ -122,11 +122,23 @@ if (spec.kind === 'overlay') {
 if (spec.kind === 'magnifier' && anchor) {
   var zoom = spec.zoom == null || spec.zoom === '' ? 2 : spec.zoom;
   var clone = anchor.cloneNode(true);
-  if (clone.removeAttribute) clone.removeAttribute('id');
+  // The copy is a picture of the page node: no ids, names, inline handlers, scripts, or focus.
+  clone.querySelectorAll('script').forEach(function(s) { s.remove(); });
+  [clone].concat(Array.from(clone.querySelectorAll('*'))).forEach(function(el) {
+    if (!el.attributes) return;
+    Array.from(el.attributes).forEach(function(a) {
+      var n = a.name.toLowerCase();
+      if (n === 'id' || n === 'name' || n === 'for' || n === 'form' || n === 'tabindex' || n.indexOf('on') === 0) el.removeAttribute(a.name);
+    });
+  });
+  clone.setAttribute('inert', '');
+  clone.setAttribute('aria-hidden', 'true');
   clone.style.transform = 'scale(' + zoom + ')';
   clone.style.transformOrigin = '0 0';
+  clone.style.pointerEvents = 'none';
   host.textContent = '';
   host.appendChild(clone);
+  markTree(clone, spec.kind, spec.sentence);
 }
 if (op === 'replace' && anchor) {
   window.__pkbUndo = window.__pkbUndo || {};

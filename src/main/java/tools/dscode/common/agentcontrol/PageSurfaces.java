@@ -497,6 +497,18 @@ final class PageSurfaces {
     }
 
     static Map<String, Object> remove(Path page, String id, Path ledger) throws IOException {
+        return remove(page, id, ledger, "html");
+    }
+
+    /**
+     * Removes one placement. A visual kind (label, border, arrow, step, magnifier,
+     * spotlight) logs under its own {@code pkb_composite_log} entity and labels the
+     * result with its own sentence. Other kinds keep the {@code html} entity.
+     */
+    static Map<String, Object> remove(Path page, String id, Path ledger, String kind) throws IOException {
+        boolean visual = VisualKinds.is(kind);
+        String entity = visual ? kind : "html";
+        String sentence = visual ? SurfaceAssets.sentence(kind) : HTML_SENTENCE;
         if (id == null || id.isBlank()) throw new IllegalArgumentException("missing id");
         Placement placement = placement(page, ledger, id);
         if (page != null && Files.isRegularFile(page)) {
@@ -517,8 +529,8 @@ final class PageSurfaces {
         }
         String digest = placement == null ? "" : placement.sha;
         String summary = placement == null ? "" : placement.summary;
-        CompositeLog.info("html", "remove id=" + id + " sha=" + digest + " summary=" + summary);
-        Map<String, Object> body = labeled(List.of("agent_injected"), HTML_SENTENCE);
+        CompositeLog.info(entity, "remove id=" + id + " sha=" + digest + " summary=" + summary);
+        Map<String, Object> body = labeled(visual ? List.of("agent_injected", kind) : List.of("agent_injected"), sentence);
         body.put("id", id);
         body.put("removed", true);
         body.put("sha256", digest);

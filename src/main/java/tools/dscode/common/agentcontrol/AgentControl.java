@@ -401,7 +401,7 @@ public final class AgentControl {
 
     private static Result remove(Path project, String runId, Map<String, String> args, String kind) throws Exception {
         String id = present(args.get("id")) ? args.get("id") : args.get("handle");
-        Map<String, Object> removed = PageSurfaces.remove(explicitPage(project, args), id, AgentStore.root(project, runId));
+        Map<String, Object> removed = PageSurfaces.remove(explicitPage(project, args), id, AgentStore.root(project, runId), kind);
         removed.put("ok", true);
         removed.put("kind", kind);
         return new Result(0, removed);

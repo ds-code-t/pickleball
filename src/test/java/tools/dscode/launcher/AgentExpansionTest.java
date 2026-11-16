@@ -603,6 +603,83 @@ class AgentExpansionTest {
         assertTrue(ScenarioCapture.feature(ObserveEvents.parse(Files.readString(events))).contains("EXECUTE SERVICE CALL"));
     }
 
+    @Test
+    void step_badge_and_magnifier_text_is_escaped_not_markup() throws Exception {
+        Path page = page();
+        Capture step = agent(
+                "step-badge", temp.toString(), "--html=" + page, "--number=4",
+                "--text=<b>Go</b> & \"on\"", "--x=1", "--y=1", "--target=page"
+        );
+        assertEquals(0, step.code, step.err);
+        String html = Files.readString(page);
+        assertFalse(html.contains("<b>Go</b>"), html);
+        assertTrue(html.contains("&" + "lt;b&" + "gt;Go&" + "lt;/b&" + "gt;"), html);
+        assertTrue(html.contains("&" + "amp;"), html);
+        Capture zoomed = agent(
+                "magnifier", temp.toString(), "--html=" + page, "--text=<i>tiny</i>",
+                "--x=2", "--y=2", "--target=page"
+        );
+        assertEquals(0, zoomed.code, zoomed.err);
+        html = Files.readString(page);
+        assertFalse(html.contains("<i>tiny</i>"), html);
+        assertTrue(html.contains("&" + "lt;i&" + "gt;tiny"), html);
+    }
+
+    @Test
+    void every_visual_kind_logs_place_and_remove_under_its_own_entity() throws Exception {
+        CompositeRuntime.resetForTests();
+        Path logs = temp.resolve("logs");
+        String previousLog = System.getProperty("pkb_composite_log");
+        String previousDir = System.getProperty("pkb_composite_log_dir");
+        System.setProperty("pkb_composite_log", "label,border,arrow,step,magnifier,spotlight");
+        System.setProperty("pkb_composite_log_dir", logs.toString());
+        try {
+            Path page = page();
+            String[][] calls = {
+                    {"label", "unlabel", "label", "--text=Name"},
+                    {"border", "unborder", "border", "--width=10"},
+                    {"arrow", "unarrow", "arrow", "--direction=up"},
+                    {"step-badge", "unstep-badge", "step", "--number=1"},
+                    {"magnifier", "unmagnifier", "magnifier", "--zoom=2"},
+                    {"spotlight", "unspotlight", "spotlight", "--dim=0.3"},
+            };
+            for (String[] call : calls) {
+                Capture placed = agent(call[0], temp.toString(), "--html=" + page, "--x=5", "--y=40", "--height=10", call[3]);
+                assertEquals(0, placed.code, call[0] + " " + placed.err);
+                String id = placed.out.replaceAll("(?s).*\"id\":\"([^\"]+)\".*", "$1");
+                Capture removed = agent(call[1], temp.toString(), "--html=" + page, "--id=" + id);
+                assertEquals(0, removed.code, call[1] + " " + removed.err);
+                assertTrue(removed.out.contains("\"" + call[2] + "\""), removed.out);
+                String log = readLogs(logs);
+                assertTrue(log.contains("INFO " + call[2] + " append id=" + id), call[2] + " place line missing:\n" + log);
+                assertTrue(log.contains("INFO " + call[2] + " remove id=" + id), call[2] + " remove line missing:\n" + log);
+            }
+
+            System.setProperty("pkb_composite_log", "overlay");
+            String before = readLogs(logs);
+            Capture quiet = agent("label", temp.toString(), "--html=" + page, "--x=1", "--y=1", "--text=quiet");
+            assertEquals(0, quiet.code, quiet.err);
+            assertEquals(before, readLogs(logs), "label logged while only overlay was named");
+        } finally {
+            if (previousLog == null) System.clearProperty("pkb_composite_log");
+            else System.setProperty("pkb_composite_log", previousLog);
+            if (previousDir == null) System.clearProperty("pkb_composite_log_dir");
+            else System.setProperty("pkb_composite_log_dir", previousDir);
+        }
+    }
+
+    private static String readLogs(Path dir) throws Exception {
+        if (!Files.isDirectory(dir)) return "";
+        StringBuilder all = new StringBuilder();
+        try (var files = Files.list(dir)) {
+            for (Path file : files.sorted().toList()) {
+                assertTrue(file.getFileName().toString().matches("composite-\\d{4}-\\d{2}-\\d{2}\\.log(\\.1)?"), file.toString());
+                all.append(Files.readString(file));
+            }
+        }
+        return all.toString();
+    }
+
     private Path page() throws Exception {
         Path page = temp.resolve("page.html");
         Files.writeString(page, "<html><body><button id=\"save\">Save</button></body></html>");

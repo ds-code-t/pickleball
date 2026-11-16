@@ -66,6 +66,13 @@ public final class AgentSurfaceRouter {
     }
 
     static void onScenarioEnd() {
+        // Native rectangles (highlight, overlay, and every visual kind) do not outlive the scenario.
+        try {
+            java.util.List<String> hidden = tools.dscode.control.protocol.surface.NativeHighlightBox.hideAll();
+            if (!hidden.isEmpty()) tools.dscode.common.composite.CompositeLog.info("highlight", "native scenario-end hidden=" + hidden);
+        } catch (RuntimeException ignored) {
+            // Scenario cleanup must not block the popup ledger cleanup below.
+        }
         for (HostRef host : OPENED) {
             try {
                 PopupLedger.append(host.project, host.runId, "cleanup", "", "", "", "", "", "");
@@ -167,7 +174,8 @@ public final class AgentSurfaceRouter {
 
     private static AgentControl.Result nativeHighlight(Path project, String runId, String op, Map<String, String> args) throws Exception {
         if ("unhighlight".equals(op) || "overlay-remove".equals(op) || VisualKinds.removal(op)) {
-            String id = text(args.get("id"), args.get("handle"), "native");
+            String fallback = VisualKinds.removal(op) ? NativeVisual.defaultId(VisualKinds.kind(op)) : "native";
+            String id = text(args.get("id"), args.get("handle"), fallback);
             Map<String, Object> body = NativeHighlight.hide(id);
             body.put("ok", true);
             body.put("target", "native");

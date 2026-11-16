@@ -138,6 +138,102 @@ class LiveChromeCdpTest {
         assertEquals(null, point);
     }
 
+    @Test
+    void visualKindsPaintAtTheResolvedBoxOnALivePageAndRemove() throws Exception {
+        String binary = chromeBinary();
+        Assumptions.assumeTrue(binary != null, "skipped: no Chrome binary on this machine");
+        browser = open(binary);
+        browser.get("data:text/html,<!doctype html><body style='margin:40px'>"
+                + "<button id='save' name='save' onclick='window.clicked=1' style='width:80px;height:24px'>Save</button></body>");
+        PageSurfaces.manage(browser, "chrome-headless-quiet", false);
+        assertTrue(PageSurfaces.focus(browser), "page focus");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> model = (Map<String, Object>) browser.executeCdpCommand(
+                "DOM.getBoxModel", Map.of("nodeId", nodeId(browser, "#save")));
+        @SuppressWarnings("unchecked")
+        List<Object> quad = (List<Object>) ((Map<String, Object>) model.get("model")).get("border");
+        int left = (int) Math.round(((Number) quad.get(0)).doubleValue());
+        int top = (int) Math.round(((Number) quad.get(1)).doubleValue());
+        int width = (int) Math.round(((Number) quad.get(2)).doubleValue() - ((Number) quad.get(0)).doubleValue());
+        int height = (int) Math.round(((Number) quad.get(5)).doubleValue() - ((Number) quad.get(1)).doubleValue());
+        PageSurfaces.rememberBounds("save", left, top, width, height, browser, browser.getWindowHandle());
+        JavascriptExecutor js = browser;
+
+        Map<String, Map<String, String>> calls = new java.util.LinkedHashMap<>();
+        calls.put("label", Map.of("text", "Save name"));
+        calls.put("border", Map.of("color", "#123456"));
+        calls.put("step-badge", Map.of("number", "2", "text", "<b>Go</b>"));
+        calls.put("magnifier", Map.of("zoom", "3"));
+        calls.put("spotlight", Map.of("dim", "0.5"));
+        calls.put("arrow", Map.of("direction", "down"));
+        Map<String, String> ids = new java.util.LinkedHashMap<>();
+        for (var call : calls.entrySet()) {
+            Map<String, String> args = new java.util.LinkedHashMap<>(call.getValue());
+            args.put("handle", "save");
+            args.put("target", "page");
+            AgentControl.Result result = AgentControl.execute(temp, "live-vc", call.getKey(), args, List.of(), "a");
+            assertEquals(0, result.exit(), call.getKey() + " " + result.body());
+            String id = String.valueOf(result.body().get("id"));
+            ids.put(call.getKey(), id);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> seen = (Map<String, Object>) js.executeScript(
+                    "var n=document.querySelector('[data-pkb-id=\"'+arguments[0]+'\"]');"
+                            + "if(!n) return null; return {agent:n.getAttribute('data-pkb-agent'), kind:n.getAttribute('data-pkb-kind'),"
+                            + "left:n.style.left, top:n.style.top, width:n.style.width, shadow:n.style.boxShadow, text:n.textContent,"
+                            + "bold:n.querySelector('b')!==null, cloneButton:n.querySelector('button')?{id:n.querySelector('button').getAttribute('id'),"
+                            + "name:n.querySelector('button').getAttribute('name'), onclick:n.querySelector('button').getAttribute('onclick'),"
+                            + "inert:n.querySelector('button').hasAttribute('inert'), agent:n.querySelector('button').getAttribute('data-pkb-agent')}:null,"
+                            + "saves:document.querySelectorAll('#save').length}",
+                    id);
+            assertNotNull(seen, call.getKey() + " was not injected into the live page");
+            assertEquals("agent_injected", seen.get("agent"), call.getKey() + " " + seen);
+            String kind = "step-badge".equals(call.getKey()) ? "step" : call.getKey();
+            assertEquals(kind, seen.get("kind"), seen.toString());
+            assertEquals(1L, ((Number) seen.get("saves")).longValue(), "the page button was duplicated by " + call.getKey());
+            if (!"arrow".equals(call.getKey())) {
+                assertEquals("resolved", result.body().get("boundsSource"), call.getKey() + " " + result.body());
+                assertEquals(left + "px", seen.get("left"), call.getKey() + " " + seen);
+                assertEquals(top + "px", seen.get("top"), call.getKey() + " " + seen);
+            }
+            switch (call.getKey()) {
+                case "border", "spotlight", "magnifier" -> assertEquals(width + "px", seen.get("width"), call.getKey() + " " + seen);
+                default -> { }
+            }
+            if ("spotlight".equals(call.getKey())) {
+                assertTrue(String.valueOf(seen.get("shadow")).contains("9999px"), seen.toString());
+                assertTrue(String.valueOf(seen.get("shadow")).contains("0.5"), seen.toString());
+            }
+            if ("step-badge".equals(call.getKey())) {
+                assertTrue(String.valueOf(seen.get("text")).contains("2"), seen.toString());
+                assertTrue(String.valueOf(seen.get("text")).contains("<b>Go</b>"), seen.toString());
+                assertEquals(false, seen.get("bold"), "step text became markup: " + seen);
+            }
+            if ("magnifier".equals(call.getKey())) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> clone = (Map<String, Object>) seen.get("cloneButton");
+                assertNotNull(clone, "magnifier did not copy the resolved node: " + seen);
+                assertEquals(null, clone.get("id"), clone.toString());
+                assertEquals(null, clone.get("name"), clone.toString());
+                assertEquals(null, clone.get("onclick"), clone.toString());
+                assertEquals(true, clone.get("inert"), clone.toString());
+                assertEquals("agent_injected", clone.get("agent"), clone.toString());
+            }
+        }
+
+        AgentControl.Result unlabel = AgentControl.execute(temp, "live-vc", "unlabel",
+                Map.of("id", ids.get("label"), "target", "page"), List.of(), "a");
+        assertEquals(0, unlabel.exit(), String.valueOf(unlabel.body()));
+        assertEquals(0L, ((Number) js.executeScript(
+                "return document.querySelectorAll('[data-pkb-id=\"'+arguments[0]+'\"]').length", ids.get("label"))).longValue());
+        assertTrue(((Number) js.executeScript("return document.querySelectorAll('[data-pkb-agent]').length")).longValue() > 0);
+
+        AgentControl.Result cleaned = AgentControl.execute(temp, "live-vc", "html-cleanup", Map.of("target", "page"), List.of(), "a");
+        assertEquals(0, cleaned.exit(), String.valueOf(cleaned.body()));
+        assertEquals(0L, ((Number) js.executeScript("return document.querySelectorAll('[data-pkb-agent]').length")).longValue());
+        assertEquals("width:80px;height:24px", String.valueOf(js.executeScript(
+                "return document.getElementById('save').getAttribute('style')")));
+    }
+
     private static int nodeId(ChromeDriver browser, String selector) {
         @SuppressWarnings("unchecked")
         Map<String, Object> document = (Map<String, Object>) browser.executeCdpCommand(

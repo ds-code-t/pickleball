@@ -22,7 +22,7 @@ public final class NativeVisual {
     public static Map<String, Object> show(Path project, String runId, String kind, Map<String, String> args) throws Exception {
         SurfaceBox.View box = box(kind, args);
         if (box == null) throw new IllegalArgumentException(kind + " needs a target or a visual-viewport box");
-        String id = text(args.get("id"), args.get("handle"), "native-" + kind);
+        String id = text(args.get("id"), args.get("handle"), defaultId(kind));
         NativeHighlightBox.Drawn drawn = box.sized()
                 ? NativeHighlightBox.show(id, box.x(), box.y(), box.width(), box.height())
                 : new NativeHighlightBox.Drawn(false, "no-size", id);
@@ -50,6 +50,11 @@ public final class NativeVisual {
         body.put("popup", false);
         body.put("native", "rectangle");
         return body;
+    }
+
+    /** Native id used when neither {@code --id} nor {@code --handle} is given. The {@code un*} verb uses the same id. */
+    public static String defaultId(String kind) {
+        return "native-" + kind;
     }
 
     private static SurfaceBox.View box(String kind, Map<String, String> args) throws Exception {

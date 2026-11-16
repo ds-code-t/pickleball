@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class NativeHighlightRouteTest {
@@ -79,5 +80,43 @@ class NativeHighlightRouteTest {
             tools.dscode.common.agentcontrol.AgentControl.clearRememberedGeometry();
             NativeHighlight.queries = query -> "{}";
         }
+    }
+
+    @Test
+    void visualRemovalWithoutAnIdHidesTheBoxItsShowDrew() throws Exception {
+        String[][] pairs = {
+                {"label", "unlabel"}, {"border", "unborder"}, {"step-badge", "unstep-badge"},
+                {"magnifier", "unmagnifier"}, {"spotlight", "unspotlight"}
+        };
+        for (String[] pair : pairs) {
+            var shown = AgentSurfaceRouter.route(project, "nat", pair[0], Map.of(
+                    "target", "native", "x", "4", "y", "5", "width", "30", "height", "12",
+                    "text", "t", "number", "1"), "a").orElseThrow();
+            String id = String.valueOf(shown.body().get("id"));
+            assertTrue(id.startsWith("native-"), id);
+            var hidden = AgentSurfaceRouter.route(project, "nat", pair[1], Map.of("target", "native"), "a").orElseThrow();
+            assertEquals(id, hidden.body().get("id"), pair[1] + " hid a different native box");
+            assertEquals(true, hidden.body().get("reversed"));
+            if (!java.awt.GraphicsEnvironment.isHeadless()) {
+                assertEquals(true, hidden.body().get("drawn"), pair[1] + " did not find the box " + id);
+                assertFalse(tools.dscode.control.protocol.surface.NativeHighlightBox.shown().contains(id), id);
+            }
+        }
+    }
+
+    @Test
+    void scenarioEndHidesEveryNativeBox() throws Exception {
+        AgentSurfaceRouter.route(project, "nat", "border", Map.of(
+                "target", "native", "id", "end-a", "x", "1", "y", "1", "width", "20", "height", "10"), "a").orElseThrow();
+        AgentSurfaceRouter.route(project, "nat", "spotlight", Map.of(
+                "target", "native", "id", "end-b", "x", "30", "y", "1", "width", "20", "height", "10"), "a").orElseThrow();
+        if (!java.awt.GraphicsEnvironment.isHeadless()) {
+            assertTrue(tools.dscode.control.protocol.surface.NativeHighlightBox.shown().containsAll(java.util.List.of("end-a", "end-b")));
+        }
+        AgentSurfaceRouter.onScenarioEnd();
+        assertTrue(tools.dscode.control.protocol.surface.NativeHighlightBox.shown().isEmpty(),
+                String.valueOf(tools.dscode.control.protocol.surface.NativeHighlightBox.shown()));
+        var again = AgentSurfaceRouter.route(project, "nat", "unborder", Map.of("target", "native", "id", "end-a"), "a").orElseThrow();
+        if (!java.awt.GraphicsEnvironment.isHeadless()) assertEquals("absent", again.body().get("reason"));
     }
 }
