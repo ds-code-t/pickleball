@@ -43,8 +43,8 @@ class AgentSurfacePopupLiveTest {
             PopupLedger.append(project, "live", "chat", "chat", "", "", chat, "", "");
             PopupSurfaceBridge.sendChat(project, "live", "run", "human", chat);
             String rendered = waitRendered(project);
-            assertTrue(rendered.contains(sha(html)), rendered);
-            assertTrue(rendered.contains(sha(chat)), rendered);
+            assertTrue(rendered.contains(sha(html)), () -> "rendered=" + rendered + " " + hostDiagnostics(project));
+            assertTrue(rendered.contains(sha(chat)), () -> "rendered=" + rendered + " " + hostDiagnostics(project));
             boolean exited = PopupHost.closeAndWait(project, "live", Duration.ofSeconds(10));
             assertTrue(exited, () -> closeDiagnostics(project));
             long browserPid = opened.get("browserPid") instanceof Number number ? number.longValue() : -1;
@@ -75,6 +75,24 @@ class AgentSurfacePopupLiveTest {
         return Files.isRegularFile(file) ? Files.readString(file) : "";
     }
 
+    /** Status, popup log, and the host and browser output when the page never rendered. */
+    private static String hostDiagnostics(Path project) {
+        StringBuilder out = new StringBuilder();
+        try {
+            out.append("status=").append(tools.dscode.common.agentsurface.PopupStatus.read(project, "live"));
+            Path dir = PopupLog.popupDir(project, "live");
+            for (String name : java.util.List.of("warnings.txt", "popup.log", "host.out", "browser.out")) {
+                Path file = dir.resolve(name);
+                if (!Files.isRegularFile(file)) continue;
+                java.util.List<String> lines = Files.readAllLines(file);
+                out.append(' ').append(name).append('=').append(lines.subList(Math.max(0, lines.size() - 20), lines.size()));
+            }
+        } catch (Exception failure) {
+            out.append(" diagnostics failed: ").append(failure);
+        }
+        return out.toString();
+    }
+
     /** What still holds the popup after close: status pids, profile, surviving processes, and the log tail. */
     private static String closeDiagnostics(Path project) {
         StringBuilder out = new StringBuilder("popup did not exit.");
@@ -101,11 +119,7 @@ class AgentSurfacePopupLiveTest {
                     .filter(handle -> handle.info().commandLine().map(line -> line.contains(marker)).orElse(false))
                     .map(handle -> handle.pid() + ":" + handle.info().command().orElse("?"))
                     .toList());
-            Path log = dir.resolve("popup.log");
-            if (Files.isRegularFile(log)) {
-                java.util.List<String> lines = Files.readAllLines(log);
-                out.append(" log=").append(lines.subList(Math.max(0, lines.size() - 15), lines.size()));
-            }
+            out.append(' ').append(hostDiagnostics(project));
         } catch (Exception failure) {
             out.append(" diagnostics failed: ").append(failure);
         }

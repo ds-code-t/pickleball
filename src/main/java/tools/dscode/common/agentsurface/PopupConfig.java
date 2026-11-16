@@ -27,6 +27,11 @@ public final class PopupConfig {
         return truth(raw);
     }
 
+    /** Forces {@code --no-sandbox}. Unset, the host adds it only after a sandboxed launch fails with a sandbox error. */
+    public static boolean noSandbox() {
+        return truth(PopupLog.setting("pkb_agent_popup_no_sandbox", "PKB_AGENT_POPUP_NO_SANDBOX"));
+    }
+
     public static int width() {
         return size()[0];
     }
