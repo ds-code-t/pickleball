@@ -1177,6 +1177,84 @@ final class PageSurfaces {
         return executor.executeScript(LIVE_HELPER, spec);
     }
 
+    private static final String RUNTIME_CALL = "var a = JSON.parse(raw); var ui = window.__pkbUi;"
+            + " if (!ui || typeof ui[a.m] !== 'function') return null;"
+            + " var r = ui[a.m](a.a); return r === undefined || r === null ? null : JSON.stringify(r);";
+
+    /**
+     * Calls one {@code window.__pkbUi} method on the focused managed page and returns its JSON reply,
+     * or null when no page is managed or the runtime is not there. {@code install} loads the runtime first.
+     * CDP and BiDi sessions run it in the {@code pkb-surface} world; a Selenium-only session in the page.
+     */
+    static String runtimeCall(String method, Object argument, boolean install) {
+        WebDriver web = driver;
+        if (web == null) {
+            List<Managed> all = managed();
+            if (all.isEmpty()) return null;
+            web = all.get(0).driver;
+        }
+        Map<String, Object> call = new LinkedHashMap<>();
+        call.put("m", method);
+        call.put("a", argument == null ? Map.of() : argument);
+        String json;
+        try {
+            json = AgentStore.JSON.writeValueAsString(call);
+        } catch (IOException failure) {
+            throw new IllegalStateException(failure);
+        }
+        BrowserFacade facade = directPage(web);
+        if (facade != null) {
+            installSurface(web, facade);
+            Object value = facade.evaluateIsolated("pkb-surface",
+                    "function(raw){" + (install ? RUNTIME + "\n;" : "") + RUNTIME_CALL + "}", json);
+            return value == null ? null : String.valueOf(value);
+        }
+        if (!(web instanceof JavascriptExecutor executor)) return null;
+        if (install) executor.executeScript(RUNTIME);
+        Object value = executor.executeScript("var raw = arguments[0];" + RUNTIME_CALL, json);
+        return value == null ? null : String.valueOf(value);
+    }
+
+    static boolean hasLivePage() {
+        return driver != null || !MANAGED.isEmpty();
+    }
+
+    /**
+     * Moves messages typed into the in-page panel into the run chat ({@code source=human}) and marks
+     * them delivered in the panel. Returns how many were stored. A page without a panel stores nothing.
+     */
+    static int drainPanelChat(Path project, String runId) throws IOException {
+        if (!hasLivePage()) return 0;
+        String raw;
+        try {
+            raw = runtimeCall("drainChat", null, false);
+        } catch (RuntimeException failure) {
+            CompositeLog.info("chat", "panel drain skipped " + failure.getMessage());
+            return 0;
+        }
+        if (raw == null || raw.isBlank() || "null".equals(raw)) return 0;
+        int stored = 0;
+        for (Object item : AgentStore.JSON.readValue(raw, List.class)) {
+            if (!(item instanceof Map<?, ?> map) || map.get("text") == null) continue;
+            String text = String.valueOf(map.get("text"));
+            if (text.isBlank()) continue;
+            ChatLog.send(project, runId, null, "human", "", text);
+            CompositeLog.info("chat", "panel human message chars=" + text.length());
+            stored++;
+        }
+        return stored;
+    }
+
+    /** Shows an agent chat message in the in-page panel when one is open. Never installs the runtime. */
+    static void pushChat(Map<String, Object> message) {
+        if (!hasLivePage()) return;
+        try {
+            runtimeCall("chat", List.of(message), false);
+        } catch (RuntimeException failure) {
+            CompositeLog.info("chat", "panel push skipped " + failure.getMessage());
+        }
+    }
+
     private static boolean tracksTarget(Map<String, Object> spec) {
         Object kind = spec.get("kind");
         boolean anchored = present(spec.get("handle")) || present(spec.get("anchor")) || present(spec.get("bridge"));

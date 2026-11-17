@@ -46,6 +46,8 @@
       "overlay",
       "overlay-poll",
       "overlay-remove",
+      "panel-close",
+      "panel-open",
       "plan",
       "popup-close",
       "popup-open",

@@ -92,6 +92,8 @@ public final class WorkbenchSessionActions {
             "popup-open",
             "popup-status",
             "popup-close",
+            "panel-open",
+            "panel-close",
             "capture-scenario"
     );
 
@@ -410,6 +412,7 @@ public final class WorkbenchSessionActions {
                  "magnifier", "unmagnifier", "spotlight", "unspotlight",
                  "html-write", "html-replace", "html-insert", "html-remove", "html-cleanup",
                  "popup-open", "popup-status", "popup-close",
+                 "panel-open", "panel-close",
                  "capture-scenario" -> forwardAgent(op, args);
             default -> throw new IllegalArgumentException("Unknown session command: " + op);
         };

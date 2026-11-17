@@ -138,6 +138,7 @@ public final class WorkbenchAgentCommands {
                      "magnifier", "unmagnifier", "spotlight", "unspotlight",
                      "html-write", "html-replace", "html-insert", "html-remove", "html-cleanup",
                      "popup-open", "popup-status", "popup-close",
+                     "panel-open", "panel-close",
                      "capture-scenario" -> agentControl(parsed, safeOut, safeErr);
                 case "help" -> help(args, safeOut, safeErr);
                 default -> {
@@ -1889,6 +1890,13 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "zoom");
         copyFlag(args, parsed, "direction");
         copyFlag(args, parsed, "dim");
+        // Overlay-polish flags: chat-poll --wait, overlay --at/--theme, panel-open --tab/--title/--minimized.
+        copyFlag(args, parsed, "wait");
+        copyFlag(args, parsed, "at");
+        copyFlag(args, parsed, "theme");
+        copyFlag(args, parsed, "tab");
+        copyFlag(args, parsed, "title");
+        copyFlag(args, parsed, "minimized");
         if ("arrow".equals(parsed.command())) {
             if (parsed.coordination().inboxFrom() != null) args.put("from", parsed.coordination().inboxFrom());
             if (parsed.coordination().inboxTo() != null) args.put("to", parsed.coordination().inboxTo());

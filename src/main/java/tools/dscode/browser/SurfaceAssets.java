@@ -53,6 +53,7 @@ public final class SurfaceAssets {
      * {@code pkb-runtime} (the tracker that keeps placements on their targets).
      */
     public static String script(String name) {
+        if ("pkb-runtime".equals(scriptName(name))) return runtime();
         String file = switch (scriptName(name)) {
             case "live-helper" -> "live-helper.js";
             case "bridge-mark" -> "bridge-mark.js";
@@ -62,6 +63,41 @@ public final class SurfaceAssets {
             default -> throw unknownScript(name);
         };
         return load(file);
+    }
+
+    /** Panel, chat, and steps stylesheet shared by the in-page panel and the popup window. */
+    public static String panelCss() {
+        return load("panel.css");
+    }
+
+    /** The page runtime with the shared panel stylesheet embedded as a string literal. */
+    private static String runtime() {
+        String built = runtime;
+        if (built == null) {
+            built = load("pkb-runtime.js").replace("\"__PKB_PANEL_CSS__\"", jsString(panelCss()));
+            runtime = built;
+        }
+        return built;
+    }
+
+    private static volatile String runtime;
+
+    private static String jsString(String text) {
+        StringBuilder out = new StringBuilder(text.length() + 16).append('"');
+        for (char c : text.toCharArray()) {
+            switch (c) {
+                case '"' -> out.append("\\\"");
+                case '\\' -> out.append("\\\\");
+                case '\n' -> out.append("\\n");
+                case '\r' -> out.append("\\r");
+                case '<' -> out.append("\\u003c");
+                default -> {
+                    if (c < 0x20 || c == 0x2028 || c == 0x2029) out.append(String.format("\\u%04x", (int) c));
+                    else out.append(c);
+                }
+            }
+        }
+        return out.append('"').toString();
     }
 
     /** Label sentence for a kind. {@code style} and {@code highlight} are the same sentence. */

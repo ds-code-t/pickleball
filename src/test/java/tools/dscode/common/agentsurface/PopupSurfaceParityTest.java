@@ -68,4 +68,26 @@ class PopupSurfaceParityTest {
     private static String escape(String html) {
         return html.replace("\\", "\\\\").replace("\"", "\\\"");
     }
+
+    @Test
+    void panelCssShared() throws Exception {
+        String panelCss = tools.dscode.browser.SurfaceAssets.panelCss();
+        assertTrue(panelCss.contains(".pkb-panel {") && panelCss.contains(".pkb-composer textarea"), "shared panel stylesheet incomplete");
+        String runtime = tools.dscode.browser.SurfaceAssets.script("pkb-runtime");
+        assertFalse(runtime.contains("__PKB_PANEL_CSS__"), "runtime placeholder was not replaced");
+        assertTrue(runtime.contains(".pkb-panel {") && runtime.contains(".pkb-composer textarea"), "runtime does not embed the panel stylesheet");
+        try (PopupBridge bridge = PopupBridge.start(project, "parity-css")) {
+            java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
+            String query = java.net.URLEncoder.encode(bridge.token(), java.nio.charset.StandardCharsets.UTF_8);
+            java.net.http.HttpResponse<String> shell = client.send(java.net.http.HttpRequest.newBuilder(
+                    java.net.URI.create("http://127.0.0.1:" + bridge.port() + "/")).header("X-Pkb-Popup-Token", bridge.token()).build(),
+                    java.net.http.HttpResponse.BodyHandlers.ofString());
+            assertTrue(shell.body().contains("assets/surface/panel.css?t=" + query), shell.body());
+            java.net.http.HttpResponse<String> css = client.send(java.net.http.HttpRequest.newBuilder(
+                    java.net.URI.create("http://127.0.0.1:" + bridge.port() + "/assets/surface/panel.css?t=" + query)).build(),
+                    java.net.http.HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, css.statusCode(), css.body());
+            assertEquals(panelCss, css.body());
+        }
+    }
 }

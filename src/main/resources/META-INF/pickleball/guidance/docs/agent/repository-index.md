@@ -656,6 +656,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/resources/tools/dscode/browser/surface/magnifier.html`
 - `src/main/resources/tools/dscode/browser/surface/overlay.css`
 - `src/main/resources/tools/dscode/browser/surface/overlay.html`
+- `src/main/resources/tools/dscode/browser/surface/panel.css`
 - `src/main/resources/tools/dscode/browser/surface/pkb-runtime.js`
 - `src/main/resources/tools/dscode/browser/surface/spotlight.css`
 - `src/main/resources/tools/dscode/browser/surface/spotlight.html`

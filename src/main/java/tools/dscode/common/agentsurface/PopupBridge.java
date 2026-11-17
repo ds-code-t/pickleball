@@ -92,7 +92,8 @@ public final class PopupBridge implements AutoCloseable {
             if ("GET".equals(method) && ("/".equals(path) || path.isEmpty())) {
                 String shell = new String(resource("agent-surface-popup.html"), StandardCharsets.UTF_8);
                 String query = java.net.URLEncoder.encode(token, StandardCharsets.UTF_8);
-                shell = shell.replace("assets/agent-surface-popup.css", "assets/agent-surface-popup.css?t=" + query)
+                shell = shell.replace("assets/surface/panel.css", "assets/surface/panel.css?t=" + query)
+                        .replace("assets/agent-surface-popup.css", "assets/agent-surface-popup.css?t=" + query)
                         .replace("assets/agent-surface-popup.js", "assets/agent-surface-popup.js?t=" + query);
                 send(exchange, 200, "text/html; charset=utf-8", shell);
                 return;
@@ -210,6 +211,10 @@ public final class PopupBridge implements AutoCloseable {
     private static byte[] surface(String kind, String extension) {
         try {
             Class<?> type = Class.forName("tools.dscode.browser.SurfaceAssets");
+            if ("panel".equals(kind) && "css".equals(extension)) {
+                Object shared = type.getMethod("panelCss").invoke(null);
+                return shared == null ? null : shared.toString().getBytes(StandardCharsets.UTF_8);
+            }
             String method = "css".equals(extension) ? "css" : "js";
             Object value = type.getMethod(method, String.class).invoke(null, kind);
             return value == null ? null : value.toString().getBytes(StandardCharsets.UTF_8);

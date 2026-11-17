@@ -5,7 +5,7 @@
 (function () {
   'use strict';
   if (typeof window === 'undefined' || typeof document === 'undefined' || !document.documentElement) return;
-  var VERSION = '3.0.0-p2';
+  var VERSION = '3.0.0-p3';
   if (window.__pkbUi && window.__pkbUi.version === VERSION) return;
   if (window.__pkbUi && typeof window.__pkbUi.dispose === 'function') {
     try { window.__pkbUi.dispose(); } catch (ignored) { /* older runtime */ }
@@ -86,7 +86,6 @@
     if (!layer) {
       layer = document.createElement('pkb-layer');
       layer.setAttribute('data-pkb-layer', 'agent_injected');
-      layer.setAttribute('aria-hidden', 'true');
       layer.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;max-width:none;max-height:none;margin:0;padding:0;'
         + 'border:0;background:transparent;overflow:visible;pointer-events:none;z-index:2147483647;display:block;';
       shadow = layer.attachShadow({mode: 'open'});
@@ -293,6 +292,7 @@
     var ring = document.createElement('div');
     ring.className = 'ring';
     ring.setAttribute('data-ring', id);
+    ring.setAttribute('aria-hidden', 'true');
     root.appendChild(ring);
     return ring;
   }
@@ -319,6 +319,7 @@
 
   function update() {
     frame = 0;
+    if (panel) panelPlace();
     if (scrollersDirty) {
       scrollersDirty = false;
       items.forEach(function (item) {
@@ -389,11 +390,11 @@
         setStyle(item.ring, rc, 'clipPath', clipFor(r, plan.v));
       }
     });
-    if (items.size === 0 && layer && layer.isConnected) layer.remove();
+    if (items.size === 0 && !panel && layer && layer.isConnected) layer.remove();
   }
 
   function schedule() {
-    if (frame || paused || items.size === 0) return;
+    if (frame || paused || (items.size === 0 && !panel)) return;
     frame = window.requestAnimationFrame ? window.requestAnimationFrame(update) : window.setTimeout(update, 16);
   }
 
@@ -495,12 +496,12 @@
 
   function prune() {
     items.forEach(function (item, id) { if (!item.host.isConnected) untrack(id); });
-    if (items.size === 0 && layer && layer.isConnected) layer.remove();
+    if (items.size === 0 && !panel && layer && layer.isConnected) layer.remove();
   }
 
   function clear() {
     Array.from(items.keys()).forEach(untrack);
-    if (layer && layer.isConnected) layer.remove();
+    if (!panel && layer && layer.isConnected) layer.remove();
   }
 
   function state() {
@@ -521,6 +522,379 @@
     listening = false;
   }
 
+
+  // ---- Panel: chat and steps in the page (shadow root, keyboard-isolated, draggable, resizable) ----
+  var PANEL_CSS = "__PKB_PANEL_CSS__";
+  var PANEL_MIN_W = 260;
+  var PANEL_MIN_H = 200;
+  var SNAP = 16;
+  var panel = null;
+  var chatSeq = 0;
+
+  function el(tag, cls, text) {
+    var node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text != null) node.textContent = text;
+    return node;
+  }
+
+  function clock(at) {
+    var d = at ? new Date(at) : new Date();
+    if (isNaN(d.getTime())) d = new Date();
+    return d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+  }
+
+  function panelDefaults() {
+    var vp = viewport();
+    var w = Math.min(360, Math.floor(vp.w * 0.9));
+    var h = Math.min(420, Math.floor(vp.h * 0.9));
+    return {x: vp.w - w - 16, y: vp.h - h - 16, w: w, h: h, min: false, tab: 'chat'};
+  }
+
+  function panelClamp(st) {
+    var vp = viewport();
+    st.w = clamp(st.w, PANEL_MIN_W, Math.max(PANEL_MIN_W, Math.floor(vp.w * 0.9)));
+    st.h = clamp(st.h, PANEL_MIN_H, Math.max(PANEL_MIN_H, Math.floor(vp.h * 0.9)));
+    st.x = clamp(st.x, 0, vp.w - st.w);
+    st.y = clamp(st.y, 0, vp.h - st.h);
+    return st;
+  }
+
+  function panelSnap(st) {
+    var vp = viewport();
+    if (st.x <= SNAP) st.x = 0;
+    if (st.y <= SNAP) st.y = 0;
+    if (vp.w - (st.x + st.w) <= SNAP) st.x = vp.w - st.w;
+    if (vp.h - (st.y + st.h) <= SNAP) st.y = vp.h - st.h;
+    return panelClamp(st);
+  }
+
+  function panelPlace() {
+    if (!panel) return;
+    var st = panelClamp(panel.state);
+    var card = panel.card;
+    card.style.transform = 'translate3d(' + Math.round(st.x) + 'px,' + Math.round(st.y) + 'px,0)';
+    card.style.width = Math.round(st.w) + 'px';
+    card.style.height = Math.round(st.h) + 'px';
+    card.hidden = !!st.min;
+    panel.pill.hidden = !st.min;
+    if (st.min) {
+      var pw = panel.pill.offsetWidth || 120;
+      var ph = panel.pill.offsetHeight || 32;
+      panel.pill.style.transform = 'translate3d(' + Math.round(st.x + st.w - pw) + 'px,' + Math.round(st.y + st.h - ph) + 'px,0)';
+    }
+    window.__pkbPanelState = {x: Math.round(st.x), y: Math.round(st.y), w: Math.round(st.w), h: Math.round(st.h), min: !!st.min, tab: st.tab};
+  }
+
+  function panelTab(name) {
+    if (!panel) return;
+    panel.state.tab = name;
+    panel.tabs.forEach(function (b) {
+      var on = b.getAttribute('data-tab') === name;
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+      if (on) b.querySelector('.pkb-badge').textContent = '';
+    });
+    panel.chatPane.hidden = name !== 'chat';
+    panel.stepsPane.hidden = name !== 'steps';
+    panel.composer.hidden = name !== 'chat';
+    if (name === 'chat') panel.chatPane.scrollTop = panel.chatPane.scrollHeight;
+    panelPlace();
+  }
+
+  function panelUnread() {
+    var count = 0;
+    if (!panel) return;
+    if (panel.state.min || panel.state.tab !== 'chat') count = ++panel.unread; else panel.unread = 0;
+    var badge = panel.tabs[0].querySelector('.pkb-badge');
+    badge.textContent = panel.state.tab !== 'chat' && count ? String(count) : '';
+    panel.pill.querySelector('.pkb-unread').textContent = panel.state.min && count ? String(count) : '';
+  }
+
+  function bubble(row) {
+    var from = row.from || (row.source === 'human' ? 'human' : (row.source === 'system' ? 'system' : 'agent'));
+    var node = el('div', 'pkb-msg');
+    node.setAttribute('data-from', from);
+    if (row.id) node.setAttribute('data-id', row.id);
+    if (row.state) node.setAttribute('data-state', row.state);
+    var who = from === 'human' ? 'You' : (from === 'system' ? 'System' : ('Agent' + (row.agent ? ' ' + row.agent : '')));
+    var meta = el('span', 'pkb-meta', who + ' \u00b7 ' + clock(row.at));
+    node.appendChild(meta);
+    node.appendChild(document.createTextNode(String(row.text == null ? '' : row.text)));
+    return node;
+  }
+
+  function chat(rows) {
+    if (!panel) return 0;
+    var list = Array.isArray(rows) ? rows : [rows];
+    var added = 0;
+    var pane = panel.chatPane;
+    var stick = pane.scrollHeight - pane.scrollTop - pane.clientHeight < 40;
+    list.forEach(function (row) {
+      if (!row || row.text == null) return;
+      var key = row.id ? String(row.id) : '';
+      if (key && panel.seen[key]) return;
+      if (key) panel.seen[key] = true;
+      if (panel.empty) { panel.empty.remove(); panel.empty = null; }
+      pane.appendChild(bubble(row));
+      added++;
+      if ((row.from || row.source) !== 'human') panelUnread();
+    });
+    if (stick) pane.scrollTop = pane.scrollHeight;
+    return added;
+  }
+
+  function chatSent(ids) {
+    if (!panel || !ids) return 0;
+    var n = 0;
+    ids.forEach(function (id) {
+      var node = panel.chatPane.querySelector('.pkb-msg[data-id="' + CSS.escape(String(id)) + '"]');
+      if (node) { node.setAttribute('data-state', 'sent'); n++; }
+    });
+    return n;
+  }
+
+  function panelSend() {
+    var text = panel.input.value;
+    if (!text.trim()) return;
+    var id = 'h' + (++chatSeq) + '-' + Date.now().toString(36);
+    window.__pkbChat = window.__pkbChat || [];
+    window.__pkbChat.push({id: id, text: text, at: new Date().toISOString()});
+    chat({id: id, from: 'human', text: text, state: 'pending', at: new Date().toISOString()});
+    panel.input.value = '';
+    panel.send.disabled = true;
+    panel.input.focus();
+  }
+
+  function isolateKeys(node) {
+    ['keydown', 'keypress', 'keyup', 'beforeinput', 'input', 'compositionstart', 'compositionupdate', 'compositionend',
+      'paste', 'copy', 'cut', 'pointerdown', 'mousedown', 'mouseup', 'click', 'dblclick', 'contextmenu', 'wheel']
+      .forEach(function (type) {
+        node.addEventListener(type, function (event) { event.stopPropagation(); }, type === 'wheel' ? {passive: true} : false);
+      });
+  }
+
+  function dragger(handle, onStart, onMove, onEnd) {
+    var active = null;
+    handle.addEventListener('pointerdown', function (event) {
+      if (event.button !== 0) return;
+      if (event.target !== handle && event.target.closest && event.target.closest('button,textarea,input,select,a')) return;
+      event.preventDefault();
+      try { handle.setPointerCapture(event.pointerId); } catch (ignored) { /* synthetic pointer */ }
+      active = {id: event.pointerId, x: event.clientX, y: event.clientY};
+      onStart();
+    });
+    handle.addEventListener('pointermove', function (event) {
+      if (!active || event.pointerId !== active.id) return;
+      onMove(event.clientX - active.x, event.clientY - active.y);
+    });
+    function end(event) {
+      if (!active || event.pointerId !== active.id) return;
+      active = null;
+      try { handle.releasePointerCapture(event.pointerId); } catch (ignored) { /* already released */ }
+      onEnd();
+    }
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
+  }
+
+  function buildPanel(root) {
+    var card = el('section', 'pkb-card pkb-panel');
+    card.setAttribute('role', 'dialog');
+    card.setAttribute('aria-label', 'Agent');
+    card.setAttribute('data-pkb-panel', '');
+    var head = el('header', 'pkb-head');
+    var dot = el('span', 'pkb-dot');
+    dot.setAttribute('data-state', 'live');
+    var title = el('strong', 'pkb-title', 'Agent');
+    var tabs = el('nav', 'pkb-tabs');
+    tabs.setAttribute('role', 'tablist');
+    var tabButtons = [['chat', 'Chat'], ['steps', 'Steps']].map(function (t) {
+      var b = el('button', '', t[1]);
+      b.type = 'button';
+      b.setAttribute('role', 'tab');
+      b.setAttribute('data-tab', t[0]);
+      b.appendChild(el('span', 'pkb-badge'));
+      b.addEventListener('click', function () { panelTab(t[0]); });
+      tabs.appendChild(b);
+      return b;
+    });
+    var minimize = el('button', 'pkb-icon', '\u2013');
+    minimize.type = 'button';
+    minimize.setAttribute('aria-label', 'Minimize');
+    minimize.setAttribute('data-action', 'minimize');
+    var close = el('button', 'pkb-icon', '\u00d7');
+    close.type = 'button';
+    close.setAttribute('aria-label', 'Close');
+    close.setAttribute('data-action', 'close');
+    head.appendChild(dot);
+    head.appendChild(title);
+    head.appendChild(tabs);
+    head.appendChild(minimize);
+    head.appendChild(close);
+    var chatPane = el('div', 'pkb-pane pkb-chat');
+    chatPane.setAttribute('role', 'log');
+    chatPane.setAttribute('aria-live', 'polite');
+    var empty = el('div', 'pkb-empty', 'Messages from the agent appear here.');
+    chatPane.appendChild(empty);
+    var stepsPane = el('div', 'pkb-pane');
+    stepsPane.hidden = true;
+    stepsPane.appendChild(el('div', 'pkb-empty', 'No steps yet.'));
+    var composer = el('form', 'pkb-composer');
+    composer.setAttribute('autocomplete', 'off');
+    var input = el('textarea');
+    input.rows = 1;
+    input.placeholder = 'Message the agent (Enter to send, Shift+Enter for a new line)';
+    input.setAttribute('aria-label', 'Message');
+    var send = el('button', '', 'Send');
+    send.type = 'submit';
+    send.disabled = true;
+    composer.appendChild(input);
+    composer.appendChild(send);
+    card.appendChild(head);
+    card.appendChild(chatPane);
+    card.appendChild(stepsPane);
+    card.appendChild(composer);
+    ['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw'].forEach(function (dir) {
+      var grip = el('div', 'pkb-grip');
+      grip.setAttribute('data-dir', dir);
+      card.appendChild(grip);
+    });
+    var pill = el('button', 'pkb-card pkb-pill');
+    pill.type = 'button';
+    pill.hidden = true;
+    pill.setAttribute('aria-label', 'Open agent panel');
+    var pillDot = el('span', 'pkb-dot');
+    pillDot.setAttribute('data-state', 'live');
+    pill.appendChild(pillDot);
+    pill.appendChild(document.createTextNode('Agent'));
+    pill.appendChild(el('span', 'pkb-unread'));
+    root.appendChild(card);
+    root.appendChild(pill);
+    isolateKeys(card);
+    isolateKeys(pill);
+    var p = {card: card, pill: pill, head: head, title: title, tabs: tabButtons, chatPane: chatPane, stepsPane: stepsPane,
+      composer: composer, input: input, send: send, empty: empty, seen: {}, unread: 0, state: panelDefaults()};
+    input.addEventListener('input', function () { send.disabled = !input.value.trim(); });
+    input.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter' && !event.shiftKey && !event.isComposing && event.keyCode !== 229) {
+        event.preventDefault();
+        panelSend();
+      }
+    });
+    composer.addEventListener('submit', function (event) { event.preventDefault(); panelSend(); });
+    minimize.addEventListener('click', function () { p.state.min = true; panelPlace(); });
+    close.addEventListener('click', function () {
+      events().push({type: 'panel', action: 'close'});
+      panelClose();
+    });
+    pill.addEventListener('click', function () { p.state.min = false; p.unread = 0; pill.querySelector('.pkb-unread').textContent = ''; panelPlace(); });
+    var start = null;
+    dragger(head, function () {
+      start = {x: p.state.x, y: p.state.y};
+      card.classList.add('pkb-dragging');
+    }, function (dx, dy) {
+      p.state.x = start.x + dx;
+      p.state.y = start.y + dy;
+      panelPlace();
+    }, function () {
+      card.classList.remove('pkb-dragging');
+      panelSnap(p.state);
+      panelPlace();
+    });
+    head.addEventListener('dblclick', function (event) {
+      if (event.target.closest && event.target.closest('button')) return;
+      var d = panelDefaults();
+      d.tab = p.state.tab;
+      p.state = d;
+      panelPlace();
+    });
+    Array.prototype.forEach.call(card.querySelectorAll('.pkb-grip'), function (grip) {
+      var dir = grip.getAttribute('data-dir');
+      var from = null;
+      dragger(grip, function () {
+        from = {x: p.state.x, y: p.state.y, w: p.state.w, h: p.state.h};
+        card.classList.add('pkb-resizing');
+      }, function (dx, dy) {
+        var vp = viewport();
+        var maxW = Math.max(PANEL_MIN_W, Math.floor(vp.w * 0.9));
+        var maxH = Math.max(PANEL_MIN_H, Math.floor(vp.h * 0.9));
+        var st = p.state;
+        if (dir.indexOf('e') >= 0) st.w = clamp(from.w + dx, PANEL_MIN_W, maxW);
+        if (dir.indexOf('s') >= 0) st.h = clamp(from.h + dy, PANEL_MIN_H, maxH);
+        if (dir.indexOf('w') >= 0) {
+          st.w = clamp(from.w - dx, PANEL_MIN_W, maxW);
+          st.x = from.x + (from.w - st.w);
+        }
+        if (dir.indexOf('n') >= 0) {
+          st.h = clamp(from.h - dy, PANEL_MIN_H, maxH);
+          st.y = from.y + (from.h - st.h);
+        }
+        panelPlace();
+      }, function () {
+        card.classList.remove('pkb-resizing');
+        panelPlace();
+      });
+    });
+    return p;
+  }
+
+  function panelSheet(root) {
+    if (root.__pkbPanelSheet) return;
+    root.__pkbPanelSheet = true;
+    try {
+      var sheet = new CSSStyleSheet();
+      sheet.replaceSync(PANEL_CSS + '\n.pkb-panel,.pkb-pill{pointer-events:auto;}');
+      root.adoptedStyleSheets = Array.from(root.adoptedStyleSheets || []).concat([sheet]);
+    } catch (unsupported) {
+      var style = document.createElement('style');
+      style.textContent = PANEL_CSS;
+      root.appendChild(style);
+    }
+  }
+
+  function panelOpen(opts) {
+    opts = opts || {};
+    listen();
+    var root = ensureLayer();
+    panelSheet(root);
+    if (!panel) panel = buildPanel(root);
+    if (!panel.card.isConnected) { root.appendChild(panel.card); root.appendChild(panel.pill); }
+    var st = panel.state;
+    ['x', 'y', 'w', 'h'].forEach(function (k) { if (opts[k] != null && opts[k] !== '' && isFinite(+opts[k])) st[k] = +opts[k]; });
+    if (opts.min != null) st.min = opts.min === true || opts.min === 'true';
+    if (opts.title) panel.title.textContent = String(opts.title).slice(0, 80);
+    if (opts.theme === 'light' || opts.theme === 'dark') { panel.card.setAttribute('data-theme', opts.theme); panel.pill.setAttribute('data-theme', opts.theme); }
+    else if (opts.theme === 'auto') { panel.card.removeAttribute('data-theme'); panel.pill.removeAttribute('data-theme'); }
+    if (Array.isArray(opts.history)) chat(opts.history);
+    panelTab(opts.tab === 'steps' ? 'steps' : (opts.tab === 'chat' ? 'chat' : st.tab || 'chat'));
+    raiseLayer();
+    if (opts.focus !== false && !st.min && st.tab === 'chat') {
+      try { panel.input.focus({preventScroll: true}); } catch (ignored) { /* focus refused */ }
+    }
+    return window.__pkbPanelState;
+  }
+
+  function panelClose() {
+    if (!panel) return false;
+    panel.card.remove();
+    panel.pill.remove();
+    panel = null;
+    window.__pkbPanelState = null;
+    if (items.size === 0 && layer && layer.isConnected) layer.remove();
+    return true;
+  }
+
+  function drainChat() {
+    var queue = window.__pkbChat || [];
+    window.__pkbChat = [];
+    chatSent(queue.map(function (m) { return m.id; }));
+    return queue;
+  }
+
+  function panelState() {
+    return panel ? window.__pkbPanelState : null;
+  }
+
   window.__pkbUi = {
     version: VERSION,
     track: track,
@@ -530,6 +904,13 @@
     refresh: update,
     state: state,
     dispose: dispose,
-    raise: raiseLayer
+    raise: raiseLayer,
+    panelOpen: panelOpen,
+    panelClose: panelClose,
+    panelState: panelState,
+    panelTab: panelTab,
+    chat: chat,
+    chatSent: chatSent,
+    drainChat: drainChat
   };
 })();

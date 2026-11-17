@@ -91,6 +91,8 @@ public final class AgentControl {
                 case "chat-send" -> chatSend(project, runId, values, agentId);
                 case "chat-history" -> chatHistory(project, runId, values);
                 case "chat-poll" -> chatPoll(project, runId, values);
+                case "panel-open" -> panelOpen(project, runId, values, extraArgs, agentId);
+                case "panel-close" -> panelClose(project, runId, values, extraArgs, agentId);
                 case "highlight" -> highlight(project, runId, values);
                 case "unhighlight" -> unhighlight(project, runId, values);
                 case "overlay" -> overlay(project, runId, values);
@@ -245,10 +247,88 @@ public final class AgentControl {
         );
         Map<String, Object> body = ok("Chat message stored for this run channel.");
         body.put("message", ChatLog.toMap(message));
+        if ("run".equals(message.channel())) PageSurfaces.pushChat(panelRow(message));
+        return new Result(0, body);
+    }
+
+    private static Map<String, Object> panelRow(ChatLog.Message message) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("id", "c" + message.id());
+        row.put("source", message.source());
+        row.put("agent", message.agent());
+        row.put("text", message.text());
+        row.put("at", message.at());
+        return row;
+    }
+
+    private static Result panelOpen(Path project, String runId, Map<String, String> args, List<String> extraArgs, String agentId) throws Exception {
+        String target = present(args.get("target")) ? args.get("target").trim().toLowerCase(java.util.Locale.ROOT) : "auto";
+        if (!target.matches("auto|page|popup")) return fail(2, "panel-open --target must be auto, page, or popup");
+        if ("popup".equals(target) || ("auto".equals(target) && !PageSurfaces.hasLivePage())) {
+            Result popup = execute(project, runId, "popup-open", args, extraArgs, agentId);
+            if (popup.body() instanceof Map<?, ?> map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> body = new LinkedHashMap<>((Map<String, Object>) map);
+                body.put("op", "panel-open");
+                body.putIfAbsent("target", "popup");
+                return new Result(popup.exit(), body);
+            }
+            return popup;
+        }
+        Map<String, Object> spec = new LinkedHashMap<>();
+        for (String key : List.of("x", "y", "width", "height")) {
+            if (!present(args.get(key))) continue;
+            Integer value = integerOrNull(args.get(key));
+            if (value == null) return fail(2, "panel-open --" + key + " must be a whole number of pixels");
+            spec.put(key.equals("width") ? "w" : key.equals("height") ? "h" : key, value);
+        }
+        String tab = args.get("tab");
+        if (present(tab) && !tab.trim().matches("chat|steps")) return fail(2, "panel-open --tab must be chat or steps");
+        if (present(tab)) spec.put("tab", tab.trim());
+        String theme = args.get("theme");
+        if (present(theme) && !theme.trim().matches("auto|light|dark")) return fail(2, "panel-open --theme must be auto, light, or dark");
+        if (present(theme)) spec.put("theme", theme.trim());
+        if (present(args.get("title"))) spec.put("title", args.get("title").trim());
+        if (present(args.get("minimized"))) spec.put("min", Boolean.parseBoolean(args.get("minimized").trim()));
+        PageSurfaces.drainPanelChat(project, runId);
+        List<Map<String, Object>> history = new ArrayList<>();
+        for (ChatLog.Message message : ChatLog.history(project, runId, null, 50)) history.add(panelRow(message));
+        spec.put("history", history);
+        String reply = PageSurfaces.runtimeCall("panelOpen", spec, true);
+        if (reply == null || reply.isBlank() || "null".equals(reply)) return fail(1, "panel did not open on the page");
+        CompositeLog.info("panel", "open " + reply);
+        Map<String, Object> body = ok("Agent panel open on the page.");
+        body.put("op", "panel-open");
+        body.put("target", "page");
+        body.put("panel", AgentStore.JSON.readValue(reply, Map.class));
+        return new Result(0, body);
+    }
+
+    private static Result panelClose(Path project, String runId, Map<String, String> args, List<String> extraArgs, String agentId) throws Exception {
+        String target = present(args.get("target")) ? args.get("target").trim().toLowerCase(java.util.Locale.ROOT) : "auto";
+        if (!target.matches("auto|page|popup")) return fail(2, "panel-close --target must be auto, page, or popup");
+        if ("popup".equals(target) || ("auto".equals(target) && !PageSurfaces.hasLivePage())) {
+            Result popup = execute(project, runId, "popup-close", args, extraArgs, agentId);
+            if (popup.body() instanceof Map<?, ?> map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> body = new LinkedHashMap<>((Map<String, Object>) map);
+                body.put("op", "panel-close");
+                return new Result(popup.exit(), body);
+            }
+            return popup;
+        }
+        PageSurfaces.drainPanelChat(project, runId);
+        String reply = PageSurfaces.runtimeCall("panelClose", null, false);
+        CompositeLog.info("panel", "close " + reply);
+        Map<String, Object> body = ok("Agent panel closed on the page.");
+        body.put("op", "panel-close");
+        body.put("target", "page");
+        body.put("closed", "true".equals(reply));
         return new Result(0, body);
     }
 
     private static Result chatHistory(Path project, String runId, Map<String, String> args) throws Exception {
+        PageSurfaces.drainPanelChat(project, runId);
         int limit = integer(args.get("limit"), 100);
         List<Map<String, Object>> messages = new ArrayList<>();
         for (ChatLog.Message message : ChatLog.history(project, runId, args.get("channel"), limit)) {
@@ -273,6 +353,7 @@ public final class AgentControl {
         long deadline = System.nanoTime() + waitMillis * 1_000_000L;
         List<Map<String, Object>> messages = new ArrayList<>();
         while (true) {
+            PageSurfaces.drainPanelChat(project, runId);
             for (ChatLog.Message message : ChatLog.poll(project, runId, args.get("channel"), after)) {
                 messages.add(ChatLog.toMap(message));
             }

@@ -119,6 +119,7 @@ public final class AgentSurfaceRouter {
             Map<String, Object> message = PopupSurfaceBridge.sendChat(project, runId, args.get("channel"), args.get("source"), agentId, args.get("text"));
             String text = args.get("text") == null ? "" : args.get("text");
             PopupLedger.append(project, runId, "chat", "chat", "", "", text, "", "");
+            PopupSurfaceBridge.pushPanelChat(message);
             track(project, runId);
             maybeOpen(project, runId, decision);
             Map<String, Object> body = ok("Chat message stored for this run channel.");

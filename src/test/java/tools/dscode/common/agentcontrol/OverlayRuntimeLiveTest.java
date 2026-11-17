@@ -7,6 +7,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openqa.selenium.By;
 import org.openqa.selenium.Dimension;
+import org.openqa.selenium.Keys;
+import org.openqa.selenium.SearchContext;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.chrome.ChromeDriver;
 import tools.dscode.common.composite.CompositeRuntime;
 
@@ -313,5 +317,148 @@ class OverlayRuntimeLiveTest {
                 + "return document.elementFromPoint(r.left+r.width/2, r.top+r.height/2).id;");
         assertEquals("modal-ok", hit);
         assertFalse(String.valueOf(ring().get("vis")).equals("hidden"));
+    }
+
+    // ---- P3: panel in the page ----
+
+    private Map<String, Object> openPanel(Map<String, String> extra) {
+        Map<String, String> args = new LinkedHashMap<>(extra);
+        args.put("target", "page");
+        AgentControl.Result opened = run("panel-open", args);
+        assertEquals(0, opened.exit(), String.valueOf(opened.body()));
+        assertEquals("page", opened.body().get("target"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> state = (Map<String, Object>) opened.body().get("panel");
+        return state;
+    }
+
+    private SearchContext layerRoot() {
+        return browser.findElement(By.cssSelector("[data-pkb-layer]")).getShadowRoot();
+    }
+
+    private WebElement inPanel(String css) {
+        return layerRoot().findElement(By.cssSelector(css));
+    }
+
+    private Map<String, Object> panelRect() {
+        return rect(RING.replace(".ring", "[data-pkb-panel]"));
+    }
+
+    /** Presses at a viewport point and drags to another, in two pointer moves. */
+    private void dragTo(int fromX, int fromY, int toX, int toY) {
+        new Actions(browser).moveToLocation(fromX, fromY).clickAndHold()
+                .moveToLocation((fromX + toX) / 2, (fromY + toY) / 2)
+                .moveToLocation(toX, toY).release().perform();
+        frames(2);
+    }
+
+    private int[] pointIn(String css, int dx, int dy) {
+        Map<String, Object> box = rect(RING.replace(".ring", css));
+        assertNotNull(box, css);
+        return new int[]{(int) Math.round(num(box, "l") + dx), (int) Math.round(num(box, "t") + dy)};
+    }
+
+    /** Item 1: the header drags the panel by the pointer delta; dragging past the edge clamps it inside the viewport. */
+    @Test
+    void panelDragsAndClamps() {
+        load("basic.html");
+        openPanel(Map.of());
+        Map<String, Object> before = panelRect();
+        int[] grab = pointIn(".pkb-panel .pkb-head", 30, 18);
+        // Headless Chrome's viewport is shorter than its 800 px window, so the upward move stays on screen.
+        dragTo(grab[0], grab[1], grab[0] - 400, grab[1] - 250);
+        Map<String, Object> moved = panelRect();
+        assertEquals(num(before, "l") - 400, num(moved, "l"), 1.01, moved.toString());
+        assertEquals(num(before, "t") - 250, num(moved, "t"), 1.01, moved.toString());
+        int[] again = pointIn(".pkb-panel .pkb-head", 30, 18);
+        dragTo(again[0], again[1], 2, 2);
+        Map<String, Object> clamped = panelRect();
+        assertEquals(0.0, num(clamped, "l"), 1.01, clamped.toString());
+        assertEquals(0.0, num(clamped, "t"), 1.01, clamped.toString());
+        OverlayFixtures.shot(browser, "p3-panel-dragged");
+    }
+
+    /** Item 1: the corner grip resizes; the minimum size holds. */
+    @Test
+    void panelResizes() {
+        load("basic.html");
+        openPanel(Map.of("x", "100", "y", "100"));
+        Map<String, Object> before = panelRect();
+        int[] corner = pointIn(".pkb-grip[data-dir=se]", 7, 7);
+        dragTo(corner[0], corner[1], corner[0] + 120, corner[1] + 80);
+        Map<String, Object> grown = panelRect();
+        assertEquals(num(before, "w") + 120, num(grown, "w"), 1.01, grown.toString());
+        assertEquals(num(before, "h") + 80, num(grown, "h"), 1.01, grown.toString());
+        int[] small = pointIn(".pkb-grip[data-dir=se]", 7, 7);
+        dragTo(small[0], small[1], 110, 110);
+        Map<String, Object> smallest = panelRect();
+        assertEquals(260.0, num(smallest, "w"), 1.01, smallest.toString());
+        assertEquals(200.0, num(smallest, "h"), 1.01, smallest.toString());
+        OverlayFixtures.shot(browser, "p3-panel-resized");
+    }
+
+    /** Item 2 in the page: Enter sends, Shift+Enter adds a line, and the bubble shows both lines. */
+    @Test
+    void enterSendsShiftEnterNewlines() throws Exception {
+        load("basic.html");
+        openPanel(Map.of());
+        WebElement text = inPanel(".pkb-composer textarea");
+        text.click();
+        text.sendKeys("hello");
+        text.sendKeys(Keys.chord(Keys.SHIFT, Keys.ENTER));
+        text.sendKeys("world");
+        text.sendKeys(Keys.ENTER);
+        frames(1);
+        assertEquals("", text.getAttribute("value"));
+        Object bubble = browser.executeScript(RING.replace(".ring", ".pkb-msg[data-from=human]")
+                + " return n ? n.lastChild.textContent : null;");
+        assertEquals("hello\nworld", bubble);
+        AgentControl.Result history = run("chat-history", Map.of());
+        assertTrue(String.valueOf(history.body().get("messages")).contains("hello\nworld"), String.valueOf(history.body()));
+    }
+
+    /** Item 1: a page hotkey on "s" that calls preventDefault cannot eat the letters typed in the panel. */
+    @Test
+    void pageHotkeysDoNotStealTyping() {
+        load("basic.html");
+        openPanel(Map.of());
+        WebElement text = inPanel(".pkb-composer textarea");
+        text.click();
+        text.sendKeys("sss");
+        assertEquals("sss", text.getAttribute("value"));
+        assertEquals(0L, ((Number) browser.executeScript("return window.hotkeys")).longValue());
+    }
+
+    /** The human message lands in the run chat as source=human, and the bubble turns from pending to sent. */
+    @Test
+    void humanMessageReachesChatLog() throws Exception {
+        load("basic.html");
+        openPanel(Map.of());
+        WebElement text = inPanel(".pkb-composer textarea");
+        text.click();
+        text.sendKeys("from the page");
+        inPanel(".pkb-composer button").click();
+        AgentControl.Result polled = run("chat-poll", Map.of("wait", "5"));
+        assertEquals(0, polled.exit(), String.valueOf(polled.body()));
+        String messages = String.valueOf(polled.body().get("messages"));
+        assertTrue(messages.contains("from the page") && messages.contains("source=human"), messages);
+        Object state = browser.executeScript(RING.replace(".ring", ".pkb-msg[data-from=human]") + " return n ? n.getAttribute('data-state') : null;");
+        assertEquals("sent", state);
+    }
+
+    /** An agent chat-send reaches the open page panel as well as the run chat. */
+    @Test
+    void agentMessageAppearsInPanel() throws Exception {
+        load("basic.html");
+        openPanel(Map.of());
+        AgentControl.Result sent = run("chat-send", Map.of("text", "Next, open Settings."));
+        assertEquals(0, sent.exit(), String.valueOf(sent.body()));
+        frames(1);
+        Object bubble = browser.executeScript(RING.replace(".ring", ".pkb-msg[data-from=agent]") + " return n ? n.textContent : null;");
+        assertTrue(String.valueOf(bubble).contains("Next, open Settings."), String.valueOf(bubble));
+        OverlayFixtures.shot(browser, "p3-panel-chat");
+        AgentControl.Result closed = run("panel-close", Map.of("target", "page"));
+        assertEquals(0, closed.exit(), String.valueOf(closed.body()));
+        assertEquals(0L, ((Number) browser.executeScript("return document.querySelectorAll('[data-pkb-layer]').length")).longValue());
     }
 }

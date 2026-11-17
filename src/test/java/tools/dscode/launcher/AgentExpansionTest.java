@@ -720,6 +720,34 @@ class AgentExpansionTest {
         return page;
     }
 
+    @Test
+    void covers_command_panel_open() {
+        Capture badTheme = agent("panel-open", temp.toString(), "--run-id=panel", "--target=page", "--theme=neon");
+        assertEquals(2, badTheme.code, badTheme.out + badTheme.err);
+        assertTrue((badTheme.out + badTheme.err).contains("--theme"), badTheme.out + badTheme.err);
+    }
+
+    @Test
+    void covers_command_panel_close() {
+        Capture badTarget = agent("panel-close", temp.toString(), "--run-id=panel", "--target=desktop");
+        assertEquals(2, badTarget.code, badTarget.out + badTarget.err);
+        assertTrue((badTarget.out + badTarget.err).contains("--target"), badTarget.out + badTarget.err);
+    }
+
+    @Test
+    void panelOpenCloseVerbs() {
+        Capture badWidth = agent("panel-open", temp.toString(), "--run-id=panel", "--target=page", "--width=wide");
+        assertEquals(2, badWidth.code, badWidth.out + badWidth.err);
+        assertTrue((badWidth.out + badWidth.err).contains("--width"), badWidth.out + badWidth.err);
+        Capture badTab = agent("panel-open", temp.toString(), "--run-id=panel", "--target=page", "--tab=diagram");
+        assertEquals(2, badTab.code, badTab.out + badTab.err);
+        Capture badTarget = agent("panel-close", temp.toString(), "--run-id=panel", "--target=native");
+        assertEquals(2, badTarget.code, badTarget.out + badTarget.err);
+        Capture noPage = agent("panel-open", temp.toString(), "--run-id=panel", "--target=page");
+        assertEquals(1, noPage.code, noPage.out + noPage.err);
+        assertTrue((noPage.out + noPage.err).contains("panel did not open"), noPage.out + noPage.err);
+    }
+
     private Capture agent(String... args) {
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();

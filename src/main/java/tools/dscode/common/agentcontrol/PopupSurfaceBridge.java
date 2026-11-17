@@ -57,6 +57,18 @@ public final class PopupSurfaceBridge {
         return ChatLog.toMap(message);
     }
 
+    /** Shows a stored run-chat message in the in-page panel when one is open on the managed page. */
+    public static void pushPanelChat(Map<String, Object> message) {
+        if (message == null || !"run".equals(String.valueOf(message.get("channel")))) return;
+        Map<String, Object> row = new java.util.LinkedHashMap<>();
+        row.put("id", "c" + message.get("id"));
+        row.put("source", message.get("source"));
+        row.put("agent", message.get("agent"));
+        row.put("text", message.get("text"));
+        row.put("at", message.get("at"));
+        PageSurfaces.pushChat(row);
+    }
+
     public static List<Map<String, Object>> pollInput(Path project, String runId) throws IOException {
         return PageSurfaces.pollInput(project, runId);
     }
