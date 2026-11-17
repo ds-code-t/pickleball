@@ -20,7 +20,7 @@ Commit and push after each phase. Finish with a scoreboard.
 ## Phase A: Integrity and bug fixes
 Implement every item in the roadmap Phase A.  
 Start with the Workbench freeze (A1) and the worker lock-up + watchdog (A2).  
-Then A3–A7.  
+Then A3–A8 (A8 = the three store test failures from the last full regression).  
 Update the roadmap scoreboard after the phase.  
 Named tests must pass. No weakened tests.
 
@@ -29,6 +29,11 @@ Implement every item in the roadmap Phase B.
 CLI-first: every capability reachable from the CLI; MCP and Workbench only forward.  
 Update the consumer agent guide so an agent can start without searching.  
 Update the roadmap scoreboard after the phase.
+
+## Rules for done
+- Nothing is optional. Don't stop at a summary: implement, test, commit, push each item.
+- If a report item can't be reproduced, write a test that encodes the reported behavior and fix the code path the report points to; don't mark it 'not reproducible' without that test.
+- Run the named tests plus the affected module test suites before each push (root `:test` for store/engine changes, `pickleball-workbench` tests for Workbench changes).
 
 ## Finish
 - Final scoreboard listing each item as done or not, with SHAs and test results.
