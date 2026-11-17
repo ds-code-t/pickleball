@@ -52,6 +52,8 @@ final class StorePanel extends JPanel {
     private final JButton sandboxes = WorkbenchTheme.flatButton("Sandboxes", "store sandbox list");
     private final JButton createSandbox = WorkbenchTheme.flatButton("Create sandbox", "store sandbox create");
     private final JButton dropSandbox = WorkbenchTheme.flatButton("Drop sandbox", "store sandbox drop");
+    private final JButton mergeSandbox = WorkbenchTheme.flatButton("Merge sandbox", "store sandbox merge");
+    private final JButton changes = WorkbenchTheme.flatButton("Changes", "store changes");
     private final JButton load = WorkbenchTheme.flatButton("Load", "Show the feature text or entity");
     private final JButton saveFeature = WorkbenchTheme.accentButton("Save feature", "store feature put of the editor text");
     private final JButton saveEntity = WorkbenchTheme.flatButton("Save entity", "store entity put of the editor text");
@@ -80,6 +82,8 @@ final class StorePanel extends JPanel {
         north.add(sandboxes);
         north.add(createSandbox);
         north.add(dropSandbox);
+        north.add(mergeSandbox);
+        north.add(changes);
         sandboxes.addActionListener(event -> run(StoreBrowser.sandboxList(), false));
         createSandbox.addActionListener(event -> {
             String name = sandboxName.getText().trim();
@@ -97,6 +101,19 @@ final class StorePanel extends JPanel {
             }
             run(StoreBrowser.sandboxDrop(name), false);
         });
+        mergeSandbox.addActionListener(event -> {
+            String name = sandboxName.getText().trim();
+            if (name.isEmpty() || "main".equals(name)) {
+                Object selected = sandbox.getSelectedItem();
+                name = selected == null ? "" : String.valueOf(selected).trim();
+            }
+            if (name.isEmpty() || "main".equals(name)) {
+                status.setText("Name a sandbox to merge");
+                return;
+            }
+            run(StoreBrowser.sandboxMerge(name), false);
+        });
+        changes.addActionListener(event -> run(StoreBrowser.changes(), false));
         north.add(new JLabel("Feature"));
         north.add(featurePath);
         north.add(new JLabel("Scenario"));

@@ -56,6 +56,12 @@ class StoreCliForwarderTest {
         assertEquals(List.of("sandbox", "list", "--json"), list.subList(4, 7));
         List<String> compile = StoreCliForwarder.command(jar, project, List.of("glue", "compile", "--sandbox=left"));
         assertEquals(List.of("glue", "compile", "--sandbox=left"), compile.subList(4, 7));
+        List<String> merge = StoreCliForwarder.command(
+                jar, project, List.of("sandbox", "merge", "left", "--policy=branch-wins", "--json"));
+        assertEquals(List.of("sandbox", "merge", "left", "--policy=branch-wins", "--json"), merge.subList(4, 9));
+        List<String> changes = StoreCliForwarder.command(
+                jar, project, List.of("changes", "--since=3", "--table=files", "--limit=10", "--json"));
+        assertEquals(List.of("changes", "--since=3", "--table=files", "--limit=10", "--json"), changes.subList(4, 9));
     }
 
     @Test

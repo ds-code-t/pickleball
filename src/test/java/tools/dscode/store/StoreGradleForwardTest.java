@@ -67,17 +67,22 @@ class StoreGradleForwardTest {
                 "-PstoreName=Ada",
                 "-PstoreGlue=tools.dscode.coredefinitions",
                 "-PstoreFeaturePath=features/pay.feature",
-                "-PstoreScenario=Ada"
+                "-PstoreScenario=Ada",
+                "-PstorePolicy=branch-wins",
+                "-PstoreDrop=1",
+                "-PstoreSince=4",
+                "-PstoreTable=files",
+                "-PstoreLimit=10"
         ));
         assertEquals(List.of("store", "status", "--sandbox=alpha"), set.get("storeStatus"));
         assertEquals(List.of("store", "hydrate", "--path=features/pay.feature", "--force", "--sandbox=alpha"), set.get("storeHydrate"));
         assertEquals(List.of("store", "extract", "--path=features/pay.feature", "--force", "--sandbox=alpha"), set.get("storeExtract"));
         assertEquals(List.of("store", "feature", "put", "features/pay.feature", "--text=Feature:+Pay", "--file=/tmp/pay.feature", "--sandbox=alpha"), set.get("storeFeature"));
         assertEquals(List.of("store", "diff", "alpha", "--json", "--path=features/pay.feature", "--id=ada", "--text=Feature:+Pay", "--file=/tmp/pay.feature", "--confirm", "--force", "--sandbox=alpha"), set.get("storeEdit"));
-        assertEquals(List.of("store", "diff", "alpha", "--json", "--feature=features/pay.feature", "--scenario=Ada", "--sandbox=alpha"), set.get("storeQuery"));
+        assertEquals(List.of("store", "diff", "alpha", "--json", "--feature=features/pay.feature", "--scenario=Ada", "--since=4", "--table=files", "--limit=10", "--sandbox=alpha"), set.get("storeQuery"));
         assertEquals(List.of("store", "history", "show", "run-42", "--days=4", "--max-bytes=100", "--sandbox=alpha"), set.get("storeHistory"));
         assertEquals(List.of("store", "run", "--tags=@pay", "--name=Ada", "--glue=tools.dscode.coredefinitions", "--dry-run", "--sandbox=alpha"), set.get("storeRun"));
-        assertEquals(List.of("store", "sandbox", "diff", "alpha", "--json", "--force", "--sandbox=alpha"), set.get("storeSandbox"));
+        assertEquals(List.of("store", "sandbox", "diff", "alpha", "--policy=branch-wins", "--drop", "--json", "--force", "--sandbox=alpha"), set.get("storeSandbox"));
         assertEquals(List.of("store", "migrate", "--dry-run", "--remove-legacy", "--sandbox=alpha"), set.get("storeMigrate"));
         assertOut(set.get("storeRunClasspath"), "--sandbox=alpha");
     }

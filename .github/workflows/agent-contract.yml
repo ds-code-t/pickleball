@@ -86,8 +86,13 @@ jobs:
             --tests tools.dscode.store.StoreRunClasspathRefreshTest \
             --tests tools.dscode.store.SandboxIndependenceTest \
             --tests tools.dscode.store.SandboxCreateTimingTest \
+            --tests tools.dscode.store.SandboxMergeTest \
+            --tests tools.dscode.store.SandboxMergeConflictTest \
+            --tests tools.dscode.store.SandboxMergeTimingTest \
+            --tests tools.dscode.store.ChangesCliTest \
             --tests tools.dscode.store.StoreFileReleaseTest
           grep -h 'SANDBOX_CREATE_MS' build/test-results/test/TEST-tools.dscode.store.SandboxCreateTimingTest.xml | head -20 >> "$GITHUB_STEP_SUMMARY" || true
+          grep -h 'SANDBOX_MERGE_MS' build/test-results/test/TEST-tools.dscode.store.SandboxMergeTimingTest.xml | head -20 >> "$GITHUB_STEP_SUMMARY" || true
 
       - name: Agent surface popup live (real Chromium, must not skip)
         shell: bash
@@ -206,8 +211,13 @@ jobs:
             --tests tools.dscode.store.StoreRunClasspathRefreshTest \
             --tests tools.dscode.store.SandboxIndependenceTest \
             --tests tools.dscode.store.SandboxCreateTimingTest \
+            --tests tools.dscode.store.SandboxMergeTest \
+            --tests tools.dscode.store.SandboxMergeConflictTest \
+            --tests tools.dscode.store.SandboxMergeTimingTest \
+            --tests tools.dscode.store.ChangesCliTest \
             --tests tools.dscode.store.StoreFileReleaseTest
           grep -h 'SANDBOX_CREATE_MS' build/test-results/test/TEST-tools.dscode.store.SandboxCreateTimingTest.xml | head -20 >> "$GITHUB_STEP_SUMMARY" || true
+          grep -h 'SANDBOX_MERGE_MS' build/test-results/test/TEST-tools.dscode.store.SandboxMergeTimingTest.xml | head -20 >> "$GITHUB_STEP_SUMMARY" || true
 
       - name: Targeted core agent surface and Cucumber boundary
         run: |
@@ -333,8 +343,13 @@ jobs:
             --tests tools.dscode.store.StoreRunClasspathRefreshTest \
             --tests tools.dscode.store.SandboxIndependenceTest \
             --tests tools.dscode.store.SandboxCreateTimingTest \
+            --tests tools.dscode.store.SandboxMergeTest \
+            --tests tools.dscode.store.SandboxMergeConflictTest \
+            --tests tools.dscode.store.SandboxMergeTimingTest \
+            --tests tools.dscode.store.ChangesCliTest \
             --tests tools.dscode.store.StoreFileReleaseTest
           grep -h 'SANDBOX_CREATE_MS' build/test-results/test/TEST-tools.dscode.store.SandboxCreateTimingTest.xml | head -20 >> "$GITHUB_STEP_SUMMARY" || true
+          grep -h 'SANDBOX_MERGE_MS' build/test-results/test/TEST-tools.dscode.store.SandboxMergeTimingTest.xml | head -20 >> "$GITHUB_STEP_SUMMARY" || true
 
       - name: Install Chrome for Testing
         shell: bash

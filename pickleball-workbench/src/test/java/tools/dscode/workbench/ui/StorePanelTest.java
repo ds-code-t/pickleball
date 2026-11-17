@@ -178,6 +178,10 @@ class StorePanelTest {
         assertEquals(List.of("sandbox", "create", "left"), forwarded.get(2));
         click(panel, "Drop sandbox", status);
         assertEquals(List.of("sandbox", "drop", "left"), forwarded.get(3));
+        click(panel, "Merge sandbox", status);
+        assertEquals(List.of("sandbox", "merge", "left", "--json"), forwarded.get(4));
+        click(panel, "Changes", status);
+        assertEquals(List.of("changes", "--json", "--sandbox=left"), forwarded.get(5));
     }
 
     private static String body(List<String> args) {

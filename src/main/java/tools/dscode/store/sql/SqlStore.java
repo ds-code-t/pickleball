@@ -1,5 +1,6 @@
 package tools.dscode.store.sql;
 
+import tools.dscode.store.StoreHashes;
 import tools.dscode.store.StorePaths;
 
 import java.io.IOException;
@@ -7,9 +8,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /** Opens one bound session. Schema is created on main before the session is returned. */
@@ -90,10 +95,7 @@ public final class SqlStore implements AutoCloseable {
                             INSERT INTO _pkb_base(tbl, pk, base_hash, location, git_commit)
                             SELECT 'files', path, content_hash, location, git_commit FROM files
                             """);
-                    statement.execute("""
-                            INSERT INTO _pkb_base(tbl, pk, base_hash, location, git_commit)
-                            SELECT 'entities', entity_type || '#' || entity_id, content_hash, 'db', '' FROM entities
-                            """);
+                    writeEntityBase(branched);
                     statement.execute("PRAGMA wal_checkpoint(TRUNCATE)");
                 }
             }
@@ -105,6 +107,43 @@ public final class SqlStore implements AutoCloseable {
                 Files.deleteIfExists(tmp);
             } catch (IOException ignored) {
                 // The moved file is already gone. A leftover temp is retried on the next create.
+            }
+        }
+    }
+
+    /** Rewrites {@code _pkb_base} from the current files and entities on this connection. */
+    public static void writeBase(Connection connection) throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("DELETE FROM _pkb_base");
+            statement.execute("""
+                    INSERT INTO _pkb_base(tbl, pk, base_hash, location, git_commit)
+                    SELECT 'files', path, content_hash, location, git_commit FROM files
+                    """);
+        }
+        writeEntityBase(connection);
+    }
+
+    private static void writeEntityBase(Connection connection) throws SQLException {
+        List<String[]> rows = new ArrayList<>();
+        try (Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery(
+                     "SELECT entity_type, entity_id, payload_json, secret_refs, content_hash FROM entities")) {
+            while (result.next()) {
+                rows.add(new String[] {
+                        result.getString(1),
+                        result.getString(2),
+                        result.getString(3),
+                        result.getString(4),
+                        result.getString(5)
+                });
+            }
+        }
+        try (PreparedStatement insert = connection.prepareStatement(
+                "INSERT INTO _pkb_base(tbl, pk, base_hash, location, git_commit) VALUES ('entities', ?, ?, 'db', '')")) {
+            for (String[] row : rows) {
+                insert.setString(1, row[0] + "#" + row[1]);
+                insert.setString(2, StoreHashes.entityIdentity(row[2], row[3], row[4]));
+                insert.executeUpdate();
             }
         }
     }

@@ -146,6 +146,108 @@ public final class StoreStepCatalog {
         return found.size();
     }
 
+    /**
+     * Refreshes step definitions for merged source paths. A null body removes
+     * that path's definitions. Disk is not scanned.
+     */
+    public static void refreshSources(Connection connection, Path project, Map<String, byte[]> sources, String hydratedAt)
+            throws SQLException {
+        if (sources == null || sources.isEmpty()) return;
+        String now = hydratedAt == null ? Instant.now().toString() : hydratedAt;
+        for (Map.Entry<String, byte[]> entry : sources.entrySet()) {
+            String path = entry.getKey();
+            String language = sourceLanguage(path);
+            if (language == null) continue;
+            List<Definition> found = definitionsFrom(path, language, entry.getValue());
+            replacePath(connection, path, found, now);
+        }
+        StoreLog.log(project, "track", "step-definitions", "merge sources " + sources.size());
+    }
+
+    private static String sourceLanguage(String path) {
+        if (path == null) return null;
+        String lower = path.toLowerCase(java.util.Locale.ROOT);
+        if (lower.endsWith(".java")) return "java";
+        if (lower.endsWith(".js")) return "js";
+        if (lower.endsWith(".ts")) return "ts";
+        return null;
+    }
+
+    private static List<Definition> definitionsFrom(String path, String language, byte[] raw) {
+        if (raw == null) return List.of();
+        String text = new String(raw, StandardCharsets.UTF_8);
+        String hash = StoreHashes.sha256(raw);
+        List<Hit> hits = "java".equals(language) ? javaHits(text) : scriptHits(text);
+        List<Definition> found = new ArrayList<>();
+        for (Hit hit : hits) {
+            found.add(new Definition(
+                    definitionId(language, hit.pattern(), path, hit.line()),
+                    language,
+                    hit.pattern(),
+                    hit.method(),
+                    path,
+                    hit.line(),
+                    hash));
+        }
+        return found;
+    }
+
+    private static void replacePath(Connection connection, String path, List<Definition> found, String hydratedAt)
+            throws SQLException {
+        Map<String, Definition> foundById = new LinkedHashMap<>();
+        for (Definition definition : found) foundById.put(definition.id(), definition);
+        List<Stored> existing = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT definition_id, language, pattern, source_path, content_hash, removed FROM step_definitions WHERE source_path = ?")) {
+            statement.setString(1, path);
+            try (ResultSet result = statement.executeQuery()) {
+                while (result.next()) {
+                    existing.add(new Stored(
+                            result.getString(1),
+                            result.getString(2) + "\u001f" + result.getString(3) + "\u001f" + result.getString(4),
+                            result.getString(5) == null ? "" : result.getString(5),
+                            result.getInt(6) != 0));
+                }
+            }
+        }
+        try (PreparedStatement statement = connection.prepareStatement("""
+                INSERT INTO step_definitions(
+                    definition_id, language, pattern, method_name, source_path, source_line, content_hash, hydrated_at, removed)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+                ON CONFLICT(definition_id) DO UPDATE SET
+                    language = excluded.language,
+                    pattern = excluded.pattern,
+                    method_name = excluded.method_name,
+                    source_path = excluded.source_path,
+                    source_line = excluded.source_line,
+                    content_hash = excluded.content_hash,
+                    hydrated_at = excluded.hydrated_at,
+                    removed = 0
+                """)) {
+            for (Definition definition : found) {
+                statement.setString(1, definition.id());
+                statement.setString(2, definition.language());
+                statement.setString(3, definition.pattern());
+                statement.setString(4, definition.methodName());
+                statement.setString(5, definition.sourcePath());
+                statement.setInt(6, definition.sourceLine());
+                statement.setString(7, definition.contentHash());
+                statement.setString(8, hydratedAt);
+                statement.addBatch();
+            }
+            if (!found.isEmpty()) statement.executeBatch();
+        }
+        try (PreparedStatement retire = connection.prepareStatement(
+                     "UPDATE step_definitions SET removed = 1, hydrated_at = ? WHERE definition_id = ?")) {
+            for (Stored row : existing) {
+                if (foundById.containsKey(row.id())) continue;
+                retire.setString(1, hydratedAt);
+                retire.setString(2, row.id());
+                retire.executeUpdate();
+            }
+        }
+    }
+
     private static String stableKey(Definition definition) {
         return definition.language() + "\u001f" + definition.pattern() + "\u001f" + definition.sourcePath();
     }

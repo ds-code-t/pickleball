@@ -122,7 +122,7 @@ public final class StoreFiles {
         }
     }
 
-    private static Row read(ResultSet result) throws SQLException {
+    static Row read(ResultSet result) throws SQLException {
         byte[] raw = result.getBytes(3);
         long byteSize = result.getLong(11);
         if (result.wasNull()) byteSize = raw == null ? 0L : raw.length;

@@ -20,6 +20,14 @@ public final class StoreHashes {
         }
     }
 
+    /** Identity of an entity row: payload, secret references, and content hash. */
+    public static String entityIdentity(String payloadJson, String secretRefs, String contentHash) {
+        String raw = (payloadJson == null ? "" : payloadJson) + "\n"
+                + (secretRefs == null ? "" : secretRefs) + "\n"
+                + (contentHash == null ? "" : contentHash);
+        return sha256(raw.getBytes(StandardCharsets.UTF_8));
+    }
+
     /** Git blob object id: SHA-1 of {@code blob <len>\0} plus the bytes. */
     public static String gitBlob(byte[] content) {
         byte[] body = content == null ? new byte[0] : content;

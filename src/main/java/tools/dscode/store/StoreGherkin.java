@@ -298,6 +298,10 @@ public final class StoreGherkin {
         store(connection, project, path, sourceType, raw);
     }
 
+    public static void clear(Connection connection, String path) throws SQLException {
+        delete(connection, path);
+    }
+
     private static void delete(Connection connection, String path) throws SQLException {
         for (String sql : List.of(
                 "DELETE FROM steps WHERE file_path = ?",

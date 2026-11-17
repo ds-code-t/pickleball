@@ -555,6 +555,9 @@ tasks.register('storeQuery', JavaExec) {
     if (storeProp('storeJson').isPresent()) args += ['--json']
     if (storeProp('storeFeaturePath').isPresent()) args += ['--feature=' + storeProp('storeFeaturePath').get()]
     if (storeProp('storeScenario').isPresent()) args += ['--scenario=' + storeProp('storeScenario').get()]
+    if (storeProp('storeSince').isPresent()) args += ['--since=' + storeProp('storeSince').get()]
+    if (storeProp('storeTable').isPresent()) args += ['--table=' + storeProp('storeTable').get()]
+    if (storeProp('storeLimit').isPresent()) args += ['--limit=' + storeProp('storeLimit').get()]
     if (storeProp('storeSandbox').isPresent()) args += ['--sandbox=' + storeProp('storeSandbox').get()]
 }
 
@@ -596,6 +599,8 @@ tasks.register('storeSandbox', JavaExec) {
         def trimmed = piece == null ? '' : piece.toString().trim()
         if (!trimmed.isEmpty()) args += [trimmed]
     }
+    if (storeProp('storePolicy').isPresent()) args += ['--policy=' + storeProp('storePolicy').get()]
+    if (storeProp('storeDrop').isPresent()) args += ['--drop']
     if (storeProp('storeJson').isPresent()) args += ['--json']
     if (storeProp('storeForce').isPresent()) args += ['--force']
     if (storeProp('storeSandbox').isPresent()) args += ['--sandbox=' + storeProp('storeSandbox').get()]

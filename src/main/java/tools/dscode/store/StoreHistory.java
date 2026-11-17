@@ -285,9 +285,11 @@ public final class StoreHistory {
                     delete(connection, left.get(0).id());
                     removed++;
                 }
+                int trimmed = StoreChanges.trim(connection, StoreChanges.days());
                 connection.commit();
                 int remaining = load(connection).size();
                 StoreLog.log(project, "history", "runs", "retain removed=" + removed);
+                StoreLog.log(project, "changes", "*", "retain removed=" + trimmed);
                 return new RetainResult(remaining, removed);
             } catch (SQLException | RuntimeException failure) {
                 connection.rollback();

@@ -43,9 +43,10 @@ public final class StoreSandbox {
                 case "extract" -> extract(project, tokens, out);
                 case "drop" -> drop(project, tokens, out);
                 case "prune" -> prune(project, tokens, out);
+                case "merge" -> merge(project, tokens, json, out);
                 default -> {
                     err.println("error: Unknown Store sandbox command: " + action);
-                    err.println("fix: store sandbox create|list|use|diff|extract|drop|prune");
+                    err.println("fix: store sandbox create|list|use|diff|extract|drop|prune|merge");
                     yield 2;
                 }
             };
@@ -172,6 +173,24 @@ public final class StoreSandbox {
         return 0;
     }
 
+    private static int merge(Path project, List<String> tokens, boolean json, PrintStream out) throws Exception {
+        String name = positional(tokens, 2, "sandbox merge needs a name");
+        Binding.sandbox(name);
+        String policy = value(tokens, "--policy=");
+        boolean dry = tokens.contains("--dry-run");
+        boolean dropAfter = tokens.contains("--drop");
+        StoreMerge.Outcome outcome = StoreMerge.run(project, name, policy, dry);
+        if (json) out.println(outcome.json());
+        else out.print(outcome.text());
+        StoreLog.log(project, "merge", name, name,
+                "policy=" + outcome.policy() + " applied=" + outcome.applied() + " conflicts=" + outcome.conflicts());
+        if (!outcome.ok()) return 1;
+        if (dropAfter && !dry) {
+            return drop(project, List.of("sandbox", "drop", name), out);
+        }
+        return 0;
+    }
+
     private static List<String> diffTable(SqlSession session, String table) throws SQLException {
         Map<String, String> base = new LinkedHashMap<>();
         try (var statement = session.connection().prepareStatement(
@@ -184,11 +203,23 @@ public final class StoreSandbox {
         Map<String, String> current = new LinkedHashMap<>();
         String sql = "files".equals(table)
                 ? "SELECT path, content_hash FROM files ORDER BY path"
-                : "SELECT entity_type || '#' || entity_id, content_hash FROM entities ORDER BY 1";
-        try (var statement = session.connection().createStatement();
-             var result = statement.executeQuery(sql)) {
-            while (result.next()) {
-                current.put(result.getString(1), result.getString(2) == null ? "" : result.getString(2));
+                : null;
+        if (sql != null) {
+            try (var statement = session.connection().createStatement();
+                 var result = statement.executeQuery(sql)) {
+                while (result.next()) {
+                    current.put(result.getString(1), result.getString(2) == null ? "" : result.getString(2));
+                }
+            }
+        } else {
+            try (var statement = session.connection().prepareStatement(
+                    "SELECT entity_type, entity_id, payload_json, secret_refs, content_hash FROM entities")) {
+                try (var result = statement.executeQuery()) {
+                    while (result.next()) {
+                        String key = result.getString(1) + "#" + result.getString(2);
+                        current.put(key, StoreHashes.entityIdentity(result.getString(3), result.getString(4), result.getString(5)));
+                    }
+                }
             }
         }
         List<String> lines = new ArrayList<>();
@@ -398,6 +429,8 @@ public final class StoreSandbox {
             vacuumMain(project);
             out.println("vacuum " + dropped);
         }
+        int trimmed = StoreChanges.trimAll(project);
+        if (trimmed > 0) out.println("changes removed=" + trimmed);
         return 0;
     }
 

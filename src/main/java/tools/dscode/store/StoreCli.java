@@ -62,6 +62,7 @@ public final class StoreCli {
                 }
                 case "migrate" -> StoreMigrate.cli(tokens, stdout, stderr);
                 case "sandbox" -> StoreSandbox.execute(project, tokens, stdout, stderr);
+                case "changes" -> StoreChanges.execute(project, tokens, stdout, stderr);
                 case "status" -> status(project, json(tokens), stdout);
                 case "hydrate" -> hydrate(project, tokens, stdout, stderr);
                 case "extract", "hydrate-out" -> extract(project, tokens, stdout, stderr);
@@ -143,6 +144,8 @@ public final class StoreCli {
                 Usage: store sandbox extract <name> --to=<dir> [--into-project] [--project=<dir>]
                 Usage: store sandbox drop <name> [--force] [--project=<dir>]
                 Usage: store sandbox prune [--older-than=<duration>] [--owner=<id>] [--dry-run] [--with-history] [--vacuum] [--project=<dir>]
+                Usage: store sandbox merge <name> [--policy=fail|branch-wins|main-wins] [--dry-run] [--drop] [--json] [--project=<dir>]
+                Usage: store changes [--sandbox=<name>] [--since=<seq>] [--table=<t>] [--limit=<n>] [--json] [--project=<dir>]
                 Usage: store status [--project=<dir>] [--json]
                 Usage: store hydrate [--project=<dir>] [--path=<relative>] [--force] [--dry-run]
                 Usage: store extract [--project=<dir>] [--path=<relative>] [--force]
@@ -174,6 +177,7 @@ public final class StoreCli {
                 Usage: store run [--project=<dir>] [--dry-run] [--tags=<expr>] [--name=<text>] [--glue=<packages>] [--sandbox=<name>] [--engine]
                 Usage: store run-classpath --out=<file> [--project=<dir>]
                 Files stay the source of truth. The working copy is .pickleball/store/main.db and is gitignored. Opening it starts no process and downloads nothing.
+                sandbox merge compares _pkb_base, the sandbox, and main by hash. The default policy fail writes nothing when any key conflicts, prints a text table, and saves sandboxes/<name>/merge-<time>.json. branch-wins and main-wins resolve those keys. One transaction applies the chosen rows, rebuilds derived feature rows, and re-baselines the sandbox. --dry-run writes nothing. --drop drops the sandbox after a successful merge. store changes lists the _pkb_changes rows for the bound database. --since and --limit page by sequence. pkb_store_changes_days (default 14) is how long store retain and sandbox prune keep those rows. Set pkb_store_log=merge,changes to log them.
                 status and hydrate --dry-run do not create a database when it is missing.
                 hydrate copies features, configs, calls, components, resource maps, templates, and store-entities/*.entity files.
                 A .feature file also stores scenarios, steps, tags, docstrings, and data tables. The original bytes stay in the file row.

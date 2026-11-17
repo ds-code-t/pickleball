@@ -124,6 +124,14 @@ public final class StoreBrowser {
         return List.of("sandbox", "drop", name);
     }
 
+    public static List<String> sandboxMerge(String name) {
+        return List.of("sandbox", "merge", name, "--json");
+    }
+
+    public static List<String> changes() {
+        return List.of("changes", "--json");
+    }
+
     public static List<String> withSandbox(List<String> args, String sandbox) {
         if (args == null || args.isEmpty()) return List.of();
         if (sandbox == null || sandbox.isBlank() || "main".equals(sandbox)) return List.copyOf(args);

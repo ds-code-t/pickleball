@@ -385,11 +385,11 @@ final class WorkbenchMcpTools {
                     return value == null ? Map.of("status", "UNAVAILABLE", "op", op) : value;
                 });
         add("store",
-                "Forwards arguments to the pickleball store CLI, including server, sandbox, query, timeline, and retain. Does not open the store.",
+                "Forwards store CLI arguments, including sandbox merge and changes. Does not open the store.",
                 schema(Map.of(
                         "args", Map.of(
                                 "type", "array",
-                                "description", "Arguments after store. Example: [\"status\"], [\"query\", \"--entity=Account#ada\", \"--tag=@pay\", \"--feature=features/pay.feature\", \"--run=sample-run\", \"--text=total\", \"--json\"], [\"timeline\", \"--latest\", \"--json\"], [\"timeline\", \"--before=<cursor>\", \"--json\"], [\"retain\", \"--days=30\"], [\"files\", \"list\", \"--json\"], [\"run\", \"--dry-run\"].",
+                                "description", "Arguments after store. Example: [\"sandbox\", \"merge\", \"left\", \"--policy=fail\", \"--json\"], [\"changes\", \"--since=1\", \"--table=files\", \"--limit=20\", \"--json\"], [\"status\"], [\"query\", \"--json\"], [\"retain\"].",
                                 "items", Map.of("type", "string")
                         )
                 ), "args"),

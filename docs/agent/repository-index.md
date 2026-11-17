@@ -656,6 +656,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/store/sql/SqlStore.java`
 - `src/main/java/tools/dscode/store/sql/StoreFiles.java`
 - `src/main/java/tools/dscode/store/StoreArtifacts.java`
+- `src/main/java/tools/dscode/store/StoreChanges.java`
 - `src/main/java/tools/dscode/store/StoreCli.java`
 - `src/main/java/tools/dscode/store/StoreConfig.java`
 - `src/main/java/tools/dscode/store/StoreContent.java`
@@ -674,6 +675,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/store/StoreHistory.java`
 - `src/main/java/tools/dscode/store/StoreHydrator.java`
 - `src/main/java/tools/dscode/store/StoreLog.java`
+- `src/main/java/tools/dscode/store/StoreMerge.java`
 - `src/main/java/tools/dscode/store/StoreMigrate.java`
 - `src/main/java/tools/dscode/store/StorePaths.java`
 - `src/main/java/tools/dscode/store/StoreQuery.java`
@@ -929,6 +931,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/scenarioobject/ScenarioObjectSteps.java`
 - `src/test/java/tools/dscode/ScenarioObjectTest.java`
 - `src/test/java/tools/dscode/store/CategoryEditTest.java`
+- `src/test/java/tools/dscode/store/ChangesCliTest.java`
 - `src/test/java/tools/dscode/store/EmbeddedStoreOpenTest.java`
 - `src/test/java/tools/dscode/store/FileEditTest.java`
 - `src/test/java/tools/dscode/store/GherkinRewriteTest.java`
@@ -940,6 +943,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/store/RenameGateTest.java`
 - `src/test/java/tools/dscode/store/SandboxCreateTimingTest.java`
 - `src/test/java/tools/dscode/store/SandboxIndependenceTest.java`
+- `src/test/java/tools/dscode/store/SandboxMergeConflictTest.java`
+- `src/test/java/tools/dscode/store/SandboxMergeTest.java`
+- `src/test/java/tools/dscode/store/SandboxMergeTimingTest.java`
 - `src/test/java/tools/dscode/store/spike/EmbeddedMultiProcessTest.java`
 - `src/test/java/tools/dscode/store/spike/EmbeddedNativeProbe.java`
 - `src/test/java/tools/dscode/store/spike/EmbeddedStoreSpikeTest.java`
