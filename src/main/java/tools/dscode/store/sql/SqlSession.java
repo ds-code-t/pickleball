@@ -125,46 +125,57 @@ public final class SqlSession implements AutoCloseable {
             run.setAutoCommit(false);
             try {
                 work.run();
-                commitIdle(run);
-                connection.commit();
+                // sqlite-jdbc Connection.commit() runs COMMIT and then BEGIN.
+                // A lock on that BEGIN means the write already landed. Retrying
+                // would apply it again, so commit with SQL instead.
+                commitOpen(run);
+                commitOpen(connection);
             } catch (SQLException failure) {
-                rollbackIdle(run);
-                rollbackIdle(connection);
+                rollbackOpen(run);
+                rollbackOpen(connection);
                 throw failure;
             } finally {
                 inTransaction = false;
-                try {
-                    run.setAutoCommit(true);
-                } catch (SQLException ignored) {
-                    // The commit or rollback already finished.
-                }
-                try {
-                    connection.setAutoCommit(true);
-                } catch (SQLException ignored) {
-                    // The commit or rollback already finished.
-                }
+                restoreAutoCommit(run);
+                restoreAutoCommit(connection);
             }
         });
     }
 
     /**
-     * A connection with {@code setAutoCommit(false)} and no statement has no
-     * SQLite transaction on some hosts. Committing it then fails with
-     * {@code cannot commit - no transaction is active}.
+     * Ends the open transaction with SQL {@code COMMIT}. The JDBC {@code commit()}
+     * also starts the next transaction, and a lock on that restart must not be
+     * treated as a failed write.
      */
-    private static void commitIdle(Connection connection) throws SQLException {
-        try {
-            connection.commit();
+    private static void commitOpen(Connection connection) throws SQLException {
+        if (connection == null || connection.getAutoCommit()) return;
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("COMMIT");
         } catch (SQLException failure) {
             if (!inactive(failure)) throw failure;
         }
     }
 
-    private static void rollbackIdle(Connection connection) {
+    private static void rollbackOpen(Connection connection) {
         try {
-            connection.rollback();
+            if (connection == null || connection.isClosed() || connection.getAutoCommit()) return;
+            try (Statement statement = connection.createStatement()) {
+                statement.execute("ROLLBACK");
+            }
         } catch (SQLException ignored) {
             // The original failure is the one the caller needs.
+        }
+    }
+
+    private static void restoreAutoCommit(Connection connection) {
+        try {
+            if (connection != null && !connection.isClosed() && !connection.getAutoCommit()) {
+                connection.setAutoCommit(true);
+            }
+        } catch (SQLException ignored) {
+            // The commit or rollback already finished. sqlite-jdbc sets the flag
+            // before COMMIT, so a "no transaction is active" error still leaves
+            // the connection in auto-commit mode.
         }
     }
 
