@@ -93,6 +93,11 @@ def main() -> int:
         help="run only the report-7 consumer scenarios (still requires a published build)",
     )
     parser.add_argument(
+        "--observed-2-20-hook-only",
+        action="store_true",
+        help="run only the 2.20.0 bug 5 warm lifecycle-hook block",
+    )
+    parser.add_argument(
         "--observed-2-20-only",
         action="store_true",
         help="run only the 2.20.0 bugs 3 and 4 multi-run blocks",
@@ -112,6 +117,19 @@ def main() -> int:
             stop_report7(timings)
             write_timings(timings)
         print("consumer-sim report7 recorded")
+        return 0
+    if args.observed_2_20_hook_only:
+        timings = []
+        try:
+            prepare_tree()
+            run_stage(timings, "test-compile", [], maven_args=["-q", "test-compile"], allow_exit={0})
+            try:
+                _observed_hook(timings)
+            finally:
+                _observed_cleanup()
+        finally:
+            write_timings(timings)
+        print("consumer-sim observed-2.20 hook recorded")
         return 0
     if args.observed_2_20_only:
         timings = []
@@ -1996,8 +2014,67 @@ def observed_2_20(timings: list[dict]) -> None:
     try:
         _observed_bug3(timings)
         _observed_bug4(timings)
+        _observed_hook(timings)
     finally:
         _observed_cleanup()
+
+
+HOOK_TAGS = "@lifecycle-before-run-hook"
+HOOK_FEATURE = "src/test/resources/features/lifecycle-before-run-hook.feature"
+
+
+def _observed_hook(timings: list[dict]) -> None:
+    """Bug 5. The consumer runner's BEFORE_CUCUMBER_RUN hook must run on every warm run.
+
+    A fresh warm JVM, the same JVM reused, a JVM started after a resource edit
+    re-pins the generation, and the sequential control path. The probe scenario
+    fails when the hook did not run, so PASSED is the proof.
+    """
+    feature = CONSUMER / HOOK_FEATURE
+    original = feature.read_text(encoding="utf-8")
+    launcher(["warm-stop", "--all"], 60)
+    try:
+        fresh = _observed_discover(timings, "observed220-hook-fresh", HOOK_TAGS, None, 300)
+        _observed_passed(fresh, "observed220-hook-fresh")
+        timing = _timing_text("observed220-hook-fresh")
+        assert_true("action=start" in timing, "hook run 1 did not start a warm JVM\n" + timing[-1500:])
+        _assert_hook_ran("observed220-hook-fresh", fresh)
+
+        reused = _observed_discover(timings, "observed220-hook-reused", HOOK_TAGS, None, 180)
+        _observed_passed(reused, "observed220-hook-reused")
+        timing = _timing_text("observed220-hook-reused")
+        assert_true("action=reuse" in timing, "hook run 2 did not reuse the warm JVM\n" + timing[-1500:])
+        _assert_hook_ran("observed220-hook-reused", reused)
+
+        before = _active_generation()
+        feature.write_text(original + "\n", encoding="utf-8", newline="\n")
+        repinned = _observed_discover(timings, "observed220-hook-repin", HOOK_TAGS, None, 300)
+        _observed_passed(repinned, "observed220-hook-repin")
+        after = _active_generation()
+        assert_true(after != "" and after != before, f"hook run 3 did not publish a new generation ({before} -> {after})")
+        _assert_hook_ran("observed220-hook-repin", repinned)
+
+        again = _observed_discover(timings, "observed220-hook-repin-reused", HOOK_TAGS, None, 180)
+        _observed_passed(again, "observed220-hook-repin-reused")
+        timing = _timing_text("observed220-hook-repin-reused")
+        assert_true("action=reuse" in timing, "hook run 4 did not reuse the re-pinned warm JVM\n" + timing[-1500:])
+        _assert_hook_ran("observed220-hook-repin-reused", again)
+
+        sequential = _observed_discover(
+            timings, "observed220-hook-sequential", HOOK_TAGS, {"PKB_WORKBENCH_SPEED": "sequential"}, 600
+        )
+        _observed_passed(sequential, "observed220-hook-sequential")
+        _assert_hook_ran("observed220-hook-sequential", sequential)
+    finally:
+        feature.write_text(original, encoding="utf-8", newline="\n")
+    print("observed-2.20 bug5 PASS", flush=True)
+
+
+def _assert_hook_ran(run_id: str, result: subprocess.CompletedProcess) -> None:
+    text = (result.stdout or "") + "\n" + (result.stderr or "")
+    assert_true("no consumer PickleballRunner subclass was found" not in text, f"{run_id} fell back to the default suite\n" + text[-2000:])
+    evidence = _observed_evidence(run_id, result)
+    assert_true("lifecycle-before-run-hook-ok" in evidence, f"{run_id} did not run the hook probe step")
 
 
 def _observed_cleanup() -> None:

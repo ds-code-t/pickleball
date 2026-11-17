@@ -88,6 +88,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/roadmaps/2.1.18-direct-control-handoff.md`
 - `docs/roadmaps/2.1.18-workbench-coverage-findings.md`
 - `docs/roadmaps/2.1.18-workbench-full-coverage.md`
+- `docs/roadmaps/2.20.0-observed-issues/BUG-5-WARM-LIFECYCLE-HOOKS.md`
 - `docs/roadmaps/2.20.0-observed-issues/INVESTIGATION.md`
 - `docs/roadmaps/2.20.0-observed-issues/PICKLEBALL_2.1.19_ISSUES.md`
 - `docs/roadmaps/2.20.0-observed-issues/ROADMAP.md`
@@ -536,6 +537,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/SecretRedactionTest.java`
 - `src/test/java/tools/dscode/launcher/SessionHealthWaitTest.java`
 - `src/test/java/tools/dscode/launcher/VersionSwitchTest.java`
+- `src/test/java/tools/dscode/launcher/WarmRunnerRootTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchAgentCommandsTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchAgentUsabilityTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchCliCoverageGateTest.java`
@@ -982,6 +984,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/features/keyboard.feature`
 - `maven-consumer-project/src/test/resources/features/lazy-boolean-sides.feature`
 - `maven-consumer-project/src/test/resources/features/lazy-branch-resolution.feature`
+- `maven-consumer-project/src/test/resources/features/lifecycle-before-run-hook.feature`
 - `maven-consumer-project/src/test/resources/features/log-and-assert-steps.feature`
 - `maven-consumer-project/src/test/resources/features/map-ref-plain-forms.feature`
 - `maven-consumer-project/src/test/resources/features/mapping-and-resources.feature`

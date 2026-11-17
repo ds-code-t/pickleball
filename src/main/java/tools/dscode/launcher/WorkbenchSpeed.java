@@ -1,6 +1,7 @@
 package tools.dscode.launcher;
 
 import tools.dscode.control.protocol.AgentLog;
+import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.speed.ClasspathCache;
 import tools.dscode.control.protocol.speed.InputFingerprint;
@@ -640,6 +641,8 @@ public final class WorkbenchSpeed {
         List<String> command = new ArrayList<>();
         command.add(Path.of(System.getProperty("java.home"), "bin", windows ? "java.exe" : "java").toString());
         if (Boolean.getBoolean("pkb_warm_test_child")) command.add("-Dpkb_warm_test_child=true");
+        String testOutputRoot = warmTestOutputRootArgument(snapshot);
+        if (testOutputRoot != null) command.add(testOutputRoot);
         command.add("-cp");
         command.add(String.join(java.io.File.pathSeparator, entries));
         command.add(WorkbenchWarmMain.class.getName());
@@ -751,14 +754,34 @@ public final class WorkbenchSpeed {
     }
 
     private static List<String> generationProperties(Path state, List<String> dashD) {
+        return generationProperties(WarmGeneration.readActive(state), dashD);
+    }
+
+    /**
+     * Per-RUN generation tokens. The test-classes copy and, since 2.20.0 bug 5,
+     * {@code pickleball.workbench.testOutputRoot} pointing at the same copy so the
+     * consumer runner and its {@code @LifecycleHook} methods are found on a reused
+     * or freshly started warm JVM. A caller-supplied value wins.
+     */
+    static List<String> generationProperties(WarmGeneration.Snapshot snapshot, List<String> dashD) {
         List<String> tokens = new ArrayList<>(dashD == null ? List.of() : dashD);
-        WarmGeneration.Snapshot snapshot = WarmGeneration.readActive(state);
         if (snapshot == null || snapshot.testClasses() == null) return tokens;
-        String token = "-D" + WarmGeneration.TEST_CLASSES_PROPERTY + "=" + snapshot.testClasses();
-        if (tokens.stream().noneMatch(item -> item != null && item.startsWith("-D" + WarmGeneration.TEST_CLASSES_PROPERTY + "="))) {
-            tokens.add(token);
-        }
+        String testClasses = snapshot.testClasses().toAbsolutePath().normalize().toString();
+        addIfAbsent(tokens, WarmGeneration.TEST_CLASSES_PROPERTY, testClasses);
+        addIfAbsent(tokens, ControlProtocol.WORKBENCH_TEST_OUTPUT_ROOT_PROPERTY, testClasses);
         return tokens;
+    }
+
+    /** JVM-level {@code -D} for a new warm slot, or null when there is no generation copy. */
+    static String warmTestOutputRootArgument(WarmGeneration.Snapshot snapshot) {
+        if (snapshot == null || snapshot.testClasses() == null) return null;
+        return "-D" + ControlProtocol.WORKBENCH_TEST_OUTPUT_ROOT_PROPERTY + "="
+                + snapshot.testClasses().toAbsolutePath().normalize();
+    }
+
+    private static void addIfAbsent(List<String> tokens, String key, String value) {
+        String prefix = "-D" + key + "=";
+        if (tokens.stream().noneMatch(item -> item != null && item.startsWith(prefix))) tokens.add(prefix + value);
     }
 
     record SlotView(int slot, long pid, int port, String state, String runId, String generation, long ageSeconds) {

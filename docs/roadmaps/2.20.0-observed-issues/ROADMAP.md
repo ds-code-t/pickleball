@@ -4,6 +4,7 @@
 **Inputs on this branch:** `docs/roadmaps/2.20.0-observed-issues/PICKLEBALL_2.1.19_ISSUES.md` (the report) and `INVESTIGATION.md` (the first-pass root causes). This roadmap supersedes the first draft pushed at `c0bc542b` and corrects `INVESTIGATION.md` where noted below.
 **Code baseline:** the code on 2.20.0 is identical to the reported 2.1.19. Its only commits since then are docs under `docs/roadmaps/2.20.0-observed-issues/`.
 **Version:** `2.20.0` (Phase 0).
+**Follow-up:** bug 5 (warm runs skipped the consumer runner's `@LifecycleHook` methods), found after bugs 1–4 shipped, is in `BUG-5-WARM-LIFECYCLE-HOOKS.md`.
 
 ## Hard rules (apply to every phase)
 

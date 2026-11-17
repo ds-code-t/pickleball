@@ -7,6 +7,7 @@ import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
 import org.junit.platform.launcher.core.LauncherFactory;
 import org.junit.platform.launcher.listeners.SummaryGeneratingListener;
 import tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner;
+import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.control.protocol.speed.WarmGeneration;
 import tools.dscode.testengine.DynamicSuiteEngine;
 
@@ -38,6 +39,7 @@ public final class WorkbenchDirectRun {
         Path tests;
         if (override != null && !override.isBlank()) {
             tests = Path.of(override.trim());
+            pinTestOutputRoot(tests, dashD);
         } else {
             tests = root.resolve("target").resolve("test-classes");
             if (!Files.isDirectory(tests)) {
@@ -60,6 +62,18 @@ public final class WorkbenchDirectRun {
             System.err.println("fix: the wrapper path still runs this command.");
             return 1;
         }
+    }
+
+    /**
+     * A warm run discovers from a generation copy, not {@code target/test-classes}.
+     * Point the consumer-runner search at that copy unless this RUN supplied its own
+     * root (2.20.0 bug 5: otherwise no {@code @LifecycleHook} method runs).
+     */
+    static void pinTestOutputRoot(Path tests, List<String> dashD) {
+        String key = ControlProtocol.WORKBENCH_TEST_OUTPUT_ROOT_PROPERTY;
+        String prefix = "-D" + key + "=";
+        if (dashD != null && dashD.stream().anyMatch(token -> token != null && token.startsWith(prefix))) return;
+        System.setProperty(key, tests.toAbsolutePath().normalize().toString());
     }
 
     public static int run(Path project, String[] args) {
