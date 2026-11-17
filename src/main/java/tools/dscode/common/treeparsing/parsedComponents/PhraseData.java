@@ -35,6 +35,7 @@ import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.mappings.StepMapping.copytoNewParsingMap;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
+import static tools.dscode.common.reporting.logging.LogForwarder.logDebug;
 import static tools.dscode.common.reporting.logging.LogForwarder.logError;
 import static tools.dscode.common.reporting.logging.LogForwarder.logToDefaultLevel;
 import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
@@ -285,6 +286,9 @@ public abstract class PhraseData extends PassedData {
         hasTextToResolve = hasResolvedText || text.matches(".*<.*>.*");
         resetParsedFields();
         parseFromText(resolvedText);
+        if (assertionChainMembership != null) {
+            logDebug("chain member resolved: " + text + " -> " + resolvedText);
+        }
     }
 
     /**
@@ -303,6 +307,11 @@ public abstract class PhraseData extends PassedData {
     }
 
     public boolean skipReferenceResolution() {
+        // A chain member runs only when the chain reaches it. That short-circuit
+        // is the only gate; a false earlier member must not leave this phrase literal.
+        if (assertionChainMembership != null) {
+            return false;
+        }
         String cond = getConditional() == null ? "" : getConditional().trim().toLowerCase();
         if (cond.startsWith("else")) {
             if (position == 0 || getPreviousPhrase() == null) {

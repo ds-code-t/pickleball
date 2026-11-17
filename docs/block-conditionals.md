@@ -39,6 +39,8 @@ Phrase comparisons and element states use the same words as a dynamic step. `end
   : * , save "disabled" as "state"
 ```
 
+Each phrase of an `, or` or `, and` chain fills its placeholders when that phrase runs. A phrase the chain never reaches is not resolved. An untaken `THEN`, `ELSE`, or `ELSE-IF` is still not resolved.
+
 ## Expression-style conditions
 
 Expression-style conditions use explicit operators:

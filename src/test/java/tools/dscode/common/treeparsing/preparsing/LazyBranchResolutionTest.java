@@ -1,6 +1,8 @@
 package tools.dscode.common.treeparsing.preparsing;
 
 import org.junit.jupiter.api.Test;
+import tools.dscode.common.assertions.AssertionChain;
+import tools.dscode.common.mappings.ParsingMap;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
 import java.lang.reflect.Constructor;
@@ -57,6 +59,44 @@ class LazyBranchResolutionTest {
         assertTrue(body.getText().contains("$DateTime"), body.getText());
         assertTrue(body.skipReferenceResolution(), body.getConditional() + " / " + body.getText());
         assertFalse(body.evaluationsResolved);
+    }
+
+    @Test
+    void orChainMemberResolvesAfterAFalseHeadAndASkippedThenStaysSuppressed() throws Exception {
+        ParsedLine line = parse(ParsedLine.rewriteConditionalBranches(
+                "IF: \"x\" is equal to \"y\", or \"<N>\" is equal to \"2\" THEN: , save \"yes\" as \"B\""));
+        PhraseData second = line.phrases().stream()
+                .filter(phrase -> "or".equals(phrase.conjunction))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError(phraseText(line)));
+        PhraseData previous = second.getPreviousPhrase();
+        assertTrue(previous != null, phraseText(line));
+        previous.evaluationsResolved = true;
+        previous.phraseConditionalMode = -1;
+        assertTrue(second.deferEvaluations, second.getText());
+        assertTrue(second.skipReferenceResolution(), second.getText());
+
+        second.assertionChainMembership = new AssertionChain(previous);
+        assertFalse(second.skipReferenceResolution(), second.getText());
+        assertTrue(second.shouldResolveBranchReferences());
+        if (second.deferEvaluations && !second.shouldResolveBranchReferences()) {
+            second.suppressResolve = true;
+        }
+        assertFalse(second.suppressResolve);
+        second.setPhraseParsingMap(new ParsingMap());
+        second.resolveForExecution();
+        assertTrue(second.evaluationsResolved, second.getText());
+        assertFalse(second.suppressResolve);
+
+        ParsedLine skippedThen = parse(ParsedLine.rewriteConditionalBranches(
+                "IF: 1 == 0 THEN: save \"<$DateTime:now <MISSING> format: uuuu>\""));
+        PhraseData body = skippedThen.phrases().get(1);
+        PhraseData condition = skippedThen.phrases().getFirst();
+        condition.evaluationsResolved = true;
+        condition.phraseConditionalMode = -1;
+        assertTrue(body.skipReferenceResolution(), body.getText());
+        assertFalse(body.evaluationsResolved);
+        assertTrue(body.getText().contains("$DateTime"), body.getText());
     }
 
     private static String phraseText(ParsedLine line) {
