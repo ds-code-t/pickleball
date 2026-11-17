@@ -180,6 +180,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentcontrol/PopupSurfaceBridge.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ScenarioCapture.java`
 - `src/main/java/tools/dscode/common/agentcontrol/SurfaceBox.java`
+- `src/main/java/tools/dscode/common/agentcontrol/UiBatch.java`
+- `src/main/java/tools/dscode/common/agentcontrol/UiCatalog.java`
+- `src/main/java/tools/dscode/common/agentcontrol/UiState.java`
 - `src/main/java/tools/dscode/common/agentcontrol/VisualKinds.java`
 - `src/main/java/tools/dscode/common/agentcontrol/WindowRegistry.java`
 - `src/main/java/tools/dscode/common/agentsurface/AgentSurfaceRouter.java`
@@ -656,6 +659,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/resources/tools/dscode/browser/surface/magnifier.html`
 - `src/main/resources/tools/dscode/browser/surface/overlay.css`
 - `src/main/resources/tools/dscode/browser/surface/overlay.html`
+- `src/main/resources/tools/dscode/browser/surface/panel.css`
+- `src/main/resources/tools/dscode/browser/surface/pkb-runtime.js`
 - `src/main/resources/tools/dscode/browser/surface/spotlight.css`
 - `src/main/resources/tools/dscode/browser/surface/spotlight.html`
 - `src/main/resources/tools/dscode/browser/surface/step.css`
@@ -689,10 +694,18 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentcontrol/FallbackLogTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/IsolatedWorldTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/LiveChromeCdpTest.java`
+- `src/test/java/tools/dscode/common/agentcontrol/OverlayFixtures.java`
+- `src/test/java/tools/dscode/common/agentcontrol/OverlayPollCursorTest.java`
+- `src/test/java/tools/dscode/common/agentcontrol/OverlayRuntimeLiveTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/SurfaceIdChild.java`
+- `src/test/java/tools/dscode/common/agentcontrol/UiBatchTest.java`
+- `src/test/java/tools/dscode/common/agentcontrol/UiCatalogTest.java`
+- `src/test/java/tools/dscode/common/agentcontrol/UiStateTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/AgentSurfaceRouterTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/live/AgentSurfacePopupLiveTest.java`
+- `src/test/java/tools/dscode/common/agentsurface/live/PopupChatLiveTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/NativeHighlightRouteTest.java`
+- `src/test/java/tools/dscode/common/agentsurface/PopupBridgeChatTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/PopupBridgeTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/PopupBrowserLocatorTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/PopupCleanupTest.java`
@@ -949,6 +962,13 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/resources/META-INF/services/org.junit.platform.launcher.LauncherSessionListener`
 - `src/test/resources/META-INF/services/org.junit.platform.launcher.TestExecutionListener`
 - `src/test/resources/multiline-assert/multiline-assert.feature`
+- `src/test/resources/overlay/basic.html`
+- `src/test/resources/overlay/basic.js`
+- `src/test/resources/overlay/nested-scroll.html`
+- `src/test/resources/overlay/spa.html`
+- `src/test/resources/overlay/spa.js`
+- `src/test/resources/overlay/strict-csp.css`
+- `src/test/resources/overlay/strict-csp.html`
 - `src/test/resources/position/ordinals.html`
 - `src/test/resources/scenario-object/scenario-object.feature`
 - `src/test/resources/suite-hooks/suite-hook.feature`
@@ -1158,6 +1178,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/McpRegistry.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/popup/PopupMcpCommands.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/SnapshotCommand.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/ui/WorkbenchUiTools.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/WorkbenchAttachServer.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/WorkbenchCommandQueue.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/WorkbenchMcpServer.java`
@@ -1242,6 +1263,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/log/LogCliForwarderTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mapping/MappingValueCodecTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/popup/PopupMcpCommandsTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/ui/WorkbenchUiToolsTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchAttachServerProgressTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchAttachServerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchCommandQueueTest.java`
@@ -1264,6 +1286,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/sync/WorkbenchSynchronizerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/sync/WorkbenchSyncPlannerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/terminal/WorkerLogBufferTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/AgentChatPanelEnterTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/AgentChatPanelPopupTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/ConfigTabModelTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/DoltPanelTest.java`

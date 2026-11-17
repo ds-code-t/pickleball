@@ -57,11 +57,21 @@ final class WorkbenchCliHelp {
             Map.entry("tabs", "Usage: tabs [--switch=<handle>] [--close=<handle>] [--run-id=<id>]"),
             Map.entry("chat-send", "Usage: chat-send --text=<message> [--source=agent|human|system] [--channel=<name>] [--agent=<id>] [--run-id=<id>]"),
             Map.entry("chat-history", "Usage: chat-history [--channel=<name>] [--limit=<n>] [--run-id=<id>]"),
-            Map.entry("chat-poll", "Usage: chat-poll [--channel=<name>] [--id=<after>] [--run-id=<id>]"),
+            Map.entry("chat-poll", "Usage: chat-poll [--channel=<name>] [--id=<after>] [--wait=<seconds>] [--run-id=<id>]"),
             Map.entry("highlight", "Usage: highlight --handle=<id> (--preset=yellow|outline-red) [--style=<css>] [--html=<page>] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>]"),
             Map.entry("unhighlight", "Usage: unhighlight [--handle=<id>] [--html=<page>]"),
-            Map.entry("overlay", "Usage: overlay --text=<html> [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--handle=<id>] [--geometry=<json>] [--html=<page>]"),
-            Map.entry("overlay-poll", "Usage: overlay-poll [--run-id=<id>]"),
+            Map.entry("overlay", "Usage: overlay --text=<html> [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--handle=<id>] [--at=auto|top|bottom|left|right|over] [--theme=auto|light|dark] [--geometry=<json>] [--html=<page>]"),
+            Map.entry("panel-open", "Usage: panel-open [--target=auto|page|popup] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--tab=chat|steps] [--title=<text>] [--theme=auto|light|dark] [--minimized=true|false] [--run-id=<id>]"),
+            Map.entry("panel-close", "Usage: panel-close [--target=auto|page|popup] [--run-id=<id>]"),
+            Map.entry("guide", "Usage: guide --steps=<json array>|@file.json [--id=<guide>] [--scroll=true] [--run-id=<id>]  (step: {\"t\":\"#email\",\"say\":\"Type your email\",\"do\":\"input\"}; do is click, input, select, check, or any)"),
+            Map.entry("guide-next", "Usage: guide-next [--id=<guide>] [--run-id=<id>]"),
+            Map.entry("guide-back", "Usage: guide-back [--id=<guide>] [--run-id=<id>]"),
+            Map.entry("guide-done", "Usage: guide-done [--id=<guide>] [--run-id=<id>]"),
+            Map.entry("ask", "Usage: ask --say=<question> [--choices=Yes,No] [--handle=<target>] [--id=<question>] [--sensitive=true] [--run-id=<id>]"),
+            Map.entry("ui-apply", "Usage: ui-apply --ops=<json array>|@file.json [--verbose=true] [--scope=page|origin|run] [--ttl=<seconds>] [--run-id=<id>]  (op: {\"c\":\"label\",\"t\":\"#email\",\"text\":\"Email\"}; see ui-catalog)"),
+            Map.entry("ui-poll", "Usage: ui-poll [--after=<n>] [--chat-after=<id>] [--wait=<seconds, up to 25>] [--channel=<name>] [--run-id=<id>]"),
+            Map.entry("ui-catalog", "Usage: ui-catalog [--component=<name>] [--json]"),
+            Map.entry("overlay-poll", "Usage: overlay-poll [--after=<next>] [--run-id=<id>]"),
             Map.entry("overlay-remove", "Usage: overlay-remove --id=<id> [--html=<page>]"),
             Map.entry("label", "Usage: label --text=<label> [--handle=<id>] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--geometry=<json>] [--target=auto|page|popup|native] [--html=<page>]"),
             Map.entry("unlabel", "Usage: unlabel --id=<id> [--html=<page>]"),
@@ -157,7 +167,7 @@ final class WorkbenchCliHelp {
         text.append("coordination: short-log note inbox finish presence post history gc-runs gc-versions use-version export-guidance\n");
         text.append("descriptors: session list | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>\n");
         text.append("page: inspect-page find-element\n");
-        text.append("agent: observe launch windows tabs chat-send chat-history chat-poll highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close capture-scenario\n");
+        text.append("agent: observe launch windows tabs chat-send chat-history chat-poll highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close panel-open panel-close guide guide-next guide-back guide-done ask ui-apply ui-poll ui-catalog capture-scenario\n");
         text.append("retrieval: query runs | query get | query query | query search | query props | query errors | query tail\n");
         text.append("controller: sync worker-check live-check ui mcp session\n");
         text.append("all:");

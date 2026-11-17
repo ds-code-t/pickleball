@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; require-trusted-types-for 'script'">
+<title>Overlay fixture: strict CSP</title>
+<link rel="stylesheet" href="strict-csp.css">
+</head>
+<body>
+<form id="account" onsubmit="return false">
+  <label>Email <input id="email" name="email" type="email"></label>
+  <button id="save" type="button">Save</button>
+</form>
+</body>
+</html>

@@ -91,6 +91,24 @@ public final class BidiAdapter implements BrowserFacade {
     }
 
     @Override
+    public String addPreloadIn(String script, String world) {
+        if (script == null) {
+            throw new IllegalArgumentException("error: preload script is null.\nfix: Pass the script text.");
+        }
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("functionDeclaration", functionDeclaration(script));
+        params.put("sandbox", world == null || world.isBlank() ? "pkb" : world);
+        JsonNode result = rpc.call("script.addPreloadScript", params);
+        return result == null ? "" : result.path("script").asText("");
+    }
+
+    @Override
+    public void removePreload(String identifier) {
+        if (identifier == null || identifier.isBlank()) return;
+        rpc.call("script.removePreloadScript", Map.of("script", identifier));
+    }
+
+    @Override
     public void addBinding(String name, BindingListener listener) {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("error: binding name is blank.\nfix: Pass the binding name.");

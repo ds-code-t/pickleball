@@ -18,16 +18,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SurfaceAssetsTest {
     @Test
     void loadsEachAssetAtItsHash() throws Exception {
-        assertEquals("8e454a18df9580abd7810a59562e4786f75b0e39f3bcbd708845b018295f6cfa", sha(SurfaceAssets.script("live-helper")));
+        assertEquals("619c32f1a280a5f2b2738d4926bb82e4999990a4f8a90e33b0318f40f1d6b68a", sha(SurfaceAssets.script("live-helper")));
         assertEquals("5d6b24e641d70c4c252804b3d0bfae48f6170037434b6d43b2b8e2650c0821a7", sha(SurfaceAssets.script("bridge-mark")));
         assertEquals("ab8f90e2e4d04214af67e933ab190a0bfab7c89e57ba6cdfe5e10bd3eec6e29a", sha(SurfaceAssets.script("frame-mark")));
         assertEquals("afc0169aba6b94679a425b8b8868193583b8813e8bcf52fadf089389d7999c88", sha(SurfaceAssets.script("frame-restore")));
         assertEquals("405c93b5a4482851c1a77962c8157aa3564d5cf1eb805a779e624dcff023273f", sha(SurfaceAssets.html("html")));
         assertEquals("6eb22bb91aa747f562d04c88609a3c5750daf70c901063fa4c82efafa528c2ff", sha(SurfaceAssets.css("html")));
-        assertEquals("9f3408c537a2e78487851a69fedf000ee4f3f9549d23f2fbc3ce4b5589f023d2", sha(SurfaceAssets.js("html")));
+        assertEquals("67876a1dd59fb3ad81ab13ec0f8d9b49c0f7eef9cafb5d56c6493f1d7bd0977c", sha(SurfaceAssets.js("html")));
         assertEquals("e0dd572fb8aaf3f0ad821aa7c5887831712983321f9f677f14ba96355a42035f", sha(SurfaceAssets.html("overlay")));
         assertEquals("6e058d1ce20346fd16be1389948cfdc7a0e298f88087f7b7c73ddaae24a72a34", sha(SurfaceAssets.css("overlay")));
-        assertEquals("9f3408c537a2e78487851a69fedf000ee4f3f9549d23f2fbc3ce4b5589f023d2", sha(SurfaceAssets.js("overlay")));
+        assertEquals("67876a1dd59fb3ad81ab13ec0f8d9b49c0f7eef9cafb5d56c6493f1d7bd0977c", sha(SurfaceAssets.js("overlay")));
         assertEquals("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", sha(SurfaceAssets.html("highlight")));
         assertEquals("134ef85a646321fad03b805b81566356724f8a8da26b8e0b9e5be36943ff92cd", sha(SurfaceAssets.css("highlight")));
         assertEquals("085febe43a03b7a1991f3f8f950306413ce85d98c1cffb727b7cafc51117568c", sha(SurfaceAssets.js("highlight")));
@@ -116,5 +116,15 @@ class SurfaceAssetsTest {
     private static String sha(String text) throws Exception {
         byte[] digest = MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8));
         return HexFormat.of().formatHex(digest);
+    }
+
+    @Test
+    void runtimeScriptLoads() {
+        String runtime = SurfaceAssets.script("pkb-runtime");
+        assertTrue(runtime.contains("window.__pkbUi = {"), "runtime does not expose __pkbUi");
+        assertTrue(runtime.contains("version: VERSION"), "runtime has no version");
+        assertTrue(runtime.contains("addEventListener") && runtime.contains("capture: true"), "runtime has no capture-phase scroll listener");
+        assertTrue(runtime.contains("ResizeObserver") && runtime.contains("MutationObserver"), "runtime does not observe resize and mutation");
+        assertSame(runtime, SurfaceAssets.script("PKB-RUNTIME"));
     }
 }

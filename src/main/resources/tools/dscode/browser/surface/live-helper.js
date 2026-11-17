@@ -20,6 +20,31 @@ function node() {
   if (marked) return marked;
   return null;
 }
+// Pages that require Trusted Types reject plain innerHTML. The HTML is already neutralized in Java,
+// so a named policy passes it through; if the page forbids new policies the text is shown instead.
+function setHtml(el, html) {
+  var text = html || '';
+  if (typeof window !== 'undefined' && window.trustedTypes && window.trustedTypes.createPolicy) {
+    if (window.__pkbPolicy === undefined) {
+      try {
+        window.__pkbPolicy = window.trustedTypes.createPolicy('pkb-surface', {createHTML: function(s) { return s; }});
+      } catch (refused) {
+        window.__pkbPolicy = null;
+      }
+    }
+    if (window.__pkbPolicy) {
+      el.innerHTML = window.__pkbPolicy.createHTML(text);
+      return;
+    }
+    try {
+      el.innerHTML = text;
+    } catch (blocked) {
+      el.textContent = text;
+    }
+    return;
+  }
+  el.innerHTML = text;
+}
 function mark(el, kind, sentence) {
   if (!el || el.nodeType !== 1) return;
   el.setAttribute('data-pkb-agent', 'agent_injected');
@@ -81,7 +106,7 @@ if (op === 'remove' || op === 'cleanup') {
     nodes.forEach(function(el) {
       if (undo) {
         var tpl = document.createElement('template');
-        tpl.innerHTML = undo;
+        setHtml(tpl, undo);
         el.replaceWith(tpl.content);
         delete window.__pkbUndo[id];
       } else el.remove();
@@ -89,6 +114,9 @@ if (op === 'remove' || op === 'cleanup') {
     });
   });
   if (op === 'cleanup') document.querySelectorAll('[data-pkb-style]').forEach(restoreStyle);
+  if (typeof window !== 'undefined' && window.__pkbUi) {
+    if (op === 'cleanup') window.__pkbUi.clear(); else window.__pkbUi.prune();
+  }
   if (op === 'remove' && removed === 0) return {ok:false, error:'unknown id'};
   return {ok:true, removed:removed};
 }
@@ -96,7 +124,7 @@ if (spec.handle && !node()) {
   return {ok:false, error:'unknown handle'};
 }
 var host = document.createElement('div');
-host.innerHTML = spec.html || '';
+setHtml(host, spec.html || '');
 markTree(host, spec.kind, spec.sentence);
 var anchor = node();
 var left = spec.x;
@@ -158,7 +186,24 @@ if (!window.__pkbOverlayBound) {
   document.addEventListener('change', function(ev) {
     var n = ev.target && ev.target.closest ? ev.target.closest('[data-pkb-agent]') : null;
     if (!n) return;
-    window.__pkbEvents.push({type:'input', id:n.getAttribute('data-pkb-id'), name:ev.target.name || '', value:ev.target.value || ''});
+    var t = ev.target;
+    var kind = ((t.getAttribute && t.getAttribute('type')) || '').toLowerCase();
+    var auto = ((t.getAttribute && t.getAttribute('autocomplete')) || '').toLowerCase();
+    if (kind === 'password' || auto.indexOf('password') >= 0 || auto.indexOf('cc-') >= 0 || auto.indexOf('one-time-code') >= 0) {
+      window.__pkbEvents.push({type:'input', id:n.getAttribute('data-pkb-id'), name:t.name || '', filled:true, sensitive:true});
+    } else {
+      window.__pkbEvents.push({type:'input', id:n.getAttribute('data-pkb-id'), name:t.name || '', value:t.value || ''});
+    }
   }, true);
+}
+// The runtime (pkb-runtime.js) keeps a placement on its target through scroll, resize, zoom and re-render.
+var tracked = anchor;
+if (!tracked && spec.anchor) {
+  tracked = document.getElementById(spec.anchor)
+    || document.querySelector('[data-pkb-handle="' + CSS.escape(String(spec.anchor)) + '"]');
+}
+if (tracked && op === 'append' && spec.kind && spec.kind !== 'html' && host.isConnected
+    && typeof window !== 'undefined' && window.__pkbUi && window.__pkbUi.track) {
+  try { window.__pkbUi.track(host, tracked, spec); } catch (ignored) { /* placement stays static */ }
 }
 return {ok:true, id:spec.id, x:left, y:top};

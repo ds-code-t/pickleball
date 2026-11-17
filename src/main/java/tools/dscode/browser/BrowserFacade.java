@@ -31,6 +31,20 @@ public interface BrowserFacade {
     /** Install {@code script} so later documents run it before page scripts. */
     void addPreload(String script);
 
+    /**
+     * Install {@code script} for later documents in the isolated world {@code world} and return an
+     * identifier for {@link #removePreload}. A protocol without isolated worlds installs it the
+     * ordinary way and returns an empty identifier.
+     */
+    default String addPreloadIn(String script, String world) {
+        addPreload(script);
+        return "";
+    }
+
+    /** Remove a preload that {@link #addPreloadIn} returned. A blank identifier is ignored. */
+    default void removePreload(String identifier) {
+    }
+
     /** Register {@code name}. Events are pushed to {@code listener}. There is no poll. */
     void addBinding(String name, BindingListener listener);
 

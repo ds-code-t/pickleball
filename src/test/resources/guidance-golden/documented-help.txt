@@ -11,10 +11,10 @@ session: isolate session-start execute-step status events stop kill open-scenari
 coordination: short-log note inbox finish presence post history gc-runs gc-versions use-version export-guidance
 descriptors: session list | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>
 page: inspect-page find-element
-agent: observe launch windows tabs chat-send chat-history chat-poll highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close capture-scenario
+agent: observe launch windows tabs chat-send chat-history chat-poll highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close panel-open panel-close guide guide-next guide-back guide-done ask ui-apply ui-poll ui-catalog capture-scenario
 retrieval: query runs | query get | query query | query search | query props | query errors | query tail
 controller: sync worker-check live-check ui mcp session
-all: arrow border capture-scenario chat-history chat-poll chat-send close-window confirm diagnostic-run discover discover-hint events example execute-step export-guidance find-element finish from-here gc-runs gc-versions help highlight hint history html-cleanup html-insert html-remove html-replace html-write inbox insert-step inspect-page isolate kill label launch live-check magnifier mcp note observe open-scenario open-window overlay overlay-poll overlay-remove pause plan play popup-close popup-open popup-status post presence query refresh resolve-runvars save session session-hold session-info session-list session-release session-start session-sync short-log show-run spotlight status step-badge stop sync tabs ui unarrow unborder unhighlight unlabel unmagnifier unspotlight unstep-badge update-step use-version validate windows worker-check worker-restart worker-start worker-stop workspace-edit workspace-seed workspace-show
+all: arrow ask border capture-scenario chat-history chat-poll chat-send close-window confirm diagnostic-run discover discover-hint events example execute-step export-guidance find-element finish from-here gc-runs gc-versions guide guide-back guide-done guide-next help highlight hint history html-cleanup html-insert html-remove html-replace html-write inbox insert-step inspect-page isolate kill label launch live-check magnifier mcp note observe open-scenario open-window overlay overlay-poll overlay-remove panel-close panel-open pause plan play popup-close popup-open popup-status post presence query refresh resolve-runvars save session session-hold session-info session-list session-release session-start session-sync short-log show-run spotlight status step-badge stop sync tabs ui ui-apply ui-catalog ui-poll unarrow unborder unhighlight unlabel unmagnifier unspotlight unstep-badge update-step use-version validate windows worker-check worker-restart worker-start worker-stop workspace-edit workspace-seed workspace-show
 
 # help capture-scenario
 Usage: capture-scenario [--url=<substring>] [--since=<epoch-ms>] [--until=<epoch-ms>] [--events=<file>] [--out=<feature>] [--run-id=<id>]
@@ -23,7 +23,7 @@ Usage: capture-scenario [--url=<substring>] [--since=<epoch-ms>] [--until=<epoch
 Usage: chat-history [--channel=<name>] [--limit=<n>] [--run-id=<id>]
 
 # help chat-poll
-Usage: chat-poll [--channel=<name>] [--id=<after>] [--run-id=<id>]
+Usage: chat-poll [--channel=<name>] [--id=<after>] [--wait=<seconds>] [--run-id=<id>]
 
 # help chat-send
 Usage: chat-send --text=<message> [--source=agent|human|system] [--channel=<name>] [--agent=<id>] [--run-id=<id>]
@@ -83,10 +83,10 @@ session: isolate session-start execute-step status events stop kill open-scenari
 coordination: short-log note inbox finish presence post history gc-runs gc-versions use-version export-guidance
 descriptors: session list | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>
 page: inspect-page find-element
-agent: observe launch windows tabs chat-send chat-history chat-poll highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close capture-scenario
+agent: observe launch windows tabs chat-send chat-history chat-poll highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close panel-open panel-close guide guide-next guide-back guide-done ask ui-apply ui-poll ui-catalog capture-scenario
 retrieval: query runs | query get | query query | query search | query props | query errors | query tail
 controller: sync worker-check live-check ui mcp session
-all: arrow border capture-scenario chat-history chat-poll chat-send close-window confirm diagnostic-run discover discover-hint events example execute-step export-guidance find-element finish from-here gc-runs gc-versions help highlight hint history html-cleanup html-insert html-remove html-replace html-write inbox insert-step inspect-page isolate kill label launch live-check magnifier mcp note observe open-scenario open-window overlay overlay-poll overlay-remove pause plan play popup-close popup-open popup-status post presence query refresh resolve-runvars save session session-hold session-info session-list session-release session-start session-sync short-log show-run spotlight status step-badge stop sync tabs ui unarrow unborder unhighlight unlabel unmagnifier unspotlight unstep-badge update-step use-version validate windows worker-check worker-restart worker-start worker-stop workspace-edit workspace-seed workspace-show
+all: arrow ask border capture-scenario chat-history chat-poll chat-send close-window confirm diagnostic-run discover discover-hint events example execute-step export-guidance find-element finish from-here gc-runs gc-versions guide guide-back guide-done guide-next help highlight hint history html-cleanup html-insert html-remove html-replace html-write inbox insert-step inspect-page isolate kill label launch live-check magnifier mcp note observe open-scenario open-window overlay overlay-poll overlay-remove panel-close panel-open pause plan play popup-close popup-open popup-status post presence query refresh resolve-runvars save session session-hold session-info session-list session-release session-start session-sync short-log show-run spotlight status step-badge stop sync tabs ui ui-apply ui-catalog ui-poll unarrow unborder unhighlight unlabel unmagnifier unspotlight unstep-badge update-step use-version validate windows worker-check worker-restart worker-start worker-stop workspace-edit workspace-seed workspace-show
 
 # help highlight
 Usage: highlight --handle=<id> (--preset=yellow|outline-red) [--style=<css>] [--html=<page>] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>]
@@ -147,10 +147,10 @@ Usage: open-scenario --feature=<path-or-name> --name=<scenario> [--example=<rows
 Usage: open-window --run-id=<id>
 
 # help overlay
-Usage: overlay --text=<html> [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--handle=<id>] [--geometry=<json>] [--html=<page>]
+Usage: overlay --text=<html> [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--handle=<id>] [--at=auto|top|bottom|left|right|over] [--theme=auto|light|dark] [--geometry=<json>] [--html=<page>]
 
 # help overlay-poll
-Usage: overlay-poll [--run-id=<id>]
+Usage: overlay-poll [--after=<next>] [--run-id=<id>]
 
 # help overlay-remove
 Usage: overlay-remove --id=<id> [--html=<page>]
@@ -218,6 +218,15 @@ Usage: sync
 
 # help tabs
 Usage: tabs [--switch=<handle>] [--close=<handle>] [--run-id=<id>]
+
+# help ui-apply
+Usage: ui-apply --ops=<json array>|@file.json [--verbose=true] [--scope=page|origin|run] [--ttl=<seconds>] [--run-id=<id>]  (op: {"c":"label","t":"#email","text":"Email"}; see ui-catalog)
+
+# help ui-catalog
+Usage: ui-catalog [--component=<name>] [--json]
+
+# help ui-poll
+Usage: ui-poll [--after=<n>] [--chat-after=<id>] [--wait=<seconds, up to 25>] [--channel=<name>] [--run-id=<id>]
 
 # help unhighlight
 Usage: unhighlight [--handle=<id>] [--html=<page>]

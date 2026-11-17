@@ -720,6 +720,115 @@ class AgentExpansionTest {
         return page;
     }
 
+    @Test
+    void covers_command_panel_open() {
+        Capture badTheme = agent("panel-open", temp.toString(), "--run-id=panel", "--target=page", "--theme=neon");
+        assertEquals(2, badTheme.code, badTheme.out + badTheme.err);
+        assertTrue((badTheme.out + badTheme.err).contains("--theme"), badTheme.out + badTheme.err);
+    }
+
+    @Test
+    void covers_command_panel_close() {
+        Capture badTarget = agent("panel-close", temp.toString(), "--run-id=panel", "--target=desktop");
+        assertEquals(2, badTarget.code, badTarget.out + badTarget.err);
+        assertTrue((badTarget.out + badTarget.err).contains("--target"), badTarget.out + badTarget.err);
+    }
+
+    @Test
+    void panelOpenCloseVerbs() {
+        Capture badWidth = agent("panel-open", temp.toString(), "--run-id=panel", "--target=page", "--width=wide");
+        assertEquals(2, badWidth.code, badWidth.out + badWidth.err);
+        assertTrue((badWidth.out + badWidth.err).contains("--width"), badWidth.out + badWidth.err);
+        Capture badTab = agent("panel-open", temp.toString(), "--run-id=panel", "--target=page", "--tab=diagram");
+        assertEquals(2, badTab.code, badTab.out + badTab.err);
+        Capture badTarget = agent("panel-close", temp.toString(), "--run-id=panel", "--target=native");
+        assertEquals(2, badTarget.code, badTarget.out + badTarget.err);
+        Capture noPage = agent("panel-open", temp.toString(), "--run-id=panel", "--target=page");
+        assertEquals(1, noPage.code, noPage.out + noPage.err);
+        assertTrue((noPage.out + noPage.err).contains("panel did not open"), noPage.out + noPage.err);
+    }
+
+    @Test
+    void guideVerbsValidate() {
+        Capture noSay = agent("guide", temp.toString(), "--run-id=guide", "--steps=[{\"t\":\"#email\"}]");
+        assertEquals(2, noSay.code, noSay.out + noSay.err);
+        assertTrue((noSay.out + noSay.err).contains("needs t (target) and say"), noSay.out + noSay.err);
+        assertTrue((noSay.out + noSay.err).contains("fix:"), noSay.out + noSay.err);
+        Capture noTarget = agent("guide", temp.toString(), "--run-id=guide", "--steps=[{\"say\":\"Type\"}]");
+        assertEquals(2, noTarget.code, noTarget.out + noTarget.err);
+        assertTrue((noTarget.out + noTarget.err).contains("fix:"), noTarget.out + noTarget.err);
+        Capture badDo = agent("guide", temp.toString(), "--run-id=guide", "--steps=[{\"t\":\"#a\",\"say\":\"x\",\"do\":\"hover\"}]");
+        assertEquals(2, badDo.code, badDo.out + badDo.err);
+        Capture empty = agent("guide", temp.toString(), "--run-id=guide", "--steps=[]");
+        assertEquals(2, empty.code, empty.out + empty.err);
+    }
+
+    @Test
+    void covers_command_guide() throws Exception {
+        java.nio.file.Files.writeString(temp.resolve("steps.json"), "[{\"t\":\"#email\",\"say\":\"Type your email\",\"do\":\"input\"}]");
+        Capture noPage = agent("guide", temp.toString(), "--run-id=guide", "--steps=@steps.json");
+        assertEquals(1, noPage.code, noPage.out + noPage.err);
+        assertTrue((noPage.out + noPage.err).contains("live browser page"), noPage.out + noPage.err);
+    }
+
+    @Test
+    void covers_command_guide_next() {
+        Capture next = agent("guide-next", temp.toString(), "--run-id=guide");
+        assertEquals(1, next.code, next.out + next.err);
+        assertTrue((next.out + next.err).contains("no live browser page"), next.out + next.err);
+    }
+
+    @Test
+    void covers_command_guide_back() {
+        Capture back = agent("guide-back", temp.toString(), "--run-id=guide");
+        assertEquals(1, back.code, back.out + back.err);
+        assertTrue((back.out + back.err).contains("no live browser page"), back.out + back.err);
+    }
+
+    @Test
+    void covers_command_guide_done() {
+        Capture done = agent("guide-done", temp.toString(), "--run-id=guide");
+        assertEquals(1, done.code, done.out + done.err);
+        assertTrue((done.out + done.err).contains("no live browser page"), done.out + done.err);
+    }
+
+    @Test
+    void covers_command_ask() {
+        Capture noSay = agent("ask", temp.toString(), "--run-id=ask");
+        assertEquals(2, noSay.code, noSay.out + noSay.err);
+        assertTrue((noSay.out + noSay.err).contains("--say"), noSay.out + noSay.err);
+        Capture tooMany = agent("ask", temp.toString(), "--run-id=ask", "--say=Pick", "--choices=a,b,c,d,e,f,g");
+        assertEquals(2, tooMany.code, tooMany.out + tooMany.err);
+    }
+
+    @Test
+    void covers_command_ui_apply() {
+        Capture bad = agent("ui-apply", temp.toString(), "--run-id=ui", "--ops=[{\"c\":\"toast\"}]");
+        assertEquals(2, bad.code, bad.out + bad.err);
+        assertTrue((bad.out + bad.err).contains("unknown component toast") && (bad.out + bad.err).contains("fix:"), bad.out + bad.err);
+        Capture noPage = agent("ui-apply", temp.toString(), "--run-id=ui", "--ops=[{\"c\":\"label\",\"t\":\"#a\",\"text\":\"A\"}]");
+        assertEquals(1, noPage.code, noPage.out + noPage.err);
+        assertTrue((noPage.out + noPage.err).contains("live browser page"), noPage.out + noPage.err);
+    }
+
+    @Test
+    void covers_command_ui_poll() {
+        Capture polled = agent("ui-poll", temp.toString(), "--run-id=ui");
+        assertEquals(0, polled.code, polled.out + polled.err);
+        assertTrue(polled.out.contains("\"events\"") && polled.out.contains("\"chat\""), polled.out);
+        Capture bad = agent("ui-poll", temp.toString(), "--run-id=ui", "--wait=soon");
+        assertEquals(2, bad.code, bad.out + bad.err);
+    }
+
+    @Test
+    void covers_command_ui_catalog() {
+        Capture all = agent("ui-catalog", temp.toString());
+        assertEquals(0, all.code, all.out + all.err);
+        assertTrue(all.out.contains("\"guide\"") && all.out.contains("\"eg\""), all.out);
+        Capture bad = agent("ui-catalog", temp.toString(), "--component=toast");
+        assertEquals(2, bad.code, bad.out + bad.err);
+    }
+
     private Capture agent(String... args) {
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();

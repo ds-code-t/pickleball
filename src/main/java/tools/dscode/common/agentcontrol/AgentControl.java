@@ -83,6 +83,26 @@ public final class AgentControl {
         try {
             Optional<Result> routed = AgentSurfaceRouter.route(project, runId, op, values, agentId);
             if (routed.isPresent()) return routed.get();
+            if (values.get("scope") != null && !values.get("scope").isBlank()) UiState.scope(values.get("scope"));
+            if (values.get("ttl") != null && !values.get("ttl").isBlank()) UiState.expires(values.get("ttl"), 0L);
+            Result result = dispatch(project, runId, op, values, extraArgs, agentId);
+            if (result.exit() == 0 && UiState.TRACKED.contains(op)) UiState.sync(project, runId, values);
+            if (result.exit() == 0 && "html-cleanup".equals(op)) UiState.clear(project, runId);
+            return result;
+        } catch (IllegalArgumentException failure) {
+            return fail(2, failure.getMessage() == null ? "usage" : failure.getMessage());
+        } catch (Exception failure) {
+            return fail(1, failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage());
+        }
+    }
+
+    static Result failure(int exit, String error) {
+        return fail(exit, error);
+    }
+
+    static Result dispatch(Path project, String runId, String op, Map<String, String> values,
+                                   List<String> extraArgs, String agentId) throws Exception {
+        {
             return switch (op == null ? "" : op) {
                 case "observe" -> observe(project, runId, values);
                 case "launch" -> launch(project, runId, values, extraArgs);
@@ -91,10 +111,20 @@ public final class AgentControl {
                 case "chat-send" -> chatSend(project, runId, values, agentId);
                 case "chat-history" -> chatHistory(project, runId, values);
                 case "chat-poll" -> chatPoll(project, runId, values);
+                case "panel-open" -> panelOpen(project, runId, values, extraArgs, agentId);
+                case "panel-close" -> panelClose(project, runId, values, extraArgs, agentId);
+                case "guide" -> guide(project, runId, values);
+                case "guide-next" -> guideMove(project, runId, values, 1);
+                case "guide-back" -> guideMove(project, runId, values, -1);
+                case "guide-done" -> guideDone(project, runId, values);
+                case "ask" -> ask(project, runId, values);
+                case "ui-apply" -> UiBatch.apply(project, runId, values, agentId);
+                case "ui-poll" -> UiBatch.poll(project, runId, values, agentId);
+                case "ui-catalog" -> uiCatalog(values);
                 case "highlight" -> highlight(project, runId, values);
                 case "unhighlight" -> unhighlight(project, runId, values);
                 case "overlay" -> overlay(project, runId, values);
-                case "overlay-poll" -> overlayPoll(project, runId);
+                case "overlay-poll" -> overlayPoll(project, runId, values);
                 case "overlay-remove" -> remove(project, runId, values, "overlay");
                 case "label", "border", "arrow", "step-badge", "magnifier", "spotlight" -> visual(project, runId, op, values);
                 case "unlabel", "unborder", "unarrow", "unstep-badge", "unmagnifier", "unspotlight" ->
@@ -107,10 +137,6 @@ public final class AgentControl {
                 case "capture-scenario" -> capture(project, runId, values);
                 default -> fail(2, "unknown agent command: " + op);
             };
-        } catch (IllegalArgumentException failure) {
-            return fail(2, failure.getMessage() == null ? "usage" : failure.getMessage());
-        } catch (Exception failure) {
-            return fail(1, failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage());
         }
     }
 
@@ -245,10 +271,204 @@ public final class AgentControl {
         );
         Map<String, Object> body = ok("Chat message stored for this run channel.");
         body.put("message", ChatLog.toMap(message));
+        if ("run".equals(message.channel())) PageSurfaces.pushChat(panelRow(message));
+        return new Result(0, body);
+    }
+
+    private static Map<String, Object> panelRow(ChatLog.Message message) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("id", "c" + message.id());
+        row.put("source", message.source());
+        row.put("agent", message.agent());
+        row.put("text", message.text());
+        row.put("at", message.at());
+        return row;
+    }
+
+    private static Result panelOpen(Path project, String runId, Map<String, String> args, List<String> extraArgs, String agentId) throws Exception {
+        String target = present(args.get("target")) ? args.get("target").trim().toLowerCase(java.util.Locale.ROOT) : "auto";
+        if (!target.matches("auto|page|popup")) return fail(2, "panel-open --target must be auto, page, or popup");
+        if ("popup".equals(target) || ("auto".equals(target) && !PageSurfaces.hasLivePage())) {
+            Result popup = execute(project, runId, "popup-open", args, extraArgs, agentId);
+            if (popup.body() instanceof Map<?, ?> map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> body = new LinkedHashMap<>((Map<String, Object>) map);
+                body.put("op", "panel-open");
+                body.putIfAbsent("target", "popup");
+                return new Result(popup.exit(), body);
+            }
+            return popup;
+        }
+        Map<String, Object> spec = new LinkedHashMap<>();
+        for (String key : List.of("x", "y", "width", "height")) {
+            if (!present(args.get(key))) continue;
+            Integer value = integerOrNull(args.get(key));
+            if (value == null) return fail(2, "panel-open --" + key + " must be a whole number of pixels");
+            spec.put(key.equals("width") ? "w" : key.equals("height") ? "h" : key, value);
+        }
+        String tab = args.get("tab");
+        if (present(tab) && !tab.trim().matches("chat|steps")) return fail(2, "panel-open --tab must be chat or steps");
+        if (present(tab)) spec.put("tab", tab.trim());
+        String theme = args.get("theme");
+        if (present(theme) && !theme.trim().matches("auto|light|dark")) return fail(2, "panel-open --theme must be auto, light, or dark");
+        if (present(theme)) spec.put("theme", theme.trim());
+        if (present(args.get("title"))) spec.put("title", args.get("title").trim());
+        if (present(args.get("minimized"))) spec.put("min", Boolean.parseBoolean(args.get("minimized").trim()));
+        PageSurfaces.drainPanelChat(project, runId);
+        List<Map<String, Object>> history = new ArrayList<>();
+        for (ChatLog.Message message : ChatLog.history(project, runId, null, 50)) history.add(panelRow(message));
+        spec.put("history", history);
+        String reply = PageSurfaces.runtimeCall("panelOpen", spec, true);
+        if (reply == null || reply.isBlank() || "null".equals(reply)) return fail(1, "panel did not open on the page");
+        CompositeLog.info("panel", "open " + reply);
+        Map<String, Object> body = ok("Agent panel open on the page.");
+        body.put("op", "panel-open");
+        body.put("target", "page");
+        body.put("panel", AgentStore.JSON.readValue(reply, Map.class));
+        return new Result(0, body);
+    }
+
+    private static final java.util.Set<String> STEP_ACTIONS = java.util.Set.of("click", "input", "select", "check", "any");
+
+    /** Reads {@code --steps} as a JSON array, or {@code @file} relative to the project. */
+    @SuppressWarnings("unchecked")
+    static List<Map<String, Object>> guideSteps(Path project, String raw) throws Exception {
+        if (!present(raw)) throw new IllegalArgumentException("guide requires --steps=<json array> or --steps=@file.json");
+        String text = raw.trim();
+        if (text.startsWith("@")) {
+            Path file = Path.of(text.substring(1));
+            if (!file.isAbsolute() && project != null) file = project.resolve(file);
+            text = java.nio.file.Files.readString(file);
+        }
+        Object parsed;
+        try {
+            parsed = AgentStore.JSON.readValue(text, Object.class);
+        } catch (java.io.IOException failure) {
+            throw new IllegalArgumentException("guide --steps is not valid JSON: " + failure.getMessage().lines().findFirst().orElse(""));
+        }
+        if (!(parsed instanceof List<?> list) || list.isEmpty()) throw new IllegalArgumentException("guide --steps must be a non-empty JSON array");
+        if (list.size() > 50) throw new IllegalArgumentException("guide --steps holds at most 50 steps");
+        List<Map<String, Object>> steps = new ArrayList<>();
+        int n = 0;
+        for (Object item : list) {
+            n++;
+            if (!(item instanceof Map<?, ?> map)) throw new IllegalArgumentException("guide step " + n + " must be an object with t and say");
+            Object t = map.get("t");
+            Object say = map.get("say");
+            if (t == null || String.valueOf(t).isBlank() || say == null || String.valueOf(say).isBlank()) {
+                throw new IllegalArgumentException("guide step " + n + " needs t (target) and say (instruction)");
+            }
+            Object action = map.get("do");
+            if (action != null && !STEP_ACTIONS.contains(String.valueOf(action))) {
+                throw new IllegalArgumentException("guide step " + n + " do must be click, input, select, check, or any");
+            }
+            steps.add((Map<String, Object>) map);
+        }
+        return steps;
+    }
+
+    private static Result uiCatalog(Map<String, String> args) {
+        String only = args.get("component");
+        if (present(only) && UiCatalog.component(only.trim()) == null) {
+            return fail(2, "ui-catalog --component must be one of " + String.join(", ", UiCatalog.components().keySet()));
+        }
+        Map<String, Object> body = ok("Page UI components for ui-apply: options as type=default; help, an example op, and how to undo it.");
+        body.put("op", "ui-catalog");
+        body.put("components", UiCatalog.describe(present(only) ? only.trim() : null));
+        return new Result(0, body);
+    }
+
+    private static Result guide(Path project, String runId, Map<String, String> args) throws Exception {
+        List<Map<String, Object>> steps = guideSteps(project, args.get("steps"));
+        if (!PageSurfaces.hasLivePage()) return fail(1, "guide needs a live browser page; run launch first");
+        Map<String, Object> spec = new LinkedHashMap<>();
+        spec.put("id", present(args.get("id")) ? args.get("id").trim() : "g1");
+        spec.put("steps", steps);
+        spec.put("scroll", "true".equalsIgnoreCase(String.valueOf(args.get("scroll"))));
+        String reply = PageSurfaces.runtimeCall("guide", spec, true);
+        if (reply == null || "null".equals(reply)) return fail(1, "guide did not start on the page");
+        CompositeLog.info("guide", "start " + reply);
+        Map<String, Object> body = ok("Guide shown on the page; steps advance as the person acts.");
+        body.put("op", "guide");
+        body.putAll(AgentStore.JSON.readValue(reply, Map.class));
+        return new Result(0, body);
+    }
+
+    private static Result guideMove(Path project, String runId, Map<String, String> args, int delta) throws Exception {
+        if (!PageSurfaces.hasLivePage()) return fail(1, "no live browser page holds a guide");
+        Map<String, Object> spec = new LinkedHashMap<>();
+        spec.put("id", present(args.get("id")) ? args.get("id").trim() : "g1");
+        spec.put("delta", delta);
+        String reply = PageSurfaces.runtimeCall("guideMove", spec, false);
+        if (reply == null || "null".equals(reply)) return fail(1, "no guide " + spec.get("id") + " on the page");
+        CompositeLog.info("guide", (delta > 0 ? "next " : "back ") + reply);
+        Map<String, Object> body = ok(delta > 0 ? "Guide moved to the next step." : "Guide moved back one step.");
+        body.put("op", delta > 0 ? "guide-next" : "guide-back");
+        body.putAll(AgentStore.JSON.readValue(reply, Map.class));
+        return new Result(0, body);
+    }
+
+    private static Result guideDone(Path project, String runId, Map<String, String> args) throws Exception {
+        if (!PageSurfaces.hasLivePage()) return fail(1, "no live browser page holds a guide");
+        Map<String, Object> spec = new LinkedHashMap<>();
+        spec.put("id", present(args.get("id")) ? args.get("id").trim() : "g1");
+        String reply = PageSurfaces.runtimeCall("guideDone", spec, false);
+        if (reply == null || "null".equals(reply)) return fail(1, "no guide " + spec.get("id") + " on the page");
+        CompositeLog.info("guide", "done " + reply);
+        Map<String, Object> body = ok("Guide closed.");
+        body.put("op", "guide-done");
+        body.putAll(AgentStore.JSON.readValue(reply, Map.class));
+        return new Result(0, body);
+    }
+
+    private static Result ask(Path project, String runId, Map<String, String> args) throws Exception {
+        if (!present(args.get("say"))) return fail(2, "ask requires --say=<question>");
+        Map<String, Object> spec = new LinkedHashMap<>();
+        spec.put("id", present(args.get("id")) ? args.get("id").trim() : "q1");
+        spec.put("say", args.get("say").trim());
+        if (present(args.get("choices"))) {
+            List<String> choices = new ArrayList<>();
+            for (String choice : args.get("choices").split(",")) if (!choice.isBlank()) choices.add(choice.trim());
+            if (choices.size() > 6) return fail(2, "ask --choices holds at most 6 answers");
+            spec.put("choices", choices);
+        }
+        if (!PageSurfaces.hasLivePage()) return fail(1, "ask needs a live browser page; run launch first");
+        if (present(args.get("handle"))) spec.put("t", args.get("handle").trim());
+        if ("true".equalsIgnoreCase(String.valueOf(args.get("sensitive")))) spec.put("sensitive", true);
+        String reply = PageSurfaces.runtimeCall("ask", spec, true);
+        if (reply == null || "null".equals(reply)) return fail(1, "ask did not show on the page");
+        CompositeLog.info("ui", "ask " + reply);
+        Map<String, Object> body = ok("Question shown on the page; the answer arrives as an answer event in overlay-poll.");
+        body.put("op", "ask");
+        body.putAll(AgentStore.JSON.readValue(reply, Map.class));
+        return new Result(0, body);
+    }
+
+    private static Result panelClose(Path project, String runId, Map<String, String> args, List<String> extraArgs, String agentId) throws Exception {
+        String target = present(args.get("target")) ? args.get("target").trim().toLowerCase(java.util.Locale.ROOT) : "auto";
+        if (!target.matches("auto|page|popup")) return fail(2, "panel-close --target must be auto, page, or popup");
+        if ("popup".equals(target) || ("auto".equals(target) && !PageSurfaces.hasLivePage())) {
+            Result popup = execute(project, runId, "popup-close", args, extraArgs, agentId);
+            if (popup.body() instanceof Map<?, ?> map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> body = new LinkedHashMap<>((Map<String, Object>) map);
+                body.put("op", "panel-close");
+                return new Result(popup.exit(), body);
+            }
+            return popup;
+        }
+        PageSurfaces.drainPanelChat(project, runId);
+        String reply = PageSurfaces.runtimeCall("panelClose", null, false);
+        CompositeLog.info("panel", "close " + reply);
+        Map<String, Object> body = ok("Agent panel closed on the page.");
+        body.put("op", "panel-close");
+        body.put("target", "page");
+        body.put("closed", "true".equals(reply));
         return new Result(0, body);
     }
 
     private static Result chatHistory(Path project, String runId, Map<String, String> args) throws Exception {
+        PageSurfaces.drainPanelChat(project, runId);
         int limit = integer(args.get("limit"), 100);
         List<Map<String, Object>> messages = new ArrayList<>();
         for (ChatLog.Message message : ChatLog.history(project, runId, args.get("channel"), limit)) {
@@ -262,9 +482,23 @@ public final class AgentControl {
 
     private static Result chatPoll(Path project, String runId, Map<String, String> args) throws Exception {
         String after = present(args.get("after")) ? args.get("after") : args.get("id");
+        long waitMillis = 0;
+        if (present(args.get("wait"))) {
+            try {
+                waitMillis = Math.min(25_000L, Math.max(0L, (long) (Double.parseDouble(args.get("wait").trim()) * 1000)));
+            } catch (NumberFormatException failure) {
+                return fail(2, "chat-poll --wait is seconds, up to 25");
+            }
+        }
+        long deadline = System.nanoTime() + waitMillis * 1_000_000L;
         List<Map<String, Object>> messages = new ArrayList<>();
-        for (ChatLog.Message message : ChatLog.poll(project, runId, args.get("channel"), after)) {
-            messages.add(ChatLog.toMap(message));
+        while (true) {
+            PageSurfaces.drainPanelChat(project, runId);
+            for (ChatLog.Message message : ChatLog.poll(project, runId, args.get("channel"), after)) {
+                messages.add(ChatLog.toMap(message));
+            }
+            if (!messages.isEmpty() || System.nanoTime() >= deadline) break;
+            Thread.sleep(200);
         }
         Map<String, Object> body = ok("Chat messages after the given id.");
         body.put("count", messages.size());
@@ -296,6 +530,17 @@ public final class AgentControl {
 
     private static Result overlay(Path project, String runId, Map<String, String> args) throws Exception {
         if (!present(args.get("text"))) return fail(2, "overlay requires --text");
+        String at = args.get("at");
+        if (present(at) && !at.trim().matches("auto|top|bottom|left|right|over")) {
+            return fail(2, "overlay --at must be auto, top, bottom, left, right, or over");
+        }
+        String theme = args.get("theme");
+        if (present(theme) && !theme.trim().matches("auto|light|dark")) {
+            return fail(2, "overlay --theme must be auto, light, or dark");
+        }
+        Map<String, String> look = new LinkedHashMap<>();
+        if (present(at)) look.put("at", at.trim());
+        if (present(theme)) look.put("theme", theme.trim());
         Map<String, Object> placed = PageSurfaces.place(
                 explicitPage(project, args),
                 "append",
@@ -308,9 +553,11 @@ public final class AgentControl {
                 args.get("geometry"),
                 AgentStore.root(project, runId),
                 integerOrNull(args.get("width")),
-                integerOrNull(args.get("height"))
+                integerOrNull(args.get("height")),
+                look
         );
         placed.put("ok", true);
+        if (present(at)) placed.put("at", at.trim());
         return new Result(0, placed);
     }
 
@@ -343,6 +590,9 @@ public final class AgentControl {
             y = arrow.y();
             width = arrow.width();
             height = arrow.height();
+            args = new LinkedHashMap<>(args);
+            String anchor = present(args.get("handle")) ? args.get("handle") : args.get("from");
+            if (present(anchor)) args.put("anchor", anchor.trim());
             handle = null;
             geometry = arrow.resolved()
                     ? "{\"visual_viewport_relative\":{\"x\":" + arrow.x() + ",\"y\":" + arrow.y()
@@ -373,11 +623,27 @@ public final class AgentControl {
         return new Result(0, placed);
     }
 
-    private static Result overlayPoll(Path project, String runId) throws Exception {
-        List<Map<String, Object>> events = PageSurfaces.pollInput(project, runId);
-        Map<String, Object> body = ok("Forwarded overlay clicks and form inputs.");
+    private static Result overlayPoll(Path project, String runId, Map<String, String> args) throws Exception {
+        if (!present(args.get("after"))) {
+            List<Map<String, Object>> events = PageSurfaces.pollInput(project, runId);
+            Map<String, Object> body = ok("Forwarded overlay clicks and form inputs.");
+            body.put("count", events.size());
+            body.put("events", events);
+            return new Result(0, body);
+        }
+        int after;
+        try {
+            after = Integer.parseInt(args.get("after").trim());
+        } catch (NumberFormatException failure) {
+            return fail(2, "overlay-poll --after must be a whole number (the next value from the last poll)");
+        }
+        List<Map<String, Object>> all = PageSurfaces.pollInput(project, runId);
+        List<Map<String, Object>> events = after <= 0 ? all
+                : after >= all.size() ? List.of() : List.copyOf(all.subList(after, all.size()));
+        Map<String, Object> body = ok("Overlay events after the cursor.");
         body.put("count", events.size());
         body.put("events", events);
+        body.put("next", all.size());
         return new Result(0, body);
     }
 

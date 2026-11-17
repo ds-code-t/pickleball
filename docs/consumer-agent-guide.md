@@ -65,6 +65,10 @@ summary status=PASSED
 | PowerShell `.\mvnw.cmd` | 1 |
 | stock `mvn.cmd` | non-zero, not asserted as 2 |
 
+## Guiding a human on a live page in 3 calls
+
+`ui-catalog` once, `ui-apply` with a guide op, then `ui-poll --wait=20` until the guide is done (MCP ui_catalog, ui, ui_poll).
+
 ## Query loop
 
 `query runs|get|search|errors|tail`. Agents use the shallowest evidence layer and keep terminal logging minimal. `pkb_reportretention=failed` keeps failing scenarios.

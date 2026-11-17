@@ -68,6 +68,7 @@ final class PageSurfaces {
     }
 
     private static final String LIVE_HELPER = SurfaceAssets.script("live-helper");
+    private static final String RUNTIME = SurfaceAssets.script("pkb-runtime");
     private static final java.util.concurrent.ConcurrentHashMap<Integer, BrowserFacade> FACADES = new java.util.concurrent.ConcurrentHashMap<>();
     private static final java.util.Set<Integer> SURFACE_PROTOCOL = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private static final java.util.concurrent.ConcurrentLinkedQueue<Map<String, String>> PUSHED = new java.util.concurrent.ConcurrentLinkedQueue<>();
@@ -565,6 +566,11 @@ final class PageSurfaces {
 
     static void recordInput(Path project, String runId, Map<String, String> event) throws IOException {
         Map<String, Object> row = new LinkedHashMap<>(event);
+        // Values typed into password, card, or one-time-code fields are never stored, whatever the page sent.
+        if ("true".equals(event.get("sensitive"))) {
+            row.remove("value");
+            row.put("filled", "true");
+        }
         row.put("at", AgentStore.now());
         row.put("codes", List.of("agent_injected", "overlay"));
         row.put("sentence", OVERLAY_SENTENCE);
@@ -572,6 +578,14 @@ final class PageSurfaces {
         AgentStore.appendCapped(file, AgentStore.JSON.writeValueAsString(row));
         CompositeLog.info("overlay", "input type=" + event.getOrDefault("type", ""));
         ChatLog.send(project, runId, "overlay", "system", "", "overlay input " + event.getOrDefault("type", "") + " " + event.getOrDefault("id", ""));
+    }
+
+    /** Events after the first {@code after} stored events. The cursor is the stored event count. */
+    static List<Map<String, Object>> pollInput(Path project, String runId, int after) throws IOException {
+        List<Map<String, Object>> all = pollInput(project, runId);
+        if (after <= 0) return all;
+        if (after >= all.size()) return List.of();
+        return List.copyOf(all.subList(after, all.size()));
     }
 
     static List<Map<String, Object>> pollInput(Path project, String runId) throws IOException {
@@ -719,6 +733,7 @@ final class PageSurfaces {
                     throw new IllegalStateException("tab switch failed");
                 }
                 if (!resetTop(managed.driver)) throw new IllegalStateException("top document reset failed");
+                drainIsolated(project, runId, managed.driver);
                 drainTab(project, runId, managed.driver);
                 for (String frame : framesFor(managed.driver, tab)) {
                     if (!enterFrame(managed.driver, frame)) throw new IllegalStateException("frame entry failed");
@@ -730,6 +745,41 @@ final class PageSurfaces {
             }
         }
     }
+
+    /**
+     * On a CDP or BiDi session the surface helper runs in the {@code pkb-surface} isolated world, and
+     * its listeners queue events in that world's own {@code window}. Those are drained in the same
+     * world; the main-world queue is read by {@link #drainTab}.
+     */
+    private static void drainIsolated(Path project, String runId, WebDriver web) throws IOException {
+        BrowserFacade facade;
+        try {
+            facade = directPage(web);
+        } catch (RuntimeException failure) {
+            return;
+        }
+        if (facade == null) return;
+        Object value;
+        try {
+            value = facade.evaluateIsolated("pkb-surface", DRAIN_ISOLATED, "drain");
+        } catch (RuntimeException failure) {
+            CompositeLog.info("overlay", "isolated input poll skipped " + failure.getMessage());
+            return;
+        }
+        if (!(value instanceof String text) || text.isBlank()) return;
+        for (Object item : AgentStore.JSON.readValue(text, List.class)) {
+            if (item instanceof Map<?, ?> map) {
+                Map<String, String> event = new LinkedHashMap<>();
+                map.forEach((key, raw) -> {
+                    if (key != null && raw != null) event.put(String.valueOf(key), String.valueOf(raw));
+                });
+                recordInput(project, runId, event);
+            }
+        }
+    }
+
+    private static final String DRAIN_ISOLATED =
+            "function(reason){ var e = window.__pkbEvents || []; window.__pkbEvents = []; return JSON.stringify(e); }";
 
     private static void drainTab(Path project, String runId, WebDriver web) throws IOException {
         if (!(web instanceof JavascriptExecutor executor)) return;
@@ -1121,12 +1171,139 @@ final class PageSurfaces {
         BrowserLog.warnOnce(
                 "page-surface-script",
                 "PageSurfaces used Selenium executeScript; no CDP or BiDi session");
+        if (tracksTarget(spec)) {
+            // Main-world fallback (D4): the runtime installs lazily, only for a placement that follows a target.
+            try {
+                executor.executeScript(RUNTIME);
+            } catch (RuntimeException failure) {
+                BrowserLog.warnOnce("page-surface-runtime", "page runtime did not install: " + failure.getMessage());
+            }
+        }
         return executor.executeScript(LIVE_HELPER, spec);
+    }
+
+    private static final String RUNTIME_CALL = "var a = JSON.parse(raw); var ui = window.__pkbUi;"
+            + " if (!ui || typeof ui[a.m] !== 'function') return null;"
+            + " var r = ui[a.m](a.a); return r === undefined || r === null ? null : JSON.stringify(r);";
+
+    /**
+     * Calls one {@code window.__pkbUi} method on the focused managed page and returns its JSON reply,
+     * or null when no page is managed or the runtime is not there. {@code install} loads the runtime first.
+     * CDP and BiDi sessions run it in the {@code pkb-surface} world; a Selenium-only session in the page.
+     */
+    static String runtimeCall(String method, Object argument, boolean install) {
+        WebDriver web = driver;
+        if (web == null) {
+            List<Managed> all = managed();
+            if (all.isEmpty()) return null;
+            web = all.get(0).driver;
+        }
+        Map<String, Object> call = new LinkedHashMap<>();
+        call.put("m", method);
+        call.put("a", argument == null ? Map.of() : argument);
+        String json;
+        try {
+            json = AgentStore.JSON.writeValueAsString(call);
+        } catch (IOException failure) {
+            throw new IllegalStateException(failure);
+        }
+        BrowserFacade facade = directPage(web);
+        if (facade != null) {
+            installSurface(web, facade);
+            Object value = facade.evaluateIsolated("pkb-surface",
+                    "function(raw){" + (install ? RUNTIME + "\n;" : "") + RUNTIME_CALL + "}", json);
+            return value == null ? null : String.valueOf(value);
+        }
+        if (!(web instanceof JavascriptExecutor executor)) return null;
+        if (install) executor.executeScript(RUNTIME);
+        Object value = executor.executeScript("var raw = arguments[0];" + RUNTIME_CALL, json);
+        return value == null ? null : String.valueOf(value);
+    }
+
+    static String runtimeSource() {
+        return RUNTIME;
+    }
+
+    /** Registers a {@code pkb-surface} preload on the focused page's protocol session; null without CDP or BiDi. */
+    static String addStatePreload(String script) {
+        WebDriver web = driver;
+        if (web == null) {
+            List<Managed> all = managed();
+            if (all.isEmpty()) return null;
+            web = all.get(0).driver;
+        }
+        BrowserFacade facade = directPage(web);
+        if (facade == null) return null;
+        installSurface(web, facade);
+        return facade.addPreloadIn(script, "pkb-surface");
+    }
+
+    static void removeStatePreload(String identifier) {
+        if (identifier == null || identifier.isBlank()) return;
+        WebDriver web = driver;
+        if (web == null) {
+            List<Managed> all = managed();
+            if (all.isEmpty()) return;
+            web = all.get(0).driver;
+        }
+        BrowserFacade facade = directPage(web);
+        if (facade != null) facade.removePreload(identifier);
+    }
+
+    static boolean hasLivePage() {
+        return driver != null || !MANAGED.isEmpty();
+    }
+
+    /**
+     * Moves messages typed into the in-page panel into the run chat ({@code source=human}) and marks
+     * them delivered in the panel. Returns how many were stored. A page without a panel stores nothing.
+     */
+    static int drainPanelChat(Path project, String runId) throws IOException {
+        if (!hasLivePage()) return 0;
+        String raw;
+        try {
+            raw = runtimeCall("drainChat", null, false);
+        } catch (RuntimeException failure) {
+            CompositeLog.info("chat", "panel drain skipped " + failure.getMessage());
+            return 0;
+        }
+        if (raw == null || raw.isBlank() || "null".equals(raw)) return 0;
+        int stored = 0;
+        for (Object item : AgentStore.JSON.readValue(raw, List.class)) {
+            if (!(item instanceof Map<?, ?> map) || map.get("text") == null) continue;
+            String text = String.valueOf(map.get("text"));
+            if (text.isBlank()) continue;
+            ChatLog.send(project, runId, null, "human", "", text);
+            CompositeLog.info("chat", "panel human message chars=" + text.length());
+            stored++;
+        }
+        return stored;
+    }
+
+    /** Shows an agent chat message in the in-page panel when one is open. Never installs the runtime. */
+    static void pushChat(Map<String, Object> message) {
+        if (!hasLivePage()) return;
+        try {
+            runtimeCall("chat", List.of(message), false);
+        } catch (RuntimeException failure) {
+            CompositeLog.info("chat", "panel push skipped " + failure.getMessage());
+        }
+    }
+
+    private static boolean tracksTarget(Map<String, Object> spec) {
+        Object kind = spec.get("kind");
+        boolean anchored = present(spec.get("handle")) || present(spec.get("anchor")) || present(spec.get("bridge"));
+        return "append".equals(spec.get("op")) && kind != null && !"html".equals(kind) && anchored;
+    }
+
+    private static boolean present(Object value) {
+        return value != null && !String.valueOf(value).isBlank();
     }
 
     private static void installSurface(WebDriver web, BrowserFacade facade) {
         if (!SURFACE_PROTOCOL.add(System.identityHashCode(web))) return;
-        facade.addPreload(SurfaceAssets.js("html"));
+        // Same world as the helper, so one set of listeners queues events where drainIsolated reads them.
+        facade.addPreloadIn(SurfaceAssets.js("html"), "pkb-surface");
         facade.addBinding("pkbSurface", (name, payload) -> PUSHED.add(bindingEvent(name, payload)));
     }
 
@@ -1179,7 +1356,8 @@ final class PageSurfaces {
         if (semi > 0 && LIVE_HELPER.substring(0, semi).contains("arguments[0]")) {
             body = LIVE_HELPER.substring(semi + 1);
         }
-        return "function(raw){ var spec = JSON.parse(raw);" + body + "}";
+        // The runtime is idempotent: a second install in the same document returns at once.
+        return "function(raw){ var spec = JSON.parse(raw);\n" + RUNTIME + "\n;" + body + "}";
     }
 
     private record ParsedColors(double[] content, double[] border, boolean unsupported) {}
@@ -1708,6 +1886,9 @@ final class PageSurfaces {
             if (extra.get("dim") != null) spec.put("dim", extra.get("dim"));
             if (extra.get("number") != null) spec.put("number", extra.get("number"));
             if (extra.get("direction") != null) spec.put("direction", extra.get("direction"));
+            if (extra.get("at") != null) spec.put("at", extra.get("at"));
+            if (extra.get("theme") != null) spec.put("theme", extra.get("theme"));
+            if (extra.get("anchor") != null) spec.put("anchor", extra.get("anchor"));
         }
         try {
             Object value = evaluateHelper(current, executor, spec);
