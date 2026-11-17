@@ -68,6 +68,24 @@ class SandboxIndependenceTest {
         assertFalse(bytes.contains("main.db"), "sandbox file names main.db");
         assertFalse(bytes.contains("runstate.db"), "sandbox file names runstate.db");
         assertFalse(bytes.contains("sandboxes/beta"), bytes);
+        try (java.sql.Connection copy = java.sql.DriverManager.getConnection("jdbc:sqlite:" + sandbox.toAbsolutePath());
+             java.sql.Statement statement = copy.createStatement()) {
+            try (java.sql.ResultSet name = statement.executeQuery("SELECT value FROM _pkb_branch WHERE `key` = 'name'")) {
+                assertTrue(name.next(), "sandbox has no _pkb_branch name");
+                assertEquals("alpha", name.getString(1));
+            }
+            try (java.sql.ResultSet commit = statement.executeQuery(
+                    "SELECT COUNT(*) FROM _pkb_branch WHERE `key` = 'created_from_commit'")) {
+                assertTrue(commit.next());
+                assertEquals(1, commit.getInt(1), "sandbox does not record the commit it was created from");
+            }
+            try (java.sql.ResultSet base = statement.executeQuery(
+                    "SELECT base_hash, location FROM _pkb_base WHERE tbl = 'files' AND pk = 'features/pay.feature'")) {
+                assertTrue(base.next(), "sandbox has no _pkb_base row for features/pay.feature");
+                assertFalse(base.getString(1).isBlank(), "base hash is blank");
+                assertFalse(base.getString(2).contains(".db"), base.getString(2));
+            }
+        }
 
         for (String suffix : new String[] {"", "-wal", "-shm"}) {
             Files.deleteIfExists(Path.of(StorePaths.mainDatabase(project).toString() + suffix));

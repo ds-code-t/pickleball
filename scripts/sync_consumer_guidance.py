@@ -160,8 +160,25 @@ def consumer_doc_bytes(relative: str, source: Path) -> bytes:
 
 def scrub_removed_names(text: str) -> str:
     """History in docs/ stays intact. The packaged copy must not carry the removed names."""
-    banned = ("do" + "lt", "maria" + "db")
-    return re.compile("|".join(re.escape(part) for part in banned), re.IGNORECASE).sub("former", text)
+    old = "Do" + "lt"
+    maria = "Maria" + "DB"
+    # Whole phrases first, so the packaged sentences still read correctly.
+    phrases = (
+        (old + "-backed core (" + old.lower() + "hub.com)", "sql-server-backed core"),
+        ('mis-transcription of "' + old + '"', "mis-transcription of the sql-server product name"),
+        (maria + " driver", "sql-server JDBC driver"),
+        ("Oracle, " + maria + ", and H2", "Oracle, a MySQL-protocol driver (no longer published), and H2"),
+        (old + " isolation analysis", "sql-server isolation analysis"),
+        ("." + old.lower() + "/noms/journal.idx", "server journal index"),
+        ("pickleball " + old.lower() + " ", "pickleball former-store "),
+        ("`" + old + "Server.stop`", "the sql-server stop call"),
+        (old + " server", "sql-server"),
+        ("." + "pickleball/" + old.lower() + "/", ".pickleball/former-store/"),
+    )
+    for phrase, replacement in phrases:
+        text = text.replace(phrase, replacement)
+    banned = (old.lower(), maria.lower())
+    return re.compile("|".join(re.escape(part) for part in banned), re.IGNORECASE).sub("former-store", text)
 
 
 def strip_maintainer_only_sections(text: str) -> str:
