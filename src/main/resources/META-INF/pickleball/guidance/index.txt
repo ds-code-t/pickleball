@@ -21,7 +21,6 @@ docs/diagnostic-lineage-metadata.md
 docs/diagnostic-query.md
 docs/diagnostic-reporting.md
 docs/direct-control-handoff.md
-docs/dolt-entities.md
 docs/dynamic-control-api.md
 docs/dynamic-steps.md
 docs/experimental-features.md
@@ -39,6 +38,7 @@ docs/reserved-element-names.md
 docs/service-call-scenarios.md
 docs/snapshot.md
 docs/step-overrides.md
+docs/store-entities.md
 docs/workbench-agent-detail.md
 maven-consumer-project/pom.xml
 maven-consumer-project/src/test/java/com/example/pickleball/PickleballTests.java

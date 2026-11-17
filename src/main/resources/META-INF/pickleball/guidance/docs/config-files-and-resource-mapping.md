@@ -126,12 +126,12 @@ Template resolution behavior for ordinary runtime resource files is unchanged by
 
 When a consumer agent needs project configuration data, read the version-matched Pickleball documentation and the consumer's active `pkb_configpath`. Prefer `<config:...>` for new references; preserve existing `<configs...>` references unless there is a reason to modernize them. Never rewrite config references to match a physical directory name.
 
-## Dolt hydrate
+## Store hydrate
 
-`dolt hydrate` reads the same on-disk trees a project already keeps in Git: `src/test/resources/features`, `configs`, `calls`, `component`, `templates`, and `resource-maps`, plus `pickleball.properties` and `profiles.yaml` when they sit in `src/test/resources`. Paths are stored with `/` even when the CLI is given Windows `\`. File bytes are copied as-is, including non-UTF-8 bytes. Hydrate does not change `pkb_configpath`, `<config:...>`, or `<file:...>`. A run hydrates on the first feature load unless Dolt is explicitly off. `dolt hydrate` is that same copy when you invoke the CLI.
+`store hydrate` reads the same on-disk trees a project already keeps in Git: `src/test/resources/features`, `configs`, `calls`, `component`, `templates`, and `resource-maps`, plus `pickleball.properties` and `profiles.yaml` when they sit in `src/test/resources`. Paths are stored with `/` even when the CLI is given Windows `\`. File bytes are copied as-is, including non-UTF-8 bytes. Hydrate does not change `pkb_configpath`, `<config:...>`, or `<file:...>`. A run hydrates on the first feature load unless Store is explicitly off. `store hydrate` is that same copy when you invoke the CLI.
 
-With Dolt on (the default; `pkb_dolt=false`, `PKB_DOLT=false`, or `dolt.properties` `enabled=false` turns it off), feature loading uses the hydrated `.feature` bytes. The query rows (scenarios, steps, tags, docstrings, and data tables) are not a second Gherkin dialect. The native engine reads those bytes. `pkb_engine=cucumber` gives the same bytes to the Cucumber adapter. With Dolt off, that load does not open the database.
+With Store on (the default; `pkb_store=false`, `PKB_STORE=false`, or `store.properties` `enabled=false` turns it off), feature loading uses the hydrated `.feature` bytes. The query rows (scenarios, steps, tags, docstrings, and data tables) are not a second Gherkin dialect. The native engine reads those bytes. `pkb_engine=cucumber` gives the same bytes to the Cucumber adapter. With Store off, that load does not open the database.
 
-`<entity:Type#id.field>` resolves only when Dolt is on. It does not change `<config:...>`, `<file:...>`, or `<data:...>`. Entity files and the no-cleartext rule are in [Dolt entities](dolt-entities.md).
+`<entity:Type#id.field>` resolves only when Store is on. It does not change `<config:...>`, `<file:...>`, or `<data:...>`. Entity files and the no-cleartext rule are in [Store entities](store-entities.md).
 
-`dolt extract` copies stored bytes back to those files and does not reformat them. It leaves a file that only changed on disk. It refuses with `conflict: <path>` when the file and the database both changed, unless `--force` is set.
+`store extract` copies stored bytes back to those files and does not reformat them. It leaves a file that only changed on disk. It refuses with `conflict: <path>` when the file and the database both changed, unless `--force` is set.

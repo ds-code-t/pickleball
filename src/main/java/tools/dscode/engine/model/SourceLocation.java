@@ -2,7 +2,7 @@ package tools.dscode.engine.model;
 
 /**
  * Where a feature, scenario, or step was read from. {@code uri} may be a
- * file URI, {@code dolt:} row, {@code memory:} text, or empty when the
+ * file URI, {@code store:} row, {@code memory:} text, or empty when the
  * text was written at runtime and has no address.
  */
 public record SourceLocation(String uri, int line, int column) {

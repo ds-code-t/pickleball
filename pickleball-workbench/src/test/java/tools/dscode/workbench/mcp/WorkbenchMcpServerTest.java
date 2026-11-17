@@ -91,7 +91,7 @@ class WorkbenchMcpServerTest {
             "workbench_investigation_emit",
             "workbench_go",
             "workbench_agent_command",
-            "dolt",
+            "store",
             "engine",
             "domengine",
             "query",
@@ -496,6 +496,22 @@ class WorkbenchMcpServerTest {
         assertTrue(emittedJson.contains(".pickleball/investigations/form-1/report.html"));
         assertFalse(emittedJson.contains("Selector drifted."));
         assertFalse(emittedJson.contains(".png"));
+    }
+
+    @Test
+    void storeForwardsMergeAndChanges() {
+        WorkbenchMcpTools tools = new WorkbenchMcpTools(fakeServices((method, args) -> {
+            if ("projectRoot".equals(method)) return project;
+            return null;
+        }), JSON);
+        Object merge = tools.call("store", Map.of(
+                "args", List.of("sandbox", "merge", "left", "--policy=fail", "--json")));
+        assertEquals(List.of("sandbox", "merge", "left", "--policy=fail", "--json"),
+                ((Map<?, ?>) merge).get("forwarded"));
+        Object changes = tools.call("store", Map.of(
+                "args", List.of("changes", "--since=3", "--table=files", "--limit=10", "--json")));
+        assertEquals(List.of("changes", "--since=3", "--table=files", "--limit=10", "--json"),
+                ((Map<?, ?>) changes).get("forwarded"));
     }
 
     private static WorkbenchServices fakeServices(FakeInvocation invocation) {

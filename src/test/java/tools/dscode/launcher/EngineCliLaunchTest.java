@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EngineCliLaunchTest {
     @Test
-    void launcherRoutesEngineBeforeDoltAndWorkbench() {
+    void launcherRoutesEngineBeforeStoreAndWorkbench() {
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
         int code = PickleballWorkbenchLauncher.dispatchEngineIfAny(
@@ -22,7 +22,7 @@ class EngineCliLaunchTest {
         assertEquals(0, code, stderr.toString(StandardCharsets.UTF_8));
         assertTrue(stdout.toString(StandardCharsets.UTF_8).contains("Usage: engine run"));
         assertEquals(-1, PickleballWorkbenchLauncher.dispatchEngineIfAny(
-                new String[]{"dolt", "help"},
+                new String[]{"store", "help"},
                 new PrintStream(new ByteArrayOutputStream()),
                 new PrintStream(new ByteArrayOutputStream())
         ));

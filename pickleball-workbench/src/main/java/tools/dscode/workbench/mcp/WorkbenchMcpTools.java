@@ -9,7 +9,7 @@ import tools.dscode.control.protocol.SecretRedactor;
 import tools.dscode.control.protocol.ControlBridgeMappingSnapshot;
 import tools.dscode.control.protocol.DiagnosticQuery;
 import tools.dscode.workbench.WorkbenchServices;
-import tools.dscode.workbench.dolt.DoltCliForwarder;
+import tools.dscode.workbench.store.StoreCliForwarder;
 import tools.dscode.workbench.engine.DomEngineCliForwarder;
 import tools.dscode.workbench.engine.EngineCliForwarder;
 import tools.dscode.workbench.nav.WorkbenchGoLink;
@@ -384,16 +384,16 @@ final class WorkbenchMcpTools {
                     Object value = services.agentCommand(op, forwarded);
                     return value == null ? Map.of("status", "UNAVAILABLE", "op", op) : value;
                 });
-        add("dolt",
-                "Forwards arguments to the pickleball dolt CLI, including server, sandbox, query, timeline, and retain. Does not open the store.",
+        add("store",
+                "Forwards store CLI arguments, including sandbox merge and changes. Does not open the store.",
                 schema(Map.of(
                         "args", Map.of(
                                 "type", "array",
-                                "description", "Arguments after dolt. Example: [\"status\"], [\"query\", \"--entity=Account#ada\", \"--tag=@pay\", \"--feature=features/pay.feature\", \"--run=sample-run\", \"--text=total\", \"--json\"], [\"timeline\", \"--latest\", \"--json\"], [\"timeline\", \"--before=<cursor>\", \"--json\"], [\"retain\", \"--days=30\"], [\"files\", \"list\", \"--json\"], [\"run\", \"--dry-run\"].",
+                                "description", "Arguments after store. Example: [\"sandbox\", \"merge\", \"left\", \"--policy=fail\", \"--json\"], [\"changes\", \"--since=1\", \"--table=files\", \"--limit=20\", \"--json\"], [\"status\"], [\"query\", \"--json\"], [\"retain\"].",
                                 "items", Map.of("type", "string")
                         )
                 ), "args"),
-                arguments -> forwardDolt(arguments.get("args")));
+                arguments -> forwardStore(arguments.get("args")));
         add("engine",
                 "Forward arguments to the pickleball engine CLI. Does not run steps inside Workbench.",
                 schema(Map.of(
@@ -427,19 +427,19 @@ final class WorkbenchMcpTools {
         });
     }
 
-    private Object forwardDolt(Object rawArgs) {
+    private Object forwardStore(Object rawArgs) {
         List<String> args = new ArrayList<>();
         if (rawArgs instanceof List<?> list) {
             for (Object item : list) {
                 if (item != null && !String.valueOf(item).isBlank()) args.add(String.valueOf(item));
             }
         } else if (rawArgs != null) {
-            throw new IllegalArgumentException("error: dolt requires args as a list of strings.\nfix: Pass {\"args\":[\"status\"]}.");
+            throw new IllegalArgumentException("error: store requires args as a list of strings.\nfix: Pass {\"args\":[\"status\"]}.");
         }
         if (args.isEmpty()) {
-            throw new IllegalArgumentException("error: dolt requires args.\nfix: Pass {\"args\":[\"status\"]}.");
+            throw new IllegalArgumentException("error: store requires args.\nfix: Pass {\"args\":[\"status\"]}.");
         }
-        DoltCliForwarder.Result result = DoltCliForwarder.run(services.projectRoot(), args);
+        StoreCliForwarder.Result result = StoreCliForwarder.run(services.projectRoot(), args);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("exit", result.exit());
         body.put("out", result.out());

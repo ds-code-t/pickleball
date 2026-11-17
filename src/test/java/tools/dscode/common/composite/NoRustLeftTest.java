@@ -63,7 +63,7 @@ class NoRustLeftTest {
         if (rel.startsWith(".git/") || rel.contains("/build/") || rel.startsWith("build/")) return false;
         if (rel.contains("/src/test/") || rel.startsWith("src/test/")) return false;
         if (rel.startsWith("src/main/resources/META-INF/pickleball/guidance/")) return false;
-        if (rel.startsWith("docs/maintainer/") && !rel.equals("docs/maintainer/3.0.0-dolt-working-copy-design.md")) return false;
+        if (rel.startsWith("docs/maintainer/")) return false;
         if (rel.startsWith("docs/roadmaps/") || rel.startsWith("docs/audits/") || rel.startsWith("prompts/")) return false;
         if (rel.equals("docs/release-notes.md") || rel.equals("docs/agent/repository-index.md")) return false;
         if (isMain(rel)) return textFile(path);
@@ -83,7 +83,6 @@ class NoRustLeftTest {
 
     private static boolean isCurrentDoc(String rel) {
         if (rel.equals("AGENTS.md") || rel.equals("README.md")) return true;
-        if (rel.equals("docs/maintainer/3.0.0-dolt-working-copy-design.md")) return true;
         if (rel.startsWith("docs/agent/") && rel.endsWith(".md")) return true;
         return rel.startsWith("docs/") && !rel.substring("docs/".length()).contains("/") && rel.endsWith(".md");
     }

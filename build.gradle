@@ -159,9 +159,6 @@ dependencies {
     implementation 'org.postgresql:postgresql:42.7.7'
     implementation 'com.microsoft.sqlserver:mssql-jdbc:12.10.1.jre11'
     implementation 'com.oracle.database.jdbc:ojdbc11:23.7.0.25.01'
-    // Newest 3.5.x on Maven Central at the Dolt-core P1 pin (3.5.11). Runtime POM scope.
-    // Not shaded. The Dolt core connects with this driver; JDBC service calls use it too.
-    runtimeOnly 'org.mariadb.jdbc:mariadb-java-client:3.5.11'
 
     // logging and reports
 //    api "com.aventstack:extentreports:5.1.2"
@@ -456,80 +453,78 @@ tasks.register('engineRun', JavaExec) {
     if (project.hasProperty('engineSteps')) args += ['--steps=' + project.property('engineSteps')]
     if (project.hasProperty('engineGlue')) args += ['--glue=' + project.property('engineGlue')]
     if (project.hasProperty('engineName')) args += ['--name=' + project.property('engineName')]
-    if (project.hasProperty('engineDolt')) args += ['--dolt']
+    if (project.hasProperty('engineStore')) args += ['--store']
     if (project.hasProperty('engineFeature')) args += ['--feature=' + project.property('engineFeature')]
 }
 
-def doltForwardClasspath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
-        dependencies.create('org.mariadb.jdbc:mariadb-java-client:3.5.11')
-)
-// A dolt* task is itself a project property. -Pdoltsomething must come from Gradle properties,
+def storeForwardClasspath = sourceSets.main.runtimeClasspath
+// A store* task is itself a project property. -Pstoresomething must come from Gradle properties,
 // never project.hasProperty, or the task name is forwarded as the command.
-def doltProp = { String key -> providers.gradleProperty(key) }
+def storeProp = { String key -> providers.gradleProperty(key) }
 
-tasks.register('doltStatus', JavaExec) {
-    group = 'dolt'
-    description = 'Forward to the Dolt CLI status command. The MariaDB JDBC driver is on this task classpath.'
-    classpath = doltForwardClasspath
-    mainClass = 'tools.dscode.dolt.DoltCli'
-    args = ['dolt', 'status']
-    if (doltProp('doltSandbox').isPresent()) args += ['--sandbox=' + doltProp('doltSandbox').get()]
+tasks.register('storeStatus', JavaExec) {
+    group = 'store'
+    description = 'Forward to the Store CLI status command. The store driver is already on the runtime classpath.'
+    classpath = storeForwardClasspath
+    mainClass = 'tools.dscode.store.StoreCli'
+    args = ['store', 'status']
+    if (storeProp('storeSandbox').isPresent()) args += ['--sandbox=' + storeProp('storeSandbox').get()]
 }
 
-tasks.register('doltHydrate', JavaExec) {
-    group = 'dolt'
-    description = 'Forward to the Dolt CLI hydrate command. The MariaDB JDBC driver is on this task classpath.'
-    classpath = doltForwardClasspath
-    mainClass = 'tools.dscode.dolt.DoltCli'
-    args = ['dolt', 'hydrate']
-    if (doltProp('doltPath').isPresent()) args += ['--path=' + doltProp('doltPath').get()]
-    if (doltProp('doltForce').isPresent()) args += ['--force']
-    if (doltProp('doltSandbox').isPresent()) args += ['--sandbox=' + doltProp('doltSandbox').get()]
+tasks.register('storeHydrate', JavaExec) {
+    group = 'store'
+    description = 'Forward to the Store CLI hydrate command. The store driver is already on the runtime classpath.'
+    classpath = storeForwardClasspath
+    mainClass = 'tools.dscode.store.StoreCli'
+    args = ['store', 'hydrate']
+    if (storeProp('storePath').isPresent()) args += ['--path=' + storeProp('storePath').get()]
+    if (storeProp('storeForce').isPresent()) args += ['--force']
+    if (storeProp('storeSandbox').isPresent()) args += ['--sandbox=' + storeProp('storeSandbox').get()]
 }
 
-tasks.register('doltExtract', JavaExec) {
-    group = 'dolt'
-    description = 'Forward to the Dolt CLI extract command. The MariaDB JDBC driver is on this task classpath.'
-    classpath = doltForwardClasspath
-    mainClass = 'tools.dscode.dolt.DoltCli'
-    args = ['dolt', 'extract']
-    if (doltProp('doltPath').isPresent()) args += ['--path=' + doltProp('doltPath').get()]
-    if (doltProp('doltForce').isPresent()) args += ['--force']
-    if (doltProp('doltSandbox').isPresent()) args += ['--sandbox=' + doltProp('doltSandbox').get()]
+tasks.register('storeExtract', JavaExec) {
+    group = 'store'
+    description = 'Forward to the Store CLI extract command. The store driver is already on the runtime classpath.'
+    classpath = storeForwardClasspath
+    mainClass = 'tools.dscode.store.StoreCli'
+    args = ['store', 'extract']
+    if (storeProp('storePath').isPresent()) args += ['--path=' + storeProp('storePath').get()]
+    if (storeProp('storeForce').isPresent()) args += ['--force']
+    if (storeProp('storeSandbox').isPresent()) args += ['--sandbox=' + storeProp('storeSandbox').get()]
 }
 
-tasks.register('doltFeature', JavaExec) {
-    group = 'dolt'
-    description = 'Forward to the Dolt CLI feature command. The MariaDB JDBC driver is on this task classpath.'
-    classpath = doltForwardClasspath
-    mainClass = 'tools.dscode.dolt.DoltCli'
-    args = ['dolt', 'feature']
-    args += [doltProp('doltFeature').orElse('put').get()]
-    if (doltProp('doltPath').isPresent()) args += [doltProp('doltPath').get()]
-    if (doltProp('doltText').isPresent()) args += ['--text=' + doltProp('doltText').get()]
-    if (doltProp('doltFile').isPresent()) args += ['--file=' + doltProp('doltFile').get()]
-    if (doltProp('doltSandbox').isPresent()) args += ['--sandbox=' + doltProp('doltSandbox').get()]
+tasks.register('storeFeature', JavaExec) {
+    group = 'store'
+    description = 'Forward to the Store CLI feature command. The store driver is already on the runtime classpath.'
+    classpath = storeForwardClasspath
+    mainClass = 'tools.dscode.store.StoreCli'
+    args = ['store', 'feature']
+    args += [storeProp('storeFeature').orElse('put').get()]
+    if (storeProp('storePath').isPresent()) args += [storeProp('storePath').get()]
+    if (storeProp('storeText').isPresent()) args += ['--text=' + storeProp('storeText').get()]
+    if (storeProp('storeFile').isPresent()) args += ['--file=' + storeProp('storeFile').get()]
+    if (storeProp('storeSandbox').isPresent()) args += ['--sandbox=' + storeProp('storeSandbox').get()]
 }
 
-tasks.register('doltEdit', JavaExec) {
-    group = 'dolt'
-    description = 'Forward to the Dolt edit CLI (category, file, glue, feature scenario/step). The MariaDB JDBC driver is on this task classpath.'
-    classpath = doltForwardClasspath
-    mainClass = 'tools.dscode.dolt.DoltCli'
-    args = ['dolt']
-    def editArgs = doltProp('doltArgs').orElse('category,list').get()
+tasks.register('storeEdit', JavaExec) {
+    group = 'store'
+    description = 'Forward to the Store edit CLI (category, file, glue, feature scenario/step). The store driver is already on the runtime classpath.'
+    classpath = storeForwardClasspath
+    mainClass = 'tools.dscode.store.StoreCli'
+    args = ['store']
+    def editArgs = storeProp('storeArgs').orElse('category,list').get()
     editArgs.split(',').each { piece ->
         def trimmed = piece == null ? '' : piece.toString().trim()
         if (!trimmed.isEmpty()) args += [trimmed]
     }
-    if (doltProp('doltJson').isPresent()) args += ['--json']
-    if (doltProp('doltPath').isPresent()) args += ['--path=' + doltProp('doltPath').get()]
-    if (doltProp('doltId').isPresent()) args += ['--id=' + doltProp('doltId').get()]
-    if (doltProp('doltText').isPresent()) args += ['--text=' + doltProp('doltText').get()]
-    if (doltProp('doltFile').isPresent()) args += ['--file=' + doltProp('doltFile').get()]
-    if (doltProp('doltConfirm').isPresent()) args += ['--confirm']
-    if (doltProp('doltForce').isPresent()) args += ['--force']
-    if (doltProp('doltSandbox').isPresent()) args += ['--sandbox=' + doltProp('doltSandbox').get()]
+    if (storeProp('storeJson').isPresent()) args += ['--json']
+    if (storeProp('storePath').isPresent()) args += ['--path=' + storeProp('storePath').get()]
+    if (storeProp('storeId').isPresent()) args += ['--id=' + storeProp('storeId').get()]
+    if (storeProp('storeText').isPresent()) args += ['--text=' + storeProp('storeText').get()]
+    if (storeProp('storeFile').isPresent()) args += ['--file=' + storeProp('storeFile').get()]
+    if (storeProp('storeConfirm').isPresent()) args += ['--confirm']
+    if (storeProp('storeForce').isPresent()) args += ['--force']
+    if (storeProp('storeSandbox').isPresent()) args += ['--sandbox=' + storeProp('storeSandbox').get()]
 }
 
 tasks.register('domengine', JavaExec) {
@@ -546,111 +541,93 @@ tasks.register('domengine', JavaExec) {
     args(forwarded)
 }
 
-tasks.register('doltQuery', JavaExec) {
-    group = 'dolt'
-    description = 'Forward to a Dolt CLI read command. The MariaDB JDBC driver is on this task classpath.'
-    classpath = doltForwardClasspath
-    mainClass = 'tools.dscode.dolt.DoltCli'
-    args = ['dolt']
-    def queryArgs = doltProp('doltArgs').orElse('files,list').get()
+tasks.register('storeQuery', JavaExec) {
+    group = 'store'
+    description = 'Forward to a Store CLI read command. The store driver is already on the runtime classpath.'
+    classpath = storeForwardClasspath
+    mainClass = 'tools.dscode.store.StoreCli'
+    args = ['store']
+    def queryArgs = storeProp('storeArgs').orElse('files,list').get()
     queryArgs.split(',').each { piece ->
         def trimmed = piece == null ? '' : piece.toString().trim()
         if (!trimmed.isEmpty()) args += [trimmed]
     }
-    if (doltProp('doltJson').isPresent()) args += ['--json']
-    if (doltProp('doltFeaturePath').isPresent()) args += ['--feature=' + doltProp('doltFeaturePath').get()]
-    if (doltProp('doltScenario').isPresent()) args += ['--scenario=' + doltProp('doltScenario').get()]
-    if (doltProp('doltSandbox').isPresent()) args += ['--sandbox=' + doltProp('doltSandbox').get()]
+    if (storeProp('storeJson').isPresent()) args += ['--json']
+    if (storeProp('storeFeaturePath').isPresent()) args += ['--feature=' + storeProp('storeFeaturePath').get()]
+    if (storeProp('storeScenario').isPresent()) args += ['--scenario=' + storeProp('storeScenario').get()]
+    if (storeProp('storeSince').isPresent()) args += ['--since=' + storeProp('storeSince').get()]
+    if (storeProp('storeTable').isPresent()) args += ['--table=' + storeProp('storeTable').get()]
+    if (storeProp('storeLimit').isPresent()) args += ['--limit=' + storeProp('storeLimit').get()]
+    if (storeProp('storeSandbox').isPresent()) args += ['--sandbox=' + storeProp('storeSandbox').get()]
 }
 
-tasks.register('doltHistory', JavaExec) {
-    group = 'dolt'
-    description = 'Forward to the Dolt CLI history command. The MariaDB JDBC driver is on this task classpath.'
-    classpath = doltForwardClasspath
-    mainClass = 'tools.dscode.dolt.DoltCli'
-    args = ['dolt', 'history']
-    args += [doltProp('doltHistory').orElse('list').get()]
-    if (doltProp('doltRun').isPresent()) args += [doltProp('doltRun').get()]
-    if (doltProp('doltDays').isPresent()) args += ['--days=' + doltProp('doltDays').get()]
-    if (doltProp('doltMaxBytes').isPresent()) args += ['--max-bytes=' + doltProp('doltMaxBytes').get()]
-    if (doltProp('doltSandbox').isPresent()) args += ['--sandbox=' + doltProp('doltSandbox').get()]
+tasks.register('storeHistory', JavaExec) {
+    group = 'store'
+    description = 'Forward to the Store CLI history command. The store driver is already on the runtime classpath.'
+    classpath = storeForwardClasspath
+    mainClass = 'tools.dscode.store.StoreCli'
+    args = ['store', 'history']
+    args += [storeProp('storeHistory').orElse('list').get()]
+    if (storeProp('storeRun').isPresent()) args += [storeProp('storeRun').get()]
+    if (storeProp('storeDays').isPresent()) args += ['--days=' + storeProp('storeDays').get()]
+    if (storeProp('storeMaxBytes').isPresent()) args += ['--max-bytes=' + storeProp('storeMaxBytes').get()]
+    if (storeProp('storeSandbox').isPresent()) args += ['--sandbox=' + storeProp('storeSandbox').get()]
 }
 
-tasks.register('doltRun', JavaExec) {
-    group = 'dolt'
-    description = 'Forward to the Dolt CLI run command. The MariaDB JDBC driver is on this task classpath.'
-    classpath = doltForwardClasspath
-    mainClass = 'tools.dscode.dolt.DoltCli'
-    args = ['dolt', 'run']
-    if (doltProp('doltTags').isPresent()) args += ['--tags=' + doltProp('doltTags').get()]
-    if (doltProp('doltName').isPresent()) args += ['--name=' + doltProp('doltName').get()]
-    if (doltProp('doltGlue').isPresent()) args += ['--glue=' + doltProp('doltGlue').get()]
-    if (doltProp('doltDryRun').isPresent()) args += ['--dry-run']
-    systemProperty 'pkb_dolt_run_classpath', sourceSets.test.runtimeClasspath.asPath
-    if (doltProp('doltSandbox').isPresent()) args += ['--sandbox=' + doltProp('doltSandbox').get()]
+tasks.register('storeRun', JavaExec) {
+    group = 'store'
+    description = 'Forward to the Store CLI run command.'
+    classpath = storeForwardClasspath
+    mainClass = 'tools.dscode.store.StoreCli'
+    args = ['store', 'run']
+    if (storeProp('storeTags').isPresent()) args += ['--tags=' + storeProp('storeTags').get()]
+    if (storeProp('storeName').isPresent()) args += ['--name=' + storeProp('storeName').get()]
+    if (storeProp('storeGlue').isPresent()) args += ['--glue=' + storeProp('storeGlue').get()]
+    if (storeProp('storeDryRun').isPresent()) args += ['--dry-run']
+    systemProperty 'pkb_store_run_classpath', sourceSets.test.runtimeClasspath.asPath
+    if (storeProp('storeSandbox').isPresent()) args += ['--sandbox=' + storeProp('storeSandbox').get()]
 }
 
-tasks.register('doltInstall', JavaExec) {
-    group = 'dolt'
-    description = 'Forward to the Dolt CLI install command. The MariaDB JDBC driver is on this task classpath.'
-    classpath = doltForwardClasspath
-    mainClass = 'tools.dscode.dolt.DoltCli'
-    args = ['dolt', 'install']
-    if (doltProp('doltCheck').isPresent()) args += ['--check']
-    if (doltProp('doltForce').isPresent()) args += ['--force']
-    if (doltProp('doltDir').isPresent()) args += ['--dir=' + doltProp('doltDir').get()]
-    if (doltProp('doltSandbox').isPresent()) args += ['--sandbox=' + doltProp('doltSandbox').get()]
-}
-
-tasks.register('doltServer', JavaExec) {
-    group = 'dolt'
-    description = 'Forward to the Dolt CLI server command. The MariaDB JDBC driver is on this task classpath.'
-    classpath = doltForwardClasspath
-    mainClass = 'tools.dscode.dolt.DoltCli'
-    args = ['dolt', 'server']
-    args += [doltProp('doltServer').orElse('status').get()]
-    if (doltProp('doltJson').isPresent()) args += ['--json']
-    if (doltProp('doltSandbox').isPresent()) args += ['--sandbox=' + doltProp('doltSandbox').get()]
-}
-
-tasks.register('doltSandbox', JavaExec) {
-    group = 'dolt'
-    description = 'Forward to the Dolt CLI sandbox command. The MariaDB JDBC driver is on this task classpath.'
-    classpath = doltForwardClasspath
-    mainClass = 'tools.dscode.dolt.DoltCli'
-    args = ['dolt', 'sandbox']
-    def sandboxArgs = doltProp('doltArgs').orElse('list').get()
+tasks.register('storeSandbox', JavaExec) {
+    group = 'store'
+    description = 'Forward to the Store CLI sandbox command. The store driver is already on the runtime classpath.'
+    classpath = storeForwardClasspath
+    mainClass = 'tools.dscode.store.StoreCli'
+    args = ['store', 'sandbox']
+    def sandboxArgs = storeProp('storeArgs').orElse('list').get()
     sandboxArgs.split(',').each { piece ->
         def trimmed = piece == null ? '' : piece.toString().trim()
         if (!trimmed.isEmpty()) args += [trimmed]
     }
-    if (doltProp('doltJson').isPresent()) args += ['--json']
-    if (doltProp('doltForce').isPresent()) args += ['--force']
-    if (doltProp('doltSandbox').isPresent()) args += ['--sandbox=' + doltProp('doltSandbox').get()]
+    if (storeProp('storePolicy').isPresent()) args += ['--policy=' + storeProp('storePolicy').get()]
+    if (storeProp('storeDrop').isPresent()) args += ['--drop']
+    if (storeProp('storeJson').isPresent()) args += ['--json']
+    if (storeProp('storeForce').isPresent()) args += ['--force']
+    if (storeProp('storeSandbox').isPresent()) args += ['--sandbox=' + storeProp('storeSandbox').get()]
 }
 
-tasks.register('doltMigrate', JavaExec) {
-    group = 'dolt'
-    description = 'Forward to the Dolt CLI migrate command. The MariaDB JDBC driver is on this task classpath.'
-    classpath = doltForwardClasspath
-    mainClass = 'tools.dscode.dolt.DoltCli'
-    args = ['dolt', 'migrate']
-    if (doltProp('doltDryRun').isPresent()) args += ['--dry-run']
-    if (doltProp('doltRemoveLegacy').isPresent()) args += ['--remove-legacy']
-    if (doltProp('doltSandbox').isPresent()) args += ['--sandbox=' + doltProp('doltSandbox').get()]
+tasks.register('storeMigrate', JavaExec) {
+    group = 'store'
+    description = 'Forward to the Store CLI migrate command. The store driver is already on the runtime classpath.'
+    classpath = storeForwardClasspath
+    mainClass = 'tools.dscode.store.StoreCli'
+    args = ['store', 'migrate']
+    if (storeProp('storeDryRun').isPresent()) args += ['--dry-run']
+    if (storeProp('storeRemoveLegacy').isPresent()) args += ['--remove-legacy']
+    if (storeProp('storeSandbox').isPresent()) args += ['--sandbox=' + storeProp('storeSandbox').get()]
 }
 
-tasks.register('doltRunClasspath', JavaExec) {
-    group = 'dolt'
-    description = 'Forward to the Dolt CLI run-classpath command. The MariaDB JDBC driver is on this task classpath.'
-    classpath = doltForwardClasspath
-    mainClass = 'tools.dscode.dolt.DoltCli'
-    def out = layout.buildDirectory.file('dolt-run-classpath.txt')
+tasks.register('storeRunClasspath', JavaExec) {
+    group = 'store'
+    description = 'Forward to the Store CLI run-classpath command. The store driver is already on the runtime classpath.'
+    classpath = storeForwardClasspath
+    mainClass = 'tools.dscode.store.StoreCli'
+    def out = layout.buildDirectory.file('store-run-classpath.txt')
     def joined = sourceSets.test.runtimeClasspath.asPath
     if (joined.contains(' ')) joined = '"' + joined + '"'
-    environment 'PKB_DOLT_RUN_CLASSPATH_TEXT', joined
-    args = ['dolt', 'run-classpath', '--out=' + out.get().asFile.absolutePath]
-    if (doltProp('doltSandbox').isPresent()) args += ['--sandbox=' + doltProp('doltSandbox').get()]
+    environment 'PKB_STORE_RUN_CLASSPATH_TEXT', joined
+    args = ['store', 'run-classpath', '--out=' + out.get().asFile.absolutePath]
+    if (storeProp('storeSandbox').isPresent()) args += ['--sandbox=' + storeProp('storeSandbox').get()]
 }
 
 tasks.register('verifySqlitePackaging') {
@@ -918,7 +895,7 @@ publishing {
                         d.appendNode('version', v)
                     }
 
-                    if (ga == 'org.xerial:sqlite-jdbc' || ga == 'org.mariadb.jdbc:mariadb-java-client') {
+                    if (ga == 'org.xerial:sqlite-jdbc') {
                         d.appendNode('scope', 'runtime')
                     } else {
                         d.appendNode('scope', 'compile')

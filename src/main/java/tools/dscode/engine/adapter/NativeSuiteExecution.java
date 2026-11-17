@@ -32,7 +32,7 @@ import org.junit.platform.engine.ExecutionRequest;
 import org.junit.platform.engine.TestDescriptor;
 import org.junit.platform.engine.TestExecutionResult;
 import tools.dscode.coredefinitions.GeneralSteps;
-import tools.dscode.dolt.DoltFeatureSource;
+import tools.dscode.store.StoreFeatureSource;
 import tools.dscode.engine.EngineLog;
 import tools.dscode.engine.EngineOptions;
 import tools.dscode.engine.match.StepRegistry;
@@ -176,7 +176,7 @@ public final class NativeSuiteExecution {
                     : result.message()))
                     : null;
             publish(bus, pickle, result, pluginStatus, error);
-            tools.dscode.dolt.DoltExecution.finishScenario(pluginStatus.name());
+            tools.dscode.store.StoreExecution.finishScenario(pluginStatus.name());
             EngineLog.log(options.project(), "suite", pickle.getName(), pluginStatus.name());
             if (pluginStatus == Status.FAILED || pluginStatus == Status.UNDEFINED || pluginStatus == Status.AMBIGUOUS) {
                 return TestExecutionResult.failed(error == null ? new IllegalStateException(pluginStatus.name()) : error);
@@ -360,7 +360,7 @@ public final class NativeSuiteExecution {
 
     private static String read(URI uri) throws IOException {
         if (uri == null) return "";
-        byte[] fromDb = DoltFeatureSource.bytesFor(uri);
+        byte[] fromDb = StoreFeatureSource.bytesFor(uri);
         if (fromDb != null) return new String(fromDb, StandardCharsets.UTF_8);
         if ("file".equalsIgnoreCase(uri.getScheme())) {
             return Files.readString(Path.of(uri));

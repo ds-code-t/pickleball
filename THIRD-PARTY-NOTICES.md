@@ -115,7 +115,6 @@ These drivers are compile dependencies of the published Pickleball POM. They are
 - org.postgresql:postgresql:42.7.7 — PostgreSQL JDBC driver, PostgreSQL License (BSD-style). https://jdbc.postgresql.org/about/license/
 - com.microsoft.sqlserver:mssql-jdbc:12.10.1.jre11 — Microsoft JDBC Driver for SQL Server, MIT License. https://github.com/microsoft/mssql-jdbc/blob/main/LICENSE
 - com.oracle.database.jdbc:ojdbc11:23.7.0.25.01 — Oracle Free Use Terms and Conditions. https://www.oracle.com/downloads/licenses/oracle-free-license.html
-- org.mariadb.jdbc:mariadb-java-client:3.5.11 — MariaDB Connector/J, LGPL-2.1-or-later. Unmodified published runtime dependency (POM scope runtime), not shaded into the Pickleball jar. The Dolt core uses it to talk to a loopback Dolt sql-server. JDBC service calls use the same jar. https://mariadb.com/kb/en/mariadb-license/
 - com.h2database:h2:2.3.232 — H2, MPL-2.0 or EPL-1.0. https://h2database.com/html/license.html
 
 The GPL MySQL Connector/J driver is not included.

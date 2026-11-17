@@ -34,7 +34,7 @@ class CucumberBoundaryTest {
 
     /** Core spine packages that must not import Cucumber at all, not even the syntax libraries. */
     static final List<String> CLEAN = List.of(
-            "src/main/java/tools/dscode/dolt",
+            "src/main/java/tools/dscode/store",
             "src/main/java/tools/dscode/engine/model",
             "src/main/java/tools/dscode/engine/source",
             "src/main/java/tools/dscode/engine/parity",
@@ -102,11 +102,11 @@ class CucumberBoundaryTest {
     @Test
     void cucumberAdapterListenerLivesInTheAdapterPackage() throws IOException {
         Path root = repoRoot();
-        Path plugin = root.resolve("src/main/java/tools/dscode/engine/adapter/cucumber/DoltRunTracePlugin.java");
+        Path plugin = root.resolve("src/main/java/tools/dscode/engine/adapter/cucumber/StoreRunTracePlugin.java");
         assertTrue(Files.isRegularFile(plugin), "the Cucumber run listener must stay in tools.dscode.engine.adapter.cucumber");
-        for (Path file : javaFiles(root.resolve("src/main/java/tools/dscode/dolt"))) {
+        for (Path file : javaFiles(root.resolve("src/main/java/tools/dscode/store"))) {
             String text = Files.readString(file, StandardCharsets.UTF_8);
-            assertTrue(!text.contains("io.cucumber"), "Dolt core names Cucumber: " + relative(root, file));
+            assertTrue(!text.contains("io.cucumber"), "Store core names Cucumber: " + relative(root, file));
         }
     }
 

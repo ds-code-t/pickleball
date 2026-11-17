@@ -2,7 +2,7 @@ package tools.dscode.workbench.ui;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import tools.dscode.workbench.dolt.DoltCliForwarder;
+import tools.dscode.workbench.store.StoreCliForwarder;
 
 import javax.swing.JButton;
 import javax.swing.JComboBox;
@@ -38,7 +38,7 @@ class EditPanelTest {
                 () -> project,
                 (root, args) -> {
                     forwarded.add(List.copyOf(args));
-                    return new DoltCliForwarder.Result(0, "{\"ok\":true,\"items\":[],\"text\":\"name: Badge\"}", "", List.of());
+                    return new StoreCliForwarder.Result(0, "{\"ok\":true,\"items\":[],\"text\":\"name: Badge\"}", "", List.of());
                 },
                 message -> confirmed[0]
         ));

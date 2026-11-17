@@ -1,18 +1,15 @@
 AGENTS.md
 docs/agent/repository-index.md
 docs/audits/3.0.0-architecture-doc-audit.md
-docs/maintainer/3.0.0-dolt-core-design.md
 docs/maintainer/3.0.0-locked-decisions-prior-audit.md
 docs/maintainer/3.0.0-locked-decisions-sweep.md
 docs/maintainer/3.0.0-locked-groups-plan.md
-docs/maintainer/dolt-isolation-analysis-2026-11-15.md
 docs/maintainer/execution-path-audit-2026-11-15.md
 docs/maintainer/locked-decisions-digest-2026-11-13.md
 docs/release-notes.md
 docs/roadmaps/3.0.0-dalton-roadmap.md
 docs/roadmaps/3.0.0-dalton-round2-roadmap.md
 docs/roadmaps/3.0.0-decouple-round3-roadmap.md
-docs/roadmaps/3.0.0-dolt-core-roadmap.md
 docs/roadmaps/3.0.0-java-dom-roadmap.md
 docs/roadmaps/3.0.0-linked-tracking-roadmap.md
 docs/roadmaps/3.0.0-locked-G2-query.md
@@ -31,7 +28,6 @@ prompts/3.0.0-locked-G2-build.md
 prompts/3.0.0-locked-G3-build.md
 prompts/3.0.0-locked-G4-build.md
 prompts/build-3.0.0-doc-fixes.md
-prompts/build-3.0.0-dolt-core.md
 prompts/build-3.0.0-linked-tracking-fixback1-addendum.md
 prompts/build-3.0.0-linked-tracking-fixback1.md
 prompts/build-3.0.0-linked-tracking-fixback2.md
@@ -45,7 +41,7 @@ prompts/heavy-3.0.0-locked-G4-surfaces-dalton-rust.md
 prompts/heavy-3.0.0-locked-decisions-sweep.md
 prompts/heavy-3.0.0-locked-roadmaps.md
 scripts/rename-history-allowlist.txt
-src/main/java/tools/dscode/dolt/LegacyNames.java
+src/main/java/tools/dscode/store/LegacyNames.java
 src/main/resources/META-INF/pickleball/guidance/docs/agent/repository-index.md
 src/main/resources/META-INF/pickleball/guidance/docs/release-notes.md
-src/test/java/tools/dscode/dolt/LegacyNamesTest.java
+src/test/java/tools/dscode/store/LegacyNamesTest.java

@@ -943,7 +943,7 @@ public final class DefinitionContext {
 
     public static ExecutionDictionary getExecutionDictionary() {
         ExecutionDictionary dictionary = EXECUTION_DICTIONARY_THREAD_LOCAL.get();
-        tools.dscode.dolt.ProjectElementCategories.ensureLoaded(dictionary);
+        tools.dscode.store.ProjectElementCategories.ensureLoaded(dictionary);
         return dictionary;
     }
 
