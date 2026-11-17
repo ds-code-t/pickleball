@@ -51,6 +51,8 @@ public final class CdpAdapter implements BrowserFacade {
         return new CdpAdapter(ProtocolSockets.open(websocket));
     }
 
+    private volatile String pageEnabledFor;
+
     @Override
     public String protocol() {
         return "cdp";
@@ -170,8 +172,20 @@ public final class CdpAdapter implements BrowserFacade {
         Map<String, Object> params = new LinkedHashMap<>();
         params.put("source", script);
         if (world != null && !world.isBlank()) params.put("worldName", world);
+        enablePage();
         JsonNode result = rpc.call("Page.addScriptToEvaluateOnNewDocument", params);
         return result == null ? "" : result.path("identifier").asText("");
+    }
+
+    /**
+     * Chrome evaluates a {@code worldName} preload only on a session with the Page domain enabled;
+     * without it the script is accepted and never runs on the next document.
+     */
+    private void enablePage() {
+        String session = pageSession == null ? "" : pageSession;
+        if (session.equals(pageEnabledFor)) return;
+        rpc.call("Page.enable", Map.of());
+        pageEnabledFor = session;
     }
 
     @Override

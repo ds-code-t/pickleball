@@ -27,6 +27,7 @@ public final class AgentDriverHooks {
 
     public static void quit() {
         RuntimeException cleanupFailure = null;
+        UiState.clearAll();
         try {
             PageSurfaces.cleanupAll();
         } catch (RuntimeException failure) {

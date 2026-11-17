@@ -5,7 +5,7 @@
 (function () {
   'use strict';
   if (typeof window === 'undefined' || typeof document === 'undefined' || !document.documentElement) return;
-  var VERSION = '3.0.0-p4';
+  var VERSION = '3.0.0-p5';
   if (window.__pkbUi && window.__pkbUi.version === VERSION) return;
   if (window.__pkbUi && typeof window.__pkbUi.dispose === 'function') {
     try { window.__pkbUi.dispose(); } catch (ignored) { /* older runtime */ }
@@ -505,7 +505,7 @@
       id: id, host: host, anchor: anchor, kind: spec.kind || host.getAttribute('data-pkb-kind') || '', at: at,
       baseL: num(host.style.left), baseT: num(host.style.top),
       sizeW: num(host.style.width), sizeH: num(host.style.height),
-      origin: {l: r.left, t: r.top}, locator: locatorOf(anchor), scrollers: scrollersOf(anchor),
+      origin: spec.origin && isFinite(spec.origin.l) ? {l: +spec.origin.l, t: +spec.origin.t} : {l: r.left, t: r.top}, locator: locatorOf(anchor), scrollers: scrollersOf(anchor),
       cache: {}, ringCache: {}, lost: false, cloneDirty: false
     };
     if (item.kind === 'overlay' && at !== 'over') item.ring = makeRing(id);
@@ -783,7 +783,9 @@
     guideClose(id);
     listen();
     guideListen();
-    var g = {id: id, current: 0, scroll: !!spec.scroll, pulse: true, steps: steps.map(function (st, i) {
+    var g = {id: id, current: 0, scroll: !!spec.scroll, pulse: true, spec: {id: id, scroll: !!spec.scroll, steps: steps.map(function (st) {
+      return {t: st.t, say: st.say, do: st.do, n: st.n, sensitive: st.sensitive, capture: st.capture};
+    })}, steps: steps.map(function (st, i) {
       return {t: st.t, say: st.say, do: st.do || 'any', n: st.n || i + 1, sensitive: !!st.sensitive, capture: !!st.capture, done: false};
     })};
     var miss = [];
@@ -1289,6 +1291,129 @@
     return panel ? window.__pkbPanelState : null;
   }
 
+
+  // ---- State and re-injection (P5) ----
+  // snapshot() describes what is shown (placements, guides with progress, the panel) without any
+  // value a person typed; restoreWhenReady(state) brings it back after a reload or route change.
+  var restoreState = null;
+  var restoreApplied = false;
+  var restoreHref = '';
+  var restoreTimer = 0;
+  var pendingItems = [];
+
+  function snapshot() {
+    var out = {v: 1, url: location.href, items: [], guides: [], panel: panel ? window.__pkbPanelState : null};
+    items.forEach(function (item) {
+      if (!item.host.isConnected) return;
+      var copy = item.host.cloneNode(true);
+      copy.style.translate = '';
+      copy.style.visibility = '';
+      copy.style.clipPath = '';
+      Array.prototype.forEach.call(copy.querySelectorAll('input,textarea'), function (field) {
+        field.removeAttribute('value');
+        if (field.nodeName.toLowerCase() === 'textarea') field.textContent = '';
+      });
+      out.items.push({id: item.id, kind: item.kind, at: item.at, theme: item.host.getAttribute('data-pkb-theme') || '',
+        html: copy.outerHTML, locator: item.locator, origin: item.origin});
+    });
+    guides.forEach(function (g) {
+      var cur = g.steps[g.current];
+      out.guides.push({spec: g.spec, at: cur ? cur.n : (g.steps.length ? g.steps[g.steps.length - 1].n + 1 : 1)});
+    });
+    return out;
+  }
+
+  function empty(snap) {
+    return !snap || ((!snap.items || !snap.items.length) && (!snap.guides || !snap.guides.length) && !snap.panel);
+  }
+
+  function inScope(st) {
+    if (!st || !st.snap) return false;
+    if (st.expires && Date.now() > st.expires) return false;
+    var saved;
+    try { saved = new URL(st.snap.url); } catch (ignored) { return st.scope === 'run'; }
+    if (st.scope === 'run') return true;
+    if (st.scope === 'origin') return saved.origin === location.origin;
+    // A page is its origin, path and query; an SPA route that changes the query is another page.
+    return saved.origin === location.origin && saved.pathname === location.pathname && saved.search === location.search;
+  }
+
+  function placeItem(rec) {
+    if (document.querySelector('[data-pkb-id="' + CSS.escape(rec.id) + '"]')) return true;
+    var anchor = relocate(rec.locator || {});
+    if (!anchor) return false;
+    var box = document.createElement('div');
+    box.innerHTML = rec.html;
+    var host = box.firstElementChild;
+    if (!host) return true;
+    (document.body || document.documentElement).appendChild(host);
+    track(host, anchor, {id: rec.id, kind: rec.kind, at: rec.at, theme: rec.theme, origin: rec.origin});
+    return true;
+  }
+
+  function applyRestore() {
+    var snap = restoreState.snap;
+    pendingItems = (snap.items || []).filter(function (rec) { return !placeItem(rec); });
+    (snap.guides || []).forEach(function (rec) {
+      if (!guides.has(rec.spec.id)) guide({id: rec.spec.id, steps: rec.spec.steps, scroll: false, at: rec.at, tab: false});
+    });
+    if (snap.panel && !panel) panelOpen({x: snap.panel.x, y: snap.panel.y, w: snap.panel.w, h: snap.panel.h, min: snap.panel.min, tab: snap.panel.tab, focus: false});
+    restoreApplied = true;
+  }
+
+  function withdraw() {
+    items.forEach(function (item) { if (item.host && item.host.isConnected) item.host.remove(); });
+    clear();
+    panelClose();
+    pendingItems = [];
+    restoreApplied = false;
+  }
+
+  function restoreCheck() {
+    if (!restoreState || !document.body) return;
+    var href = location.href;
+    var want = inScope(restoreState);
+    if (want && !restoreApplied) applyRestore();
+    else if (!want && restoreApplied) withdraw();
+    else if (want && pendingItems.length) pendingItems = pendingItems.filter(function (rec) { return !placeItem(rec); });
+    restoreHref = href;
+  }
+
+  function restoreWhenReady(st) {
+    restoreState = st;
+    restoreApplied = false;
+    if (st && st.pageState) {
+      try { sessionStorage.setItem('pkb-ui', JSON.stringify(st)); } catch (ignored) { /* storage blocked */ }
+    }
+    var start = function () {
+      restoreCheck();
+      // SPA routes change the URL without a reload; checking twice a second costs one string compare.
+      if (!restoreTimer) restoreTimer = setInterval(function () { if (location.href !== restoreHref || pendingItems.length) restoreCheck(); }, 500);
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, {once: true});
+    else start();
+    on(window, 'pageshow', function () { restoreCheck(); });
+    return {scope: st && st.scope, inScope: inScope(st)};
+  }
+
+  function forget() {
+    restoreState = null;
+    if (restoreTimer) { clearInterval(restoreTimer); restoreTimer = 0; }
+    try { sessionStorage.removeItem('pkb-ui'); } catch (ignored) { /* storage blocked */ }
+    withdraw();
+    return true;
+  }
+
+  // A Selenium-only session has no preload; with pkb_ui_page_state=session the digest kept in
+  // sessionStorage brings the state back the next time the runtime is installed on this tab.
+  try {
+    var kept = sessionStorage.getItem('pkb-ui');
+    if (kept && !restoreState) {
+      var parsed = JSON.parse(kept);
+      if (parsed && parsed.pageState) setTimeout(function () { if (!restoreState) restoreWhenReady(parsed); }, 0);
+    }
+  } catch (ignored) { /* storage blocked */ }
+
   window.__pkbUi = {
     version: VERSION,
     track: track,
@@ -1311,6 +1436,9 @@
     guideDone: guideDone,
     guideState: guideState,
     ask: ask,
-    askClose: askClose
+    askClose: askClose,
+    snapshot: snapshot,
+    restoreWhenReady: restoreWhenReady,
+    forget: forget
   };
 })();

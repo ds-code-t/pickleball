@@ -1903,6 +1903,8 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "say");
         copyFlag(args, parsed, "choices");
         copyFlag(args, parsed, "sensitive");
+        copyFlag(args, parsed, "scope");
+        copyFlag(args, parsed, "ttl");
         if ("arrow".equals(parsed.command())) {
             if (parsed.coordination().inboxFrom() != null) args.put("from", parsed.coordination().inboxFrom());
             if (parsed.coordination().inboxTo() != null) args.put("to", parsed.coordination().inboxTo());

@@ -1220,6 +1220,36 @@ final class PageSurfaces {
         return value == null ? null : String.valueOf(value);
     }
 
+    static String runtimeSource() {
+        return RUNTIME;
+    }
+
+    /** Registers a {@code pkb-surface} preload on the focused page's protocol session; null without CDP or BiDi. */
+    static String addStatePreload(String script) {
+        WebDriver web = driver;
+        if (web == null) {
+            List<Managed> all = managed();
+            if (all.isEmpty()) return null;
+            web = all.get(0).driver;
+        }
+        BrowserFacade facade = directPage(web);
+        if (facade == null) return null;
+        installSurface(web, facade);
+        return facade.addPreloadIn(script, "pkb-surface");
+    }
+
+    static void removeStatePreload(String identifier) {
+        if (identifier == null || identifier.isBlank()) return;
+        WebDriver web = driver;
+        if (web == null) {
+            List<Managed> all = managed();
+            if (all.isEmpty()) return;
+            web = all.get(0).driver;
+        }
+        BrowserFacade facade = directPage(web);
+        if (facade != null) facade.removePreload(identifier);
+    }
+
     static boolean hasLivePage() {
         return driver != null || !MANAGED.isEmpty();
     }

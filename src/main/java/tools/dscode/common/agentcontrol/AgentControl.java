@@ -83,6 +83,22 @@ public final class AgentControl {
         try {
             Optional<Result> routed = AgentSurfaceRouter.route(project, runId, op, values, agentId);
             if (routed.isPresent()) return routed.get();
+            if (values.get("scope") != null && !values.get("scope").isBlank()) UiState.scope(values.get("scope"));
+            if (values.get("ttl") != null && !values.get("ttl").isBlank()) UiState.expires(values.get("ttl"), 0L);
+            Result result = dispatch(project, runId, op, values, extraArgs, agentId);
+            if (result.exit() == 0 && UiState.TRACKED.contains(op)) UiState.sync(project, runId, values);
+            if (result.exit() == 0 && "html-cleanup".equals(op)) UiState.clear(project, runId);
+            return result;
+        } catch (IllegalArgumentException failure) {
+            return fail(2, failure.getMessage() == null ? "usage" : failure.getMessage());
+        } catch (Exception failure) {
+            return fail(1, failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage());
+        }
+    }
+
+    private static Result dispatch(Path project, String runId, String op, Map<String, String> values,
+                                   List<String> extraArgs, String agentId) throws Exception {
+        {
             return switch (op == null ? "" : op) {
                 case "observe" -> observe(project, runId, values);
                 case "launch" -> launch(project, runId, values, extraArgs);
@@ -114,10 +130,6 @@ public final class AgentControl {
                 case "capture-scenario" -> capture(project, runId, values);
                 default -> fail(2, "unknown agent command: " + op);
             };
-        } catch (IllegalArgumentException failure) {
-            return fail(2, failure.getMessage() == null ? "usage" : failure.getMessage());
-        } catch (Exception failure) {
-            return fail(1, failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage());
         }
     }
 

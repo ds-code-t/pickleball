@@ -577,4 +577,90 @@ class OverlayRuntimeLiveTest {
         String events = String.valueOf(run("overlay-poll", Map.of()).body().get("events"));
         assertTrue(events.contains("type=answer") && events.contains("value=No"), events);
     }
+
+    // ---- P5: state and re-injection ----
+
+    private boolean shown(String id) {
+        return (Boolean) browser.executeScript("return !!document.querySelector('[data-pkb-id=\"' + arguments[0] + '\"]');", id);
+    }
+
+    private void awaitShown(String id, boolean expected) {
+        long end = System.currentTimeMillis() + 5000;
+        while (shown(id) != expected && System.currentTimeMillis() < end) frames(2);
+        if (shown(id) != expected) {
+            Path state = AgentStore.root(project, "overlay-live").resolve(UiState.FILE);
+            String saved;
+            try {
+                saved = java.nio.file.Files.exists(state) ? "preload=" + UiState.read(state).path("preload").asText() + " layer=" + browser.executeScript("return !!document.querySelector('[data-pkb-layer]') + ' ' + document.readyState") : "(no state file)";
+            } catch (java.io.IOException failure) {
+                saved = failure.toString();
+            }
+            String live;
+            try {
+                live = PageSurfaces.runtimeCall("snapshot", null, false);
+            } catch (RuntimeException failure) {
+                live = failure.toString();
+            }
+            assertEquals(expected, shown(id), "placement " + id + " shown; page runtime: " + live + "; saved state: " + saved);
+        }
+    }
+
+    /** Item 6: a reload brings back the callout, the guide at its step, and the moved panel. */
+    @Test
+    void reloadReinjects() {
+        load("basic.html");
+        String id = overlay("save", "Click Save when ready", null);
+        startGuide(THREE_STEPS);
+        assertEquals(0, run("guide-next", Map.of()).exit());
+        openPanel(Map.of("x", "40", "y", "300"));
+        Map<String, Object> before = panelRect();
+        browser.navigate().refresh();
+        awaitShown(id, true);
+        long end = System.currentTimeMillis() + 5000;
+        while (stateFromBadges().size() < 3 && System.currentTimeMillis() < end) frames(2);
+        assertEquals("done", badge(1));
+        assertEquals("current", badge(2));
+        Map<String, Object> panel = panelRect();
+        assertEquals(40, num(panel, "l"), 1.01, String.valueOf(panel));
+        assertEquals(num(before, "t"), num(panel, "t"), 1.01, String.valueOf(panel));
+        assertEquals(num(before, "w"), num(panel, "w"), 1.01, String.valueOf(panel));
+        OverlayFixtures.shot(browser, "p5-after-reload");
+    }
+
+    /** Leaving the page shows nothing there; coming back restores the placement. */
+    @Test
+    void navigateAwayAndBack() {
+        load("basic.html");
+        String id = overlay("save", "Saved here", null);
+        browser.get(fixtures.url("strict-csp.html"));
+        frames(3);
+        assertFalse(shown(id), "placement shown on another page");
+        browser.navigate().back();
+        awaitShown(id, true);
+    }
+
+    /** An SPA route change (pushState) withdraws page-scoped UI; the route back re-places it on the re-rendered target. */
+    @Test
+    void spaRouteScope() {
+        load("spa.html?route=a");
+        String id = overlay("a-action", "Route A only", null);
+        browser.findElement(By.id("to-b")).click();
+        awaitShown(id, false);
+        browser.findElement(By.id("to-a")).click();
+        awaitShown(id, true);
+        assertSameBox(target("a-action"), ring());
+    }
+
+    /** html-cleanup removes the preload too: after a reload nothing comes back. */
+    @Test
+    void clearRemovesPreload() {
+        load("basic.html");
+        String id = overlay("save", "Gone after cleanup", null);
+        AgentControl.Result cleaned = run("html-cleanup", Map.of("target", "page"));
+        assertEquals(0, cleaned.exit(), String.valueOf(cleaned.body()));
+        browser.navigate().refresh();
+        frames(10);
+        assertFalse(shown(id), "placement came back after cleanup");
+        assertFalse(java.nio.file.Files.exists(AgentStore.root(project, "overlay-live").resolve(UiState.FILE)));
+    }
 }
