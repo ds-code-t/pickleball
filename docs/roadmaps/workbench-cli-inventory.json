@@ -1,5 +1,5 @@
 {
-  "version": "2.1.19",
+  "version": "2.20.0",
   "source": "src/main/java/tools/dscode/launcher/WorkbenchCommandLine.java",
   "commands": {
     "forwarded": [
