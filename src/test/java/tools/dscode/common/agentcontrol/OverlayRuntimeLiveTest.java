@@ -191,6 +191,43 @@ class OverlayRuntimeLiveTest {
         assertEquals("visible", callout.get("vis"));
     }
 
+    /** Item 5: default click-through still works; block:true intercepts clicks on the target. */
+    @Test
+    void blockTrueInterceptsTargetClicks() {
+        load("basic.html");
+        String id = overlay("save", "Click Save", null);
+        frames(2);
+        Object open = browser.executeScript("var r=document.getElementById('save').getBoundingClientRect();"
+                + "return document.elementFromPoint(r.left+r.width/2, r.top+r.height/2).id;");
+        assertEquals("save", open);
+        browser.findElement(By.id("save")).click();
+        assertEquals(1L, ((Number) browser.executeScript("return window.saved||0")).longValue());
+
+        assertEquals(0, run("overlay-remove", Map.of("id", id, "target", "page")).exit());
+        remember("save");
+        Map<String, String> args = new LinkedHashMap<>();
+        args.put("handle", "save");
+        args.put("target", "page");
+        args.put("text", "Blocked");
+        args.put("block", "true");
+        AgentControl.Result blocked = run("overlay", args);
+        assertEquals(0, blocked.exit(), String.valueOf(blocked.body()));
+        assertEquals(Boolean.TRUE, blocked.body().get("block"));
+        frames(2);
+        Object hit = browser.executeScript("var r=document.getElementById('save').getBoundingClientRect();"
+                + "var n=document.elementFromPoint(r.left+r.width/2, r.top+r.height/2);"
+                + "return n && (n.id || n.tagName || n.getAttribute('data-pkb-layer') || n.className);");
+        assertFalse("save".equals(String.valueOf(hit)), "block:true still click-through: " + hit);
+        boolean intercepted = false;
+        try {
+            browser.findElement(By.id("save")).click();
+        } catch (RuntimeException failure) {
+            intercepted = true;
+        }
+        assertEquals(1L, ((Number) browser.executeScript("return window.saved||0")).longValue(),
+                "click reached the target despite block:true (hit=" + hit + ", intercepted=" + intercepted + ")");
+    }
+
     /** D2: --at=over keeps the old covering placement, but it is click-through. */
     @Test
     void atOverCoversTheTargetButPassesClicks() {

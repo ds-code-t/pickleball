@@ -1888,6 +1888,7 @@ final class PageSurfaces {
             if (extra.get("direction") != null) spec.put("direction", extra.get("direction"));
             if (extra.get("at") != null) spec.put("at", extra.get("at"));
             if (extra.get("theme") != null) spec.put("theme", extra.get("theme"));
+            if (extra.get("block") != null) spec.put("block", extra.get("block"));
             if (extra.get("anchor") != null) spec.put("anchor", extra.get("anchor"));
         }
         try {

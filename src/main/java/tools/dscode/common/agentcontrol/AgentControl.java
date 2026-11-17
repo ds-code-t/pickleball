@@ -538,9 +538,14 @@ public final class AgentControl {
         if (present(theme) && !theme.trim().matches("auto|light|dark")) {
             return fail(2, "overlay --theme must be auto, light, or dark");
         }
+        String block = args.get("block");
+        if (present(block) && !block.trim().matches("(?i)true|false")) {
+            return fail(2, "overlay --block must be true or false");
+        }
         Map<String, String> look = new LinkedHashMap<>();
         if (present(at)) look.put("at", at.trim());
         if (present(theme)) look.put("theme", theme.trim());
+        if (present(block)) look.put("block", block.trim().toLowerCase());
         Map<String, Object> placed = PageSurfaces.place(
                 explicitPage(project, args),
                 "append",
@@ -558,11 +563,15 @@ public final class AgentControl {
         );
         placed.put("ok", true);
         if (present(at)) placed.put("at", at.trim());
+        if (present(block) && Boolean.parseBoolean(block.trim())) placed.put("block", true);
         return new Result(0, placed);
     }
 
     private static Result visual(Path project, String runId, String op, Map<String, String> args) throws Exception {
         String kind = VisualKinds.kind(op);
+        if (present(args.get("block")) && !args.get("block").trim().matches("(?i)true|false")) {
+            return fail(2, op + " --block must be true or false");
+        }
         String text = args.get("text");
         String handle = args.get("handle");
         Integer x = integerOrNull(args.get("x"));
@@ -600,6 +609,10 @@ public final class AgentControl {
                     : null;
         }
         if ("border".equals(kind) && text == null) text = "";
+        if (present(args.get("block"))) {
+            args = new LinkedHashMap<>(args);
+            args.put("block", args.get("block").trim().toLowerCase());
+        }
         Map<String, Object> placed = PageSurfaces.place(
                 explicitPage(project, args),
                 "append",
@@ -620,6 +633,7 @@ public final class AgentControl {
         if ("step".equals(kind)) placed.put("number", Integer.parseInt(args.get("number").trim()));
         if ("magnifier".equals(kind)) placed.put("zoom", args.get("zoom"));
         if ("spotlight".equals(kind)) placed.put("dim", args.get("dim"));
+        if (present(args.get("block")) && Boolean.parseBoolean(args.get("block").trim())) placed.put("block", true);
         return new Result(0, placed);
     }
 

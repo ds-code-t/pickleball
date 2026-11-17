@@ -69,9 +69,11 @@ public final class WorkbenchUiTools implements McpCommandContributor {
     static Map<String, Object> uiSchema() {
         Map<String, Object> op = new LinkedHashMap<>();
         op.put("type", "object");
-        op.put("properties", Map.of(
-                "c", Map.of("type", "string", "enum", COMPONENTS, "description", "Component."),
-                "t", Map.of("type", "string", "description", "Target: id, h:<handle>, CSS, text:<words>, role:<role>[name=..], x:<xpath>.")));
+        Map<String, Object> opProps = new LinkedHashMap<>();
+        opProps.put("c", Map.of("type", "string", "enum", COMPONENTS, "description", "Component."));
+        opProps.put("t", Map.of("type", "string", "description", "Target: id, h:<handle>, CSS, text:<words>, role:<role>[name=..], x:<xpath>."));
+        opProps.put("block", Map.of("type", "boolean", "description", "When true, intercept pointer events over the target. Default false (click-through)."));
+        op.put("properties", opProps);
         op.put("required", List.of("c"));
         op.put("additionalProperties", true);
         Map<String, Object> properties = new LinkedHashMap<>();

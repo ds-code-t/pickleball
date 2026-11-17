@@ -128,7 +128,7 @@ Usage: isolate [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--runvar=key
 Usage: kill
 
 # help label
-Usage: label --text=<label> [--handle=<id>] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--geometry=<json>] [--target=auto|page|popup|native] [--html=<page>]
+Usage: label --text=<label> [--handle=<id>] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--geometry=<json>] [--target=auto|page|popup|native] [--block=true] [--html=<page>]
 
 # help launch
 Usage: launch --template=<name> [--arg=<chrome-arg>] [--start] [--run-id=<id>]
@@ -147,7 +147,7 @@ Usage: open-scenario --feature=<path-or-name> --name=<scenario> [--example=<rows
 Usage: open-window --run-id=<id>
 
 # help overlay
-Usage: overlay --text=<html> [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--handle=<id>] [--at=auto|top|bottom|left|right|over] [--theme=auto|light|dark] [--geometry=<json>] [--html=<page>]
+Usage: overlay --text=<html> [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--handle=<id>] [--at=auto|top|bottom|left|right|over] [--theme=auto|light|dark] [--block=true] [--geometry=<json>] [--html=<page>]
 
 # help overlay-poll
 Usage: overlay-poll [--after=<next>] [--run-id=<id>]

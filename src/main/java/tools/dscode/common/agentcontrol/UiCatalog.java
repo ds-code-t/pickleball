@@ -23,27 +23,28 @@ final class UiCatalog {
     static {
         Option text = new Option("string", null, "text", "text or HTML shown");
         Option theme = new Option("string", "auto", "theme", "auto, light or dark");
+        Option block = new Option("boolean", false, "block", "true intercepts clicks on the target");
         add("overlay", "overlay", true, "callout beside the target with a ring on it",
                 "{\"c\":\"overlay\",\"t\":\"#save\",\"text\":\"Click Save\"}", "overlay-remove --id",
                 opt("text", new Option("string", null, "text", "HTML shown (required)")),
-                opt("at", new Option("string", "auto", "at", "auto, top, bottom, left, right or over")), opt("theme", theme));
+                opt("at", new Option("string", "auto", "at", "auto, top, bottom, left, right or over")), opt("theme", theme), opt("block", block));
         add("label", "label", true, "short label above the target",
-                "{\"c\":\"label\",\"t\":\"#email\",\"text\":\"Work email\"}", "unlabel --id", opt("text", text));
+                "{\"c\":\"label\",\"t\":\"#email\",\"text\":\"Work email\"}", "unlabel --id", opt("text", text), opt("block", block));
         add("border", "border", true, "outline around the target",
                 "{\"c\":\"border\",\"t\":\"#plan\",\"color\":\"#2563eb\"}", "unborder --id",
-                opt("color", new Option("string", null, "color", "CSS color")), opt("text", text));
+                opt("color", new Option("string", null, "color", "CSS color")), opt("text", text), opt("block", block));
         add("arrow", "arrow", true, "arrow pointing at the target",
                 "{\"c\":\"arrow\",\"t\":\"#save\",\"direction\":\"left\"}", "unarrow --id",
-                opt("direction", new Option("string", "left", "direction", "up, down, left or right")));
+                opt("direction", new Option("string", "left", "direction", "up, down, left or right")), opt("block", block));
         add("step-badge", "step-badge", true, "numbered badge left of the target",
                 "{\"c\":\"step-badge\",\"t\":\"#email\",\"number\":1}", "unstep-badge --id",
-                opt("number", new Option("integer", 1, "number", "badge number")), opt("text", text));
+                opt("number", new Option("integer", 1, "number", "badge number")), opt("text", text), opt("block", block));
         add("magnifier", "magnifier", true, "zoomed copy beside the target",
                 "{\"c\":\"magnifier\",\"t\":\"#terms\",\"zoom\":2}", "unmagnifier --id",
-                opt("zoom", new Option("number", 2, "zoom", "1 to 8")), opt("text", text));
+                opt("zoom", new Option("number", 2, "zoom", "1 to 8")), opt("text", text), opt("block", block));
         add("spotlight", "spotlight", true, "dims the page except the target",
                 "{\"c\":\"spotlight\",\"t\":\"#save\",\"dim\":0.5}", "unspotlight --id",
-                opt("dim", new Option("number", 0.5, "dim", "0 to 1")));
+                opt("dim", new Option("number", 0.5, "dim", "0 to 1")), opt("block", block));
         add("panel", "panel-open", false, "chat panel in the page",
                 "{\"c\":\"panel\",\"tab\":\"steps\"}", "panel-close",
                 opt("x", new Option("integer", null, "x", "left px")), opt("y", new Option("integer", null, "y", "top px")),
