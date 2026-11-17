@@ -148,6 +148,12 @@ class WorkbenchLaunchCorrectnessTest {
                 """;
         assertEquals("Caused by: java.nio.file.NoSuchFileException: missing.jar", WorkbenchAgentCommands.launchCause(text));
         assertEquals("[ERROR] Failed to execute goal example:compile", WorkbenchAgentCommands.launchCause("[ERROR] Failed to execute goal example:compile\n"));
+        String[] refusal = WorkbenchAgentCommands.refusalFault("""
+                error: all 1 warm JVMs are busy (runs: observed220-cap1-l)
+                fix: wait for a run to finish, pass --warm-wait=<seconds>, or raise pkb_workbench_warm_pool_max.
+                """);
+        assertEquals("all 1 warm JVMs are busy (runs: observed220-cap1-l)", refusal[0]);
+        assertTrue(refusal[1].contains("--warm-wait"));
     }
 
     @Test

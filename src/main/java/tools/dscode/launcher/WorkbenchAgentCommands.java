@@ -127,6 +127,8 @@ public final class WorkbenchAgentCommands {
                 case "session-info" -> sessionInfo(parsed, safeOut, safeErr);
                 case "session-hold" -> sessionHold(parsed, safeOut, safeErr, true);
                 case "session-release" -> sessionHold(parsed, safeOut, safeErr, false);
+                case "warm-status" -> warmStatus(parsed, safeOut);
+                case "warm-stop" -> warmStop(parsed, safeOut, safeErr);
                 case "help" -> help(args, safeOut, safeErr);
                 default -> {
                     safeErr.print(WorkbenchCliHelp.unknown(parsed.command()));
@@ -152,6 +154,65 @@ public final class WorkbenchAgentCommands {
         } catch (RuntimeException ignored) {
             // The command's own read reports "Workbench <command> failed:".
         }
+    }
+
+    private static void printJson(PrintStream out, Object value) {
+        try {
+            out.println(JSON.writeValueAsString(value));
+        } catch (java.io.IOException failure) {
+            throw new IllegalStateException("Could not write JSON.", failure);
+        }
+    }
+
+    private static int warmStatus(WorkbenchCommandLine.Parsed parsed, PrintStream out) {
+        List<WorkbenchSpeed.SlotView> slots = WorkbenchSpeed.warmSlots(parsed.project());
+        if (jsonRequested(parsed)) {
+            List<Map<String, Object>> rows = new ArrayList<>();
+            for (WorkbenchSpeed.SlotView slot : slots) rows.add(slotJson(slot));
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("slots", rows);
+            printJson(out, body);
+            return 0;
+        }
+        if (slots.isEmpty()) {
+            out.println("slots=0");
+            return 0;
+        }
+        for (WorkbenchSpeed.SlotView slot : slots) {
+            out.println("slot=" + slot.slot()
+                    + " pid=" + slot.pid()
+                    + " port=" + slot.port()
+                    + " state=" + slot.state()
+                    + " run=" + slot.runId()
+                    + " generation=" + slot.generation()
+                    + " age=" + slot.ageSeconds());
+        }
+        return 0;
+    }
+
+    private static Map<String, Object> slotJson(WorkbenchSpeed.SlotView slot) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("slot", slot.slot());
+        row.put("pid", slot.pid());
+        row.put("port", slot.port());
+        row.put("state", slot.state());
+        row.put("runId", slot.runId());
+        row.put("generation", slot.generation());
+        row.put("age", slot.ageSeconds());
+        return row;
+    }
+
+    private static int warmStop(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        if (!parsed.allSteps()) {
+            if (err != null) err.print(WorkbenchCliHelp.structured(
+                    "warm-stop needs --all",
+                    "warm-stop --all kills every warm JVM. stop releases only idle JVMs."
+            ));
+            return 2;
+        }
+        WorkbenchSpeed.releaseAll(parsed.project());
+        out.println("warm-stop slots=all");
+        return 0;
     }
 
     private static int exportGuidance(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
@@ -738,9 +799,15 @@ public final class WorkbenchAgentCommands {
             PrintStream captureErr,
             MavenRunner maven
     ) {
-        WorkbenchSpeed.DirectAttempt direct = WorkbenchSpeed.tryDirect(
-                parsed.project(), command, captureOut, captureErr, parsed.runTimeoutSeconds()
-        );
+        WorkbenchSpeed.warmWait(parsed.warmWaitSeconds());
+        WorkbenchSpeed.DirectAttempt direct;
+        try {
+            direct = WorkbenchSpeed.tryDirect(
+                    parsed.project(), command, captureOut, captureErr, parsed.runTimeoutSeconds()
+            );
+        } finally {
+            WorkbenchSpeed.warmWait(null);
+        }
         if (direct.kind() == WorkbenchSpeed.DirectKind.TIMED_OUT) {
             return new Bounded(direct.exit(), true);
         }
@@ -1892,6 +1959,8 @@ public final class WorkbenchAgentCommands {
             boolean zeroSteps
     ) {
         String captured = capturedOut.toString(StandardCharsets.UTF_8) + capturedErr.toString(StandardCharsets.UTF_8);
+        String[] refusal = refusalFault(captured);
+        if (refusal != null) return refusal;
         String cause = launchCause(captured);
         if (cause == null || cause.isBlank()) cause = "Maven exited " + exit + " before any scenario.";
         String fix = zeroSteps
@@ -1899,6 +1968,25 @@ public final class WorkbenchAgentCommands {
                 + runId + "/console/ and fix that hook, then run again."
                 : "Read .pickleball/runs/" + runId + "/console/ and fix the reported cause, then run again.";
         return new String[]{cause, fix};
+    }
+
+    /** A warm-pool refusal already named the cause. Do not replace it with a Maven line. */
+    static String[] refusalFault(String captured) {
+        if (captured == null || captured.isBlank()) return null;
+        String cause = null;
+        String fix = null;
+        for (String raw : captured.split("\\R")) {
+            String line = raw.strip();
+            if (line.startsWith("error: ")
+                    && (line.contains("warm JVMs are busy") || line.contains("is already running"))) {
+                cause = line.substring("error: ".length()).strip();
+                fix = null;
+            } else if (cause != null && line.startsWith("fix: ")) {
+                fix = line.substring("fix: ".length()).strip();
+            }
+        }
+        if (cause == null) return null;
+        return new String[]{cause, fix == null ? "" : fix};
     }
 
     static String launchCause(String captured) {

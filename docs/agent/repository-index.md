@@ -88,6 +88,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/roadmaps/2.1.18-direct-control-handoff.md`
 - `docs/roadmaps/2.1.18-workbench-coverage-findings.md`
 - `docs/roadmaps/2.1.18-workbench-full-coverage.md`
+- `docs/roadmaps/2.20.0-observed-issues/INVESTIGATION.md`
+- `docs/roadmaps/2.20.0-observed-issues/PICKLEBALL_2.1.19_ISSUES.md`
+- `docs/roadmaps/2.20.0-observed-issues/ROADMAP.md`
 - `docs/service-call-scenarios.md`
 - `docs/step-overrides.md`
 - `docs/workbench-agent-detail.md`
@@ -431,6 +434,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/launcher/PickleballWorkbenchLauncher.java`
 - `src/main/java/tools/dscode/launcher/QuietWarnings.java`
 - `src/main/java/tools/dscode/launcher/SessionHealthWait.java`
+- `src/main/java/tools/dscode/launcher/WarmPoolLog.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchAgentCommands.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchCliErrors.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchCliFlags.java`
@@ -489,6 +493,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/assertions/AssertionClauseSplitterTest.java`
 - `src/test/java/tools/dscode/common/assertions/MultilineAssertFeatureTest.java`
 - `src/test/java/tools/dscode/common/assertions/MultilineAssertTest.java`
+- `src/test/java/tools/dscode/common/assertions/ValueWrapperNumericTest.java`
 - `src/test/java/tools/dscode/common/coordination/AgentCoordinationTest.java`
 - `src/test/java/tools/dscode/common/coordination/PathPrefixResolutionTest.java`
 - `src/test/java/tools/dscode/common/coordination/RunConfigIsolationTest.java`
@@ -555,6 +560,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/WorkbenchValidateTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchWarmFallbackTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchWarmLifecycleTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchWarmPoolTest.java`
 - `src/test/java/tools/dscode/launcher/WorkspaceLaunchForkTest.java`
 - `src/test/java/tools/dscode/parallelutilities/ParallelCountEstimatorTest.java`
 - `src/test/java/tools/dscode/release/Release217ReportedBugsTest.java`
@@ -726,8 +732,12 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/ClasspathCache.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/InputFingerprint.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/ProcessTree.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/SplitInputFingerprint.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/StageScheduler.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/WarmGeneration.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/WarmPool.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/WarmProcess.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/WarmSlot.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/WindowDriver.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/WorkbenchFeatureIndex.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/Workspace.java`
@@ -749,6 +759,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/SessionHoldTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/SleepGapMonitorTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/speed/SpeedTypesTest.java`
+- `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/speed/SplitInputFingerprintTest.java`
+- `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/speed/WarmGenerationTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/WorkbenchFeatureIndexTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/WorkspaceTest.java`
 
@@ -911,6 +923,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/io/cucumber/core/runner/ScenarioStepChecks.java`
 - `maven-consumer-project/src/test/java/io/cucumber/core/runner/ScenarioStepDataChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/assertions/AssertionClauseSplitterChecks.java`
+- `maven-consumer-project/src/test/java/tools/dscode/common/assertions/NumberQualifierChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/dataelements/DataElementPhaseFiveChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/dataelements/DataElementPhaseFourAndSixChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/dataelements/DataElementPhaseOneChecks.java`

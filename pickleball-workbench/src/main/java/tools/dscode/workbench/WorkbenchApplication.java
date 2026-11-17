@@ -13,6 +13,7 @@ import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.sync.WorkbenchSynchronizer;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.WindowDriver;
+import tools.dscode.control.protocol.speed.WarmPool;
 import tools.dscode.control.protocol.speed.WarmProcess;
 import tools.dscode.workbench.ui.WorkbenchUi;
 import tools.dscode.workbench.worker.WorkbenchLiveSession;
@@ -79,7 +80,8 @@ public final class WorkbenchApplication {
                                 + "fix: Usage: pickleball-workbench mcp <project>\n"
                 );
                 case "export-guidance", "hint", "discover-hint", "discover", "confirm", "plan",
-                        "workspace-show", "workspace-edit", "workspace-seed" -> {
+                        "workspace-show", "workspace-edit", "workspace-seed",
+                        "warm-status", "warm-stop" -> {
                     err.println("Workbench " + args[0]
                             + " runs through PickleballWorkbenchLauncher in the consumer JVM, not this controller JAR.");
                     yield 2;
@@ -398,7 +400,7 @@ public final class WorkbenchApplication {
 
     private static void releaseWarm(Path project) {
         if (project == null) return;
-        WarmProcess.release(PickleballLocalLayout.workbenchStateRoot(project));
+        WarmPool.releaseIdle(PickleballLocalLayout.workbenchStateRoot(project));
     }
 
     private static void printReplayedRunVars(PrintStream out, Map<String, String> workerProperties) {

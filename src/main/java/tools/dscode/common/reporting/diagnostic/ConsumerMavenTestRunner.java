@@ -48,6 +48,28 @@ public final class ConsumerMavenTestRunner {
         return List.copyOf(command);
     }
 
+    /**
+     * Resource sync for a classpath-cache hit. Offline first. Maven is batch
+     * and skips tests. Gradle runs {@code processTestResources}.
+     */
+    public static List<String> processTestResourcesCommand(Path projectRoot, boolean offline) {
+        Path root = projectRoot.toAbsolutePath().normalize();
+        List<String> command = new ArrayList<>(launchPrefix(wrapper(root)));
+        boolean mavenProject = Files.isRegularFile(root.resolve("pom.xml"));
+        if (mavenProject) {
+            if (offline) command.add("-o");
+            command.add("-q");
+            command.add("-B");
+            command.add("-DskipTests");
+            command.add("process-test-resources");
+        } else {
+            if (offline) command.add("--offline");
+            command.add("-q");
+            command.add("processTestResources");
+        }
+        return List.copyOf(command);
+    }
+
     public static List<String> confirmCommand(Path projectRoot, Path workspace, Map<String, String> selection) {
         return confirmCommand(projectRoot, workspace, selection, null);
     }

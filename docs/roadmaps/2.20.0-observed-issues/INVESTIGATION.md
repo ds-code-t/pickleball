@@ -1,5 +1,7 @@
 # Pickleball bug report: code investigation on branch 2.20.0
 
+Corrections to this investigation are in `docs/roadmaps/2.20.0-observed-issues/ROADMAP.md`. This file is unchanged below that pointer.
+
 _Read-only investigation on 2026-11-17, Tue (MST). Target: **branch 2.20.0 (`85a8cdc2`)** only. Source came from `gh api` (git tree, contents) only. Nothing was cloned, built, or run, and no 3.x branch was read. The report itself was written against 2.1.19. Every path, line number, and doc reference below is from 2.20.0: each fetched file's git blob SHA was checked against the 2.20.0 tree._
 
 Docs read on 2.20.0 first: `AGENTS.md`, `docs/agent/feature-map.md`, `docs/block-conditionals.md`, `docs/log-and-assert-steps.md`, `docs/dynamic-steps.md`, `docs/workbench-agent-detail.md`, `docs/pickleball-workbench.md`, `pickleball-workbench/AGENTS.md`, `docs/release-notes.md`, and `docs/maintainer/2.1.19-issuefix-roadmap.md`.

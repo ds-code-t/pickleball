@@ -2,6 +2,7 @@ package tools.dscode.launcher;
 
 import tools.dscode.control.protocol.speed.ProcessTree;
 import tools.dscode.control.protocol.speed.WarmProcess;
+import tools.dscode.control.protocol.speed.WarmSlot;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
@@ -32,9 +33,12 @@ public final class WorkbenchWarmMain {
     private static final AtomicBoolean EXITING = new AtomicBoolean();
     private static final AtomicBoolean BUSY = new AtomicBoolean();
     private static volatile long parentPid;
+    private static volatile boolean oneShotRun;
+    private static volatile String currentRunId = "";
     private static volatile long lastUsedNanos = System.nanoTime();
     private static volatile long idleNanos = TimeUnit.SECONDS.toNanos(WarmProcess.DEFAULT_IDLE_SECONDS);
     private static volatile Runnable afterStarted;
+    private static volatile Path stateDir;
 
     private WorkbenchWarmMain() {
     }
@@ -55,9 +59,12 @@ public final class WorkbenchWarmMain {
             return;
         }
         Path state = Path.of(args[0]);
+        stateDir = state;
         String watch = args[1];
         parentPid = args.length >= 3 ? positiveLong(args[2]) : 0L;
         long idleSeconds = args.length >= 4 ? positiveLong(args[3]) : 0L;
+        String generation = args.length >= 5 ? args[4] : "";
+        boolean slot = WarmSlot.isSlotDirectory(state);
         if (idleSeconds <= 0) idleSeconds = WarmProcess.DEFAULT_IDLE_SECONDS;
         try {
             idleNanos = TimeUnit.SECONDS.toNanos(idleSeconds);
@@ -67,7 +74,12 @@ public final class WorkbenchWarmMain {
         lastUsedNanos = System.nanoTime();
         boolean started = false;
         try (ServerSocket server = new ServerSocket(0, 50, InetAddress.getLoopbackAddress())) {
-            WarmProcess.write(state, new WarmProcess.Handle(ProcessHandle.current().pid(), server.getLocalPort(), watch));
+            long pid = ProcessHandle.current().pid();
+            if (slot) {
+                WarmSlot.write(state, new WarmSlot.Handle(pid, server.getLocalPort(), generation, parentPid, watch));
+            } else {
+                WarmProcess.write(state, new WarmProcess.Handle(pid, server.getLocalPort(), watch));
+            }
             spawnTestChild(state);
             started = true;
             Thread watchThread = new Thread(() -> watch(state), "pickleball-warm-idle");
@@ -117,12 +129,16 @@ public final class WorkbenchWarmMain {
                 Thread.currentThread().interrupt();
                 return;
             }
-            boolean missing = !Files.isRegularFile(WarmProcess.file(state));
+            boolean missing = !Files.isRegularFile(handleFile(state));
             if (!missing) {
-                long filed = WarmProcess.readOwner(state);
-                if (filed > 0) parentPid = filed;
+                long filed = WarmProcess.readOwner(ownerRoot(state));
+                boolean running = BUSY.get();
+                if (filed > 0 && !(running && oneShotRun)) parentPid = filed;
             }
-            if (exitDue(parentPid, BUSY.get(), idleNanos, lastUsedNanos, System.nanoTime(), missing)) shutdown(state);
+            boolean running = BUSY.get();
+            long parent = running && oneShotRun ? 0L : parentPid;
+            if (exitDue(parent, running, idleNanos, lastUsedNanos, System.nanoTime(), missing)) shutdown(state);
+            if (!running && WarmSlot.retirePending(state)) shutdown(state);
         }
     }
 
@@ -133,8 +149,18 @@ public final class WorkbenchWarmMain {
         } catch (RuntimeException ignored) {
             // A child can exit between the snapshot and the kill.
         }
-        WarmProcess.delete(state);
-        WarmProcess.deleteRememberedPid(state);
+        WarmSlot.clearBusy(state);
+        if (WarmSlot.isSlotDirectory(state)) {
+            try {
+                Files.deleteIfExists(WarmSlot.handleFile(state));
+                Files.deleteIfExists(state.resolve(WarmProcess.PID_FILE_NAME));
+            } catch (java.io.IOException ignored) {
+                // The killer also deletes the handle.
+            }
+        } else {
+            WarmProcess.delete(state);
+            WarmProcess.deleteRememberedPid(state);
+        }
         System.exit(0);
     }
 
@@ -165,7 +191,8 @@ public final class WorkbenchWarmMain {
         String verb = reader.readLine();
         if ("PING".equals(verb)) {
             lastUsedNanos = System.nanoTime();
-            writer.println("PONG");
+            if (BUSY.get()) writer.println("PONG busy " + currentRunId);
+            else writer.println("PONG idle");
             return;
         }
         if (!"RUN".equals(verb)) {
@@ -185,6 +212,7 @@ public final class WorkbenchWarmMain {
             return;
         }
         Path project = projectLine == null || projectLine.isBlank() ? Path.of("") : Path.of(projectLine);
+        currentRunId = runIdOf(dashD);
         ByteArrayOutputStream captured = new ByteArrayOutputStream();
         PrintStream tee = new PrintStream(captured, true, StandardCharsets.UTF_8);
         PrintStream out = System.out;
@@ -195,6 +223,7 @@ public final class WorkbenchWarmMain {
         try {
             loader = newLoader();
             writer.println("STARTED");
+            WarmSlot.markBusy(stateDir, currentRunId);
             Runnable hook = afterStarted;
             if (hook != null) hook.run();
             System.setOut(tee);
@@ -208,11 +237,14 @@ public final class WorkbenchWarmMain {
             tee.println("fix: the wrapper path still runs this command.");
         } finally {
             BUSY.set(false);
+            currentRunId = "";
+            WarmSlot.clearBusy(stateDir);
             lastUsedNanos = System.nanoTime();
             Thread.currentThread().setContextClassLoader(previous);
             System.setOut(out);
             System.setErr(err);
             loader = null;
+            if (WarmSlot.retirePending(stateDir)) shutdown(stateDir);
         }
         writer.println("EXIT " + exit);
         for (String capturedLine : captured.toString(StandardCharsets.UTF_8).split("\\R", -1)) {
@@ -234,8 +266,34 @@ public final class WorkbenchWarmMain {
 
     private static void adoptParent(String line) {
         long adopted = positiveLong(line);
-        if (adopted > 0) parentPid = adopted;
+        if (adopted > 0) {
+            parentPid = adopted;
+            oneShotRun = false;
+        } else {
+            oneShotRun = true;
+        }
         lastUsedNanos = System.nanoTime();
+    }
+
+    private static Path handleFile(Path state) {
+        return WarmSlot.isSlotDirectory(state) ? WarmSlot.handleFile(state) : WarmProcess.file(state);
+    }
+
+    /** A slot's owner file lives on the workbench state root, two levels up. */
+    private static Path ownerRoot(Path state) {
+        if (WarmSlot.isSlotDirectory(state) && state.getParent() != null && state.getParent().getParent() != null) {
+            return state.getParent().getParent();
+        }
+        return state;
+    }
+
+    private static String runIdOf(List<String> dashD) {
+        if (dashD == null) return "";
+        String prefix = "-Dpkb_run_id=";
+        for (String token : dashD) {
+            if (token != null && token.startsWith(prefix)) return token.substring(prefix.length()).trim();
+        }
+        return "";
     }
 
     private static long positiveLong(String raw) {

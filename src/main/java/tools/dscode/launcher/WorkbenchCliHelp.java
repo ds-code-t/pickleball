@@ -13,8 +13,8 @@ import java.util.TreeSet;
 final class WorkbenchCliHelp {
     private static final Map<String, String> USAGE = Map.ofEntries(
             Map.entry("help", "Usage: help [command|flag]"),
-            Map.entry("discover", "Usage: discover [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<path:line>] [--plan] [--quiet] [--refresh] [--no-narrow|--full-scan] [--runvar=key=value] [--retention=all|failed|none] [--run-id=<id>] [--agent=<id>] [--run-timeout=<seconds>]"),
-            Map.entry("confirm", "Usage: confirm [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<path:line>] [--quiet] [--runvar=key=value] [--run-id=<id>] [--agent=<id>] [--run-timeout=<seconds>]"),
+            Map.entry("discover", "Usage: discover [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<path:line>] [--plan] [--quiet] [--refresh] [--no-narrow|--full-scan] [--runvar=key=value] [--retention=all|failed|none] [--run-id=<id>] [--agent=<id>] [--run-timeout=<seconds>] [--warm-wait=<seconds>]"),
+            Map.entry("confirm", "Usage: confirm [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<path:line>] [--quiet] [--runvar=key=value] [--run-id=<id>] [--agent=<id>] [--run-timeout=<seconds>] [--warm-wait=<seconds>]"),
             Map.entry("plan", "Usage: plan [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<path:line>] [--refresh] [--json]"),
             Map.entry("validate", "Usage: validate [--tags=<expr>] [--name=<regex>] [--run-id=<id>] [--max-steps=<n>] [--all]\nReports undefined steps, ambiguous glue, and unresolved RUN SCENARIO targets. Outline rows are expanded. Core steps count as defined. A long suite prints progress and stops at a step cap unless --max-steps or --all is set, and reports how many scenarios were skipped. Runs nothing. A flag this command does not use, including --quiet, is rejected with error: and fix:."),
             Map.entry("hint", "Usage: hint [--json]"),
@@ -29,6 +29,8 @@ final class WorkbenchCliHelp {
             Map.entry("status", "Usage: status [command-id] [--json] [--run-id=<id>]"),
             Map.entry("events", "Usage: events [--hooks] [--json] [--cursor=<token>] [--run-id=<id>]"),
             Map.entry("stop", "Usage: stop [--force] [--run-id=<id>]"),
+            Map.entry("warm-status", "Usage: warm-status [--json]"),
+            Map.entry("warm-stop", "Usage: warm-stop --all"),
             Map.entry("diagnostic-run", "Usage: diagnostic-run --run=<id> [--run-id=<live-session>]"),
             Map.entry("open-scenario", "Usage: open-scenario --feature=<path-or-name> --name=<scenario> [--example=<rows>]"),
             Map.entry("example", "Usage: example --example=<rows>"),
@@ -64,6 +66,7 @@ final class WorkbenchCliHelp {
             Map.entry("--session-file", "Usage: --session-file=<path>\nisolate and session-start wait on this file. The default is that run's cli-session.json."),
             Map.entry("--step-timeout", "Usage: --step-timeout=<seconds>\nPositive whole number of seconds. execute-step only. discover and confirm reject it; use --run-timeout."),
             Map.entry("--run-timeout", "Usage: --run-timeout=<seconds>\nPositive whole number of seconds. discover, confirm, and execute-step."),
+            Map.entry("--warm-wait", "Usage: --warm-wait=<seconds>\nHow long discover or confirm waits for a warm JVM when every slot is busy. Zero, the default, refuses at once with exit 2."),
             Map.entry("--kind", "Usage: --kind=run|scenario|step|event|property|artifact|error|log\nquery and query get. Default for query is event when --run-id is set, otherwise run."),
             Map.entry("--scenario", "Usage: --scenario=<id>\nScenario directory name under the run. query get, query query, and query errors."),
             Map.entry("--cursor", "Usage: --cursor=<token>\nPage token from nextCursor. The truncated line says ...+N more, use cursor."),
@@ -123,7 +126,7 @@ final class WorkbenchCliHelp {
         text.append("Do not pass pkb_run_profile. Do not open the GUI to test yourself. isolate is the headless session.\n");
         text.append("run: discover confirm plan validate hint discover-hint resolve-runvars\n");
         text.append("workspace: workspace-show workspace-edit workspace-seed\n");
-        text.append("session: isolate session-start execute-step status events stop kill open-scenario example play from-here pause insert-step update-step diagnostic-run save refresh session-sync worker-start worker-restart worker-stop open-window close-window show-run\n");
+        text.append("session: isolate session-start execute-step status events stop kill open-scenario example play from-here pause insert-step update-step diagnostic-run save refresh session-sync worker-start worker-restart worker-stop open-window close-window show-run warm-status warm-stop\n");
         text.append("coordination: short-log note inbox finish presence post history gc-runs gc-versions use-version export-guidance\n");
         text.append("descriptors: session list | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>\n");
         text.append("page: inspect-page find-element\n");

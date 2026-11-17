@@ -494,6 +494,23 @@ class WorkbenchCliSurfaceCoverageTest {
     }
 
     @Test
+    void covers_command_warm_status() {
+        Capture capture = agent("warm-status", temp.toString());
+        assertEquals(0, capture.code, capture.err);
+        assertTrue(capture.out.contains("slots=0"), capture.out);
+    }
+
+    @Test
+    void covers_command_warm_stop() {
+        Capture missing = agent("warm-stop", temp.toString());
+        assertEquals(2, missing.code);
+        assertTrue(missing.err.contains("warm-stop needs --all"), missing.err);
+        Capture stopped = agent("warm-stop", temp.toString(), "--all");
+        assertEquals(0, stopped.code, stopped.err);
+        assertTrue(stopped.out.contains("warm-stop"), stopped.out);
+    }
+
+    @Test
     void covers_command_stop() throws Exception {
         AgentCoordination.begin(temp, AgentCoordination.Request.of("stop-1", "ada", null, null, null, null, "isolate"));
         Capture capture = session((launch) -> new ProcessBuilder("true").start(),
@@ -1097,6 +1114,18 @@ class WorkbenchCliSurfaceCoverageTest {
         IllegalArgumentException bad = assertThrows(IllegalArgumentException.class,
                 () -> parse("execute-step", "--step-timeout=0"));
         assertTrue(bad.getMessage().contains("positive"));
+    }
+
+    @Test
+    void covers_flag_warm_wait() {
+        assertEquals(5, parse("discover", "--warm-wait=5").warmWaitSeconds());
+        assertEquals(0, parse("discover", "--warm-wait=0").warmWaitSeconds());
+        IllegalArgumentException bad = assertThrows(IllegalArgumentException.class,
+                () -> parse("discover", "--warm-wait=-1"));
+        assertTrue(bad.getMessage().contains("warm-wait"));
+        Capture help = agent("help", "--warm-wait");
+        assertEquals(0, help.code, help.err);
+        assertTrue(help.out.contains("refuses at once with exit 2"), help.out);
     }
 
     @Test

@@ -7,6 +7,7 @@ import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
 import org.junit.platform.launcher.core.LauncherFactory;
 import org.junit.platform.launcher.listeners.SummaryGeneratingListener;
 import tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner;
+import tools.dscode.control.protocol.speed.WarmGeneration;
 import tools.dscode.testengine.DynamicSuiteEngine;
 
 import java.nio.file.Files;
@@ -33,9 +34,15 @@ public final class WorkbenchDirectRun {
     public static int run(Path project, List<String> dashD) {
         apply(dashD);
         Path root = project == null ? Path.of("").toAbsolutePath().normalize() : project.toAbsolutePath().normalize();
-        Path tests = root.resolve("target").resolve("test-classes");
-        if (!Files.isDirectory(tests)) {
-            tests = root.resolve("build").resolve("classes").resolve("java").resolve("test");
+        String override = System.getProperty(WarmGeneration.TEST_CLASSES_PROPERTY);
+        Path tests;
+        if (override != null && !override.isBlank()) {
+            tests = Path.of(override.trim());
+        } else {
+            tests = root.resolve("target").resolve("test-classes");
+            if (!Files.isDirectory(tests)) {
+                tests = root.resolve("build").resolve("classes").resolve("java").resolve("test");
+            }
         }
         try {
             LauncherDiscoveryRequest request = LauncherDiscoveryRequestBuilder.request()

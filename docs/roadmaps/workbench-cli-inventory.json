@@ -39,6 +39,8 @@
       "short-log",
       "use-version",
       "validate",
+      "warm-status",
+      "warm-stop",
       "workspace-edit",
       "workspace-seed",
       "workspace-show"
@@ -107,6 +109,7 @@
     "--ttl",
     "--step-timeout",
     "--run-timeout",
+    "--warm-wait",
     "--quiet",
     "--max-steps",
     "--all"

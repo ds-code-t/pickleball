@@ -25,7 +25,7 @@ final class WorkbenchCommandLine {
             "presence", "post", "history", "gc-runs", "gc-versions", "use-version",
             "inspect-page", "find-element", "query",
             "session-list", "session-info", "session-hold", "session-release",
-            "help"
+            "help", "warm-status", "warm-stop"
     );
     static final Set<String> SESSION_CLIENT_COMMANDS = Set.of(
             "isolate", "session-start", "execute-step", "status", "events", "stop", "kill",
@@ -105,7 +105,8 @@ final class WorkbenchCommandLine {
             Long runTimeoutSeconds,
             boolean quiet,
             Integer maxSteps,
-            boolean allSteps
+            boolean allSteps,
+            Integer warmWaitSeconds
     ) {
         public Parsed {
             selects = selects == null ? List.of() : List.copyOf(selects);
@@ -147,14 +148,14 @@ final class WorkbenchCommandLine {
         args = sessionQueryArgs(normalizeFlags(args));
         Path cwd = Path.of("").toAbsolutePath().normalize();
         if (args == null || args.length == 0) {
-            return new Parsed("ui", cwd, null, null, null, null, null, new String[]{"ui", cwd.toString()}, Coordination.empty(), null, false, false, false, List.of(), List.of(), null, null, false, null, false);
+            return new Parsed("ui", cwd, null, null, null, null, null, new String[]{"ui", cwd.toString()}, Coordination.empty(), null, false, false, false, List.of(), List.of(), null, null, false, null, false, null);
         }
         String command = args[0];
         if ("export-guidance".equals(command) || "help".equals(command)) {
             Path output = "export-guidance".equals(command) && args.length >= 2 && !isFlag(args[1])
                     ? Path.of(args[1])
                     : Path.of(".pickleball");
-            return new Parsed(command, cwd, output, null, null, null, null, args.clone(), Coordination.empty(), null, false, false, false, List.of(), List.of(), null, null, false, null, false);
+            return new Parsed(command, cwd, output, null, null, null, null, args.clone(), Coordination.empty(), null, false, false, false, List.of(), List.of(), null, null, false, null, false, null);
         }
 
         String tags = null;
@@ -193,6 +194,7 @@ final class WorkbenchCommandLine {
         boolean quiet = false;
         Integer maxSteps = null;
         boolean allSteps = false;
+        Integer warmWaitSeconds = null;
         java.util.LinkedHashSet<String> seenFlags = new java.util.LinkedHashSet<>();
         String absorb = null;
         boolean tagsSplitOpen = false;
@@ -530,6 +532,14 @@ final class WorkbenchCommandLine {
                 absorb = null;
                 continue;
             }
+            if (token.startsWith("--warm-wait=") || "--warm-wait".equals(token)) {
+                String value = token.startsWith("--warm-wait=")
+                        ? token.substring("--warm-wait=".length())
+                        : (index + 1 < args.length ? args[++index] : null);
+                warmWaitSeconds = parseNonNegativeSeconds(value);
+                absorb = null;
+                continue;
+            }
             if (isFlag(token)) {
                 rest.add(token);
                 if (takesSeparateValue(token) && index + 1 < args.length && !isFlag(args[index + 1])) {
@@ -602,12 +612,12 @@ final class WorkbenchCommandLine {
             forwarded.addAll(rest);
             return new Parsed(
                     command, project, null, tags, name, example, retention, forwarded.toArray(String[]::new),
-                    coordination, version, planOnly, refreshIndex, fullScan, runVars, selects, stepTimeoutSeconds, runTimeoutSeconds, quiet, maxSteps, allSteps
+                    coordination, version, planOnly, refreshIndex, fullScan, runVars, selects, stepTimeoutSeconds, runTimeoutSeconds, quiet, maxSteps, allSteps, warmWaitSeconds
             );
         }
         return new Parsed(
                 command, project, null, tags, name, example, retention, args.clone(),
-                coordination, version, planOnly, refreshIndex, fullScan, runVars, selects, stepTimeoutSeconds, runTimeoutSeconds, quiet, maxSteps, allSteps
+                coordination, version, planOnly, refreshIndex, fullScan, runVars, selects, stepTimeoutSeconds, runTimeoutSeconds, quiet, maxSteps, allSteps, warmWaitSeconds
         );
     }
 
@@ -734,6 +744,22 @@ final class WorkbenchCommandLine {
             );
         }
         return parsed;
+    }
+
+    private static Integer parseNonNegativeSeconds(String value) {
+        if (value == null || value.isBlank()) {
+            throw usageFailure("--warm-wait requires a number of seconds", "--warm-wait");
+        }
+        try {
+            long seconds = Long.parseLong(value.trim());
+            if (seconds < 0) {
+                throw usageFailure("--warm-wait requires zero or a positive number of seconds", "--warm-wait");
+            }
+            if (seconds > Integer.MAX_VALUE) return Integer.MAX_VALUE;
+            return (int) seconds;
+        } catch (NumberFormatException failure) {
+            throw cliError("--warm-wait must be a whole number of seconds: " + value, "Pass --warm-wait=<seconds>. See help discover.");
+        }
     }
 
     private static Long parsePositiveSeconds(String value, String label) {
