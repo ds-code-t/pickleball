@@ -226,6 +226,10 @@ is greater than or equal to
 
 `matches` compiles a Java regular expression and uses `Matcher.matches`, so the pattern must cover the whole value. A double-quoted pattern is case-sensitive. A single quote on either side is case-insensitive. `"Ava"` matches `"A.+"`.
 
+### Number qualifier
+
+`number`, `integer`, and `decimal` on either side of `is equal to`, `is not equal to`, `is less than`, `is less than or equal to`, `is greater than`, or `is greater than or equal to` compare the operands as numbers. `"1" number is equal to "$1.00"` passes. `"1.5" number is equal to "1.50"` passes. `"1" is equal to "1.00"` with no qualifier stays a text compare and fails. Both sides must be numeric: at least one digit, and the only ignored characters are a currency symbol, `,`, `_`, whitespace, and an extra `.`. `integer` also requires a whole number, so `"1.00" integer` passes and `"1.5" integer` does not. `decimal` is the same as `number`. `"abc" number is equal to "abc"` fails with `number qualifier: 'abc' is not a number`. `is not equal to` does not turn that into a pass. `ensure`, `verify`, `ASSERT:`, and `SOFT ASSERT:` fail. `IF:`, `ELSE-IF:`, `, if`, and `until` are false and log that same text as a warning.
+
 Common state checks include:
 
 ```text

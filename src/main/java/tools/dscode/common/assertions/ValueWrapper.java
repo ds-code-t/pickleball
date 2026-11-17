@@ -264,6 +264,53 @@ public class ValueWrapper {
         return new BigDecimal(text);
     }
 
+    /**
+     * True when {@code asBigDecimal()} would keep this text as a real number.
+     * Letters and other symbols are rejected. Currency symbols, grouping
+     * commas, underscores, whitespace, and extra dots are allowed.
+     * {@code integerOnly} also requires an integral value ({@code 1.00} yes, {@code 1.5} no).
+     */
+    public boolean isQualifiedNumeric(boolean integerOnly) {
+        if (!qualifiedNumericText(asNormalizedText())) {
+            return false;
+        }
+        if (!integerOnly) {
+            return true;
+        }
+        try {
+            return asBigDecimal().stripTrailingZeros().scale() <= 0;
+        } catch (RuntimeException ex) {
+            return false;
+        }
+    }
+
+    private static boolean qualifiedNumericText(String text) {
+        if (text == null || text.isBlank()) {
+            return false;
+        }
+        boolean digit = false;
+        boolean signUsed = false;
+        for (int i = 0; i < text.length(); i++) {
+            char character = text.charAt(i);
+            if (Character.isDigit(character)) {
+                digit = true;
+                continue;
+            }
+            if (character == '.' || character == ',' || character == '_' || Character.isWhitespace(character)) {
+                continue;
+            }
+            if ((character == '+' || character == '-') && !signUsed && !digit) {
+                signUsed = true;
+                continue;
+            }
+            if (Character.getType(character) == Character.CURRENCY_SYMBOL) {
+                continue;
+            }
+            return false;
+        }
+        return digit;
+    }
+
     public static BigInteger convertToInteger(String inputString) {
         if (inputString == null || inputString.isBlank()) return BigInteger.ZERO;
 

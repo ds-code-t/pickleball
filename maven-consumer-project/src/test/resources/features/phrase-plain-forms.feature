@@ -95,3 +95,26 @@ Feature: Plain phrase forms select a branch without throwing
     * , ensure "<noWord>" equals "untouched"
     * , ensure "<nullWord>" equals "untouched"
     * , ensure "<nullMarker>" equals "untouched"
+
+  @NumericEqualityRepro
+  Scenario: number is equal to compares quoted operands as numbers
+    * , save "untouched" as "numberBranch"
+    * , save "untouched" as "numberSkip"
+    * , save "untouched" as "textEqual"
+    * , ensure "1" number is equal to "1.00"
+    * , ensure "1" number is equal to "$1.00"
+    * , ensure "1.5" number is equal to "1.50"
+    * , ensure 1 number is equal to "$1.00"
+    * , ensure 1 is equal to "1.00"
+    * , ensure "1" number is less than or equal to "1.00"
+    * , ensure "1" number is greater than or equal to "$1.00"
+    * IF: "1" number is equal to "1.00":
+      : * , save "yes" as "numberBranch"
+    * IF: "abc" number is equal to "abc":
+      : * , save "no" as "numberSkip"
+    * IF: "1" is equal to "1.00":
+      : * , save "text" as "textEqual"
+    * , ensure "<numberBranch>" equals "yes"
+    * , ensure "<numberSkip>" equals "untouched"
+    * , ensure "<textEqual>" equals "untouched"
+

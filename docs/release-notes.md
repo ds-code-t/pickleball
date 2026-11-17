@@ -4,6 +4,8 @@
 
 - An `, or` chain fills `<placeholders>` in every phrase that actually runs, including phrases after the first. A phrase the chain never reaches, and an untaken `THEN`, `ELSE`, or `ELSE-IF`, is not resolved. A normal `mvn test` is affected.
 
+- `number`, `integer`, and `decimal` on either side of an equality or ordering comparison compare the operands as numbers. `"1" number is equal to "$1.00"` passes. A value that is not a number fails `ensure`, `verify`, `ASSERT:`, and `SOFT ASSERT:`, and makes `IF:` false with a warning. `is not equal to` does not turn that failure into a pass. Without the qualifier, quoted equality stays text. A normal `mvn test` is affected.
+
 ## 2.1.19
 
 - A single-line equality check ignores a leading or trailing line break again, the same as 2.1.16. `"Please select one customer for each individual and submit.\n"` equals `"Please select one customer for each individual and submit."`. A value whose only line breaks are leading or trailing whitespace uses the single-line comparison, including internal space collapse. A real multi-line value still keeps internal line breaks: `"line one\nline two"` is not equal to `"line one line two"`. CR/LF is still the same break as LF. A trailing newline on a real multi-line value is removed after that normalization, so `"line one\nline two\n"` equals `"line one\nline two"`. Internal spaces on that path are not collapsed. Backtick text stays exact, so `` `foo.\n` `` is not equal to `` `foo.` ``. `contains`, `starts with`, `ends with`, and `matches` use the same text. `IF:` conditions, dropdown selection, and table cells use it too. A normal `mvn test` uses this comparison.

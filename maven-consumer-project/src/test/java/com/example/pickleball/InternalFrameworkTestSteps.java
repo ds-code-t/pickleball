@@ -6,6 +6,7 @@ import io.cucumber.core.runner.ScenarioStepDataChecks;
 import io.cucumber.java.en.Given;
 import tools.dscode.Release217Phase1Checks;
 import tools.dscode.common.assertions.AssertionClauseSplitterChecks;
+import tools.dscode.common.assertions.NumberQualifierChecks;
 import tools.dscode.common.dataelements.DataElementPhaseFiveChecks;
 import tools.dscode.common.dataelements.DataElementPhaseFourAndSixChecks;
 import tools.dscode.common.dataelements.DataElementPhaseOneChecks;
@@ -89,6 +90,11 @@ public final class InternalFrameworkTestSteps {
     @Given("^RUN AREA C JAVA TESTS$")
     public static void runAreaCJavaTests() {
         runAndAssert(AreaCElementChecks.class);
+    }
+
+    @Given("^RUN NUMBER QUALIFIER JAVA TESTS$")
+    public static void runNumberQualifierJavaTests() {
+        runAndAssert(NumberQualifierChecks.class);
     }
 
     @Given("^RUN LOG AND ASSERT JAVA TESTS$")

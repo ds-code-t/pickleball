@@ -32,6 +32,32 @@ public class AssertionChain {
         parentPhrase = phrase;
     }
 
+    public String ownerAssertionType() {
+        if (parentPhrase == null || parentPhrase.getAssertionType() == null) {
+            return "";
+        }
+        return parentPhrase.getAssertionType();
+    }
+
+    public boolean ownerIsConditional() {
+        if (parentPhrase == null) {
+            return false;
+        }
+        if (parentPhrase.untilPhrase) {
+            return true;
+        }
+        String type = parentPhrase.getAssertionType();
+        if (type != null && type.equalsIgnoreCase("conditional")) {
+            return true;
+        }
+        String conditional = parentPhrase.getConditional();
+        if (conditional == null) {
+            return false;
+        }
+        String normalized = conditional.trim().toLowerCase();
+        return normalized.equals("if") || normalized.equals("until") || normalized.startsWith("else");
+    }
+
     public static void copyAssertionChainToNewPhrase(PhraseData oldPhrase, PhraseData newPhrase) {
         newPhrase.assertionChain = new AssertionChain(newPhrase);
         oldPhrase.assertionChain.phraseChain.forEach(newPhrase.assertionChain::addAssertionPhrase);
