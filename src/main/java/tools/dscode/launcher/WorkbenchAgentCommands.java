@@ -1892,10 +1892,11 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "zoom");
         copyFlag(args, parsed, "direction");
         copyFlag(args, parsed, "dim");
-        // Overlay-polish flags: chat-poll --wait, overlay --at/--theme, panel-open --tab/--title/--minimized.
+        // Overlay-polish flags: chat-poll --wait, overlay --at/--theme/--block, panel-open --tab/--title/--minimized.
         copyFlag(args, parsed, "wait");
         copyFlag(args, parsed, "at");
         copyFlag(args, parsed, "theme");
+        copyFlag(args, parsed, "block");
         copyFlag(args, parsed, "tab");
         copyFlag(args, parsed, "title");
         copyFlag(args, parsed, "minimized");

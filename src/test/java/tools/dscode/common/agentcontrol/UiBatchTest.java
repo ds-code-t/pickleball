@@ -28,6 +28,8 @@ class UiBatchTest {
         assertEquals("true", panel.get("minimized"));
         assertTrue(UiBatch.flags(ops.get(3), null).get("steps").contains("\"say\":\"Click A\""));
         assertEquals(1, UiBatch.parse(null, "{\"c\":\"clear\"}").size(), "a single op object is a batch of one");
+        Map<String, String> blocked = UiBatch.flags(UiBatch.parse(null, "{\"c\":\"overlay\",\"t\":\"#save\",\"text\":\"X\",\"block\":true}").get(0), "save");
+        assertEquals("true", blocked.get("block"));
     }
 
     @Test

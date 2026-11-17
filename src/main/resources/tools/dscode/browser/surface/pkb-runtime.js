@@ -5,7 +5,7 @@
 (function () {
   'use strict';
   if (typeof window === 'undefined' || typeof document === 'undefined' || !document.documentElement) return;
-  var VERSION = '3.0.0-p7';
+  var VERSION = '3.0.0-block';
   if (window.__pkbUi && window.__pkbUi.version === VERSION) return;
   if (window.__pkbUi && typeof window.__pkbUi.dispose === 'function') {
     try { window.__pkbUi.dispose(); } catch (ignored) { /* older runtime */ }
@@ -25,6 +25,7 @@
     + 'box-shadow:var(--pkb-shadow)!important;padding:8px 12px!important;font:13px/1.45 ' + FONT + '!important;'
     + 'box-sizing:border-box;transition:opacity .14s ease-out;}'
     + '[data-pkb-ui][data-pkb-kind=overlay][data-pkb-at=over]{background:color-mix(in srgb,var(--pkb-bg) 80%,transparent)!important;pointer-events:none!important;}'
+    + '[data-pkb-ui][data-pkb-kind=overlay][data-pkb-at=over][data-pkb-block=true]{pointer-events:auto!important;}'
     + '[data-pkb-ui][data-pkb-at=over] :is(a,button,input,select,textarea,[data-pkb-action]){pointer-events:auto;}'
     + '[data-pkb-ui][data-pkb-kind=overlay] button{font:inherit;border:0;background:var(--pkb-accent);color:#fff;border-radius:6px;padding:3px 10px;margin:4px 4px 0 0;cursor:pointer;}'
     + '[data-pkb-ui][data-pkb-kind=label]{background:#111827!important;color:#fff!important;border-radius:6px!important;'
@@ -39,6 +40,7 @@
     + '.ring{position:fixed;left:0;top:0;box-sizing:border-box;border-radius:6px;pointer-events:none;'
     + 'box-shadow:0 0 0 2px var(--pkb-accent),0 0 0 6px rgba(59,130,246,.22);background:transparent;'
     + 'transition:opacity .14s ease-out;will-change:transform;}'
+    + '.ring[data-pkb-block=true]{pointer-events:auto;}'
     + '.ring.todo{box-shadow:0 0 0 1px rgba(59,130,246,.45);}'
     + '.ring.done{box-shadow:0 0 0 2px rgba(34,160,107,.75);}'
     + '.ring.pulse{animation:pkb-pulse .9s ease-out 1;}'
@@ -253,6 +255,20 @@
 
   function onTarget(kind, at) {
     return kind === 'border' || kind === 'spotlight' || (kind === 'overlay' && at === 'over');
+  }
+
+  function isBlocked(spec) {
+    var b = spec && spec.block;
+    return b === true || b === 'true' || b === 1 || b === '1';
+  }
+
+  function applyBlock(item) {
+    if (!item || !item.block) return;
+    if (item.host) {
+      item.host.setAttribute('data-pkb-block', 'true');
+      if (onTarget(item.kind, item.at)) item.host.style.setProperty('pointer-events', 'auto', 'important');
+    }
+    if (item.ring) item.ring.setAttribute('data-pkb-block', 'true');
   }
 
   function desired(item, r, w, h, vp) {
@@ -506,9 +522,10 @@
       baseL: num(host.style.left), baseT: num(host.style.top),
       sizeW: num(host.style.width), sizeH: num(host.style.height),
       origin: spec.origin && isFinite(spec.origin.l) ? {l: +spec.origin.l, t: +spec.origin.t} : {l: r.left, t: r.top}, locator: locatorOf(anchor), scrollers: scrollersOf(anchor),
-      cache: {}, ringCache: {}, lost: false, cloneDirty: false
+      cache: {}, ringCache: {}, lost: false, cloneDirty: false, block: isBlocked(spec)
     };
-    if (item.kind === 'overlay' && at !== 'over') item.ring = makeRing(id);
+    if ((item.kind === 'overlay' && at !== 'over') || (item.block && !onTarget(item.kind, at))) item.ring = makeRing(id);
+    applyBlock(item);
     items.set(id, item);
     observe(item);
     update();
