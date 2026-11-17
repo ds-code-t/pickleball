@@ -220,7 +220,7 @@ final class TrackingPanel extends JPanel {
                 try {
                     show(get());
                 } catch (Exception failure) {
-                    status.setText("error: " + failure.getMessage());
+                    showTableError("error: " + failure.getMessage() + " (exit 1)");
                 }
             }
         }.execute();
@@ -228,6 +228,7 @@ final class TrackingPanel extends JPanel {
 
     private void show(StoreCliForwarder.Result result) {
         String body = result.out() == null ? "" : result.out();
+        String err = result.err() == null ? "" : result.err().trim();
         beats.clear();
         rows.clear();
         pageCursor = "";
@@ -247,7 +248,11 @@ final class TrackingPanel extends JPanel {
                 }
             }
         } catch (Exception failure) {
-            status.setText("error: " + failure.getMessage());
+            showTableError(StoreCliForwarder.visibleFailure(result));
+            return;
+        }
+        if (beats.isEmpty() && (result.exit() != 0 || !err.isEmpty())) {
+            showTableError(StoreCliForwarder.visibleFailure(result));
             return;
         }
         if (beats.isEmpty()) {
@@ -258,7 +263,31 @@ final class TrackingPanel extends JPanel {
         }
         scrub.setMaximum(beats.size() - 1);
         select(0);
-        if (result.exit() != 0) status.setText("exit " + result.exit());
+        if (result.exit() != 0 || !err.isEmpty()) {
+            String visible = StoreCliForwarder.visibleFailure(result);
+            rows.addElement(visible);
+            status.setText(visible);
+            return;
+        }
+    }
+
+    private void showTableError(String visible) {
+        if (rows.isEmpty() || (rows.getSize() == 1 && "none".equals(rows.getElementAt(0)))) {
+            rows.clear();
+            rows.addElement(visible);
+        } else if (!contains(visible)) {
+            rows.addElement(visible);
+        }
+        scrub.setMaximum(0);
+        index = 0;
+        status.setText(visible);
+    }
+
+    private boolean contains(String visible) {
+        for (int i = 0; i < rows.getSize(); i++) {
+            if (visible.equals(rows.getElementAt(i))) return true;
+        }
+        return false;
     }
 
     private JButton button(String title, String tip, Runnable action) {

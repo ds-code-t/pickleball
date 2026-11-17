@@ -184,6 +184,54 @@ class StorePanelTest {
         assertEquals(List.of("changes", "--json", "--sandbox=left"), forwarded.get(5));
     }
 
+    @Test
+    void populatedStoreShowsRowsAndAFailureIsVisibleInTheTable() throws Exception {
+        StorePanel[] holder = new StorePanel[1];
+        SwingUtilities.invokeAndWait(() -> holder[0] = new StorePanel(() -> project, (root, args) -> {
+            if (args.size() >= 1 && "files".equals(args.get(0))) {
+                return new StoreCliForwarder.Result(0, """
+                        {"files":[
+                          {"path":"features/pay.feature","sourceType":"feature","edited":true,"bytes":42},
+                          {"path":"configs/cafe.yaml","sourceType":"config","edited":false,"bytes":2}
+                        ]}
+                        """, "", List.of());
+            }
+            return new StoreCliForwarder.Result(
+                    1,
+                    "",
+                    "error: Store is enabled but org.xerial:sqlite-jdbc is not on the classpath.\n",
+                    List.of());
+        }));
+        StorePanel panel = holder[0];
+        JLabel status = label(panel, "Store");
+        click(panel, "Refresh", status);
+        JList<?> list = list(panel);
+        assertEquals("features/pay.feature  feature  edited=yes  bytes=42", row(list, 0));
+        assertEquals("configs/cafe.yaml  config  edited=no  bytes=2", row(list, 1));
+        clickUntil(panel, "Status", status, "sqlite-jdbc");
+        String shown = row(list, 0);
+        assertTrue(shown.contains("sqlite-jdbc"), shown);
+        assertTrue(shown.contains("exit 1"), shown);
+    }
+
+    private static void clickUntil(Container panel, String title, JLabel status, String needle) throws Exception {
+        JButton button = button(panel, title);
+        SwingUtilities.invokeAndWait(button::doClick);
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline) {
+            String[] text = new String[1];
+            String[] row = new String[1];
+            SwingUtilities.invokeAndWait(() -> {
+                text[0] = status.getText();
+                JList<?> rows = list(panel);
+                row[0] = rows.getModel().getSize() == 0 ? "" : String.valueOf(rows.getModel().getElementAt(0));
+            });
+            if ((text[0] != null && text[0].contains(needle)) || (row[0] != null && row[0].contains(needle))) return;
+            Thread.sleep(20);
+        }
+        throw new AssertionError(title + " never showed " + needle + " status=" + status.getText());
+    }
+
     private static String body(List<String> args) {
         String key = String.join(" ", args);
         if (key.equals("status")) {

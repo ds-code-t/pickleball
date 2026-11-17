@@ -218,6 +218,33 @@ class WorkbenchTrackingForwarderTest {
         assertTrue(pushed.isEmpty(), pushed.toString());
     }
 
+    @Test
+    void populatedTimelineShowsRowsAndAFailureIsVisibleInTheTable() throws Exception {
+        String body = """
+                {"command":"timeline","count":1,"total":1,"limit":50,"offset":0,"cursor":"c","events":[
+                  {"at":"2020-01-01T00:00:00Z","kind":"run","id":"sample-run","runId":"sample-run","status":"PASSED","scenarioKey":"Pay","stepExecId":"","stepText":"","definitionId":"","entityType":"","entityId":"","field":"","operation":"","valueRef":"","message":"","path":""}
+                ]}
+                """;
+        TrackingPanel[] holder = new TrackingPanel[1];
+        SwingUtilities.invokeAndWait(() -> holder[0] = new TrackingPanel(() -> project, (root, args) -> {
+            if (args.contains("timeline")) return new StoreCliForwarder.Result(0, body, "", List.of());
+            return new StoreCliForwarder.Result(
+                    1, "", "error: Store is enabled but org.xerial:sqlite-jdbc is not on the classpath.\n", List.of());
+        }, ignored -> { }));
+        TrackingPanel panel = holder[0];
+        click(panel, "Refresh");
+        assertEquals("2020-01-01T00:00:00Z run sample-run", row(panel, 0));
+        click(panel, "Retain");
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        String shown = "";
+        while (System.nanoTime() < deadline) {
+            shown = row(panel, 0);
+            if (shown.contains("sqlite-jdbc") && shown.contains("exit 1")) return;
+            Thread.sleep(20);
+        }
+        throw new AssertionError("table stayed " + shown + " status=" + labelText(panel, ""));
+    }
+
     private static void click(Container panel, String title) throws Exception {
         JButton button = button(panel, title);
         SwingUtilities.invokeAndWait(button::doClick);
@@ -226,7 +253,7 @@ class WorkbenchTrackingForwarderTest {
             String text = labelText(panel, "Tracking");
             if (text.startsWith("exit 0") || text.startsWith("2020-") || text.startsWith("explorer ")
                     || text.startsWith("Select a run") || text.startsWith("Explorer is not ready")
-                    || "paused".equals(text) || text.startsWith("play ")) return;
+                    || text.startsWith("error:") || "paused".equals(text) || text.startsWith("play ")) return;
             Thread.sleep(20);
         }
     }

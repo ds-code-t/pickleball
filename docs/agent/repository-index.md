@@ -82,6 +82,11 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/2.1.19-workbench-expansion-brainstorm.md`
 - `docs/maintainer/2.1.19-workbench-expansion-ideas.md`
 - `docs/maintainer/2.1.19-workbench-expansion-roadmap.md`
+- `docs/maintainer/3.0.0-consumer-ready-handoff.md`
+- `docs/maintainer/3.0.0-consumer-report-2026-11-17/agent-blockers-digest.md`
+- `docs/maintainer/3.0.0-consumer-report-2026-11-17/agreed-plan.md`
+- `docs/maintainer/3.0.0-consumer-report-2026-11-17/bug-p2-24-tracking-store-tabs-empty.md`
+- `docs/maintainer/3.0.0-consumer-report-2026-11-17/bug-workbench-window-freeze.md`
 - `docs/maintainer/3.0.0-embedded-store-design.md`
 - `docs/maintainer/3.0.0-engine-defects-design.md`
 - `docs/maintainer/3.0.0-engine-design.md`
@@ -115,6 +120,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/roadmaps/2.1.18-direct-control-handoff.md`
 - `docs/roadmaps/2.1.18-workbench-coverage-findings.md`
 - `docs/roadmaps/2.1.18-workbench-full-coverage.md`
+- `docs/roadmaps/3.0.0-consumer-ready-roadmap.md`
 - `docs/roadmaps/3.0.0-dalton-roadmap.md`
 - `docs/roadmaps/3.0.0-dalton-round2-roadmap.md`
 - `docs/roadmaps/3.0.0-decouple-round3-roadmap.md`
@@ -1253,6 +1259,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/discover/LastDiscoverSnapshot.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/engine/DomEngineCliForwarder.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/engine/EngineCliForwarder.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/launch/ConsumerClasspath.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchCallContext.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchControlLease.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchControlLeaseSnapshot.java`

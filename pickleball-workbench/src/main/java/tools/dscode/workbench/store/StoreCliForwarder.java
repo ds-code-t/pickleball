@@ -2,6 +2,7 @@ package tools.dscode.workbench.store;
 
 import tools.dscode.control.protocol.PickleballArtifactLocator;
 import tools.dscode.control.protocol.PickleballLocalLayout;
+import tools.dscode.workbench.launch.ConsumerClasspath;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
@@ -13,13 +14,26 @@ import java.util.Optional;
 
 /**
  * Workbench action that only forwards to the Pickleball {@code store} CLI.
- * This module does not link Store classes.
+ * This module does not link Store classes. The published jar stays thin:
+ * the child JVM is {@code java -cp} on the resolved consumer classpath.
  */
 public final class StoreCliForwarder {
     private StoreCliForwarder() {
     }
 
     public record Result(int exit, String out, String err, List<String> command) {
+    }
+
+    /** Stderr (else stdout) plus the exit code, for the Tracking and Store tables. */
+    public static String visibleFailure(Result result) {
+        String err = result == null || result.err() == null ? "" : result.err().trim();
+        String out = result == null || result.out() == null ? "" : result.out().trim();
+        int exit = result == null ? 1 : result.exit();
+        String message = !err.isEmpty() ? err : out;
+        if (message.isEmpty()) message = "exit " + exit;
+        String exitText = "exit " + exit;
+        if (exit != 0 && !message.contains(exitText)) message = message + " (" + exitText + ")";
+        return message;
     }
 
     public static Result run(Path project, List<String> storeArgs) {
@@ -67,17 +81,19 @@ public final class StoreCliForwarder {
 
     /** The process command. Tests assert this list without starting a JVM. */
     public static List<String> command(Path jar, Path project, List<String> storeArgs) {
+        Path root = project == null ? Path.of("").toAbsolutePath().normalize() : project.toAbsolutePath().normalize();
         List<String> command = new ArrayList<>();
         command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
-        command.add("-jar");
-        command.add(jar.toAbsolutePath().normalize().toString());
+        command.add("-cp");
+        command.add(ConsumerClasspath.joined(root, jar));
+        command.add(ConsumerClasspath.MAIN_CLASS);
         command.add("store");
         if (storeArgs != null) {
             for (String arg : storeArgs) {
                 if (arg != null && !arg.isBlank()) command.add(arg);
             }
         }
-        command.add("--project=" + project.toAbsolutePath().normalize());
+        command.add("--project=" + root.toAbsolutePath().normalize());
         return List.copyOf(command);
     }
 

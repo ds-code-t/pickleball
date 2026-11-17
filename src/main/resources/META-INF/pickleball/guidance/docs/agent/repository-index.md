@@ -1174,6 +1174,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/discover/LastDiscoverSnapshot.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/engine/DomEngineCliForwarder.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/engine/EngineCliForwarder.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/launch/ConsumerClasspath.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchCallContext.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchControlLease.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchControlLeaseSnapshot.java`

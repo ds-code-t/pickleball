@@ -82,10 +82,10 @@ If the address has no scheme, prefix `http://`. `127.0.0.1:9222` becomes `http:/
 
 Do not pass a `url`. Do not launch a browser. Attach requires the local-attach acknowledgement so the engine records `launched: false`.
 
-CLI, when you are attaching yourself and Pickleball has not already attached. Consumers run the engine from the Pickleball jar (a bare `domengine` script exists only from `:dom-engine:installDist`):
+CLI, when you are attaching yourself and Pickleball has not already attached. Consumers run the engine on the resolved consumer classpath (a bare `domengine` script exists only from `:dom-engine:installDist`). `<resolved-consumer-classpath>` is `classpath.txt` or `classpath.cache` under the Workbench state root: the thin pickleball jar plus runtime libraries, including Jackson. `java -jar` on the thin jar is not that command.
 
 ```text
-java -jar pickleball-<version>.jar domengine session attach --cdp http://127.0.0.1:9222 --id <sessionId> --i-accept-local-attach --session-dir <directory>
+java -cp <resolved-consumer-classpath> tools.dscode.launcher.PickleballWorkbenchLauncher domengine session attach --cdp http://127.0.0.1:9222 --id <sessionId> --i-accept-local-attach --session-dir <directory>
 ```
 
 `<version>` is `3.0.0`. `composite session attach ...` in older examples is the same verb set. The command Pickleball itself runs is whatever path the locator or launcher resolved.
@@ -120,7 +120,7 @@ Drive the page with the engine CLI, MCP (`domengine serve --stdio`, or `composit
 Close the engine session before Pickleball stops the run or closes the browser.
 
 ```text
-java -jar pickleball-<version>.jar domengine session close --id <sessionId> --session-dir <directory>
+java -cp <resolved-consumer-classpath> tools.dscode.launcher.PickleballWorkbenchLauncher domengine session close --id <sessionId> --session-dir <directory>
 ```
 
 `composite session close ...` is the same verb set. `Session.close()` and `Client.close()` send that close. Closing a session this process did not launch sets `killed` false and does not stop Chrome or Edge. Detach drops the engine registry entry and the DevTools socket. It must not call WebDriver quit, must not kill the browser process, and must not delete the run directory.
@@ -188,17 +188,17 @@ The Java engine reports desktop `list`, `attach`, `walk`, `query`, `resolve`, `c
 When those two descriptor fields are set, the session is already attached. Do not attach again. Join it:
 
 ```text
-java -jar pickleball-<version>.jar domengine --session-dir <compositeSessionDir> query --session <compositeSessionId> --css 'body'
-java -jar pickleball-<version>.jar domengine --session-dir <compositeSessionDir> query --session <compositeSessionId> --css 'button' --wait-for visible --filter displayed --timeout-ms 2000
-java -jar pickleball-<version>.jar domengine --session-dir <compositeSessionDir> hover --session <compositeSessionId> --css 'button' --force-hover
-java -jar pickleball-<version>.jar domengine --session-dir <compositeSessionDir> query --session <compositeSessionId> --css '#inner' --frame <frameId>
-java -jar pickleball-<version>.jar domengine --session-dir <compositeSessionDir> click --session <compositeSessionId> --node-id <backendNodeId>
+java -cp <resolved-consumer-classpath> tools.dscode.launcher.PickleballWorkbenchLauncher domengine --session-dir <compositeSessionDir> query --session <compositeSessionId> --css 'body'
+java -cp <resolved-consumer-classpath> tools.dscode.launcher.PickleballWorkbenchLauncher domengine --session-dir <compositeSessionDir> query --session <compositeSessionId> --css 'button' --wait-for visible --filter displayed --timeout-ms 2000
+java -cp <resolved-consumer-classpath> tools.dscode.launcher.PickleballWorkbenchLauncher domengine --session-dir <compositeSessionDir> hover --session <compositeSessionId> --css 'button' --force-hover
+java -cp <resolved-consumer-classpath> tools.dscode.launcher.PickleballWorkbenchLauncher domengine --session-dir <compositeSessionDir> query --session <compositeSessionId> --css '#inner' --frame <frameId>
+java -cp <resolved-consumer-classpath> tools.dscode.launcher.PickleballWorkbenchLauncher domengine --session-dir <compositeSessionDir> click --session <compositeSessionId> --node-id <backendNodeId>
 ```
 
 The same directory is the MCP join:
 
 ```text
-java -jar pickleball-<version>.jar domengine --session-dir <compositeSessionDir> serve --stdio
+java -cp <resolved-consumer-classpath> tools.dscode.launcher.PickleballWorkbenchLauncher domengine --session-dir <compositeSessionDir> serve --stdio
 ```
 
 `composite --session-dir ...` is the same verb set on an explicit binary. Pass `compositeSessionId` on the later tool call. Close with `session close` only when you are the owner of that registry entry. If Pickleball started the provider, Pickleball closes it when the live session stops. Do not close it out from under a step that is still using it. Hold the session first.

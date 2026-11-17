@@ -2,6 +2,7 @@ package tools.dscode.workbench.engine;
 
 import tools.dscode.control.protocol.PickleballArtifactLocator;
 import tools.dscode.control.protocol.PickleballLocalLayout;
+import tools.dscode.workbench.launch.ConsumerClasspath;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
@@ -13,7 +14,8 @@ import java.util.Optional;
 
 /**
  * Workbench action that only forwards to the Pickleball {@code domengine} CLI.
- * This module does not link {@code dev.domengine} classes.
+ * This module does not link {@code dev.domengine} classes. The published jar
+ * stays thin: the child JVM is {@code java -cp} on the resolved consumer classpath.
  */
 public final class DomEngineCliForwarder {
     private DomEngineCliForwarder() {
@@ -32,7 +34,7 @@ public final class DomEngineCliForwarder {
         if (jar == null || !Files.isRegularFile(jar)) {
             return new Result(1, "", "error: pickleball jar was not found\nfix: Set -Dpkb.pickleball.jar or publish the jar.\n", List.of());
         }
-        List<String> command = command(jar, engineArgs);
+        List<String> command = command(jar, root, engineArgs);
         ProcessBuilder builder = new ProcessBuilder(command);
         builder.directory(root.toFile());
         try {
@@ -56,11 +58,13 @@ public final class DomEngineCliForwarder {
     }
 
     /** The process command. Tests assert this list without starting a JVM. */
-    public static List<String> command(Path jar, List<String> engineArgs) {
+    public static List<String> command(Path jar, Path project, List<String> engineArgs) {
+        Path root = project == null ? Path.of("").toAbsolutePath().normalize() : project.toAbsolutePath().normalize();
         List<String> command = new ArrayList<>();
         command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
-        command.add("-jar");
-        command.add(jar.toAbsolutePath().normalize().toString());
+        command.add("-cp");
+        command.add(ConsumerClasspath.joined(root, jar));
+        command.add(ConsumerClasspath.MAIN_CLASS);
         command.add("domengine");
         if (engineArgs != null) {
             for (String arg : engineArgs) {
