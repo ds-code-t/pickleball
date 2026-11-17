@@ -20,7 +20,7 @@ Commit and push after each phase. Finish with a scoreboard.
 ## Phase A: Integrity and bug fixes
 Implement every item in the roadmap Phase A.  
 Start with the Workbench freeze (A1) and the worker lock-up + watchdog (A2).  
-Then A3–A8 (A8 = the three store test failures from the last full regression).  
+Then A3–A9 (A8 = the three store test failures from the last full regression; A9 = empty Tracking and Store tabs, consumer report P2-24).  
 Update the roadmap scoreboard after the phase.  
 Named tests must pass. No weakened tests.
 
