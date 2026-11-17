@@ -5,7 +5,7 @@
 (function () {
   'use strict';
   if (typeof window === 'undefined' || typeof document === 'undefined' || !document.documentElement) return;
-  var VERSION = '3.0.0-p6';
+  var VERSION = '3.0.0-p7';
   if (window.__pkbUi && window.__pkbUi.version === VERSION) return;
   if (window.__pkbUi && typeof window.__pkbUi.dispose === 'function') {
     try { window.__pkbUi.dispose(); } catch (ignored) { /* older runtime */ }
@@ -675,6 +675,18 @@
     node.style.transform = 'translate3d(' + Math.round(x) + 'px,' + Math.round(y) + 'px,0)';
   }
 
+  // A step badge sits outside its target so it never covers a field's text: left of it, else
+  // above, else below; only when all three are cut off by the viewport does it go inside the corner.
+  var BADGE_GAP = 6;
+  function badgeSpot(r, bw, bh, vp) {
+    var midY = r.top + (r.height - bh) / 2;
+    if (r.left - bw - BADGE_GAP >= 0) return {x: r.left - bw - BADGE_GAP, y: midY};
+    var x = Math.max(0, r.left);
+    if (r.top - bh - BADGE_GAP >= 0) return {x: x, y: r.top - bh - BADGE_GAP};
+    if (r.bottom + BADGE_GAP + bh <= vp.h) return {x: x, y: r.bottom + BADGE_GAP};
+    return {x: x + 2, y: Math.max(0, r.top) + 2};
+  }
+
   function guidesUpdate(vp) {
     guides.forEach(function (g) {
       g.steps.forEach(function (step, i) {
@@ -694,8 +706,8 @@
         var vis = v.empty ? 'hidden' : '';
         step.badge.style.visibility = vis;
         step.ring.style.visibility = vis;
-        var bw = step.badge.offsetWidth || 22;
-        placeAt(step.badge, r.left - bw / 2, r.top - 11);
+        var b = badgeSpot(r, step.badge.offsetWidth || 22, step.badge.offsetHeight || 22, vp);
+        placeAt(step.badge, b.x, b.y);
         placeAt(step.ring, r.left, r.top);
         step.ring.style.width = Math.round(r.width) + 'px';
         step.ring.style.height = Math.round(r.height) + 'px';

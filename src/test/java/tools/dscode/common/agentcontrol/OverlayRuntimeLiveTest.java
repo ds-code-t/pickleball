@@ -700,4 +700,23 @@ class OverlayRuntimeLiveTest {
         assertTrue(bytes < 1536, "guided flow replies were " + bytes + " bytes: " + reply + events);
         OverlayFixtures.shot(browser, "p6-ui-apply");
     }
+
+    /** A step badge sits outside its target (never over the field's text), and flips when the left side is cut off. */
+    @Test
+    void guideBadgesSitOutsideTheirTargets() {
+        load("basic.html");
+        startGuide(THREE_STEPS);
+        frames(3);
+        for (int n = 1; n <= 3; n++) {
+            String id = n == 1 ? "email" : n == 2 ? "password" : "save";
+            Map<String, Object> badge = rect("var l=document.querySelector('[data-pkb-layer]'); var n=l&&l.shadowRoot.querySelectorAll('.badge')[" + (n - 1) + "];");
+            assertTrue(apart(target(id), badge), "badge " + n + " overlaps #" + id + ": " + badge + " vs " + target(id));
+        }
+        OverlayFixtures.shot(browser, "p4-guide-step3-v2");
+        browser.executeScript("document.body.style.margin='0'; document.getElementById('account').style.padding='0'; document.getElementById('account').style.border='0';");
+        frames(3);
+        Map<String, Object> flipped = rect("var l=document.querySelector('[data-pkb-layer]'); var n=l&&l.shadowRoot.querySelectorAll('.badge')[0];");
+        assertTrue(num(flipped, "l") >= 0, "badge left of the viewport: " + flipped);
+        assertTrue(apart(target("email"), flipped), "flipped badge overlaps #email: " + flipped);
+    }
 }
