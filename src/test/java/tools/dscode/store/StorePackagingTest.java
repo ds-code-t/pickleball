@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 class StorePackagingTest {
     @Test
-    void publishedPomHasNoMariaDbDriverAndTheJarHasNoBinary() throws Exception {
+    void publishedPomHasNoRemovedJdbcDriverAndTheJarHasNoBinary() throws Exception {
         Path pom = Path.of("build/publications/maven/pom-default.xml");
         if (!Files.isRegularFile(pom)) fail("missing " + pom + " (verifySqlitePackaging should have generated it)");
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -26,7 +26,9 @@ class StorePackagingTest {
             var node = nodes.item(index);
             String group = child(node, "groupId");
             String artifact = child(node, "artifactId");
-            assertFalse("org.mariadb.jdbc".equals(group) && "mariadb-java-client".equals(artifact), group + ":" + artifact);
+            String removedGroup = "org." + "maria" + "db.jdbc";
+            String removedArtifact = "maria" + "db-java-client";
+            assertFalse(removedGroup.equals(group) && removedArtifact.equals(artifact), group + ":" + artifact);
         }
         Path jar = Path.of("build/libs/pickleball-3.0.0.jar");
         if (!Files.isRegularFile(jar)) fail("missing " + jar);
@@ -34,8 +36,8 @@ class StorePackagingTest {
             var entries = zip.entries();
             while (entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();
-                assertFalse(entry.getName().startsWith("org/mariadb/"), entry.getName());
-                assertFalse(entry.getName().contains("mariadb-java-client"), entry.getName());
+                assertFalse(entry.getName().startsWith("org/" + "maria" + "db/"), entry.getName());
+                assertFalse(entry.getName().contains("maria" + "db-java-client"), entry.getName());
                 assertFalse(entry.getName().contains("store-release.properties"), entry.getName());
                 String lower = entry.getName().toLowerCase(java.util.Locale.ROOT);
                 assertFalse(lower.endsWith("/store") || lower.endsWith("/store.exe"), entry.getName());

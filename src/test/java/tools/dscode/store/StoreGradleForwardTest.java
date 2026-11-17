@@ -30,7 +30,7 @@ class StoreGradleForwardTest {
 
     @Test
     @Timeout(value = 8, unit = TimeUnit.MINUTES)
-    void everyDoltTaskResolvesArgumentsWithAndWithoutProperties() throws Exception {
+    void everyStoreTaskResolvesArgumentsWithAndWithoutProperties() throws Exception {
         Map<String, List<String>> plain = resolve(List.of());
         assertEquals(List.of("store", "status"), plain.get("storeStatus"));
         assertEquals(List.of("store", "hydrate"), plain.get("storeHydrate"));
@@ -117,11 +117,11 @@ class StoreGradleForwardTest {
                     def names = [%s]
                     names.each { name ->
                         def task = gradle.rootProject.tasks.named(name).get()
-                        println 'DOLT_TASK ' + name
-                        println 'DOLT_MAIN ' + String.valueOf(task.mainClass.get())
-                        println 'DOLT_KIND ' + task.class.name
-                        task.args.each { println 'DOLT_ARG ' + String.valueOf(it) }
-                        println 'DOLT_END'
+                        println 'STORE_TASK ' + name
+                        println 'STORE_MAIN ' + String.valueOf(task.mainClass.get())
+                        println 'STORE_KIND ' + task.class.name
+                        task.args.each { println 'STORE_ARG ' + String.valueOf(it) }
+                        println 'STORE_END'
                     }
                 }
                 """.formatted(TASKS.stream().map(name -> "'" + name + "'").reduce((a, b) -> a + ", " + b).orElse("")),
@@ -153,15 +153,15 @@ class StoreGradleForwardTest {
         Map<String, List<String>> resolved = new LinkedHashMap<>();
         String current = null;
         for (String line : text.split("\\R")) {
-            if (line.startsWith("DOLT_TASK ")) {
-                current = line.substring("DOLT_TASK ".length()).trim();
+            if (line.startsWith("STORE_TASK ")) {
+                current = line.substring("STORE_TASK ".length()).trim();
                 resolved.put(current, new ArrayList<>());
-            } else if (line.startsWith("DOLT_MAIN ")) {
-                assertEquals("tools.dscode.store.StoreCli", line.substring("DOLT_MAIN ".length()).trim(), current);
-            } else if (line.startsWith("DOLT_KIND ")) {
+            } else if (line.startsWith("STORE_MAIN ")) {
+                assertEquals("tools.dscode.store.StoreCli", line.substring("STORE_MAIN ".length()).trim(), current);
+            } else if (line.startsWith("STORE_KIND ")) {
                 assertTrue(line.contains("JavaExec"), line);
-            } else if (line.startsWith("DOLT_ARG ")) {
-                String arg = line.substring("DOLT_ARG ".length());
+            } else if (line.startsWith("STORE_ARG ")) {
+                String arg = line.substring("STORE_ARG ".length());
                 assertFalse(arg.contains("task ':"), arg);
                 resolved.get(current).add(arg);
             }

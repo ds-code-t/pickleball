@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EngineCliLaunchTest {
     @Test
-    void launcherRoutesEngineBeforeDoltAndWorkbench() {
+    void launcherRoutesEngineBeforeStoreAndWorkbench() {
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
         int code = PickleballWorkbenchLauncher.dispatchEngineIfAny(

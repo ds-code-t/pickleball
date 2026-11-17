@@ -69,7 +69,7 @@ public final class PickleballWorkbenchLauncher {
             if (logs != 0) exitProcess(logs);
             return;
         }
-        int store = dispatchDoltIfAny(args, System.out, System.err);
+        int store = dispatchStoreIfAny(args, System.out, System.err);
         if (store >= 0) {
             if (store != 0) exitProcess(store);
             return;
@@ -123,7 +123,7 @@ public final class PickleballWorkbenchLauncher {
      * Returns {@code -1} when {@code args} are not a {@code store} invocation.
      * This is not the Store binary.
      */
-    static int dispatchDoltIfAny(String[] args, PrintStream out, PrintStream err) {
+    static int dispatchStoreIfAny(String[] args, PrintStream out, PrintStream err) {
         if (!tools.dscode.store.StoreCli.handles(args)) return -1;
         return tools.dscode.store.StoreCli.execute(args, out, err);
     }

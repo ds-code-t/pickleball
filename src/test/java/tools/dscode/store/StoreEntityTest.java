@@ -119,7 +119,7 @@ class StoreEntityTest {
     }
 
     @Test
-    void entityReferenceResolvesOnlyWhenDoltIsOn() throws Exception {
+    void entityReferenceResolvesOnlyWhenStoreIsOn() throws Exception {
         Path file = project.resolve("store-entities/Account/ada.entity");
         Files.createDirectories(file.getParent());
         Files.write(file, StoreEntities.canonicalFile("Account", "ada", 1, CANONICAL));
@@ -151,7 +151,7 @@ class StoreEntityTest {
     }
 
     @Test
-    void entityReferenceInAScenarioReachesTheStepOnlyWhenDoltIsOn() throws Exception {
+    void entityReferenceInAScenarioReachesTheStepOnlyWhenStoreIsOn() throws Exception {
         Path features = project.resolve("features");
         Path entity = project.resolve("store-entities/Account/ada.entity");
         Files.createDirectories(features);

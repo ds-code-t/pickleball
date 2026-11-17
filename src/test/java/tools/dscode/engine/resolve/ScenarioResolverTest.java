@@ -47,7 +47,7 @@ class ScenarioResolverTest {
     }
 
     @Test
-    void resolvesADoltRow(@TempDir Path project) throws Exception {
+    void resolvesAStoreRow(@TempDir Path project) throws Exception {
         Path file = project.resolve("features/box.feature");
         Files.createDirectories(file.getParent());
         Files.writeString(file, FEATURE);

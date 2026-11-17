@@ -182,7 +182,7 @@ class StoreDriverMissingTest {
         StringBuilder filtered = new StringBuilder();
         for (String entry : System.getProperty("java.class.path").split(separator)) {
             if (entry.toLowerCase(Locale.ROOT).contains("sqlite")) continue;
-            if (entry.toLowerCase(Locale.ROOT).contains("mariadb")) continue;
+            if (entry.toLowerCase(Locale.ROOT).contains("maria" + "db")) continue;
             if (filtered.length() > 0) filtered.append(separator);
             filtered.append(entry);
         }

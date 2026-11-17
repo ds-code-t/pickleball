@@ -18,10 +18,10 @@ class StoreCliLaunchTest {
     Path project;
 
     @Test
-    void launcherRoutesDoltBeforeWorkbenchDispatch() {
+    void launcherRoutesStoreBeforeWorkbenchDispatch() {
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
-        int code = PickleballWorkbenchLauncher.dispatchDoltIfAny(
+        int code = PickleballWorkbenchLauncher.dispatchStoreIfAny(
                 new String[] {"store", "status", "--project=" + project},
                 new PrintStream(stdout, true, StandardCharsets.UTF_8),
                 new PrintStream(stderr, true, StandardCharsets.UTF_8)
@@ -30,7 +30,7 @@ class StoreCliLaunchTest {
         String out = stdout.toString(StandardCharsets.UTF_8);
         assertTrue(out.contains("Store database missing: .pickleball/store/main.db"), out);
         assertFalse(Files.exists(project.resolve(".pickleball")));
-        assertEquals(-1, PickleballWorkbenchLauncher.dispatchDoltIfAny(
+        assertEquals(-1, PickleballWorkbenchLauncher.dispatchStoreIfAny(
                 new String[] {"help"},
                 new PrintStream(new ByteArrayOutputStream()),
                 new PrintStream(new ByteArrayOutputStream())

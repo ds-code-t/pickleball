@@ -228,7 +228,7 @@ class StoreExecutionRecordingTest {
     }
 
     @Test
-    void cucumberEngineRecordsOutsideDoltRun() throws Exception {
+    void cucumberEngineRecordsOutsideStoreRun() throws Exception {
         Path feature = project.resolve("features/pay.feature");
         Files.createDirectories(feature.getParent());
         Files.writeString(feature, """

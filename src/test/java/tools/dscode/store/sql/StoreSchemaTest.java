@@ -34,7 +34,7 @@ class StoreSchemaTest {
     }
 
     @Test
-    void freshStoreIsDoltSchemaOneWithEveryTable() throws Exception {
+    void freshStoreIsStoreSchemaOneWithEveryTable() throws Exception {
         assertEquals("1", store.session().scalar("SELECT value FROM schema_meta WHERE `key` = 'store_schema'"));
         for (String table : SqlDialect.SOURCE_TABLES) {
             assertEquals(table, tableName(table), table);

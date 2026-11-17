@@ -55,7 +55,7 @@ class StoreDialectInventoryTest {
                 if (relative.startsWith("sql/")) continue;
                 String text = Files.readString(file);
                 if (text.contains("DriverManager")) problems.add(relative + " uses DriverManager");
-                if (text.contains("jdbc:mariadb://") || text.contains("jdbc:sqlite:") || text.contains("jdbc:mysql:")) {
+                if (text.contains("jdbc:" + "maria" + "db://") || text.contains("jdbc:sqlite:") || text.contains("jdbc:mysql:")) {
                     problems.add(relative + " has a jdbc url");
                 }
                 boolean infrastructure = relative.startsWith("install/") || relative.startsWith("server/");

@@ -940,6 +940,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/store/LargeFileReferenceTest.java`
 - `src/test/java/tools/dscode/store/LegacyNamesTest.java`
 - `src/test/java/tools/dscode/store/NoRuntimeDownloadTest.java`
+- `src/test/java/tools/dscode/store/RemovedNamesGateTest.java`
 - `src/test/java/tools/dscode/store/RenameGateTest.java`
 - `src/test/java/tools/dscode/store/SandboxCreateTimingTest.java`
 - `src/test/java/tools/dscode/store/SandboxIndependenceTest.java`

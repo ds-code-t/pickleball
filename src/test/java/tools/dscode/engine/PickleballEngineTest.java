@@ -36,7 +36,7 @@ class PickleballEngineTest {
             """;
 
     @Test
-    void runsFromTextAStepListAndADoltRowWithNothingElseOnDisk(@TempDir Path dir) throws Exception {
+    void runsFromTextAStepListAndAStoreRowWithNothingElseOnDisk(@TempDir Path dir) throws Exception {
         EngineOptions options = EngineOptions.of(EchoGlue.class).project(dir);
         RunResult text = PickleballEngine.run(FEATURE, options);
         assertEquals(Status.PASSED, text.status());

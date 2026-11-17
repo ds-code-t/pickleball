@@ -49,7 +49,7 @@ class StoreLegacyMigrationTest {
     }
 
     @Test
-    void removeLegacyDeletesTheDoltDirectory() throws Exception {
+    void removeLegacyDeletesTheLegacyDirectory() throws Exception {
         seed();
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();

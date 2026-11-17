@@ -78,7 +78,7 @@ class GherkinEngineParserTest {
     }
 
     @Test
-    void memoryFileStepListAndDoltSourcesLoad(@TempDir Path project) throws Exception {
+    void memoryFileStepListAndStoreSourcesLoad(@TempDir Path project) throws Exception {
         EngineFeature memory = new MemoryScenarioSource(FEATURE).load().getFirst();
         assertEquals("Box", memory.name());
         Path file = project.resolve("features/box.feature");

@@ -322,7 +322,7 @@ public final class CompositeRuntime {
      * Optional Store note. The engine stays usable when Store is off.
      * This adapter writes one line; it does not open the Store database.
      */
-    private static void recordDolt(Sources sources, Path binary, String version) {
+    private static void recordStore(Sources sources, Path binary, String version) {
         String flag = CompositeMode.read("pkb_store", sources);
         if (flag == null || !(flag.equalsIgnoreCase("true") || "1".equals(flag))) return;
         Path root = sources.project() == null ? Path.of("") : sources.project();
@@ -372,7 +372,7 @@ public final class CompositeRuntime {
             String version = opened.version().path("version").asText("");
             client = opened;
             CompositeLog.info("session", "client " + binary.get() + " version " + version);
-            recordDolt(sources, binary.get(), version);
+            recordStore(sources, binary.get(), version);
             return new Decision(true, binary.get(), version, "composite");
         } catch (RuntimeException failure) {
             CompositeLog.fallbackOnce(

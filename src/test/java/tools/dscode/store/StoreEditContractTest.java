@@ -24,18 +24,18 @@ class StoreEditContractTest {
     @TempDir
     Path project;
 
-    private String previousDolt;
+    private String previousStore;
 
     @BeforeEach
     void filePathIsTheOptOutTheseAssertionsCover() {
-        previousDolt = System.getProperty("pkb_store");
+        previousStore = System.getProperty("pkb_store");
         System.setProperty("pkb_store", "false");
     }
 
     @AfterEach
-    void restoreDoltFlag() {
-        if (previousDolt == null) System.clearProperty("pkb_store");
-        else System.setProperty("pkb_store", previousDolt);
+    void restoreStoreFlag() {
+        if (previousStore == null) System.clearProperty("pkb_store");
+        else System.setProperty("pkb_store", previousStore);
     }
 
     @Test

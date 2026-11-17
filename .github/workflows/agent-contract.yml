@@ -90,6 +90,10 @@ jobs:
             --tests tools.dscode.store.SandboxMergeConflictTest \
             --tests tools.dscode.store.SandboxMergeTimingTest \
             --tests tools.dscode.store.ChangesCliTest \
+            --tests 'tools.dscode.store.NoDo*' \
+            --tests tools.dscode.docs.CurrentDocsTest \
+            --tests tools.dscode.store.RenameGateTest \
+            --tests tools.dscode.common.composite.NoRustLeftTest \
             --tests tools.dscode.store.StoreFileReleaseTest
           grep -h 'SANDBOX_CREATE_MS' build/test-results/test/TEST-tools.dscode.store.SandboxCreateTimingTest.xml | head -20 >> "$GITHUB_STEP_SUMMARY" || true
           grep -h 'SANDBOX_MERGE_MS' build/test-results/test/TEST-tools.dscode.store.SandboxMergeTimingTest.xml | head -20 >> "$GITHUB_STEP_SUMMARY" || true
@@ -215,6 +219,10 @@ jobs:
             --tests tools.dscode.store.SandboxMergeConflictTest \
             --tests tools.dscode.store.SandboxMergeTimingTest \
             --tests tools.dscode.store.ChangesCliTest \
+            --tests 'tools.dscode.store.NoDo*' \
+            --tests tools.dscode.docs.CurrentDocsTest \
+            --tests tools.dscode.store.RenameGateTest \
+            --tests tools.dscode.common.composite.NoRustLeftTest \
             --tests tools.dscode.store.StoreFileReleaseTest
           grep -h 'SANDBOX_CREATE_MS' build/test-results/test/TEST-tools.dscode.store.SandboxCreateTimingTest.xml | head -20 >> "$GITHUB_STEP_SUMMARY" || true
           grep -h 'SANDBOX_MERGE_MS' build/test-results/test/TEST-tools.dscode.store.SandboxMergeTimingTest.xml | head -20 >> "$GITHUB_STEP_SUMMARY" || true
@@ -347,6 +355,10 @@ jobs:
             --tests tools.dscode.store.SandboxMergeConflictTest \
             --tests tools.dscode.store.SandboxMergeTimingTest \
             --tests tools.dscode.store.ChangesCliTest \
+            --tests 'tools.dscode.store.NoDo*' \
+            --tests tools.dscode.docs.CurrentDocsTest \
+            --tests tools.dscode.store.RenameGateTest \
+            --tests tools.dscode.common.composite.NoRustLeftTest \
             --tests tools.dscode.store.StoreFileReleaseTest
           grep -h 'SANDBOX_CREATE_MS' build/test-results/test/TEST-tools.dscode.store.SandboxCreateTimingTest.xml | head -20 >> "$GITHUB_STEP_SUMMARY" || true
           grep -h 'SANDBOX_MERGE_MS' build/test-results/test/TEST-tools.dscode.store.SandboxMergeTimingTest.xml | head -20 >> "$GITHUB_STEP_SUMMARY" || true

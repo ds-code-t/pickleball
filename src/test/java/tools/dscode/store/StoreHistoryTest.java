@@ -129,7 +129,7 @@ class StoreHistoryTest {
     }
 
     @Test
-    void gradleTasksForwardToTheDoltCli() throws Exception {
+    void gradleTasksForwardToTheStoreCli() throws Exception {
         String gradle = Files.readString(Path.of("build.gradle"), StandardCharsets.UTF_8);
         assertTrue(gradle.contains("tasks.register('storeStatus'"), excerpt(gradle, "tasks.register('storeStatus'"));
         assertTrue(gradle.contains("tasks.register('storeHydrate'"), excerpt(gradle, "tasks.register('storeHydrate'"));

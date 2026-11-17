@@ -17,7 +17,7 @@ class StoreFeatureLoadHookTest {
     Path project;
 
     @Test
-    void fileLoadDoesNotHydrateWhenDoltIsOff() {
+    void fileLoadDoesNotHydrateWhenStoreIsOff() {
         String previous = System.getProperty("pkb_store");
         String previousProject = System.getProperty("pkb_store_project");
         try {
@@ -36,7 +36,7 @@ class StoreFeatureLoadHookTest {
     }
 
     @Test
-    void fileLoadHydratesWhenDoltIsOn() throws Exception {
+    void fileLoadHydratesWhenStoreIsOn() throws Exception {
         String previous = System.getProperty("pkb_store");
         String previousProject = System.getProperty("pkb_store_project");
         try {

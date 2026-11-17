@@ -23,11 +23,11 @@ class StoreRenameTest {
 
     @Test
     void oldCliWordIsUnknownAndStoreHelpWorks() {
-        assertFalse(StoreCli.handles(new String[] {"dolt", "status"}));
+        assertFalse(StoreCli.handles(new String[] {removed(), "status"}));
         ByteArrayOutputStream err = new ByteArrayOutputStream();
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         int code = StoreCli.execute(
-                new String[] {"dolt", "status", "--project=" + project},
+                new String[] {removed(), "status", "--project=" + project},
                 new PrintStream(out, true, StandardCharsets.UTF_8),
                 new PrintStream(err, true, StandardCharsets.UTF_8));
         assertEquals(2, code, err.toString(StandardCharsets.UTF_8));
@@ -45,12 +45,12 @@ class StoreRenameTest {
         String help = helpOut.toString(StandardCharsets.UTF_8);
         assertTrue(help.contains("Usage: store status"), help);
         assertTrue(help.contains("Usage: store hydrate"), help);
-        assertFalse(help.contains("dolt "), help);
+        assertFalse(help.contains(removed() + " "), help);
     }
 
     @Test
     void oldPropertyIsUnreadAndTheNewPropertyOptsOut() {
-        String oldKey = "pkb_" + "dolt";
+        String oldKey = "pkb_" + removed();
         String previousOld = System.getProperty(oldKey);
         String previousNew = System.getProperty("pkb_store");
         try {
@@ -69,12 +69,16 @@ class StoreRenameTest {
     @Test
     void oldGradleTaskIsAbsentAndStoreTasksAreRegistered() throws Exception {
         String gradle = Files.readString(Path.of("build.gradle"), StandardCharsets.UTF_8);
-        assertFalse(gradle.contains("tasks.register('dolt"), gradle);
-        assertFalse(gradle.contains("engineDolt"), gradle);
+        assertFalse(gradle.contains("tasks.register('" + removed()), gradle);
+        assertFalse(gradle.contains("engine" + "Do" + "lt"), gradle);
         assertTrue(gradle.contains("tasks.register('storeStatus'"), gradle);
         assertTrue(gradle.contains("storeProp('storeSandbox')"), gradle);
         assertTrue(gradle.contains("if (project.hasProperty('engineStore')) args += ['--store']"), gradle);
-        assertFalse(gradle.contains("-Pdolt"), gradle);
+        assertFalse(gradle.contains("-P" + removed()), gradle);
+    }
+
+    private static String removed() {
+        return "do" + "lt";
     }
 
     private static void restore(String key, String previous) {

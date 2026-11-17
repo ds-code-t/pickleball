@@ -25,7 +25,7 @@ class StoreLinkedTrackingSmokeTest {
 
     @Test
     void linkedRowsQueryTimelineAndRetainLeaveDefinitionsAndReports() throws Exception {
-        String previousDolt = System.getProperty("pkb_store");
+        String previousStore = System.getProperty("pkb_store");
         String previousProject = System.getProperty("pkb_store_project");
         String previousLog = System.getProperty("pkb_store_log");
         try {
@@ -116,7 +116,7 @@ class StoreLinkedTrackingSmokeTest {
             assertFalse(after.out.contains("old-run"), after.out);
             assertTrue(after.out.contains("new-run"), after.out);
         } finally {
-            restore("pkb_store", previousDolt);
+            restore("pkb_store", previousStore);
             restore("pkb_store_project", previousProject);
             restore("pkb_store_log", previousLog);
             StoreRunContext.clear();

@@ -14,7 +14,7 @@ class StoreCliForwarderTest {
     Path project;
 
     @Test
-    void commandForwardsToTheDoltCli() {
+    void commandForwardsToTheStoreCli() {
         Path jar = Path.of("pickleball.jar");
         List<String> command = StoreCliForwarder.command(jar, project, List.of("status"));
         assertEquals("store", command.get(3));

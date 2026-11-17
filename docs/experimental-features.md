@@ -84,7 +84,7 @@ Values come back from `ResultSet.getObject` as follows:
 
 Each call opens a new connection and closes it. There is no pool.
 
-Pickleball publishes these drivers as dependencies: PostgreSQL, Microsoft SQL Server, Oracle ojdbc, MariaDB (use this for MySQL as well), and H2. The MySQL Connector/J driver is not included.
+Pickleball publishes these drivers as dependencies: PostgreSQL, Microsoft SQL Server, Oracle ojdbc, and H2. The MySQL Connector/J driver is not included.
 
 ```gherkin
 * MAP "REQUEST" TABLE VALUES TO SCENARIO MAP

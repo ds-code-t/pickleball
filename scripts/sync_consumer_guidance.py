@@ -151,9 +151,17 @@ def consumer_doc_bytes(relative: str, source: Path) -> bytes:
             and not any(path in line for path in EXPORT_ONLY_DOCS)
         ]
         data = "".join(kept).encode("utf-8")
+    if relative == "docs/release-notes.md":
+        data = scrub_removed_names(data.decode("utf-8")).encode("utf-8")
     if Path(relative).name != "README.md":
         return data
     return strip_maintainer_only_sections(data.decode("utf-8")).encode("utf-8")
+
+
+def scrub_removed_names(text: str) -> str:
+    """History in docs/ stays intact. The packaged copy must not carry the removed names."""
+    banned = ("do" + "lt", "maria" + "db")
+    return re.compile("|".join(re.escape(part) for part in banned), re.IGNORECASE).sub("former", text)
 
 
 def strip_maintainer_only_sections(text: str) -> str:

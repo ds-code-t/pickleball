@@ -393,7 +393,7 @@ final class WorkbenchMcpTools {
                                 "items", Map.of("type", "string")
                         )
                 ), "args"),
-                arguments -> forwardDolt(arguments.get("args")));
+                arguments -> forwardStore(arguments.get("args")));
         add("engine",
                 "Forward arguments to the pickleball engine CLI. Does not run steps inside Workbench.",
                 schema(Map.of(
@@ -427,7 +427,7 @@ final class WorkbenchMcpTools {
         });
     }
 
-    private Object forwardDolt(Object rawArgs) {
+    private Object forwardStore(Object rawArgs) {
         List<String> args = new ArrayList<>();
         if (rawArgs instanceof List<?> list) {
             for (Object item : list) {

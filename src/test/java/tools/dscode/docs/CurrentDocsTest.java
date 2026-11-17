@@ -74,12 +74,12 @@ class CurrentDocsTest {
                     hits.add(rel + ":" + n + ": pkb_composite=auto starts the engine: " + clip(line));
                 }
             }
-            optInNextToDolt(rel, text, hits);
+            optInNextToStore(rel, text, hits);
         }
         assertTrue(hits.isEmpty(), String.join("\n", hits));
     }
 
-    private static void optInNextToDolt(String rel, String text, List<String> hits) {
+    private static void optInNextToStore(String rel, String text, List<String> hits) {
         List<Integer> store = starts(STORE, text);
         List<Integer> optIn = starts(OPT_IN, text);
         for (int d : store) {
