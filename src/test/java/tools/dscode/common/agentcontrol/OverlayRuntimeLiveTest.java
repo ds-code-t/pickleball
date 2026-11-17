@@ -461,4 +461,120 @@ class OverlayRuntimeLiveTest {
         assertEquals(0, closed.exit(), String.valueOf(closed.body()));
         assertEquals(0L, ((Number) browser.executeScript("return document.querySelectorAll('[data-pkb-layer]').length")).longValue());
     }
+
+    // ---- P4: guided steps ----
+
+    private static final String THREE_STEPS = "[{\"t\":\"#email\",\"say\":\"Type your email\",\"do\":\"input\",\"capture\":true},"
+            + "{\"t\":\"#password\",\"say\":\"Type your password\",\"do\":\"input\",\"capture\":true},"
+            + "{\"t\":\"#save\",\"say\":\"Click Save\",\"do\":\"click\"}]";
+
+    private AgentControl.Result startGuide(String steps) {
+        AgentControl.Result started = run("guide", Map.of("steps", steps));
+        assertEquals(0, started.exit(), String.valueOf(started.body()));
+        return started;
+    }
+
+    /** Badge states read from the layer: "current", "done" or "todo" per step number. */
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> stateFromBadges() {
+        return (List<Map<String, Object>>) browser.executeScript("var l=document.querySelector('[data-pkb-layer]'); if(!l) return [];"
+                + "return Array.from(l.shadowRoot.querySelectorAll('.badge')).map(function(b,i){ return {n:i+1, state:b.className.replace('badge ','')}; });");
+    }
+
+    private String badge(int n) {
+        return String.valueOf(stateFromBadges().get(n - 1).get("state"));
+    }
+
+    /** Waits (up to five seconds) for step n's badge to reach the state; typing settles before a step completes. */
+    private void awaitBadge(int n, String state) {
+        long end = System.currentTimeMillis() + 5000;
+        while (!state.equals(badge(n)) && System.currentTimeMillis() < end) frames(1);
+        assertEquals(state, badge(n), "step " + n);
+    }
+
+    /** Item 7: typing into the step-1 field completes step 1 and makes step 2 current. */
+    @Test
+    void guideAdvancesOnInput() throws Exception {
+        load("basic.html");
+        AgentControl.Result started = startGuide(THREE_STEPS);
+        assertEquals(3, ((Number) started.body().get("steps")).intValue());
+        assertEquals("[]", String.valueOf(started.body().get("miss")));
+        assertEquals("current", badge(1));
+        assertEquals("todo", badge(2));
+        browser.findElement(By.id("email")).sendKeys("me@example.test");
+        assertEquals("current", badge(1), "one keystroke must not complete the step");
+        awaitBadge(1, "done");
+        assertEquals("current", badge(2));
+        OverlayFixtures.shot(browser, "p4-guide-step2");
+        String events = String.valueOf(run("overlay-poll", Map.of()).body().get("events"));
+        assertTrue(events.contains("type=step") && events.contains("s=1") && events.contains("me@example.test"), events);
+    }
+
+    /** Item 7: a click step completes on the click; the last step closes the guide with a guide-done event. */
+    @Test
+    void guideClickStep() {
+        load("basic.html");
+        startGuide("[{\"t\":\"#save\",\"say\":\"Click Save\",\"do\":\"click\"}]");
+        browser.findElement(By.id("save")).click();
+        frames(2);
+        assertEquals("done", badge(1));
+        String events = String.valueOf(run("overlay-poll", Map.of()).body().get("events"));
+        assertTrue(events.contains("how=click") && events.contains("type=guide"), events);
+        AgentControl.Result done = run("guide-done", Map.of());
+        assertEquals(0, done.exit(), String.valueOf(done.body()));
+        assertTrue(stateFromBadges().isEmpty(), "guide visuals left behind");
+    }
+
+    /** Password values never reach the event file, even with capture:true. */
+    @Test
+    void passwordValueNeverRecorded() throws Exception {
+        load("basic.html");
+        startGuide(THREE_STEPS);
+        browser.findElement(By.id("email")).sendKeys("me@example.test");
+        awaitBadge(2, "current");
+        browser.findElement(By.id("password")).sendKeys("Hunter2-Secret!");
+        awaitBadge(3, "current");
+        AgentControl.Result polled = run("overlay-poll", Map.of());
+        String events = String.valueOf(polled.body().get("events"));
+        assertTrue(events.contains("s=2") && events.contains("filled=true"), events);
+        Path agentDir = AgentStore.root(project, "overlay-live");
+        try (var files = java.nio.file.Files.walk(agentDir)) {
+            for (Path file : files.filter(java.nio.file.Files::isRegularFile).toList()) {
+                String body = java.nio.file.Files.readString(file);
+                assertFalse(body.contains("Hunter2"), "password text stored in " + file);
+            }
+        }
+        OverlayFixtures.shot(browser, "p4-guide-step3");
+    }
+
+    /** The step-3 target is re-rendered by the page; its ring follows the new node. */
+    @Test
+    void guideSurvivesRerender() {
+        load("basic.html");
+        startGuide(THREE_STEPS);
+        run("guide-next", Map.of());
+        run("guide-next", Map.of());
+        assertEquals("current", badge(3));
+        browser.findElement(By.id("grow")).click();
+        browser.findElement(By.id("rerender")).click();
+        frames(3);
+        Map<String, Object> ring = rect("var l=document.querySelector('[data-pkb-layer]'); var n=l&&l.shadowRoot.querySelectorAll('.ring')[2];");
+        assertSameBox(target("save"), ring);
+        AgentControl.Result back = run("guide-back", Map.of());
+        assertEquals(0, back.exit(), String.valueOf(back.body()));
+        assertEquals(2, ((Number) back.body().get("current")).intValue());
+    }
+
+    /** ask with choices returns the person's pick as an answer event. */
+    @Test
+    void askConfirmReturnsTheChoice() {
+        load("basic.html");
+        AgentControl.Result asked = run("ask", Map.of("say", "Use the Pro plan?", "choices", "Yes,No", "handle", "plan"));
+        assertEquals(0, asked.exit(), String.valueOf(asked.body()));
+        frames(2);
+        OverlayFixtures.shot(browser, "p4-ask-confirm");
+        layerRoot().findElement(By.cssSelector(".ask button.secondary")).click();
+        String events = String.valueOf(run("overlay-poll", Map.of()).body().get("events"));
+        assertTrue(events.contains("type=answer") && events.contains("value=No"), events);
+    }
 }

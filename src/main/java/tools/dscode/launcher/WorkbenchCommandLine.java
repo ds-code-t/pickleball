@@ -37,6 +37,7 @@ final class WorkbenchCommandLine {
             "spotlight", "unspotlight",
             "html-write", "html-replace", "html-insert", "html-remove", "html-cleanup",
             "popup-open", "popup-status", "popup-close",
+            "guide", "guide-next", "guide-back", "guide-done", "ask",
             "panel-open", "panel-close",
             "capture-scenario",
             "help"

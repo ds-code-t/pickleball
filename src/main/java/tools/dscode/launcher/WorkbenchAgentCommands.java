@@ -138,6 +138,7 @@ public final class WorkbenchAgentCommands {
                      "magnifier", "unmagnifier", "spotlight", "unspotlight",
                      "html-write", "html-replace", "html-insert", "html-remove", "html-cleanup",
                      "popup-open", "popup-status", "popup-close",
+                     "guide", "guide-next", "guide-back", "guide-done", "ask",
                      "panel-open", "panel-close",
                      "capture-scenario" -> agentControl(parsed, safeOut, safeErr);
                 case "help" -> help(args, safeOut, safeErr);
@@ -1897,6 +1898,11 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "tab");
         copyFlag(args, parsed, "title");
         copyFlag(args, parsed, "minimized");
+        copyFlag(args, parsed, "steps");
+        copyFlag(args, parsed, "scroll");
+        copyFlag(args, parsed, "say");
+        copyFlag(args, parsed, "choices");
+        copyFlag(args, parsed, "sensitive");
         if ("arrow".equals(parsed.command())) {
             if (parsed.coordination().inboxFrom() != null) args.put("from", parsed.coordination().inboxFrom());
             if (parsed.coordination().inboxTo() != null) args.put("to", parsed.coordination().inboxTo());

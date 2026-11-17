@@ -14,6 +14,7 @@
     ],
     "agentCore": [
       "arrow",
+      "ask",
       "border",
       "capture-scenario",
       "chat-history",
@@ -27,6 +28,10 @@
       "finish",
       "gc-runs",
       "gc-versions",
+      "guide",
+      "guide-back",
+      "guide-done",
+      "guide-next",
       "help",
       "highlight",
       "hint",

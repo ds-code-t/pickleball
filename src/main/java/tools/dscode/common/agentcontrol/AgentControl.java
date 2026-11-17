@@ -93,6 +93,11 @@ public final class AgentControl {
                 case "chat-poll" -> chatPoll(project, runId, values);
                 case "panel-open" -> panelOpen(project, runId, values, extraArgs, agentId);
                 case "panel-close" -> panelClose(project, runId, values, extraArgs, agentId);
+                case "guide" -> guide(project, runId, values);
+                case "guide-next" -> guideMove(project, runId, values, 1);
+                case "guide-back" -> guideMove(project, runId, values, -1);
+                case "guide-done" -> guideDone(project, runId, values);
+                case "ask" -> ask(project, runId, values);
                 case "highlight" -> highlight(project, runId, values);
                 case "unhighlight" -> unhighlight(project, runId, values);
                 case "overlay" -> overlay(project, runId, values);
@@ -301,6 +306,111 @@ public final class AgentControl {
         body.put("op", "panel-open");
         body.put("target", "page");
         body.put("panel", AgentStore.JSON.readValue(reply, Map.class));
+        return new Result(0, body);
+    }
+
+    private static final java.util.Set<String> STEP_ACTIONS = java.util.Set.of("click", "input", "select", "check", "any");
+
+    /** Reads {@code --steps} as a JSON array, or {@code @file} relative to the project. */
+    @SuppressWarnings("unchecked")
+    static List<Map<String, Object>> guideSteps(Path project, String raw) throws Exception {
+        if (!present(raw)) throw new IllegalArgumentException("guide requires --steps=<json array> or --steps=@file.json");
+        String text = raw.trim();
+        if (text.startsWith("@")) {
+            Path file = Path.of(text.substring(1));
+            if (!file.isAbsolute() && project != null) file = project.resolve(file);
+            text = java.nio.file.Files.readString(file);
+        }
+        Object parsed;
+        try {
+            parsed = AgentStore.JSON.readValue(text, Object.class);
+        } catch (java.io.IOException failure) {
+            throw new IllegalArgumentException("guide --steps is not valid JSON: " + failure.getMessage().lines().findFirst().orElse(""));
+        }
+        if (!(parsed instanceof List<?> list) || list.isEmpty()) throw new IllegalArgumentException("guide --steps must be a non-empty JSON array");
+        if (list.size() > 50) throw new IllegalArgumentException("guide --steps holds at most 50 steps");
+        List<Map<String, Object>> steps = new ArrayList<>();
+        int n = 0;
+        for (Object item : list) {
+            n++;
+            if (!(item instanceof Map<?, ?> map)) throw new IllegalArgumentException("guide step " + n + " must be an object with t and say");
+            Object t = map.get("t");
+            Object say = map.get("say");
+            if (t == null || String.valueOf(t).isBlank() || say == null || String.valueOf(say).isBlank()) {
+                throw new IllegalArgumentException("guide step " + n + " needs t (target) and say (instruction)");
+            }
+            Object action = map.get("do");
+            if (action != null && !STEP_ACTIONS.contains(String.valueOf(action))) {
+                throw new IllegalArgumentException("guide step " + n + " do must be click, input, select, check, or any");
+            }
+            steps.add((Map<String, Object>) map);
+        }
+        return steps;
+    }
+
+    private static Result guide(Path project, String runId, Map<String, String> args) throws Exception {
+        List<Map<String, Object>> steps = guideSteps(project, args.get("steps"));
+        if (!PageSurfaces.hasLivePage()) return fail(1, "guide needs a live browser page; run launch first");
+        Map<String, Object> spec = new LinkedHashMap<>();
+        spec.put("id", present(args.get("id")) ? args.get("id").trim() : "g1");
+        spec.put("steps", steps);
+        spec.put("scroll", "true".equalsIgnoreCase(String.valueOf(args.get("scroll"))));
+        String reply = PageSurfaces.runtimeCall("guide", spec, true);
+        if (reply == null || "null".equals(reply)) return fail(1, "guide did not start on the page");
+        CompositeLog.info("guide", "start " + reply);
+        Map<String, Object> body = ok("Guide shown on the page; steps advance as the person acts.");
+        body.put("op", "guide");
+        body.putAll(AgentStore.JSON.readValue(reply, Map.class));
+        return new Result(0, body);
+    }
+
+    private static Result guideMove(Path project, String runId, Map<String, String> args, int delta) throws Exception {
+        if (!PageSurfaces.hasLivePage()) return fail(1, "no live browser page holds a guide");
+        Map<String, Object> spec = new LinkedHashMap<>();
+        spec.put("id", present(args.get("id")) ? args.get("id").trim() : "g1");
+        spec.put("delta", delta);
+        String reply = PageSurfaces.runtimeCall("guideMove", spec, false);
+        if (reply == null || "null".equals(reply)) return fail(1, "no guide " + spec.get("id") + " on the page");
+        CompositeLog.info("guide", (delta > 0 ? "next " : "back ") + reply);
+        Map<String, Object> body = ok(delta > 0 ? "Guide moved to the next step." : "Guide moved back one step.");
+        body.put("op", delta > 0 ? "guide-next" : "guide-back");
+        body.putAll(AgentStore.JSON.readValue(reply, Map.class));
+        return new Result(0, body);
+    }
+
+    private static Result guideDone(Path project, String runId, Map<String, String> args) throws Exception {
+        if (!PageSurfaces.hasLivePage()) return fail(1, "no live browser page holds a guide");
+        Map<String, Object> spec = new LinkedHashMap<>();
+        spec.put("id", present(args.get("id")) ? args.get("id").trim() : "g1");
+        String reply = PageSurfaces.runtimeCall("guideDone", spec, false);
+        if (reply == null || "null".equals(reply)) return fail(1, "no guide " + spec.get("id") + " on the page");
+        CompositeLog.info("guide", "done " + reply);
+        Map<String, Object> body = ok("Guide closed.");
+        body.put("op", "guide-done");
+        body.putAll(AgentStore.JSON.readValue(reply, Map.class));
+        return new Result(0, body);
+    }
+
+    private static Result ask(Path project, String runId, Map<String, String> args) throws Exception {
+        if (!present(args.get("say"))) return fail(2, "ask requires --say=<question>");
+        Map<String, Object> spec = new LinkedHashMap<>();
+        spec.put("id", present(args.get("id")) ? args.get("id").trim() : "q1");
+        spec.put("say", args.get("say").trim());
+        if (present(args.get("choices"))) {
+            List<String> choices = new ArrayList<>();
+            for (String choice : args.get("choices").split(",")) if (!choice.isBlank()) choices.add(choice.trim());
+            if (choices.size() > 6) return fail(2, "ask --choices holds at most 6 answers");
+            spec.put("choices", choices);
+        }
+        if (!PageSurfaces.hasLivePage()) return fail(1, "ask needs a live browser page; run launch first");
+        if (present(args.get("handle"))) spec.put("t", args.get("handle").trim());
+        if ("true".equalsIgnoreCase(String.valueOf(args.get("sensitive")))) spec.put("sensitive", true);
+        String reply = PageSurfaces.runtimeCall("ask", spec, true);
+        if (reply == null || "null".equals(reply)) return fail(1, "ask did not show on the page");
+        CompositeLog.info("ui", "ask " + reply);
+        Map<String, Object> body = ok("Question shown on the page; the answer arrives as an answer event in overlay-poll.");
+        body.put("op", "ask");
+        body.putAll(AgentStore.JSON.readValue(reply, Map.class));
         return new Result(0, body);
     }
 

@@ -566,6 +566,11 @@ final class PageSurfaces {
 
     static void recordInput(Path project, String runId, Map<String, String> event) throws IOException {
         Map<String, Object> row = new LinkedHashMap<>(event);
+        // Values typed into password, card, or one-time-code fields are never stored, whatever the page sent.
+        if ("true".equals(event.get("sensitive"))) {
+            row.remove("value");
+            row.put("filled", "true");
+        }
         row.put("at", AgentStore.now());
         row.put("codes", List.of("agent_injected", "overlay"));
         row.put("sentence", OVERLAY_SENTENCE);
