@@ -801,6 +801,34 @@ class AgentExpansionTest {
         assertEquals(2, tooMany.code, tooMany.out + tooMany.err);
     }
 
+    @Test
+    void covers_command_ui_apply() {
+        Capture bad = agent("ui-apply", temp.toString(), "--run-id=ui", "--ops=[{\"c\":\"toast\"}]");
+        assertEquals(2, bad.code, bad.out + bad.err);
+        assertTrue((bad.out + bad.err).contains("unknown component toast") && (bad.out + bad.err).contains("fix:"), bad.out + bad.err);
+        Capture noPage = agent("ui-apply", temp.toString(), "--run-id=ui", "--ops=[{\"c\":\"label\",\"t\":\"#a\",\"text\":\"A\"}]");
+        assertEquals(1, noPage.code, noPage.out + noPage.err);
+        assertTrue((noPage.out + noPage.err).contains("live browser page"), noPage.out + noPage.err);
+    }
+
+    @Test
+    void covers_command_ui_poll() {
+        Capture polled = agent("ui-poll", temp.toString(), "--run-id=ui");
+        assertEquals(0, polled.code, polled.out + polled.err);
+        assertTrue(polled.out.contains("\"events\"") && polled.out.contains("\"chat\""), polled.out);
+        Capture bad = agent("ui-poll", temp.toString(), "--run-id=ui", "--wait=soon");
+        assertEquals(2, bad.code, bad.out + bad.err);
+    }
+
+    @Test
+    void covers_command_ui_catalog() {
+        Capture all = agent("ui-catalog", temp.toString());
+        assertEquals(0, all.code, all.out + all.err);
+        assertTrue(all.out.contains("\"guide\"") && all.out.contains("\"eg\""), all.out);
+        Capture bad = agent("ui-catalog", temp.toString(), "--component=toast");
+        assertEquals(2, bad.code, bad.out + bad.err);
+    }
+
     private Capture agent(String... args) {
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();

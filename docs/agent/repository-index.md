@@ -263,6 +263,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentcontrol/PopupSurfaceBridge.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ScenarioCapture.java`
 - `src/main/java/tools/dscode/common/agentcontrol/SurfaceBox.java`
+- `src/main/java/tools/dscode/common/agentcontrol/UiBatch.java`
+- `src/main/java/tools/dscode/common/agentcontrol/UiCatalog.java`
 - `src/main/java/tools/dscode/common/agentcontrol/UiState.java`
 - `src/main/java/tools/dscode/common/agentcontrol/VisualKinds.java`
 - `src/main/java/tools/dscode/common/agentcontrol/WindowRegistry.java`
@@ -779,6 +781,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentcontrol/OverlayPollCursorTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/OverlayRuntimeLiveTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/SurfaceIdChild.java`
+- `src/test/java/tools/dscode/common/agentcontrol/UiBatchTest.java`
+- `src/test/java/tools/dscode/common/agentcontrol/UiCatalogTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/UiStateTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/AgentSurfaceRouterTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/live/AgentSurfacePopupLiveTest.java`
@@ -1257,6 +1261,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/McpRegistry.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/popup/PopupMcpCommands.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/SnapshotCommand.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/ui/WorkbenchUiTools.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/WorkbenchAttachServer.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/WorkbenchCommandQueue.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/WorkbenchMcpServer.java`
@@ -1341,6 +1346,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/log/LogCliForwarderTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mapping/MappingValueCodecTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/popup/PopupMcpCommandsTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/ui/WorkbenchUiToolsTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchAttachServerProgressTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchAttachServerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchCommandQueueTest.java`

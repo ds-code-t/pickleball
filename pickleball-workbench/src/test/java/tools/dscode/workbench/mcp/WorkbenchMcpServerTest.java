@@ -103,7 +103,10 @@ class WorkbenchMcpServerTest {
             "surfaces",
             "agent_popup_open",
             "agent_popup_status",
-            "agent_popup_close"
+            "agent_popup_close",
+            "ui",
+            "ui_poll",
+            "ui_catalog"
     );
 
     @TempDir

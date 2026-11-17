@@ -34,7 +34,8 @@ public final class PopupMcpCommands implements McpCommandContributor {
         return value == null ? Map.of("status", "UNAVAILABLE", "op", op, "args", args) : value;
     }
 
-    private static WorkbenchServices currentServices() {
+    /** The Workbench services of the MCP call on this thread, or null outside one. */
+    public static WorkbenchServices currentServices() {
         try {
             Class<?> type = Class.forName("tools.dscode.workbench.mcp.WorkbenchMcpTools");
             var current = type.getDeclaredField("CURRENT");

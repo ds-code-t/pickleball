@@ -663,4 +663,41 @@ class OverlayRuntimeLiveTest {
         assertFalse(shown(id), "placement came back after cleanup");
         assertFalse(java.nio.file.Files.exists(AgentStore.root(project, "overlay-live").resolve(UiState.FILE)));
     }
+
+    // ---- P6: batch and merged poll ----
+
+    /** Item 8: a guided flow in 3 calls (catalog, batch, poll) with short CSS/text targets and a compact reply. */
+    @Test
+    void uiApplyGuidedFlowInThreeCalls() throws Exception {
+        load("basic.html");
+        int bytes = 0;
+        AgentControl.Result catalog = run("ui-catalog", Map.of("component", "guide"));
+        assertEquals(0, catalog.exit());
+        AgentControl.Result applied = run("ui-apply", Map.of("ops", "["
+                + "{\"c\":\"label\",\"t\":\"text:Save\",\"text\":\"Last step\"},"
+                + "{\"c\":\"border\",\"t\":\"form#account select\"},"
+                + "{\"c\":\"label\",\"t\":\"#missing\",\"text\":\"x\"},"
+                + "{\"c\":\"guide\",\"steps\":[{\"t\":\"#email\",\"say\":\"Type your email\",\"do\":\"input\"},"
+                + "{\"t\":\"#password\",\"say\":\"Type your password\",\"do\":\"input\"},{\"t\":\"text:Save\",\"say\":\"Click Save\",\"do\":\"click\"}]},"
+                + "{\"c\":\"panel\",\"tab\":\"steps\"}]"));
+        String reply = AgentStore.JSON.writeValueAsString(applied.body());
+        bytes += reply.length();
+        assertEquals(1, applied.exit(), reply);
+        assertTrue(reply.contains("\"miss\":\"#missing\""), reply);
+        assertEquals(5, ((List<?>) applied.body().get("ops")).size(), reply);
+        assertTrue((Boolean) browser.executeScript("return document.querySelectorAll('[data-pkb-kind=label]').length === 1"
+                + " && document.querySelectorAll('[data-pkb-kind=border]').length === 1"), reply);
+        browser.findElement(By.id("email")).sendKeys("me@example.test");
+        browser.findElement(By.id("password")).sendKeys("Hunter2-Secret!");
+        awaitBadge(3, "current");
+        browser.findElement(By.id("save")).click();
+        AgentControl.Result polled = run("ui-poll", Map.of("wait", "5"));
+        String events = AgentStore.JSON.writeValueAsString(polled.body());
+        bytes += events.length();
+        assertTrue(events.contains("\"type\":\"guide\"") && events.contains("\"s\":\"3\""), events);
+        assertFalse(events.contains("Hunter2") || events.contains("me@example.test"), events);
+        assertFalse(events.contains("sentence"), "ui-poll is compact: " + events);
+        assertTrue(bytes < 1536, "guided flow replies were " + bytes + " bytes: " + reply + events);
+        OverlayFixtures.shot(browser, "p6-ui-apply");
+    }
 }

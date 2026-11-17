@@ -96,7 +96,11 @@ public final class AgentControl {
         }
     }
 
-    private static Result dispatch(Path project, String runId, String op, Map<String, String> values,
+    static Result failure(int exit, String error) {
+        return fail(exit, error);
+    }
+
+    static Result dispatch(Path project, String runId, String op, Map<String, String> values,
                                    List<String> extraArgs, String agentId) throws Exception {
         {
             return switch (op == null ? "" : op) {
@@ -114,6 +118,9 @@ public final class AgentControl {
                 case "guide-back" -> guideMove(project, runId, values, -1);
                 case "guide-done" -> guideDone(project, runId, values);
                 case "ask" -> ask(project, runId, values);
+                case "ui-apply" -> UiBatch.apply(project, runId, values, agentId);
+                case "ui-poll" -> UiBatch.poll(project, runId, values, agentId);
+                case "ui-catalog" -> uiCatalog(values);
                 case "highlight" -> highlight(project, runId, values);
                 case "unhighlight" -> unhighlight(project, runId, values);
                 case "overlay" -> overlay(project, runId, values);
@@ -358,6 +365,17 @@ public final class AgentControl {
             steps.add((Map<String, Object>) map);
         }
         return steps;
+    }
+
+    private static Result uiCatalog(Map<String, String> args) {
+        String only = args.get("component");
+        if (present(only) && UiCatalog.component(only.trim()) == null) {
+            return fail(2, "ui-catalog --component must be one of " + String.join(", ", UiCatalog.components().keySet()));
+        }
+        Map<String, Object> body = ok("Page UI components for ui-apply: options as type=default; help, an example op, and how to undo it.");
+        body.put("op", "ui-catalog");
+        body.put("components", UiCatalog.describe(present(only) ? only.trim() : null));
+        return new Result(0, body);
     }
 
     private static Result guide(Path project, String runId, Map<String, String> args) throws Exception {

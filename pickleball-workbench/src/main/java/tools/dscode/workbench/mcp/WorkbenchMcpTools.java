@@ -363,7 +363,7 @@ final class WorkbenchMcpTools {
                     return services.go(Map.of());
                 });
         add("workbench_agent_command",
-                "Forward one agent command (observe, launch, chat, highlight, overlay, html, capture) to the shared controller.",
+                "Forward one agent command (observe, launch, chat, overlay, panel, guide, ask, ui-apply, html, capture) to the shared controller. Page UI: see ui_catalog.",
                 schema(Map.of(
                         "op", stringProperty("Agent command name."),
                         "args", Map.of(

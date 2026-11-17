@@ -5,7 +5,7 @@
 (function () {
   'use strict';
   if (typeof window === 'undefined' || typeof document === 'undefined' || !document.documentElement) return;
-  var VERSION = '3.0.0-p5';
+  var VERSION = '3.0.0-p6';
   if (window.__pkbUi && window.__pkbUi.version === VERSION) return;
   if (window.__pkbUi && typeof window.__pkbUi.dispose === 'function') {
     try { window.__pkbUi.dispose(); } catch (ignored) { /* older runtime */ }
@@ -1414,6 +1414,20 @@
     }
   } catch (ignored) { /* storage blocked */ }
 
+  // ui-apply targets: a CSS, text, role or xpath target is marked with a handle the helper can find.
+  var resolveSeq = 0;
+  function resolve(spec) {
+    var el = findTarget(spec && spec.t);
+    if (!el) return null;
+    var h = el.getAttribute('data-pkb-handle');
+    if (!h) {
+      h = 'ui-' + (++resolveSeq) + '-' + Math.random().toString(36).slice(2, 6);
+      el.setAttribute('data-pkb-handle', h);
+    }
+    var r = el.getBoundingClientRect();
+    return {h: h, x: r.left, y: r.top, w: r.width, hh: r.height};
+  }
+
   window.__pkbUi = {
     version: VERSION,
     track: track,
@@ -1439,6 +1453,7 @@
     askClose: askClose,
     snapshot: snapshot,
     restoreWhenReady: restoreWhenReady,
-    forget: forget
+    forget: forget,
+    resolve: resolve
   };
 })();
