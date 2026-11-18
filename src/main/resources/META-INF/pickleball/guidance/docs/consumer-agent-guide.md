@@ -73,6 +73,14 @@ summary status=PASSED
 
 `query runs|get|search|errors|tail`. Agents use the shallowest evidence layer and keep terminal logging minimal. `pkb_reportretention=failed` keeps failing scenarios.
 
+## Headless, step ids, and the search index
+
+Headless Workbench is not a headless browser. `isolate` and `execute-step` skip the GUI. The browser stays the one the project names. `CHROME_HEADLESS` is the fallback only when the project names no browser. A named project browser is kept.
+
+`store entity use <type> <id>` records a read, write, or mention. Omit `--step` to use the active tracked step. The step id is `runId|featurePath|scenarioLine|examplesRow|stepOrd|sha256` of the step text (UTF-8, lowercase hex). `examplesRow` is empty for a plain scenario and the 1-based outline row otherwise, so a plain step looks like `run|features/pay.feature|2||1|<64 hex>`.
+
+The search index is disposable FTS5 at `reports/diagnostic-runs/diagnostics.db` (virtual table `record_fts`). JSON files stay authoritative. DiagnosticCli `rebuild` on `reports/diagnostic-runs` rewrites each `run-index.json` and `run-catalog.json` and rebuilds that database when the directory is named `diagnostic-runs`. Delete `diagnostics.db` and its `-wal` and `-shm` files to drop it. A missing database makes `query search` read the JSON. A present database is rebuilt only when a source is newer. Older notes that say dalton mean store. The superseded-history section is not the current CLI.
+
 ## First-read
 
 1. This page, then the consumer project.
