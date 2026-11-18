@@ -54,6 +54,7 @@ public final class StepRegistry {
     private final List<GlueStep> steps = new ArrayList<>();
     private final List<Hook> hooks = new ArrayList<>();
     private final ExpressionFactory expressions;
+    private final GlueConverters converters;
     private final Map<String, Expression> compiled = new LinkedHashMap<>();
     private Path logProject;
 
@@ -62,12 +63,19 @@ public final class StepRegistry {
     }
 
     public StepRegistry(Locale locale) {
-        expressions = new ExpressionFactory(new ParameterTypeRegistry(locale == null ? Locale.ENGLISH : locale));
+        Locale chosen = locale == null ? Locale.ENGLISH : locale;
+        expressions = new ExpressionFactory(new ParameterTypeRegistry(chosen));
+        converters = new GlueConverters(chosen);
     }
 
     public StepRegistry logTo(Path project) {
         this.logProject = project;
         return this;
+    }
+
+    /** Converter for step tables. Custom types are already registered when this returns. */
+    public DataTable.TableConverter tableConverter() {
+        return converters.converter();
     }
 
     public List<GlueStep> steps() {
@@ -78,14 +86,24 @@ public final class StepRegistry {
         if (types == null) return this;
         for (Class<?> type : types) {
             if (type == null) continue;
-            for (Method method : type.getMethods()) {
-                scanMethod(method);
-            }
+            scanType(type);
             for (Class<?> nested : type.getDeclaredClasses()) {
                 scan(nested);
             }
         }
         return this;
+    }
+
+    /** Declared methods, then superclasses, so a package-private hook is not skipped. */
+    private void scanType(Class<?> type) {
+        Class<?> cursor = type;
+        while (cursor != null && cursor != Object.class) {
+            for (Method method : cursor.getDeclaredMethods()) {
+                if (method.isSynthetic() || method.isBridge()) continue;
+                scanMethod(method);
+            }
+            cursor = cursor.getSuperclass();
+        }
     }
 
     /** Loads every class in a package the same way a Cucumber glue path does. */
@@ -280,6 +298,7 @@ public final class StepRegistry {
     }
 
     private void scanMethod(Method method) {
+        converters.register(method);
         scanHook(method);
         for (Annotation annotation : method.getAnnotations()) {
             for (Found found : valuesOf(annotation)) {
@@ -289,15 +308,19 @@ public final class StepRegistry {
     }
 
     private void scanHook(Method method) {
-        if (method == null || method.getParameterCount() != 0) return;
-        Before before = method.getAnnotation(Before.class);
-        if (before != null) hooks.add(new Hook("before", before.order(), before.value(), method));
-        After after = method.getAnnotation(After.class);
-        if (after != null) hooks.add(new Hook("after", after.order(), after.value(), method));
-        BeforeStep beforeStep = method.getAnnotation(BeforeStep.class);
-        if (beforeStep != null) hooks.add(new Hook("beforestep", beforeStep.order(), beforeStep.value(), method));
-        AfterStep afterStep = method.getAnnotation(AfterStep.class);
-        if (afterStep != null) hooks.add(new Hook("afterstep", afterStep.order(), afterStep.value(), method));
+        if (method == null || !GlueHooks.callable(method)) return;
+        for (Before before : method.getAnnotationsByType(Before.class)) {
+            hooks.add(new Hook("before", before.order(), before.value(), method));
+        }
+        for (After after : method.getAnnotationsByType(After.class)) {
+            hooks.add(new Hook("after", after.order(), after.value(), method));
+        }
+        for (BeforeStep beforeStep : method.getAnnotationsByType(BeforeStep.class)) {
+            hooks.add(new Hook("beforestep", beforeStep.order(), beforeStep.value(), method));
+        }
+        for (AfterStep afterStep : method.getAnnotationsByType(AfterStep.class)) {
+            hooks.add(new Hook("afterstep", afterStep.order(), afterStep.value(), method));
+        }
     }
 
     public List<Hook> hooks(String phase) {
@@ -310,7 +333,7 @@ public final class StepRegistry {
         return found;
     }
 
-    /** Runs scanned Cucumber hooks. Zero-argument methods only. */
+    /** Runs scanned Cucumber hooks on the same glue instance as the steps. */
     public void fire(String phase, List<String> tags, Map<Class<?>, Object> instances) {
         Map<Class<?>, Object> targets = instances == null ? new IdentityHashMap<>() : instances;
         for (Hook hook : hooks(phase)) {
@@ -328,7 +351,7 @@ public final class StepRegistry {
             }
             method.setAccessible(true);
             try {
-                method.invoke(target);
+                method.invoke(target, GlueHooks.arguments(method));
             } catch (InvocationTargetException failure) {
                 Throwable cause = failure.getCause() == null ? failure : failure.getCause();
                 if (cause instanceof RuntimeException runtime) throw runtime;

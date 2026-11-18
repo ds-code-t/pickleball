@@ -207,7 +207,7 @@ public final class ScenarioStepData {
                         .map(cell -> cell.getValue())
                         .toList())
                 .toList();
-        return DataTable.create(cells);
+        return tools.dscode.engine.convert.CucumberModelConverter.dataTable(cells);
     }
 
     static DocString docStringFromPickleArgument(
