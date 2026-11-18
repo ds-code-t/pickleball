@@ -1193,7 +1193,7 @@ public final class WorkbenchSessionCommands {
         ));
     }
 
-    private static Optional<SessionState> resolveSession(WorkbenchCommandLine.Parsed parsed, HttpClient http) {
+    static Optional<SessionState> resolveSession(WorkbenchCommandLine.Parsed parsed, HttpClient http) {
         String runId = parsed.coordination().runId();
         if (runId != null && !runId.isBlank()) {
             Path file = AgentCoordination.runDirectory(parsed.project(), runId)

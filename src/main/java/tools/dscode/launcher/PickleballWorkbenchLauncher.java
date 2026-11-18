@@ -91,6 +91,25 @@ public final class PickleballWorkbenchLauncher {
         return tools.dscode.engine.EngineCli.execute(args, out, err);
     }
 
+    /** Test hook. Production calls {@code DomEngineMain.dispatch}. */
+    static java.util.function.Function<java.util.List<String>, dev.domengine.cli.CliResult> domEngineCall =
+            dev.domengine.cli.DomEngineMain::dispatch;
+
+    static void resetDomEngineCall() {
+        domEngineCall = dev.domengine.cli.DomEngineMain::dispatch;
+    }
+
+    /**
+     * Classpath form for a thin jar. {@code java -jar} does not see Jackson.
+     * This does not ask the caller to shade a fat jar.
+     */
+    static String missingDomEngine(Throwable missing) {
+        String type = missing == null ? "NoClassDefFoundError" : missing.getClass().getSimpleName();
+        return "error: java -jar cannot load domengine (" + type + ").\n"
+                + "fix: java -cp <classpath> tools.dscode.launcher.PickleballWorkbenchLauncher domengine ...\n"
+                + "The published jar stays thin.\n";
+    }
+
     /**
      * The Java DOM engine is a core CLI. Returns {@code -1} when {@code args}
      * are not a {@code domengine} invocation. Workbench only forwards.
@@ -103,7 +122,13 @@ public final class PickleballWorkbenchLauncher {
         for (int index = 1; index < args.length; index++) {
             if (args[index] != null) rest.add(args[index]);
         }
-        dev.domengine.cli.CliResult result = dev.domengine.cli.DomEngineMain.dispatch(rest);
+        dev.domengine.cli.CliResult result;
+        try {
+            result = domEngineCall.apply(rest);
+        } catch (NoClassDefFoundError | ExceptionInInitializerError missing) {
+            stderr.print(missingDomEngine(missing));
+            return 1;
+        }
         if (result.stdout() != null && !result.stdout().isEmpty()) stdout.print(result.stdout());
         if (result.stderr() != null && !result.stderr().isEmpty()) stderr.print(result.stderr());
         return result.exit();

@@ -14,6 +14,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
 /**
@@ -608,35 +610,85 @@ public final class StoreExecution {
         }
     }
 
+    private static final AtomicInteger DEFINITION_LOADS = new AtomicInteger();
+    private static final ConcurrentHashMap<String, Catalog> DEFINITION_CATALOG = new ConcurrentHashMap<>();
+
+    /** How many times recording loaded {@code step_definitions} instead of reusing the catalog. */
+    public static int definitionLoads() {
+        return DEFINITION_LOADS.get();
+    }
+
+    private record CompiledDef(String id, String pattern, Pattern placeholder, Pattern regex) {
+    }
+
+    private record Catalog(String stamp, List<CompiledDef> defs) {
+    }
+
     static String match(Connection connection, String text) throws SQLException {
+        List<CompiledDef> defs = catalog(connection);
         String bestId = null;
         int best = Integer.MIN_VALUE;
-        try (PreparedStatement statement = connection.prepareStatement(
-                "SELECT definition_id, pattern FROM step_definitions");
-             ResultSet rows = statement.executeQuery()) {
-            while (rows.next()) {
-                String pattern = rows.getString(2);
-                int score = score(pattern, text);
-                if (score > best) {
-                    best = score;
-                    bestId = rows.getString(1);
-                }
+        for (CompiledDef def : defs) {
+            int score = score(def, text);
+            if (score > best) {
+                best = score;
+                bestId = def.id();
             }
         }
         return best < 0 ? null : bestId;
     }
 
-    static int score(String pattern, String text) {
-        if (pattern == null || text == null) return -1;
-        if (pattern.equals(text)) return 1_000_000 + pattern.length();
-        if (placeholder(pattern, text)) return pattern.length();
-        if ((pattern.startsWith("^") || (pattern.startsWith("/") && pattern.endsWith("/"))) && regex(pattern, text)) {
-            return pattern.length();
+    private static List<CompiledDef> catalog(Connection connection) throws SQLException {
+        String url;
+        try {
+            url = connection.getMetaData().getURL();
+        } catch (SQLException failure) {
+            url = null;
         }
+        String stamp = stamp(connection);
+        if (url != null) {
+            Catalog cached = DEFINITION_CATALOG.get(url);
+            if (cached != null && cached.stamp().equals(stamp)) return cached.defs();
+        }
+        DEFINITION_LOADS.incrementAndGet();
+        List<CompiledDef> loaded = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT definition_id, pattern FROM step_definitions WHERE removed = 0");
+             ResultSet rows = statement.executeQuery()) {
+            while (rows.next()) loaded.add(compile(rows.getString(1), rows.getString(2)));
+        }
+        List<CompiledDef> frozen = List.copyOf(loaded);
+        if (url != null) DEFINITION_CATALOG.put(url, new Catalog(stamp, frozen));
+        return frozen;
+    }
+
+    private static String stamp(Connection connection) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT COUNT(*), COALESCE(MAX(hydrated_at), '') FROM step_definitions WHERE removed = 0");
+             ResultSet rows = statement.executeQuery()) {
+            if (!rows.next()) return "0|";
+            return rows.getInt(1) + "|" + (rows.getString(2) == null ? "" : rows.getString(2));
+        }
+    }
+
+    private static CompiledDef compile(String id, String pattern) {
+        return new CompiledDef(id, pattern, placeholderPattern(pattern), regexPattern(pattern));
+    }
+
+    static int score(String pattern, String text) {
+        return score(compile(null, pattern), text);
+    }
+
+    private static int score(CompiledDef def, String text) {
+        if (def == null || def.pattern() == null || text == null) return -1;
+        if (def.pattern().equals(text)) return 1_000_000 + def.pattern().length();
+        if (def.placeholder() != null && def.placeholder().matcher(text).matches()) return def.pattern().length();
+        if (def.regex() != null && def.regex().matcher(text).matches()) return def.pattern().length();
         return -1;
     }
 
-    private static boolean placeholder(String pattern, String text) {
+    private static Pattern placeholderPattern(String pattern) {
+        if (pattern == null || pattern.indexOf('{') < 0) return null;
         StringBuilder regex = new StringBuilder();
         for (int index = 0; index < pattern.length(); ) {
             char ch = pattern.charAt(index);
@@ -652,16 +704,24 @@ public final class StoreExecution {
             regex.append(ch);
             index++;
         }
-        return regex(regex.toString(), text);
+        return compileQuiet(regex.toString());
     }
 
-    private static boolean regex(String pattern, String text) {
-        String body = pattern;
-        if (body.startsWith("/") && body.endsWith("/") && body.length() >= 2) body = body.substring(1, body.length() - 1);
+    private static Pattern regexPattern(String pattern) {
+        if (pattern == null) return null;
+        if (pattern.startsWith("^") || (pattern.startsWith("/") && pattern.endsWith("/") && pattern.length() >= 2)) {
+            String body = pattern;
+            if (body.startsWith("/") && body.endsWith("/")) body = body.substring(1, body.length() - 1);
+            return compileQuiet(body);
+        }
+        return null;
+    }
+
+    private static Pattern compileQuiet(String body) {
         try {
-            return Pattern.compile(body).matcher(text).matches();
+            return Pattern.compile(body);
         } catch (RuntimeException failure) {
-            return false;
+            return null;
         }
     }
 

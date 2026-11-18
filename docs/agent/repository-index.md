@@ -786,6 +786,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentcontrol/SurfaceIdChild.java`
 - `src/test/java/tools/dscode/common/agentcontrol/UiBatchTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/UiCatalogTest.java`
+- `src/test/java/tools/dscode/common/agentcontrol/UiChatVisibilityTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/UiStateTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/AgentSurfaceRouterTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/live/AgentSurfacePopupLiveTest.java`
@@ -856,6 +857,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/reporting/diagnostic/DiagnosticCliGuidanceTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/DiagnosticIndexRebuilderSqliteTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/DiagnosticSecretRedactionTest.java`
+- `src/test/java/tools/dscode/common/reporting/diagnostic/DiagnosticStepTextTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/DiscoverHintJvmLeakTest.java`
 - `src/test/java/tools/dscode/common/resources/PathListSemanticsTest.java`
 - `src/test/java/tools/dscode/common/seleniumextensions/AllContextsPositionTest.java`
@@ -965,6 +967,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/store/LargeFileBranchCopyTest.java`
 - `src/test/java/tools/dscode/store/LargeFileReferenceTest.java`
 - `src/test/java/tools/dscode/store/LegacyNamesTest.java`
+- `src/test/java/tools/dscode/store/NestedColonStepsTest.java`
 - `src/test/java/tools/dscode/store/NoRuntimeDownloadTest.java`
 - `src/test/java/tools/dscode/store/RemovedNamesGateTest.java`
 - `src/test/java/tools/dscode/store/RenameGateTest.java`
@@ -1018,6 +1021,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/store/StoreRenameTest.java`
 - `src/test/java/tools/dscode/store/StoreRunClasspathRefreshTest.java`
 - `src/test/java/tools/dscode/store/StoreRunProbe.java`
+- `src/test/java/tools/dscode/store/StoreRunRecordingSpeedTest.java`
 - `src/test/java/tools/dscode/store/StoreRunTest.java`
 - `src/test/java/tools/dscode/store/StoreSandboxBindingTest.java`
 - `src/test/java/tools/dscode/store/StoreSandboxCliTest.java`

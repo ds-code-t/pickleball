@@ -1687,8 +1687,13 @@ public final class WorkbenchAgentCommands {
             PrintStream err
     ) {
         HttpClient http = HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(5)).build();
-        java.util.Optional<WorkbenchSessionCommands.SessionState> session =
-                WorkbenchSessionCommands.readHealthy(parsed.project(), http);
+        java.util.Optional<WorkbenchSessionCommands.SessionState> session;
+        try {
+            session = WorkbenchSessionCommands.resolveSession(parsed, http);
+        } catch (IllegalStateException several) {
+            err.println(several.getMessage());
+            return 2;
+        }
         if (session.isEmpty()) {
             err.println(WorkbenchCliHelp.structured("start a session first", "isolate, then retry this command."));
             return 2;

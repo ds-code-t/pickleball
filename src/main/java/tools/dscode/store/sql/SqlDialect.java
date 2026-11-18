@@ -361,10 +361,26 @@ public final class SqlDialect {
                 + " 2147483647)";
     }
 
+    private static final java.util.concurrent.atomic.AtomicInteger SCHEMA_FULL = new java.util.concurrent.atomic.AtomicInteger();
+    private static final java.util.concurrent.atomic.AtomicInteger SCHEMA_FAST = new java.util.concurrent.atomic.AtomicInteger();
+
+    /** How many opens ran the full DDL. Recording should not do this on every step. */
+    public static int schemaFullEnsures() {
+        return SCHEMA_FULL.get();
+    }
+
+    /** How many opens found schema 1 and the changelog trigger and returned. */
+    public static int schemaFastEnsures() {
+        return SCHEMA_FAST.get();
+    }
+
     public static void ensureSchema(SqlSession session) throws SQLException {
-        for (String ddl : SOURCE_DDL) session.script(ddl);
-        for (String ddl : BRANCH_DDL) session.script(ddl);
-        String current = session.scalar("SELECT value FROM schema_meta WHERE `key` = 'store_schema'");
+        String current = null;
+        try {
+            current = session.scalar("SELECT value FROM schema_meta WHERE `key` = 'store_schema'");
+        } catch (SQLException ignored) {
+            current = null;
+        }
         if (current != null && !current.isBlank()) {
             int version;
             try {
@@ -377,7 +393,31 @@ public final class SqlDialect {
                         + SCHEMA_VERSION + ")");
             }
         }
-        if (!"1".equals(current)) {
+        if ("1".equals(current)) {
+            String trigger = session.scalar(
+                    "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name = 'files_pkb_insert'");
+            if (trigger != null) {
+                SCHEMA_FAST.incrementAndGet();
+                return;
+            }
+        }
+        SCHEMA_FULL.incrementAndGet();
+        for (String ddl : SOURCE_DDL) session.script(ddl);
+        for (String ddl : BRANCH_DDL) session.script(ddl);
+        String stored = session.scalar("SELECT value FROM schema_meta WHERE `key` = 'store_schema'");
+        if (stored != null && !stored.isBlank()) {
+            int version;
+            try {
+                version = Integer.parseInt(stored.trim());
+            } catch (NumberFormatException failure) {
+                version = 0;
+            }
+            if (version > SCHEMA_VERSION) {
+                throw new SQLException("store schema " + version + " is newer than this build ("
+                        + SCHEMA_VERSION + ")");
+            }
+        }
+        if (!"1".equals(stored)) {
             session.update(UPSERT_META, "store_schema", "1");
             session.update(UPSERT_META, "schema_version", "1");
             session.update(UPSERT_META, "hydrate_generation", "0");

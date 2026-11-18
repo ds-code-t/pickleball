@@ -24,6 +24,25 @@ class WorkbenchElementInspectTest {
     Path tempDir;
 
     @Test
+    void inspectPageUsesALiveRunSession() throws Exception {
+        try (FakeQuerySession session = FakeQuerySession.startRun(tempDir, "live-inspect")) {
+            session.completeWith("{\"id\":\"cmd-1\",\"status\":\"SUCCESS\",\"result\":{\"status\":\"SUCCESS\",\"source\":\"live-session\",\"hits\":[{\"phrase\":\"the \\\"Save\\\" Button\",\"xpath\":\"//button\",\"rawMatchCount\":1,\"visibleCount\":1}]}}");
+            java.io.ByteArrayOutputStream stdout = new java.io.ByteArrayOutputStream();
+            java.io.ByteArrayOutputStream stderr = new java.io.ByteArrayOutputStream();
+            int page = WorkbenchAgentCommands.run(
+                    new String[]{"inspect-page", tempDir.toString()},
+                    new java.io.PrintStream(stdout, true, StandardCharsets.UTF_8),
+                    new java.io.PrintStream(stderr, true, StandardCharsets.UTF_8)
+            );
+            String err = stderr.toString(StandardCharsets.UTF_8);
+            assertEquals(0, page, err);
+            assertFalse(err.contains("start a session first"), err);
+            assertTrue(stdout.toString(StandardCharsets.UTF_8).contains("source=live-session"));
+            assertTrue(session.lastPost().contains("\"op\":\"inspect-page\""), session.lastPost());
+        }
+    }
+
+    @Test
     void dumpAndFindUseTheDictionaryWithoutActing() throws Exception {
         String html = """
                 <html><body>
@@ -307,6 +326,17 @@ class WorkbenchElementInspectTest {
         }
 
         static FakeQuerySession start(Path project) throws IOException {
+            return start(project, PickleballLocalLayout.cliSessionState(project));
+        }
+
+        /** A live session published only under the run, not the project session file. */
+        static FakeQuerySession startRun(Path project, String runId) throws IOException {
+            Path stateFile = project.resolve(".pickleball").resolve("runs").resolve(runId)
+                    .resolve("session").resolve("cli-session.json");
+            return start(project, stateFile);
+        }
+
+        static FakeQuerySession start(Path project, Path stateFile) throws IOException {
             HttpServer http = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             FakeQuerySession[] box = new FakeQuerySession[1];
             http.createContext("/health", exchange -> write(exchange, 200, "{\"status\":\"ok\"}"));
@@ -326,7 +356,6 @@ class WorkbenchElementInspectTest {
                 write(exchange, 200, current == null ? "{}" : current.completed);
             });
             http.start();
-            Path stateFile = PickleballLocalLayout.cliSessionState(project);
             Files.createDirectories(stateFile.getParent());
             String url = "http://127.0.0.1:" + http.getAddress().getPort();
             String projectText = project.toAbsolutePath().normalize().toString().replace("\\", "\\\\").replace("\"", "\\\"");

@@ -272,6 +272,11 @@ public final class AgentControl {
         Map<String, Object> body = ok("Chat message stored for this run channel.");
         body.put("message", ChatLog.toMap(message));
         if ("run".equals(message.channel())) PageSurfaces.pushChat(panelRow(message));
+        // The popup draws ledger rows whose op is chat. A stored ChatLog line alone is not visible.
+        if (!"off".equals(tools.dscode.common.agentsurface.PopupConfig.mode())) {
+            tools.dscode.common.agentsurface.PopupLedger.append(
+                    project, runId, "chat", "chat", "", "", message.text(), "", "");
+        }
         return new Result(0, body);
     }
 

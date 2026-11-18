@@ -66,13 +66,19 @@ public final class SqlConnections {
         return new Borrowed(take(pool), pool);
     }
 
+    private static final java.util.Set<String> RUN_SCHEMA = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
     private static void ensureRunState(Path project) throws IOException, SQLException {
+        Path file = StorePaths.runState(project);
+        String key = file.toAbsolutePath().normalize().toString();
+        if (RUN_SCHEMA.contains(key) && Files.isRegularFile(file)) return;
         Borrowed borrowed = borrowRunState(project);
         try (Statement statement = borrowed.connection().createStatement()) {
             for (String ddl : SqlDialect.RUN_DDL) statement.execute(ddl);
         } finally {
             giveBack(borrowed.pool(), borrowed.connection());
         }
+        RUN_SCHEMA.add(key);
     }
 
     private static void prepareSource(Connection connection, Path runState) throws SQLException {

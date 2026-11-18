@@ -326,7 +326,8 @@ final class DiagnosticReporter {
         data.put("stepNumber", context.stepNumber);
         data.put("nestingLevel", step == null ? 0 : step.getNestingLevel());
         data.put("keyword", context.keyword);
-        data.put("text", context.text);
+        if (context.text == null || context.text.isBlank()) context.text = frameText(context.step);
+        data.put("text", context.text == null ? "" : context.text);
         data.put("source", context.source);
         data.put("definition", context.definition);
         data.put("status", status);
@@ -355,12 +356,30 @@ final class DiagnosticReporter {
         if (!stack.isEmpty()) stack.peek().capabilities.add(normalized);
     }
 
+    private static String frameText(StepExtension step) {
+        if (step == null) return "";
+        String text = step.getStepText();
+        return text == null ? "" : text;
+    }
+
+    private static String frameKeyword(StepExtension step) {
+        if (step == null || step.nativeKeyword == null) return "";
+        return step.nativeKeyword;
+    }
+
     private void bindDefinition(StepContext context, DiagnosticStepMetadata metadata) {
-        if (context == null || metadata == null) return;
+        if (context == null) return;
+        String fromFrame = frameText(context.step);
+        if (metadata == null) {
+            context.text = fromFrame;
+            if (context.keyword == null || context.keyword.isBlank()) context.keyword = frameKeyword(context.step);
+            return;
+        }
         context.definition = sourceProvenance.definitionSource(metadata.method(), metadata.codeLocation());
         context.stepLine = metadata.stepLine();
-        context.keyword = metadata.keyword();
-        context.text = metadata.stepText();
+        context.keyword = metadata.keyword() == null ? frameKeyword(context.step) : metadata.keyword();
+        String text = metadata.stepText();
+        context.text = text == null || text.isBlank() ? fromFrame : text;
         ScenarioContext scenario = current.get();
         if (scenario == null) return;
         ScenarioIdentity identity = nested.get().isEmpty()

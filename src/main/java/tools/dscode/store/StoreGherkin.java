@@ -20,6 +20,8 @@ import java.util.regex.Pattern;
  */
 public final class StoreGherkin {
     private static final Pattern STEP = Pattern.compile("^(Given|When|Then|And|But|\\*)(?:\\s+(.*))?$");
+    /** A nested Gherkin child: {@code : * click} or {@code :: * save}. */
+    private static final Pattern COLON_STEP = Pattern.compile("^(:+)\\s+(Given|When|Then|And|But|\\*)(?:\\s+(.*))?$");
     private static final Pattern LANGUAGE = Pattern.compile("^#\\s*language\\s*:\\s*(\\S+)\\s*$", Pattern.CASE_INSENSITIVE);
     private static final String[] HEADERS = {
             "Scenario Outline",
@@ -188,15 +190,21 @@ public final class StoreGherkin {
                 if (step != null) step.table.add(cells(trimmed));
                 continue;
             }
-            Matcher stepMatcher = STEP.matcher(trimmed);
-            if (stepMatcher.matches()) {
+            Matcher colonMatcher = COLON_STEP.matcher(trimmed);
+            Matcher stepMatcher = colonMatcher.matches() ? null : STEP.matcher(trimmed);
+            if (colonMatcher.matches() || (stepMatcher != null && stepMatcher.matches())) {
                 describingFeature = false;
                 describingScenario = false;
                 trimTrailingBlank(featureDescription);
                 if (current != null) trimTrailingBlank(current.description);
                 if (current == null) continue;
-                String body = stepMatcher.group(2);
-                step = current.addStep(stepMatcher.group(1), body == null ? "" : body, lineNo);
+                if (colonMatcher.matches()) {
+                    String body = colonMatcher.group(3);
+                    step = current.addStep(colonMatcher.group(1) + " " + colonMatcher.group(2), body == null ? "" : body, lineNo);
+                } else {
+                    String body = stepMatcher.group(2);
+                    step = current.addStep(stepMatcher.group(1), body == null ? "" : body, lineNo);
+                }
                 continue;
             }
             if (describingFeature) featureDescription.add(trimmed);
