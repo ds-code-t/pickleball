@@ -167,6 +167,8 @@ public final class SqlDialect {
                 failed INTEGER NOT NULL DEFAULT 0,
                 note TEXT NOT NULL,
                 sandbox TEXT NOT NULL DEFAULT '',
+                git_commit TEXT NOT NULL DEFAULT '',
+                feature_path TEXT NOT NULL DEFAULT '',
                 PRIMARY KEY (run_id)
             )
             """,

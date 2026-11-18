@@ -78,6 +78,7 @@ public final class StoreExecution {
             try {
                 String definition = match(connection, text);
                 ensureRun(connection, runId, started, finished, recordedScenario(draft.scenarioName()));
+                RunProvenance.fill(connection, project, runId, scenarioKey);
                 ensureScenario(connection, execId, runId, scenarioKey, scenarioHash, draft.examplesRow(), started, status);
                 writeStep(connection, stepId, execId, draft.stepOrd(), text, hash, definition, draft.sourceLine(), started, finished, status);
                 recount(connection, execId, runId, finished);
@@ -148,6 +149,7 @@ public final class StoreExecution {
                 connection.setAutoCommit(false);
                 try {
                     ensureRun(connection, active.runId, active.started, now, active.recordedScenario);
+                    RunProvenance.fill(connection, root, active.runId, active.scenarioKey);
                     ensureScenario(connection, active.execId, active.runId, active.scenarioKey, active.scenarioHash(),
                             active.examplesRow, active.started, "RUNNING");
                     writeStep(connection, stepExec, active.execId, ord, text, hash, match(connection, text),

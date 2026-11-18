@@ -69,6 +69,11 @@ public final class PickleballWorkbenchLauncher {
             if (logs != 0) exitProcess(logs);
             return;
         }
+        int dashboard = dispatchDashboardIfAny(args, System.out, System.err);
+        if (dashboard >= 0) {
+            if (dashboard != 0) exitProcess(dashboard);
+            return;
+        }
         int store = dispatchStoreIfAny(args, System.out, System.err);
         if (store >= 0) {
             if (store != 0) exitProcess(store);
@@ -148,6 +153,15 @@ public final class PickleballWorkbenchLauncher {
     static int dispatchLogIfAny(String[] args, PrintStream out, PrintStream err) {
         if (!tools.dscode.common.composite.DomLogCli.handles(args)) return -1;
         return tools.dscode.common.composite.DomLogCli.execute(args, out, err);
+    }
+
+    /**
+     * The static dashboard is a core CLI, not a Workbench verb.
+     * Returns {@code -1} when {@code args} are not a {@code dashboard} invocation.
+     */
+    static int dispatchDashboardIfAny(String[] args, PrintStream out, PrintStream err) {
+        if (!tools.dscode.store.dashboard.DashboardCli.handles(args)) return -1;
+        return tools.dscode.store.dashboard.DashboardCli.execute(args, out, err);
     }
 
     /**

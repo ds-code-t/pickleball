@@ -2,6 +2,7 @@ package tools.dscode.workbench.ui;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.workbench.launch.ConsumerReadyForwarder;
 import tools.dscode.workbench.store.StoreBrowser;
 import tools.dscode.workbench.store.StoreCliForwarder;
 import tools.dscode.workbench.diagnostics.DiagnosticEvidenceNavigator;
@@ -83,6 +84,32 @@ class WorkbenchTrackingForwarderTest {
         click(panel, "Query");
         assertEquals(List.of("query", "--entity=Account#ada", "--status=FAILED", "--json"), forwarded.get(1));
         assertFalse(Files.exists(project.resolve(".pickleball/store/data/pickleball/.store")));
+    }
+
+    @Test
+    void htmlDashboardForwardsWithoutReplacingTracking() throws Exception {
+        List<List<String>> seen = new ArrayList<>();
+        ConsumerReadyForwarder.runner = command -> {
+            seen.add(List.copyOf(command));
+            return new ConsumerReadyForwarder.Result(
+                    0, "dashboard=.pickleball/dashboard/index.html\nruns=0\n", "", command);
+        };
+        try {
+            TrackingPanel[] holder = new TrackingPanel[1];
+            SwingUtilities.invokeAndWait(() -> holder[0] = new TrackingPanel(
+                    () -> project,
+                    (root, args) -> new StoreCliForwarder.Result(0, "{}", "", List.of()),
+                    ignored -> { }));
+            assertTrue(button(holder[0], "Refresh") != null);
+            assertTrue(button(holder[0], "Open in Explorer") != null);
+            click(holder[0], "HTML dashboard");
+            assertEquals(1, seen.size());
+            assertTrue(seen.get(0).contains("dashboard"), seen.get(0).toString());
+            assertTrue(seen.get(0).stream().noneMatch(arg -> arg.contains("localhost")), seen.get(0).toString());
+            assertEquals("dashboard=.pickleball/dashboard/index.html", labelText(holder[0], "Tracking"));
+        } finally {
+            ConsumerReadyForwarder.runner = null;
+        }
     }
 
     @Test
@@ -253,7 +280,8 @@ class WorkbenchTrackingForwarderTest {
             String text = labelText(panel, "Tracking");
             if (text.startsWith("exit 0") || text.startsWith("2020-") || text.startsWith("explorer ")
                     || text.startsWith("Select a run") || text.startsWith("Explorer is not ready")
-                    || text.startsWith("error:") || "paused".equals(text) || text.startsWith("play ")) return;
+                    || text.startsWith("error:") || text.startsWith("dashboard=")
+                    || "paused".equals(text) || text.startsWith("play ")) return;
             Thread.sleep(20);
         }
     }

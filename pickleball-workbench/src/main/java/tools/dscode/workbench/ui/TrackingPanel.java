@@ -2,6 +2,7 @@ package tools.dscode.workbench.ui;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.dscode.workbench.launch.ConsumerReadyForwarder;
 import tools.dscode.workbench.store.StoreBrowser;
 import tools.dscode.workbench.store.StoreCliForwarder;
 
@@ -102,6 +103,7 @@ final class TrackingPanel extends JPanel {
         north.add(new JLabel("Speed"));
         north.add(speed);
         north.add(button("Open in Explorer", "Jump to the existing Explorer for this run", this::open));
+        north.add(button("HTML dashboard", "Write the static dashboard from the same store", this::dashboard));
         speed.addActionListener(event -> playTimer.setDelay(delayMillis()));
         scrub.addChangeListener(event -> {
             if (!scrub.getValueIsAdjusting()) select(scrub.getValue());
@@ -182,6 +184,19 @@ final class TrackingPanel extends JPanel {
         }
         status.setText("explorer " + runId);
         openExplorer.accept(runId);
+    }
+
+    private void dashboard() {
+        ConsumerReadyForwarder.Result result = ConsumerReadyForwarder.forward(
+                project.get(), java.util.List.of("dashboard"));
+        if (result.exit() == 0) {
+            String line = result.out() == null ? "" : result.out().trim();
+            int cut = line.indexOf('\n');
+            status.setText(cut < 0 ? line : line.substring(0, cut));
+        } else {
+            String err = result.err() == null ? "" : result.err().trim();
+            status.setText(err.isBlank() ? "exit " + result.exit() : err);
+        }
     }
 
     private void select(int next) {

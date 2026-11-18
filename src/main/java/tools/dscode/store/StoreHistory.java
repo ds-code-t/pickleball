@@ -132,6 +132,7 @@ public final class StoreHistory {
                     }
                     insertLinks(connection, logId, structured);
                 }
+                RunProvenance.fill(connection, project, id, scenario);
                 connection.commit();
             } catch (SQLException | RuntimeException failure) {
                 connection.rollback();
