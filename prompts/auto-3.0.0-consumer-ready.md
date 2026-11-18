@@ -38,7 +38,7 @@ One roadmap that owns every phase, in this order. Everything must be implemented
     - a bridge health signal
     - a fast launcher, so agents don't pay 10–16 s per `mvnw` call
   - A supported agent route that the exported consumer guide allows without IDE MCP.
-  - Fix every "missing instructions" item: headless meaning, the step-id format, building the search index, and `dalton` renamed to `store` in the release notes.
+  - Fix every "missing instructions" item: headless meaning, the step-id format, building the search index, and the former core name renamed to `store` in the release notes.
   - Update the consumer agent guide so an agent can start working without searching around.
 - **Phase C: a polished static HTML dashboard.**
   - Passive and view-only, generated from the same embedded SQLite store, with no second database.

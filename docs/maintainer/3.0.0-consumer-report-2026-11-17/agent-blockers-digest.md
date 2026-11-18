@@ -25,7 +25,7 @@
 5. `query` and `store` are two history sources that disagree, and neither doc says which one to trust.
 6. Nothing explains how to open a chosen run in the Explorer or Tracking tab.
 7. The step id format for `store entity use` isn't documented, and neither is how to build the search index.
-8. `dalton ...` in the release notes is the old name for `store ...`.
+8. `(former core name) ...` in the release notes is the old name for `store ...`.
 
 ## Missing tools (the agent's workaround and what it cost)
 | Missing | Workaround | Cost |

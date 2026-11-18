@@ -13,7 +13,7 @@ Status: agreed order, no written roadmap or Build prompt yet. One roadmap doc sh
 2. Turnkey agent tools and instructions.
    - Ready-made CLI/MCP calls: start-session (--url/--browser/--env), chat-wait, history query, entity lookup, open run in Explorer.
    - Guidance that matches what the exported docs allow (a CLI route for consumers that ban IDE MCP).
-   - Fix doc gaps: headless meaning, step-id format, search index, dalton -> store in release notes.
+   - Fix doc gaps: headless meaning, step-id format, search index, former core name -> store in release notes.
 3. Polished static HTML dashboard.
    - Passive and view-only; it never triggers runs.
    - Built on the same SQLite store, with no second instance. Add commit SHA and feature path columns/metadata to runs.
