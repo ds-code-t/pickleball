@@ -51,6 +51,9 @@ class StoreExecutionRecordingTest {
 
     @Test
     void aRunRecordsStepsAndLinksTheMatchingDefinition() throws Exception {
+        StoreScope.clear();
+        StoreExecution.clearCatalog();
+        StoreRunContext.clear();
         Path java = project.resolve("src/test/java/demo/Steps.java");
         Files.createDirectories(java.getParent());
         Files.writeString(java, """
@@ -60,15 +63,17 @@ class StoreExecutionRecordingTest {
                     public void total(int amount) {}
                 }
                 """, StandardCharsets.UTF_8);
-        StoreHydrator.hydrate(project, StoreHydrator.Options.full());
-        String expected = StoreStepCatalog.definitionId("java", "the total is {int}", "src/test/java/demo/Steps.java", 3);
         String track = System.getProperty("pkb_store_track");
         String run = System.getProperty("pkb_run_id");
         String root = System.getProperty("pkb_store_project");
+        String sandbox = System.getProperty("pkb_store_sandbox");
+        System.setProperty("pkb_store_project", project.toAbsolutePath().normalize().toString());
+        System.clearProperty("pkb_store_sandbox");
         try {
+            StoreHydrator.hydrate(project, StoreHydrator.Options.full());
+            String expected = StoreStepCatalog.definitionId("java", "the total is {int}", "src/test/java/demo/Steps.java", 3);
             System.setProperty("pkb_store_track", "true");
             System.setProperty("pkb_run_id", "sample-run");
-            System.setProperty("pkb_store_project", project.toAbsolutePath().normalize().toString());
             StoreExecution.beforeStep(project, "Pay", "features/pay.feature", 2, "the total is 10", 3);
             assertNotNull(StoreRunContext.current());
             assertEquals(project.toAbsolutePath().normalize(), StoreRunContext.current().project());
@@ -96,6 +101,10 @@ class StoreExecutionRecordingTest {
             restore("pkb_store_track", track);
             restore("pkb_run_id", run);
             restore("pkb_store_project", root);
+            restore("pkb_store_sandbox", sandbox);
+            StoreScope.clear();
+            StoreExecution.clearCatalog();
+            StoreRunContext.clear();
             StoreExecution.finishScenario("PASSED");
         }
     }

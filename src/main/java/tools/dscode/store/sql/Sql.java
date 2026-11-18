@@ -28,6 +28,149 @@ public final class Sql {
     private Sql() {
     }
 
+    /**
+     * sqlite-jdbc stores the autocommit flag before it runs BEGIN or COMMIT.
+     * A busy BEGIN therefore leaves the flag false with no transaction, and a
+     * later {@code setAutoCommit(false)} returns without trying again.
+     * {@code commit} and {@code rollback} then start another transaction; if
+     * that restart is busy, the next rollback reports that no transaction is
+     * active even though the end itself succeeded.
+     */
+    private static void setAutoCommit(Connection connection, boolean auto) throws SQLException {
+        SQLException last = null;
+        for (int attempt = 1; attempt <= 30; attempt++) {
+            try {
+                connection.setAutoCommit(auto);
+                return;
+            } catch (SQLException failure) {
+                last = failure;
+                String message = lower(failure);
+                if (auto && noTransaction(message)) return;
+                if (!auto && message.contains("within a transaction")) return;
+                if (!busy(message)) throw failure;
+                if (auto) {
+                    for (int commitAttempt = attempt; commitAttempt <= 30; commitAttempt++) {
+                        if (commitOpenTransaction(connection)) return;
+                        if (commitAttempt == 30) throw failure;
+                        pause();
+                    }
+                    return;
+                }
+                restoreAutocommitFlag(connection);
+                if (attempt == 30) throw failure;
+                pause();
+            }
+        }
+        if (last != null) throw last;
+    }
+
+    private static void commit(Connection connection) throws SQLException {
+        finish(connection, true);
+    }
+
+    private static void rollback(Connection connection) throws SQLException {
+        finish(connection, false);
+    }
+
+    /**
+     * End the open transaction. If the end succeeded and only the driver's
+     * follow-up BEGIN failed, or there was never a transaction, leave one
+     * transaction open while the Java flag stays false. That is the state
+     * sqlite-jdbc is in after a normal commit or rollback.
+     */
+    private static void finish(Connection connection, boolean commit) throws SQLException {
+        if (connection.getAutoCommit()) return;
+        SQLException last = null;
+        for (int attempt = 1; attempt <= 30; attempt++) {
+            try {
+                if (commit) connection.commit();
+                else connection.rollback();
+                return;
+            } catch (SQLException failure) {
+                last = failure;
+                String message = lower(failure);
+                if (!busy(message) && !noTransaction(message)) throw failure;
+                if (!transactionAlreadyOpen(connection)) return;
+                if (attempt == 30) throw failure;
+                pause();
+            }
+        }
+        if (last != null) throw last;
+    }
+
+    /** @return true when a transaction was already open. A false return has started one. */
+    private static boolean transactionAlreadyOpen(Connection connection) throws SQLException {
+        SQLException last = null;
+        for (int attempt = 1; attempt <= 30; attempt++) {
+            try (Statement statement = connection.createStatement()) {
+                statement.execute("BEGIN IMMEDIATE");
+                return false;
+            } catch (SQLException failure) {
+                last = failure;
+                String message = lower(failure);
+                if (message.contains("within a transaction")) return true;
+                if (!busy(message)) throw failure;
+                if (attempt == 30) throw failure;
+                pause();
+            }
+        }
+        if (last != null) throw last;
+        return true;
+    }
+
+    /** @return true when no transaction remains open */
+    private static boolean commitOpenTransaction(Connection connection) throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("COMMIT");
+            return true;
+        } catch (SQLException failure) {
+            String message = lower(failure);
+            if (noTransaction(message)) return true;
+            if (busy(message)) return false;
+            throw failure;
+        }
+    }
+
+    private static void restoreAutocommitFlag(Connection connection) throws SQLException {
+        try {
+            if (!connection.getAutoCommit()) connection.setAutoCommit(true);
+        } catch (SQLException failure) {
+            String message = lower(failure);
+            if (!noTransaction(message) && !busy(message)) throw failure;
+        }
+        for (int attempt = 1; attempt <= 30; attempt++) {
+            if (commitOpenTransaction(connection)) return;
+            if (attempt == 30) {
+                throw new SQLException("error: store connection stayed locked");
+            }
+            pause();
+        }
+    }
+
+    private static boolean noTransaction(String message) {
+        return message.contains("no transaction is active")
+                || message.contains("cannot commit")
+                || message.contains("cannot rollback");
+    }
+
+    private static boolean busy(String message) {
+        return message.contains("busy") || message.contains("locked");
+    }
+
+    private static String lower(SQLException failure) {
+        String message = failure == null || failure.getMessage() == null ? "" : failure.getMessage();
+        return message.toLowerCase(Locale.ROOT);
+    }
+
+    private static void pause() throws SQLException {
+        try {
+            Thread.sleep(100L);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new SQLException("error: store connection interrupted", interrupted);
+        }
+    }
+
     public static Connection wrap(SqlSession session) {
         Router router = new Router(session);
         InvocationHandler handler = (proxy, method, args) -> {
@@ -41,18 +184,18 @@ public final class Sql {
             }
             if ("setAutoCommit".equals(name) && method.getParameterCount() == 1) {
                 boolean auto = Boolean.TRUE.equals(args[0]);
-                router.delegate.setAutoCommit(auto);
-                if (router.main != null) router.main.setAutoCommit(auto);
+                setAutoCommit(router.delegate, auto);
+                if (router.main != null) setAutoCommit(router.main, auto);
                 return null;
             }
             if ("commit".equals(name) && method.getParameterCount() == 0) {
-                if (router.main != null && !router.main.getAutoCommit()) router.main.commit();
-                router.delegate.commit();
+                if (router.main != null) commit(router.main);
+                commit(router.delegate);
                 return null;
             }
             if ("rollback".equals(name) && method.getParameterCount() == 0) {
-                if (router.main != null && !router.main.getAutoCommit()) router.main.rollback();
-                router.delegate.rollback();
+                if (router.main != null) rollback(router.main);
+                rollback(router.delegate);
                 return null;
             }
             if (args != null && args.length > 0 && args[0] instanceof String sql
@@ -427,7 +570,7 @@ public final class Sql {
             } catch (java.io.IOException failure) {
                 throw new SQLException(failure.getMessage() == null ? "run-state database did not open" : failure.getMessage(), failure);
             }
-            if (!delegate.getAutoCommit()) main.setAutoCommit(false);
+            if (!delegate.getAutoCommit()) setAutoCommit(main, false);
             return main;
         }
 
@@ -443,7 +586,7 @@ public final class Sql {
             }
             if (main != null) {
                 try {
-                    if (!main.getAutoCommit()) main.setAutoCommit(true);
+                    if (!main.getAutoCommit()) setAutoCommit(main, true);
                 } catch (SQLException ignored) {
                     // The pool replaces a connection that will not reset.
                 }

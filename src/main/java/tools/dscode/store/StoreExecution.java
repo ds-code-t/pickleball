@@ -618,6 +618,11 @@ public final class StoreExecution {
         return DEFINITION_LOADS.get();
     }
 
+    /** Tests share a JVM. Drop cached definitions so one project cannot match another's catalog. */
+    static void clearCatalog() {
+        DEFINITION_CATALOG.clear();
+    }
+
     private record CompiledDef(String id, String pattern, Pattern placeholder, Pattern regex) {
     }
 
@@ -639,12 +644,7 @@ public final class StoreExecution {
     }
 
     private static List<CompiledDef> catalog(Connection connection) throws SQLException {
-        String url;
-        try {
-            url = connection.getMetaData().getURL();
-        } catch (SQLException failure) {
-            url = null;
-        }
+        String url = catalogKey(connection);
         String stamp = stamp(connection);
         if (url != null) {
             Catalog cached = DEFINITION_CATALOG.get(url);
@@ -660,6 +660,27 @@ public final class StoreExecution {
         List<CompiledDef> frozen = List.copyOf(loaded);
         if (url != null) DEFINITION_CATALOG.put(url, new Catalog(stamp, frozen));
         return frozen;
+    }
+
+    private static String catalogKey(Connection connection) throws SQLException {
+        try (java.sql.Statement statement = connection.createStatement();
+             ResultSet rows = statement.executeQuery("PRAGMA database_list")) {
+            while (rows.next()) {
+                if ("main".equalsIgnoreCase(rows.getString("name"))) {
+                    String file = rows.getString("file");
+                    if (file != null && !file.isBlank()) return file;
+                }
+            }
+        } catch (SQLException ignored) {
+            // The JDBC URL is enough when the pragma cannot be read.
+        }
+        try {
+            String url = connection.getMetaData().getURL();
+            if (url != null && url.contains("/")) return url;
+        } catch (SQLException ignored) {
+            // No stable key. The caller loads definitions and does not cache them.
+        }
+        return null;
     }
 
     private static String stamp(Connection connection) throws SQLException {
