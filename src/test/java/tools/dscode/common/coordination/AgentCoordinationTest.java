@@ -242,26 +242,38 @@ class AgentCoordinationTest {
         AgentCoordination.finish(project, run.runId(), "first", "FAILED");
         String failed = Files.readString(run.recordFile());
         assertTrue(failed.contains("\"status\" : \"FAILED\""), failed);
-        AgentCoordination.begin(project, request("run-again", "agent-again"));
-        String reset = Files.readString(run.recordFile());
-        assertTrue(reset.contains("\"status\" : \"RUNNING\""), reset);
-        assertTrue(reset.contains("\"stoppedAt\" : null"), reset);
-        assertTrue(reset.contains("\"failureCount\" : null"), reset);
-        long starts = AgentCoordination.readLog(project).stream().filter(line -> line.contains("\tstart\t")).count();
-        assertEquals(2, starts);
+        IllegalStateException refused = assertThrows(IllegalStateException.class,
+                () -> AgentCoordination.begin(project, request("run-again", "agent-again")));
+        assertTrue(refused.getMessage().contains("already finished"), refused.getMessage());
+        String kept = Files.readString(run.recordFile());
+        assertTrue(kept.contains("\"status\" : \"FAILED\""), kept);
+        assertFalse(kept.contains("\"status\" : \"RUNNING\""), kept);
         AgentCoordination.finish(project, run.runId(), null, "PASSED");
-        String passed = Files.readString(run.recordFile());
-        assertTrue(passed.contains("\"status\" : \"PASSED\""), passed);
-        assertFalse(passed.contains("\"failureCount\" : 1"), passed);
-        long stops = AgentCoordination.readLog(project).stream().filter(line -> line.contains("\tstop\t")).count();
-        assertEquals(2, stops);
-        AgentCoordination.finish(project, run.runId(), null, "STOPPED");
-        long stopsAfterSession = AgentCoordination.readLog(project).stream().filter(line -> line.contains("\tstop\t")).count();
-        assertEquals(3, stopsAfterSession);
+        String stillFailed = Files.readString(run.recordFile());
+        assertTrue(stillFailed.contains("\"status\" : \"FAILED\""), stillFailed);
+        assertFalse(stillFailed.contains("\"status\" : \"PASSED\""), stillFailed);
     }
 
     @Test
-    void relaunchArchivesThePreviousDiagnosticAndDoesNotReadItAsCurrent() throws Exception {
+    void runningRelaunchArchivesThePreviousDiagnostic() throws Exception {
+        AgentCoordination.Run run = AgentCoordination.begin(project, request("run-live-attempt", "agent-attempt"));
+        Path scenario = run.diagnosticDirectory().resolve(run.runId()).resolve("scenarios").resolve("old-scenario");
+        Files.createDirectories(scenario);
+        Files.writeString(scenario.resolve("summary.json"), "{\"name\":\"Old failure\",\"outcome\":\"FAILED\"}\n");
+        Files.writeString(
+                run.diagnosticDirectory().resolve(run.runId()).resolve("run-index.json"),
+                "{\"runId\":\"run-live-attempt\",\"outcome\":\"FAILED\"}\n"
+        );
+        AgentCoordination.begin(project, request("run-live-attempt", "agent-attempt"));
+        Path archived = run.dataDirectory().resolve("attempts").resolve("1").resolve("diagnostic")
+                .resolve(run.runId()).resolve("scenarios").resolve("old-scenario").resolve("summary.json");
+        assertTrue(Files.isRegularFile(archived), archived.toString());
+        assertFalse(Files.exists(scenario));
+        assertTrue(Files.readString(run.recordFile()).contains("\"status\" : \"RUNNING\""));
+    }
+
+    @Test
+    void relaunchOfAFinishedRunRefusesAndLeavesTheDiagnosticInPlace() throws Exception {
         AgentCoordination.Run run = AgentCoordination.begin(project, request("run-attempt", "agent-attempt"));
         Path scenario = run.diagnosticDirectory().resolve(run.runId()).resolve("scenarios").resolve("old-scenario");
         Files.createDirectories(scenario);
@@ -271,18 +283,12 @@ class AgentCoordinationTest {
                 "{\"runId\":\"run-attempt\",\"outcome\":\"FAILED\",\"counts\":{\"total\":1,\"failed\":1}}\n"
         );
         AgentCoordination.finish(project, run.runId(), null, "FAILED");
-        AgentCoordination.begin(project, request("run-attempt", "agent-attempt"));
-        Path archived = run.dataDirectory().resolve("attempts").resolve("1").resolve("diagnostic")
-                .resolve(run.runId()).resolve("scenarios").resolve("old-scenario").resolve("summary.json");
-        assertTrue(Files.isRegularFile(archived), archived.toString());
-        assertFalse(Files.exists(scenario));
-        Path stale = project.resolve("reports").resolve("diagnostic-runs").resolve(run.runId());
-        Files.createDirectories(stale.resolve("scenarios").resolve("stale-scenario"));
-        Files.writeString(
-                stale.resolve("run-index.json"),
-                "{\"runId\":\"run-attempt\",\"outcome\":\"FAILED\",\"counts\":{\"failed\":9}}\n"
-        );
-        assertNull(AgentCoordination.findRunIndex(project, run.runId()));
+        IllegalStateException refused = assertThrows(IllegalStateException.class,
+                () -> AgentCoordination.begin(project, request("run-attempt", "agent-attempt")));
+        assertTrue(refused.getMessage().contains("already finished"), refused.getMessage());
+        assertTrue(Files.isRegularFile(scenario.resolve("summary.json")));
+        assertFalse(Files.isDirectory(run.dataDirectory().resolve("attempts")));
+        assertTrue(Files.readString(run.recordFile()).contains("\"status\" : \"FAILED\""));
     }
 
     @Test
@@ -292,18 +298,16 @@ class AgentCoordinationTest {
                 AgentCoordination.Request.of("run-why", "agent-why", null, null, null, "first why", "discover")
         );
         AgentCoordination.finish(project, run.runId(), "first", "FAILED", Instant.parse("2026-01-01T00:00:00Z"), null);
-        AgentCoordination.begin(
+        IllegalStateException refused = assertThrows(IllegalStateException.class, () -> AgentCoordination.begin(
                 project,
                 AgentCoordination.Request.of("run-why", "agent-why", null, null, null, "second why", "discover")
-        );
-        String reset = Files.readString(run.recordFile());
-        assertTrue(reset.contains("second why"), reset);
-        assertFalse(reset.contains("first why"), reset);
-        AgentCoordination.finish(project, run.runId(), "done", "PASSED", Instant.parse("2026-01-02T00:00:00Z"), null);
-        AgentCoordination.finish(project, run.runId(), "done later", "PASSED", Instant.parse("2026-02-01T00:00:00Z"), null);
-        String finished = Files.readString(run.recordFile());
-        assertTrue(finished.contains("2026-02-01T00:00:00Z"), finished);
-        assertFalse(finished.contains("2026-01-02T00:00:00Z"), finished);
+        ));
+        assertTrue(refused.getMessage().contains("already finished"), refused.getMessage());
+        String kept = Files.readString(run.recordFile());
+        assertTrue(kept.contains("first why"), kept);
+        assertFalse(kept.contains("second why"), kept);
+        assertTrue(kept.contains("\"status\" : \"FAILED\""), kept);
+        assertTrue(kept.contains("2026-01-01T00:00:00Z"), kept);
     }
 
     @Test

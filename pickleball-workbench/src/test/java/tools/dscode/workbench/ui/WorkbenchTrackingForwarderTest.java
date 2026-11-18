@@ -2,6 +2,7 @@ package tools.dscode.workbench.ui;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.workbench.launch.ConsumerReadyForwarder;
 import tools.dscode.workbench.store.StoreBrowser;
 import tools.dscode.workbench.store.StoreCliForwarder;
 import tools.dscode.workbench.diagnostics.DiagnosticEvidenceNavigator;
@@ -83,6 +84,39 @@ class WorkbenchTrackingForwarderTest {
         click(panel, "Query");
         assertEquals(List.of("query", "--entity=Account#ada", "--status=FAILED", "--json"), forwarded.get(1));
         assertFalse(Files.exists(project.resolve(".pickleball/store/data/pickleball/.store")));
+    }
+
+    @Test
+    void htmlDashboardForwardsWithoutReplacingTracking() throws Exception {
+        List<List<String>> seen = new ArrayList<>();
+        List<Path> opened = new ArrayList<>();
+        ConsumerReadyForwarder.runner = command -> {
+            seen.add(List.copyOf(command));
+            return new ConsumerReadyForwarder.Result(
+                    0, "dashboard=.pickleball/dashboard/index.html\nruns=0\n", "", command);
+        };
+        java.util.function.Consumer<Path> previousOpener = TrackingPanel.dashboardOpener;
+        TrackingPanel.dashboardOpener = opened::add;
+        try {
+            TrackingPanel[] holder = new TrackingPanel[1];
+            SwingUtilities.invokeAndWait(() -> holder[0] = new TrackingPanel(
+                    () -> project,
+                    (root, args) -> new StoreCliForwarder.Result(0, "{}", "", List.of()),
+                    ignored -> { }));
+            assertTrue(button(holder[0], "Refresh") != null);
+            assertTrue(button(holder[0], "Open in Explorer") != null);
+            click(holder[0], "HTML dashboard");
+            assertEquals(1, seen.size());
+            assertTrue(seen.get(0).contains("dashboard"), seen.get(0).toString());
+            assertTrue(seen.get(0).stream().noneMatch(arg -> arg.contains("localhost")), seen.get(0).toString());
+            assertEquals("dashboard=.pickleball/dashboard/index.html", labelText(holder[0], "Tracking"));
+            assertEquals(
+                    List.of(project.resolve(".pickleball/dashboard/index.html").toAbsolutePath().normalize()),
+                    opened);
+        } finally {
+            ConsumerReadyForwarder.runner = null;
+            TrackingPanel.dashboardOpener = previousOpener;
+        }
     }
 
     @Test
@@ -218,6 +252,33 @@ class WorkbenchTrackingForwarderTest {
         assertTrue(pushed.isEmpty(), pushed.toString());
     }
 
+    @Test
+    void populatedTimelineShowsRowsAndAFailureIsVisibleInTheTable() throws Exception {
+        String body = """
+                {"command":"timeline","count":1,"total":1,"limit":50,"offset":0,"cursor":"c","events":[
+                  {"at":"2020-01-01T00:00:00Z","kind":"run","id":"sample-run","runId":"sample-run","status":"PASSED","scenarioKey":"Pay","stepExecId":"","stepText":"","definitionId":"","entityType":"","entityId":"","field":"","operation":"","valueRef":"","message":"","path":""}
+                ]}
+                """;
+        TrackingPanel[] holder = new TrackingPanel[1];
+        SwingUtilities.invokeAndWait(() -> holder[0] = new TrackingPanel(() -> project, (root, args) -> {
+            if (args.contains("timeline")) return new StoreCliForwarder.Result(0, body, "", List.of());
+            return new StoreCliForwarder.Result(
+                    1, "", "error: Store is enabled but org.xerial:sqlite-jdbc is not on the classpath.\n", List.of());
+        }, ignored -> { }));
+        TrackingPanel panel = holder[0];
+        click(panel, "Refresh");
+        assertEquals("2020-01-01T00:00:00Z run sample-run", row(panel, 0));
+        click(panel, "Retain");
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        String shown = "";
+        while (System.nanoTime() < deadline) {
+            shown = row(panel, 0);
+            if (shown.contains("sqlite-jdbc") && shown.contains("exit 1")) return;
+            Thread.sleep(20);
+        }
+        throw new AssertionError("table stayed " + shown + " status=" + labelText(panel, ""));
+    }
+
     private static void click(Container panel, String title) throws Exception {
         JButton button = button(panel, title);
         SwingUtilities.invokeAndWait(button::doClick);
@@ -226,6 +287,7 @@ class WorkbenchTrackingForwarderTest {
             String text = labelText(panel, "Tracking");
             if (text.startsWith("exit 0") || text.startsWith("2020-") || text.startsWith("explorer ")
                     || text.startsWith("Select a run") || text.startsWith("Explorer is not ready")
+                    || text.startsWith("error:") || text.startsWith("dashboard=")
                     || "paused".equals(text) || text.startsWith("play ")) return;
             Thread.sleep(20);
         }

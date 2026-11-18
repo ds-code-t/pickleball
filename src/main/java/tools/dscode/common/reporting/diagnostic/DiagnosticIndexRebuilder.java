@@ -110,6 +110,7 @@ public final class DiagnosticIndexRebuilder {
             }
         }
         runs.sort((a, b) -> text(b.get("startedAt")).compareTo(text(a.get("startedAt"))));
+        tools.dscode.store.RunCatalog.retain(runsRoot, runs);
         writeAtomic(runsRoot.resolve("run-catalog.json"), Map.of(
                 "schemaVersion", 1,
                 "updatedAt", Instant.now().toString(),

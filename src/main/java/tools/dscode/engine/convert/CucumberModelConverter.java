@@ -78,7 +78,27 @@ public final class CucumberModelConverter {
 
     public static io.cucumber.datatable.DataTable toDataTable(Table table) {
         if (table == null || table.isEmpty()) return io.cucumber.datatable.DataTable.emptyDataTable();
-        return io.cucumber.datatable.DataTable.create(copyRows(table.rows()));
+        return dataTable(table.rows());
+    }
+
+    /**
+     * A step table. Uses the glue converter already registered on the running
+     * scenario so {@code asList} and {@code asMaps} see consumer {@code @DataTableType}s.
+     */
+    public static io.cucumber.datatable.DataTable dataTable(List<List<String>> rows) {
+        if (rows == null || rows.isEmpty()) return io.cucumber.datatable.DataTable.emptyDataTable();
+        List<List<String>> copy = copyRows(rows);
+        io.cucumber.datatable.DataTable.TableConverter converter = activeTableConverter();
+        if (converter == null) return io.cucumber.datatable.DataTable.create(copy);
+        return io.cucumber.datatable.DataTable.create(copy, converter);
+    }
+
+    public static io.cucumber.datatable.DataTable.TableConverter activeTableConverter() {
+        tools.dscode.engine.context.ExecutionContext context = tools.dscode.engine.context.ExecutionContext.current();
+        if (context == null) return null;
+        Object registry = context.resources().get("registry");
+        if (registry instanceof tools.dscode.engine.match.StepRegistry steps) return steps.tableConverter();
+        return null;
     }
 
     public static DocText toDocText(io.cucumber.docstring.DocString doc) {

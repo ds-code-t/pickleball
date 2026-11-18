@@ -69,6 +69,11 @@ public final class PickleballWorkbenchLauncher {
             if (logs != 0) exitProcess(logs);
             return;
         }
+        int dashboard = dispatchDashboardIfAny(args, System.out, System.err);
+        if (dashboard >= 0) {
+            if (dashboard != 0) exitProcess(dashboard);
+            return;
+        }
         int store = dispatchStoreIfAny(args, System.out, System.err);
         if (store >= 0) {
             if (store != 0) exitProcess(store);
@@ -91,6 +96,32 @@ public final class PickleballWorkbenchLauncher {
         return tools.dscode.engine.EngineCli.execute(args, out, err);
     }
 
+    /** Test hook. Production resolves {@code DomEngineMain.dispatch} on the first domengine call, not in {@code <clinit>}. */
+    static java.util.function.Function<java.util.List<String>, dev.domengine.cli.CliResult> domEngineCall;
+
+    static void resetDomEngineCall() {
+        domEngineCall = null;
+    }
+
+    private static dev.domengine.cli.CliResult invokeDomEngine(java.util.List<String> rest) {
+        java.util.function.Function<java.util.List<String>, dev.domengine.cli.CliResult> call = domEngineCall;
+        if (call == null) {
+            call = dev.domengine.cli.DomEngineMain::dispatch;
+        }
+        return call.apply(rest);
+    }
+
+    /**
+     * Classpath form for a thin jar. {@code java -jar} does not see Jackson.
+     * This does not ask the caller to shade a fat jar.
+     */
+    static String missingDomEngine(Throwable missing) {
+        String type = missing == null ? "NoClassDefFoundError" : missing.getClass().getSimpleName();
+        return "error: java -jar cannot load domengine (" + type + ").\n"
+                + "fix: java -cp <classpath> tools.dscode.launcher.PickleballWorkbenchLauncher domengine ...\n"
+                + "The published jar stays thin.\n";
+    }
+
     /**
      * The Java DOM engine is a core CLI. Returns {@code -1} when {@code args}
      * are not a {@code domengine} invocation. Workbench only forwards.
@@ -103,7 +134,13 @@ public final class PickleballWorkbenchLauncher {
         for (int index = 1; index < args.length; index++) {
             if (args[index] != null) rest.add(args[index]);
         }
-        dev.domengine.cli.CliResult result = dev.domengine.cli.DomEngineMain.dispatch(rest);
+        dev.domengine.cli.CliResult result;
+        try {
+            result = invokeDomEngine(rest);
+        } catch (NoClassDefFoundError | ExceptionInInitializerError missing) {
+            stderr.print(missingDomEngine(missing));
+            return 1;
+        }
         if (result.stdout() != null && !result.stdout().isEmpty()) stdout.print(result.stdout());
         if (result.stderr() != null && !result.stderr().isEmpty()) stderr.print(result.stderr());
         return result.exit();
@@ -116,6 +153,15 @@ public final class PickleballWorkbenchLauncher {
     static int dispatchLogIfAny(String[] args, PrintStream out, PrintStream err) {
         if (!tools.dscode.common.composite.DomLogCli.handles(args)) return -1;
         return tools.dscode.common.composite.DomLogCli.execute(args, out, err);
+    }
+
+    /**
+     * The static dashboard is a core CLI, not a Workbench verb.
+     * Returns {@code -1} when {@code args} are not a {@code dashboard} invocation.
+     */
+    static int dispatchDashboardIfAny(String[] args, PrintStream out, PrintStream err) {
+        if (!tools.dscode.store.dashboard.DashboardCli.handles(args)) return -1;
+        return tools.dscode.store.dashboard.DashboardCli.execute(args, out, err);
     }
 
     /**

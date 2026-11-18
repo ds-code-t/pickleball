@@ -167,6 +167,8 @@ public final class SqlDialect {
                 failed INTEGER NOT NULL DEFAULT 0,
                 note TEXT NOT NULL,
                 sandbox TEXT NOT NULL DEFAULT '',
+                git_commit TEXT NOT NULL DEFAULT '',
+                feature_path TEXT NOT NULL DEFAULT '',
                 PRIMARY KEY (run_id)
             )
             """,
@@ -361,23 +363,59 @@ public final class SqlDialect {
                 + " 2147483647)";
     }
 
+    private static final java.util.concurrent.atomic.AtomicInteger SCHEMA_FULL = new java.util.concurrent.atomic.AtomicInteger();
+    private static final java.util.concurrent.atomic.AtomicInteger SCHEMA_FAST = new java.util.concurrent.atomic.AtomicInteger();
+    private static final java.util.concurrent.ConcurrentHashMap<String, Object> SCHEMA_LOCKS =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** How many opens ran the full DDL. Recording should not do this on every step. */
+    public static int schemaFullEnsures() {
+        return SCHEMA_FULL.get();
+    }
+
+    /** How many opens found schema 1 and the changelog trigger and returned. */
+    public static int schemaFastEnsures() {
+        return SCHEMA_FAST.get();
+    }
+
     public static void ensureSchema(SqlSession session) throws SQLException {
-        for (String ddl : SOURCE_DDL) session.script(ddl);
-        for (String ddl : BRANCH_DDL) session.script(ddl);
-        String current = session.scalar("SELECT value FROM schema_meta WHERE `key` = 'store_schema'");
-        if (current != null && !current.isBlank()) {
-            int version;
-            try {
-                version = Integer.parseInt(current.trim());
-            } catch (NumberFormatException failure) {
-                version = 0;
-            }
-            if (version > SCHEMA_VERSION) {
-                throw new SQLException("store schema " + version + " is newer than this build ("
-                        + SCHEMA_VERSION + ")");
-            }
+        rejectNewer(readStoreSchema(session));
+        if (schemaReady(session)) {
+            SCHEMA_FAST.incrementAndGet();
+            return;
         }
-        if (!"1".equals(current)) {
+        synchronized (schemaLock(session)) {
+            rejectNewer(readStoreSchema(session));
+            if (schemaReady(session)) {
+                SCHEMA_FAST.incrementAndGet();
+                return;
+            }
+            SQLException last = null;
+            for (int attempt = 1; attempt <= 5; attempt++) {
+                try {
+                    if (attempt == 1) SCHEMA_FULL.incrementAndGet();
+                    applySchema(session);
+                    return;
+                } catch (SQLException failure) {
+                    last = failure;
+                    if (!schemaRace(failure) || attempt == 5) throw failure;
+                    pause(attempt);
+                    if (schemaReady(session)) {
+                        SCHEMA_FAST.incrementAndGet();
+                        return;
+                    }
+                }
+            }
+            if (last != null) throw last;
+        }
+    }
+
+    private static void applySchema(SqlSession session) throws SQLException {
+        for (String ddl : SOURCE_DDL) scriptSchema(session, ddl);
+        for (String ddl : BRANCH_DDL) scriptSchema(session, ddl);
+        String stored = readStoreSchema(session);
+        rejectNewer(stored);
+        if (!"1".equals(stored)) {
             session.update(UPSERT_META, "store_schema", "1");
             session.update(UPSERT_META, "schema_version", "1");
             session.update(UPSERT_META, "hydrate_generation", "0");
@@ -390,9 +428,96 @@ public final class SqlDialect {
                             + "ON CONFLICT(`key`) DO UPDATE SET value = excluded.value");
         }
         session.update("INSERT OR IGNORE INTO _pkb_actor(id, name) VALUES (1, '')");
-        String trigger = session.scalar(
-                "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name = 'files_pkb_insert'");
-        if (trigger == null) installChangeLog(session);
+        if (!triggerExists(session, "files_pkb_insert")) installChangeLog(session);
+    }
+
+    private static String readStoreSchema(SqlSession session) {
+        try {
+            return session.scalar("SELECT value FROM schema_meta WHERE `key` = 'store_schema'");
+        } catch (SQLException ignored) {
+            return null;
+        }
+    }
+
+    private static void rejectNewer(String current) throws SQLException {
+        if (current == null || current.isBlank()) return;
+        int version;
+        try {
+            version = Integer.parseInt(current.trim());
+        } catch (NumberFormatException failure) {
+            return;
+        }
+        if (version > SCHEMA_VERSION) {
+            throw new SQLException("store schema " + version + " is newer than this build ("
+                    + SCHEMA_VERSION + ")");
+        }
+    }
+
+    /** Schema 1 with the changelog trigger. A newer version never takes this path. */
+    private static boolean schemaReady(SqlSession session) {
+        String current = readStoreSchema(session);
+        if (!"1".equals(current)) return false;
+        try {
+            return triggerExists(session, "files_pkb_insert");
+        } catch (SQLException ignored) {
+            return false;
+        }
+    }
+
+    private static boolean triggerExists(SqlSession session, String name) throws SQLException {
+        return session.scalar(
+                "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name = ?", name) != null;
+    }
+
+    private static Object schemaLock(SqlSession session) {
+        tools.dscode.store.sql.Binding binding = session.binding();
+        java.nio.file.Path file = binding.primary()
+                ? tools.dscode.store.StorePaths.mainDatabase(session.project())
+                : tools.dscode.store.StorePaths.sandboxDatabase(session.project(), binding.name());
+        return SCHEMA_LOCKS.computeIfAbsent(file.toAbsolutePath().normalize().toString(), ignored -> new Object());
+    }
+
+    private static void scriptSchema(SqlSession session, String sql) throws SQLException {
+        SQLException last = null;
+        for (int attempt = 1; attempt <= 5; attempt++) {
+            try {
+                session.script(sql);
+                return;
+            } catch (SQLException failure) {
+                last = failure;
+                if (!schemaRace(failure) || attempt == 5) {
+                    if (alreadyPresent(failure)) return;
+                    throw failure;
+                }
+                pause(attempt);
+            }
+        }
+        if (last != null) throw last;
+    }
+
+    private static boolean schemaRace(SQLException failure) {
+        String message = failure == null || failure.getMessage() == null
+                ? "" : failure.getMessage().toLowerCase(Locale.ROOT);
+        return message.contains("already exists")
+                || message.contains("database is locked")
+                || message.contains("schema is locked")
+                || message.contains("sqlite_busy")
+                || message.contains("busy");
+    }
+
+    private static boolean alreadyPresent(SQLException failure) {
+        String message = failure == null || failure.getMessage() == null
+                ? "" : failure.getMessage().toLowerCase(Locale.ROOT);
+        return message.contains("already exists");
+    }
+
+    private static void pause(int attempt) throws SQLException {
+        try {
+            Thread.sleep(20L * attempt + ThreadLocalRandom.current().nextLong(30));
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new SQLException("error: schema setup interrupted", interrupted);
+        }
     }
 
     public static void ensureRunSchema(SqlSession session) throws SQLException {
@@ -401,6 +526,26 @@ public final class SqlDialect {
 
     /** Triggers omit BLOB columns. JSON cannot hold a multi-byte blob. */
     public static void installChangeLog(SqlSession session) throws SQLException {
+        synchronized (schemaLock(session)) {
+            SQLException last = null;
+            for (int attempt = 1; attempt <= 5; attempt++) {
+                try {
+                    installChangeLogOnce(session);
+                    return;
+                } catch (SQLException failure) {
+                    last = failure;
+                    if (!schemaRace(failure) || attempt == 5) {
+                        if (alreadyPresent(failure) && triggerExists(session, "files_pkb_insert")) return;
+                        throw failure;
+                    }
+                    pause(attempt);
+                }
+            }
+            if (last != null) throw last;
+        }
+    }
+
+    private static void installChangeLogOnce(SqlSession session) throws SQLException {
         for (String table : List.of("files", "entities", "step_definitions")) {
             List<String> columns = session.column("SELECT name FROM pragma_table_info('" + table + "')");
             List<String> types = session.column("SELECT type FROM pragma_table_info('" + table + "')");
@@ -414,14 +559,14 @@ public final class SqlDialect {
             }
             for (String when : List.of("INSERT", "UPDATE", "DELETE")) {
                 String name = table + "_pkb_" + when.toLowerCase(Locale.ROOT);
-                session.script("DROP TRIGGER IF EXISTS " + name);
+                scriptSchema(session, "DROP TRIGGER IF EXISTS " + name);
                 String op = when.toLowerCase(Locale.ROOT);
                 String row = "DELETE".equals(when) ? "OLD" : "NEW";
                 String oldJson = "DELETE".equals(when) || "UPDATE".equals(when)
                         ? json.toString().replace("NEW.", "OLD.") : "NULL";
                 String newJson = "DELETE".equals(when) ? "NULL" : json.toString();
-                session.script("""
-                        CREATE TRIGGER %s AFTER %s ON %s BEGIN
+                scriptSchema(session, """
+                        CREATE TRIGGER IF NOT EXISTS %s AFTER %s ON %s BEGIN
                             INSERT INTO _pkb_changes(at, tbl, pk, op, old, new, actor)
                             VALUES (
                                 strftime('%%Y-%%m-%%dT%%H:%%M:%%fZ','now'),

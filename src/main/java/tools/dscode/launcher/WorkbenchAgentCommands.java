@@ -86,6 +86,13 @@ public final class WorkbenchAgentCommands {
         try {
             return switch (parsed.command()) {
                 case "export-guidance" -> exportGuidance(parsed, safeOut, safeErr);
+                case "start" -> ConsumerReadyCommands.start(parsed, safeOut, safeErr);
+                case "chat_wait" -> ConsumerReadyCommands.chatWait(parsed, safeOut, safeErr);
+                case "history-summary" -> ConsumerReadyCommands.historySummary(parsed, safeOut, safeErr);
+                case "history-query" -> query(parsed, safeOut, safeErr);
+                case "entity-lookup" -> ConsumerReadyCommands.entityLookup(parsed, safeOut, safeErr);
+                case "open-run" -> ConsumerReadyCommands.openRun(parsed, safeOut, safeErr);
+                case "bridge-health" -> ConsumerReadyCommands.bridgeHealth(parsed, safeOut, safeErr);
                 case "hint", "discover-hint" -> hint(parsed, safeOut, safeErr);
                 case "resolve-runvars" -> resolveRunVars(parsed, safeOut);
                 case "workspace-show" -> workspaceShow(parsed, safeOut, safeErr);
@@ -1687,8 +1694,13 @@ public final class WorkbenchAgentCommands {
             PrintStream err
     ) {
         HttpClient http = HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(5)).build();
-        java.util.Optional<WorkbenchSessionCommands.SessionState> session =
-                WorkbenchSessionCommands.readHealthy(parsed.project(), http);
+        java.util.Optional<WorkbenchSessionCommands.SessionState> session;
+        try {
+            session = WorkbenchSessionCommands.resolveSession(parsed, http);
+        } catch (IllegalStateException several) {
+            err.println(several.getMessage());
+            return 2;
+        }
         if (session.isEmpty()) {
             err.println(WorkbenchCliHelp.structured("start a session first", "isolate, then retry this command."));
             return 2;
@@ -1931,7 +1943,7 @@ public final class WorkbenchAgentCommands {
         }
         AgentControl.Result result = AgentControl.execute(
                 parsed.project(),
-                parsed.coordination().runId(),
+                boundRunId(parsed),
                 parsed.command(),
                 args,
                 extra,
@@ -1951,6 +1963,12 @@ public final class WorkbenchAgentCommands {
             ));
         }
         return result.exit();
+    }
+
+    private static String boundRunId(WorkbenchCommandLine.Parsed parsed) {
+        String runId = parsed.coordination().runId();
+        if (runId != null && !runId.isBlank()) return runId;
+        return ConsumerReadyCommands.sessionId(parsed.project());
     }
 
     private static void copyFlag(Map<String, String> args, WorkbenchCommandLine.Parsed parsed, String name) {

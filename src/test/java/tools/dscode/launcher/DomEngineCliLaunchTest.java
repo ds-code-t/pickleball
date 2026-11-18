@@ -7,6 +7,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DomEngineCliLaunchTest {
@@ -26,5 +27,27 @@ class DomEngineCliLaunchTest {
                 new PrintStream(new ByteArrayOutputStream()),
                 new PrintStream(new ByteArrayOutputStream())
         ));
+    }
+
+    @Test
+    void missingDomEngineClassesUseTheClasspathForm() {
+        PickleballWorkbenchLauncher.domEngineCall = rest -> {
+            throw new NoClassDefFoundError("com/fasterxml/jackson/databind/ObjectMapper");
+        };
+        try {
+            ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+            int code = PickleballWorkbenchLauncher.dispatchDomEngineIfAny(
+                    new String[]{"domengine", "query"},
+                    new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                    new PrintStream(stderr, true, StandardCharsets.UTF_8)
+            );
+            String text = stderr.toString(StandardCharsets.UTF_8);
+            assertEquals(1, code, text);
+            assertTrue(text.contains("java -cp <classpath> tools.dscode.launcher.PickleballWorkbenchLauncher domengine"), text);
+            assertTrue(text.contains("thin"), text);
+            assertFalse(text.contains("build a fat jar"), text);
+        } finally {
+            PickleballWorkbenchLauncher.resetDomEngineCall();
+        }
     }
 }

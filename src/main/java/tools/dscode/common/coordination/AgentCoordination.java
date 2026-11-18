@@ -322,6 +322,19 @@ public final class AgentCoordination {
         try {
             if (Files.isRegularFile(recordFile)) {
                 RunRecord existing = readRecord(recordFile);
+                if (finishedRecord(existing)) {
+                    if (!continuesFinishedRun(safe, existing, data)) {
+                        throw new IllegalStateException(
+                                "run id " + existing.runId() + " is already finished ("
+                                        + existing.status() + "). Use a new run id.");
+                    }
+                    Run continued = toRun(project, data, recordFile, existing);
+                    activate(continued);
+                    print(out, "run-id=" + continued.runId());
+                    print(out, "run-record=" + continued.recordFile());
+                    print(out, "short-log=" + logFile(project));
+                    return continued;
+                }
                 if (logStart) archivePreviousAttempt(data);
                 ensureTree(data);
                 if (logStart) {
@@ -348,6 +361,7 @@ public final class AgentCoordination {
                     );
                     writeRecord(recordFile, reset);
                     appendLog(project, clock, existing.agentId(), runId, "start", purpose, recordFile);
+                    tools.dscode.store.RunCatalog.publishAgent(project, runId, "RUNNING", purpose);
                     existing = reset;
                 }
                 Run adopted = toRun(project, data, recordFile, existing);
@@ -384,6 +398,7 @@ public final class AgentCoordination {
                     null
             );
             writeRecord(recordFile, record);
+            tools.dscode.store.RunCatalog.publishAgent(project, runId, "RUNNING", purpose);
             if (logStart) {
                 appendLog(project, clock, agentId, runId, "start", purpose, recordFile);
             }
@@ -582,6 +597,7 @@ public final class AgentCoordination {
                     appendLog(project, clock, existing.agentId(), existing.runId(), "note", oneLine(learnedValue), recordFile);
                 }
             }
+            tools.dscode.store.RunCatalog.publishAgent(project, existing.runId(), statusValue, existing.why());
             print(out, "run-id=" + existing.runId());
             print(out, "run-record=" + recordFile);
         } catch (IOException failure) {
@@ -1110,6 +1126,30 @@ public final class AgentCoordination {
         return PickleballLocalLayout.root(project).resolve(INBOX_DIRECTORY).resolve(agentFolder);
     }
 
+    private static boolean finishedRecord(RunRecord existing) {
+        if (existing == null) return false;
+        if (existing.stoppedAt() != null && !existing.stoppedAt().isBlank()) return true;
+        String status = existing.status();
+        return status != null && !status.isBlank() && !"RUNNING".equalsIgnoreCase(status.trim());
+    }
+
+    /**
+     * A6 refuses isolate on a finished discover, and a second discover.
+     * Two callers still continue, and neither rewrites the finished record
+     * or moves {@code diagnostic/}:
+     * confirm, which is the next launch on that same id, and a later isolate
+     * whose only finish was a session that exited before it was healthy.
+     * That second isolate still rotates {@code session/session.log}.
+     */
+    private static boolean continuesFinishedRun(Request request, RunRecord existing, Path data) throws IOException {
+        String purpose = request == null ? null : request.purpose();
+        if ("confirm".equals(purpose)) return true;
+        if (!"isolate".equals(purpose) || existing == null) return false;
+        String learned = existing.learned() == null ? "" : existing.learned();
+        if (!learned.startsWith("Session start failed")) return false;
+        return !attemptEvidence(data.resolve("diagnostic"));
+    }
+
     private static void ensureTree(Path data) throws IOException {
         Files.createDirectories(data.resolve("reports"));
         Files.createDirectories(data.resolve("diagnostic"));
@@ -1120,8 +1160,12 @@ public final class AgentCoordination {
     }
 
     /**
-     * A relaunch keeps the previous diagnostic pack, but not on the path query
-     * and the summary walk. {@code attempts/} is outside {@code diagnostic/}.
+     * A still-RUNNING relaunch keeps the previous diagnostic pack off the path
+     * query and the summary walk. A finished discover is refused before this
+     * runs, so {@code diagnostic/} stays put. {@code attempts/} is outside
+     * {@code diagnostic/}. A session log is rotated separately, under
+     * {@code session/attempts/}, and that path stays open for a session launch
+     * that never became healthy.
      */
     private static void archivePreviousAttempt(Path data) throws IOException {
         Path diagnostic = data.resolve("diagnostic");

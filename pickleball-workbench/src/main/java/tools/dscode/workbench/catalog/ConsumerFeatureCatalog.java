@@ -146,6 +146,11 @@ public final class ConsumerFeatureCatalog {
         return new ConsumerFeatureCatalog(projectRoot, manifest);
     }
 
+    /** Rows already built. Does not scan the project. */
+    public static ConsumerFeatureCatalog fromEntries(Path projectRoot, List<FeatureEntry> features) {
+        return new ConsumerFeatureCatalog(projectRoot, features == null ? List.of() : features);
+    }
+
     public Path projectRoot() {
         return projectRoot;
     }

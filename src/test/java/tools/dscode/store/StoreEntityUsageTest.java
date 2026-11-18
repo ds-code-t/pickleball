@@ -98,15 +98,18 @@ class StoreEntityUsageTest {
     @Test
     void aRealStepRecordsTheLookup() throws Exception {
         writeEntity();
+        isolateStore();
         String previous = System.getProperty("pkb_store");
         String previousProject = System.getProperty("pkb_store_project");
         String track = System.getProperty("pkb_store_track");
         String run = System.getProperty("pkb_run_id");
+        String sandbox = System.getProperty("pkb_store_sandbox");
         try {
             System.setProperty("pkb_store", "true");
             System.setProperty("pkb_store_track", "true");
             System.setProperty("pkb_store_project", project.toAbsolutePath().normalize().toString());
-            System.setProperty("pkb_run_id", "usage-live");
+            System.setProperty("pkb_run_id", "usage-" + java.util.UUID.randomUUID());
+            System.clearProperty("pkb_store_sandbox");
             StoreRunContext.clear();
             var result = PickleballEngine.run("""
                     Feature: Usage
@@ -127,9 +130,19 @@ class StoreEntityUsageTest {
             restore("pkb_store_project", previousProject);
             restore("pkb_store_track", track);
             restore("pkb_run_id", run);
+            restore("pkb_store_sandbox", sandbox);
             StoreRunContext.clear();
+            StoreScope.clear();
+            StoreExecution.clearCatalog();
             StoreExecution.finishScenario("PASSED");
         }
+    }
+
+    /** A bound sandbox or another project's definition catalog must not share this database. */
+    private static void isolateStore() {
+        StoreScope.clear();
+        StoreExecution.clearCatalog();
+        StoreRunContext.clear();
     }
 
     private void writeEntity() throws Exception {

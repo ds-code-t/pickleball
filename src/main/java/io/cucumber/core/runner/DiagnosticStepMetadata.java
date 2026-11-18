@@ -17,15 +17,27 @@ public record DiagnosticStepMetadata(
 
         PickleStepTestStep executionStep = step.executingPickleStepTestStep;
         if (executionStep == null) executionStep = step.pickleStepTestStep;
-        if (executionStep == null) return null;
+        if (executionStep == null) {
+            String text = step.getStepText();
+            return new DiagnosticStepMetadata(
+                    step.method,
+                    step.codeLocation == null ? "" : step.codeLocation,
+                    0,
+                    step.nativeKeyword == null ? "" : step.nativeKeyword,
+                    text == null ? "" : text
+            );
+        }
 
         var cucumberStep = executionStep.getStep();
+        String text = executionStep.getStepText();
+        if (text == null || text.isBlank()) text = step.getStepText();
+        if (text == null) text = "";
         return new DiagnosticStepMetadata(
                 executionStep.getMethod(),
                 executionStep.getCodeLocation(),
                 executionStep.getStepLine(),
                 cucumberStep == null ? "" : cucumberStep.getKeyword(),
-                executionStep.getStepText()
+                text
         );
     }
 }

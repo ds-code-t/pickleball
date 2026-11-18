@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -66,12 +67,59 @@ public final class SqlConnections {
         return new Borrowed(take(pool), pool);
     }
 
+    private static final java.util.Set<String> RUN_SCHEMA = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
     private static void ensureRunState(Path project) throws IOException, SQLException {
+        Path file = StorePaths.runState(project);
+        String key = file.toAbsolutePath().normalize().toString();
+        if (RUN_SCHEMA.contains(key) && Files.isRegularFile(file)) return;
         Borrowed borrowed = borrowRunState(project);
         try (Statement statement = borrowed.connection().createStatement()) {
             for (String ddl : SqlDialect.RUN_DDL) statement.execute(ddl);
+            addRunColumns(borrowed.connection());
         } finally {
             giveBack(borrowed.pool(), borrowed.connection());
+        }
+        RUN_SCHEMA.add(key);
+    }
+
+    /** Older run-state files predate git commit and feature path. New files already have both. */
+    private static void addRunColumns(Connection connection) throws SQLException {
+        java.util.Set<String> names = new java.util.HashSet<>();
+        try (ResultSet rows = connection.createStatement().executeQuery("PRAGMA table_info(runs)")) {
+            while (rows.next()) names.add(rows.getString("name"));
+        }
+        if (names.isEmpty()) return;
+        try (Statement statement = connection.createStatement()) {
+            if (!names.contains("git_commit")) {
+                statement.execute("ALTER TABLE runs ADD COLUMN git_commit TEXT NOT NULL DEFAULT ''");
+            }
+            if (!names.contains("feature_path")) {
+                statement.execute("ALTER TABLE runs ADD COLUMN feature_path TEXT NOT NULL DEFAULT ''");
+            }
+        }
+    }
+
+    /** Feature paths from scenario keys. Does not assign a git commit and does not create a database. */
+    public static void fillRunProvenance(Path project) throws SQLException {
+        if (project == null) return;
+        Path file = StorePaths.runState(project);
+        if (!Files.isRegularFile(file)) return;
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + file.toAbsolutePath())) {
+            tools.dscode.store.RunProvenance.fillBlanks(connection, project);
+        }
+    }
+
+    /**
+     * Adds the run provenance columns when a run-state file already exists.
+     * Does not create a database.
+     */
+    public static void ensureRunColumns(Path project) throws IOException, SQLException {
+        if (project == null) return;
+        Path file = StorePaths.runState(project);
+        if (!Files.isRegularFile(file)) return;
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + file.toAbsolutePath())) {
+            addRunColumns(connection);
         }
     }
 

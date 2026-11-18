@@ -6,6 +6,7 @@ import tools.dscode.control.protocol.ControlBridgeDescriptor;
 import tools.dscode.control.protocol.ControlBridgeScenarioStatus;
 import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.control.protocol.Workspace;
+import tools.dscode.workbench.bridge.BridgeHealthReport;
 import tools.dscode.workbench.bridge.ControlBridgeClient;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.sync.WorkbenchSynchronizer;
@@ -51,6 +52,9 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
     private final Map<String, String> workerSystemProperties;
     private final SecureRandom random = new SecureRandom();
     private WorkerSession active;
+    private volatile boolean autoRestart;
+    private int healthFailures;
+    private ScheduledExecutorService healthWatch;
 
     public WorkbenchWorkerManager(Path projectRoot) {
         this(projectRoot, Map.of());
@@ -66,6 +70,8 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
             throw new IllegalStateException("Workbench already owns an active interactive worker for " + projectRoot);
         }
         active = null;
+        autoRestart = true;
+        ensureHealthWatch();
 
         Path stateRoot = WorkbenchManifest.workbenchRoot(projectRoot);
         String sessionId = UUID.randomUUID().toString();
@@ -125,12 +131,10 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
     }
 
     public synchronized WorkbenchWorkerStatus restartInteractive() {
-        WorkerSession previous = active;
-        WorkbenchWorkerStatus stopped = stop();
-        if (stopped.exitCode() != null && stopped.exitCode() != 0) {
+        WorkbenchWorkerStatus stopped = stopActive();
+        if (!WorkerRestart.canStart(stopped)) {
             throw new IllegalStateException(
-                    "Previous Workbench worker did not stop gracefully. exit=" + stopped.exitCode()
-                            + (previous == null ? "" : ", stdout=" + previous.stdout() + ", stderr=" + previous.stderr())
+                    "Previous Workbench worker is still running. pid=" + stopped.pid()
             );
         }
         return startInteractive();
@@ -181,6 +185,12 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
     }
 
     public synchronized WorkbenchWorkerStatus stop() {
+        autoRestart = false;
+        healthFailures = 0;
+        return stopActive();
+    }
+
+    private synchronized WorkbenchWorkerStatus stopActive() {
         WorkerSession session = active;
         active = null;
         if (session == null) {
@@ -209,6 +219,48 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
     @Override
     public void close() {
         stop();
+        ScheduledExecutorService watch = healthWatch;
+        healthWatch = null;
+        if (watch != null) stopLeaseRenewal(watch);
+    }
+
+    private void ensureHealthWatch() {
+        if (healthWatch != null) return;
+        ScheduledExecutorService watch = Executors.newSingleThreadScheduledExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "pickleball-worker-health");
+            thread.setDaemon(true);
+            return thread;
+        });
+        healthWatch = watch;
+        watch.scheduleAtFixedRate(this::pollHealth, 5, 5, TimeUnit.SECONDS);
+    }
+
+    private void pollHealth() {
+        WorkerSession session;
+        boolean alive;
+        synchronized (this) {
+            if (!autoRestart || active == null) return;
+            session = active;
+            alive = session.process().isAlive();
+        }
+        boolean healthOk = false;
+        if (alive) {
+            BridgeHealthReport report = session.client().health();
+            healthOk = report.healthy();
+        }
+        boolean restart;
+        synchronized (this) {
+            if (!autoRestart || active != session) return;
+            WorkerRestart.HealthDecision decision = WorkerRestart.note(healthFailures, alive, healthOk);
+            healthFailures = decision.failures();
+            restart = decision.restart();
+        }
+        if (!restart) return;
+        try {
+            restartInteractive();
+        } catch (RuntimeException ignored) {
+            // The next poll tries again. A still-running process is not replaced.
+        }
     }
 
     private WorkerSession requireActive() {

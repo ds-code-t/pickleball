@@ -15,21 +15,22 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
  * Business entities. Files under {@code store-entities/} stay the Git source of truth.
- * The reference syntax is {@code <entity:Type#id.field>}. Payloads hold secret
+ * The reference syntax is {@code <entity:Type#id.field>}. An id may contain dots
+ * ({@code ae-mgr-all.app}). Lookup uses the longest stored id and treats the
+ * remainder as the field path, so {@code Account#ada.name} is still the
+ * {@code name} field when only {@code ada} exists. Payloads hold secret
  * references such as {@code <password:qaDb>} or {@code ~MASK;}, never cleartext.
  */
 public final class StoreEntities {
     public static final String REFERENCE_PREFIX = "entity:";
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final Pattern TYPE = Pattern.compile("[A-Za-z][A-Za-z0-9_-]*");
-    private static final Pattern ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_-]*");
-    private static final Pattern REFERENCE = Pattern.compile(
-            "entity:([A-Za-z][A-Za-z0-9_-]*)#([A-Za-z0-9][A-Za-z0-9_-]*)(?:\\.([A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)*))?");
+    private static final Pattern ID = Pattern.compile(
+            "[A-Za-z0-9][A-Za-z0-9_-]*(?:\\.[A-Za-z0-9][A-Za-z0-9_-]*)*");
 
     private StoreEntities() {
     }
@@ -322,26 +323,57 @@ public final class StoreEntities {
 
     /**
      * Resolves {@code entity:Type#id} or {@code entity:Type#id.field} when Store
-     * is on. Returns null when Store is off, the syntax does not match, or the
-     * entity is absent. Does not create a database.
+     * is on. A dotted id such as {@code ae-mgr-all.app} is tried before a shorter
+     * id plus a field. Returns null when Store is off, the syntax does not match,
+     * or the entity is absent. Does not create a database.
      */
     public static Object lookup(String source) {
         if (source == null || !StoreConfig.enabled()) return null;
-        Matcher matcher = REFERENCE.matcher(source.trim());
-        if (!matcher.matches()) return null;
-        String type = matcher.group(1);
-        String id = matcher.group(2);
-        String field = matcher.group(3);
-        try {
-            Entity entity = readForLookup(type, id);
-            if (entity == null) return null;
-            Object value = field == null || field.isBlank() ? entity.payloadJson() : fieldValue(entity.payloadJson(), field);
-            rememberRead(type, id, field, value);
-            return value;
-        } catch (RuntimeException | IOException | SQLException failure) {
-            StoreLog.log(StoreConfig.project(), "entity", type + "#" + id, "lookup failed " + failure.getMessage());
-            return null;
+        Parsed parsed = parse(source.trim());
+        if (parsed == null) return null;
+        for (int end = parsed.parts.length; end >= 1; end--) {
+            String id = join(parsed.parts, 0, end);
+            if (!ID.matcher(id).matches()) continue;
+            String field = end == parsed.parts.length ? null : join(parsed.parts, end, parsed.parts.length);
+            try {
+                Entity entity = readForLookup(parsed.type, id);
+                if (entity == null) continue;
+                Object value = field == null || field.isBlank() ? entity.payloadJson() : fieldValue(entity.payloadJson(), field);
+                if (value != null) rememberRead(parsed.type, id, field, value);
+                return value;
+            } catch (RuntimeException | IOException | SQLException failure) {
+                StoreLog.log(StoreConfig.project(), "entity", parsed.type + "#" + id, "lookup failed " + failure.getMessage());
+                return null;
+            }
         }
+        return null;
+    }
+
+    private record Parsed(String type, String[] parts) {
+    }
+
+    private static Parsed parse(String source) {
+        if (!source.startsWith(REFERENCE_PREFIX)) return null;
+        String body = source.substring(REFERENCE_PREFIX.length());
+        int hash = body.indexOf('#');
+        if (hash <= 0 || hash >= body.length() - 1) return null;
+        String type = body.substring(0, hash);
+        if (!TYPE.matcher(type).matches()) return null;
+        String rest = body.substring(hash + 1);
+        String[] parts = rest.split("\\.", -1);
+        for (String part : parts) {
+            if (part.isBlank() || part.indexOf('#') >= 0) return null;
+        }
+        return new Parsed(type, parts);
+    }
+
+    private static String join(String[] parts, int from, int to) {
+        StringBuilder joined = new StringBuilder();
+        for (int index = from; index < to; index++) {
+            if (index > from) joined.append('.');
+            joined.append(parts[index]);
+        }
+        return joined.toString();
     }
 
     public static byte[] canonicalFile(String type, String id, int version, String payloadJson) {
@@ -577,7 +609,8 @@ public final class StoreEntities {
 
     private static void requireId(String id) {
         if (id == null || !ID.matcher(id).matches()) {
-            throw new IllegalArgumentException("entity id must match [A-Za-z0-9][A-Za-z0-9_-]*");
+            throw new IllegalArgumentException(
+                    "entity id must match [A-Za-z0-9][A-Za-z0-9_-]*(.[A-Za-z0-9][A-Za-z0-9_-]*)*");
         }
     }
 }

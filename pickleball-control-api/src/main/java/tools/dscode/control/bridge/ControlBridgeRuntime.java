@@ -15,6 +15,7 @@ import tools.dscode.control.protocol.ControlBridgeStatus;
 import tools.dscode.control.protocol.ControlBridgeStepOverride;
 import tools.dscode.control.protocol.ControlBridgeStepOverrideResult;
 import tools.dscode.control.protocol.ControlProtocol;
+import tools.dscode.control.protocol.SelectorWatchdog;
 
 import static tools.dscode.control.protocol.ControlBridgeRequests.*;
 import static tools.dscode.control.protocol.ControlBridgeResponses.*;
@@ -50,6 +51,7 @@ final class ControlBridgeRuntime implements AutoCloseable {
     private final ExecutorService executor;
     private final ControlBridgeDescriptor descriptor;
     private final AtomicBoolean closed = new AtomicBoolean();
+    private SelectorWatchdog watchdog;
 
     private ControlBridgeRuntime(
             String token,
@@ -90,6 +92,7 @@ final class ControlBridgeRuntime implements AutoCloseable {
 
         HttpServer server = null;
         ExecutorService executor = null;
+        SelectorWatchdog watchdog = SelectorWatchdog.startDefault();
         Path descriptorFile = directory.resolve("runtime-" + runtimeId + ".json");
         try {
             server = HttpServer.create(new InetSocketAddress(HOST, 0), 0);
@@ -116,6 +119,7 @@ final class ControlBridgeRuntime implements AutoCloseable {
                             ControlProtocol.WORKER_CAPABILITIES
                     )
             );
+            runtime.watchdog = watchdog;
             runtime.registerContexts();
             server.start();
             ControlRuntime.addObserver(eventRecorder);
@@ -124,6 +128,7 @@ final class ControlBridgeRuntime implements AutoCloseable {
             runtime.writeDescriptor();
             return runtime;
         } catch (Throwable failure) {
+            watchdog.stop();
             ControlRuntime.removeObserver(coordinator);
             ControlRuntime.removeObserver(eventRecorder);
             coordinator.close();
@@ -142,6 +147,7 @@ final class ControlBridgeRuntime implements AutoCloseable {
     }
 
     private void registerContexts() {
+        server.createContext("/v1/health", exchange -> BridgeHealth.write(exchange, token, watchdog));
         server.createContext("/v1/status", exchange -> handle(exchange, "GET", coordinator::status));
         server.createContext("/v1/scenarios", exchange -> handle(exchange, "GET", coordinator::scenarios));
         server.createContext("/v1/events", exchange -> handle(exchange, "GET", () -> eventRecorder.page(
@@ -453,6 +459,7 @@ final class ControlBridgeRuntime implements AutoCloseable {
     @Override
     public void close() {
         if (!closed.compareAndSet(false, true)) return;
+        if (watchdog != null) watchdog.stop();
         ControlRuntime.removeObserver(coordinator);
         ControlRuntime.removeObserver(eventRecorder);
         coordinator.close();

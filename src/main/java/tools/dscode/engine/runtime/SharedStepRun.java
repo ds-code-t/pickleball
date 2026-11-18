@@ -402,7 +402,7 @@ public final class SharedStepRun {
         if ((raw == DataTable.class || raw == Table.class) && inlineDataTable(extension) != null) {
             List<List<String>> rows = inlineDataTable(extension);
             if (raw == Table.class) return new Table(rows);
-            return DataTable.create(rows);
+            return CucumberModelConverter.dataTable(rows);
         }
         if (step == null) {
             if (raw == DataTable.class) return DataTable.emptyDataTable();

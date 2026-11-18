@@ -296,6 +296,7 @@ class PickleballWorkbenchLauncherTest {
         assertEquals(0, help.exit, help.text());
         assertTrue(help.out.contains("Pickleball Workbench"), help.text());
         assertTrue(help.out.contains("thin controller jar"), help.text());
+        assertTrue(help.out.contains("dashboard"), help.text());
         assertFalse(help.text().contains("NoClassDefFoundError"), help.text());
         assertFalse(help.text().contains("ObjectMapper"), help.text());
 

@@ -2,6 +2,7 @@ package tools.dscode.workbench.ui;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.dscode.workbench.launch.ConsumerReadyForwarder;
 import tools.dscode.workbench.store.StoreBrowser;
 import tools.dscode.workbench.store.StoreCliForwarder;
 
@@ -102,6 +103,7 @@ final class TrackingPanel extends JPanel {
         north.add(new JLabel("Speed"));
         north.add(speed);
         north.add(button("Open in Explorer", "Jump to the existing Explorer for this run", this::open));
+        north.add(button("HTML dashboard", "Write the static dashboard from the same store", this::dashboard));
         speed.addActionListener(event -> playTimer.setDelay(delayMillis()));
         scrub.addChangeListener(event -> {
             if (!scrub.getValueIsAdjusting()) select(scrub.getValue());
@@ -184,6 +186,65 @@ final class TrackingPanel extends JPanel {
         openExplorer.accept(runId);
     }
 
+    /**
+     * Opens the written page. Tests replace this so no browser starts.
+     * Production uses the desktop browser when one is available.
+     */
+    static Consumer<Path> dashboardOpener = TrackingPanel::browse;
+
+    private void dashboard() {
+        status.setText("dashboard");
+        Path root = project.get();
+        new SwingWorker<ConsumerReadyForwarder.Result, Void>() {
+            @Override
+            protected ConsumerReadyForwarder.Result doInBackground() {
+                return ConsumerReadyForwarder.forward(root, java.util.List.of("dashboard"));
+            }
+
+            @Override
+            protected void done() {
+                ConsumerReadyForwarder.Result result;
+                try {
+                    result = get();
+                } catch (Exception failure) {
+                    status.setText("error: " + failure.getMessage());
+                    return;
+                }
+                if (result.exit() == 0) {
+                    String line = result.out() == null ? "" : result.out().trim();
+                    int cut = line.indexOf('\n');
+                    String first = cut < 0 ? line : line.substring(0, cut);
+                    String shown = first;
+                    if (first.startsWith("dashboard=")) {
+                        Path page = Path.of(first.substring("dashboard=".length()).trim());
+                        Path file = page.isAbsolute() || root == null ? page : root.resolve(page);
+                        try {
+                            dashboardOpener.accept(file.toAbsolutePath().normalize());
+                        } catch (RuntimeException failure) {
+                            shown = first + " (open it in a browser: " + failure.getMessage() + ")";
+                        }
+                    }
+                    status.setText(shown);
+                } else {
+                    String err = result.err() == null ? "" : result.err().trim();
+                    status.setText(err.isBlank() ? "exit " + result.exit() : err);
+                }
+            }
+        }.execute();
+    }
+
+    private static void browse(Path file) {
+        if (java.awt.GraphicsEnvironment.isHeadless() || !java.awt.Desktop.isDesktopSupported()
+                || !java.awt.Desktop.getDesktop().isSupported(java.awt.Desktop.Action.BROWSE)) {
+            return;
+        }
+        try {
+            java.awt.Desktop.getDesktop().browse(file.toUri());
+        } catch (java.io.IOException failure) {
+            throw new IllegalStateException(failure.getMessage(), failure);
+        }
+    }
+
     private void select(int next) {
         if (beats.isEmpty()) return;
         int bounded = Math.max(0, Math.min(beats.size() - 1, next));
@@ -220,7 +281,7 @@ final class TrackingPanel extends JPanel {
                 try {
                     show(get());
                 } catch (Exception failure) {
-                    status.setText("error: " + failure.getMessage());
+                    showTableError("error: " + failure.getMessage() + " (exit 1)");
                 }
             }
         }.execute();
@@ -228,6 +289,7 @@ final class TrackingPanel extends JPanel {
 
     private void show(StoreCliForwarder.Result result) {
         String body = result.out() == null ? "" : result.out();
+        String err = result.err() == null ? "" : result.err().trim();
         beats.clear();
         rows.clear();
         pageCursor = "";
@@ -247,7 +309,11 @@ final class TrackingPanel extends JPanel {
                 }
             }
         } catch (Exception failure) {
-            status.setText("error: " + failure.getMessage());
+            showTableError(StoreCliForwarder.visibleFailure(result));
+            return;
+        }
+        if (beats.isEmpty() && (result.exit() != 0 || !err.isEmpty())) {
+            showTableError(StoreCliForwarder.visibleFailure(result));
             return;
         }
         if (beats.isEmpty()) {
@@ -258,7 +324,31 @@ final class TrackingPanel extends JPanel {
         }
         scrub.setMaximum(beats.size() - 1);
         select(0);
-        if (result.exit() != 0) status.setText("exit " + result.exit());
+        if (result.exit() != 0 || !err.isEmpty()) {
+            String visible = StoreCliForwarder.visibleFailure(result);
+            rows.addElement(visible);
+            status.setText(visible);
+            return;
+        }
+    }
+
+    private void showTableError(String visible) {
+        if (rows.isEmpty() || (rows.getSize() == 1 && "none".equals(rows.getElementAt(0)))) {
+            rows.clear();
+            rows.addElement(visible);
+        } else if (!contains(visible)) {
+            rows.addElement(visible);
+        }
+        scrub.setMaximum(0);
+        index = 0;
+        status.setText(visible);
+    }
+
+    private boolean contains(String visible) {
+        for (int i = 0; i < rows.getSize(); i++) {
+            if (visible.equals(rows.getElementAt(i))) return true;
+        }
+        return false;
     }
 
     private JButton button(String title, String tip, Runnable action) {

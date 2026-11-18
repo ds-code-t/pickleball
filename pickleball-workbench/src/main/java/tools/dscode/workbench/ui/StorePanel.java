@@ -226,7 +226,10 @@ final class StorePanel extends JPanel {
                 try {
                     show(get(), conflictsView, sandboxList);
                 } catch (Exception failure) {
-                    status.setText("error: " + failure.getMessage());
+                    String message = "error: " + failure.getMessage() + " (exit 1)";
+                    rows.clear();
+                    rows.addElement(message);
+                    status.setText(message);
                 }
             }
         }.execute();
@@ -251,6 +254,18 @@ final class StorePanel extends JPanel {
             }
         }
         String err = result.err() == null ? "" : result.err().trim();
+        if (result.exit() != 0 || !err.isEmpty()) {
+            String visible = StoreCliForwarder.visibleFailure(result);
+            if (conflictsView) {
+                String current = conflicts.getText() == null ? "" : conflicts.getText();
+                if (!current.contains(visible)) {
+                    conflicts.setText(current.isBlank() ? visible : current + "\n" + visible);
+                }
+            } else if (!containsRow(visible)) {
+                if (rows.getSize() == 1 && "none".equals(rows.getElementAt(0))) rows.clear();
+                rows.addElement(visible);
+            }
+        }
         status.setText(result.exit() == 0 ? "exit 0" + enabledHint(body) : (err.isEmpty() ? "exit " + result.exit() : err));
     }
 
@@ -283,6 +298,13 @@ final class StorePanel extends JPanel {
         if (rest.startsWith("true")) return "true";
         if (rest.startsWith("false")) return "false";
         return "";
+    }
+
+    private boolean containsRow(String visible) {
+        for (int i = 0; i < rows.getSize(); i++) {
+            if (visible.equals(rows.getElementAt(i))) return true;
+        }
+        return false;
     }
 
     private void setBusy(boolean busy) {

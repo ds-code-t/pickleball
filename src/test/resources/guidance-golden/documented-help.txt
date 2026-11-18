@@ -11,10 +11,16 @@ session: isolate session-start execute-step status events stop kill open-scenari
 coordination: short-log note inbox finish presence post history gc-runs gc-versions use-version export-guidance
 descriptors: session list | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>
 page: inspect-page find-element
-agent: observe launch windows tabs chat-send chat-history chat-poll highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close panel-open panel-close guide guide-next guide-back guide-done ask ui-apply ui-poll ui-catalog capture-scenario
+agent: observe launch windows tabs chat-send chat-history chat-poll chat_wait highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close panel-open panel-close guide guide-next guide-back guide-done ask ui-apply ui-poll ui-catalog capture-scenario
+consumer: start history-summary history-query entity-lookup open-run bridge-health
 retrieval: query runs | query get | query query | query search | query props | query errors | query tail
 controller: sync worker-check live-check ui mcp session
-all: arrow ask border capture-scenario chat-history chat-poll chat-send close-window confirm diagnostic-run discover discover-hint events example execute-step export-guidance find-element finish from-here gc-runs gc-versions guide guide-back guide-done guide-next help highlight hint history html-cleanup html-insert html-remove html-replace html-write inbox insert-step inspect-page isolate kill label launch live-check magnifier mcp note observe open-scenario open-window overlay overlay-poll overlay-remove panel-close panel-open pause plan play popup-close popup-open popup-status post presence query refresh resolve-runvars save session session-hold session-info session-list session-release session-start session-sync short-log show-run spotlight status step-badge stop sync tabs ui ui-apply ui-catalog ui-poll unarrow unborder unhighlight unlabel unmagnifier unspotlight unstep-badge update-step use-version validate windows worker-check worker-restart worker-start worker-stop workspace-edit workspace-seed workspace-show
+dashboard: dashboard [--project=<dir>] [--out=<file>]
+all: arrow ask border bridge-health capture-scenario chat-history chat-poll chat-send chat_wait close-window confirm diagnostic-run discover discover-hint entity-lookup events example execute-step export-guidance find-element finish from-here gc-runs gc-versions guide guide-back guide-done guide-next help highlight hint history history-query history-summary html-cleanup html-insert html-remove html-replace html-write inbox insert-step inspect-page isolate kill label launch live-check magnifier mcp note observe open-run open-scenario open-window overlay overlay-poll overlay-remove panel-close panel-open pause plan play popup-close popup-open popup-status post presence query refresh resolve-runvars save session session-hold session-info session-list session-release session-start session-sync short-log show-run spotlight start status step-badge stop sync tabs ui ui-apply ui-catalog ui-poll unarrow unborder unhighlight unlabel unmagnifier unspotlight unstep-badge update-step use-version validate windows worker-check worker-restart worker-start worker-stop workspace-edit workspace-seed workspace-show
+
+# help bridge-health
+Usage: bridge-health --url=<bridge-base>
+GET /v1/health. Exit 0 on HTTP 200. Exit 1 when the bridge is down or unhealthy.
 
 # help capture-scenario
 Usage: capture-scenario [--url=<substring>] [--since=<epoch-ms>] [--until=<epoch-ms>] [--events=<file>] [--out=<feature>] [--run-id=<id>]
@@ -42,6 +48,10 @@ Usage: discover [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<p
 
 # help discover-hint
 Usage: discover-hint [--json]
+
+# help entity-lookup
+Usage: entity-lookup --ref=<entity:Type#id.field>
+Prints the field value. A miss prints miss and exits 1.
 
 # help events
 Usage: events [--hooks] [--json] [--cursor=<token>] [--run-id=<id>]
@@ -83,10 +93,12 @@ session: isolate session-start execute-step status events stop kill open-scenari
 coordination: short-log note inbox finish presence post history gc-runs gc-versions use-version export-guidance
 descriptors: session list | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>
 page: inspect-page find-element
-agent: observe launch windows tabs chat-send chat-history chat-poll highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close panel-open panel-close guide guide-next guide-back guide-done ask ui-apply ui-poll ui-catalog capture-scenario
+agent: observe launch windows tabs chat-send chat-history chat-poll chat_wait highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close panel-open panel-close guide guide-next guide-back guide-done ask ui-apply ui-poll ui-catalog capture-scenario
+consumer: start history-summary history-query entity-lookup open-run bridge-health
 retrieval: query runs | query get | query query | query search | query props | query errors | query tail
 controller: sync worker-check live-check ui mcp session
-all: arrow ask border capture-scenario chat-history chat-poll chat-send close-window confirm diagnostic-run discover discover-hint events example execute-step export-guidance find-element finish from-here gc-runs gc-versions guide guide-back guide-done guide-next help highlight hint history html-cleanup html-insert html-remove html-replace html-write inbox insert-step inspect-page isolate kill label launch live-check magnifier mcp note observe open-scenario open-window overlay overlay-poll overlay-remove panel-close panel-open pause plan play popup-close popup-open popup-status post presence query refresh resolve-runvars save session session-hold session-info session-list session-release session-start session-sync short-log show-run spotlight status step-badge stop sync tabs ui ui-apply ui-catalog ui-poll unarrow unborder unhighlight unlabel unmagnifier unspotlight unstep-badge update-step use-version validate windows worker-check worker-restart worker-start worker-stop workspace-edit workspace-seed workspace-show
+dashboard: dashboard [--project=<dir>] [--out=<file>]
+all: arrow ask border bridge-health capture-scenario chat-history chat-poll chat-send chat_wait close-window confirm diagnostic-run discover discover-hint entity-lookup events example execute-step export-guidance find-element finish from-here gc-runs gc-versions guide guide-back guide-done guide-next help highlight hint history history-query history-summary html-cleanup html-insert html-remove html-replace html-write inbox insert-step inspect-page isolate kill label launch live-check magnifier mcp note observe open-run open-scenario open-window overlay overlay-poll overlay-remove panel-close panel-open pause plan play popup-close popup-open popup-status post presence query refresh resolve-runvars save session session-hold session-info session-list session-release session-start session-sync short-log show-run spotlight start status step-badge stop sync tabs ui ui-apply ui-catalog ui-poll unarrow unborder unhighlight unlabel unmagnifier unspotlight unstep-badge update-step use-version validate windows worker-check worker-restart worker-start worker-stop workspace-edit workspace-seed workspace-show
 
 # help highlight
 Usage: highlight --handle=<id> (--preset=yellow|outline-red) [--style=<css>] [--html=<page>] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>]
@@ -96,6 +108,14 @@ Usage: hint [--json]
 
 # help history
 Usage: history --append --text=<one line>
+
+# help history-query
+Usage: history-query <runs|get|query|search|props|errors|tail> [--run-id=<id>] [--text=<words>] [--limit=<n>]
+Same read as query. The store is the source of truth.
+
+# help history-summary
+Usage: history-summary
+Prints runs, passed, failed, skipped, and other from run records and the store.
 
 # help html-cleanup
 Usage: html-cleanup [--html=<page>]
@@ -139,6 +159,10 @@ Usage: note --text=<one line> [--agent=<id>] [--run-id=<id>]
 
 # help observe
 Usage: observe [--type=<Network|console|log>] [--url=<substring>] [--since=<epoch-ms>] [--until=<epoch-ms>] [--limit=<n>] [--wait-ms=<n>] [--events=<file>] [--cdp=<url>] [--session=<id>] [--run-id=<id>]
+
+# help open-run
+Usage: open-run --run-id=<id> [--tab=explorer|tracking]
+Asks the Workbench to show that run. explorer is the default tab.
 
 # help open-scenario
 Usage: open-scenario --feature=<path-or-name> --name=<scenario> [--example=<rows>]
@@ -207,6 +231,10 @@ Usage: short-log [--limit=<n>]
 # help show-run
 Usage: show-run --run-id=<id>
 
+# help start
+Usage: start --url=<page> --browser=<chrome|edge|chrome-headless> [--env=KEY=VALUE] [--project=<dir>]
+Publishes a live session. Later page commands with no --run-id target that session.
+
 # help status
 Usage: status [command-id] [--json] [--run-id=<id>]
 
@@ -218,6 +246,9 @@ Usage: sync
 
 # help tabs
 Usage: tabs [--switch=<handle>] [--close=<handle>] [--run-id=<id>]
+
+# help ui
+Usage: ui
 
 # help ui-apply
 Usage: ui-apply --ops=<json array>|@file.json [--verbose=true] [--scope=page|origin|run] [--ttl=<seconds>] [--run-id=<id>]  (op: {"c":"label","t":"#email","text":"Email"}; see ui-catalog)
