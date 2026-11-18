@@ -1032,6 +1032,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/ServiceCallControl.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/ServiceCallEvidence.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/StepMapSeeds.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/BridgeHealth.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeBootstrap.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeBreakpoint.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeBrowserPage.java`
@@ -1062,6 +1063,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-api/src/test/java/tools/dscode/control/api/DynamicControlNoScenarioTest.java`
 - `pickleball-control-api/src/test/java/tools/dscode/control/api/PageElementQueryTest.java`
 - `pickleball-control-api/src/test/java/tools/dscode/control/api/StepMapSeedsTest.java`
+- `pickleball-control-api/src/test/java/tools/dscode/control/bridge/BridgeHealthTest.java`
 - `pickleball-control-api/src/test/java/tools/dscode/control/bridge/ControlBridgeEventRecorderTest.java`
 - `pickleball-control-api/src/test/java/tools/dscode/control/bridge/ControlBridgeNativeStepTest.java`
 - `pickleball-control-api/src/test/java/tools/dscode/control/bridge/ControlBridgePauseFirstAdoptTest.java`
@@ -1123,6 +1125,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/RunIndexFinder.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/RunView.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/SecretRedactor.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/SelectorWatchdog.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/SessionDescriptor.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/SessionDescriptorWriter.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/SessionStepGate.java`
@@ -1164,6 +1167,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `gradle/pickleball-published-variant.gradle`
 - `pickleball-workbench/AGENTS.md`
 - `pickleball-workbench/build.gradle`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/bridge/BridgeHealthReport.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/bridge/ControlBridgeClient.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/catalog/CatalogTargetResolver.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/catalog/ConsumerFeatureCatalog.java`
@@ -1252,6 +1256,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/worker/WorkbenchLiveSession.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/worker/WorkbenchWorkerManager.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/worker/WorkbenchWorkerStatus.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/worker/WorkerRestart.java`
 - `pickleball-workbench/src/main/resources/META-INF/services/tools.dscode.workbench.mcp.McpCommandContributor`
 - `pickleball-workbench/src/main/resources/tools/dscode/workbench/ui/web/diagnostic-explorer.css`
 - `pickleball-workbench/src/main/resources/tools/dscode/workbench/ui/web/diagnostic-explorer.html`
@@ -1324,6 +1329,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/worker/LiveSessionPublicationTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/worker/WorkbenchLiveSessionTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/worker/WorkbenchWorkerManagerTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/worker/WorkerWatchdogTest.java`
 
 ## Java DOM engine module
 

@@ -149,7 +149,7 @@ Project sync, starting a run, and any other long load run off the Swing event th
 | Switch the retained diagnostic run | `diagnostic-run` (`--run`) |
 | Refresh status | `refresh` |
 | Synchronize the project | `session-sync` (the one-shot forwarded command remains `sync`) |
-| Start, restart, or stop the worker | `worker-start`, `worker-restart`, `worker-stop` |
+| Start, restart, or stop the worker | `worker-start`, `worker-restart`, `worker-stop`. `worker-restart` stops the old JVM and starts a new one even when the old process was killed. MCP `workbench_worker_restart` forwards that same call. `GET /v1/health` fails immediately when the worker selector is spinning, and the controller then restarts the worker. |
 | Show a run | `show-run` (`--run-id`) loads that run's record, logs, reports, and config. The run dropdown reads the same directory. It does not start a test. |
 | Open the window on a run | `open-window` (`--run-id`) opens the one window on that run. It does not start a test. |
 | Close the window | `close-window` closes the window. It does not delete the run directory, stop a headless run, or erase the short log. A dedicated `ui` process exits when its last window closes. A window opened inside a live session controller does not exit that process. |

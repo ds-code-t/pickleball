@@ -83,6 +83,30 @@ public final class ControlBridgeClient {
         return request("GET", "/v1/status", null, ControlBridgeStatus.class, READ_TIMEOUT);
     }
 
+    /** Short timeout. A spinning selector is HTTP 503 here, not a hung page call. */
+    public BridgeHealthReport health() {
+        HttpRequest request = HttpRequest.newBuilder(uri("/v1/health"))
+                .timeout(Duration.ofSeconds(2))
+                .header("Authorization", "Bearer " + token)
+                .header("Accept", "application/json")
+                .GET()
+                .build();
+        try {
+            HttpResponse<byte[]> response = http.send(request, HttpResponse.BodyHandlers.ofByteArray());
+            String body = new String(response.body(), StandardCharsets.UTF_8);
+            boolean healthy = response.statusCode() == 200 && body.contains("\"healthy\":true");
+            String reason = reasonField(body);
+            if (healthy) return BridgeHealthReport.ok();
+            if (reason.isBlank()) reason = "http-" + response.statusCode();
+            return BridgeHealthReport.failed(reason);
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            return BridgeHealthReport.failed("interrupted");
+        } catch (IOException | RuntimeException failure) {
+            return BridgeHealthReport.failed("unreachable");
+        }
+    }
+
     public List<ControlBridgeScenarioStatus> scenarios() {
         return List.of(request(
                 "GET", "/v1/scenarios", null, ControlBridgeScenarioStatus[].class, READ_TIMEOUT
@@ -472,6 +496,16 @@ public final class ControlBridgeClient {
                     failure
             );
         }
+    }
+
+    private static String reasonField(String body) {
+        if (body == null) return "";
+        int marker = body.indexOf("\"reason\":\"");
+        if (marker < 0) return "";
+        int start = marker + "\"reason\":\"".length();
+        int end = body.indexOf('"', start);
+        if (end < 0) return "";
+        return body.substring(start, end);
     }
 
     private URI uri(String path) {
