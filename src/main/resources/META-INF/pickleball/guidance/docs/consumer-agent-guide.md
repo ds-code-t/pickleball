@@ -4,7 +4,7 @@ First-read only. Longer notes: `docs/workbench-agent-detail.md`.
 
 ## Tool chooser
 
-Pickleball Workbench is the one front door. Do not open the GUI for your own testing. While testing for yourself, stay headless. When a window is already open, only one agent is the one driver on their own run id. Read the short log `.pickleball/agent-log`. Run `mvnw` or `mvnw.cmd` (`gradlew` or `gradlew.bat`). Do not require a machine-wide Maven or Gradle install. That route is pure CLI. An IDE MCP client is not required.
+Pickleball Workbench is the one front door. Do not open the GUI for your own testing. While testing for yourself, stay headless. When a window is already open, only one agent is the one driver on their own run id. Agents are not daemons. Read the short log `.pickleball/agent-log`. Run `mvnw` or `mvnw.cmd` (`gradlew` or `gradlew.bat`). Do not require a machine-wide Maven or Gradle install. That route is pure CLI. An IDE MCP client is not required.
 
 ```text
 ./mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=discover"
@@ -21,19 +21,21 @@ only change `exec.args`: `-Dexec.args=discover`, `-Dexec.args=isolate`, `execute
 3. No `--run-id` uses the only live session. Several live sessions must pass `--run-id`.
 4. `status=idle` or `status=running`. `elapsed-step-ms=idle` when no step is running. `sleep-gap=` is a machine sleep, not a Gherkin sleep step.
 
+`...` below is the discover plugin, mainClass, and classpathScope.
+
 ```bash
 b64=$(printf '%s' 'Then the "Save" button is visible' | base64 -w0)
-./mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=execute-step --text-b64=$b64"
+./mvnw -q ... "-Dexec.args=execute-step --text-b64=$b64"
 ```
 
 ```powershell
 $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes('Then the "Save" button is visible'))
-.\mvnw.cmd -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=execute-step --text-b64=$b64"
+.\mvnw.cmd -q ... "-Dexec.args=execute-step --text-b64=$b64"
 ```
 
 ```bat
 >step.txt echo Then the "Save" button is visible
-mvnw.cmd -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=execute-step --text-file=step.txt"
+mvnw.cmd -q ... "-Dexec.args=execute-step --text-file=step.txt"
 ```
 
 The fingerprint comes from `workspace-show`. `workspace-edit` prints `workspace=` and `fingerprint=`.
@@ -51,7 +53,7 @@ confirm --run-id=row-1
 summary status=PASSED
 ```
 
-`record.json` `environment` is resolved, or `unset`. Never supply `pkb_run_profile` as input. Do not treat resolve-runvars as the environment Discover will use. `pkb_overriderunvars` is not how confirm launches. The Workbench GUI is only a lightweight head over state and controls that already exist under the hood. A finished run id is not reused. `ui` chat writes a popup-ledger row. `inspect-page` uses a live run session when one is published. Board: `presence`, `post`, `history`. `gc-runs`. `session-start` timeout is `error:`/`fix:`. `export-guidance` writes managed guidance. `query` reads the store. A skipped step stays `SKIPPED`. `<entity:Type#id>` resolves from `store-entities` when Store is on, including a dotted id.
+`record.json` `environment` is resolved, or `unset`. Never supply `pkb_run_profile` as input. Do not treat resolve-runvars as the environment Discover will use. `pkb_overriderunvars` is not how confirm launches. The Workbench GUI is only a lightweight head over state and controls that already exist under the hood. A finished run id is not reused. `ui` chat writes a popup-ledger row. `inspect-page` uses a live run session when one is published. Board: `presence --touch`, `post --write`, `history --append`. Paths: `.pickleball/investigations/`, `.pickleball/presence/`, `.pickleball/posts/`, `.pickleball/history.log`. `gc-runs`. `session-start` timeout is `error:`/`fix:`. `query` reads the store. A skipped step stays `SKIPPED`. `<entity:Type#id>` resolves from `store-entities` when Store is on, including a dotted id.
 
 Headless Workbench is not a headless browser. `isolate` and `execute-step` skip the GUI. The browser stays the one the project names. `CHROME_HEADLESS` is the fallback only when the project names no browser. A named project browser is kept.
 
@@ -60,6 +62,14 @@ Headless Workbench is not a headless browser. `isolate` and `execute-step` skip 
 The search index is disposable FTS5 at `reports/diagnostic-runs/diagnostics.db` (table `record_fts`). JSON stays authoritative. DiagnosticCli rebuild on `reports/diagnostic-runs` rewrites `run-index.json` and `run-catalog.json` and rebuilds that database. Delete `diagnostics.db` plus `-wal` and `-shm` to drop it. A missing file makes `query search` read the JSON. A present file is rebuilt only when a source is newer.
 
 `ui-catalog` once, `ui-apply` with a guide op, then `ui-poll`.
+
+## Generated guidance lifecycle
+
+`export-guidance` writes version-matched managed guidance files and `GUIDANCE-MANIFEST.json`. It ignores `.pickleball` via `.gitignore` or `.git/info/exclude`. If export fails, existing files are potentially stale. Stale does not mean an old run.
+
+## Generated Maven consumer reference
+
+`.pickleball/maven-consumer-project/` is a read-only snapshot. Do not copy, modify, or run it.
 
 ## First-read
 
