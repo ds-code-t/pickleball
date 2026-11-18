@@ -5,7 +5,6 @@ import tools.dscode.store.StorePaths;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 
@@ -34,12 +33,12 @@ public final class DashboardAccess {
         boolean hasRuns = Files.isRegularFile(runs);
         if (!hasMain && !hasRuns) return null;
         Path primary = hasMain ? main : runs;
-        Connection connection = DriverManager.getConnection("jdbc:sqlite:" + primary.toAbsolutePath());
+        Connection connection = LegacySqlite.openReadOnly(primary);
         String qualifier = "";
         if (hasMain && hasRuns) {
             try (Statement statement = connection.createStatement()) {
                 String path = runs.toAbsolutePath().toString().replace('\\', '/').replace("'", "''");
-                statement.execute("ATTACH DATABASE '" + path + "' AS rs");
+                statement.execute("ATTACH DATABASE 'file:" + path + "?mode=ro' AS rs");
             }
             qualifier = "rs.";
         }

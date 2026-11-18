@@ -90,10 +90,15 @@ public final class SqliteDashboardSource implements DashboardSource {
             sql.append(" AND run_id = ?");
             args.add(filter.runId());
         }
+        boolean featureColumn = tableHas(open.connection(), r, "runs", "feature_path");
         if (!filter.feature().isEmpty()) {
-            sql.append(" AND (instr(lower(feature_path), lower(?)) > 0 OR run_id IN (SELECT se.run_id FROM ")
+            sql.append(" AND (");
+            if (featureColumn) {
+                sql.append("instr(lower(feature_path), lower(?)) > 0 OR ");
+                args.add(filter.feature());
+            }
+            sql.append("run_id IN (SELECT se.run_id FROM ")
                     .append(r).append("scenario_executions se WHERE instr(lower(se.scenario_key), lower(?)) > 0))");
-            args.add(filter.feature());
             args.add(filter.feature());
         }
         if (!filter.text().isEmpty()) {

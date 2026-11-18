@@ -2,7 +2,9 @@
 
 `dashboard` writes one static HTML file from the embedded store. It does not start a server and it does not create a second database.
 
-Each run row can carry `git_commit` and `feature_path`. A blank commit is filled from the project git commit and then kept. Feature paths come from the scenario key. Later scenarios in the same run are appended.
+Each run row can carry `git_commit` and `feature_path`. The commit is recorded when that run is written. It is not copied onto older runs. An older row with a blank commit stays blank. A feature path is taken from the scenario key when the run is written. Later scenarios in the same run are appended.
+
+`dashboard` only reads the store. It does not add columns, fill commits, or change rows. A database from before those columns still renders. The columns are added when the store itself opens or writes a run.
 
 The page is a rewindable timeline with markers for runs, scenarios, and case ids. Filters cover status, feature, entity, text, and a time range. Panels list business entities, case ids, common errors, and case types. A run detail links the feature file, data files, the commit, and artifacts. Long lists are drawn in a window as you scroll. The script is in the page. Nothing is downloaded at runtime.
 

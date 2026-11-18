@@ -100,7 +100,7 @@ public final class SqlConnections {
         }
     }
 
-    /** Fills blank git commits and feature paths. Does not create a database. */
+    /** Feature paths from scenario keys. Does not assign a git commit and does not create a database. */
     public static void fillRunProvenance(Path project) throws SQLException {
         if (project == null) return;
         Path file = StorePaths.runState(project);

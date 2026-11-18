@@ -13,6 +13,7 @@ import java.util.TreeSet;
 final class WorkbenchCliHelp {
     private static final Map<String, String> USAGE = Map.ofEntries(
             Map.entry("help", "Usage: help [command|flag]"),
+            Map.entry("dashboard", "Usage: dashboard [--project=<dir>] [--out=<file>] [--from=<iso>] [--to=<iso>] [--status=<status>] [--feature=<path>] [--run=<id>] [--entity=<Type#id>] [--text=<words>]\nWrites one static HTML page from the embedded store. It does not change the store and it does not start a server."),
             Map.entry("discover", "Usage: discover [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<path:line>] [--plan] [--quiet] [--refresh] [--no-narrow|--full-scan] [--runvar=key=value] [--retention=all|failed|none] [--run-id=<id>] [--agent=<id>] [--run-timeout=<seconds>]"),
             Map.entry("confirm", "Usage: confirm [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<path:line>] [--quiet] [--runvar=key=value] [--run-id=<id>] [--agent=<id>] [--run-timeout=<seconds>]"),
             Map.entry("plan", "Usage: plan [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<path:line>] [--refresh] [--json]"),
@@ -178,6 +179,7 @@ final class WorkbenchCliHelp {
         text.append("consumer: start history-summary history-query entity-lookup open-run bridge-health\n");
         text.append("retrieval: query runs | query get | query query | query search | query props | query errors | query tail\n");
         text.append("controller: sync worker-check live-check ui mcp session\n");
+        text.append("dashboard: dashboard [--project=<dir>] [--out=<file>]\n");
         text.append("all:");
         for (String command : commands()) text.append(' ').append(command);
         text.append('\n');

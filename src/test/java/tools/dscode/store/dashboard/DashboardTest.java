@@ -5,14 +5,22 @@ import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.store.RunProvenance;
 import tools.dscode.store.StorePaths;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -152,6 +160,166 @@ class DashboardTest {
         assertEquals(project.resolve("features/pay.feature").normalize(),
                 page.getParent().resolve(tree.get("linkBase").asText() + "features/pay.feature").normalize());
         assertEquals("", DashboardCli.linkBase(project, project.resolve("index.html")));
+    }
+
+    @Test
+    void oldBlankRunStaysBlankAfterDashboard() throws Exception {
+        Path file = runsFile(true);
+        byte[] before = Files.readAllBytes(file);
+        var err = new ByteArrayOutputStream();
+        int code = DashboardCli.execute(
+                new String[]{"dashboard", "--project=" + project, "--out=" + project.resolve("page.html")},
+                new PrintStream(new ByteArrayOutputStream()),
+                new PrintStream(err)
+        );
+        assertEquals(0, code, err.toString(StandardCharsets.UTF_8));
+        assertArrayEquals(before, Files.readAllBytes(file));
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + file.toAbsolutePath());
+             Statement statement = connection.createStatement();
+             ResultSet rows = statement.executeQuery("SELECT git_commit FROM runs WHERE run_id = 'old'")) {
+            assertTrue(rows.next());
+            assertEquals("", rows.getString(1));
+        }
+    }
+
+    @Test
+    void dashboardLeavesAStoreWithoutProvenanceColumnsByteIdentical() throws Exception {
+        Path file = runsFile(false);
+        byte[] before = Files.readAllBytes(file);
+        var out = new ByteArrayOutputStream();
+        var err = new ByteArrayOutputStream();
+        int code = DashboardCli.execute(
+                new String[]{"dashboard", "--project=" + project, "--out=" + project.resolve("page.html")},
+                new PrintStream(out),
+                new PrintStream(err)
+        );
+        assertEquals(0, code, err.toString(StandardCharsets.UTF_8));
+        assertArrayEquals(before, Files.readAllBytes(file));
+        assertTrue(Files.readString(project.resolve("page.html")).contains("features/old.feature"));
+        assertFalse(columns(file).contains("git_commit"));
+        assertFalse(columns(file).contains("feature_path"));
+    }
+
+    @Test
+    void fillBlanksDoesNotStampTheCurrentCommit() throws Exception {
+        git("init");
+        git("config", "user.email", "provenance@example.com");
+        git("config", "user.name", "Provenance");
+        Files.writeString(project.resolve("note.txt"), "one\n");
+        git("add", "note.txt");
+        git("commit", "-m", "one");
+        Path file = runsFile(true);
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + file.toAbsolutePath())) {
+            RunProvenance.fillBlanks(connection, project);
+            try (Statement statement = connection.createStatement();
+                 ResultSet rows = statement.executeQuery("SELECT git_commit FROM runs WHERE run_id = 'old'")) {
+                assertTrue(rows.next());
+                assertEquals("", rows.getString(1));
+            }
+        }
+    }
+
+    @Test
+    void commitIsResolvedOnEachRunWrite() throws Exception {
+        git("init");
+        git("config", "user.email", "provenance@example.com");
+        git("config", "user.name", "Provenance");
+        Files.writeString(project.resolve("note.txt"), "one\n");
+        git("add", "note.txt");
+        git("commit", "-m", "one");
+        String first = git("rev-parse", "HEAD").trim();
+        Path file = runsFile(true);
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + file.toAbsolutePath());
+             Statement statement = connection.createStatement()) {
+            RunProvenance.fill(connection, project, "old", "features/old.feature|1");
+            assertEquals(first, commitOf(statement, "old"));
+            Files.writeString(project.resolve("note.txt"), "two\n");
+            git("add", "note.txt");
+            git("commit", "-m", "two");
+            String second = git("rev-parse", "HEAD").trim();
+            assertFalse(second.equals(first));
+            statement.execute("""
+                    INSERT INTO runs(run_id, started_at, status, scenario, passed, failed, note)
+                    VALUES ('next','2020-03-01T00:00:00Z','PASSED','Next',1,0,'')
+                    """);
+            RunProvenance.fill(connection, project, "next", "features/next.feature|2");
+            assertEquals(first, commitOf(statement, "old"));
+            assertEquals(second, commitOf(statement, "next"));
+        }
+    }
+
+    private Path runsFile(boolean provenanceColumns) throws Exception {
+        Path file = StorePaths.runState(project);
+        Files.createDirectories(file.getParent());
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + file.toAbsolutePath());
+             Statement statement = connection.createStatement()) {
+            if (provenanceColumns) {
+                statement.execute("""
+                        CREATE TABLE runs (
+                          run_id TEXT PRIMARY KEY, started_at TEXT, finished_at TEXT, status TEXT,
+                          scenario TEXT, passed INTEGER, failed INTEGER, note TEXT,
+                          git_commit TEXT NOT NULL DEFAULT '', feature_path TEXT NOT NULL DEFAULT '')
+                        """);
+            } else {
+                statement.execute("""
+                        CREATE TABLE runs (
+                          run_id TEXT PRIMARY KEY, started_at TEXT, finished_at TEXT, status TEXT,
+                          scenario TEXT, passed INTEGER, failed INTEGER, note TEXT)
+                        """);
+            }
+            statement.execute("""
+                    CREATE TABLE scenario_executions (
+                      exec_id TEXT PRIMARY KEY, run_id TEXT, scenario_key TEXT, started_at TEXT)
+                    """);
+            statement.execute("""
+                    CREATE TABLE step_executions (
+                      step_exec_id TEXT PRIMARY KEY, scenario_exec_id TEXT, step_text TEXT,
+                      started_at TEXT, status TEXT)
+                    """);
+            statement.execute("CREATE TABLE entity_usages (step_exec_id TEXT, entity_type TEXT, entity_id TEXT, logged_at TEXT)");
+            statement.execute("CREATE TABLE artifacts (path TEXT, run_id TEXT)");
+            statement.execute("CREATE TABLE run_logs (id INTEGER PRIMARY KEY, run_id TEXT, logged_at TEXT)");
+            statement.execute("CREATE TABLE log_entity_links (log_id INTEGER, entity_type TEXT, entity_id TEXT)");
+            statement.execute("""
+                    INSERT INTO runs(run_id, started_at, status, scenario, passed, failed, note)
+                    VALUES ('old','2020-01-01T00:00:00Z','PASSED','Old',1,0,'')
+                    """);
+            statement.execute("""
+                    INSERT INTO scenario_executions VALUES
+                    ('ex-old','old','features/old.feature|1','2020-01-01T00:00:01Z')
+                    """);
+        }
+        return file;
+    }
+
+    private static String commitOf(Statement statement, String runId) throws Exception {
+        try (ResultSet rows = statement.executeQuery("SELECT git_commit FROM runs WHERE run_id = '" + runId + "'")) {
+            assertTrue(rows.next());
+            return rows.getString(1);
+        }
+    }
+
+    private static Set<String> columns(Path file) throws Exception {
+        Set<String> names = new HashSet<>();
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + file.toAbsolutePath());
+             Statement statement = connection.createStatement();
+             ResultSet rows = statement.executeQuery("PRAGMA table_info(runs)")) {
+            while (rows.next()) names.add(rows.getString("name"));
+        }
+        return names;
+    }
+
+    private String git(String... args) throws Exception {
+        List<String> command = new ArrayList<>();
+        command.add("git");
+        command.addAll(List.of(args));
+        Process process = new ProcessBuilder(command)
+                .directory(project.toFile())
+                .redirectErrorStream(true)
+                .start();
+        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertEquals(0, process.waitFor(), output);
+        return output;
     }
 
     private void seed() throws Exception {

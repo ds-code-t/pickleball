@@ -5,16 +5,14 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Git commit and feature-file path on a run row. A blank value is filled.
- * A value already stored is kept. Feature paths from later scenarios in the
- * same run are appended. This does not start a server.
+ * Git commit and feature-file path on a run row. The commit is recorded only
+ * when that run is written. A commit already stored is kept. A blank commit
+ * on an older row stays blank. Feature paths from later scenarios in the same
+ * run are appended. This does not start a server.
  */
 public final class RunProvenance {
-    private static final ConcurrentHashMap<String, String> COMMITS = new ConcurrentHashMap<>();
-
     private RunProvenance() {
     }
 
@@ -45,17 +43,14 @@ public final class RunProvenance {
         }
     }
 
-    /** Blank commits on existing rows. A stored commit is not replaced. */
+    /**
+     * Feature paths on rows that already have a scenario key. Does not assign
+     * a git commit. {@code project} is unused; the commit is resolved in {@link #fill}.
+     */
     public static int fillBlanks(Connection connection, Path project) throws SQLException {
-        String commit = commitOf(project);
+        if (connection == null) return 0;
+        if (project == null) return 0;
         int updated = 0;
-        if (!commit.isBlank()) {
-            try (PreparedStatement statement = connection.prepareStatement(
-                    "UPDATE runs SET git_commit = ? WHERE git_commit = ''")) {
-                statement.setString(1, commit);
-                updated += statement.executeUpdate();
-            }
-        }
         try (PreparedStatement statement = connection.prepareStatement("""
                 UPDATE runs SET feature_path = (
                     SELECT CASE WHEN instr(e.scenario_key, '|') > 0
@@ -101,12 +96,14 @@ public final class RunProvenance {
         return left + "\n" + right;
     }
 
+    /** Current HEAD for this write. Not cached: a later commit in this process is a new value. */
     private static String commitOf(Path project) {
         if (project == null) return "";
-        String key = project.toAbsolutePath().normalize().toString();
-        return COMMITS.computeIfAbsent(key, ignored -> {
-            StoreGit.Snapshot git = StoreGit.capture(project);
-            return git.commit() == null ? "" : git.commit();
-        });
+        StoreGit.Command commit = StoreGit.run(project, 5, "git", "rev-parse", "HEAD");
+        if (commit == null || commit.timedOut() || commit.code() != 0 || commit.out() == null) return "";
+        String value = commit.out().trim();
+        int newline = value.indexOf('\n');
+        if (newline >= 0) value = value.substring(0, newline).trim();
+        return value;
     }
 }

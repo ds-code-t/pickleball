@@ -1,7 +1,6 @@
 package tools.dscode.store.dashboard;
 
 import tools.dscode.store.StorePaths;
-import tools.dscode.store.sql.SqlConnections;
 
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
@@ -12,7 +11,8 @@ import java.util.List;
 
 /**
  * {@code dashboard} writes one static HTML file from the embedded store.
- * It is a core CLI, like {@code store}, and it does not start a server.
+ * It is a core CLI, like {@code store}. It does not start a server and it
+ * does not change the store.
  */
 public final class DashboardCli {
     private DashboardCli() {
@@ -50,8 +50,6 @@ public final class DashboardCli {
                 value(tokens, "--text")
         );
         try {
-            SqlConnections.ensureRunColumns(project);
-            SqlConnections.fillRunProvenance(project);
             DashboardSnapshot snapshot = new SqliteDashboardSource(project).read(query);
             Files.createDirectories(destination.getParent());
             Files.writeString(destination, DashboardHtml.render(snapshot, linkBase(project, destination)),
