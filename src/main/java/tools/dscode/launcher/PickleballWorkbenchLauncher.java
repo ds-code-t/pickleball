@@ -91,12 +91,19 @@ public final class PickleballWorkbenchLauncher {
         return tools.dscode.engine.EngineCli.execute(args, out, err);
     }
 
-    /** Test hook. Production calls {@code DomEngineMain.dispatch}. */
-    static java.util.function.Function<java.util.List<String>, dev.domengine.cli.CliResult> domEngineCall =
-            dev.domengine.cli.DomEngineMain::dispatch;
+    /** Test hook. Production resolves {@code DomEngineMain.dispatch} on the first domengine call, not in {@code <clinit>}. */
+    static java.util.function.Function<java.util.List<String>, dev.domengine.cli.CliResult> domEngineCall;
 
     static void resetDomEngineCall() {
-        domEngineCall = dev.domengine.cli.DomEngineMain::dispatch;
+        domEngineCall = null;
+    }
+
+    private static dev.domengine.cli.CliResult invokeDomEngine(java.util.List<String> rest) {
+        java.util.function.Function<java.util.List<String>, dev.domengine.cli.CliResult> call = domEngineCall;
+        if (call == null) {
+            call = dev.domengine.cli.DomEngineMain::dispatch;
+        }
+        return call.apply(rest);
     }
 
     /**
@@ -124,7 +131,7 @@ public final class PickleballWorkbenchLauncher {
         }
         dev.domengine.cli.CliResult result;
         try {
-            result = domEngineCall.apply(rest);
+            result = invokeDomEngine(rest);
         } catch (NoClassDefFoundError | ExceptionInInitializerError missing) {
             stderr.print(missingDomEngine(missing));
             return 1;

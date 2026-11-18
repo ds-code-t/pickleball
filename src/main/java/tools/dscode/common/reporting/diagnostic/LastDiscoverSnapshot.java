@@ -145,7 +145,11 @@ public final class LastDiscoverSnapshot {
         return catalogRun(projectRoot, purpose, null);
     }
 
-    /** The current run's private run-index wins over a newer catalog row from another run. */
+    /**
+     * The current run's private run-index wins over a newer catalog row from another run.
+     * A catalog row with no {@code runProfile} is not a retained profile, so an agent-run
+     * row does not hide the worker row that has one.
+     */
     public static CatalogRun catalogRun(Path projectRoot, String purpose, String runId) throws IOException {
         CatalogRun scoped = scopedRunIndex(projectRoot, runId);
         if (scoped != null) return scoped;
@@ -154,8 +158,10 @@ public final class LastDiscoverSnapshot {
         CatalogRun byPurpose = null;
         CatalogRun first = null;
         for (CatalogRun candidate : runs) {
-            if (first == null) first = candidate;
-            if (!isBlank(runId) && runId.equals(candidate.runId())) byId = candidate;
+            if (first == null && !isBlank(candidate.runProfile())) first = candidate;
+            if (!isBlank(runId) && runId.equals(candidate.runId()) && !isBlank(candidate.runProfile())) {
+                byId = candidate;
+            }
             if (purpose != null && purpose.equals(candidate.purpose()) && byPurpose == null) byPurpose = candidate;
         }
         if (byId != null) return byId;
