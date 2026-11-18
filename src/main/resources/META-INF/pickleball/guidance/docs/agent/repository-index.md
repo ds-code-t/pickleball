@@ -1242,6 +1242,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/WorkbenchUi.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/WorkbenchUiController.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/WorkbenchUiSettings.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/WorkbenchWindowLifecycle.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/WorkbenchApplication.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/WorkbenchController.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/WorkbenchRuntimeBoundary.java`
@@ -1309,10 +1310,12 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/RunVarOverridePanelTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/StorePanelTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/web/WorkbenchWebResourceTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/WorkbenchFrameLoadTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/WorkbenchNativeOverlayHighlightTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/WorkbenchTrackingForwarderTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/WorkbenchUiControllerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/WorkbenchUiSettingsTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/WorkbenchWindowLifecycleTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/WorkbenchApplicationSyncFailureTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/WorkbenchApplicationTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/WorkbenchControllerLeaseTest.java`

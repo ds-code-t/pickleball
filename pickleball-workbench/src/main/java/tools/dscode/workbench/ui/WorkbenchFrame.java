@@ -292,6 +292,7 @@ final class WorkbenchFrame extends JFrame {
                 closeWorkbench();
             }
         });
+        WorkbenchWindowLifecycle.opened();
 
         runLong(LongWork.LOADING_THE_PROJECT, controller::refresh);
     }
@@ -3161,13 +3162,13 @@ final class WorkbenchFrame extends JFrame {
                     controller.close();
                     return Boolean.TRUE;
                 },
-                ignored -> {
-                    dispose();
-                },
-                failure -> {
-                    dispose();
-                }
+                ignored -> finishClose(),
+                failure -> finishClose()
         );
+    }
+
+    private void finishClose() {
+        WorkbenchWindowLifecycle.finish(this::dispose);
     }
 
     private static JTextArea outputArea() {

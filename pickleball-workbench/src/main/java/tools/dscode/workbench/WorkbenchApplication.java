@@ -15,6 +15,7 @@ import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.WindowDriver;
 import tools.dscode.control.protocol.speed.WarmProcess;
 import tools.dscode.workbench.ui.WorkbenchUi;
+import tools.dscode.workbench.ui.WorkbenchWindowLifecycle;
 import tools.dscode.workbench.worker.WorkbenchLiveSession;
 import tools.dscode.workbench.worker.WorkbenchWorkerManager;
 import tools.dscode.workbench.worker.WorkbenchWorkerStatus;
@@ -248,6 +249,7 @@ public final class WorkbenchApplication {
 
     private static int ui(String[] args) {
         IsolateArgs parsed = projectCommandArgs(args, "ui");
+        WorkbenchWindowLifecycle.armDedicatedProcess();
         claimWarm(parsed.project());
         try {
             if (parsed.runId() != null) {

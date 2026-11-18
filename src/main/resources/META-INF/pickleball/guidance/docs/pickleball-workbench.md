@@ -24,7 +24,7 @@ Workbench owns synchronization, `.pickleball/workbench/` disposable state, worke
 
 `pickleball-control-protocol` owns immutable wire records, request/response envelopes, transport constants, capabilities, version/minimum-version negotiation, and JDK-only `.pickleball` layout/store helpers (`PickleballLocalLayout`, `PickleballVersion`, `PickleballArtifactLocator`, `PickleballLocalStore`). Worker-side bridge server/coordinator/bootstrap and all translation to runtime operations remain in Pickleball core.
 
-MCP and Swing are adapters over the same Workbench service seam. They must not introduce a second runtime implementation. A visible UI keeps one Workbench JVM and one consumer worker. An AI agent attaches to that live session through a localhost HTTP JSON facade; it must not start a second Workbench or a second worker. `open-window` posts `open-ui` to a healthy `cli-session` and starts Swing in that controller JVM. A second `ui` process starts only when that post does not report `playback=OPENING`.
+MCP and Swing are adapters over the same Workbench service seam. They must not introduce a second runtime implementation. A visible UI keeps one Workbench JVM and one consumer worker. An AI agent attaches to that live session through a localhost HTTP JSON facade; it must not start a second Workbench or a second worker. `open-window` posts `open-ui` to a healthy `cli-session` and starts Swing in that controller JVM. A second `ui` process starts only when that post does not report `playback=OPENING`. Closing the last window of a dedicated `ui` process exits that JVM. Closing a window that `open-ui` opened inside a live controller does not exit that process, and it does not stop a headless run. The next `open-window` reuses a healthy window.
 
 The canonical worker bridge environment is:
 
@@ -152,7 +152,7 @@ Project sync, starting a run, and any other long load run off the Swing event th
 | Start, restart, or stop the worker | `worker-start`, `worker-restart`, `worker-stop` |
 | Show a run | `show-run` (`--run-id`) loads that run's record, logs, reports, and config. The run dropdown reads the same directory. It does not start a test. |
 | Open the window on a run | `open-window` (`--run-id`) opens the one window on that run. It does not start a test. |
-| Close the window | `close-window` closes the window. It does not delete the run directory, stop a headless run, or erase the short log. |
+| Close the window | `close-window` closes the window. It does not delete the run directory, stop a headless run, or erase the short log. A dedicated `ui` process exits when its last window closes. A window opened inside a live session controller does not exit that process. |
 | List live direct-control sessions | `session list` (add `--json` for a JSON array). One line per descriptor whose state is not `stopped`. |
 | Show one session descriptor | `session info <sessionId>` prints `.pickleball/runs/<runId>/session/descriptor.json`. `--json` prints the same bytes. |
 | Hold step advance | `session hold <sessionId>` sets the descriptor to `held`. Workbench does not start the next step while it is `held`. |

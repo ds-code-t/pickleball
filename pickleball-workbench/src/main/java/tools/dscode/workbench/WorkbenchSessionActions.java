@@ -435,6 +435,7 @@ public final class WorkbenchSessionActions {
     }
 
     public Map<String, Object> openUi(String runId, String agentId) {
+        tools.dscode.workbench.ui.WorkbenchWindowLifecycle.armSharedController();
         if (java.awt.GraphicsEnvironment.isHeadless()) {
             return accepted("open-ui", "HEADLESS");
         }

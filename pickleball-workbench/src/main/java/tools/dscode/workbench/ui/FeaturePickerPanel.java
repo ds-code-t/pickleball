@@ -5,6 +5,7 @@ import tools.dscode.workbench.catalog.ScenarioFilter;
 
 import javax.swing.Box;
 import javax.swing.BoxLayout;
+import javax.swing.DefaultListCellRenderer;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
@@ -19,10 +20,13 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.BorderLayout;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.Arrays;
+import java.util.List;
 import java.util.function.Consumer;
 
 /**
@@ -30,8 +34,11 @@ import java.util.function.Consumer;
  * feature-file selection is a collapsed secondary filter.
  */
 final class FeaturePickerPanel extends JPanel {
-    private final DefaultListModel<ConsumerFeatureCatalog.FeatureEntry> featureModel = new DefaultListModel<>();
-    private final DefaultListModel<ConsumerFeatureCatalog.ScenarioEntry> scenarioModel = new DefaultListModel<>();
+    static final int FIXED_ROW_HEIGHT = 20;
+    private static final EmptyBorder CELL_BORDER = new EmptyBorder(4, 6, 4, 6);
+
+    private DefaultListModel<ConsumerFeatureCatalog.FeatureEntry> featureModel = new DefaultListModel<>();
+    private DefaultListModel<ConsumerFeatureCatalog.ScenarioEntry> scenarioModel = new DefaultListModel<>();
     private final JList<ConsumerFeatureCatalog.FeatureEntry> featureList = new JList<>(featureModel);
     private final JList<ConsumerFeatureCatalog.ScenarioEntry> scenarioList = new JList<>(scenarioModel);
     private final JTextField nameField = new JTextField();
@@ -64,30 +71,10 @@ final class FeaturePickerPanel extends JPanel {
         add(southChrome(), BorderLayout.SOUTH);
 
         featureList.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
-        featureList.setCellRenderer((list, value, index, selected, focused) -> {
-            JLabel label = new JLabel(value == null ? "" : value.browseLabel(catalog == null
-                    ? ConsumerFeatureCatalog.BrowseMode.FEATURE_NAME
-                    : catalog.browseMode()));
-            label.setOpaque(true);
-            label.setBorder(new EmptyBorder(4, 6, 4, 6));
-            label.setBackground(selected ? WorkbenchTheme.ACCENT_SOFT : WorkbenchTheme.SURFACE);
-            label.setForeground(WorkbenchTheme.TEXT);
-            return label;
-        });
-        scenarioList.setCellRenderer((list, value, index, selected, focused) -> {
-            JLabel label = new JLabel(value == null ? "" : value.displayLabel());
-            label.setOpaque(true);
-            label.setBorder(new EmptyBorder(4, 6, 4, 6));
-            label.setBackground(selected ? WorkbenchTheme.PLAYHEAD : WorkbenchTheme.SURFACE);
-            label.setForeground(WorkbenchTheme.TEXT);
-            if (value != null) {
-                String tags = value.effectiveTags().isEmpty()
-                        ? ""
-                        : "  @" + String.join(" @", value.effectiveTags());
-                label.setToolTipText(value.featureName() + " — " + value.relativePath() + tags);
-            }
-            return label;
-        });
+        featureList.setCellRenderer(featureRenderer);
+        scenarioList.setCellRenderer(scenarioRenderer);
+        featureList.setFixedCellHeight(FIXED_ROW_HEIGHT);
+        scenarioList.setFixedCellHeight(FIXED_ROW_HEIGHT);
         featureList.addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent event) {
@@ -140,27 +127,44 @@ final class FeaturePickerPanel extends JPanel {
 
     void setCatalog(ConsumerFeatureCatalog catalog) {
         this.catalog = catalog;
-        featureModel.clear();
-        if (catalog == null) {
-            refreshScenarios();
-            return;
+        int featureSets = installFeatureModel(catalog == null
+                ? List.of()
+                : catalog.featuresForBrowse());
+        int selections = 0;
+        if (catalog != null) {
+            applyFiltersFromUi();
+            selections = syncFeatureSelection();
         }
-        applyFiltersFromUi();
-        for (ConsumerFeatureCatalog.FeatureEntry feature : catalog.featuresForBrowse()) {
-            featureModel.addElement(feature);
-        }
-        syncFeatureSelection();
-        refreshScenarios();
+        int scenarioSets = refreshScenarios();
+        lastLoad = new CatalogLoad(
+                featureSets,
+                scenarioSets,
+                selections,
+                scenarioList.getFixedCellHeight(),
+                featureModel.getSize(),
+                scenarioModel.getSize()
+        );
     }
 
-    private void syncFeatureSelection() {
-        if (catalog == null) return;
-        featureList.clearSelection();
+    private int installFeatureModel(List<ConsumerFeatureCatalog.FeatureEntry> features) {
+        DefaultListModel<ConsumerFeatureCatalog.FeatureEntry> next = new DefaultListModel<>();
+        next.addAll(features);
+        featureModel = next;
+        featureList.setModel(next);
+        return 1;
+    }
+
+    private int syncFeatureSelection() {
+        if (catalog == null) return 0;
+        int[] selected = new int[featureModel.size()];
+        int count = 0;
         for (int i = 0; i < featureModel.size(); i++) {
             if (catalog.selected(featureModel.get(i).file())) {
-                featureList.addSelectionInterval(i, i);
+                selected[count++] = i;
             }
         }
+        featureList.setSelectedIndices(Arrays.copyOf(selected, count));
+        return 1;
     }
 
     void onScenarioSelected(Consumer<ConsumerFeatureCatalog.ScenarioEntry> onScenario) {
@@ -308,24 +312,107 @@ final class FeaturePickerPanel extends JPanel {
         filter.setExcludeTagsQuery(excludeTags.getText());
     }
 
-    private void refreshScenarios() {
-        scenarioModel.clear();
+    private int refreshScenarios() {
         if (catalog == null) {
+            installScenarioModel(List.of());
             status.setText("No synchronized consumer project.");
-            return;
+            return 1;
         }
+        List<ConsumerFeatureCatalog.ScenarioEntry> visible = catalog.visibleScenarios();
+        installScenarioModel(visible);
         int candidates = catalog.candidateScenarios().size();
-        for (ConsumerFeatureCatalog.ScenarioEntry scenario : catalog.visibleScenarios()) {
-            scenarioModel.addElement(scenario);
-        }
-        int visible = scenarioModel.size();
+        int shown = scenarioModel.size();
         String featureNote = catalog.selectedFeatureFiles().isEmpty()
                 ? "all features"
                 : catalog.selectedFeatureFiles().size() + " feature(s)";
-        if (visible == candidates) {
-            status.setText(visible + " scenario(s) · " + featureNote);
+        if (shown == candidates) {
+            status.setText(shown + " scenario(s) · " + featureNote);
         } else {
-            status.setText(visible + " of " + candidates + " scenario(s) · " + featureNote);
+            status.setText(shown + " of " + candidates + " scenario(s) · " + featureNote);
         }
+        return 1;
+    }
+
+    private void installScenarioModel(List<ConsumerFeatureCatalog.ScenarioEntry> scenarios) {
+        DefaultListModel<ConsumerFeatureCatalog.ScenarioEntry> next = new DefaultListModel<>();
+        next.addAll(scenarios);
+        scenarioModel = next;
+        scenarioList.setModel(next);
+    }
+
+    private final DefaultListCellRenderer featureRenderer = new DefaultListCellRenderer() {
+        @Override
+        public Component getListCellRendererComponent(
+                JList<?> list, Object value, int index, boolean selected, boolean focused
+        ) {
+            ConsumerFeatureCatalog.FeatureEntry feature = value instanceof ConsumerFeatureCatalog.FeatureEntry entry
+                    ? entry
+                    : null;
+            String text = feature == null
+                    ? ""
+                    : feature.browseLabel(catalog == null
+                    ? ConsumerFeatureCatalog.BrowseMode.FEATURE_NAME
+                    : catalog.browseMode());
+            Component rendered = super.getListCellRendererComponent(list, text, index, selected, focused);
+            if (rendered instanceof JLabel label) {
+                label.setOpaque(true);
+                label.setBorder(CELL_BORDER);
+                label.setBackground(selected ? WorkbenchTheme.ACCENT_SOFT : WorkbenchTheme.SURFACE);
+                label.setForeground(WorkbenchTheme.TEXT);
+            }
+            return rendered;
+        }
+    };
+
+    private final DefaultListCellRenderer scenarioRenderer = new DefaultListCellRenderer() {
+        @Override
+        public Component getListCellRendererComponent(
+                JList<?> list, Object value, int index, boolean selected, boolean focused
+        ) {
+            ConsumerFeatureCatalog.ScenarioEntry scenario = value instanceof ConsumerFeatureCatalog.ScenarioEntry entry
+                    ? entry
+                    : null;
+            String text = scenario == null ? "" : scenario.displayLabel();
+            Component rendered = super.getListCellRendererComponent(list, text, index, selected, focused);
+            if (rendered instanceof JLabel label) {
+                label.setOpaque(true);
+                label.setBorder(CELL_BORDER);
+                label.setBackground(selected ? WorkbenchTheme.PLAYHEAD : WorkbenchTheme.SURFACE);
+                label.setForeground(WorkbenchTheme.TEXT);
+                if (scenario == null) {
+                    label.setToolTipText(null);
+                } else {
+                    String tags = scenario.effectiveTags().isEmpty()
+                            ? ""
+                            : "  @" + String.join(" @", scenario.effectiveTags());
+                    label.setToolTipText(scenario.featureName() + " — " + scenario.relativePath() + tags);
+                }
+            }
+            return rendered;
+        }
+    };
+
+    private CatalogLoad lastLoad = new CatalogLoad(0, 0, 0, FIXED_ROW_HEIGHT, 0, 0);
+
+    CatalogLoad lastCatalogLoad() {
+        return lastLoad;
+    }
+
+    JList<ConsumerFeatureCatalog.FeatureEntry> featureListForTest() {
+        return featureList;
+    }
+
+    JList<ConsumerFeatureCatalog.ScenarioEntry> scenarioListForTest() {
+        return scenarioList;
+    }
+
+    record CatalogLoad(
+            int featureModelSets,
+            int scenarioModelSets,
+            int selectionSets,
+            int fixedCellHeight,
+            int featureRows,
+            int scenarioRows
+    ) {
     }
 }
