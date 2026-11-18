@@ -237,21 +237,23 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
 
     private void pollHealth() {
         WorkerSession session;
+        boolean alive;
         synchronized (this) {
-            if (!autoRestart || active == null || !active.process().isAlive()) return;
+            if (!autoRestart || active == null) return;
             session = active;
+            alive = session.process().isAlive();
         }
-        BridgeHealthReport report = session.client().health();
+        boolean healthOk = false;
+        if (alive) {
+            BridgeHealthReport report = session.client().health();
+            healthOk = report.healthy();
+        }
         boolean restart;
         synchronized (this) {
             if (!autoRestart || active != session) return;
-            if (report.healthy()) {
-                healthFailures = 0;
-                return;
-            }
-            healthFailures++;
-            restart = healthFailures >= 2;
-            if (restart) healthFailures = 0;
+            WorkerRestart.HealthDecision decision = WorkerRestart.note(healthFailures, alive, healthOk);
+            healthFailures = decision.failures();
+            restart = decision.restart();
         }
         if (!restart) return;
         try {

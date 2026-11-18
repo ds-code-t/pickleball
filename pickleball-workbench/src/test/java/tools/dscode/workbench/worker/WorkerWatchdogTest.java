@@ -65,4 +65,38 @@ class WorkerWatchdogTest {
         assertEquals(killed, same);
         assertTrue(WorkerRestart.canStart(killed));
     }
+
+    @Test
+    void aDeadWorkerCountsAsAFailedHealthCheckAndRestartsOnTheSecond() {
+        WorkerRestart.HealthDecision first = WorkerRestart.note(0, false, false);
+        assertFalse(first.restart());
+        assertEquals(1, first.failures());
+        WorkerRestart.HealthDecision second = WorkerRestart.note(first.failures(), false, false);
+        assertTrue(second.restart());
+        assertEquals(0, second.failures());
+
+        WorkbenchWorkerStatus dead = new WorkbenchWorkerStatus(
+                false, "dead-session", 11L, "runtime-dead", "scenario-dead", false, 1
+        );
+        assertTrue(WorkerRestart.canStart(dead));
+        AtomicInteger starts = new AtomicInteger();
+        WorkbenchWorkerStatus restarted = WorkerRestart.afterUnhealthy(second.restart(), dead, () -> {
+            starts.incrementAndGet();
+            return new WorkbenchWorkerStatus(
+                    true, "fresh-session", 12L, "runtime-fresh", "scenario-fresh", true, null
+            );
+        });
+        assertEquals(1, starts.get());
+        assertTrue(restarted.running());
+        assertEquals("fresh-session", restarted.sessionId());
+        assertEquals(12L, restarted.pid());
+
+        WorkerRestart.HealthDecision healed = WorkerRestart.note(1, true, true);
+        assertEquals(0, healed.failures());
+        assertFalse(healed.restart());
+        WorkbenchWorkerStatus quiet = WorkerRestart.afterUnhealthy(false, dead, () -> {
+            throw new AssertionError("a healthy read must not start a worker");
+        });
+        assertEquals(dead, quiet);
+    }
 }
