@@ -28,11 +28,16 @@ class WorkbenchFrameLoadTest {
         AtomicReference<Component> secondRender = new AtomicReference<>();
         AtomicReference<Integer> featureHeight = new AtomicReference<>();
         long[] elapsedMs = new long[1];
+        int[] observedFeatureModelSets = new int[1];
+        int[] observedScenarioModelSets = new int[1];
 
         SwingUtilities.invokeAndWait(() -> {
             FeaturePickerPanel panel = new FeaturePickerPanel();
             assertEquals(FeaturePickerPanel.FIXED_ROW_HEIGHT, panel.featureListForTest().getFixedCellHeight());
             assertEquals(FeaturePickerPanel.FIXED_ROW_HEIGHT, panel.scenarioListForTest().getFixedCellHeight());
+            // Count real JList "model" property changes, not only the panel's own counters.
+            panel.featureListForTest().addPropertyChangeListener("model", event -> observedFeatureModelSets[0]++);
+            panel.scenarioListForTest().addPropertyChangeListener("model", event -> observedScenarioModelSets[0]++);
             long started = System.nanoTime();
             panel.setCatalog(catalog);
             panel.revalidate();
@@ -40,6 +45,8 @@ class WorkbenchFrameLoadTest {
             panel.featureListForTest().getPreferredSize();
             elapsedMs[0] = (System.nanoTime() - started) / 1_000_000L;
             unfiltered.set(panel.lastCatalogLoad());
+            assertEquals(1, observedFeatureModelSets[0], "JList feature model property changed once");
+            assertEquals(1, observedScenarioModelSets[0], "JList scenario model property changed once");
             List<ConsumerFeatureCatalog.FeatureEntry> browse = catalog.featuresForBrowse();
             catalog.selectFeature(browse.get(0).file());
             catalog.selectFeature(browse.get(10).file());
