@@ -255,7 +255,25 @@ class AgentCoordinationTest {
     }
 
     @Test
-    void relaunchArchivesThePreviousDiagnosticAndDoesNotReadItAsCurrent() throws Exception {
+    void runningRelaunchArchivesThePreviousDiagnostic() throws Exception {
+        AgentCoordination.Run run = AgentCoordination.begin(project, request("run-live-attempt", "agent-attempt"));
+        Path scenario = run.diagnosticDirectory().resolve(run.runId()).resolve("scenarios").resolve("old-scenario");
+        Files.createDirectories(scenario);
+        Files.writeString(scenario.resolve("summary.json"), "{\"name\":\"Old failure\",\"outcome\":\"FAILED\"}\n");
+        Files.writeString(
+                run.diagnosticDirectory().resolve(run.runId()).resolve("run-index.json"),
+                "{\"runId\":\"run-live-attempt\",\"outcome\":\"FAILED\"}\n"
+        );
+        AgentCoordination.begin(project, request("run-live-attempt", "agent-attempt"));
+        Path archived = run.dataDirectory().resolve("attempts").resolve("1").resolve("diagnostic")
+                .resolve(run.runId()).resolve("scenarios").resolve("old-scenario").resolve("summary.json");
+        assertTrue(Files.isRegularFile(archived), archived.toString());
+        assertFalse(Files.exists(scenario));
+        assertTrue(Files.readString(run.recordFile()).contains("\"status\" : \"RUNNING\""));
+    }
+
+    @Test
+    void relaunchOfAFinishedRunRefusesAndLeavesTheDiagnosticInPlace() throws Exception {
         AgentCoordination.Run run = AgentCoordination.begin(project, request("run-attempt", "agent-attempt"));
         Path scenario = run.diagnosticDirectory().resolve(run.runId()).resolve("scenarios").resolve("old-scenario");
         Files.createDirectories(scenario);
@@ -269,6 +287,7 @@ class AgentCoordinationTest {
                 () -> AgentCoordination.begin(project, request("run-attempt", "agent-attempt")));
         assertTrue(refused.getMessage().contains("already finished"), refused.getMessage());
         assertTrue(Files.isRegularFile(scenario.resolve("summary.json")));
+        assertFalse(Files.isDirectory(run.dataDirectory().resolve("attempts")));
         assertTrue(Files.readString(run.recordFile()).contains("\"status\" : \"FAILED\""));
     }
 

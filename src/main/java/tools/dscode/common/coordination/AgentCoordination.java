@@ -1135,8 +1135,10 @@ public final class AgentCoordination {
     }
 
     /**
-     * A relaunch keeps the previous diagnostic pack, but not on the path query
-     * and the summary walk. {@code attempts/} is outside {@code diagnostic/}.
+     * A still-RUNNING relaunch keeps the previous diagnostic pack off the path
+     * query and the summary walk. A finished record never gets here: {@code begin}
+     * refuses it first and leaves {@code diagnostic/} in place. {@code attempts/}
+     * is outside {@code diagnostic/}.
      */
     private static void archivePreviousAttempt(Path data) throws IOException {
         Path diagnostic = data.resolve("diagnostic");

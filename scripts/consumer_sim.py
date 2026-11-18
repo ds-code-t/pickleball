@@ -216,21 +216,19 @@ def main() -> int:
         rerun = run_stage(timings, "discover-rerun", [
             "discover", "--run-id=" + RUN, "--tags=" + TAGS, "--name=" + NAME,
             "--runvar=pkb_browser=CHROME_HEADLESS", "--retention=failed", "--agent=consumer-sim",
-        ], allow_exit={0, 1})
-        assert_in(rerun, "summary status=")
+        ], allow_exit={1})
+        assert_in(rerun, "already finished")
+        assert_not_in(rerun, "summary status=")
         attempts = CONSUMER / ".pickleball" / "runs" / RUN / "attempts"
-        assert_true(attempts.is_dir(), "rerun did not archive the previous diagnostic attempt")
-        if "status=PASSED" in (rerun.stdout or ""):
-            assert_in(rerun, "failed=0")
+        assert_true(not attempts.exists(), "a finished run id must not archive diagnostic/ to attempts/")
         after = run_stage(timings, "query-errors-after", ["query", "errors", "--run-id=" + RUN], allow_exit={0})
         assert_not_in(after, "attempts/")
-        if "status=PASSED" in (rerun.stdout or ""):
-            assert_true('"matched":0' in after.stdout, "a passed rerun still reported errors: " + after.stdout[:500])
         confirm = run_stage(timings, "confirm", [
             "confirm", "--run-id=" + RUN, "--tags=" + TAGS, "--name=" + NAME,
             "--agent=consumer-sim",
-        ], allow_exit={0, 1})
-        assert_in(confirm, "summary status=")
+        ], allow_exit={1})
+        assert_in(confirm, "already finished")
+        assert_not_in(confirm, "summary status=")
         run_stage(timings, "finish", [
             "finish", "--run-id=" + RUN, "--status=PASSED", "--agent=consumer-sim",
         ], allow_exit={0})
