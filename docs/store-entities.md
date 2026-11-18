@@ -20,7 +20,7 @@ version: 1
 payload: {"name":"Ada","password":"<password:qaDb>"}
 ```
 
-`type` matches `[A-Za-z][A-Za-z0-9_-]*`. `id` matches `[A-Za-z0-9][A-Za-z0-9_-]*` and does not contain `.` or `#`. `version` is an integer starting at 1. `payload` is one JSON object. Keys are not Gherkin.
+`type` matches `[A-Za-z][A-Za-z0-9_-]*`. `id` matches `[A-Za-z0-9][A-Za-z0-9_-]*` with optional extra `.segment` pieces (`ae-mgr-all.app`). It does not contain `#`, a slash, or `..`. `version` is an integer starting at 1. `payload` is one JSON object. Keys are not Gherkin.
 
 Commit the files you want Git to remember. Ignore a type directory in `.gitignore` when that type must stay local. Store does not choose for you. The database `.pickleball/store/data` is always gitignored. An entity put with `--sandbox=<name>` stays on that sandbox branch. `main` does not see it.
 
@@ -34,7 +34,7 @@ The only new reference is:
 <entity:Type#id.field>
 ```
 
-`field` is optional. Dots walk nested JSON. `<entity:Account#ada.name>` is the string `Ada`. `<entity:Account#ada>` is the payload JSON. This does not change `<config:...>`, `<file:...>`, `<data:...>`, or any other existing reference.
+`field` is optional. Dots walk nested JSON after the longest stored id. `<entity:Account#ada.name>` is the string `Ada` when the file is `Account/ada.entity`. `<entity:Operator#ae-mgr-all.app>` is the payload of `Operator/ae-mgr-all.app.entity`, and `<entity:Operator#ae-mgr-all.app.name>` is that payload's `name`. `<entity:Account#ada>` is the payload JSON. This does not change `<config:...>`, `<file:...>`, `<data:...>`, or any other existing reference.
 
 A scenario step receives that resolved field only when Store is on. With Store off, the step receives the reference text unchanged. A secret field stays the reference. `<entity:Account#ada.password>` reaches the step as `<password:qaDb>`, not as a password.
 

@@ -958,6 +958,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/store/CategoryEditTest.java`
 - `src/test/java/tools/dscode/store/ChangesCliTest.java`
 - `src/test/java/tools/dscode/store/EmbeddedStoreOpenTest.java`
+- `src/test/java/tools/dscode/store/EntityResolutionTest.java`
 - `src/test/java/tools/dscode/store/FileEditTest.java`
 - `src/test/java/tools/dscode/store/GherkinRewriteTest.java`
 - `src/test/java/tools/dscode/store/GlueEditTest.java`
