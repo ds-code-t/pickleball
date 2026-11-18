@@ -20,8 +20,10 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * Read-only query over retained diagnostic JSON. Files stay the source of truth.
- * The same method serves the launcher {@code query} command and the MCP retrieval tools.
+ * Read-only query. The store ({@code .pickleball/store/runstate.db}) is the source
+ * of truth for run status and step rows when that file has them. Diagnostic JSON
+ * fills the gaps. The same method serves the launcher {@code query} command and
+ * the MCP retrieval tools.
  */
 public final class DiagnosticQuery {
     public static final int DEFAULT_LIMIT = 20;
@@ -258,7 +260,8 @@ public final class DiagnosticQuery {
                 if (needle != null && !contains(run, needle)) continue;
                 items.add(runItem(project, run));
             }
-            return new Loaded(items, catalog.where, catalog.capped);
+            addMissingStoreRuns(project, items, status);
+            return new Loaded(items, storeAnswered(items) ? StoreHistoryReader.WHERE : catalog.where, catalog.capped);
         }
         if ("tail".equals(op)) {
             Loaded failures = load(project, "errors", runId, null, "error", null, null, null);
@@ -291,6 +294,19 @@ public final class DiagnosticQuery {
         for (String current : runIds) {
             Resolved resolved = resolve(project, current);
             if (resolved.where != null) where = resolved.where;
+            if ("step".equals(kind)) {
+                List<Map<String, Object>> storedSteps = StoreHistoryReader.steps(project, current);
+                if (!storedSteps.isEmpty()) {
+                    where = StoreHistoryReader.WHERE;
+                    for (Map<String, Object> step : storedSteps) {
+                        if (id != null && !id.equals(str(step.get("seq"))) && !id.equals(str(step.get("id")))) continue;
+                        if (status != null && !status.equalsIgnoreCase(str(step.get("status")))) continue;
+                        if (needle != null && !contains(step, needle)) continue;
+                        items.add(step);
+                    }
+                    continue;
+                }
+            }
             if ("get".equals(op) && "run".equals(kind)) {
                 items.add(runItem(project, catalogRow(catalog, current)));
                 continue;
@@ -466,7 +482,9 @@ public final class DiagnosticQuery {
                     if (!Files.isDirectory(child)) continue;
                     String name = child.getFileName().toString();
                     if (!safeId(name)) continue;
-                    if (resolve(project, name).index != null) seen.add(name);
+                    if (resolve(project, name).index != null || Files.isRegularFile(child.resolve("record.json"))) {
+                        seen.add(name);
+                    }
                 }
             }
         }
@@ -498,7 +516,7 @@ public final class DiagnosticQuery {
                 if (!Files.isDirectory(child)) continue;
                 String name = child.getFileName().toString();
                 if (!safeId(name) || listed.contains(name)) continue;
-                if (resolve(project, name).index == null) continue;
+                if (resolve(project, name).index == null && !Files.isRegularFile(child.resolve("record.json"))) continue;
                 Map<String, Object> row = new LinkedHashMap<>();
                 row.put("runId", name);
                 runs.add(row);
@@ -522,7 +540,9 @@ public final class DiagnosticQuery {
                     if (!Files.isDirectory(child)) continue;
                     String name = child.getFileName().toString();
                     if (!safeId(name)) continue;
-                    if (resolve(project, name).index != null) seen.add(name);
+                    if (resolve(project, name).index != null || Files.isRegularFile(child.resolve("record.json"))) {
+                        seen.add(name);
+                    }
                 }
             }
         }
@@ -577,7 +597,59 @@ public final class DiagnosticQuery {
         }
         item.put("failed", failed(item.get("outcome"), index.get("counts"), row.get("counts")));
         item.put("where", resolved.where == null ? null : resolved.where);
+        if (item.get("outcome") == null || item.get("where") == null) {
+            Map<String, Object> record = agentRecord(project, runId);
+            if (record != null) {
+                if (item.get("outcome") == null) item.put("outcome", str(record.get("status")));
+                if (item.get("purpose") == null) {
+                    String why = firstNonBlank(str(record.get("why")), str(record.get("purpose")));
+                    if (why != null) item.put("purpose", clip(why));
+                }
+                if (item.get("where") == null) item.put("where", ".pickleball/runs/" + runId + "/record.json");
+            }
+        }
+        Map<String, Object> stored = StoreHistoryReader.one(project, runId);
+        if (stored != null) {
+            item.put("outcome", stored.get("outcome"));
+            item.put("failed", stored.get("failed"));
+            item.put("where", stored.get("where"));
+        }
         return item;
+    }
+
+    private static void addMissingStoreRuns(Path project, List<Map<String, Object>> items, String status) {
+        for (Map<String, Object> stored : StoreHistoryReader.runs(project)) {
+            String id = str(stored.get("runId"));
+            if (id == null) continue;
+            boolean listed = false;
+            for (Map<String, Object> item : items) {
+                if (id.equals(str(item.get("runId")))) {
+                    listed = true;
+                    break;
+                }
+            }
+            if (listed) continue;
+            if (status != null && !status.equalsIgnoreCase(str(stored.get("outcome")))) continue;
+            items.add(stored);
+        }
+    }
+
+    private static boolean storeAnswered(List<Map<String, Object>> items) {
+        for (Map<String, Object> item : items) {
+            if (StoreHistoryReader.WHERE.equals(str(item.get("where")))) return true;
+        }
+        return false;
+    }
+
+    private static Map<String, Object> agentRecord(Path project, String runId) {
+        if (project == null || runId == null || !safeId(runId)) return null;
+        Path file = project.resolve(".pickleball").resolve("runs").resolve(runId).resolve("record.json");
+        if (!Files.isRegularFile(file)) return null;
+        try {
+            return JsonLite.object(JsonLite.parse(Files.readString(file)));
+        } catch (IOException | RuntimeException ignored) {
+            return null;
+        }
     }
 
     private static String purpose(Map<String, Object> row, Map<String, Object> index) {

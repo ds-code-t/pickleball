@@ -200,6 +200,37 @@ public final class StoreExecution {
         }
     }
 
+    /** Appends one finished nested step under the scenario already opened on this thread. */
+    public static void appendFinishedStep(
+            Path project, String scenarioName, String uri, int scenarioLine, String stepText, int stepLine, String status, Integer examplesRow
+    ) {
+        if (!shouldTrack()) return;
+        try {
+            Path root = resolveProject(project);
+            Active active = active(root, scenarioName, uri, scenarioLine, examplesRow);
+            String text = stepText == null ? "" : stepText;
+            int ord = ++active.nextOrd;
+            if (active.pluginOrd < ord) active.pluginOrd = ord;
+            while (active.texts.size() < ord - 1) active.texts.add("");
+            if (active.texts.size() == ord - 1) active.texts.add(text);
+            else if (active.texts.size() >= ord) active.texts.set(ord - 1, text);
+            recordStep(root, new StepDraft(
+                    active.runId,
+                    active.scenarioKey,
+                    active.recordedScenario,
+                    null,
+                    active.examplesRow,
+                    ord,
+                    text,
+                    stepLine > 0 ? stepLine : null,
+                    status,
+                    active.started,
+                    Instant.now().toString()));
+        } catch (RuntimeException | SQLException ignored) {
+            // A tracking write must not change the scenario result.
+        }
+    }
+
     public static void finishUnopenedStep(Path project, String scenarioName, String uri, int scenarioLine, String stepText, int stepLine, String status) {
         finishUnopenedStep(project, scenarioName, uri, scenarioLine, stepText, stepLine, status, null);
     }
@@ -248,13 +279,22 @@ public final class StoreExecution {
             try (StoreDatabase database = StoreDatabase.open(active.project)) {
                 recount(database.connection(), active.execId, active.runId, now);
                 try (PreparedStatement statement = database.connection().prepareStatement(
-                        "UPDATE scenario_executions SET status = ?, finished_at = ? WHERE exec_id = ? AND status = 'RUNNING'")) {
+                        "UPDATE scenario_executions SET status = ?, finished_at = ? WHERE exec_id = ? AND (status = 'RUNNING' OR ? = 'FAILED')")) {
                     statement.setString(1, status(status));
                     statement.setString(2, now);
                     statement.setString(3, active.execId);
+                    statement.setString(4, status(status));
                     statement.executeUpdate();
                 }
+                if ("FAILED".equals(status(status))) {
+                    try (PreparedStatement statement = database.connection().prepareStatement(
+                            "UPDATE runs SET status = 'FAILED', failed = CASE WHEN failed < 1 THEN 1 ELSE failed END WHERE run_id = ?")) {
+                        statement.setString(1, active.runId);
+                        statement.executeUpdate();
+                    }
+                }
             }
+            RunCatalog.publishStore(active.project, active.runId);
         } catch (RuntimeException | SQLException ignored) {
         } finally {
             ACTIVE.remove();
@@ -521,7 +561,8 @@ public final class StoreExecution {
     private static void recount(Connection connection, String execId, String runId, String finished) throws SQLException {
         int passed = count(connection, "SELECT COUNT(*) FROM step_executions WHERE scenario_exec_id = ? AND status = 'PASSED'", execId);
         int failed = count(connection, "SELECT COUNT(*) FROM step_executions WHERE scenario_exec_id = ? AND status = 'FAILED'", execId);
-        String status = failed > 0 ? "FAILED" : passed > 0 ? "PASSED" : "RUNNING";
+        int skipped = count(connection, "SELECT COUNT(*) FROM step_executions WHERE scenario_exec_id = ? AND status = 'SKIPPED'", execId);
+        String status = failed > 0 ? "FAILED" : passed > 0 ? "PASSED" : skipped > 0 ? "SKIPPED" : "RUNNING";
         try (PreparedStatement statement = connection.prepareStatement(
                 "UPDATE scenario_executions SET passed = ?, failed = ?, status = ?, finished_at = ? WHERE exec_id = ?")) {
             statement.setInt(1, passed);
@@ -541,11 +582,17 @@ public final class StoreExecution {
                 JOIN scenario_executions e ON e.exec_id = s.scenario_exec_id
                 WHERE e.run_id = ? AND s.status = 'FAILED'
                 """, runId);
+        int runSkipped = count(connection, """
+                SELECT COUNT(*) FROM step_executions s
+                JOIN scenario_executions e ON e.exec_id = s.scenario_exec_id
+                WHERE e.run_id = ? AND s.status = 'SKIPPED'
+                """, runId);
+        String runStatus = runFailed > 0 ? "FAILED" : runPassed > 0 ? "PASSED" : runSkipped > 0 ? "SKIPPED" : "PASSED";
         try (PreparedStatement statement = connection.prepareStatement(
                 "UPDATE runs SET passed = ?, failed = ?, status = ?, finished_at = ? WHERE run_id = ?")) {
             statement.setInt(1, runPassed);
             statement.setInt(2, runFailed);
-            statement.setString(3, runFailed > 0 ? "FAILED" : "PASSED");
+            statement.setString(3, runStatus);
             statement.setString(4, finished);
             statement.setString(5, runId);
             statement.executeUpdate();

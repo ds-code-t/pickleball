@@ -3,6 +3,7 @@ package tools.dscode.engine.runtime;
 import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.core.runner.CurrentScenarioState;
 import io.cucumber.core.runner.ScenarioStep;
+import io.cucumber.core.runner.StepBase;
 import io.cucumber.core.runner.StepExtension;
 import io.cucumber.plugin.event.Result;
 import tools.dscode.common.mappings.MapConfigurations;
@@ -130,6 +131,7 @@ public final class NativeScenarioRun {
                             stepText,
                             stepLine,
                             exampleRow(scenario));
+                    int tracedFrom = seen.size();
                     try {
                         state.runStep(frame);
                     } catch (Throwable thrown) {
@@ -144,10 +146,14 @@ public final class NativeScenarioRun {
                         NativeStepTrace.record(frame);
                         state.recordHardFailure(thrown);
                     } finally {
-                        String trackedStatus = frame.result == null || frame.result.getStatus() == null
-                                ? "PASSED"
-                                : frame.result.getStatus().name();
+                        String trackedStatus;
+                        try {
+                            trackedStatus = storeStatus(frame, seen, tracedFrom);
+                        } catch (RuntimeException ignored) {
+                            trackedStatus = toResult(engineStep, frame).status().name();
+                        }
                         tools.dscode.store.StoreExecution.afterStep(trackedStatus);
+                        recordNested(options, scenario, frame, seen, tracedFrom);
                         frame.nextSibling = savedNext;
                         context.popStep();
                     }
@@ -377,6 +383,121 @@ public final class NativeScenarioRun {
             }
         }
         return frame;
+    }
+
+    private static void recordNested(
+            EngineOptions options, EngineScenario scenario, StepExtension frame, List<Seen> traced, int from
+    ) {
+        if (frame == null || scenario == null) return;
+        try {
+            IdentityHashMap<StepExtension, Boolean> stored = new IdentityHashMap<>();
+            stored.put(frame, Boolean.TRUE);
+            if (traced != null) {
+                for (int index = Math.max(0, from); index < traced.size(); index++) {
+                    storeOne(options, scenario, traced.get(index).frame(), stored);
+                }
+            }
+            for (StepExtension child : executedDescendants(frame)) {
+                storeOne(options, scenario, child, stored);
+            }
+        } catch (RuntimeException ignored) {
+            // A tracking write must not change the scenario result.
+        }
+    }
+
+    private static void storeOne(
+            EngineOptions options,
+            EngineScenario scenario,
+            StepExtension child,
+            IdentityHashMap<StepExtension, Boolean> stored
+    ) {
+        if (child == null || stored.put(child, Boolean.TRUE) != null) return;
+        String text = nestedText(child);
+        if (!worthStoring(child)) return;
+        tools.dscode.store.StoreExecution.appendFinishedStep(
+                options == null ? null : options.project(),
+                scenario.name(),
+                scenario.location() == null ? "" : scenario.location().uri(),
+                scenario.location() == null ? 0 : scenario.location().line(),
+                text,
+                0,
+                storeStatus(child),
+                exampleRow(scenario));
+    }
+
+    private static String storeStatus(StepExtension frame) {
+        return storeStatus(frame, List.of(), 0);
+    }
+
+    private static String storeStatus(StepExtension frame, List<Seen> traced, int from) {
+        Status status = toResult(null, frame).status();
+        if (descendantFailed(frame) || tracedFailed(frame, traced, from)) return Status.FAILED.name();
+        return status.name();
+    }
+
+    private static boolean tracedFailed(StepExtension root, List<Seen> traced, int from) {
+        if (traced == null) return false;
+        for (int index = Math.max(0, from); index < traced.size(); index++) {
+            StepExtension child = traced.get(index).frame();
+            if (child == null || child == root) continue;
+            Status status = toResult(null, child).status();
+            if (status == Status.FAILED || status == Status.UNDEFINED || status == Status.AMBIGUOUS) return true;
+            if (child.result != null && child.result.getStatus() == io.cucumber.plugin.event.Status.FAILED) return true;
+        }
+        return false;
+    }
+
+    private static boolean descendantFailed(StepExtension frame) {
+        for (StepExtension child : executedDescendants(frame)) {
+            Status status = toResult(null, child).status();
+            if (status == Status.FAILED || status == Status.UNDEFINED || status == Status.AMBIGUOUS) return true;
+            if (child.result != null && child.result.getStatus() == io.cucumber.plugin.event.Status.FAILED) return true;
+        }
+        return false;
+    }
+
+    private static List<StepExtension> executedDescendants(StepExtension frame) {
+        List<StepExtension> found = new ArrayList<>();
+        IdentityHashMap<StepExtension, Boolean> seen = new IdentityHashMap<>();
+        collect(frame, found, seen, true);
+        return found;
+    }
+
+    private static void collect(StepExtension frame, List<StepExtension> found, IdentityHashMap<StepExtension, Boolean> seen, boolean root) {
+        if (frame == null || seen.containsKey(frame)) return;
+        seen.put(frame, Boolean.TRUE);
+        if (!root && worthStoring(frame)) found.add(frame);
+        for (StepBase child : frame.childSteps) {
+            if (child instanceof StepExtension extension) collect(extension, found, seen, false);
+        }
+        for (StepBase child : frame.attachedSteps) {
+            if (child instanceof StepExtension extension) collect(extension, found, seen, false);
+        }
+        for (StepExtension child : frame.finalizerSteps) collect(child, found, seen, false);
+    }
+
+    private static boolean worthStoring(StepExtension frame) {
+        if (nestedText(frame).isBlank()) return false;
+        if (frame.runCount > 0 || frame.skipped || frame.result != null) return true;
+        return frame instanceof ScenarioStep && executedChild(frame);
+    }
+
+    private static boolean executedChild(StepExtension frame) {
+        for (StepBase child : frame.childSteps) {
+            if (child instanceof StepExtension extension && (extension.runCount > 0 || extension.skipped || extension.result != null || executedChild(extension))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String nestedText(StepExtension frame) {
+        if (frame instanceof ScenarioStep scenario) {
+            String name = scenario.getSourceScenarioName();
+            if (name != null && !name.isBlank()) return "Scenario: " + name;
+        }
+        String text = frame.getStepText();
+        return text == null ? "" : text;
     }
 
     private static void appendChildren(StepExtension frame, List<StepResult> results) {

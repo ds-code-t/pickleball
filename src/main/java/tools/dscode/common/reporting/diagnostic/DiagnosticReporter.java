@@ -807,6 +807,7 @@ final class DiagnosticReporter {
                 }
             }
             runs.sort((a, b) -> String.valueOf(b.get("startedAt")).compareTo(String.valueOf(a.get("startedAt"))));
+            tools.dscode.store.RunCatalog.retain(runsRoot, runs);
             Map<String, Object> catalog = new LinkedHashMap<>();
             catalog.put("schemaVersion", 1);
             catalog.put("updatedAt", Instant.now().toString());

@@ -1,6 +1,6 @@
 # Diagnostic query
 
-Agents read retained diagnostics through one service, `DiagnosticQuery`. JSON files stay the source of truth. The launcher command and the MCP tools call that service. They do not glob `reports/diagnostic-runs` and they do not guess which of the candidate `run-index.json` paths is live.
+Agents read retained diagnostics through one service, `DiagnosticQuery`. The store (`.pickleball/store/runstate.db`) is the source of truth for run status and step rows. `query` is a view of that store when the run is there, and diagnostic JSON fills what the store does not have. A skipped step stays `SKIPPED`. Nested steps are rows. An agent run (`.pickleball/runs/<id>/record.json`) is included even when it has no `run-index.json`, and it is written into `reports/diagnostic-runs/run-catalog.json`. The launcher command and the MCP tools call that service. They do not glob `reports/diagnostic-runs` and they do not guess which of the candidate `run-index.json` paths is live.
 
 ## Command
 

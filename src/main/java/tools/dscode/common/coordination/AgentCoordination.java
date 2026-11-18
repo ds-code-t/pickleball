@@ -348,6 +348,7 @@ public final class AgentCoordination {
                     );
                     writeRecord(recordFile, reset);
                     appendLog(project, clock, existing.agentId(), runId, "start", purpose, recordFile);
+                    tools.dscode.store.RunCatalog.publishAgent(project, runId, "RUNNING", purpose);
                     existing = reset;
                 }
                 Run adopted = toRun(project, data, recordFile, existing);
@@ -384,6 +385,7 @@ public final class AgentCoordination {
                     null
             );
             writeRecord(recordFile, record);
+            tools.dscode.store.RunCatalog.publishAgent(project, runId, "RUNNING", purpose);
             if (logStart) {
                 appendLog(project, clock, agentId, runId, "start", purpose, recordFile);
             }
@@ -582,6 +584,7 @@ public final class AgentCoordination {
                     appendLog(project, clock, existing.agentId(), existing.runId(), "note", oneLine(learnedValue), recordFile);
                 }
             }
+            tools.dscode.store.RunCatalog.publishAgent(project, existing.runId(), statusValue, existing.why());
             print(out, "run-id=" + existing.runId());
             print(out, "run-record=" + recordFile);
         } catch (IOException failure) {

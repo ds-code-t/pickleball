@@ -573,6 +573,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/store/GlueRules.java`
 - `src/main/java/tools/dscode/store/LegacyNames.java`
 - `src/main/java/tools/dscode/store/ProjectElementCategories.java`
+- `src/main/java/tools/dscode/store/RunCatalog.java`
 - `src/main/java/tools/dscode/store/sql/Binding.java`
 - `src/main/java/tools/dscode/store/sql/LegacySqlite.java`
 - `src/main/java/tools/dscode/store/sql/Sql.java`
@@ -881,6 +882,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/store/NoRuntimeDownloadTest.java`
 - `src/test/java/tools/dscode/store/RemovedNamesGateTest.java`
 - `src/test/java/tools/dscode/store/RenameGateTest.java`
+- `src/test/java/tools/dscode/store/RunHistoryAccuracyTest.java`
 - `src/test/java/tools/dscode/store/SandboxCreateTimingTest.java`
 - `src/test/java/tools/dscode/store/SandboxIndependenceTest.java`
 - `src/test/java/tools/dscode/store/SandboxMergeConflictTest.java`
@@ -1139,6 +1141,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/ProcessTree.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/StageScheduler.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/WarmProcess.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/StoreHistoryReader.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/surface/NativeHighlightBox.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/WindowDriver.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/WorkbenchFeatureIndex.java`
