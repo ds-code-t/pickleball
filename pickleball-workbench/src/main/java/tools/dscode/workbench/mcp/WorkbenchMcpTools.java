@@ -12,6 +12,7 @@ import tools.dscode.workbench.WorkbenchServices;
 import tools.dscode.workbench.store.StoreCliForwarder;
 import tools.dscode.workbench.engine.DomEngineCliForwarder;
 import tools.dscode.workbench.engine.EngineCliForwarder;
+import tools.dscode.workbench.launch.ConsumerReadyForwarder;
 import tools.dscode.workbench.nav.WorkbenchGoLink;
 import tools.dscode.workbench.lease.WorkbenchCallContext;
 import tools.dscode.workbench.lease.WorkbenchLeaseHolder;
@@ -425,6 +426,92 @@ final class WorkbenchMcpTools {
         McpRegistry.contribute((name, description, schema, handler) -> {
             if (!tools.containsKey(name)) add(name, description, schema, handler);
         });
+        add("workbench_start",
+                "Forward start --url --browser --env. Later page commands target that live session.",
+                schema(Map.of(
+                        "url", stringProperty("Page URL."),
+                        "browser", stringProperty("chrome, edge, or chrome-headless."),
+                        "env", stringProperty("Optional KEY=VALUE pairs, comma-separated.")
+                ), "url", "browser"),
+                args -> forwardReady(List.of(
+                        "start",
+                        "--url=" + text(args, "url"),
+                        "--browser=" + text(args, "browser"),
+                        "--env=" + blank(optionalText(args, "env"))
+                )));
+        add("workbench_chat_wait",
+                "Forward blocking chat_wait. Returns when a chat message is stored or the timeout elapses.",
+                schema(Map.of("timeout", stringProperty("Seconds to wait, 0 to 120. Default 30."))),
+                args -> forwardReady(waitArgs(args)));
+        add("workbench_history_summary",
+                "Forward history-summary. Counts runs, passed, failed, and skipped.",
+                schema(Map.of()),
+                args -> forwardReady(List.of("history-summary")));
+        add("workbench_history_query",
+                "Forward history-query. Same read as query. The store is the source of truth.",
+                schema(Map.of(
+                        "op", stringProperty("runs, get, query, search, props, errors, or tail."),
+                        "text", stringProperty("Optional words."),
+                        "runId", stringProperty("Optional run id.")
+                ), "op"),
+                args -> forwardReady(historyQueryArgs(args)));
+        add("workbench_entity_lookup",
+                "Forward entity-lookup --ref. Prints the field value.",
+                schema(Map.of("ref", stringProperty("entity:Type#id.field or the angle-bracket form.")), "ref"),
+                args -> forwardReady(List.of("entity-lookup", "--ref=" + text(args, "ref"))));
+        add("workbench_open_run",
+                "Forward open-run so the Workbench shows that run in Explorer or Tracking.",
+                schema(Map.of(
+                        "runId", stringProperty("Run id."),
+                        "tab", stringProperty("explorer or tracking. Default explorer.")
+                ), "runId"),
+                args -> forwardReady(openRunArgs(args)));
+        add("workbench_bridge_health",
+                "Forward bridge-health. GET /v1/health on the bridge URL.",
+                schema(Map.of("url", stringProperty("Bridge base URL.")), "url"),
+                args -> forwardReady(List.of("bridge-health", "--url=" + text(args, "url"))));
+    }
+
+    private Object forwardReady(List<String> verbArgs) {
+        ConsumerReadyForwarder.Result result = ConsumerReadyForwarder.forward(services.projectRoot(), verbArgs);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("exit", result.exit());
+        body.put("out", result.out());
+        body.put("err", result.err());
+        body.put("command", result.command());
+        return body;
+    }
+
+    private static List<String> waitArgs(Map<String, Object> args) {
+        List<String> verb = new ArrayList<>();
+        verb.add("chat_wait");
+        String timeout = optionalText(args, "timeout");
+        if (timeout != null && !timeout.isBlank()) verb.add("--timeout=" + timeout);
+        return verb;
+    }
+
+    private static List<String> historyQueryArgs(Map<String, Object> args) {
+        List<String> verb = new ArrayList<>();
+        verb.add("history-query");
+        verb.add(text(args, "op"));
+        String words = optionalText(args, "text");
+        if (words != null && !words.isBlank()) verb.add("--text=" + words);
+        String runId = optionalText(args, "runId");
+        if (runId != null && !runId.isBlank()) verb.add("--run-id=" + runId);
+        return verb;
+    }
+
+    private static List<String> openRunArgs(Map<String, Object> args) {
+        List<String> verb = new ArrayList<>();
+        verb.add("open-run");
+        verb.add("--run-id=" + text(args, "runId"));
+        String tab = optionalText(args, "tab");
+        if (tab != null && !tab.isBlank()) verb.add("--tab=" + tab);
+        return verb;
+    }
+
+    private static String blank(String value) {
+        return value == null ? "" : value;
     }
 
     private Object forwardStore(Object rawArgs) {

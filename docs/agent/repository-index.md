@@ -622,6 +622,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/engine/source/StepListScenarioSource.java`
 - `src/main/java/tools/dscode/engine/source/StoreScenarioSource.java`
 - `src/main/java/tools/dscode/internal/ValuesSupport.java`
+- `src/main/java/tools/dscode/launcher/ConsumerReadyCommands.java`
 - `src/main/java/tools/dscode/launcher/PickleballWorkbenchLauncher.java`
 - `src/main/java/tools/dscode/launcher/QuietWarnings.java`
 - `src/main/java/tools/dscode/launcher/SessionHealthWait.java`
@@ -912,6 +913,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureSteps.java`
 - `src/test/java/tools/dscode/GuidancePackagingTest.java`
 - `src/test/java/tools/dscode/launcher/AgentExpansionTest.java`
+- `src/test/java/tools/dscode/launcher/ConsumerReadyCliTest.java`
 - `src/test/java/tools/dscode/launcher/DomEngineCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/DomLogCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/EngineCliLaunchTest.java`
@@ -1277,6 +1279,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/engine/DomEngineCliForwarder.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/engine/EngineCliForwarder.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/launch/ConsumerClasspath.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/launch/ConsumerReadyForwarder.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchCallContext.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchControlLease.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchControlLeaseSnapshot.java`
@@ -1375,6 +1378,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/engine/DomEngineCliForwarderTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/engine/EngineCliForwarderTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/JavaEngineClasspathTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/launch/ConsumerReadyForwarderTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/lease/WorkbenchControlLeaseTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/log/LogCliForwarderTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mapping/MappingValueCodecTest.java`

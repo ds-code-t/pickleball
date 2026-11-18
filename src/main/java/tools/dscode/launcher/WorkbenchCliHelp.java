@@ -58,6 +58,13 @@ final class WorkbenchCliHelp {
             Map.entry("chat-send", "Usage: chat-send --text=<message> [--source=agent|human|system] [--channel=<name>] [--agent=<id>] [--run-id=<id>]"),
             Map.entry("chat-history", "Usage: chat-history [--channel=<name>] [--limit=<n>] [--run-id=<id>]"),
             Map.entry("chat-poll", "Usage: chat-poll [--channel=<name>] [--id=<after>] [--wait=<seconds>] [--run-id=<id>]"),
+            Map.entry("start", "Usage: start --url=<page> --browser=<chrome|edge|chrome-headless> [--env=KEY=VALUE] [--project=<dir>]\nPublishes a live session. Later page commands with no --run-id target that session."),
+            Map.entry("chat_wait", "Usage: chat_wait [--timeout=<seconds>] [--run-id=<id>]\nBlocks until a chat message is stored, or until --timeout (default 30, max 120)."),
+            Map.entry("history-summary", "Usage: history-summary\nPrints runs, passed, failed, skipped, and other from run records and the store."),
+            Map.entry("history-query", "Usage: history-query <runs|get|query|search|props|errors|tail> [--run-id=<id>] [--text=<words>] [--limit=<n>]\nSame read as query. The store is the source of truth."),
+            Map.entry("entity-lookup", "Usage: entity-lookup --ref=<entity:Type#id.field>\nPrints the field value. A miss prints miss and exits 1."),
+            Map.entry("open-run", "Usage: open-run --run-id=<id> [--tab=explorer|tracking]\nAsks the Workbench to show that run. explorer is the default tab."),
+            Map.entry("bridge-health", "Usage: bridge-health --url=<bridge-base>\nGET /v1/health. Exit 0 on HTTP 200. Exit 1 when the bridge is down or unhealthy."),
             Map.entry("highlight", "Usage: highlight --handle=<id> (--preset=yellow|outline-red) [--style=<css>] [--html=<page>] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>]"),
             Map.entry("unhighlight", "Usage: unhighlight [--handle=<id>] [--html=<page>]"),
             Map.entry("overlay", "Usage: overlay --text=<html> [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--handle=<id>] [--at=auto|top|bottom|left|right|over] [--theme=auto|light|dark] [--block=true] [--geometry=<json>] [--html=<page>]"),
@@ -167,7 +174,8 @@ final class WorkbenchCliHelp {
         text.append("coordination: short-log note inbox finish presence post history gc-runs gc-versions use-version export-guidance\n");
         text.append("descriptors: session list | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>\n");
         text.append("page: inspect-page find-element\n");
-        text.append("agent: observe launch windows tabs chat-send chat-history chat-poll highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close panel-open panel-close guide guide-next guide-back guide-done ask ui-apply ui-poll ui-catalog capture-scenario\n");
+        text.append("agent: observe launch windows tabs chat-send chat-history chat-poll chat_wait highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close panel-open panel-close guide guide-next guide-back guide-done ask ui-apply ui-poll ui-catalog capture-scenario\n");
+        text.append("consumer: start history-summary history-query entity-lookup open-run bridge-health\n");
         text.append("retrieval: query runs | query get | query query | query search | query props | query errors | query tail\n");
         text.append("controller: sync worker-check live-check ui mcp session\n");
         text.append("all:");

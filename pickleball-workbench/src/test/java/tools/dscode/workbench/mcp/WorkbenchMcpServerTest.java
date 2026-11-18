@@ -106,7 +106,14 @@ class WorkbenchMcpServerTest {
             "agent_popup_close",
             "ui",
             "ui_poll",
-            "ui_catalog"
+            "ui_catalog",
+            "workbench_start",
+            "workbench_chat_wait",
+            "workbench_history_summary",
+            "workbench_history_query",
+            "workbench_entity_lookup",
+            "workbench_open_run",
+            "workbench_bridge_health"
     );
 
     @TempDir
@@ -512,6 +519,41 @@ class WorkbenchMcpServerTest {
                 "args", List.of("changes", "--since=3", "--table=files", "--limit=10", "--json")));
         assertEquals(List.of("changes", "--since=3", "--table=files", "--limit=10", "--json"),
                 ((Map<?, ?>) changes).get("forwarded"));
+    }
+
+    @Test
+    void consumerVerbsForwardThroughConsumerClasspath() {
+        java.util.List<String> seen = new java.util.ArrayList<>();
+        tools.dscode.workbench.launch.ConsumerReadyForwarder.runner = command -> {
+            seen.addAll(command);
+            return new tools.dscode.workbench.launch.ConsumerReadyForwarder.Result(0, "live=true\n", "", command);
+        };
+        try {
+            String mainClass = tools.dscode.workbench.launch.ConsumerClasspath.MAIN_CLASS;
+            java.util.List<java.nio.file.Path> entries =
+                    tools.dscode.workbench.launch.ConsumerClasspath.entries(project, null);
+            WorkbenchMcpTools tools = new WorkbenchMcpTools(fakeServices((method, args) -> {
+                if ("projectRoot".equals(method)) return project;
+                return null;
+            }), JSON);
+            Object started = tools.call("workbench_start", java.util.Map.of(
+                    "url", "http://127.0.0.1/page",
+                    "browser", "chrome",
+                    "env", "FOO=bar"));
+            assertTrue(String.valueOf(((java.util.Map<?, ?>) started).get("command")).contains("start"), String.valueOf(started));
+            assertTrue(seen.contains("start"));
+            assertTrue(seen.contains("--url=http://127.0.0.1/page"));
+            assertTrue(seen.contains("--browser=chrome"));
+            assertTrue(seen.contains(mainClass));
+            assertEquals("-cp", seen.get(1));
+            String classpath = seen.get(2);
+            assertFalse(classpath.isBlank());
+            for (java.nio.file.Path entry : entries) {
+                assertTrue(classpath.contains(entry.toAbsolutePath().normalize().toString()), entry.toString());
+            }
+        } finally {
+            tools.dscode.workbench.launch.ConsumerReadyForwarder.runner = null;
+        }
     }
 
     private static WorkbenchServices fakeServices(FakeInvocation invocation) {
