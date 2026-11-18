@@ -36,6 +36,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/consumer-project.md`
 - `docs/cucumber-compatibility.md`
 - `docs/custom-element-definitions.md`
+- `docs/dashboard.md`
 - `docs/data-element-query-runtime.md`
 - `docs/data-values-and-elements.md`
 - `docs/date-time-utilities.md`
@@ -491,6 +492,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/coredefinitions/TableSteps.java`
 - `src/main/java/tools/dscode/coredefinitions/UtilitySteps.java`
 - `src/main/java/tools/dscode/cucumberextended/utilities/StringUtilities.java`
+- `src/main/java/tools/dscode/engine/adapter/cucumber/GlueHooks.java`
 - `src/main/java/tools/dscode/engine/adapter/cucumber/StoreRunTracePlugin.java`
 - `src/main/java/tools/dscode/engine/adapter/CucumberAdapterRun.java`
 - `src/main/java/tools/dscode/engine/adapter/NativeSuiteExecution.java`
@@ -503,7 +505,6 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/engine/EngineOptions.java`
 - `src/main/java/tools/dscode/engine/match/AmbiguousMatchException.java`
 - `src/main/java/tools/dscode/engine/match/GlueConverters.java`
-- `src/main/java/tools/dscode/engine/match/GlueHooks.java`
 - `src/main/java/tools/dscode/engine/match/GlueStep.java`
 - `src/main/java/tools/dscode/engine/match/StepKind.java`
 - `src/main/java/tools/dscode/engine/match/StepMatch.java`
@@ -568,6 +569,12 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/registry/GlobalRegistry.java`
 - `src/main/java/tools/dscode/release/WorkingTreeDiffHash.java`
 - `src/main/java/tools/dscode/store/CategoryRules.java`
+- `src/main/java/tools/dscode/store/dashboard/DashboardCli.java`
+- `src/main/java/tools/dscode/store/dashboard/DashboardHtml.java`
+- `src/main/java/tools/dscode/store/dashboard/DashboardQuery.java`
+- `src/main/java/tools/dscode/store/dashboard/DashboardSnapshot.java`
+- `src/main/java/tools/dscode/store/dashboard/DashboardSource.java`
+- `src/main/java/tools/dscode/store/dashboard/SqliteDashboardSource.java`
 - `src/main/java/tools/dscode/store/EditRules.java`
 - `src/main/java/tools/dscode/store/FileRules.java`
 - `src/main/java/tools/dscode/store/GherkinRewrite.java`
@@ -575,7 +582,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/store/LegacyNames.java`
 - `src/main/java/tools/dscode/store/ProjectElementCategories.java`
 - `src/main/java/tools/dscode/store/RunCatalog.java`
+- `src/main/java/tools/dscode/store/RunProvenance.java`
 - `src/main/java/tools/dscode/store/sql/Binding.java`
+- `src/main/java/tools/dscode/store/sql/DashboardAccess.java`
 - `src/main/java/tools/dscode/store/sql/LegacySqlite.java`
 - `src/main/java/tools/dscode/store/sql/Sql.java`
 - `src/main/java/tools/dscode/store/sql/SqlConnections.java`
@@ -876,6 +885,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/ScenarioObjectTest.java`
 - `src/test/java/tools/dscode/store/CategoryEditTest.java`
 - `src/test/java/tools/dscode/store/ChangesCliTest.java`
+- `src/test/java/tools/dscode/store/dashboard/DashboardTest.java`
 - `src/test/java/tools/dscode/store/EmbeddedStoreOpenTest.java`
 - `src/test/java/tools/dscode/store/EntityResolutionTest.java`
 - `src/test/java/tools/dscode/store/FileEditTest.java`

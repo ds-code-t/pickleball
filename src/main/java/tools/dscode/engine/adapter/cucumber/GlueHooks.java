@@ -1,4 +1,4 @@
-package tools.dscode.engine.match;
+package tools.dscode.engine.adapter.cucumber;
 
 import io.cucumber.core.backend.Status;
 import io.cucumber.core.backend.TestCaseState;
@@ -13,8 +13,12 @@ import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
 
-/** Builds the {@code Scenario} argument consumer {@code @Before} hooks expect. */
-final class GlueHooks {
+/**
+ * Builds the {@code Scenario} argument consumer {@code @Before} hooks expect.
+ * It names Cucumber runtime types, so it lives in the Cucumber adapter;
+ * {@code StepRegistry} in the native spine calls it.
+ */
+public final class GlueHooks {
     private static final Constructor<?> SCENARIO;
 
     static {
@@ -30,7 +34,7 @@ final class GlueHooks {
     private GlueHooks() {
     }
 
-    static boolean callable(Method method) {
+    public static boolean callable(Method method) {
         if (method == null) return false;
         for (Class<?> parameter : method.getParameterTypes()) {
             if (parameter != io.cucumber.java.Scenario.class) return false;
@@ -38,7 +42,7 @@ final class GlueHooks {
         return true;
     }
 
-    static Object[] arguments(Method method) {
+    public static Object[] arguments(Method method) {
         Class<?>[] parameters = method.getParameterTypes();
         Object[] args = new Object[parameters.length];
         if (parameters.length == 0) return args;
