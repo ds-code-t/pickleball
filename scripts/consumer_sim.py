@@ -2,10 +2,11 @@
 """Consumer-simulation E2E harness for the Workbench CLI.
 
 Drives maven-consumer-project the way an agent does: discover (before and
-after test-compile), isolate, execute-step via base64 and an absolute
---text-file, events, query errors/tail, a rerun of the same run id, confirm,
-and finish. Asserts exit codes, summary lines, and record.json. Prints a
-timing line per stage and fails when a stage exceeds its budget.
+after test-compile), isolate on a separate seeded run id, execute-step via
+base64 and an absolute --text-file, events, query errors/tail, a rerun of the
+finished discover id, confirm on that same id, and finish. Asserts exit codes,
+summary lines, and record.json. Prints a timing line per stage and fails when
+a stage exceeds its budget.
 
 Linux CI calls this script. The windows-latest job calls it from PowerShell.
 Wrappers are absolute paths. On Windows a .cmd/.bat is started with cmd.exe
@@ -29,6 +30,22 @@ ROOT = Path(__file__).resolve().parents[1]
 CONSUMER = ROOT / "maven-consumer-project"
 RUN_UNCOMPILED = "sim-uncompiled"
 RUN = "sim-compiled"
+# Discover finishes RUN. Isolate and the later session commands use a seeded
+# id that was never discovered, so A6 does not refuse them.
+SESSION = "sim-session"
+# Report-7/8 ids are finished by an earlier harness run. A later isolate or
+# discover on that same id is refused. Each harness start removes them.
+_REPORT_RUNS = (
+    "report7-a",
+    "report7-b",
+    "report7-c",
+    "report7-quiet",
+    "report7-quiet-warn",
+    "report7-fail",
+    "report7-cache",
+    "report8-gap",
+    "report8-between",
+)
 TAGS = "@log-assert-steps"
 NAME = "TRACE.DEBUG.INFO"
 STEP = 'INFO: harness "quoted" step'
@@ -55,12 +72,12 @@ BUDGETS = {
     "discover-uncompiled": 900,
     "test-compile": 900,
     "workspace-seed": 180,
+    "workspace-seed-session": 180,
     "discover-compiled": 900,
     "validate": 30,
     "validate-quiet": 30,
     "discover-quiet": 120,
     "isolate-no-workspace": 60,
-    "stop-before-rotate": 60,
     "isolate-again": 600,
     "isolate": 600,
     "execute-step-b64": 180,
@@ -71,6 +88,7 @@ BUDGETS = {
     "query-tail": 60,
     "discover-rerun": 900,
     "query-errors-after": 60,
+    "stop-session": 60,
     "confirm": 900,
     "finish": 60,
     "stop": 60,
@@ -172,19 +190,25 @@ def main() -> int:
         assert_in(missing, "error: no workspace for run id sim-missing-workspace")
         assert_in(missing, "fix: Run workspace-seed or discover for that run id.")
         assert_not_in(missing, "exited before becoming healthy")
+        run_stage(timings, "workspace-seed-session", [
+            "workspace-seed", "--run-id=" + SESSION, "--reseed",
+        ], allow_exit={0})
         run_stage(timings, "isolate", [
-            "isolate", "--run-id=" + RUN, "--tags=" + TAGS, "--name=" + NAME,
+            "isolate", "--run-id=" + SESSION, "--tags=" + TAGS, "--name=" + NAME,
             "--runvar=pkb_browser=CHROME_HEADLESS", "--agent=consumer-sim",
         ], allow_exit={0})
-        assert_first_start_timing(RUN)
-        log_path = CONSUMER / ".pickleball" / "runs" / RUN / "session" / "session.log"
+        assert_first_start_timing(SESSION)
+        log_path = CONSUMER / ".pickleball" / "runs" / SESSION / "session" / "session.log"
         before = log_path.read_bytes() if log_path.is_file() else b""
-        run_stage(timings, "stop-before-rotate", ["stop", "--run-id=" + RUN, "--force"], allow_exit={0, 1})
+        # stop --force would mark SESSION STOPPED. The next isolate is then
+        # refused unless learned is a failed session start. Kill the controller
+        # and leave the record RUNNING so isolate-again can rotate the log.
+        release_session_for_rotate(SESSION)
         run_stage(timings, "isolate-again", [
-            "isolate", "--run-id=" + RUN, "--tags=" + TAGS, "--name=" + NAME,
+            "isolate", "--run-id=" + SESSION, "--tags=" + TAGS, "--name=" + NAME,
             "--runvar=pkb_browser=CHROME_HEADLESS", "--agent=consumer-sim",
         ], allow_exit={0})
-        archived = CONSUMER / ".pickleball" / "runs" / RUN / "session" / "attempts" / "1" / "session.log"
+        archived = CONSUMER / ".pickleball" / "runs" / SESSION / "session" / "attempts" / "1" / "session.log"
         assert_true(archived.is_file(), "first session.log was not kept at " + str(archived))
         if before:
             kept = archived.read_bytes()
@@ -194,7 +218,7 @@ def main() -> int:
             )
         b64 = base64.b64encode(STEP.encode("utf-8")).decode("ascii")
         stepped = run_stage(timings, "execute-step-b64", [
-            "execute-step", "--run-id=" + RUN, "--text-b64=" + b64,
+            "execute-step", "--run-id=" + SESSION, "--text-b64=" + b64,
         ], allow_exit={0})
         assert_in(stepped, "ACK ")
         assert_in(stepped, "harness")
@@ -202,15 +226,16 @@ def main() -> int:
         step_file.parent.mkdir(parents=True, exist_ok=True)
         step_file.write_text(STEP + "\n", encoding="utf-8", newline="\n")
         filed = run_stage(timings, "execute-step-file", [
-            "execute-step", "--run-id=" + RUN, "--text-file=" + step_file.resolve().as_posix(),
+            "execute-step", "--run-id=" + SESSION, "--text-file=" + step_file.resolve().as_posix(),
         ], allow_exit={0})
         assert_in(filed, "ACK ")
         assert_not_in(filed, STEP + "\r")
-        events = run_stage(timings, "events", ["events", "--run-id=" + RUN], allow_exit={0})
+        events = run_stage(timings, "events", ["events", "--run-id=" + SESSION], allow_exit={0})
         assert_true(events.stdout.strip() != "" or events.stderr.strip() != "", "events produced no output")
-        status = run_stage(timings, "status", ["status", "--run-id=" + RUN], allow_exit={0})
+        status = run_stage(timings, "status", ["status", "--run-id=" + SESSION], allow_exit={0})
         assert_in(status, "status=idle")
         assert_in(status, "elapsed-step-ms=idle")
+        run_stage(timings, "stop-session", ["stop", "--run-id=" + SESSION, "--force"], allow_exit={0, 1})
         run_stage(timings, "query-errors", ["query", "errors", "--run-id=" + RUN], allow_exit={0})
         run_stage(timings, "query-tail", ["query", "tail", "--run-id=" + RUN], allow_exit={0})
         rerun = run_stage(timings, "discover-rerun", [
@@ -226,9 +251,10 @@ def main() -> int:
         confirm = run_stage(timings, "confirm", [
             "confirm", "--run-id=" + RUN, "--tags=" + TAGS, "--name=" + NAME,
             "--agent=consumer-sim",
-        ], allow_exit={1})
-        assert_in(confirm, "already finished")
-        assert_not_in(confirm, "summary status=")
+        ], allow_exit={0, 1})
+        assert_in(confirm, "summary status=")
+        assert_not_in(confirm, "already finished")
+        assert_true(not attempts.exists(), "confirm on a finished discover must not archive diagnostic/ to attempts/")
         run_stage(timings, "finish", [
             "finish", "--run-id=" + RUN, "--status=PASSED", "--agent=consumer-sim",
         ], allow_exit={0})
@@ -238,11 +264,12 @@ def main() -> int:
         report7(timings)
     finally:
         warm_before_stop = warm_pids()
-        if (CONSUMER / ".pickleball" / "runs" / RUN).exists():
-            try:
-                run_stage(timings, "stop", ["stop", "--run-id=" + RUN, "--force"], allow_exit={0, 1, 2})
-            except SystemExit:
-                pass
+        for run_id in (SESSION, RUN):
+            if (CONSUMER / ".pickleball" / "runs" / run_id).exists():
+                try:
+                    run_stage(timings, "stop", ["stop", "--run-id=" + run_id, "--force"], allow_exit={0, 1, 2})
+                except SystemExit:
+                    pass
         assert_warm_dead(warm_before_stop)
         write_timings(timings)
     assert_session_start(timings)
@@ -272,7 +299,7 @@ def publish() -> None:
 
 def prepare_tree() -> None:
     runs = CONSUMER / ".pickleball" / "runs"
-    for run_id in (RUN_UNCOMPILED, RUN):
+    for run_id in (RUN_UNCOMPILED, RUN, SESSION, *_REPORT_RUNS):
         shutil.rmtree(runs / run_id, ignore_errors=True)
     classes = CONSUMER / "target" / "test-classes"
     if classes.exists():
@@ -343,6 +370,130 @@ def pid_alive(pid: int) -> bool:
     except OSError:
         return False
     return True
+
+
+def release_session_for_rotate(run_id: str) -> None:
+    """Drop the live controller without finishing the run.
+
+    The next isolate adopts the still-RUNNING record and rotates
+    session/session.log. stop --force would mark the run STOPPED, and A6
+    would refuse that isolate. A finished discover is not this run id.
+    """
+    path = CONSUMER / ".pickleball" / "runs" / run_id / "session" / "cli-session.json"
+    pid = _session_pid(path)
+    if pid:
+        victims = _kill_tree(pid)
+        _wait_dead(pid, victims)
+    path.unlink(missing_ok=True)
+
+
+def release_before_reisolate(timings: list[dict], stage: str, run_id: str) -> None:
+    started = time.monotonic()
+    release_session_for_rotate(run_id)
+    seconds = round(time.monotonic() - started, 3)
+    timings.append({
+        "stage": stage,
+        "seconds": seconds,
+        "exit": 0,
+        "stdout": "",
+        "stderr": "",
+    })
+    print(f"stage={stage} exit=0 seconds={seconds}", flush=True)
+
+
+def _session_pid(path: Path) -> int | None:
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    pid = data.get("pid")
+    if isinstance(pid, bool):
+        return None
+    if isinstance(pid, int) and pid > 1:
+        return pid
+    if isinstance(pid, str) and pid.isdigit() and int(pid) > 1:
+        return int(pid)
+    return None
+
+
+def _kill_tree(pid: int) -> list[int]:
+    if pid <= 1:
+        return []
+    if os.name == "nt":
+        subprocess.run(
+            ["taskkill", "/PID", str(pid), "/T", "/F"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return [pid]
+    victims = _descendants(pid)
+    victims.append(pid)
+    for target in reversed(victims):
+        _signal(target, 15)
+    return victims
+
+
+def _wait_dead(pid: int, victims: list[int] | None = None) -> None:
+    pending = [item for item in (victims or [pid]) if item > 1]
+    deadline = time.time() + 8
+    while time.time() < deadline:
+        pending = [item for item in pending if pid_alive(item)]
+        if not pending:
+            return
+        time.sleep(0.2)
+    for target in pending:
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/PID", str(target), "/T", "/F"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        else:
+            _signal(target, 9)
+    deadline = time.time() + 2
+    while time.time() < deadline and any(pid_alive(item) for item in pending):
+        time.sleep(0.1)
+
+
+def _signal(pid: int, sig: int) -> None:
+    try:
+        os.kill(pid, sig)
+    except OSError:
+        return
+
+
+def _descendants(root: int) -> list[int]:
+    if os.name == "nt" or root <= 1 or not Path("/proc").is_dir():
+        return []
+    children: dict[int, list[int]] = {}
+    for entry in Path("/proc").iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            stat = (entry / "stat").read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        end = stat.rfind(")")
+        if end < 0:
+            continue
+        fields = stat[end + 2:].split()
+        if len(fields) < 2:
+            continue
+        try:
+            parent = int(fields[1])
+            child = int(entry.name)
+        except ValueError:
+            continue
+        children.setdefault(parent, []).append(child)
+    found: list[int] = []
+    stack = list(children.get(root, []))
+    while stack:
+        child = stack.pop()
+        found.append(child)
+        stack.extend(children.get(child, []))
+    return found
 
 
 def assert_warm_dead(pids: list[int]) -> None:
@@ -843,7 +994,7 @@ def _report7_cleanup() -> None:
     if ambiguous.is_file():
         ambiguous.unlink()
     _restore_quiet_properties()
-    for run_id in ("report7-a", "report7-b", "report7-c", "report7-quiet", "report7-quiet-warn", "report7-fail", "report8-gap"):
+    for run_id in _REPORT_RUNS:
         try:
             launcher(["stop", "--run-id=" + run_id, "--force"], 30)
         except SystemExit:
@@ -1096,7 +1247,7 @@ def _report7_body(timings: list[dict], results: list[dict]) -> None:
     stages = first_progress.get("stages") if isinstance(first_progress, dict) else None
     if isinstance(stages, list) and stages:
         previous_last = str(stages[-1].get("stage") or "")
-    _report7_launch(timings, "report7-stop-a", ["stop", "--run-id=report7-a", "--force"], 60)
+    release_before_reisolate(timings, "report7-stop-a", "report7-a")
     _ensure_classpath_cache(timings)
     bulk = _inflate_consumer_classpath()
     _plant_prior_session("report7-a", previous_last)
@@ -1112,7 +1263,7 @@ def _report7_body(timings: list[dict], results: list[dict]) -> None:
         leaked.returncode == 0 and not planted,
         f"previous={previous_last} planted={planted} stages={leaked_names} seconds={leaked_seconds}",
     )
-    _report7_launch(timings, "report7-stop-prior", ["stop", "--run-id=report7-a", "--force"], 60)
+    release_before_reisolate(timings, "report7-stop-prior", "report7-a")
     _clear_prior_session("report7-a")
     log_before = _log_snapshot()
     second, second_seconds = _report7_launch(timings, "report7-isolate-a-restart", [
@@ -1140,7 +1291,7 @@ def _report7_body(timings: list[dict], results: list[dict]) -> None:
 
 def _report7_open_items(timings: list[dict], results: list[dict]) -> None:
     """Follow-up symptoms from the 6a7e660 retest. Items 2-5 fail on 1d4e2f6d."""
-    _report7_launch(timings, "report7-stop-before-restarts", ["stop", "--run-id=report7-a", "--force"], 60)
+    release_before_reisolate(timings, "report7-stop-before-restarts", "report7-a")
     gaps: list[str] = []
     restart_ok = True
     for index in range(RESTARTS):
@@ -1152,7 +1303,7 @@ def _report7_open_items(timings: list[dict], results: list[dict]) -> None:
         gaps.append(str(gap_ms))
         if started.returncode != 0 or gap_ms is None or gap_ms > INDEX_JVM_BUDGET_MS:
             restart_ok = False
-        _report7_launch(timings, f"report7-restart-stop-{index}", ["stop", "--run-id=report7-a", "--force"], 60)
+        release_before_reisolate(timings, f"report7-restart-stop-{index}", "report7-a")
     _report7_note(
         results, "1-every-restart",
         restart_ok,
@@ -1330,7 +1481,7 @@ def _report8_fixback(timings: list[dict], results: list[dict]) -> None:
         stale_warn[0] if stale_warn else "no stale-glue warning",
     )
 
-    _report7_launch(timings, "report8-stop-before", ["stop", "--run-id=report8-gap", "--force"], 60)
+    release_before_reisolate(timings, "report8-stop-before", "report8-gap")
     bulk = _inflate_consumer_classpath()
     _report7_launch(timings, "report8-seed", [
         "workspace-seed", "--run-id=report8-gap", "--reseed",
@@ -1346,7 +1497,7 @@ def _report8_fixback(timings: list[dict], results: list[dict]) -> None:
     legs.append(("resource-edit",) + _report8_materialize(timings, "report8-resource-edit", delete_manifest=False))
     legs.append(("manifest-removed",) + _report8_materialize(timings, "report8-manifest-removed", delete_manifest=True))
     _report7_launch(timings, "report8-discover", [
-        "discover", "--run-id=report8-gap", "--tags=@report7-regex",
+        "discover", "--run-id=report8-between", "--tags=@report7-regex",
         "--runvar=pkb_browser=CHROME_HEADLESS", "--agent=consumer-sim",
     ], 900)
     code, gap, observed, work = _report8_isolate(timings, "report8-after-discover")
@@ -1574,7 +1725,8 @@ def _report8_isolate(timings: list[dict], stage: str):
 
 
 def _report8_materialize(timings: list[dict], stage: str, delete_manifest: bool):
-    _report7_launch(timings, stage + "-stop", ["stop", "--run-id=report8-gap", "--force"], 60)
+    # stop --force would finish the run. The next isolate must keep it RUNNING.
+    release_before_reisolate(timings, stage + "-stop", "report8-gap")
     if delete_manifest:
         _delete_workbench_manifests()
     code, gap, observed, work = _report8_isolate(timings, stage)
