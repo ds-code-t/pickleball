@@ -23,7 +23,58 @@ class StoreDiscoveryTest {
     Path project;
 
     @Test
-    void defaultsKeepFixedDirectoriesSkipBinariesAndKeepUtf8() throws Exception {
+    void defaultsKeepFixedDirectoriesIncludeBinariesAndKeepUtf8() throws Exception {
+        write("features/pay.feature", "Feature: Pay\n  Scenario: One\n    Given ready\n");
+        write("notes/extra.txt", "not a default directory\n");
+        byte[] cafe = new byte[] {(byte) 0x63, (byte) 0x61, (byte) 0x66, (byte) 0xC3, (byte) 0xA9, (byte) 0xFF};
+        Path cafePath = project.resolve("src/test/resources/configs/cafe.yaml");
+        Files.createDirectories(cafePath.getParent());
+        Files.write(cafePath, cafe);
+        byte[] png = new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47};
+        byte[] noise = new byte[] {0, 1, 2, 3};
+        byte[] controls = new byte[64];
+        java.util.Arrays.fill(controls, (byte) 1);
+        Files.write(project.resolve("features/shot.png"), png);
+        Files.write(project.resolve("features/noise.dat"), noise);
+        Files.write(project.resolve("features/controls.dat"), controls);
+
+        String previous = System.getProperty("pkb_store_log");
+        try {
+            System.setProperty("pkb_store_log", "discover");
+            Capture hydrate = run("store", "hydrate", "--project=" + project);
+            assertEquals(0, hydrate.code, hydrate.err);
+            assertTrue(hydrate.out.contains("inserted=5"), hydrate.out);
+            assertTrue(hydrate.out.contains("ignored=0"), hydrate.out);
+            assertEquals("feature", row("features/pay.feature").sourceType());
+            assertArrayEquals(cafe, row("src/test/resources/configs/cafe.yaml").raw());
+            assertNull(row("notes/extra.txt"));
+            assertStoredInline("features/shot.png", png);
+            assertStoredInline("features/noise.dat", noise);
+            assertStoredInline("features/controls.dat", controls);
+            Path log = StorePaths.log(project);
+            if (Files.exists(log)) {
+                String text = Files.readString(log, StandardCharsets.UTF_8);
+                assertFalse(text.contains("exclude **/*.png"), text);
+                assertFalse(text.contains("binary null byte"), text);
+                assertFalse(text.contains("binary content"), text);
+            }
+        } finally {
+            restore("pkb_store_log", previous);
+        }
+
+        Capture status = run("store", "status", "--project=" + project);
+        assertEquals(0, status.code, status.err);
+        assertTrue(status.out.contains("skipped 0"), status.out);
+        assertFalse(status.out.contains("sample features/shot.png"), status.out);
+        Capture json = run("store", "status", "--json", "--project=" + project);
+        JsonNode node = JSON.readTree(json.out);
+        assertEquals(0, node.get("skipped").asInt());
+        assertEquals(0, node.get("skipSamples").size());
+    }
+
+    @Test
+    void explicitSkipStillDropsBinariesAndKeepsUtf8() throws Exception {
+        write("store.properties", "binary-policy=skip\n");
         write("features/pay.feature", "Feature: Pay\n  Scenario: One\n    Given ready\n");
         write("notes/extra.txt", "not a default directory\n");
         byte[] cafe = new byte[] {(byte) 0x63, (byte) 0x61, (byte) 0x66, (byte) 0xC3, (byte) 0xA9, (byte) 0xFF};
@@ -70,7 +121,23 @@ class StoreDiscoveryTest {
     }
 
     @Test
-    void statusOnSkippedFilesDoesNotCreateDatabase() throws Exception {
+    void statusOnAnIncludedBinaryDoesNotCreateDatabase() throws Exception {
+        Path png = project.resolve("features/shot.png");
+        Files.createDirectories(png.getParent());
+        Files.write(png, new byte[] {1, 2, 3, 4});
+        Capture status = run("store", "status", "--json", "--project=" + project);
+        assertEquals(0, status.code, status.err);
+        assertTrue(status.out.contains("\"database\":\"missing\""), status.out);
+        JsonNode node = JSON.readTree(status.out);
+        assertEquals(0, node.get("skipped").asInt());
+        assertEquals(0, node.get("skipSamples").size());
+        assertFalse(Files.exists(StorePaths.database(project)));
+        assertFalse(Files.exists(StorePaths.root(project)));
+    }
+
+    @Test
+    void statusOnExplicitSkipDoesNotCreateDatabase() throws Exception {
+        write("store.properties", "binary-policy=skip\n");
         Path png = project.resolve("features/shot.png");
         Files.createDirectories(png.getParent());
         Files.write(png, new byte[] {1, 2, 3, 4});
@@ -156,6 +223,15 @@ class StoreDiscoveryTest {
         write("store.properties", "binary-policy=keep\n");
         Capture unknown = run("store", "status", "--project=" + project);
         assertTrue(unknown.out.contains("binary-policy keep is not supported"), unknown.out);
+    }
+
+    private void assertStoredInline(String path, byte[] bytes) throws Exception {
+        StoreFiles.Row stored = row(path);
+        assertTrue(stored != null, path);
+        assertFalse(stored.binaryRef(), path);
+        assertEquals("binary", stored.sourceType(), path);
+        assertEquals("db", stored.location(), path);
+        assertArrayEquals(bytes, stored.raw());
     }
 
     private StoreFiles.Row row(String path) throws Exception {

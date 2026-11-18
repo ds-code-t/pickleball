@@ -11,8 +11,9 @@ import java.util.regex.Pattern;
 
 /**
  * Include, exclude, size, and binary rules for Store discovery.
- * Defaults keep the fixed directories. Size and binary skips are extra.
- * {@code --path --force} is the only bypass.
+ * Defaults keep the fixed directories and include binaries.
+ * A blank binary policy is include. Explicit skip still drops binaries.
+ * Size skips are extra. {@code --path --force} is the only bypass.
  */
 public final class StoreDiscovery {
     public static final long DEFAULT_MAX_BYTES = 1024L * 1024L;
@@ -61,7 +62,7 @@ public final class StoreDiscovery {
         long large = parseSize(first(setting("pkb_store_large_file_bytes", "PKB_STORE_LARGE_FILE_BYTES"), file.get("large-file-bytes")),
                 DEFAULT_LARGE_BYTES, true);
         String policy = first(setting("pkb_store_binary_policy", "PKB_STORE_BINARY_POLICY"), file.get("binary-policy"));
-        if (policy == null || policy.isBlank()) policy = BINARY_SKIP;
+        if (policy == null || policy.isBlank()) policy = BINARY_INCLUDE;
         return new StoreDiscovery(includes, excludes, max, large, policy.trim().toLowerCase(Locale.ROOT));
     }
 

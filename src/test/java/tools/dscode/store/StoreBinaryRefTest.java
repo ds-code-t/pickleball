@@ -68,7 +68,29 @@ class StoreBinaryRefTest {
     }
 
     @Test
-    void skipDefaultStillIgnoresAPng() throws Exception {
+    void defaultIncludeStoresAPngInline() throws Exception {
+        byte[] png = new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47};
+        Path file = project.resolve("features/shot.png");
+        Files.createDirectories(file.getParent());
+        Files.write(file, png);
+        Files.writeString(project.resolve("features/one.feature"), "Feature: One\n  Scenario: A\n    Given ready\n", StandardCharsets.UTF_8);
+        Capture hydrate = run("hydrate");
+        assertEquals(0, hydrate.code, hydrate.out + hydrate.err);
+        assertTrue(hydrate.out.contains("ignored=0"), hydrate.out);
+        assertTrue(hydrate.out.contains("inserted=2"), hydrate.out);
+        try (StoreDatabase database = StoreDatabase.open(project)) {
+            StoreFiles.Row row = StoreFiles.find(database.connection(), "features/shot.png");
+            assertFalse(row.binaryRef());
+            assertArrayEquals(png, row.raw());
+            assertEquals("db", row.location());
+            assertEquals("binary", row.sourceType());
+            assertEquals("feature", StoreFiles.find(database.connection(), "features/one.feature").sourceType());
+        }
+    }
+
+    @Test
+    void explicitSkipStillIgnoresAPng() throws Exception {
+        Files.writeString(project.resolve("store.properties"), "binary-policy=skip\n");
         byte[] png = new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47};
         Path file = project.resolve("features/shot.png");
         Files.createDirectories(file.getParent());
@@ -79,6 +101,7 @@ class StoreBinaryRefTest {
         assertTrue(hydrate.out.contains("ignored=1"), hydrate.out);
         try (StoreDatabase database = StoreDatabase.open(project)) {
             assertNull(StoreFiles.find(database.connection(), "features/shot.png"));
+            assertEquals("feature", StoreFiles.find(database.connection(), "features/one.feature").sourceType());
         }
     }
 
