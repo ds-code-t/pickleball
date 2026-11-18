@@ -121,6 +121,39 @@ class DashboardTest {
         assertFalse(html.contains("other-run"));
     }
 
+    @Test
+    void writtenPageLinksFromItsOwnFolderAndItsDataIsValidJson() throws Exception {
+        seed();
+        try (Connection connection = DriverManager.getConnection(
+                "jdbc:sqlite:" + StorePaths.runState(project).toAbsolutePath());
+             Statement statement = connection.createStatement()) {
+            statement.execute("UPDATE runs SET note = 'tab\there' || char(1) || char(8232) WHERE run_id = 'pay-run'");
+        }
+        var out = new java.io.ByteArrayOutputStream();
+        var err = new java.io.ByteArrayOutputStream();
+        int code = DashboardCli.execute(
+                new String[]{"dashboard", "--project=" + project},
+                new java.io.PrintStream(out),
+                new java.io.PrintStream(err)
+        );
+        assertEquals(0, code, err.toString(StandardCharsets.UTF_8));
+        String html = Files.readString(project.resolve(".pickleball/dashboard/index.html"));
+        String open = "<script id=\"data\" type=\"application/json\">";
+        int start = html.indexOf(open);
+        assertTrue(start >= 0, "data block");
+        String json = html.substring(start + open.length(), html.indexOf("</script>", start)).trim();
+        var tree = new com.fasterxml.jackson.databind.ObjectMapper().readTree(json);
+        assertEquals("../../", tree.get("linkBase").asText());
+        var notes = new java.util.ArrayList<String>();
+        tree.get("runs").forEach(run -> notes.add(run.get("note").asText()));
+        assertTrue(notes.contains("tab\there\u0001\u2028"), notes.toString());
+        assertTrue(html.contains("add(local(path), path)"), "project paths are prefixed with linkBase");
+        Path page = project.resolve(".pickleball/dashboard/index.html");
+        assertEquals(project.resolve("features/pay.feature").normalize(),
+                page.getParent().resolve(tree.get("linkBase").asText() + "features/pay.feature").normalize());
+        assertEquals("", DashboardCli.linkBase(project, project.resolve("index.html")));
+    }
+
     private void seed() throws Exception {
         Path runs = StorePaths.runState(project);
         Path main = StorePaths.mainDatabase(project);

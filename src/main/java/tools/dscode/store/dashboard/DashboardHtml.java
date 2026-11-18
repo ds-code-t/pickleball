@@ -11,6 +11,15 @@ public final class DashboardHtml {
     }
 
     public static String render(DashboardSnapshot snapshot) {
+        return render(snapshot, "");
+    }
+
+    /**
+     * {@code linkBase} is the project root as seen from the page's folder,
+     * for example {@code ../../}. Project-relative feature, data, and artifact
+     * paths are prefixed with it so the links open from the written file.
+     */
+    public static String render(DashboardSnapshot snapshot, String linkBase) {
         DashboardSnapshot page = snapshot == null
                 ? new DashboardSnapshot("", List.of(), List.of(), List.of(), List.of(), List.of(), List.of())
                 : snapshot;
@@ -79,7 +88,7 @@ public final class DashboardHtml {
                 </main>
                 <script id="data" type="application/json">
                 """);
-        html.append(json(page));
+        html.append(json(page, linkBase));
         html.append("""
                 </script>
                 <script>
@@ -192,6 +201,7 @@ public final class DashboardHtml {
                   detail.appendChild(meta);
                   const links = document.createElement("p");
                   links.className = "links";
+                  const local = (path) => /^([a-z][a-z0-9+.-]*:|\\/|[a-z]:[\\\\/])/i.test(path) ? path : (data.linkBase || "") + path;
                   const add = (href, label) => {
                     if (!href) return;
                     const a = document.createElement("a");
@@ -199,9 +209,9 @@ public final class DashboardHtml {
                     a.textContent = label;
                     links.appendChild(a);
                   };
-                  (run.features || []).forEach(path => add(path, path));
-                  (run.dataFiles || []).forEach(path => add(path, path));
-                  (run.artifacts || []).forEach(path => add(path, path));
+                  (run.features || []).forEach(path => add(local(path), path));
+                  (run.dataFiles || []).forEach(path => add(local(path), path));
+                  (run.artifacts || []).forEach(path => add(local(path), path));
                   if (run.commitUrl) add(run.commitUrl, run.gitCommit || "commit");
                   detail.appendChild(links);
                 }
@@ -215,9 +225,10 @@ public final class DashboardHtml {
         return html.toString();
     }
 
-    private static String json(DashboardSnapshot page) {
+    private static String json(DashboardSnapshot page, String linkBase) {
         StringBuilder out = new StringBuilder();
-        out.append("{\"generatedAt\":\"").append(esc(page.generatedAt())).append("\",\"runs\":[");
+        out.append("{\"generatedAt\":\"").append(esc(page.generatedAt()))
+                .append("\",\"linkBase\":\"").append(esc(linkBase)).append("\",\"runs\":[");
         for (int i = 0; i < page.runs().size(); i++) {
             if (i > 0) out.append(',');
             DashboardSnapshot.RunView run = page.runs().get(i);
@@ -264,12 +275,28 @@ public final class DashboardHtml {
 
     private static String esc(String value) {
         if (value == null) return "";
-        return value.replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\r", "\\r")
-                .replace("\n", "\\n")
-                .replace("<", "\\u003c")
-                .replace(">", "\\u003e")
-                .replace("&", "\\u0026");
+        StringBuilder out = new StringBuilder(value.length() + 8);
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            switch (c) {
+                case '\\' -> out.append("\\\\");
+                case '"' -> out.append("\\\"");
+                case '\r' -> out.append("\\r");
+                case '\n' -> out.append("\\n");
+                case '\t' -> out.append("\\t");
+                case '<' -> out.append("\\u003c");
+                case '>' -> out.append("\\u003e");
+                case '&' -> out.append("\\u0026");
+                default -> {
+                    // JSON.parse rejects raw control characters; U+2028/2029 break older script parsers.
+                    if (c < 0x20 || c == '\u2028' || c == '\u2029') {
+                        out.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        out.append(c);
+                    }
+                }
+            }
+        }
+        return out.toString();
     }
 }

@@ -54,7 +54,8 @@ public final class DashboardCli {
             SqlConnections.fillRunProvenance(project);
             DashboardSnapshot snapshot = new SqliteDashboardSource(project).read(query);
             Files.createDirectories(destination.getParent());
-            Files.writeString(destination, DashboardHtml.render(snapshot), StandardCharsets.UTF_8);
+            Files.writeString(destination, DashboardHtml.render(snapshot, linkBase(project, destination)),
+                    StandardCharsets.UTF_8);
             stdout.println("dashboard=" + StorePaths.display(project, destination));
             stdout.println("runs=" + snapshot.runs().size());
             return 0;
@@ -70,6 +71,18 @@ public final class DashboardCli {
                 Usage: dashboard [--project=<dir>] [--out=<file>] [--from=<iso>] [--to=<iso>] [--status=<status>] [--feature=<path>] [--run=<id>] [--entity=<Type#id>] [--text=<words>]
                 Writes a static HTML page from the embedded store. No second database and no server.
                 """;
+    }
+
+    /** The project root as seen from the page's folder, so relative links open from the file. */
+    static String linkBase(Path project, Path destination) {
+        Path folder = destination.toAbsolutePath().normalize().getParent();
+        Path root = project.toAbsolutePath().normalize();
+        try {
+            String relative = folder.relativize(root).toString().replace('\\', '/');
+            return relative.isEmpty() ? "" : relative + "/";
+        } catch (IllegalArgumentException differentRoot) {
+            return root.toUri().toString();
+        }
     }
 
     private static Path project(List<String> tokens) {

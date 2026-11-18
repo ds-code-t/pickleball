@@ -186,16 +186,62 @@ final class TrackingPanel extends JPanel {
         openExplorer.accept(runId);
     }
 
+    /**
+     * Opens the written page. Tests replace this so no browser starts.
+     * Production uses the desktop browser when one is available.
+     */
+    static Consumer<Path> dashboardOpener = TrackingPanel::browse;
+
     private void dashboard() {
-        ConsumerReadyForwarder.Result result = ConsumerReadyForwarder.forward(
-                project.get(), java.util.List.of("dashboard"));
-        if (result.exit() == 0) {
-            String line = result.out() == null ? "" : result.out().trim();
-            int cut = line.indexOf('\n');
-            status.setText(cut < 0 ? line : line.substring(0, cut));
-        } else {
-            String err = result.err() == null ? "" : result.err().trim();
-            status.setText(err.isBlank() ? "exit " + result.exit() : err);
+        status.setText("dashboard");
+        Path root = project.get();
+        new SwingWorker<ConsumerReadyForwarder.Result, Void>() {
+            @Override
+            protected ConsumerReadyForwarder.Result doInBackground() {
+                return ConsumerReadyForwarder.forward(root, java.util.List.of("dashboard"));
+            }
+
+            @Override
+            protected void done() {
+                ConsumerReadyForwarder.Result result;
+                try {
+                    result = get();
+                } catch (Exception failure) {
+                    status.setText("error: " + failure.getMessage());
+                    return;
+                }
+                if (result.exit() == 0) {
+                    String line = result.out() == null ? "" : result.out().trim();
+                    int cut = line.indexOf('\n');
+                    String first = cut < 0 ? line : line.substring(0, cut);
+                    String shown = first;
+                    if (first.startsWith("dashboard=")) {
+                        Path page = Path.of(first.substring("dashboard=".length()).trim());
+                        Path file = page.isAbsolute() || root == null ? page : root.resolve(page);
+                        try {
+                            dashboardOpener.accept(file.toAbsolutePath().normalize());
+                        } catch (RuntimeException failure) {
+                            shown = first + " (open it in a browser: " + failure.getMessage() + ")";
+                        }
+                    }
+                    status.setText(shown);
+                } else {
+                    String err = result.err() == null ? "" : result.err().trim();
+                    status.setText(err.isBlank() ? "exit " + result.exit() : err);
+                }
+            }
+        }.execute();
+    }
+
+    private static void browse(Path file) {
+        if (java.awt.GraphicsEnvironment.isHeadless() || !java.awt.Desktop.isDesktopSupported()
+                || !java.awt.Desktop.getDesktop().isSupported(java.awt.Desktop.Action.BROWSE)) {
+            return;
+        }
+        try {
+            java.awt.Desktop.getDesktop().browse(file.toUri());
+        } catch (java.io.IOException failure) {
+            throw new IllegalStateException(failure.getMessage(), failure);
         }
     }
 

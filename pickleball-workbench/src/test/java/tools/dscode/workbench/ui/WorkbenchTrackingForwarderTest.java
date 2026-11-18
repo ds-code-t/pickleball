@@ -89,11 +89,14 @@ class WorkbenchTrackingForwarderTest {
     @Test
     void htmlDashboardForwardsWithoutReplacingTracking() throws Exception {
         List<List<String>> seen = new ArrayList<>();
+        List<Path> opened = new ArrayList<>();
         ConsumerReadyForwarder.runner = command -> {
             seen.add(List.copyOf(command));
             return new ConsumerReadyForwarder.Result(
                     0, "dashboard=.pickleball/dashboard/index.html\nruns=0\n", "", command);
         };
+        java.util.function.Consumer<Path> previousOpener = TrackingPanel.dashboardOpener;
+        TrackingPanel.dashboardOpener = opened::add;
         try {
             TrackingPanel[] holder = new TrackingPanel[1];
             SwingUtilities.invokeAndWait(() -> holder[0] = new TrackingPanel(
@@ -107,8 +110,12 @@ class WorkbenchTrackingForwarderTest {
             assertTrue(seen.get(0).contains("dashboard"), seen.get(0).toString());
             assertTrue(seen.get(0).stream().noneMatch(arg -> arg.contains("localhost")), seen.get(0).toString());
             assertEquals("dashboard=.pickleball/dashboard/index.html", labelText(holder[0], "Tracking"));
+            assertEquals(
+                    List.of(project.resolve(".pickleball/dashboard/index.html").toAbsolutePath().normalize()),
+                    opened);
         } finally {
             ConsumerReadyForwarder.runner = null;
+            TrackingPanel.dashboardOpener = previousOpener;
         }
     }
 
