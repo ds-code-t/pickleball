@@ -969,6 +969,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/store/RemovedNamesGateTest.java`
 - `src/test/java/tools/dscode/store/RenameGateTest.java`
 - `src/test/java/tools/dscode/store/RunHistoryAccuracyTest.java`
+- `src/test/java/tools/dscode/store/RunIdReuseGuardTest.java`
 - `src/test/java/tools/dscode/store/SandboxCreateTimingTest.java`
 - `src/test/java/tools/dscode/store/SandboxIndependenceTest.java`
 - `src/test/java/tools/dscode/store/SandboxMergeConflictTest.java`

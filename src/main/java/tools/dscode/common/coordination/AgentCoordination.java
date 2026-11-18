@@ -322,6 +322,11 @@ public final class AgentCoordination {
         try {
             if (Files.isRegularFile(recordFile)) {
                 RunRecord existing = readRecord(recordFile);
+                if (finishedRecord(existing)) {
+                    throw new IllegalStateException(
+                            "run id " + existing.runId() + " is already finished ("
+                                    + existing.status() + "). Use a new run id.");
+                }
                 if (logStart) archivePreviousAttempt(data);
                 ensureTree(data);
                 if (logStart) {
@@ -1111,6 +1116,13 @@ public final class AgentCoordination {
 
     private static Path inboxDirectory(Path project, String agentFolder) {
         return PickleballLocalLayout.root(project).resolve(INBOX_DIRECTORY).resolve(agentFolder);
+    }
+
+    private static boolean finishedRecord(RunRecord existing) {
+        if (existing == null) return false;
+        if (existing.stoppedAt() != null && !existing.stoppedAt().isBlank()) return true;
+        String status = existing.status();
+        return status != null && !status.isBlank() && !"RUNNING".equalsIgnoreCase(status.trim());
     }
 
     private static void ensureTree(Path data) throws IOException {
