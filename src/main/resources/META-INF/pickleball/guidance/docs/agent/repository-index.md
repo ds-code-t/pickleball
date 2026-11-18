@@ -502,6 +502,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/engine/EngineLog.java`
 - `src/main/java/tools/dscode/engine/EngineOptions.java`
 - `src/main/java/tools/dscode/engine/match/AmbiguousMatchException.java`
+- `src/main/java/tools/dscode/engine/match/GlueConverters.java`
+- `src/main/java/tools/dscode/engine/match/GlueHooks.java`
 - `src/main/java/tools/dscode/engine/match/GlueStep.java`
 - `src/main/java/tools/dscode/engine/match/StepKind.java`
 - `src/main/java/tools/dscode/engine/match/StepMatch.java`
@@ -833,6 +835,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/SessionHealthWaitTest.java`
 - `src/test/java/tools/dscode/launcher/StoreCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/VersionSwitchTest.java`
+- `src/test/java/tools/dscode/launcher/WarmJvmGlueTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchAgentCommandsTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchAgentUsabilityTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchCliCoverageGateTest.java`
@@ -965,6 +968,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/testsupport/CappedTestConsole.java`
 - `src/test/java/tools/dscode/untilpass/UntilPassBrowserSteps.java`
 - `src/test/java/tools/dscode/untilpass/UntilPassChromeLookupTest.java`
+- `src/test/java/tools/dscode/warmglue/WarmGlueSteps.java`
 - `src/test/resources/architecture/cucumber-runtime-allowlist.txt`
 - `src/test/resources/element-batch/edge.html`
 - `src/test/resources/element-snapshot/fixture.html`
