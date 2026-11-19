@@ -260,7 +260,7 @@ public final class TargetVerb {
                 return missed;
             }
             String version = docVersion(page.session.connection());
-            List<Map<String, Object>> rows = publish(runId, "browser", page.session.id, version, hits, query);
+            List<Map<String, Object>> rows = publish(runId, "browser", page.session.id, version, hits, query, page.session.connection());
             remember(runId, page.session);
             Map<String, Object> body = base("find", "cdp", "browser", target);
             body.put("docVersion", version);
@@ -309,15 +309,9 @@ public final class TargetVerb {
             DomNode node;
             String query = blank(args.get("query"));
             if (hit != null) {
-                if (stale(hit, page.session.connection())) {
-                    Outcome missed = fail("act", "stale_ref");
-                    stamp(missed.body(), page.session.connection(), null);
-                    putEntered(missed.body(), runId, page.session.connection());
-                    return missed;
-                }
-                node = findNode(root, "", hit.backend);
+                node = freshNode(hit, page.session.connection(), root);
                 if (node == null) {
-                    Outcome missed = fail("act", "stale_ref");
+                    Outcome missed = staleRef("act");
                     stamp(missed.body(), page.session.connection(), null);
                     putEntered(missed.body(), runId, page.session.connection());
                     return missed;
@@ -503,10 +497,10 @@ public final class TargetVerb {
     }
 
     private static Outcome actDesktop(Path project, String runId, Hit hit, Map<String, String> args) {
-        if (stale(hit)) return fail("act", "stale_ref");
+        if (stale(hit)) return staleRef("act");
         DesktopTree.Session session = DesktopTree.require(hit.sessionId);
         DomNode node = findNode(session.root(), "", hit.backend);
-        if (node == null) return fail("act", "stale_ref");
+        if (node == null) return staleRef("act");
         String beforeVersion = "desktop:" + session.sequence();
         boolean live = desktopAct(session, node, args);
         DesktopTree.Session after = DesktopTree.open(session.id());
@@ -611,7 +605,7 @@ public final class TargetVerb {
             String version = docVersion(page.session.connection());
             List<DomNode> shown = interactive(shownRoot);
             RowStates.fill(page.session.connection(), optionNodes(shown));
-            List<Map<String, Object>> rows = publish(runId, "browser", page.session.id, version, shown, "");
+            List<Map<String, Object>> rows = publish(runId, "browser", page.session.id, version, shown, "", page.session.connection());
             String picture = picture(page.session.connection(), rows);
             Map<String, Object> body = base("snap", "cdp", "browser", target);
             body.put("mode", mode);
@@ -764,18 +758,19 @@ public final class TargetVerb {
         Held page = openBrowser(resolved(target, args));
         try {
             String ref = blank(args.get("ref"));
+            DomNode root = tree(page.session);
             DomNode node;
             if (!ref.isBlank()) {
                 Hit hit = requireHit(ref);
-                if (stale(hit, page.session.connection())) {
-                    Outcome missed = fail("explain", "stale_ref");
+                node = freshNode(hit, page.session.connection(), root);
+                if (node == null) {
+                    Outcome missed = staleRef("explain");
                     stamp(missed.body(), page.session.connection(), null);
                     putEntered(missed.body(), runId, page.session.connection());
                     return missed;
                 }
-                node = findNode(tree(page.session), "", hit.backend);
             } else {
-                List<DomNode> hits = locate(tree(page.session), blank(args.get("query")), scopedFrame(runId, target));
+                List<DomNode> hits = locate(root, blank(args.get("query")), scopedFrame(runId, target));
                 node = hits.isEmpty() ? null : hits.get(0);
             }
             if (node == null) {
@@ -1335,9 +1330,62 @@ public final class TargetVerb {
         return !hit.docVersion.equals("desktop:" + session.sequence());
     }
 
-    private static boolean stale(Hit hit, CdpConnection cdp) {
-        if ("desktop".equals(hit.kind)) return stale(hit);
-        return !hit.docVersion.equals(docVersion(cdp));
+    /**
+     * The node from {@code hit} when it is still that same control in the same document.
+     * Unrelated mutations and pkb attribute writes do not drop it.
+     */
+    private static DomNode freshNode(Hit hit, CdpConnection cdp, DomNode root) {
+        if (hit == null || "desktop".equals(hit.kind)) return null;
+        if (documentMoved(hit, cdp)) return null;
+        DomNode node = findNode(root, "", hit.backend);
+        if (node == null) return null;
+        if (!sameText(hit.role, role(node)) || !sameText(hit.name, name(node))) return null;
+        return node;
+    }
+
+    /** True when this frame's URL or loader is no longer the one stored on the ref. */
+    private static boolean documentMoved(Hit hit, CdpConnection cdp) {
+        Map<String, String[]> frames = frameIndex(cdp);
+        if (frames.isEmpty()) return true;
+        String[] live = frames.get(hit.frameId);
+        if (live == null) return true;
+        return !sameText(hit.url, live[0]) || !sameText(hit.loader, live[1]);
+    }
+
+    private static Map<String, String[]> frameIndex(CdpConnection cdp) {
+        Map<String, String[]> frames = new LinkedHashMap<>();
+        try {
+            JsonNode tree = cdp.call("Page.getFrameTree", Jsons.object(), Duration.ofSeconds(5));
+            collectFrameIndex(tree.path("frameTree"), frames);
+        } catch (RuntimeException ignored) {
+            return frames;
+        }
+        return frames;
+    }
+
+    private static void collectFrameIndex(JsonNode node, Map<String, String[]> frames) {
+        if (node == null || node.isMissingNode() || node.isNull()) return;
+        JsonNode frame = node.path("frame");
+        String id = frame.path("id").asText("");
+        if (!id.isBlank()) {
+            frames.put(id, new String[]{frame.path("url").asText(""), frame.path("loaderId").asText("")});
+        }
+        JsonNode children = node.path("childFrames");
+        if (children.isArray()) {
+            for (JsonNode child : children) collectFrameIndex(child, frames);
+        }
+    }
+
+    private static boolean sameText(String left, String right) {
+        String a = left == null ? "" : left;
+        String b = right == null ? "" : right;
+        return a.equals(b);
+    }
+
+    private static Outcome staleRef(String op) {
+        Outcome missed = fail(op, "stale_ref");
+        missed.body().put("fix", "run snap (or find) again for a fresh ref");
+        return missed;
     }
 
     private static Hit requireHit(String ref) {
@@ -1776,11 +1824,27 @@ public final class TargetVerb {
     }
 
     private static List<Map<String, Object>> publish(String runId, String kind, String sessionId, String version, List<DomNode> nodes, String query) {
+        return publish(runId, kind, sessionId, version, nodes, query, null);
+    }
+
+    private static List<Map<String, Object>> publish(String runId, String kind, String sessionId, String version, List<DomNode> nodes, String query, CdpConnection cdp) {
+        Map<String, String[]> frames = cdp == null ? Map.of() : frameIndex(cdp);
         List<Map<String, Object>> rows = new ArrayList<>();
         for (DomNode node : nodes) {
             String ref = "ref:" + version + ":" + node.backendNodeId;
             String selector = selector(node, query);
-            HITS.put(ref, new Hit(kind, sessionId, node.backendNodeId, version, selector, query == null ? "" : query));
+            String frameId = node.frameId == null ? "" : node.frameId;
+            String[] identity = frames.get(frameId);
+            if (identity == null && !frames.isEmpty()) {
+                Map.Entry<String, String[]> top = frames.entrySet().iterator().next();
+                frameId = top.getKey();
+                identity = top.getValue();
+            }
+            String url = identity == null ? "" : identity[0];
+            String loader = identity == null ? "" : identity[1];
+            HITS.put(ref, new Hit(
+                    kind, sessionId, node.backendNodeId, version, selector, query == null ? "" : query,
+                    frameId, url, loader, role(node), name(node)));
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("ref", ref);
             row.put("role", role(node));
@@ -2758,7 +2822,19 @@ public final class TargetVerb {
         }
     }
 
-    private record Hit(String kind, String sessionId, long backend, String docVersion, String selector, String query) {
+    private record Hit(
+            String kind,
+            String sessionId,
+            long backend,
+            String docVersion,
+            String selector,
+            String query,
+            String frameId,
+            String url,
+            String loader,
+            String role,
+            String name
+    ) {
     }
 
     private record Held(BrowserSession session, boolean closeAfter) {

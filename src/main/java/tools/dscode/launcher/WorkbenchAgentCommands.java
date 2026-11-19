@@ -2095,6 +2095,9 @@ public final class WorkbenchAgentCommands {
         if (text.contains("no live browser")) {
             return WorkbenchCliHelp.structured("no live browser", "run start --url= --browser=");
         }
+        if ("stale_ref".equals(text)) {
+            return WorkbenchCliHelp.structured("stale_ref", "run snap (or find) again for a fresh ref");
+        }
         return WorkbenchCliHelp.usageError(text, command);
     }
 
