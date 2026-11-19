@@ -293,12 +293,63 @@ public final class ElementOperations {
         }
         By fallback = query.seleniumFallback();
         if (fallback == null) {
+            List<ElementView> snapped = snapshotQuery(driver, query);
+            if (snapped != null) {
+                CompositeLog.info("query", "snapshot " + query.text());
+                return snapped;
+            }
             throw new IllegalStateException(
                     "engine query needs the composite runtime: " + query.text()
             );
         }
         CompositeLog.info("query", "selenium fallback " + query.text());
         return describe(driver, fallback);
+    }
+
+    /**
+     * text=, role=, and the visual relations, read from the live page source
+     * through the snapshot query engine. Composite stays off.
+     * Null when this query is not one of those selectors or the page cannot be read.
+     */
+    private static List<ElementView> snapshotQuery(WebDriver driver, EngineQuery query) {
+        if (driver == null || query == null || query.text() == null || query.text().isBlank()) return null;
+        String pipeline = query.text().trim();
+        if (!pipeline.startsWith("text=") && !pipeline.startsWith("role=")
+                && !pipeline.startsWith("near=") && !pipeline.startsWith("below=")
+                && !pipeline.startsWith("above=")) {
+            return null;
+        }
+        try {
+            dev.domengine.tree.DomNode root = dev.domengine.query.HtmlTree.parse(driver.getPageSource());
+            com.fasterxml.jackson.databind.node.ObjectNode found =
+                    dev.domengine.query.Query.run(root, java.util.Map.of("pipeline", pipeline));
+            com.fasterxml.jackson.databind.JsonNode nodes = found.get("nodes");
+            java.util.ArrayList<ElementView> views = new java.util.ArrayList<>();
+            if (nodes != null) {
+                for (com.fasterxml.jackson.databind.JsonNode node : nodes) {
+                    String text = node.path("text").asText("");
+                    String tag = node.path("node_name").asText("").toLowerCase(java.util.Locale.ROOT);
+                    views.add(new ElementView(
+                            tag,
+                            text,
+                            true,
+                            true,
+                            false,
+                            java.util.Map.of(),
+                            0,
+                            0,
+                            0,
+                            0,
+                            "",
+                            "",
+                            new ElementState(false, text.isBlank(), false, false, false, false, false)
+                    ));
+                }
+            }
+            return views;
+        } catch (RuntimeException failure) {
+            return null;
+        }
     }
 
     /** Click or type through the same query object. Composite only. */

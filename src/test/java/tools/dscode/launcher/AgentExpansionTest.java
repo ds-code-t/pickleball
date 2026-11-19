@@ -811,9 +811,9 @@ class AgentExpansionTest {
 
     @Test
     void covers_command_ui_apply() {
-        Capture bad = agent("ui-apply", temp.toString(), "--run-id=ui", "--ops=[{\"c\":\"toast\"}]");
+        Capture bad = agent("ui-apply", temp.toString(), "--run-id=ui", "--ops=[{\"c\":\"nope\"}]");
         assertEquals(2, bad.code, bad.out + bad.err);
-        assertTrue((bad.out + bad.err).contains("unknown component toast") && (bad.out + bad.err).contains("fix:"), bad.out + bad.err);
+        assertTrue((bad.out + bad.err).contains("unknown component nope") && (bad.out + bad.err).contains("fix:"), bad.out + bad.err);
         Capture noPage = agent("ui-apply", temp.toString(), "--run-id=ui", "--ops=[{\"c\":\"label\",\"t\":\"#a\",\"text\":\"A\"}]");
         assertEquals(1, noPage.code, noPage.out + noPage.err);
         assertTrue((noPage.out + noPage.err).contains("live browser page"), noPage.out + noPage.err);
@@ -833,7 +833,7 @@ class AgentExpansionTest {
         Capture all = agent("ui-catalog", temp.toString());
         assertEquals(0, all.code, all.out + all.err);
         assertTrue(all.out.contains("\"guide\"") && all.out.contains("\"eg\""), all.out);
-        Capture bad = agent("ui-catalog", temp.toString(), "--component=toast");
+        Capture bad = agent("ui-catalog", temp.toString(), "--component=nope");
         assertEquals(2, bad.code, bad.out + bad.err);
     }
 

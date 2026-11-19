@@ -159,12 +159,14 @@ public final class AgentControl {
                 case "guide-back" -> guideMove(project, runId, values, -1);
                 case "guide-done" -> guideDone(project, runId, values);
                 case "ask" -> ask(project, runId, values);
+                case "ask-and-wait" -> askAndWait(project, runId, values);
+                case "pin", "toast", "checklist", "status" -> surfaceCard(project, runId, op, values);
                 case "ui", "ui-apply" -> UiBatch.apply(project, runId, values, agentId);
                 case "ui-poll" -> UiBatch.poll(project, runId, values, agentId);
                 case "ui-catalog" -> uiCatalog(project, runId, values, agentId);
                 case "screenshot" -> screenshot(project, values);
                 case "selftest" -> selftest(project, values);
-                case "snap", "find", "act", "wait", "watch", "explain", "capture", "attach", "eval", "frame" -> {
+                case "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame" -> {
                     tools.dscode.common.agentfast.TargetVerb.Outcome outcome =
                             tools.dscode.common.agentfast.TargetVerb.run(project, runId, op, values);
                     yield new Result(outcome.exit(), outcome.body());
@@ -440,6 +442,11 @@ public final class AgentControl {
     }
 
     private static Result selftest(Path project, Map<String, String> args) throws Exception {
+        if ("pages".equals(args.get("component"))) {
+            Map<String, Object> report = tools.dscode.common.agentfast.SelftestUi.pages(project);
+            if (Boolean.TRUE.equals(report.get("skipped"))) return new Result(1, report);
+            return new Result(Boolean.TRUE.equals(report.get("ok")) ? 0 : 1, report);
+        }
         boolean cpu = truth(args.get("cpu")) || truth(args.get("ui"));
         if (!cpu) return fail(2, "selftest ui --cpu");
         Map<String, Object> report = SelftestUi.cpu(project, args.get("component"));
@@ -527,6 +534,88 @@ public final class AgentControl {
         body.put("op", "ask");
         body.putAll(AgentStore.JSON.readValue(reply, Map.class));
         return new Result(0, body);
+    }
+
+    private static Result askAndWait(Path project, String runId, Map<String, String> args) throws Exception {
+        Result shown = ask(project, runId, args);
+        if (shown.exit() != 0) return shown;
+        String id = String.valueOf(shown.body().getOrDefault("id", "q1"));
+        long timeout = 3000L;
+        if (present(args.get("timeout"))) {
+            try {
+                timeout = Long.parseLong(args.get("timeout").trim());
+            } catch (NumberFormatException failure) {
+                return fail(2, "timeout is milliseconds");
+            }
+        }
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(Math.max(0, timeout));
+        Map<String, Object> answer = null;
+        while (true) {
+            for (Map<String, Object> event : PageSurfaces.pollInput(project, runId)) {
+                if ("answer".equals(String.valueOf(event.get("type"))) && id.equals(String.valueOf(event.get("id")))) {
+                    answer = event;
+                }
+            }
+            if (answer != null) break;
+            if (System.nanoTime() >= deadline) return fail(1, "timeout");
+            Thread.sleep(50);
+        }
+        Map<String, Object> body = ok("Answer received.");
+        body.put("op", "ask-and-wait");
+        body.put("id", id);
+        Object value = answer.get("value");
+        body.put("value", value == null ? "" : value);
+        body.put("applied", value != null && !String.valueOf(value).isBlank());
+        return new Result(0, body);
+    }
+
+    /** pin, toast, checklist, and the status banner. Toast leaves the page on its own. */
+    private static Result surfaceCard(Path project, String runId, String op, Map<String, String> args) throws Exception {
+        String text;
+        if ("checklist".equals(op)) {
+            String items = args.get("items");
+            if (!present(items)) return fail(2, "checklist requires --items");
+            StringBuilder html = new StringBuilder();
+            for (String item : items.split("\\|")) {
+                if (item.isBlank()) continue;
+                html.append(item.trim()).append(' ');
+            }
+            if (html.isEmpty()) return fail(2, "checklist requires --items");
+            text = html.toString().trim();
+        } else {
+            text = args.get("text");
+            if (!present(text)) return fail(2, op + " requires --text");
+        }
+        Map<String, Object> placed = PageSurfaces.place(
+                explicitPage(project, args),
+                "append",
+                null,
+                null,
+                text,
+                "label",
+                24,
+                24,
+                null,
+                AgentStore.root(project, runId)
+        );
+        placed.put("ok", true);
+        placed.put("op", op);
+        placed.put("kind", op);
+        if ("toast".equals(op)) {
+            placed.put("transient", true);
+            String id = String.valueOf(placed.get("id"));
+            Thread remover = new Thread(() -> {
+                try {
+                    Thread.sleep(1200);
+                    PageSurfaces.remove(null, id);
+                } catch (RuntimeException | java.io.IOException | InterruptedException ignored) {
+                    // A closed page has already dropped the toast.
+                }
+            }, "pkb-toast-" + id);
+            remover.setDaemon(true);
+            remover.start();
+        }
+        return new Result(0, placed);
     }
 
     private static Result panelClose(Path project, String runId, Map<String, String> args, List<String> extraArgs, String agentId) throws Exception {
@@ -685,6 +774,7 @@ public final class AgentControl {
                 look
         );
         placed.put("ok", true);
+        stampSeen(placed, args.get("handle"), runId);
         if (present(at)) placed.put("at", at.trim());
         if (present(block) && Boolean.parseBoolean(block.trim())) placed.put("block", true);
         return new Result(0, placed);
@@ -752,12 +842,74 @@ public final class AgentControl {
                 args
         );
         placed.put("ok", true);
+        stampSeen(placed, args.get("anchor") != null ? args.get("anchor") : args.get("handle"), runId);
         if ("arrow".equals(kind)) placed.put("direction", args.get("direction") == null ? "" : args.get("direction"));
         if ("step".equals(kind)) placed.put("number", Integer.parseInt(args.get("number").trim()));
         if ("magnifier".equals(kind)) placed.put("zoom", args.get("zoom"));
         if ("spotlight".equals(kind)) placed.put("dim", args.get("dim"));
         if (present(args.get("block")) && Boolean.parseBoolean(args.get("block").trim())) placed.put("block", true);
         return new Result(0, placed);
+    }
+
+    private record Seen(String run, String id, int x, int y, int w, int h) {}
+
+    private static final List<Seen> SEEN = java.util.Collections.synchronizedList(new ArrayList<>());
+
+    /** visible, hidden, and lost describe the target. overlaps names other placements on this run. */
+    private static void stampSeen(Map<String, Object> placed, String handle, String runId) {
+        WebDriver web = PageSurfaces.liveDriver();
+        if (web instanceof org.openqa.selenium.JavascriptExecutor js && present(handle)) {
+            try {
+                Object raw = js.executeScript(
+                        "var h=arguments[0];"
+                                + "var el=document.querySelector('[data-pkb-handle=\"'+CSS.escape(h)+'\"]');"
+                                + "if(!el) el=document.getElementById(h);"
+                                + "if(!el) return {lost:true,visible:false,hidden:true};"
+                                + "var s=getComputedStyle(el);"
+                                + "var shown=el.getClientRects().length>0 && s.display!=='none' && s.visibility!=='hidden' && !el.hidden;"
+                                + "return {lost:false,visible:shown,hidden:!shown};",
+                        handle
+                );
+                if (raw instanceof Map<?, ?> map) {
+                    placed.put("visible", Boolean.TRUE.equals(map.get("visible")));
+                    placed.put("hidden", Boolean.TRUE.equals(map.get("hidden")));
+                    placed.put("lost", Boolean.TRUE.equals(map.get("lost")));
+                }
+            } catch (RuntimeException ignored) {
+                placed.put("visible", false);
+                placed.put("hidden", false);
+                placed.put("lost", true);
+            }
+        }
+        int x = seenNumber(placed.get("x"));
+        int y = seenNumber(placed.get("y"));
+        int w = seenNumber(placed.get("width"));
+        int h = seenNumber(placed.get("height"));
+        String id = String.valueOf(placed.getOrDefault("id", ""));
+        List<String> overlaps = new ArrayList<>();
+        if (w > 0 && h > 0 && !id.isBlank()) {
+            String run = runId == null ? "" : runId;
+            synchronized (SEEN) {
+                if (SEEN.size() > 64) SEEN.subList(0, SEEN.size() - 64).clear();
+                for (Seen seen : SEEN) {
+                    if (!run.equals(seen.run) || seen.id.equals(id)) continue;
+                    boolean apart = x + w <= seen.x || seen.x + seen.w <= x || y + h <= seen.y || seen.y + seen.h <= y;
+                    if (!apart) overlaps.add(seen.id);
+                }
+                SEEN.add(new Seen(run, id, x, y, w, h));
+            }
+            placed.put("overlaps", overlaps);
+        }
+    }
+
+    private static int seenNumber(Object value) {
+        if (value instanceof Number number) return number.intValue();
+        if (value == null) return 0;
+        try {
+            return Integer.parseInt(String.valueOf(value).trim());
+        } catch (NumberFormatException failure) {
+            return 0;
+        }
     }
 
     private static Result overlayPoll(Path project, String runId, Map<String, String> args) throws Exception {

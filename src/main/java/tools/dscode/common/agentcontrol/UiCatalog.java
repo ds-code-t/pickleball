@@ -62,6 +62,18 @@ final class UiCatalog {
                 opt("id", new Option("string", "g1", "id", "guide id")));
         add("guide-done", "guide-done", false, "closes a guide", "{\"c\":\"guide-done\"}", "",
                 opt("id", new Option("string", "g1", "id", "guide id")));
+        add("status", "status", false, "persistent waiting banner",
+                "{\"c\":\"status\",\"text\":\"Waiting\"}", "",
+                opt("text", new Option("string", null, "text", "banner text (required)")));
+        add("pin", "pin", false, "comment pinned on the page",
+                "{\"c\":\"pin\",\"text\":\"Note\"}", "",
+                opt("text", new Option("string", null, "text", "comment (required)")));
+        add("toast", "toast", false, "transient message",
+                "{\"c\":\"toast\",\"text\":\"Saved\"}", "",
+                opt("text", new Option("string", null, "text", "message (required)")));
+        add("checklist", "checklist", false, "checklist of items",
+                "{\"c\":\"checklist\",\"items\":\"A|B\"}", "",
+                opt("items", new Option("string", null, "items", "items separated by | (required)")));
         add("ask", "ask", true, "question card; the answer arrives in ui-poll",
                 "{\"c\":\"ask\",\"say\":\"Use the Pro plan?\",\"choices\":[\"Yes\",\"No\"]}", "",
                 opt("say", new Option("string", null, "say", "question (required)")),
@@ -104,7 +116,8 @@ final class UiCatalog {
     static List<String> coveredVerbs() {
         return List.of("overlay", "label", "border", "arrow", "step-badge", "magnifier", "spotlight", "panel-open", "panel-close",
                 "guide", "guide-next", "guide-back", "guide-done", "ask", "chat-send", "html-cleanup",
-                "overlay-remove", "unlabel", "unborder", "unarrow", "unstep-badge", "unmagnifier", "unspotlight");
+                "overlay-remove", "unlabel", "unborder", "unarrow", "unstep-badge", "unmagnifier", "unspotlight",
+                "status", "pin", "toast", "checklist");
     }
 
     /** Compact JSON-ready view; {@code only} limits it to one component. */

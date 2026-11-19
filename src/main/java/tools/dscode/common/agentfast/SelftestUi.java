@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -101,6 +102,92 @@ public final class SelftestUi {
             body.put("ok", ok);
             body.put("sentence", "panel idle cores=" + cores + " p95Ms=" + p95);
             if (!ok) body.put("error", "selftest ui --cpu missed the idle or p95 target");
+            return body;
+        } finally {
+            AgentDriverHooks.template(null);
+            try {
+                AgentDriverHooks.quitSession(driver);
+            } catch (RuntimeException ignored) {
+                // Chrome close still runs.
+            }
+            try {
+                session.close();
+            } catch (RuntimeException ignored) {
+                // The report is already filled in.
+            }
+            deleteTree(profile);
+        }
+    }
+
+    /**
+     * Paints pin, toast, checklist, and status on a real page and reads the text back.
+     * The cpu bench stays {@link #cpu}. A missing Chrome binary is reported.
+     */
+    public static Map<String, Object> pages(Path project) throws Exception {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("op", "selftest");
+        body.put("component", "pages");
+        String chrome = BrowserSession.findChrome();
+        if (chrome == null) {
+            body.put("ok", false);
+            body.put("skipped", true);
+            body.put("error", "no Chrome binary");
+            body.put("sentence", "selftest ui --component=pages found no Chrome binary.");
+            return body;
+        }
+        Path root = project == null ? Path.of("") : project;
+        Path profile = root.resolve(".pickleball").resolve("selftest-pages-profile");
+        Files.createDirectories(profile);
+        Path page = root.resolve(".pickleball").resolve("selftest-pages.html");
+        Files.writeString(page, "<!DOCTYPE html><html><head><title>Pages</title></head><body><p>Pages</p></body></html>");
+        boolean headed = !GraphicsEnvironment.isHeadless();
+        BrowserSession session = BrowserSession.launch("selftest-pages", "about:blank", headed, true, profile, List.of());
+        LiveChromeDriver driver = new LiveChromeDriver(session);
+        try {
+            body.put("pid", session.pid);
+            AgentDriverHooks.template("selftest-pages");
+            AgentDriverHooks.ready(driver);
+            AgentDriverHooks.template(null);
+            driver.get(page.toUri().toString());
+            String[][] cards = {
+                    {"pin", "text", "Pinned note"},
+                    {"toast", "text", "Toast note"},
+                    {"checklist", "items", "Alpha|Beta"},
+                    {"status", "text", "Waiting here"}
+            };
+            List<String> wanted = List.of("Pinned note", "Toast note", "Alpha", "Beta", "Waiting here");
+            StringBuilder read = new StringBuilder();
+            for (String[] card : cards) {
+                AgentControl.Result placed = AgentControl.execute(
+                        project, "selftest-pages", card[0], Map.of(card[1], card[2]), List.of(), "selftest-pages"
+                );
+                if (placed.exit() != 0) {
+                    body.put("ok", false);
+                    body.put("error", String.valueOf(placed.body()));
+                    body.put("sentence", card[0] + " did not place");
+                    return body;
+                }
+                Object raw = driver.executeScript("""
+                        var text = document.body ? document.body.innerText : '';
+                        var layers = document.querySelectorAll('pkb-layer');
+                        for (var i = 0; i < layers.length; i++) {
+                          if (layers[i].shadowRoot) text += '\\n' + layers[i].shadowRoot.textContent;
+                        }
+                        return text;
+                        """);
+                read.append('\n').append(raw == null ? "" : raw);
+            }
+            String pageText = read.toString();
+            List<String> seen = new ArrayList<>();
+            for (String token : wanted) {
+                if (pageText.contains(token)) seen.add(token);
+            }
+            body.put("pageText", pageText);
+            body.put("seen", seen);
+            boolean ok = seen.size() == wanted.size();
+            body.put("ok", ok);
+            body.put("sentence", ok ? "pages read " + String.join(", ", seen) : "pages missed a card");
+            if (!ok) body.put("error", "selftest ui --component=pages did not read every card");
             return body;
         } finally {
             AgentDriverHooks.template(null);

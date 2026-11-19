@@ -37,19 +37,20 @@ public class NavigationSteps {
     }
 
     /**
-     * A config-key string still wins. A missing key may be a literal http(s) URL,
-     * or a placeholder that resolves to one. Anything else stays unresolved.
+     * A config-key string still wins. A missing key may be a literal http(s), file,
+     * data, or about:blank URL, or a placeholder that resolves to one.
+     * Anything else stays unresolved.
      */
-    static String addressAfterConfigLookup(String text, Object lookedUp) {
+    public static String addressAfterConfigLookup(String text, Object lookedUp) {
         if (lookedUp instanceof String address && !address.isBlank()) {
             return address;
         }
         String candidate = text == null ? "" : text.trim();
-        if (isHttpUrl(candidate)) return candidate;
+        if (isNavigable(candidate)) return candidate;
         if (candidate.indexOf('<') >= 0 && candidate.indexOf('>') > candidate.indexOf('<')) {
             try {
                 String resolved = tools.dscode.common.mappings.ParsingMap.resolveToStringWithRunningParsingMap(candidate);
-                if (resolved != null && isHttpUrl(resolved.trim())) return resolved.trim();
+                if (resolved != null && isNavigable(resolved.trim())) return resolved.trim();
             } catch (RuntimeException ignored) {
                 return null;
             }
@@ -57,9 +58,12 @@ public class NavigationSteps {
         return null;
     }
 
-    private static boolean isHttpUrl(String value) {
-        if (value == null || value.length() < 8) return false;
-        String head = value.substring(0, 8).toLowerCase(Locale.ROOT);
-        return head.startsWith("https://") || head.startsWith("http://");
+    private static boolean isNavigable(String value) {
+        if (value == null) return false;
+        String head = value.stripLeading().toLowerCase(Locale.ROOT);
+        if (head.startsWith("https://") || head.startsWith("http://")) return true;
+        if (head.startsWith("file:") && head.length() > "file:".length()) return true;
+        if (head.startsWith("data:") && head.indexOf(',') > "data:".length()) return true;
+        return "about:blank".equals(head) || head.startsWith("about:blank?") || head.startsWith("about:blank#");
     }
 }

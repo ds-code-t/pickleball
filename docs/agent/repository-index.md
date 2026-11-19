@@ -954,6 +954,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/CliForwardToWorkerTest.java`
 - `src/test/java/tools/dscode/launcher/ClosedShadowResolveTest.java`
 - `src/test/java/tools/dscode/launcher/CompactSnapshotTest.java`
+- `src/test/java/tools/dscode/launcher/ConfirmTest.java`
 - `src/test/java/tools/dscode/launcher/ConsumerReadyCliTest.java`
 - `src/test/java/tools/dscode/launcher/DesktopSameVerbTest.java`
 - `src/test/java/tools/dscode/launcher/DoctorTest.java`
@@ -964,7 +965,11 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/FrameActTest.java`
 - `src/test/java/tools/dscode/launcher/FrameInReplyTest.java`
 - `src/test/java/tools/dscode/launcher/GuidanceCommandGoldenTest.java`
+- `src/test/java/tools/dscode/launcher/MaskQuietTest.java`
+- `src/test/java/tools/dscode/launcher/NavigateDataFileTest.java`
+- `src/test/java/tools/dscode/launcher/OneCallActTest.java`
 - `src/test/java/tools/dscode/launcher/OopifAutoAttachTest.java`
+- `src/test/java/tools/dscode/launcher/OverlapTest.java`
 - `src/test/java/tools/dscode/launcher/PickleballWorkbenchLauncherTest.java`
 - `src/test/java/tools/dscode/launcher/PopupVerbCoverageTest.java`
 - `src/test/java/tools/dscode/launcher/Release218RecommendationsTest.java`
@@ -978,6 +983,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/TargetCoverageTest.java`
 - `src/test/java/tools/dscode/launcher/VersionSwitchTest.java`
 - `src/test/java/tools/dscode/launcher/VirtualizedScrollTest.java`
+- `src/test/java/tools/dscode/launcher/VisibleFlagTest.java`
 - `src/test/java/tools/dscode/launcher/WarmJvmGlueTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchAgentCommandsTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchAgentUsabilityTest.java`

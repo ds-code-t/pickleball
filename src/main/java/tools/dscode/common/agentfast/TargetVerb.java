@@ -69,7 +69,7 @@ public final class TargetVerb {
 
     private static final Set<String> ACT_KEYS = Set.of(
             "target", "kind", "query", "ref", "value", "snap", "run-id", "agent", "agent-id",
-            "fixture", "timeout", "frame", "group", "sequence"
+            "fixture", "timeout", "condition", "frame", "group", "sequence"
     );
 
     /** CSS or text selector for a fresh {@code ref:}. Null when the ref is unknown or stale. */
@@ -169,7 +169,8 @@ public final class TargetVerb {
                 case "snap" -> snap(project, runId, target, values);
                 case "find" -> find(project, runId, target, values);
                 case "act" -> act(project, runId, target, values);
-                case "wait" -> wait(project, runId, target, values);
+                case "form-fill" -> formFill(project, runId, target, values);
+                case "wait", "wait-for" -> wait(project, runId, target, values);
                 case "watch" -> watch(project, runId, target, values);
                 case "explain" -> explain(project, runId, target, values);
                 case "capture" -> capture(project, runId, target, values);
@@ -295,6 +296,8 @@ public final class TargetVerb {
             }
             String before = docVersion(page.session.connection());
             String titleBefore = title(page.session.connection());
+            String kind = blank(args.get("kind"));
+            if (kind.isBlank() || "click".equals(kind)) awaitMaskQuiet(page.session.connection(), timeoutMs(args));
             Effect effect = perform(project, runId, page.session, node, args, query, selector(node, query));
             if (!effect.applied()) {
                 Outcome failed = fail("act", "not applied");
@@ -303,18 +306,99 @@ public final class TargetVerb {
                 putEntered(failed.body(), runId, page.session.connection());
                 return failed;
             }
+            String condition = blank(args.get("condition"));
+            if (!condition.isBlank()) {
+                boolean met = waitPoll(page.session.connection(), condition, query, timeoutMs(args));
+                if (!met) {
+                    Outcome failed = fail("act", "timeout");
+                    failed.body().put("applied", true);
+                    failed.body().put("condition", condition);
+                    stamp(failed.body(), page.session.connection(), node);
+                    return failed;
+                }
+            }
             String after = docVersion(page.session.connection());
+            String titleAfter = title(page.session.connection());
             Map<String, Object> body = base("act", effect.used(), "browser", target);
             body.put("applied", true);
             body.put("docVersion", after);
             body.put("kind", blank(args.get("kind")).isBlank() ? "click" : blank(args.get("kind")));
-            putSnapDiff(body, args, titleBefore, title(page.session.connection()), before, after);
+            if (!condition.isBlank()) {
+                body.put("condition", condition);
+                body.put("title", titleAfter);
+            }
+            putSnapDiff(body, args, titleBefore, titleAfter, before, after);
             stamp(body, page.session.connection(), node);
             putEntered(body, runId, page.session.connection());
             return ok(body);
         } finally {
             page.release();
         }
+    }
+
+    /** One call fills each id=value field and reads the value back. */
+    private static Outcome formFill(Path project, String runId, TargetSelector.Parsed target, Map<String, String> args) {
+        if ("desktop".equals(target.kind())) return fail("form-fill", "form-fill is browser only");
+        String raw = blank(args.get("fields"));
+        if (raw.isBlank()) return fail("form-fill", "form-fill requires --fields");
+        List<String[]> pairs = new ArrayList<>();
+        for (String part : raw.split("\\|")) {
+            if (part.isBlank()) continue;
+            int eq = part.indexOf('=');
+            if (eq <= 0) return fail("form-fill", "fields are id=value separated by |");
+            pairs.add(new String[]{part.substring(0, eq).trim(), part.substring(eq + 1)});
+        }
+        if (pairs.isEmpty()) return fail("form-fill", "form-fill requires --fields");
+        Held page = openBrowser(resolved(target, args));
+        try {
+            DomNode root = tree(page.session);
+            List<Map<String, Object>> filled = new ArrayList<>();
+            boolean all = true;
+            for (String[] pair : pairs) {
+                DomNode node = fieldNode(root, pair[0]);
+                if (node == null) return fail("form-fill", "not found");
+                Map<String, String> one = new LinkedHashMap<>();
+                one.put("kind", "type");
+                one.put("value", pair[1]);
+                Effect effect = perform(project, runId, page.session, node, one, pair[0], selector(node, pair[0]));
+                String read = controlValue(page.session.connection(), node);
+                boolean stuck = effect.applied() && pair[1].equals(read);
+                if (!stuck) all = false;
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("field", pair[0]);
+                row.put("value", read);
+                row.put("applied", stuck);
+                filled.add(row);
+            }
+            if (!all) {
+                Outcome failed = fail("form-fill", "not applied");
+                failed.body().put("applied", false);
+                failed.body().put("fields", filled);
+                return failed;
+            }
+            Map<String, Object> body = base("form-fill", "cdp", "browser", target);
+            body.put("applied", true);
+            body.put("fields", filled);
+            stamp(body, page.session.connection(), null);
+            return ok(body);
+        } finally {
+            page.release();
+        }
+    }
+
+    private static DomNode fieldNode(DomNode node, String key) {
+        if (node == null || key == null || key.isBlank()) return null;
+        if (key.equals(node.attributes.get("id")) || key.equals(node.attributes.get("name"))) return node;
+        if (key.equals(node.accessibleName)) return node;
+        for (DomNode child : node.children) {
+            DomNode found = fieldNode(child, key);
+            if (found != null) return found;
+        }
+        for (DomNode shadow : node.shadowRoots) {
+            DomNode found = fieldNode(shadow, key);
+            if (found != null) return found;
+        }
+        return null;
     }
 
     private static Outcome actDesktop(Path project, String runId, Hit hit, Map<String, String> args) {
@@ -908,6 +992,31 @@ public final class TargetVerb {
             return cdp.call("Runtime.callFunctionOn", call, Duration.ofSeconds(5)).path("result").path("value").asText("");
         } catch (RuntimeException failure) {
             return "";
+        }
+    }
+
+    /** A visible aria-busy or progressbar holds a click until it leaves, or the timeout ends. */
+    private static void awaitMaskQuiet(CdpConnection cdp, long timeout) {
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(Math.max(0, timeout));
+        while (maskBusy(cdp)) {
+            if (System.nanoTime() >= deadline) return;
+            sleep(50);
+        }
+    }
+
+    private static boolean maskBusy(CdpConnection cdp) {
+        ObjectNode params = Jsons.object();
+        params.put("returnByValue", true);
+        params.put("expression", ""
+                + "(function(){var nodes=document.querySelectorAll('[aria-busy=\"true\"],[role=\"progressbar\"]');"
+                + "for(var i=0;i<nodes.length;i++){var el=nodes[i];var s=getComputedStyle(el);"
+                + "if(s.display==='none'||s.visibility==='hidden'||el.hidden)continue;"
+                + "if(el.getClientRects().length>0)return true;}return false;})()");
+        try {
+            JsonNode value = cdp.call("Runtime.evaluate", params, Duration.ofSeconds(5));
+            return value.path("result").path("value").asBoolean(false);
+        } catch (RuntimeException failure) {
+            return false;
         }
     }
 

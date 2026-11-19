@@ -44,7 +44,7 @@ final class WorkbenchCliFlags {
             ),
             "act", List.of(
                     "--target", "--kind", "--query", "--ref", "--value", "--snap",
-                    "--run-id", "--agent", "--agent-id", "--fixture", "--timeout", "--frame",
+                    "--run-id", "--agent", "--agent-id", "--fixture", "--timeout", "--condition", "--frame",
                     "--group", "--sequence"
             )
     );
