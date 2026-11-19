@@ -822,6 +822,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentcontrol/UiStateTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/UnownedDriverQuitTest.java`
 - `src/test/java/tools/dscode/common/agentfast/CompactReplyTest.java`
+- `src/test/java/tools/dscode/common/agentfast/FallbackRunCapTest.java`
 - `src/test/java/tools/dscode/common/agentfast/SelftestCpuBenchTest.java`
 - `src/test/java/tools/dscode/common/agentfast/TimingFieldsTest.java`
 - `src/test/java/tools/dscode/common/agentfast/UiCpuLoopTest.java`

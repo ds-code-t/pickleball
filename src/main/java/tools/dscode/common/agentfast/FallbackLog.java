@@ -7,9 +7,9 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * One JSON line per run and reason for the locate, act, wait, and snapshot chains.
@@ -19,7 +19,10 @@ public final class FallbackLog {
     static final int DEFAULT_MAX_BYTES = 1_048_576;
     /** Reasons remembered for one run. Older keys drop after this many. */
     private static final int RUN_CAP = 64;
-    private static final Map<String, LinkedHashSet<String>> BY_RUN = new ConcurrentHashMap<>();
+    /** Runs remembered for the life of this process. The oldest run drops first. */
+    static final int RUNS_CAP = 64;
+    private static final Map<String, LinkedHashSet<String>> BY_RUN = new LinkedHashMap<>();
+    private static final Object RUNS = new Object();
 
     private FallbackLog() {
     }
@@ -56,24 +59,42 @@ public final class FallbackLog {
     }
 
     /**
-     * Notes the run the host is serving. Other runs keep their own de-dupe sets.
-     * A later command with a different run id does not forget this run's reasons.
+     * Notes the run the host is serving. Other runs keep their own de-dupe sets
+     * until the run cap drops the oldest one.
      */
     public static void beginRun(String runId) {
         String safe = runId == null ? "" : runId;
         CURRENT_RUN = safe;
-        BY_RUN.computeIfAbsent(safe, id -> new LinkedHashSet<>());
+        setFor(safe);
     }
 
     public static void resetForTests() {
-        BY_RUN.clear();
+        synchronized (RUNS) {
+            BY_RUN.clear();
+        }
         CURRENT_RUN = "";
     }
 
     private static volatile String CURRENT_RUN = "";
 
+    private static LinkedHashSet<String> setFor(String run) {
+        synchronized (RUNS) {
+            LinkedHashSet<String> seen = BY_RUN.computeIfAbsent(run, id -> new LinkedHashSet<>());
+            while (BY_RUN.size() > RUNS_CAP) {
+                Iterator<String> ids = BY_RUN.keySet().iterator();
+                String oldest = ids.next();
+                if (oldest.equals(run)) {
+                    if (!ids.hasNext()) break;
+                    ids.next();
+                }
+                ids.remove();
+            }
+            return seen;
+        }
+    }
+
     private static boolean remember(String run, String key) {
-        LinkedHashSet<String> seen = BY_RUN.computeIfAbsent(run, id -> new LinkedHashSet<>());
+        LinkedHashSet<String> seen = setFor(run);
         synchronized (seen) {
             if (seen.contains(key)) return false;
             if (seen.size() >= RUN_CAP) {
