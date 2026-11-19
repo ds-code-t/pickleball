@@ -683,9 +683,16 @@ public final class TargetVerb {
             String titleBefore = title(page.session.connection());
             Map<String, String> flags = scopedFrame(runId, target);
             String session = enteredSession(page.session.connection(), runId);
+            String ref = blank(args.get("ref"));
+            if (ref.isBlank() && "ref".equals(target.kind())) ref = target.raw();
             boolean met;
-            if ("event".equals(mode)) met = waitEvent(project, runId, page.session.connection(), condition, timeout, session);
-            else met = waitPoll(page.session.connection(), condition, blank(args.get("query")), timeout, flags, session);
+            if (!ref.isBlank()) {
+                met = waitOnRef(page.session.connection(), requireHit(ref), condition, timeout);
+            } else if ("event".equals(mode)) {
+                met = waitEvent(project, runId, page.session.connection(), condition, timeout, session);
+            } else {
+                met = waitPoll(page.session.connection(), condition, blank(args.get("query")), timeout, flags, session);
+            }
             if (!met) {
                 Outcome failed = fail("wait", "timeout");
                 stamp(failed.body(), page.session.connection(), null);
@@ -1187,6 +1194,45 @@ public final class TargetVerb {
         } catch (RuntimeException failure) {
             return false;
         }
+    }
+
+    /** Polls one ref until that node matches {@code condition}, or the timeout ends. */
+    private static boolean waitOnRef(CdpConnection cdp, Hit hit, String condition, long timeout) {
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(Math.max(0, timeout));
+        while (true) {
+            if (refCondition(cdp, hit, condition)) return true;
+            if (System.nanoTime() >= deadline) return false;
+            sleep(40);
+        }
+    }
+
+    /**
+     * {@code visible}, {@code hidden}, {@code enabled}, and {@code detached} describe that node.
+     * {@code text=} matches that node's own text. A missing node is only {@code detached}.
+     */
+    private static boolean refCondition(CdpConnection cdp, Hit hit, String condition) {
+        if (hit == null || "desktop".equals(hit.kind)) return false;
+        String kind = condition == null ? "" : condition.trim();
+        DomNode node;
+        try {
+            node = findNode(tree(cdp), "", hit.backend);
+        } catch (RuntimeException failure) {
+            node = null;
+        }
+        if ("detached".equals(kind)) return node == null;
+        if (node == null) return false;
+        if ("visible".equals(kind) || "hidden".equals(kind)) {
+            Displayed.prepare(cdp, List.of(node));
+            boolean shown = Displayed.isDisplayed(node);
+            return "visible".equals(kind) ? shown : !shown;
+        }
+        if ("enabled".equals(kind)) return !disabled(node);
+        if (kind.startsWith("text=")) {
+            String want = kind.substring("text=".length());
+            String text = HtmlTree.textOf(node).trim();
+            return want.equals(text) || want.equals(name(node));
+        }
+        return false;
     }
 
     private static boolean waitPoll(

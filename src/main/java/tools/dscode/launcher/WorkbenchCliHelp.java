@@ -110,7 +110,7 @@ final class WorkbenchCliHelp {
             Map.entry("find", "Usage: find --target=<selector> [--query=<text>]"),
             Map.entry("act", "Usage: act --target=<selector> [--kind=click|type|hover|press|select] [--query=<text>] [--ref=<ref>] [--value=<text>] [--condition=title=<text>] [--timeout=<ms>]"),
             Map.entry("form-fill", "Usage: form-fill --target=<selector> --fields=id=value|id=value"),
-            Map.entry("wait", "Usage: wait --target=<selector> [--condition=mutation|network|load|navigation|mask|<text>] [--timeout=<ms>]"),
+            Map.entry("wait", "Usage: wait --target=<selector> [--ref=<ref>] [--condition=mutation|network|load|navigation|mask|visible|hidden|enabled|detached|text=<text>|<text>] [--timeout=<ms>]"),
             Map.entry("wait-for", "Usage: wait-for --target=<selector> --condition=<text> [--timeout=<ms>]"),
             Map.entry("watch", "Usage: watch --target=<selector> [--kinds=<kinds>] [--duration=<ms>]"),
             Map.entry("explain", "Usage: explain --target=<selector> [--query=<text>]"),
