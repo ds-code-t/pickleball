@@ -49,6 +49,8 @@ public final class TargetVerb {
             "a", "button", "input", "select", "textarea", "option"
     );
     private static final int HIT_CAP = 256;
+    /** How long a dispatched click waits for a visible change before it is reported quiet. */
+    private static final long CLICK_SETTLE_MS = 500;
     /** Least-recently used refs drop once the cap is passed. */
     private static final Map<String, Hit> HITS = java.util.Collections.synchronizedMap(new LinkedHashMap<>(64, 0.75f, true) {
         @Override
@@ -298,12 +300,43 @@ public final class TargetVerb {
             String titleBefore = title(page.session.connection());
             String kind = blank(args.get("kind"));
             if (kind.isBlank() || "click".equals(kind)) awaitMaskQuiet(page.session.connection(), timeoutMs(args));
+            boolean wantDiff = "diff".equals(blank(args.get("snap")));
+            List<String> linesBefore = wantDiff ? visibleLines(page.session.connection()) : List.of();
             Effect effect = perform(project, runId, page.session, node, args, query, selector(node, query));
+            List<String> linesAfter = wantDiff ? visibleLines(page.session.connection()) : List.of();
+            if (effect.refused()) {
+                Outcome failed = fail("act", "could not land");
+                failed.body().put("used", effect.used());
+                failed.body().put("dispatched", false);
+                failed.body().put("visible", false);
+                failed.body().put("reason", effect.reason());
+                stamp(failed.body(), page.session.connection(), node);
+                putEntered(failed.body(), runId, page.session.connection());
+                putSnapDiff(failed.body(), args, titleBefore, title(page.session.connection()), before, docVersion(page.session.connection()), linesBefore, linesAfter);
+                return failed;
+            }
+            if (effect.quiet()) {
+                String titleAfter = title(page.session.connection());
+                String after = docVersion(page.session.connection());
+                Map<String, Object> body = base("act", effect.used(), "browser", target);
+                body.put("applied", false);
+                body.put("dispatched", true);
+                body.put("visible", false);
+                body.put("reason", effect.reason());
+                body.put("kind", kind.isBlank() ? "click" : kind);
+                body.put("docVersion", after);
+                putSnapDiff(body, args, titleBefore, titleAfter, before, after, linesBefore, linesAfter);
+                stamp(body, page.session.connection(), node);
+                putEntered(body, runId, page.session.connection());
+                return ok(body);
+            }
             if (!effect.applied()) {
                 Outcome failed = fail("act", "not applied");
                 failed.body().put("used", effect.used());
+                failed.body().put("dispatched", false);
                 stamp(failed.body(), page.session.connection(), node);
                 putEntered(failed.body(), runId, page.session.connection());
+                putSnapDiff(failed.body(), args, titleBefore, title(page.session.connection()), before, docVersion(page.session.connection()), linesBefore, linesAfter);
                 return failed;
             }
             String condition = blank(args.get("condition"));
@@ -327,7 +360,11 @@ public final class TargetVerb {
                 body.put("condition", condition);
                 body.put("title", titleAfter);
             }
-            putSnapDiff(body, args, titleBefore, titleAfter, before, after);
+            if (kind.isBlank() || "click".equals(kind)) {
+                body.put("dispatched", true);
+                body.put("visible", true);
+            }
+            putSnapDiff(body, args, titleBefore, titleAfter, before, after, linesBefore, linesAfter);
             stamp(body, page.session.connection(), node);
             putEntered(body, runId, page.session.connection());
             return ok(body);
@@ -766,9 +803,10 @@ public final class TargetVerb {
         if ("key".equals(verb)) flags.put("key", value);
         DomNode control = "select".equals(kind) ? selectOf(node) : node;
         boolean inputOff = cdpInputOff();
+        if (control == null) return Effect.refused(inputOff ? "js" : "cdp", "detached");
         if (disabled(control)) {
             if (inputOff) FallbackLog.note(project, runId, "act", "cdp", "js", "cdp input disabled");
-            return new Effect(inputOff ? "js" : "cdp", false);
+            return Effect.refused(inputOff ? "js" : "cdp", inert(control) ? "inert" : "disabled");
         }
         String framed = cdpSessionOf(node);
         if (!framed.isBlank()) return actInFrame(session.connection(), framed, kind, value, node);
@@ -781,10 +819,7 @@ public final class TargetVerb {
                 FallbackLog.note(project, runId, "act", "cdp", "js", "cdp input disabled");
                 return jsAct(session.connection(), kind, query, selector, value, node);
             }
-            if ("click".equals(kind) && closedShadow(acted)) {
-                Effect closed = clickClosed(session.connection(), acted);
-                if (closed != null) return closed;
-            }
+            if ("click".equals(kind) && closedShadow(acted)) return clickClosed(session.connection(), acted);
             String before = pageMark(session.connection());
             LiveXPath.use(session.connection());
             try {
@@ -794,10 +829,8 @@ public final class TargetVerb {
             }
             if ("select".equals(kind)) return new Effect("cdp", valueMatches(value, controlValue(session.connection(), selectOf(acted))));
             if ("type".equals(kind)) return new Effect("cdp", valueMatches(value, controlValue(session.connection(), node)));
-            if (!before.equals(pageMark(session.connection()))) return new Effect("cdp", true);
-            if ("click".equals(kind) && clickByResolve(session.connection(), acted)) {
-                return new Effect("cdp", !before.equals(pageMark(session.connection())));
-            }
+            if ("click".equals(kind)) return clickSettled(session.connection(), "", before, "cdp");
+            if (!before.equals(pageMark(session.connection()))) return Effect.changed("cdp");
             return new Effect("cdp", false);
         } catch (CdpException failure) {
             String message = failure.getMessage() == null ? "" : failure.getMessage();
@@ -809,16 +842,13 @@ public final class TargetVerb {
         }
     }
 
-    /** One {@code element.click()} when the coordinate click did not change the page. */
-    private static boolean clickByResolve(CdpConnection cdp, DomNode node) {
-        return callOnNode(cdp, "", node, "function(){ this.click(); return true; }") != null;
-    }
-
     /** One click on a same-origin frame node. Coordinates from that document miss the parent viewport. */
     private static Effect clickInPlace(CdpConnection cdp, DomNode node) {
         String before = pageMark(cdp);
-        if (callOnNode(cdp, "", node, "function(){ this.click(); return true; }") == null) return new Effect("cdp", false);
-        return new Effect("cdp", !before.equals(pageMark(cdp)));
+        if (callOnNode(cdp, "", node, "function(){ this.click(); return true; }") == null) {
+            return Effect.refused("cdp", "detached");
+        }
+        return clickSettled(cdp, "", before, "cdp");
     }
 
     /** Click, type, or select on the frame session that owns the node. One call, then a read-back. */
@@ -837,9 +867,10 @@ public final class TargetVerb {
         };
         if (script.isBlank()) return new Effect("cdp", false);
         String read = callOnNode(cdp, sessionId, node, script);
-        if (read == null) return new Effect("cdp", false);
+        if (read == null) return "click".equals(kind) ? Effect.refused("cdp", "detached") : new Effect("cdp", false);
         if ("type".equals(kind) || "select".equals(kind)) return new Effect("cdp", valueMatches(value, read));
-        return new Effect("cdp", !before.equals(pageMark(cdp, sessionId)));
+        if ("click".equals(kind)) return clickSettled(cdp, sessionId, before, "cdp");
+        return !before.equals(pageMark(cdp, sessionId)) ? Effect.changed("cdp") : new Effect("cdp", false);
     }
 
     /** {@code null} when the node cannot be called. The result is the returned string. */
@@ -877,6 +908,30 @@ public final class TargetVerb {
     private static boolean insideFrame(DomNode node) {
         for (DomNode cursor = node == null ? null : node.parent; cursor != null; cursor = cursor.parent) {
             if (cursor.iframe) return true;
+        }
+        return false;
+    }
+
+    /** A click was sent once. Wait for a visible change, and do not send it again. */
+    private static Effect clickSettled(CdpConnection cdp, String sessionId, String before, String used) {
+        return settledChange(cdp, sessionId, before) ? Effect.changed(used) : Effect.quiet(used);
+    }
+
+    /**
+     * True when the title or the mutation count moves within {@link #CLICK_SETTLE_MS}.
+     * The main frame waits on the page watcher. A frame session polls its own mark.
+     */
+    private static boolean settledChange(CdpConnection cdp, String sessionId, String before) {
+        if (!before.equals(pageMark(cdp, sessionId))) return true;
+        if (sessionId == null || sessionId.isBlank()) {
+            String watched = evaluateWatch(cdp, "", CLICK_SETTLE_MS);
+            if (watched.contains("\"ok\":true")) return true;
+            return !before.equals(pageMark(cdp, sessionId));
+        }
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(CLICK_SETTLE_MS);
+        while (System.nanoTime() < deadline) {
+            sleep(40);
+            if (!before.equals(pageMark(cdp, sessionId))) return true;
         }
         return false;
     }
@@ -1622,6 +1677,13 @@ public final class TargetVerb {
         return report;
     }
 
+    private static boolean inert(DomNode node) {
+        for (DomNode cursor = node; cursor != null; cursor = cursor.parent) {
+            if (cursor.attributes.containsKey("inert")) return true;
+        }
+        return false;
+    }
+
     /** Bare {@code disabled} counts. So does {@code aria-disabled} other than false or 0, and a disabled fieldset. */
     private static boolean disabled(DomNode node) {
         if (node == null) return true;
@@ -1792,8 +1854,63 @@ public final class TargetVerb {
             String before,
             String after
     ) {
+        putSnapDiff(body, args, titleBefore, titleAfter, before, after, null, null);
+    }
+
+    private static void putSnapDiff(
+            Map<String, Object> body,
+            Map<String, String> args,
+            String titleBefore,
+            String titleAfter,
+            String before,
+            String after,
+            List<String> beforeLines,
+            List<String> afterLines
+    ) {
         if (!"diff".equals(blank(args == null ? null : args.get("snap")))) return;
-        body.put("snap", diffOf(titleBefore, titleAfter, before, after));
+        Map<String, Object> diff = diffOf(titleBefore, titleAfter, before, after);
+        if (beforeLines != null && afterLines != null) {
+            List<String> added = new ArrayList<>();
+            List<String> removed = new ArrayList<>();
+            lineDiff(beforeLines, afterLines, added, removed);
+            diff.put("added", added);
+            diff.put("removed", removed);
+            if (!added.isEmpty() || !removed.isEmpty()) diff.put("changed", true);
+        }
+        body.put("snap", diff);
+    }
+
+    /** Direct text of light-DOM elements. Pickleball's own nodes are left out. */
+    private static List<String> visibleLines(CdpConnection cdp) {
+        String text = evalText(cdp, "", "(function(){ var out=[];"
+                + " function walk(node){ if(!node||node.nodeType!==1) return;"
+                + " if(node.hasAttribute&&(node.hasAttribute('data-pkb-agent')||node.hasAttribute('data-pkb-layer'))) return;"
+                + " var tag=(node.tagName||'').toLowerCase();"
+                + " if(tag==='script'||tag==='style'||tag==='noscript') return;"
+                + " var text=''; for(var c=node.firstChild;c;c=c.nextSibling){ if(c.nodeType===3) text+=c.nodeValue; }"
+                + " text=text.replace(/\\s+/g,' ').trim();"
+                + " if(text) out.push('- '+tag+' \"'+text.replace(/\\\\/g,'\\\\\\\\').replace(/\"/g,'\\\\\"')+'\"');"
+                + " for(var i=0;i<node.children.length;i++) walk(node.children[i]); }"
+                + " if(document.body) walk(document.body); return out.join('\\n'); })()");
+        if (text.isBlank()) return List.of();
+        List<String> lines = new ArrayList<>();
+        for (String line : text.split("\n")) {
+            if (!line.isBlank()) lines.add(line);
+        }
+        return lines;
+    }
+
+    private static void lineDiff(List<String> before, List<String> after, List<String> added, List<String> removed) {
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        for (String line : before) counts.merge(line, 1, Integer::sum);
+        for (String line : after) {
+            int have = counts.getOrDefault(line, 0);
+            if (have > 0) counts.put(line, have - 1);
+            else added.add(line);
+        }
+        for (Map.Entry<String, Integer> entry : counts.entrySet()) {
+            for (int i = 0; i < entry.getValue(); i++) removed.add(entry.getKey());
+        }
     }
 
     private static Map<String, Object> diffOf(String titleBefore, String titleAfter, String before, String after) {
@@ -2090,9 +2207,10 @@ public final class TargetVerb {
         return "";
     }
 
-    /** Clicks through {@code DOM.resolveNode} in the pkb world. Coordinate input misses {@code pointer-events:none}. */
+    /** One click through {@code DOM.resolveNode} in the pkb world. Coordinate input misses {@code pointer-events:none}. */
     private static Effect clickClosed(CdpConnection cdp, DomNode node) {
-        if (node == null || node.backendNodeId <= 0) return new Effect("resolveNode", false);
+        if (node == null || node.backendNodeId <= 0) return Effect.refused("resolveNode", "detached");
+        String before = pageMark(cdp);
         try {
             int context = pkbContext(cdp);
             ObjectNode resolve = Jsons.object();
@@ -2100,7 +2218,7 @@ public final class TargetVerb {
             if (context > 0) resolve.put("executionContextId", context);
             JsonNode object = cdp.call("DOM.resolveNode", resolve, Duration.ofSeconds(5)).path("object");
             String objectId = object.path("objectId").asText("");
-            if (objectId.isBlank()) return null;
+            if (objectId.isBlank()) return Effect.refused("resolveNode", "detached");
             ObjectNode call = Jsons.object();
             call.put("objectId", objectId);
             // Title, text, and attributes on the node. A closed-shadow dataset write is not in the light DOM.
@@ -2109,10 +2227,11 @@ public final class TargetVerb {
                     + " return before===after?'same':'changed'; }");
             call.put("returnByValue", true);
             JsonNode called = cdp.call("Runtime.callFunctionOn", call, Duration.ofSeconds(5));
-            if (called.has("exceptionDetails")) return new Effect("resolveNode", false);
-            return new Effect("resolveNode", "changed".equals(called.path("result").path("value").asText("")));
+            if (called.has("exceptionDetails")) return Effect.refused("resolveNode", "detached");
+            if ("changed".equals(called.path("result").path("value").asText(""))) return Effect.changed("resolveNode");
+            return clickSettled(cdp, "", before, "resolveNode");
         } catch (RuntimeException failure) {
-            return new Effect("resolveNode", false);
+            return Effect.refused("resolveNode", "detached");
         }
     }
 
@@ -2333,7 +2452,30 @@ public final class TargetVerb {
         for (DomNode shadow : node.shadowRoots) walk(shadow, visit);
     }
 
-    private record Effect(String used, boolean applied) {
+    private record Effect(String used, boolean applied, String disposition, String reason) {
+        Effect(String used, boolean applied) {
+            this(used, applied, applied ? "applied" : "failed", "");
+        }
+
+        static Effect changed(String used) {
+            return new Effect(used, true, "applied", "");
+        }
+
+        static Effect quiet(String used) {
+            return new Effect(used, false, "dispatched", "no visible change");
+        }
+
+        static Effect refused(String used, String reason) {
+            return new Effect(used, false, "refused", reason == null || reason.isBlank() ? "detached" : reason);
+        }
+
+        boolean refused() {
+            return "refused".equals(disposition);
+        }
+
+        boolean quiet() {
+            return "dispatched".equals(disposition);
+        }
     }
 
     private record Hit(String kind, String sessionId, long backend, String docVersion, String selector, String query) {

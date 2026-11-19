@@ -4,7 +4,7 @@
 
 Agent-fast verification. A compact inspect or page reply keeps `source=`, `query=`, `note=`, and the first `xpath=` from the offline text; the full text stays under `.pickleball/agent-full/`. Bare `ui` without `--ops` opens the Workbench controller. `ui --ops` applies a catalog batch.
 
-`highlight --target` paints the selected page. `act` reports `applied` only after a read-back: a disabled or inert control, a click with no effect, and a select whose value does not stick are `applied:false`. `aria-label` wins over placeholder. `watch` returns at the first matching event. Fallback de-dupe is kept per run. `ui-poll` and `ui-catalog` return `browser_lost` after Chrome dies.
+`highlight --target` paints the selected page. `act` reports `applied` only after a read-back. A click is dispatched once, then waits up to 500 ms for a visible change. A dispatched click with no visible change is exit 0, `applied:false`, `dispatched:true`, `reason:"no visible change"`. A click that could not land (disabled, inert, or detached) is exit 1, `error:"could not land"`, `dispatched:false`. A select whose value does not stick is `applied:false`. `aria-label` wins over placeholder. `watch` returns at the first matching event. Fallback de-dupe is kept per run. `ui-poll` and `ui-catalog` return `browser_lost` after Chrome dies.
 
 Agent-fast phase 5. `frame --list`, `frame --reset`, and `frame --enter` share the target selector. Replies carry `frame` (a desktop window name on the desktop backend). Out-of-process iframes auto-attach with `waitForDebuggerOnStart` and resume after the preload. Closed shadow clicks go through `DOM.resolveNode` in the pkb world. `find --scroll-search` scrolls a virtualized list until the row is mounted. `snap` reports `virtualized`.
 
