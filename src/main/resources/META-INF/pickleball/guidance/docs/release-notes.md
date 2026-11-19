@@ -2,6 +2,8 @@
 
 ## 2.20.0
 
+- A plain `attach`, `attaches`, or `create and attach` names `InternalFileInput` again when the phrase does not name an HTML element or the `it` placeholder. `attach the "testFile.pdf" file` uploads that file. Naming `InternalFileInput` yourself is unchanged. A capitalized category such as `File` stays the named element. The lowercase word `file` is not a category. A normal `mvn test` is affected.
+
 - An `, or` chain fills `<placeholders>` in every phrase that actually runs, including phrases after the first. A phrase the chain never reaches, and an untaken `THEN`, `ELSE`, or `ELSE-IF`, is not resolved. A normal `mvn test` is affected.
 
 - `number`, `integer`, and `decimal` on either side of an equality or ordering comparison compare the operands as numbers. `"1" number is equal to "$1.00"` passes. A value that is not a number fails `ensure`, `verify`, `ASSERT:`, and `SOFT ASSERT:`, and makes `IF:` false with a warning. `is not equal to` does not turn that failure into a pass. Without the qualifier, quoted equality stays text. A normal `mvn test` is affected.

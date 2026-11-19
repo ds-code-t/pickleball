@@ -133,8 +133,8 @@ Frequently used actions include:
 | `scroll` | bring an element into view |
 | `wait` | wait for a duration or condition |
 | `save` | store a value under a key for later template resolution |
-| `attach` | upload an existing file through an `InternalFileInput` |
-| `create and attach` | create a temporary file, then upload it through an `InternalFileInput` |
+| `attach` | upload an existing file through an `InternalFileInput`. A phrase that does not name an HTML element or `it` inserts `InternalFileInput` after `attach` or `attaches` |
+| `create and attach` | create a temporary file, then upload it through an `InternalFileInput`. The same insertion applies when no HTML element or `it` is named |
 | `switch` | switch to a matching browser window or tab |
 | `close` | close a matched HTML component through its configured `Close Button` |
 | `accept`, `dismiss` | handle an open browser alert or confirmation. There is no phrase that types into a prompt; `BrowserAlerts.sendKeys` is Java-only |
@@ -149,6 +149,8 @@ Examples:
 * , double click the "Interaction Target" Button
 * , accept the Alert
 ```
+
+`attach the "testFile.pdf" file` is the same upload as `attach the InternalFileInput "testFile.pdf"`. `attaches` and `create and attach` insert `InternalFileInput` the same way. A capitalized category is explicit and is not replaced: `attach the File "testFile.pdf"` targets `File`. The lowercase word `file` is not a category. `attach it` keeps the `it` placeholder and does not insert a file input.
 
 `navigate to:` loads the resolved URL once. A second call is a second navigation. The text is a config key first, as in `URL.forms`. When that lookup is not a URL string, a literal `http://` or `https://` value is used, including a value a placeholder already resolved to. A missing key that is not a URL still fails. An existing `URL.xxx` key is unchanged.
 

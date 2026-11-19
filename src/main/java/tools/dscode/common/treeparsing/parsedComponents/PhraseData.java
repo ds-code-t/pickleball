@@ -23,6 +23,7 @@ import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.PlaceHo
 import tools.dscode.common.treeparsing.preparsing.LineData;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
@@ -39,6 +40,7 @@ import static tools.dscode.common.reporting.logging.LogForwarder.logDebug;
 import static tools.dscode.common.reporting.logging.LogForwarder.logError;
 import static tools.dscode.common.reporting.logging.LogForwarder.logToDefaultLevel;
 import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
+import static tools.dscode.common.treeparsing.DefinitionContext.FILE_INPUT;
 import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PLACE_HOLDER_MATCH;
 import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.ELEMENT_ONLY;
@@ -353,7 +355,58 @@ public abstract class PhraseData extends PassedData {
         setElementMatches(new ArrayList<>());
     }
 
+    private static final Pattern ATTACH_VERB = Pattern.compile("\\battach(?:es)?\\b");
+
     private void parseFromText(String source) {
+        parseStructure(source);
+        String rewritten = implicitFileInput(source);
+        if (rewritten != null) {
+            resetParsedFields();
+            resolvedText = rewritten;
+            hasResolvedText = !text.trim().equalsIgnoreCase(resolvedText.trim());
+            hasTextToResolve = hasResolvedText || text.matches(".*<.*>.*");
+            parseStructure(rewritten);
+        }
+    }
+
+    /**
+     * Insert {@code InternalFileInput} after {@code attach} or {@code attaches}
+     * when the phrase names no HTML element and no {@code it} placeholder.
+     * Returns null when the phrase should be left as written.
+     */
+    private String implicitFileInput(String source) {
+        String action = getAction();
+        if (!"attach".equals(action) && !"create and attach".equals(action)) {
+            return null;
+        }
+        if (namesHtmlElementOrPlaceholder()) {
+            return null;
+        }
+        Matcher verb = ATTACH_VERB.matcher(source);
+        if (!verb.find()) {
+            return null;
+        }
+        return source.substring(0, verb.end()) + " " + FILE_INPUT + source.substring(verb.end());
+    }
+
+    private boolean namesHtmlElementOrPlaceholder() {
+        for (ElementMatch match : getElementMatches()) {
+            if (match.isPlaceHolder() || match.elementTypes.contains(ElementType.HTML_TYPE)) {
+                return true;
+            }
+        }
+        if (phraseNode == null) {
+            return false;
+        }
+        for (MatchNode node : phraseNode.getOrderedChildren("elementMatch")) {
+            if (PLACE_HOLDER_MATCH.equals(node.getStringFromLocalState("type"))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void parseStructure(String source) {
         MatchNode returnMatchNode = getNodeDictionary().parse(source);
         phraseNode = returnMatchNode.getChild("phrase");
         assert phraseNode != null;
