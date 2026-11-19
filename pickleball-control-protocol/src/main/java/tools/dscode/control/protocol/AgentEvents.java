@@ -58,17 +58,19 @@ public final class AgentEvents {
     }
 
     /**
-     * {@code browser_lost} and {@code session_ended} lines for {@code sessionId}
-     * whose file line number is greater than {@code afterLine}. {@code next} is the
-     * last line number scanned, so a cursor can move past other sessions.
+     * Lines after {@code afterLine}. A {@code browser_lost} line, and any line whose
+     * session id is blank, is host-level: every cursor receives it once. {@code session_ended}
+     * is delivered only when {@code sessionId} equals that line. {@code next} is the last
+     * line number scanned, so a cursor moves past lines that belong to other sessions.
      */
     public static Slice after(Path project, String sessionId, int afterLine) {
         List<Map<String, String>> rows = new ArrayList<>();
         Path target = file(project);
         int next = Math.max(0, afterLine);
-        if (!Files.isRegularFile(target) || sessionId == null || sessionId.isBlank()) {
+        if (!Files.isRegularFile(target)) {
             return new Slice(rows, next);
         }
+        String wanted = sessionId == null ? "" : sessionId;
         try {
             int index = 0;
             for (String line : Files.readAllLines(target, StandardCharsets.UTF_8)) {
@@ -77,10 +79,12 @@ public final class AgentEvents {
                 next = index;
                 String event = jsonField(line, "event");
                 if (!"browser_lost".equals(event) && !"session_ended".equals(event)) continue;
-                if (!sessionId.equals(jsonField(line, "sessionId"))) continue;
+                String lineSession = jsonField(line, "sessionId");
+                boolean hostLevel = "browser_lost".equals(event) || lineSession.isBlank();
+                if (!hostLevel && !wanted.equals(lineSession)) continue;
                 Map<String, String> row = new LinkedHashMap<>();
                 row.put("event", event);
-                row.put("sessionId", sessionId);
+                row.put("sessionId", lineSession);
                 row.put("at", jsonField(line, "at"));
                 rows.add(row);
             }
