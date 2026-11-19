@@ -946,7 +946,11 @@ public final class TargetVerb {
 
     private static String docVersion(CdpConnection cdp, String sessionId) {
         String expression = "(function(){var root=document.documentElement;if(!root)return '0:0';"
-                + "if(!window.__pkbDocWatch){window.__pkbDocCount=0;window.__pkbDocWatch=new MutationObserver(function(){window.__pkbDocCount++;});"
+                + "if(!window.__pkbDocWatch){window.__pkbDocCount=0;window.__pkbDocWatch=new MutationObserver(function(records){"
+                + "for(var i=0;i<records.length;i++){var r=records[i];var t=r.target;"
+                + "if(r.type==='attributes'&&r.attributeName&&r.attributeName.indexOf('data-pkb-')===0) continue;"
+                + "if(t&&t.nodeType===1&&t.closest&&t.closest('[data-pkb-agent],[data-pkb-layer]')) continue;"
+                + "window.__pkbDocCount++;return;}});"
                 + "window.__pkbDocWatch.observe(root,{subtree:true,childList:true,attributes:true,characterData:true});}"
                 + "return location.href+':'+window.__pkbDocCount;})()";
         String text = evalText(cdp, sessionId, expression);
@@ -967,25 +971,28 @@ public final class TargetVerb {
     private static Effect jsAct(CdpConnection cdp, String kind, String query, String selector, String value, DomNode node) {
         String before = pageMark(cdp);
         String script = ""
-                + "(function(){"
+                + "(async function(){"
                 + "var kind=" + jsString(kind) + ",q=" + jsString(query) + ",sel=" + jsString(selector) + ",value=" + jsString(value) + ";"
                 + "function text(el){return ((el.innerText||el.value||el.getAttribute('aria-label')||el.getAttribute('placeholder')||el.id||'')+'').replace(/\\s+/g,' ').trim();}"
+                + "function settle(){ return new Promise(function(r){ setTimeout(r, 0); }); }"
                 + "var el=null;if(sel){try{el=document.querySelector(sel);}catch(e){el=null;}}"
                 + "if(!el){var all=document.querySelectorAll('button,a,input,select,textarea,option,label,[role=button]');"
                 + "for(var i=0;i<all.length;i++){if(text(all[i])===q||all[i].id===q){el=all[i];break;}}}"
                 + "if(!el) return {ok:false};"
                 + "if(el.tagName==='LABEL'&&el.htmlFor){var linked=document.getElementById(el.htmlFor); if(linked) el=linked;}"
-                + "if(kind==='type'){el.focus(); el.value=value; el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); return {ok:true,value:String(el.value)};}"
+                + "if(kind==='type'){el.focus(); el.value=value; el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); await settle(); return {ok:true,value:String(el.value)};}"
                 + "if(kind==='select'){var box=el.tagName==='OPTION'?(el.closest('select')||el):el; if(!box||box.tagName!=='SELECT') return {ok:false};"
                 + "var matched=false; for(var j=0;j<box.options.length;j++){var o=box.options[j]; var label=(o.label||o.text||'').replace(/\\s+/g,' ').trim();"
                 + "if(o.value===value||label===value){o.selected=true; matched=true; break;}} if(!matched) return {ok:false};"
                 + "box.dispatchEvent(new Event('input',{bubbles:true})); box.dispatchEvent(new Event('change',{bubbles:true}));"
+                + "await settle();"
                 + "var chosen=box.options[box.selectedIndex]; var shown=chosen?((chosen.value||chosen.text||'')+'').replace(/\\s+/g,' ').trim():'';"
                 + "return {ok:true,value:shown};}"
-                + "el.click(); return {ok:true,title:document.title};"
+                + "el.click(); return {ok:true};"
                 + "})()";
         ObjectNode params = Jsons.object();
         params.put("expression", script);
+        params.put("awaitPromise", true);
         params.put("returnByValue", true);
         JsonNode called = cdp.call("Runtime.evaluate", params, Duration.ofSeconds(10));
         JsonNode payload = called.path("result").path("value");
@@ -995,6 +1002,7 @@ public final class TargetVerb {
             if (!valueMatches(value, read) && node != null) read = controlValue(cdp, "select".equals(kind) ? selectOf(node) : node);
             return new Effect("js", valueMatches(value, read));
         }
+        if ("click".equals(kind)) return clickSettled(cdp, "", before, "js");
         return new Effect("js", !before.equals(pageMark(cdp)));
     }
 
@@ -1788,7 +1796,11 @@ public final class TargetVerb {
         ObjectNode params = Jsons.object();
         params.put("returnByValue", true);
         params.put("expression", "(function(){var root=document.documentElement;if(!root)return '0:0';"
-                + "if(!window.__pkbDocWatch){window.__pkbDocCount=0;window.__pkbDocWatch=new MutationObserver(function(){window.__pkbDocCount++;});"
+                + "if(!window.__pkbDocWatch){window.__pkbDocCount=0;window.__pkbDocWatch=new MutationObserver(function(records){"
+                + "for(var i=0;i<records.length;i++){var r=records[i];var t=r.target;"
+                + "if(r.type==='attributes'&&r.attributeName&&r.attributeName.indexOf('data-pkb-')===0) continue;"
+                + "if(t&&t.nodeType===1&&t.closest&&t.closest('[data-pkb-agent],[data-pkb-layer]')) continue;"
+                + "window.__pkbDocCount++;return;}});"
                 + "window.__pkbDocWatch.observe(root,{subtree:true,childList:true,attributes:true,characterData:true});}"
                 + "return location.href+':'+window.__pkbDocCount;})()");
         JsonNode value = cdp.call("Runtime.evaluate", params, Duration.ofSeconds(5));
