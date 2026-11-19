@@ -158,6 +158,137 @@ class VirtualizedScrollTest {
         assertEquals("25,80", scrolls(), missing.out);
     }
 
+    /**
+     * A tall static box sits before a decoy list and the real list.
+     * Kills "first tall box wins", "single container only", and "no restore".
+     */
+    @Test
+    @Timeout(value = 180, unit = TimeUnit.SECONDS)
+    void scrollSearchSkipsTheTallBoxAndReportsTheCap() throws Exception {
+        assumeTrue(BrowserSession.findChrome() != null, "skipped: chrome is not on PATH");
+        Path page = temp.resolve("tall-first.html");
+        Files.writeString(page, """
+                <!DOCTYPE html><html><head><style>html,body{margin:0}</style></head><body>
+                <div id="static" style="height:120px;overflow:auto;border:0">
+                  <div style="height:2000px">Static panel</div>
+                </div>
+                <div id="decoy" style="height:100px;overflow:auto;border:0">
+                  <div id="decoy-pad" style="height:500px;position:relative"></div>
+                </div>
+                <div id="list" style="height:100px;overflow:auto;border:0">
+                  <div id="pad" style="height:2000px;position:relative"></div>
+                </div>
+                <script>
+                function mount(box, pad, label, modulo) {
+                  const start = Math.floor(box.scrollTop / 20);
+                  let html = '';
+                  for (let i = start; i < start + 6; i++) {
+                    const n = modulo ? (i % 6) : i;
+                    html += '<div class="row" style="position:absolute;top:' + (i * 20) + 'px;height:20px">'
+                      + label + ' ' + n + '</div>';
+                  }
+                  pad.innerHTML = html;
+                }
+                const decoy = document.getElementById('decoy');
+                const decoyPad = document.getElementById('decoy-pad');
+                const list = document.getElementById('list');
+                const pad = document.getElementById('pad');
+                decoy.addEventListener('scroll', function(){ mount(decoy, decoyPad, 'Item', true); });
+                list.addEventListener('scroll', function(){ mount(list, pad, 'Item', false); });
+                mount(decoy, decoyPad, 'Item', true);
+                mount(list, pad, 'Item', false);
+                </script>
+                </body></html>
+                """);
+        Capture started = run("start", "--url=" + page.toUri(), "--browser=chrome-headless", "--run-id=scroll-tall");
+        assertEquals(0, started.code, started.err + started.out);
+        assertEquals("0,0,0", tops("scroll-tall"), started.out);
+
+        Capture found = run(
+                "find", "--target=browser:auto", "--query=Item 50", "--scroll-search=true", "--run-id=scroll-tall");
+        assertEquals(0, found.code, found.err + found.out);
+        JsonNode hit = JSON.readTree(found.out);
+        assertTrue(hit.path("scrollSearch").asBoolean(false), found.out);
+        assertEquals("Item 50", hit.path("hits").get(0).path("name").asText(), found.out);
+        String afterHit = tops("scroll-tall");
+        assertTrue(afterHit.startsWith("0,0,"), afterHit);
+        int listTop = Integer.parseInt(afterHit.substring(afterHit.lastIndexOf(',') + 1));
+        assertTrue(listTop >= 800, afterHit);
+
+        Capture parked = run(
+                "eval", "--target=browser:auto", "--world=main", "--run-id=scroll-tall",
+                "--expr=document.getElementById('static').scrollTop=25;"
+                        + "document.getElementById('decoy').scrollTop=11;"
+                        + "document.getElementById('list').scrollTop=80; 'set'");
+        assertEquals(0, parked.code, parked.err + parked.out);
+        assertEquals("25,11,80", tops("scroll-tall"), parked.out);
+        Capture missed = run(
+                "find", "--target=browser:auto", "--query=Nope", "--scroll-search=true", "--run-id=scroll-tall");
+        assertEquals(1, missed.code, missed.err + missed.out);
+        assertEquals("not found", JSON.readTree(missed.out).path("error").asText(), missed.out);
+        assertEquals("25,11,80", tops("scroll-tall"), missed.out);
+
+        ConsumerReadyCommands.stopQuiet(temp);
+        Path capped = temp.resolve("capped.html");
+        Files.writeString(capped, """
+                <!DOCTYPE html><html><head><style>html,body{margin:0}</style></head><body>
+                <div id="static" style="height:120px;overflow:auto;border:0">
+                  <div style="height:2000px">Static panel</div>
+                </div>
+                <div id="list" style="height:100px;overflow:auto;border:0">
+                  <div id="pad" style="height:20000px;position:relative"></div>
+                </div>
+                <script>
+                const list = document.getElementById('list');
+                const pad = document.getElementById('pad');
+                function render() {
+                  const start = Math.floor(list.scrollTop / 20);
+                  let html = '';
+                  for (let i = start; i < start + 6; i++) {
+                    html += '<div class="row" style="position:absolute;top:' + (i * 20) + 'px;height:20px">Item ' + i + '</div>';
+                  }
+                  pad.innerHTML = html;
+                }
+                list.addEventListener('scroll', render);
+                render();
+                </script>
+                </body></html>
+                """);
+        Capture again = run("start", "--url=" + capped.toUri(), "--browser=chrome-headless", "--run-id=scroll-cap");
+        assertEquals(0, again.code, again.err + again.out);
+        Capture place = run(
+                "eval", "--target=browser:auto", "--world=main", "--run-id=scroll-cap",
+                "--expr=document.getElementById('static').scrollTop=17; document.getElementById('list').scrollTop=30; 'set'");
+        assertEquals(0, place.code, place.err + place.out);
+        assertEquals("17,30", pair("scroll-cap"), place.out);
+        Capture beyond = run(
+                "find", "--target=browser:auto", "--query=Item 400", "--scroll-search=true", "--run-id=scroll-cap");
+        assertEquals(1, beyond.code, beyond.err + beyond.out);
+        JsonNode miss = JSON.readTree(beyond.out);
+        assertEquals("not found", miss.path("error").asText(), beyond.out);
+        assertEquals("list", miss.path("scrollSearch").path("container").asText(), beyond.out);
+        assertEquals(40, miss.path("scrollSearch").path("steps").asInt(-1), beyond.out);
+        assertTrue(miss.path("scrollSearch").path("capped").asBoolean(false), beyond.out);
+        assertEquals("17,30", pair("scroll-cap"), beyond.out);
+    }
+
+    private String tops(String runId) throws Exception {
+        return value(runId, "document.getElementById('static').scrollTop + ','"
+                + " + document.getElementById('decoy').scrollTop + ','"
+                + " + document.getElementById('list').scrollTop");
+    }
+
+    private String pair(String runId) throws Exception {
+        return value(runId, "document.getElementById('static').scrollTop + ','"
+                + " + document.getElementById('list').scrollTop");
+    }
+
+    private String value(String runId, String expression) throws Exception {
+        Capture read = run("eval", "--target=browser:auto", "--world=main", "--run-id=" + runId, "--expr=" + expression);
+        assertEquals(0, read.code, read.err + read.out);
+        return JSON.readTree(read.out).path("value").asText("");
+    }
+
     private String scrolls() throws Exception {
         Capture read = run(
                 "eval", "--target=browser:auto", "--world=main", "--run-id=scroll-two",

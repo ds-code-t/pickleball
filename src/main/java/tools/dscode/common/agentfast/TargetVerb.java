@@ -227,11 +227,18 @@ public final class TargetVerb {
         try {
             Map<String, String> flags = scopedFrame(runId, target);
             DomNode root = tree(page.session);
-            List<DomNode> hits = args.get("scroll-search") == null
-                    ? locate(root, query, flags)
-                    : scrollFind(page.session, query, flags);
+            Map<String, Object> capped = null;
+            List<DomNode> hits;
+            if (args.get("scroll-search") == null) {
+                hits = locate(root, query, flags);
+            } else {
+                ScrollSearch searched = scrollFind(page.session, query, flags);
+                hits = searched.hits();
+                capped = searched.capped();
+            }
             if (hits.isEmpty()) {
                 Outcome missed = fail("find", "not found");
+                if (capped != null) missed.body().put("scrollSearch", capped);
                 stamp(missed.body(), page.session.connection(), null);
                 putEntered(missed.body(), runId, page.session.connection());
                 return missed;
@@ -2080,29 +2087,129 @@ public final class TargetVerb {
         return Map.of("frame", entered);
     }
 
-    private static List<DomNode> scrollFind(BrowserSession session, String query, Map<String, String> flags) {
-        String saved = scrollState(session.connection());
-        List<DomNode> hits = locate(tree(session), query, flags);
-        int stuck = 0;
-        for (int step = 0; hits.isEmpty() && step < 40; step++) {
-            if (!scrollOnce(session.connection())) {
+    /** Viewport steps on one box before a scroll-search reports {@code capped}. */
+    private static final int SCROLL_STEPS = 40;
+
+    private record ScrollCandidate(String mark, String label) {
+    }
+
+    private record ScrollSearch(List<DomNode> hits, Map<String, Object> capped) {
+    }
+
+    /**
+     * Tries every overflow box. A box whose rendered rows change, or whose text matches the query,
+     * is tried before a static tall box. The document is last. Each miss restores that box.
+     * Forty steps without a hit is {@code scrollSearch:{container, steps, capped:true}}.
+     */
+    private static ScrollSearch scrollFind(BrowserSession session, String query, Map<String, String> flags) {
+        CdpConnection cdp = session.connection();
+        List<DomNode> hits = List.of();
+        Map<String, Object> capped = null;
+        try {
+            List<ScrollCandidate> plan = scrollPlan(cdp, query);
+            String saved = scrollState(cdp);
+            for (ScrollCandidate candidate : plan) {
+                int steps = 0;
+                int stuck = 0;
                 hits = locate(tree(session), query, flags);
-                if (!hits.isEmpty() || ++stuck >= 3) break;
-                continue;
+                while (hits.isEmpty() && steps < SCROLL_STEPS) {
+                    if (!scrollBox(cdp, candidate.mark())) {
+                        hits = locate(tree(session), query, flags);
+                        if (!hits.isEmpty() || ++stuck >= 3) break;
+                        continue;
+                    }
+                    stuck = 0;
+                    steps++;
+                    hits = locate(tree(session), query, flags);
+                }
+                if (!hits.isEmpty()) {
+                    restoreScroll(cdp, saved, candidate.mark());
+                    break;
+                }
+                restoreScroll(cdp, saved, "");
+                if (capped == null && steps >= SCROLL_STEPS) {
+                    Map<String, Object> report = new LinkedHashMap<>();
+                    report.put("container", candidate.label());
+                    report.put("steps", steps);
+                    report.put("capped", true);
+                    capped = report;
+                }
             }
-            stuck = 0;
-            hits = locate(tree(session), query, flags);
+            if (hits.isEmpty()) restoreScroll(cdp, saved, "");
+        } finally {
+            clearScrollMarks(cdp);
         }
-        if (hits.isEmpty()) {
-            restoreScroll(session.connection(), saved);
-            return hits;
-        }
-        if (query != null && !query.isBlank()) {
-            reveal(session.connection(), query);
+        if (!hits.isEmpty() && query != null && !query.isBlank()) {
+            reveal(cdp, query);
             List<DomNode> painted = locate(tree(session), query, flags);
             if (!painted.isEmpty()) hits = painted;
         }
-        return hits;
+        return new ScrollSearch(hits, hits.isEmpty() ? capped : null);
+    }
+
+    /** Marks each overflow box, probes one step, restores it, and returns boxes best-first. */
+    private static List<ScrollCandidate> scrollPlan(CdpConnection cdp, String query) {
+        String quoted = Jsons.MAPPER.valueToTree(query == null ? "" : query).toString();
+        String expression = "(function(){var q=" + quoted + ";"
+                + "function scrollable(el){if(!el||el.nodeType!==1)return false;var s=getComputedStyle(el);var oy=s.overflowY;"
+                + "return (oy==='auto'||oy==='scroll')&&el.scrollHeight>el.clientHeight+2;}"
+                + "function sig(el){var kids=el.children,parts=[],n=Math.min(kids.length,8);"
+                + "for(var i=0;i<n;i++) parts.push(((kids[i].innerText||kids[i].textContent||'')+'').replace(/\\s+/g,' ').trim().slice(0,60));"
+                + "return parts.join('|');}"
+                + "var nodes=document.querySelectorAll('*');var marked=[];"
+                + "for(var i=0;i<nodes.length;i++){if(!scrollable(nodes[i]))continue;"
+                + "nodes[i].setAttribute('data-pkb-scroll-box',String(marked.length+1));marked.push(nodes[i]);}"
+                + "var root=document.scrollingElement;"
+                + "if(root&&root.nodeType===1&&!root.getAttribute('data-pkb-scroll-box')){"
+                + "root.setAttribute('data-pkb-scroll-box',String(marked.length+1));marked.push(root);}"
+                + "var token=((q||'').trim().split(/\\s+/)[0]||'').toLowerCase();var lines=[];"
+                + "for(var j=0;j<marked.length;j++){var el=marked[j];var before=sig(el);var top=el.scrollTop;"
+                + "var step=Math.max(40,Math.floor(el.clientHeight*0.8));"
+                + "if(scrollable(el)){el.scrollTop=top+step;try{el.dispatchEvent(new Event('scroll'));}catch(e){}}"
+                + "var after=sig(el);var moved=el.scrollTop!==top;el.scrollTop=top;"
+                + "if(scrollable(el)){try{el.dispatchEvent(new Event('scroll'));}catch(e){}}"
+                + "var text=((el.innerText||el.textContent||'')+'').toLowerCase();"
+                + "var like=!!(token&&text.indexOf(token)>=0);var virtual=moved&&before!==after;"
+                + "var rank=virtual?0:(like?1:2);if(el===root&&!virtual&&!like)rank=3;"
+                + "var label=el.id?el.id:(el===root?'document':el.tagName.toLowerCase());"
+                + "lines.push(rank+'\\t'+el.getAttribute('data-pkb-scroll-box')+'\\t'+label);}"
+                + "lines.sort(function(a,b){return (+a.split('\\t')[0])-(+b.split('\\t')[0]);});"
+                + "return lines.join('\\n');})()";
+        List<ScrollCandidate> plan = new ArrayList<>();
+        String raw = evalText(cdp, expression);
+        if (raw.isBlank()) return plan;
+        for (String line : raw.split("\n")) {
+            String[] part = line.split("\t", 3);
+            if (part.length < 3 || part[1].isBlank()) continue;
+            plan.add(new ScrollCandidate(part[1], part[2]));
+        }
+        return plan;
+    }
+
+    private static boolean scrollBox(CdpConnection cdp, String mark) {
+        String expression = "(function(){var el=document.querySelector('[data-pkb-scroll-box=\"" + mark + "\"]');"
+                + "if(!el)return false;var before=el.scrollTop;"
+                + "el.scrollTop=before+Math.max(40,Math.floor(el.clientHeight*0.8));"
+                + "try{el.dispatchEvent(new Event('scroll'));}catch(e){}"
+                + "return el.scrollTop!==before;})()";
+        return "true".equals(evalText(cdp, expression));
+    }
+
+    private static void clearScrollMarks(CdpConnection cdp) {
+        evalText(cdp, "(function(){var nodes=document.querySelectorAll('[data-pkb-scroll-box]');"
+                + "for(var i=0;i<nodes.length;i++) nodes[i].removeAttribute('data-pkb-scroll-box');return true;})()");
+    }
+
+    private static String evalText(CdpConnection cdp, String expression) {
+        if (cdp == null) return "";
+        ObjectNode params = Jsons.object();
+        params.put("expression", expression);
+        params.put("returnByValue", true);
+        try {
+            return cdp.call("Runtime.evaluate", params, Duration.ofSeconds(8)).path("result").path("value").asText("");
+        } catch (RuntimeException failure) {
+            return "";
+        }
     }
 
     private static String scrollState(CdpConnection cdp) {
@@ -2120,16 +2227,21 @@ public final class TargetVerb {
         }
     }
 
-    private static void restoreScroll(CdpConnection cdp, String saved) {
+    private static void restoreScroll(CdpConnection cdp, String saved, String keepMark) {
         if (cdp == null || saved == null) return;
+        String keep = keepMark == null ? "" : keepMark;
         ObjectNode params = Jsons.object();
         params.put("expression", "(function(){var saved=" + jsString(saved) + ".split(',');"
+                + "var keep=" + jsString(keep) + ";"
                 + "function scrollable(el){var s=getComputedStyle(el);var oy=s.overflowY;"
                 + "return (oy==='auto'||oy==='scroll')&&el.scrollHeight>el.clientHeight+2;}"
+                + "function put(el, index){if(!el||index>=saved.length) return;"
+                + "if(keep&&el.getAttribute&&el.getAttribute('data-pkb-scroll-box')===keep) return;"
+                + "el.scrollTop=Number(saved[index])||0;"
+                + "try{el.dispatchEvent(new Event('scroll'));}catch(e){}}"
                 + "var nodes=document.querySelectorAll('*');var n=0;"
-                + "for(var i=0;i<nodes.length;i++){if(!scrollable(nodes[i])) continue;"
-                + "if(n<saved.length) nodes[i].scrollTop=Number(saved[n])||0; n++;}"
-                + "var root=document.scrollingElement; if(root&&n<saved.length) root.scrollTop=Number(saved[n])||0; return true;})()");
+                + "for(var i=0;i<nodes.length;i++){if(!scrollable(nodes[i])) continue; put(nodes[i], n); n++;}"
+                + "var root=document.scrollingElement; if(root) put(root, n); return true;})()");
         params.put("returnByValue", true);
         try {
             cdp.call("Runtime.evaluate", params, Duration.ofSeconds(5));
@@ -2167,28 +2279,6 @@ public final class TargetVerb {
             cdp.call("Runtime.evaluate", params, Duration.ofSeconds(5));
         } catch (RuntimeException ignored) {
             // The row is already in the tree. A later read reports whether it painted.
-        }
-    }
-
-    private static boolean scrollOnce(CdpConnection cdp) {
-        ObjectNode params = Jsons.object();
-        params.put("expression", "(function(){"
-                + "function scrollable(el){var s=getComputedStyle(el);var oy=s.overflowY;"
-                + "return (oy==='auto'||oy==='scroll')&&el.scrollHeight>el.clientHeight+2;}"
-                + "function virtual(el){return scrollable(el)&&el.scrollHeight>800&&el.children.length<30;}"
-                + "var nodes=document.querySelectorAll('*');var box=null;"
-                + "for(var i=0;i<nodes.length;i++){if(virtual(nodes[i])){box=nodes[i];break;}}"
-                + "if(!box){var root=document.scrollingElement||document.documentElement; if(root&&scrollable(root)) box=root;}"
-                + "if(!box) return false;"
-                + "var before=box.scrollTop;box.scrollTop=before+Math.max(40,Math.floor(box.clientHeight*0.8));"
-                + "try{box.dispatchEvent(new Event('scroll'));}catch(e){}"
-                + "return box.scrollTop!==before;})()");
-        params.put("returnByValue", true);
-        try {
-            JsonNode value = cdp.call("Runtime.evaluate", params, Duration.ofSeconds(5));
-            return value.path("result").path("value").asBoolean(false);
-        } catch (RuntimeException failure) {
-            return false;
         }
     }
 
