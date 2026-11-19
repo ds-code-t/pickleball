@@ -73,7 +73,7 @@ final class WorkbenchCommandLine {
             "--query", "--exposure", "--target", "--pane", "--on-top", "--headless",
             "--mode", "--condition", "--timeout", "--ref", "--value", "--snap", "--within",
             "--budget", "--strict", "--rank", "--scroll-search", "--duration", "--expr",
-            "--world", "--clip", "--frame", "--kinds", "--fixture", "--cdp-input"
+            "--world", "--clip", "--frame", "--kinds", "--fixture"
     );
 
     private WorkbenchCommandLine() {

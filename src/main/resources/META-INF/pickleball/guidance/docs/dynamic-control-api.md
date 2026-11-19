@@ -31,7 +31,7 @@ With no live browser the command exits 1 and the body is `ok:false` with `error:
 | ui | `--ops` | The `ui-apply` batch. An op target may be `ref:<docVersion:handle>`. A stale ref misses. |
 | capture | `--target --out` | Writes a PNG. No base64 in the reply. |
 
-A chain logs a line only when a step fails and a later step serves the call, once per run, chain, and reason. The line is appended to `.pickleball/logs/fallback-chain.jsonl`: `{"run","chain","from","to","reason","at"}`. Example: `{"chain":"act","from":"cdp","to":"js","reason":"cdp input disabled"}`. `--cdp-input=off` skips CDP input and takes that next step. The log stays off when `pkb_fallback_log=off`. The long-lived host clears the de-dupe set when the run id changes. On Chromium, `Runtime.addBinding` may include `executionContextName` `pkb-surface`.
+A chain logs a line only when a step fails and a later step serves the call, once per run, chain, and reason. The line is appended to `.pickleball/logs/fallback-chain.jsonl`: `{"run","chain","from","to","reason","at"}`. Example: `{"chain":"act","from":"cdp","to":"js","reason":"cdp input disabled"}`. The test property `pkb_cdp_input=off` skips CDP input and takes that next step. It is not a CLI flag. The log stays off when `pkb_fallback_log=off`. The long-lived host clears the de-dupe set when the run id changes. On Chromium, `Runtime.addBinding` may include `executionContextName` `pkb-surface`.
 
 ## MCP command registry
 

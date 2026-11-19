@@ -1615,6 +1615,7 @@ public final class WorkbenchAgentCommands {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private static int inspectPage(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        if (selectorTarget(flag(parsed, "--target"))) return agentControl(parsed, "snap", out, err);
         long startedNs = System.nanoTime();
         String html = readHtml(parsed, err);
         if (html == null && flag(parsed, "--html") != null) return 2;
@@ -1636,6 +1637,7 @@ public final class WorkbenchAgentCommands {
     }
 
     private static int findElement(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        if (selectorTarget(flag(parsed, "--target"))) return agentControl(parsed, "find", out, err);
         long startedNs = System.nanoTime();
         String category = flag(parsed, "--category");
         String query = flag(parsed, "--query");
@@ -1896,6 +1898,15 @@ public final class WorkbenchAgentCommands {
             PrintStream out,
             PrintStream err
     ) {
+        return agentControl(parsed, null, out, err);
+    }
+
+    private static int agentControl(
+            WorkbenchCommandLine.Parsed parsed,
+            String verb,
+            PrintStream out,
+            PrintStream err
+    ) {
         Map<String, String> args = new LinkedHashMap<>();
         copyFlag(args, parsed, "template");
         copyFlag(args, parsed, "type");
@@ -1971,11 +1982,21 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "frame");
         copyFlag(args, parsed, "kinds");
         copyFlag(args, parsed, "fixture");
-        copyFlag(args, parsed, "cdp-input");
         if (hasFlag(parsed, "--cpu")) args.put("cpu", "true");
         if (parsed.forwarded() != null) {
             for (String token : parsed.forwarded()) {
                 if ("ui".equals(token)) args.put("ui", "true");
+            }
+        }
+        String command = verb == null || verb.isBlank() ? parsed.command() : verb;
+        if (verb == null && selectorTarget(args.get("target"))) {
+            if ("screenshot".equals(command)) command = "capture";
+            else if ("observe".equals(command) && !args.containsKey("events")) {
+                command = "watch";
+                if (!args.containsKey("duration") && args.containsKey("wait-ms")) args.put("duration", args.get("wait-ms"));
+                if (!args.containsKey("kinds") && args.get("type") != null && !args.get("type").isBlank()) {
+                    args.put("kinds", args.get("type"));
+                }
             }
         }
         if ("arrow".equals(parsed.command())) {
@@ -2003,7 +2024,7 @@ public final class WorkbenchAgentCommands {
             long forwardStarted = System.nanoTime();
             tools.dscode.common.agentfast.AgentForward.Posted posted = tools.dscode.common.agentfast.AgentForward.post(
                     liveBridge.get(),
-                    parsed.command(),
+                    command,
                     args,
                     extra,
                     parsed.project(),
@@ -2024,11 +2045,11 @@ public final class WorkbenchAgentCommands {
                 } catch (java.io.IOException ignored) {
                     // The body is already printed.
                 }
-                err.print(failureLine(error, parsed.command()));
+                err.print(failureLine(error, command));
             }
             return posted.exit();
         }
-        if (failFastWithoutBrowser(parsed.command(), args)) {
+        if (failFastWithoutBrowser(command, args)) {
             err.print(WorkbenchCliHelp.structured("no live browser", "run start --url= --browser="));
             out.println("{\"ok\":false,\"error\":\"no live browser\"}");
             return 1;
@@ -2036,7 +2057,7 @@ public final class WorkbenchAgentCommands {
         AgentControl.Result result = AgentControl.execute(
                 parsed.project(),
                 boundRunId(parsed),
-                parsed.command(),
+                command,
                 args,
                 extra,
                 parsed.coordination().agentId()
@@ -2049,9 +2070,16 @@ public final class WorkbenchAgentCommands {
         }
         if (result.exit() != 0) {
             Object error = result.body().get("error");
-            err.print(failureLine(error == null ? "agent command failed" : String.valueOf(error), parsed.command()));
+            err.print(failureLine(error == null ? "agent command failed" : String.valueOf(error), command));
         }
         return result.exit();
+    }
+
+    /** A target-selector string, not panel `page` or `popup`. */
+    private static boolean selectorTarget(String target) {
+        if (target == null) return false;
+        String text = target.trim();
+        return text.startsWith("browser:") || text.startsWith("desktop:") || text.startsWith("ref:");
     }
 
     /** One {@code error:} line. A missing browser names {@code start}, not the usage row. */

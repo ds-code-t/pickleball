@@ -49,6 +49,11 @@ public final class LiveChromeDriver implements WebDriver, TakesScreenshot, HasCa
     /** {@link #quit()} closed this driver. Later commands fail instead of reattaching. */
     private boolean released;
 
+    /** The session this driver is attached to. The worker path reuses it instead of opening a second browser. */
+    public BrowserSession browserSession() {
+        return session;
+    }
+
     public LiveChromeDriver(BrowserSession session) {
         if (session == null) throw new IllegalArgumentException("browser session is missing");
         this.session = session;

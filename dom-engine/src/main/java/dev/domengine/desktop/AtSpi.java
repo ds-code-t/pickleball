@@ -7,6 +7,7 @@ import dev.domengine.tree.DomNode;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -46,7 +47,9 @@ final class AtSpi {
         String address = busAddress();
         int[] count = {0};
         boolean[] truncated = {false};
-        DomNode root = read(address, "org.a11y.atspi.Registry", "/org/a11y/atspi/accessible/root", 0, count, truncated, true);
+        DomNode root = read(
+                address, "org.a11y.atspi.Registry", "/org/a11y/atspi/accessible/root",
+                0, count, truncated, true, new HashMap<>());
         if (truncated[0]) root.attributes.put("walk-truncated", "true");
         EngineLog.info("desktop", "atspi nodes=" + count[0] + " truncated=" + truncated[0]);
         return root;
@@ -221,7 +224,8 @@ final class AtSpi {
     }
 
     private static DomNode read(
-            String address, String dest, String path, int depth, int[] count, boolean[] truncated, boolean root
+            String address, String dest, String path, int depth, int[] count, boolean[] truncated, boolean root,
+            Map<String, String> pids
     ) {
         if (depth > NativeDesktop.WALK_DEPTH || count[0] >= NativeDesktop.WALK_NODES) {
             truncated[0] = true;
@@ -235,6 +239,8 @@ final class AtSpi {
         node.attributes.put("desktop-backend", "atspi");
         node.attributes.put("atspi-dest", dest);
         node.attributes.put("atspi-path", path);
+        String pid = unixPid(address, dest, pids);
+        if (!pid.isBlank()) node.attributes.put("pid", pid);
         int role = methodInt(address, dest, path, GET_ROLE);
         String roleLabel = methodString(address, dest, path, GET_ROLE_NAME);
         String mapped = mappedRole(roleLabel, role);
@@ -263,10 +269,35 @@ final class AtSpi {
                 truncated[0] = true;
                 break;
             }
-            DomNode next = read(address, child.dest(), child.path(), depth + 1, count, truncated, false);
+            DomNode next = read(address, child.dest(), child.path(), depth + 1, count, truncated, false, pids);
             if (next != null) node.children.add(next);
         }
         return node;
+    }
+
+    /** Process id of an AT-SPI bus name. Empty when the bus does not answer. Cached per name. */
+    private static String unixPid(String address, String dest, Map<String, String> pids) {
+        if (dest == null || dest.isBlank()) return "";
+        String cached = pids.get(dest);
+        if (cached != null) return cached;
+        String pid = "";
+        try {
+            NativeDesktop.CommandResult result = call(
+                    address,
+                    "org.freedesktop.DBus",
+                    "/org/freedesktop/DBus",
+                    "org.freedesktop.DBus.GetConnectionUnixProcessID",
+                    "string:" + dest
+            );
+            if (!result.timedOut() && result.exit() == 0) {
+                int value = lastInt(result.output(), -1);
+                if (value > 0) pid = Integer.toString(value);
+            }
+        } catch (RuntimeException ignored) {
+            pid = "";
+        }
+        pids.put(dest, pid);
+        return pid;
     }
 
     private static String accessibleName(String address, String dest, String path) {

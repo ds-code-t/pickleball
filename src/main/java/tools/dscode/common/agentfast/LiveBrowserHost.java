@@ -118,6 +118,7 @@ public final class LiveBrowserHost {
                     binary == null || binary.isBlank() ? null : binary
             );
             CHROME.set(session);
+            armSurface(session);
             boolean navigated = true;
             String navError = "";
             if (pageUrl != null && !pageUrl.isBlank() && !"about:blank".equals(pageUrl)) {
@@ -170,6 +171,55 @@ public final class LiveBrowserHost {
         }
     }
 
+    /** Preload the surface runtime so the next document has {@code __pkbUi} in {@code pkb-surface}. */
+    private static void armSurface(BrowserSession session) {
+        if (session == null) return;
+        try {
+            session.connection().call("Page.enable", Jsons.object(), Duration.ofSeconds(5));
+            com.fasterxml.jackson.databind.node.ObjectNode preload = Jsons.object();
+            preload.put("source", tools.dscode.browser.SurfaceAssets.script("pkb-runtime"));
+            preload.put("worldName", "pkb-surface");
+            session.connection().call("Page.addScriptToEvaluateOnNewDocument", preload, Duration.ofSeconds(5));
+        } catch (RuntimeException ignored) {
+            // A page that cannot take the preload still serves CDP verbs.
+        }
+    }
+
+    /** Evaluate the runtime on the current document. {@code watchUntil} then runs without a fallback. */
+    private static void installSurfaceNow(BrowserSession session) {
+        if (session == null) return;
+        try {
+            long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
+            while (System.nanoTime() < deadline) {
+                com.fasterxml.jackson.databind.node.ObjectNode ready = Jsons.object();
+                ready.put("expression", "document.readyState");
+                ready.put("returnByValue", true);
+                JsonNode state = session.connection().call("Runtime.evaluate", ready, Duration.ofSeconds(2));
+                if ("complete".equals(state.path("result").path("value").asText())) break;
+                Thread.sleep(50);
+            }
+            JsonNode frames = session.connection().call("Page.getFrameTree", Jsons.object(), Duration.ofSeconds(5));
+            String frame = frames.path("frameTree").path("frame").path("id").asText("");
+            if (frame.isBlank()) return;
+            com.fasterxml.jackson.databind.node.ObjectNode world = Jsons.object();
+            world.put("frameId", frame);
+            world.put("worldName", "pkb-surface");
+            world.put("grantUniveralAccess", true);
+            JsonNode created = session.connection().call("Page.createIsolatedWorld", world, Duration.ofSeconds(5));
+            int context = created.path("executionContextId").asInt(0);
+            if (context <= 0) return;
+            com.fasterxml.jackson.databind.node.ObjectNode eval = Jsons.object();
+            eval.put("expression", tools.dscode.browser.SurfaceAssets.script("pkb-runtime"));
+            eval.put("contextId", context);
+            eval.put("returnByValue", true);
+            session.connection().call("Runtime.evaluate", eval, Duration.ofSeconds(5));
+        } catch (RuntimeException ignored) {
+            // Event-mode wait reports a missing watcher instead of hiding it.
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     private static boolean attachPage(BrowserSession session) {
         try {
             LiveChromeDriver driver = new LiveChromeDriver(session);
@@ -181,6 +231,7 @@ public final class LiveBrowserHost {
                 AgentDriverHooks.host(false);
             }
             CompositeRuntime.joinBrowser(session.cdp);
+            installSurfaceNow(session);
             return true;
         } catch (RuntimeException failure) {
             System.err.println("error: page attach " + failure.getMessage());

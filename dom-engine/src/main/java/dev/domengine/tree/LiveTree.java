@@ -143,7 +143,7 @@ public final class LiveTree {
                 JsonNode described = connection.call("Accessibility.getPartialAXTree", axParams(node.nodeId), Duration.ofSeconds(5));
                 JsonNode nodesJson = described.get("nodes");
                 if (nodesJson != null && nodesJson.isArray() && !nodesJson.isEmpty()) {
-                    JsonNode axNode = nodesJson.get(nodesJson.size() - 1);
+                    JsonNode axNode = axFor(nodesJson, node.backendNodeId);
                     node.role = axNode.path("role").path("value").asText("");
                     node.accessibleName = axNode.path("name").path("value").asText("");
                 }
@@ -151,6 +151,22 @@ public final class LiveTree {
                 EngineLog.debug("cdp", "name " + node.id() + " " + failure.getMessage());
             }
         }
+    }
+
+    /** The partial tree includes ancestors. Match this DOM node instead of the last row. */
+    private static JsonNode axFor(JsonNode nodes, long backendNodeId) {
+        JsonNode fallback = nodes.get(nodes.size() - 1);
+        if (backendNodeId <= 0) return fallback;
+        for (JsonNode candidate : nodes) {
+            if (candidate.path("backendDOMNodeId").asLong(-1) == backendNodeId) return candidate;
+        }
+        for (int index = nodes.size() - 1; index >= 0; index--) {
+            String role = nodes.get(index).path("role").path("value").asText("");
+            if (!"RootWebArea".equals(role) && !"WebArea".equals(role) && !"generic".equals(role)) {
+                return nodes.get(index);
+            }
+        }
+        return fallback;
     }
 
     private static ObjectNode axParams(long nodeId) {

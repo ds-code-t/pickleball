@@ -238,7 +238,9 @@ final class ConsumerReadyCommands {
                 StandardOpenOption.APPEND
         );
         String classpath = System.getProperty("java.class.path", "");
-        String body = String.join("\n",
+        String cdpInput = System.getProperty("pkb_cdp_input");
+        String inputFlag = cdpInput == null || cdpInput.isBlank() ? "" : "-Dpkb_cdp_input=" + quoteArg(cdpInput) + "\n";
+        String body = inputFlag + String.join("\n",
                 "-cp",
                 quoteArg(classpath),
                 "tools.dscode.common.agentfast.LiveBrowserHost",

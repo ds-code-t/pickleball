@@ -74,6 +74,11 @@ public final class AgentControl {
         return PageSurfaces.ownerForQuery();
     }
 
+    /** Page driver registered in this process. The worker's browser when the host is not this JVM. */
+    public static WebDriver scenarioDriver() {
+        return PageSurfaces.liveDriver();
+    }
+
     public static String queryTab(WebDriver owner) {
         return PageSurfaces.focusedTabOf(owner);
     }
@@ -589,6 +594,18 @@ public final class AgentControl {
 
     private static Result highlight(Path project, String runId, Map<String, String> args) throws Exception {
         if (!present(args.get("handle"))) return fail(2, "highlight requires --handle");
+        String target = args.get("target");
+        if (present(target)) {
+            String raw = target.trim();
+            if (raw.startsWith("browser:") || raw.startsWith("desktop:") || raw.startsWith("ref:")) {
+                String rejected = tools.dscode.common.agentfast.TargetVerb.unavailable(raw);
+                if (rejected != null) {
+                    Result failed = fail(1, rejected);
+                    failed.body().put("applied", false);
+                    return failed;
+                }
+            }
+        }
         Map<String, Object> painted = PageSurfaces.highlight(
                 explicitPage(project, args),
                 args.get("handle"),

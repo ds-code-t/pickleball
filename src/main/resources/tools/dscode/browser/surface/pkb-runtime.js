@@ -1512,6 +1512,7 @@
     for (var i = 0; i < pending.length; i++) pending[i]({ok: true, doc: docVersion});
   }
   function watchUntil(condition, timeoutMs) {
+    listen();
     return new Promise(function (resolve) {
       var finished = false;
       function finish(body) {

@@ -8,18 +8,17 @@ import dev.domengine.cdp.CdpConnection;
 import dev.domengine.cdp.CdpException;
 import dev.domengine.desktop.DesktopTree;
 import dev.domengine.json.Jsons;
+import dev.domengine.query.Displayed;
 import dev.domengine.query.HtmlTree;
 import dev.domengine.query.LiveXPath;
 import dev.domengine.query.Query;
+import dev.domengine.query.RowStates;
 import dev.domengine.session.BrowserSession;
 import dev.domengine.session.SessionEvents;
 import dev.domengine.snapshot.CompositeSnapshots;
 import dev.domengine.snapshot.DesktopSnapshotProducer;
 import dev.domengine.snapshot.SnapshotOptions;
 import dev.domengine.tree.DomNode;
-import org.openqa.selenium.WebDriver;
-import tools.dscode.common.composite.ElementOperations;
-
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -30,6 +29,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Browser and desktop verbs on the existing engine path:
@@ -42,8 +42,16 @@ public final class TargetVerb {
     private static final Set<String> INTERACTIVE = Set.of(
             "a", "button", "input", "select", "textarea", "option"
     );
-    private static final ConcurrentHashMap<String, Hit> HITS = new ConcurrentHashMap<>();
+    private static final int HIT_CAP = 256;
+    /** Least-recently used refs drop once the cap is passed. */
+    private static final Map<String, Hit> HITS = java.util.Collections.synchronizedMap(new LinkedHashMap<>(64, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, Hit> eldest) {
+            return size() > HIT_CAP;
+        }
+    });
     private static final ConcurrentHashMap<String, String> BASELINE = new ConcurrentHashMap<>();
+    private static final ThreadLocal<String> RUN = new ThreadLocal<>();
 
     private TargetVerb() {
     }
@@ -61,9 +69,26 @@ public final class TargetVerb {
         return hit.selector;
     }
 
+    /** Null when {@code target} is a browser or ref this process can open. Otherwise the error text. */
+    public static String unavailable(String raw) {
+        TargetSelector.Parsed target = TargetSelector.parse(raw);
+        if (!"browser".equals(target.kind()) && !"ref".equals(target.kind())) return "unknown target";
+        try {
+            Held page = openBrowser("ref".equals(target.kind()) ? TargetSelector.parse("browser:auto") : target);
+            page.release();
+            return null;
+        } catch (Miss miss) {
+            return miss.error;
+        } catch (RuntimeException failure) {
+            String message = failure.getMessage();
+            return message == null || message.isBlank() ? "unknown target" : message;
+        }
+    }
+
     public static Outcome run(Path project, String runId, String op, Map<String, String> args) {
         String verb = op == null ? "" : op;
         Map<String, String> values = args == null ? Map.of() : args;
+        RUN.set(runId);
         try {
             TargetSelector.Parsed target = TargetSelector.parse(values.get("target"));
             if ("ref".equals(target.kind()) && values.get("ref") == null) {
@@ -92,6 +117,8 @@ public final class TargetVerb {
         } catch (RuntimeException failure) {
             String message = failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
             return fail(verb, message);
+        } finally {
+            RUN.remove();
         }
     }
 
@@ -101,6 +128,7 @@ public final class TargetVerb {
             Map<String, Object> body = base("attach", "desktop", "desktop", target);
             body.put("session", session.id());
             body.put("docVersion", "desktop:" + session.sequence());
+            body.put("applied", session.live());
             return ok(body);
         }
         Held page = openBrowser(target);
@@ -150,6 +178,7 @@ public final class TargetVerb {
         body.put("hits", rows);
         body.put("ref", rows.get(0).get("ref"));
         body.put("session", session.id());
+        body.put("applied", session.live());
         return ok(body);
     }
 
@@ -177,9 +206,11 @@ public final class TargetVerb {
             }
             String before = docVersion(page.session.connection());
             String titleBefore = title(page.session.connection());
-            perform(project, runId, page.session, node, args, query, selector(node, query));
+            Effect effect = perform(project, runId, page.session, node, args, query, selector(node, query));
+            if (!effect.applied()) return fail("act", "not applied");
             String after = docVersion(page.session.connection());
-            Map<String, Object> body = base("act", "cdp", "browser", target);
+            Map<String, Object> body = base("act", effect.used(), "browser", target);
+            body.put("applied", true);
             body.put("docVersion", after);
             body.put("kind", blank(args.get("kind")).isBlank() ? "click" : blank(args.get("kind")));
             if ("diff".equals(blank(args.get("snap")))) {
@@ -196,9 +227,10 @@ public final class TargetVerb {
         DesktopTree.Session session = DesktopTree.require(hit.sessionId);
         DomNode node = findNode(session.root(), "", hit.backend);
         if (node == null) return fail("act", "stale_ref");
-        desktopAct(session, node, args);
+        boolean live = desktopAct(session, node, args);
         DesktopTree.Session after = DesktopTree.require(session.id());
         Map<String, Object> body = base("act", "desktop", "desktop", TargetSelector.parse("desktop:" + hit.sessionId));
+        body.put("applied", live);
         body.put("docVersion", "desktop:" + after.sequence());
         body.put("session", after.id());
         return ok(body);
@@ -210,15 +242,17 @@ public final class TargetVerb {
         List<DomNode> hits = locate(session.root(), query, Map.of());
         if (hits.isEmpty()) return fail("act", "not found");
         if (hits.size() > 1) return fail("act", "ambiguous");
-        desktopAct(session, hits.get(0), args);
+        boolean live = desktopAct(session, hits.get(0), args);
         DesktopTree.Session after = DesktopTree.require(session.id());
         Map<String, Object> body = base("act", "desktop", "desktop", target);
+        body.put("applied", live);
         body.put("docVersion", "desktop:" + after.sequence());
         body.put("session", after.id());
         return ok(body);
     }
 
-    private static void desktopAct(DesktopTree.Session session, DomNode node, Map<String, String> args) {
+    /** True only after a live platform action returns. A fixture bump is not applied. */
+    private static boolean desktopAct(DesktopTree.Session session, DomNode node, Map<String, String> args) {
         String kind = blank(args.get("kind"));
         if (kind.isBlank()) kind = "click";
         Map<String, String> flags = new LinkedHashMap<>();
@@ -228,6 +262,7 @@ public final class TargetVerb {
             case "click", "hover", "press", "select" -> DesktopTree.click(session, node);
             default -> throw new Miss("unknown kind " + kind);
         }
+        return session.live();
     }
 
     private static Map<String, String> flagsWithNode(DesktopTree.Session session, DomNode node, Map<String, String> flags) {
@@ -244,7 +279,9 @@ public final class TargetVerb {
             ObjectNode produced = CompositeSnapshots.browser(page.session, SnapshotOptions.fromFlags(Map.of()));
             DomNode root = tree(page.session);
             String version = docVersion(page.session.connection());
-            List<Map<String, Object>> rows = publish(runId, "browser", page.session.id, version, interactive(root), "");
+            List<DomNode> shown = interactive(root);
+            RowStates.fill(page.session.connection(), optionNodes(shown));
+            List<Map<String, Object>> rows = publish(runId, "browser", page.session.id, version, shown, "");
             String picture = picture(page.session.connection(), rows);
             Map<String, Object> body = base("snap", "cdp", "browser", target);
             body.put("mode", mode);
@@ -271,6 +308,7 @@ public final class TargetVerb {
         body.put("docVersion", version);
         body.put("hits", rows);
         body.put("lines", lines(rows));
+        body.put("applied", session.live());
         if ("diff".equals(mode)) body.put("diff", diffAgainst(runId, String.join("\n", lines(rows)), version));
         return ok(body);
     }
@@ -281,10 +319,30 @@ public final class TargetVerb {
         if (mode.isBlank()) mode = EVENT_CONDITIONS.contains(condition) ? "event" : "poll";
         long timeout = timeoutMs(args);
         if ("desktop".equals(target.kind())) {
-            DesktopTree.Session session = openDesktop(target, args.get("fixture"));
+            long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(Math.max(0, timeout));
+            DesktopTree.Session session = null;
+            boolean met = false;
             String looked = condition.startsWith("text=") ? condition.substring("text=".length()) : blank(args.get("query"));
-            if (!looked.isBlank() && locate(session.root(), looked, Map.of()).isEmpty()) return fail("wait", "not found");
+            while (true) {
+                session = openDesktop(target, args.get("fixture"));
+                if (session.live()) {
+                    try {
+                        DesktopTree.walk(session.id());
+                        session = DesktopTree.require(session.id());
+                    } catch (RuntimeException ignored) {
+                        // The last captured tree is still the one we can search.
+                    }
+                }
+                if (looked.isBlank() || !locate(session.root(), looked, Map.of()).isEmpty()) {
+                    met = true;
+                    break;
+                }
+                if (System.nanoTime() >= deadline) break;
+                sleep(50);
+            }
+            if (!met) return fail("wait", "timeout");
             Map<String, Object> body = base("wait", "desktop", "desktop", target);
+            body.put("applied", session.live());
             body.put("mode", mode);
             body.put("condition", condition);
             body.put("docVersion", "desktop:" + session.sequence());
@@ -308,14 +366,22 @@ public final class TargetVerb {
     }
 
     private static Outcome watch(Path project, String runId, TargetSelector.Parsed target, Map<String, String> args) {
+        if ("desktop".equals(target.kind())) return fail("watch", "watch is browser only");
         Held page = openBrowser(resolved(target, args));
         try {
             long duration = timeoutMs(args);
-            if (args.get("duration") != null && !args.get("duration").isBlank()) duration = Long.parseLong(args.get("duration").trim());
+            if (args.get("duration") != null && !args.get("duration").isBlank()) {
+                try {
+                    duration = Long.parseLong(args.get("duration").trim());
+                } catch (NumberFormatException failure) {
+                    return fail("watch", "duration is milliseconds");
+                }
+            }
             String kinds = blank(args.get("kinds"));
             if (kinds.isBlank()) kinds = blank(args.get("condition"));
+            long since = System.currentTimeMillis();
             List<ObjectNode> events = page.session.events().read(
-                    new SessionEvents.Filter(kinds, "", null, null, 50), Math.min(duration, 1000));
+                    new SessionEvents.Filter(kinds, "", since, null, 50), duration);
             List<Map<String, Object>> rows = new ArrayList<>();
             for (ObjectNode event : events) {
                 Map<String, Object> row = new LinkedHashMap<>();
@@ -339,7 +405,8 @@ public final class TargetVerb {
             List<DomNode> hits = locate(session.root(), blank(args.get("query")), Map.of());
             if (hits.isEmpty()) return fail("explain", "not found");
             Map<String, Object> body = base("explain", "desktop", "desktop", target);
-            body.put("report", report(hits.get(0)));
+            body.put("applied", session.live());
+            body.put("report", report(hits.get(0), null));
             return ok(body);
         }
         Held page = openBrowser(resolved(target, args));
@@ -356,7 +423,7 @@ public final class TargetVerb {
             }
             if (node == null) return fail("explain", "not found");
             Map<String, Object> body = base("explain", "cdp", "browser", target);
-            body.put("report", report(node));
+            body.put("report", report(node, page.session.connection()));
             body.put("docVersion", docVersion(page.session.connection()));
             return ok(body);
         } finally {
@@ -418,25 +485,22 @@ public final class TargetVerb {
             params.put("expression", expr);
             params.put("returnByValue", true);
             if ("pkb".equals(world)) {
-                ObjectNode created = Jsons.object();
-                created.put("worldName", "pkb-surface");
-                created.put("grantUniveralAccess", true);
-                JsonNode worldNode = page.session.connection().call("Page.createIsolatedWorld", created, Duration.ofSeconds(5));
-                int context = worldNode.path("executionContextId").asInt(0);
-                if (context > 0) params.put("contextId", context);
+                int context = pkbContext(page.session.connection());
+                if (context <= 0) return fail("eval", "eval failed");
+                params.put("contextId", context);
             }
             JsonNode value = page.session.connection().call("Runtime.evaluate", params, Duration.ofSeconds(10));
             if (value.has("exceptionDetails")) return fail("eval", "eval failed");
             Map<String, Object> body = base("eval", "cdp", "browser", target);
             body.put("world", world);
-            body.put("value", value.path("result").path("value").asText(""));
+            body.put("value", jsonText(value.path("result").path("value")));
             return ok(body);
         } finally {
             page.release();
         }
     }
 
-    private static void perform(
+    private static Effect perform(
             Path project,
             String runId,
             BrowserSession session,
@@ -447,18 +511,25 @@ public final class TargetVerb {
     ) {
         String kind = blank(args.get("kind"));
         if (kind.isBlank()) kind = "click";
+        String value = blank(args.get("value"));
         String verb = switch (kind) {
             case "type" -> "type";
             case "hover" -> "hover";
             case "press" -> "key";
-            case "select", "click" -> "click";
+            case "select" -> "click";
+            case "click" -> "click";
             default -> throw new Miss("unknown kind " + kind);
         };
         Map<String, String> flags = new LinkedHashMap<>();
-        flags.put("node-id", Long.toString(node.backendNodeId));
-        if ("type".equals(verb)) flags.put("text", blank(args.get("value")));
-        if ("key".equals(verb)) flags.put("key", blank(args.get("value")));
-        boolean disabled = "off".equalsIgnoreCase(blank(args.get("cdp-input")));
+        DomNode acted = node;
+        if ("select".equals(kind)) {
+            acted = optionFor(node, value);
+            if (acted == null) throw new Miss("not found");
+        }
+        flags.put("node-id", Long.toString(acted.backendNodeId));
+        if ("type".equals(verb)) flags.put("text", value);
+        if ("key".equals(verb)) flags.put("key", value);
+        boolean disabled = cdpInputOff();
         if (disabled) PageActions.useCdpInput(false);
         try {
             LiveXPath.use(session.connection());
@@ -467,27 +538,106 @@ public final class TargetVerb {
             } finally {
                 LiveXPath.use(null);
             }
+            if ("select".equals(kind)) return new Effect("cdp", valueMatches(value, controlValue(session.connection(), selectOf(acted))));
+            if ("type".equals(kind)) return new Effect("cdp", valueMatches(value, controlValue(session.connection(), node)));
+            return new Effect("cdp", true);
         } catch (CdpException failure) {
             String message = failure.getMessage() == null ? "" : failure.getMessage();
             if (!disabled && !message.contains("cdp input") && !message.contains("Input.")) throw failure;
             FallbackLog.note(project, runId, "act", "cdp", "js", message.isBlank() ? "cdp input disabled" : message);
-            if (!jsClick(query, selector)) throw failure;
+            return jsAct(session.connection(), kind, query, selector, value, node);
         } finally {
             PageActions.useCdpInput(true);
         }
     }
 
-    private static boolean jsClick(String query, String selector) {
-        WebDriver driver = LiveBrowserHost.page();
-        if (driver == null) return false;
-        String script = "var q=arguments[0]; var sel=arguments[1];"
-                + "var el=sel?document.querySelector(sel):null;"
-                + "if(!el){var all=document.querySelectorAll('button,a,input,select,textarea,option,[role=button]');"
-                + "for(var i=0;i<all.length;i++){var t=(all[i].innerText||all[i].value||'').replace(/\\s+/g,' ').trim();"
-                + "if(t===q||all[i].id===q){el=all[i];break;}}}"
-                + "if(!el) return false; el.setAttribute('data-pkb-synthetic','1'); el.click(); return true;";
-        Object value = ElementOperations.script(driver, script, query == null ? "" : query, selector == null ? "" : selector);
-        return Boolean.TRUE.equals(value);
+    /** JS runs on the session that was targeted, including a {@code browser:cdp=} page. */
+    private static Effect jsAct(CdpConnection cdp, String kind, String query, String selector, String value, DomNode node) {
+        String before = docVersion(cdp) + "\n" + title(cdp);
+        String script = ""
+                + "(function(){"
+                + "var kind=" + jsString(kind) + ",q=" + jsString(query) + ",sel=" + jsString(selector) + ",value=" + jsString(value) + ";"
+                + "function text(el){return ((el.innerText||el.value||el.getAttribute('aria-label')||el.getAttribute('placeholder')||el.id||'')+'').replace(/\\s+/g,' ').trim();}"
+                + "var el=null;if(sel){try{el=document.querySelector(sel);}catch(e){el=null;}}"
+                + "if(!el){var all=document.querySelectorAll('button,a,input,select,textarea,option,label,[role=button]');"
+                + "for(var i=0;i<all.length;i++){if(text(all[i])===q||all[i].id===q){el=all[i];break;}}}"
+                + "if(!el) return {ok:false};"
+                + "if(el.tagName==='LABEL'&&el.htmlFor){var linked=document.getElementById(el.htmlFor); if(linked) el=linked;}"
+                + "el.setAttribute('data-pkb-synthetic','1');"
+                + "if(kind==='type'){el.focus(); el.value=value; el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); return {ok:true,value:String(el.value)};}"
+                + "if(kind==='select'){var box=el.tagName==='OPTION'?(el.closest('select')||el):el; if(!box||box.tagName!=='SELECT') return {ok:false};"
+                + "var matched=false; for(var j=0;j<box.options.length;j++){var o=box.options[j]; var label=(o.label||o.text||'').replace(/\\s+/g,' ').trim();"
+                + "if(o.value===value||label===value){o.selected=true; matched=true; break;}} if(!matched) return {ok:false};"
+                + "box.dispatchEvent(new Event('input',{bubbles:true})); box.dispatchEvent(new Event('change',{bubbles:true}));"
+                + "var chosen=box.options[box.selectedIndex]; var shown=chosen?((chosen.value||chosen.text||'')+'').replace(/\\s+/g,' ').trim():'';"
+                + "return {ok:true,value:shown};}"
+                + "el.click(); return {ok:true,title:document.title};"
+                + "})()";
+        ObjectNode params = Jsons.object();
+        params.put("expression", script);
+        params.put("returnByValue", true);
+        JsonNode called = cdp.call("Runtime.evaluate", params, Duration.ofSeconds(10));
+        JsonNode payload = called.path("result").path("value");
+        if (!payload.path("ok").asBoolean(false)) return new Effect("js", false);
+        if ("type".equals(kind) || "select".equals(kind)) {
+            String read = payload.path("value").asText("");
+            if (!valueMatches(value, read) && node != null) read = controlValue(cdp, "select".equals(kind) ? selectOf(node) : node);
+            return new Effect("js", valueMatches(value, read));
+        }
+        String after = docVersion(cdp) + "\n" + title(cdp);
+        return new Effect("js", !before.equals(after));
+    }
+
+    private static boolean cdpInputOff() {
+        return "off".equalsIgnoreCase(System.getProperty("pkb_cdp_input", ""));
+    }
+
+    private static DomNode optionFor(DomNode node, String value) {
+        if (node == null) return null;
+        if ("option".equals(node.tag())) return node;
+        DomNode select = selectOf(node);
+        if (select == null) return null;
+        for (DomNode child : select.children) {
+            if (!"option".equals(child.tag())) continue;
+            String optionValue = child.attributes.getOrDefault("value", "");
+            String text = HtmlTree.textOf(child).trim();
+            String label = child.attributes.getOrDefault("label", "");
+            if (value.equals(optionValue) || value.equals(text) || value.equals(label)) return child;
+        }
+        return null;
+    }
+
+    private static DomNode selectOf(DomNode node) {
+        if (node == null) return null;
+        if ("select".equals(node.tag())) return node;
+        for (DomNode cursor = node; cursor != null; cursor = cursor.parent) {
+            if ("select".equals(cursor.tag())) return cursor;
+        }
+        return node;
+    }
+
+    private static boolean valueMatches(String wanted, String got) {
+        if (wanted == null) wanted = "";
+        if (got == null) got = "";
+        return wanted.equals(got) || wanted.equalsIgnoreCase(got.trim());
+    }
+
+    private static String controlValue(CdpConnection cdp, DomNode node) {
+        if (cdp == null || node == null || node.backendNodeId <= 0) return "";
+        try {
+            ObjectNode params = Jsons.object();
+            params.put("backendNodeId", node.backendNodeId);
+            JsonNode resolved = cdp.call("DOM.resolveNode", params, Duration.ofSeconds(5));
+            String objectId = resolved.path("object").path("objectId").asText("");
+            if (objectId.isBlank()) return "";
+            ObjectNode call = Jsons.object();
+            call.put("objectId", objectId);
+            call.put("functionDeclaration", "function(){ if(this.tagName==='SELECT'){ var o=this.options[this.selectedIndex]; return o?String(o.value||o.text||'').trim():''; } if('value' in this) return String(this.value); return ''; }");
+            call.put("returnByValue", true);
+            return cdp.call("Runtime.callFunctionOn", call, Duration.ofSeconds(5)).path("result").path("value").asText("");
+        } catch (RuntimeException failure) {
+            return "";
+        }
     }
 
     private static boolean waitPoll(CdpConnection cdp, String condition, String query, long timeout) {
@@ -512,28 +662,70 @@ public final class TargetVerb {
     }
 
     private static boolean waitEvent(Path project, String runId, CdpConnection cdp, String condition, long timeout) {
+        String primary = evaluateWatch(cdp, condition, timeout);
+        if (primary.startsWith("watchUntil:")) {
+            return !primary.contains("\"ok\":false") && !primary.contains("timeout");
+        }
+        FallbackLog.note(project, runId, "wait", "watcher", "mutation-observer", "pkb watchUntil was not on the page");
         ObjectNode params = Jsons.object();
         params.put("awaitPromise", true);
         params.put("returnByValue", true);
         params.put("expression", ""
-                + "(async function(){"
-                + "var ui=window.__pkbUi;"
-                + "if(ui&&typeof ui.watchUntil==='function'){"
-                + "var hit=await ui.watchUntil(" + jsString(condition) + "," + timeout + ");"
-                + "return 'watchUntil:'+JSON.stringify(hit);"
-                + "}"
-                + "return await new Promise(function(resolve){"
+                + "(async function(){return await new Promise(function(resolve){"
                 + "var timer=setTimeout(function(){resolve('timeout');}," + timeout + ");"
                 + "var obs=new MutationObserver(function(){clearTimeout(timer);obs.disconnect();resolve('mutation');});"
                 + "obs.observe(document.documentElement,{subtree:true,childList:true,attributes:true,characterData:true});"
-                + "});"
-                + "})()");
+                + "});})()");
         JsonNode value = cdp.call("Runtime.evaluate", params, Duration.ofMillis(Math.max(1000, timeout + 2000)));
         String text = value.path("result").path("value").asText("");
-        if (!text.contains("watchUntil") && text.contains("mutation") && !text.contains("timeout")) {
-            FallbackLog.note(project, runId, "wait", "watcher", "mutation-observer", "pkb watchUntil was not on the page");
+        return text.contains("mutation") && !text.contains("timeout");
+    }
+
+    /** Isolated-world watcher. Empty when that world cannot run {@code __pkbUi.watchUntil}. */
+    private static String evaluateWatch(CdpConnection cdp, String condition, long timeout) {
+        try {
+            int context = pkbContext(cdp);
+            if (context <= 0) return "";
+            ObjectNode params = Jsons.object();
+            params.put("awaitPromise", true);
+            params.put("returnByValue", true);
+            params.put("contextId", context);
+            params.put("expression", ""
+                    + "(async function(){"
+                    + "var ui=globalThis.__pkbUi;"
+                    + "if(!ui||typeof ui.watchUntil!=='function') return 'missing';"
+                    + "var hit=await ui.watchUntil(" + jsString(condition) + "," + timeout + ");"
+                    + "return 'watchUntil:'+JSON.stringify(hit);"
+                    + "})()");
+            JsonNode value = cdp.call("Runtime.evaluate", params, Duration.ofMillis(Math.max(1000, timeout + 2000)));
+            if (value.has("exceptionDetails")) return "";
+            return value.path("result").path("value").asText("");
+        } catch (RuntimeException failure) {
+            return "";
         }
-        return !text.contains("timeout") && !text.isBlank();
+    }
+
+    /** Reuse the surface world on the main frame. {@code Page.createIsolatedWorld} returns the existing name. */
+    private static int pkbContext(CdpConnection cdp) {
+        String frame = mainFrameId(cdp);
+        if (frame.isBlank()) return 0;
+        ObjectNode created = Jsons.object();
+        created.put("frameId", frame);
+        created.put("worldName", "pkb-surface");
+        created.put("grantUniveralAccess", true);
+        JsonNode worldNode = cdp.call("Page.createIsolatedWorld", created, Duration.ofSeconds(5));
+        return worldNode.path("executionContextId").asInt(0);
+    }
+
+    private static String mainFrameId(CdpConnection cdp) {
+        JsonNode tree = cdp.call("Page.getFrameTree", Jsons.object(), Duration.ofSeconds(5));
+        return tree.path("frameTree").path("frame").path("id").asText("");
+    }
+
+    private static String jsonText(JsonNode value) {
+        if (value == null || value.isMissingNode() || value.isNull()) return "";
+        if (value.isTextual() || value.isNumber() || value.isBoolean()) return value.asText();
+        return value.toString();
     }
 
     private static boolean stale(Hit hit) {
@@ -578,17 +770,31 @@ public final class TargetVerb {
         if ("ref".equals(target.kind())) return openBrowser(TargetSelector.parse("browser:auto"));
         if (!target.session().isBlank()) {
             BrowserSession host = LiveBrowserHost.chrome();
-            if (host == null || (!target.session().equals(host.id) && !target.session().equals(LiveBrowserHost.sessionId()))) {
-                throw new Miss("unknown target");
+            if (host != null && (target.session().equals(host.id) || target.session().equals(LiveBrowserHost.sessionId()))) {
+                requireTab(host, target.tab());
+                return new Held(host, false);
             }
-            requireTab(host, target.tab());
-            return new Held(host, false);
+            Held worker = workerHeld();
+            if (worker != null) {
+                String run = RUN.get() == null ? "" : RUN.get();
+                if (target.session().equals(worker.session.id) || target.session().equals(run)) {
+                    requireTab(worker.session, target.tab());
+                    return worker;
+                }
+                worker.release();
+            }
+            throw new Miss("unknown target");
         }
         if (target.auto() || target.raw().isBlank()) {
             BrowserSession host = LiveBrowserHost.chrome();
-            if (host == null) throw new Miss("no live browser");
-            requireTab(host, target.tab());
-            return new Held(host, false);
+            if (host != null) {
+                requireTab(host, target.tab());
+                return new Held(host, false);
+            }
+            Held worker = workerHeld();
+            if (worker == null) throw new Miss("no live browser");
+            requireTab(worker.session, target.tab());
+            return worker;
         }
         if (!target.cdp().isBlank()) {
             String pageId = pageId(target.tab());
@@ -687,9 +893,59 @@ public final class TargetVerb {
         }
         try {
             String window = !target.window().isBlank() ? target.window() : target.app();
-            return DesktopTree.attachLive(id, window);
+            DesktopTree.Session session = DesktopTree.attachLive(id, window);
+            if (!target.pid().isBlank()) {
+                if (!ownsPid(session.root(), target.pid())) {
+                    DesktopTree.close(id);
+                    throw new Miss("unknown target");
+                }
+                keepPid(session.root(), target.pid());
+                if (session.root().children.isEmpty() && !target.pid().equals(session.root().attributes.get("pid"))) {
+                    DesktopTree.close(id);
+                    throw new Miss("unknown target");
+                }
+            }
+            return session;
+        } catch (Miss failure) {
+            throw failure;
         } catch (RuntimeException failure) {
             throw new Miss("no desktop target " + label);
+        }
+    }
+
+    private static boolean ownsPid(DomNode node, String pid) {
+        if (node == null || pid == null || pid.isBlank()) return false;
+        if (pid.equals(node.attributes.get("pid"))) return true;
+        for (DomNode child : node.children) if (ownsPid(child, pid)) return true;
+        return false;
+    }
+
+    /** Keep the windows that belong to {@code pid}. The desktop root stays. */
+    private static void keepPid(DomNode root, String pid) {
+        if (root == null || pid.equals(root.attributes.get("pid"))) return;
+        List<DomNode> kept = new ArrayList<>();
+        for (DomNode child : root.children) if (ownsPid(child, pid)) kept.add(child);
+        root.children.clear();
+        root.children.addAll(kept);
+    }
+
+    /** The worker page in this JVM. Null when this process has no managed browser. */
+    private static Held workerHeld() {
+        org.openqa.selenium.WebDriver driver = tools.dscode.common.agentcontrol.AgentControl.scenarioDriver();
+        if (driver instanceof LiveChromeDriver live) {
+            BrowserSession session = live.browserSession();
+            if (session != null && !session.isClosed()) return new Held(session, false);
+        }
+        if (!(driver instanceof org.openqa.selenium.HasCapabilities has)) return null;
+        String address = tools.dscode.common.composite.CompositeRuntime.cdpAddress(has.getCapabilities());
+        if (address == null || address.isBlank()) return null;
+        String cdp = address.contains("://") ? address : "http://" + address;
+        try {
+            BrowserSession attached = BrowserSession.attach(
+                    "worker" + Long.toUnsignedString(System.nanoTime()), cdp, false, List.of(), null);
+            return new Held(attached, true);
+        } catch (RuntimeException failure) {
+            return null;
         }
     }
 
@@ -721,18 +977,82 @@ public final class TargetVerb {
             String message = failure.getMessage() == null ? "" : failure.getMessage();
             if (!message.contains("not found") && !message.contains("query requires")) throw failure;
         }
-        if (hits.isEmpty() && query != null && !query.isBlank()) hits.addAll(named(root, query));
-        return deepest(hits);
+        if (query != null && !query.isBlank()) hits.addAll(named(root, query));
+        return deepest(controlsFor(root, hits));
+    }
+
+    /** A label's {@code for} points at the control. The query names that control. */
+    private static List<DomNode> controlsFor(DomNode root, List<DomNode> hits) {
+        Map<String, DomNode> byId = new LinkedHashMap<>();
+        walk(root, node -> {
+            String id = node.attributes.get("id");
+            if (id != null && !id.isBlank() && !byId.containsKey(id)) byId.put(id, node);
+        });
+        List<DomNode> kept = new ArrayList<>();
+        for (DomNode node : hits) {
+            if (node != null && "label".equals(node.tag()) && node.attributes.containsKey("for")) {
+                DomNode control = byId.get(node.attributes.get("for"));
+                if (control != null) {
+                    addHit(kept, control);
+                    continue;
+                }
+            }
+            addHit(kept, node);
+        }
+        return kept;
     }
 
     private static List<DomNode> named(DomNode root, String query) {
+        Map<String, DomNode> byId = new LinkedHashMap<>();
+        walk(root, node -> {
+            String id = node.attributes.get("id");
+            if (id != null && !id.isBlank() && !byId.containsKey(id)) byId.put(id, node);
+        });
         List<DomNode> hits = new ArrayList<>();
         walk(root, node -> {
-            String name = node.accessibleName == null ? "" : node.accessibleName;
+            String accessible = node.accessibleName == null ? "" : node.accessibleName;
+            if (query.equals(accessible) || (!accessible.isBlank() && query.equalsIgnoreCase(accessible))) {
+                addHit(hits, node);
+                return;
+            }
             String text = HtmlTree.textOf(node);
-            if (query.equals(name) || query.equals(text) || query.equalsIgnoreCase(name)) hits.add(node);
+            if (query.equals(text)) {
+                if ("label".equals(node.tag()) && node.attributes.containsKey("for")) {
+                    DomNode control = byId.get(node.attributes.get("for"));
+                    if (control != null) addHit(hits, control);
+                    return;
+                }
+                if (ownedByControl(node, query)) return;
+                addHit(hits, node);
+                return;
+            }
+            if (query.equals(attr(node, "aria-label")) || equalsIgnore(query, attr(node, "aria-label"))) addHit(hits, node);
+            else if (query.equals(attr(node, "id"))) addHit(hits, node);
+            else if (query.equals(attr(node, "placeholder")) || equalsIgnore(query, attr(node, "placeholder"))) addHit(hits, node);
         });
         return hits;
+    }
+
+    /** Placeholder and aria-label text inside a control's shadow is the control's name, not a second hit. */
+    private static boolean ownedByControl(DomNode node, String query) {
+        for (DomNode cursor = node == null ? null : node.parent; cursor != null; cursor = cursor.parent) {
+            if (query.equals(attr(cursor, "placeholder")) || equalsIgnore(query, attr(cursor, "placeholder"))) return true;
+            if (query.equals(attr(cursor, "aria-label")) || equalsIgnore(query, attr(cursor, "aria-label"))) return true;
+        }
+        return false;
+    }
+
+    private static void addHit(List<DomNode> hits, DomNode node) {
+        if (node != null && !hits.contains(node)) hits.add(node);
+    }
+
+    private static boolean equalsIgnore(String query, String value) {
+        return value != null && !value.isBlank() && query.equalsIgnoreCase(value);
+    }
+
+    private static String attr(DomNode node, String name) {
+        String value = node.attributes.get(name);
+        return value == null ? "" : value.trim();
     }
 
     private static List<DomNode> interactive(DomNode root) {
@@ -763,6 +1083,9 @@ public final class TargetVerb {
     private static boolean contains(DomNode parent, DomNode child) {
         for (DomNode one : parent.children) {
             if (one == child || contains(one, child)) return true;
+        }
+        for (DomNode shadow : parent.shadowRoots) {
+            if (shadow == child || contains(shadow, child)) return true;
         }
         return false;
     }
@@ -815,11 +1138,14 @@ public final class TargetVerb {
         return lines;
     }
 
-    private static Map<String, Object> report(DomNode node) {
+    private static Map<String, Object> report(DomNode node, CdpConnection cdp) {
+        if (cdp != null && node != null && node.nodeId > 0) {
+            Displayed.prepare(cdp, List.of(node));
+            RowStates.fill(cdp, List.of(node));
+        }
         Map<String, Object> report = new LinkedHashMap<>();
-        boolean visible = node.hasBox && node.width > 0 && node.height > 0;
-        boolean enabled = !"true".equalsIgnoreCase(node.attributes.getOrDefault("disabled", ""))
-                && !"true".equalsIgnoreCase(node.attributes.getOrDefault("aria-disabled", ""));
+        boolean visible = Displayed.isDisplayed(node);
+        boolean enabled = !disabled(node);
         report.put("role", role(node));
         report.put("name", name(node));
         report.put("visible", visible);
@@ -829,6 +1155,20 @@ public final class TargetVerb {
         return report;
     }
 
+    /** Bare {@code disabled} counts. So does {@code aria-disabled} other than false or 0, and a disabled fieldset. */
+    private static boolean disabled(DomNode node) {
+        if (node == null) return true;
+        if (node.attributes.containsKey("disabled")) return true;
+        String aria = node.attributes.get("aria-disabled");
+        if (aria != null && !aria.isBlank() && !"false".equalsIgnoreCase(aria) && !"0".equals(aria)) return true;
+        if (node.liveState != null && node.liveState.path("disabled").asBoolean(false)) return true;
+        for (DomNode parent = node.parent; parent != null; parent = parent.parent) {
+            if (parent.attributes.containsKey("inert")) return true;
+            if ("fieldset".equals(parent.tag()) && parent.attributes.containsKey("disabled")) return true;
+        }
+        return false;
+    }
+
     private static String role(DomNode node) {
         if (node.role != null && !node.role.isBlank()) return node.role;
         String tag = node.tag();
@@ -836,11 +1176,65 @@ public final class TargetVerb {
     }
 
     private static String name(DomNode node) {
+        if ("select".equals(node.tag())) {
+            String label = labelOf(node);
+            String selected = selectedText(node);
+            if (!label.isBlank() && !selected.isBlank()) return label + " " + selected;
+            if (!selected.isBlank()) return selected;
+            if (!label.isBlank()) return label;
+        }
         if (node.accessibleName != null && !node.accessibleName.isBlank()) return node.accessibleName;
         String text = HtmlTree.textOf(node);
         if (!text.isBlank()) return text.length() > 80 ? text.substring(0, 80) : text;
         String id = node.attributes.get("id");
         return id == null ? "" : id;
+    }
+
+    private static String labelOf(DomNode node) {
+        String aria = attr(node, "aria-label");
+        if (!aria.isBlank()) return aria;
+        String id = attr(node, "id");
+        if (id.isBlank()) return "";
+        DomNode root = node;
+        while (root.parent != null) root = root.parent;
+        String[] found = {""};
+        walk(root, candidate -> {
+            if (!found[0].isEmpty() || !"label".equals(candidate.tag())) return;
+            if (id.equals(candidate.attributes.get("for"))) found[0] = HtmlTree.textOf(candidate).trim();
+        });
+        return found[0];
+    }
+
+    private static String selectedText(DomNode node) {
+        DomNode fallback = null;
+        DomNode marked = null;
+        for (DomNode child : node.children) {
+            if (!"option".equals(child.tag())) continue;
+            if (fallback == null) fallback = child;
+            if (child.liveState != null && child.liveState.path("selected").asBoolean(false)) return optionLabel(child);
+            if (marked == null && child.attributes.containsKey("selected")) marked = child;
+        }
+        if (marked != null) return optionLabel(marked);
+        return fallback == null ? "" : optionLabel(fallback);
+    }
+
+    private static List<DomNode> optionNodes(List<DomNode> nodes) {
+        List<DomNode> options = new ArrayList<>();
+        if (nodes == null) return options;
+        for (DomNode node : nodes) {
+            if (node == null || !"select".equals(node.tag())) continue;
+            for (DomNode child : node.children) {
+                if ("option".equals(child.tag())) options.add(child);
+            }
+        }
+        return options;
+    }
+
+    private static String optionLabel(DomNode option) {
+        String text = HtmlTree.textOf(option).trim();
+        if (!text.isBlank()) return text;
+        String value = option.attributes.get("value");
+        return value == null ? "" : value.trim();
     }
 
     private static DomNode tree(BrowserSession session) {
@@ -988,6 +1382,9 @@ public final class TargetVerb {
             case "act" -> "act";
             case "wait", "watch" -> "wait";
             case "snap", "capture" -> "snapshot";
+            case "eval", "attach" -> "inject";
+            case "explain" -> "explain";
+            case "find" -> "locate";
             default -> "locate";
         };
     }
@@ -1018,6 +1415,9 @@ public final class TargetVerb {
         if (node.nodeType == 1 || node.nodeType == 0) visit.accept(node);
         for (DomNode child : node.children) walk(child, visit);
         for (DomNode shadow : node.shadowRoots) walk(shadow, visit);
+    }
+
+    private record Effect(String used, boolean applied) {
     }
 
     private record Hit(String kind, String sessionId, long backend, String docVersion, String selector, String query) {

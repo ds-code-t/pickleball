@@ -101,7 +101,10 @@ class TargetCoverageTest {
         JsonNode report = JSON.readTree(capture.out).path("report");
         assertEquals("button", report.path("role").asText(), capture.out);
         assertEquals("Save", report.path("name").asText(), capture.out);
-        assertTrue(report.has("visible") && report.has("enabled") && report.has("actionable"), capture.out);
+        assertTrue(report.path("visible").asBoolean(), capture.out);
+        assertTrue(report.path("enabled").asBoolean(), capture.out);
+        assertTrue(report.path("actionable").asBoolean(), capture.out);
+        assertEquals("explain", JSON.readTree(capture.out).path("chain").asText(), capture.out);
     }
 
     @Test
