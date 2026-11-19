@@ -57,7 +57,13 @@ class AgentExpansionTest {
             Capture capture = agent("observe", temp.toString(), "--run-id=obs");
             assertNotEquals(0, capture.code, capture.out + capture.err);
             assertFalse(capture.out.contains("\"source\":\"cdp-session\""), capture.out);
-            assertTrue(capture.err.contains("observe failed") || capture.out.contains("observe failed"), capture.out + capture.err);
+            assertTrue((capture.out + capture.err).contains("error: no live browser"), capture.out + capture.err);
+            tools.dscode.common.agentcontrol.AgentControl.Result direct =
+                    tools.dscode.common.agentcontrol.AgentControl.execute(temp, "obs", "observe", java.util.Map.of(), java.util.List.of(), "a");
+            String directText = String.valueOf(direct.body());
+            assertNotEquals(0, direct.exit(), directText);
+            assertTrue(directText.contains("observe failed"), directText);
+            assertFalse(directText.contains("\"source\":\"cdp-session\""), directText);
             Capture captured = agent("capture-scenario", temp.toString(), "--run-id=obs2");
             assertNotEquals(0, captured.code, captured.out + captured.err);
             assertFalse(Files.exists(temp.resolve(".pickleball/runs/obs2/agent/captured-service-calls.feature")));

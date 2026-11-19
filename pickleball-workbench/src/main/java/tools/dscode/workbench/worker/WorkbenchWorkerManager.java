@@ -1,6 +1,7 @@
 package tools.dscode.workbench.worker;
 
 import tools.dscode.control.protocol.AgentEvents;
+import tools.dscode.control.protocol.ClientHeartbeat;
 import tools.dscode.control.protocol.ControlBridgeBreakpoint;
 import tools.dscode.control.protocol.ControlBridgeCallResult;
 import tools.dscode.control.protocol.ControlBridgeDescriptor;
@@ -758,40 +759,75 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
 
     private void scheduleLeaseRenewal(WorkerSession session) {
         session.renewal().scheduleAtFixedRate(() -> {
-            boolean alive = session.process().isAlive();
-            boolean hold = LeasePolicy.holdEnabled(projectRoot);
-            long now = System.currentTimeMillis();
             int before = session.renewFailures().get();
-            LeasePolicy.Decision plan = LeasePolicy.decide(
-                    alive, hold, ControlBridgeClient.lastClientMillis(), now, before, true
-            );
-            if (!alive || !plan.renew()) {
-                AgentEvents.append(projectRoot, "session_ended", session.sessionId());
-                session.renewal().shutdown();
-                return;
-            }
-            boolean pauseOk;
-            try {
-                ControlBridgeCallResult result = session.client().pause(
-                        session.scenarioId(), 5, plan.leaseSeconds(), false
-                );
-                pauseOk = "SUCCESS".equals(result.status());
-            } catch (RuntimeException ignored) {
-                pauseOk = false;
-            }
-            if (pauseOk) session.renewFailures().set(0);
-            else session.renewFailures().incrementAndGet();
-            LeasePolicy.Decision after = LeasePolicy.decide(
+            Renewal outcome = renewTick(
+                    projectRoot,
                     session.process().isAlive(),
-                    hold,
-                    ControlBridgeClient.lastClientMillis(),
-                    System.currentTimeMillis(),
+                    session.sessionId(),
                     before,
-                    pauseOk
+                    () -> {
+                        LeasePolicy.Decision plan = LeasePolicy.decide(
+                                true,
+                                LeasePolicy.holdEnabled(projectRoot),
+                                Math.max(ControlBridgeClient.lastClientMillis(), ClientHeartbeat.lastMillis(projectRoot)),
+                                System.currentTimeMillis(),
+                                before,
+                                true
+                        );
+                        ControlBridgeCallResult result = session.client().pause(
+                                session.scenarioId(), 5, plan.leaseSeconds(), false
+                        );
+                        return "SUCCESS".equals(result.status());
+                    }
             );
-            if (after.sessionEnded()) AgentEvents.append(projectRoot, "session_ended", session.sessionId());
-            if (after.stopRenewal()) session.renewal().shutdown();
+            session.renewFailures().set(outcome.failures);
+            if (outcome.stopRenewal) session.renewal().shutdown();
         }, LEASE_RENEW_SECONDS, LEASE_RENEW_SECONDS, TimeUnit.SECONDS);
+    }
+
+    /**
+     * One lease renewal. {@code scheduleLeaseRenewal} calls this. A fresh CLI
+     * heartbeat file counts even when the controller clock is stale.
+     */
+    static Renewal renewTick(
+            Path project,
+            boolean alive,
+            String sessionId,
+            int failuresBefore,
+            java.util.function.BooleanSupplier pause
+    ) {
+        boolean hold = LeasePolicy.holdEnabled(project);
+        long heartbeat = Math.max(ControlBridgeClient.lastClientMillis(), ClientHeartbeat.lastMillis(project));
+        long now = System.currentTimeMillis();
+        LeasePolicy.Decision plan = LeasePolicy.decide(alive, hold, heartbeat, now, failuresBefore, true);
+        if (!alive || !plan.renew()) {
+            AgentEvents.append(project, "session_ended", sessionId);
+            return new Renewal(true, true, failuresBefore);
+        }
+        boolean pauseOk;
+        try {
+            pauseOk = pause != null && pause.getAsBoolean();
+        } catch (RuntimeException ignored) {
+            pauseOk = false;
+        }
+        int failures = pauseOk ? 0 : failuresBefore + 1;
+        LeasePolicy.Decision after = LeasePolicy.decide(
+                alive, hold, heartbeat, System.currentTimeMillis(), failuresBefore, pauseOk
+        );
+        if (after.sessionEnded()) AgentEvents.append(project, "session_ended", sessionId);
+        return new Renewal(after.sessionEnded(), after.stopRenewal(), failures);
+    }
+
+    static final class Renewal {
+        final boolean sessionEnded;
+        final boolean stopRenewal;
+        final int failures;
+
+        Renewal(boolean sessionEnded, boolean stopRenewal, int failures) {
+            this.sessionEnded = sessionEnded;
+            this.stopRenewal = stopRenewal;
+            this.failures = failures;
+        }
     }
 
     private void writeLiveBridge(String token, WorkerSession session) {

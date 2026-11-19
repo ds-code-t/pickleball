@@ -208,12 +208,14 @@ final class UiBatch {
             List<Map<String, Object>> eventRows = compact(events.body().get("events"));
             List<Map<String, Object>> chatRows = compact(chat.exit() == 0 ? chat.body().get("messages") : null);
             chatRows.removeIf(row -> "agent".equals(row.get("source")));
-            if (!eventRows.isEmpty() || !chatRows.isEmpty() || System.nanoTime() >= deadline) {
+            List<Map<String, String>> agentEvents = tools.dscode.control.protocol.AgentEvents.tail(project, 20);
+            if (!eventRows.isEmpty() || !chatRows.isEmpty() || !agentEvents.isEmpty() || System.nanoTime() >= deadline) {
                 UiState.sync(project, runId, args);
                 Map<String, Object> body = new LinkedHashMap<>();
                 body.put("ok", true);
                 body.put("events", eventRows);
                 body.put("chat", chatRows);
+                body.put("agentEvents", agentEvents);
                 body.put("next", events.body().get("next"));
                 List<?> raw = chat.exit() == 0 && chat.body().get("messages") instanceof List<?> list ? list : List.of();
                 if (!raw.isEmpty() && raw.get(raw.size() - 1) instanceof Map<?, ?> last && last.get("id") != null) {

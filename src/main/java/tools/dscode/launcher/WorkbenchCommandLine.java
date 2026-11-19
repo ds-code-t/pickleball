@@ -659,11 +659,22 @@ final class WorkbenchCommandLine {
      * {@code --to=all} is {@code --to=any}. {@code session info --run-id=} is the positional id.
      */
     private static String[] rewriteLiveStart(String[] args) {
-        if (args == null || args.length == 0 || !"live-start".equals(args[0])) return args;
-        String[] copy = args.clone();
-        copy[0] = "start";
-        ALIAS_NOTICES.get().add("notice: live-start is start");
-        return copy;
+        if (args == null || args.length == 0) return args;
+        if ("live-start".equals(args[0])) {
+            String[] copy = args.clone();
+            copy[0] = "start";
+            ALIAS_NOTICES.get().add("notice: live-start is start");
+            return copy;
+        }
+        if ("live-stop".equals(args[0])) {
+            String[] copy = new String[args.length + 1];
+            copy[0] = "start";
+            copy[1] = "--stop";
+            System.arraycopy(args, 1, copy, 2, args.length - 1);
+            ALIAS_NOTICES.get().add("notice: live-stop stops the start host");
+            return copy;
+        }
+        return args;
     }
 
     private static String[] normalizeFlags(String[] args) {

@@ -3,6 +3,7 @@ package tools.dscode.common.agentfast;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import tools.dscode.control.protocol.AgentFastLog;
+import tools.dscode.control.protocol.ClientHeartbeat;
 import tools.dscode.control.protocol.LiveBridgeFile;
 
 import java.net.URI;
@@ -62,6 +63,7 @@ public final class AgentForward {
             if (response.statusCode() != 200) {
                 return new Posted(1, "", "error: live worker HTTP " + response.statusCode());
             }
+            ClientHeartbeat.touch(project);
             JsonNode node = JSON.readTree(text.isBlank() ? "{}" : text);
             int exit = node.path("exit").asInt(1);
             JsonNode body = node.get("body");

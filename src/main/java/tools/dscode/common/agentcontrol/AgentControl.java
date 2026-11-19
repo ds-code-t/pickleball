@@ -80,6 +80,7 @@ public final class AgentControl {
     /** Arms the session chat cursor at the current max id so later reads skip earlier lines. */
     public static void armChatCursor(Path project, String runId) throws IOException {
         ChatCursor.arm(project, runId, "run");
+        ChatCursor.arm(project, runId, "overlay");
     }
 
     public static Result execute(
@@ -285,6 +286,9 @@ public final class AgentControl {
     }
 
     private static Result chatSend(Path project, String runId, Map<String, String> args, String agentId) throws Exception {
+        if (ChatCursor.after(project, runId, args.get("channel")) == null) {
+            ChatCursor.arm(project, runId, args.get("channel"));
+        }
         ChatLog.Message message = ChatLog.send(
                 project, runId, args.get("channel"), args.get("source"), agentId, args.get("text")
         );
@@ -553,12 +557,19 @@ public final class AgentControl {
             for (ChatLog.Message message : ChatLog.poll(project, runId, args.get("channel"), after)) {
                 messages.add(ChatLog.toMap(message));
             }
-            if (!messages.isEmpty() || System.nanoTime() >= deadline) break;
+            List<Map<String, String>> agentEvents = tools.dscode.control.protocol.AgentEvents.tail(project, 20);
+            if (!messages.isEmpty() || !agentEvents.isEmpty() || System.nanoTime() >= deadline) break;
             Thread.sleep(200);
+        }
+        boolean explicit = present(args.get("after")) || present(args.get("id"));
+        if (!explicit && !messages.isEmpty()) {
+            Object last = messages.get(messages.size() - 1).get("id");
+            if (last != null) ChatCursor.advance(project, runId, args.get("channel"), String.valueOf(last));
         }
         Map<String, Object> body = ok("Chat messages after the given id.");
         body.put("count", messages.size());
         body.put("messages", messages);
+        body.put("agentEvents", tools.dscode.control.protocol.AgentEvents.tail(project, 20));
         return new Result(0, body);
     }
 

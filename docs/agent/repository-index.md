@@ -281,6 +281,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentfast/AgentForward.java`
 - `src/main/java/tools/dscode/common/agentfast/CompactReply.java`
 - `src/main/java/tools/dscode/common/agentfast/LiveBrowserHost.java`
+- `src/main/java/tools/dscode/common/agentfast/LiveChromeDriver.java`
 - `src/main/java/tools/dscode/common/agentfast/ReplyFields.java`
 - `src/main/java/tools/dscode/common/agentfast/RuntimeInstall.java`
 - `src/main/java/tools/dscode/common/agentfast/ScreenshotReply.java`
@@ -815,6 +816,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentcontrol/UiCatalogTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/UiChatVisibilityTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/UiStateTest.java`
+- `src/test/java/tools/dscode/common/agentcontrol/UnownedDriverQuitTest.java`
 - `src/test/java/tools/dscode/common/agentfast/CompactReplyTest.java`
 - `src/test/java/tools/dscode/common/agentfast/SelftestCpuBenchTest.java`
 - `src/test/java/tools/dscode/common/agentfast/TimingFieldsTest.java`
@@ -956,6 +958,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/Release218RecommendationsTest.java`
 - `src/test/java/tools/dscode/launcher/SecretRedactionTest.java`
 - `src/test/java/tools/dscode/launcher/SessionHealthWaitTest.java`
+- `src/test/java/tools/dscode/launcher/StartDrivesPageTest.java`
 - `src/test/java/tools/dscode/launcher/StartLaunchesBrowserTest.java`
 - `src/test/java/tools/dscode/launcher/StoreCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/VersionSwitchTest.java`
@@ -1206,6 +1209,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-api/src/test/java/tools/dscode/control/bridge/ControlBridgeStepResolverTest.java`
 - `pickleball-control-api/src/test/java/tools/dscode/control/bridge/DebuggerAddressTest.java`
 - `pickleball-control-api/src/test/java/tools/dscode/control/bridge/NoopGlueFlagTest.java`
+- `pickleball-control-api/src/test/java/tools/dscode/control/bridge/NoopGlueReportTest.java`
 - `pickleball-control-api/src/test/java/tools/dscode/control/bridge/PausedRuntimeStepOrderTest.java`
 
 ## Neutral control protocol module
@@ -1215,6 +1219,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/AgentFastLog.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/AgentLog.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/AgentSurfaceEnd.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ClientHeartbeat.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeBoundedJsonEvidence.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeBreakpoint.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeBrowserPage.java`
@@ -1255,6 +1260,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/JavaEngineLauncher.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/JsonLite.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/LiveBridgeFile.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/LiveHostFile.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/NoopNotice.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/OutputFormatter.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/PickleballArtifactLocator.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/PickleballLocalLayout.java`
@@ -1473,6 +1480,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/WorkbenchRuntimeBoundaryTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/WorkbenchSessionActionsTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/worker/LeaseHoldTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/worker/LeaseRenewTickTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/worker/LiveSessionPublicationTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/worker/WorkbenchLiveSessionTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/worker/WorkbenchWorkerManagerTest.java`

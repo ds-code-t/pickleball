@@ -7,7 +7,10 @@ import com.sun.net.httpserver.HttpServer;
 import dev.domengine.json.Jsons;
 import dev.domengine.session.BrowserSession;
 import tools.dscode.common.agentcontrol.AgentControl;
-import tools.dscode.control.protocol.LiveBridgeFile;
+import tools.dscode.common.agentcontrol.AgentDriverHooks;
+import tools.dscode.common.composite.CompositeRuntime;
+import tools.dscode.control.protocol.AgentEvents;
+import tools.dscode.control.protocol.LiveHostFile;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -17,23 +20,29 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Stream;
 
 /**
  * Detached browser host for {@code start}. Binds an ephemeral port, launches Chrome,
- * and serves {@code GET /health} plus {@code POST /v1/agent/command}.
+ * registers a page driver, and serves {@code GET /health} plus {@code POST /v1/agent/command}.
+ * State is {@link LiveHostFile}, not the Workbench worker bridge.
  */
 public final class LiveBrowserHost {
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final AtomicBoolean WAS_OK = new AtomicBoolean(false);
 
     private LiveBrowserHost() {
     }
 
     public static void main(String[] args) throws Exception {
+        System.setProperty("pkb_composite", "on");
         if (args.length < 6) {
             System.err.println("error: live browser host needs project, id, url, browser, token, headed");
             System.exit(2);
@@ -45,12 +54,14 @@ public final class LiveBrowserHost {
         String browser = args[3];
         String token = args[4];
         boolean headed = Boolean.parseBoolean(args[5]);
+        String binary = args.length >= 7 ? args[6] : "";
+        Files.deleteIfExists(project.resolve(".pickleball").resolve("live-browser").resolve(id).resolve("args.txt"));
         CountDownLatch stopped = new CountDownLatch(1);
         AtomicReference<BrowserSession> chrome = new AtomicReference<>();
         HttpServer server = bindLoopback();
         int port = server.getAddress().getPort();
         HttpServer listening = server;
-        server.createContext("/health", exchange -> health(exchange, token, headed, chrome.get()));
+        server.createContext("/health", exchange -> health(exchange, token, headed, chrome.get(), project, id));
         server.createContext("/v1/agent/command", exchange -> command(exchange, token, project));
         server.createContext("/v1/stop", exchange -> {
             if (!authorized(exchange, token)) return;
@@ -62,23 +73,38 @@ public final class LiveBrowserHost {
         int code = 0;
         try {
             System.err.println("browser=" + browser + " headed=" + headed);
+            pruneProfiles(project, id);
             Path profile = project.resolve(".pickleball").resolve("live-browser").resolve(id).resolve("profile");
             Files.createDirectories(profile);
-            BrowserSession session = BrowserSession.launch(id, "about:blank", headed, true, profile, List.of());
+            BrowserSession session = BrowserSession.launch(
+                    id, "about:blank", headed, true, profile, List.of(), List.of(),
+                    binary == null || binary.isBlank() ? null : binary
+            );
             chrome.set(session);
+            boolean navigated = true;
+            String navError = "";
             if (pageUrl != null && !pageUrl.isBlank() && !"about:blank".equals(pageUrl)) {
                 try {
                     var params = Jsons.object();
                     params.put("url", pageUrl);
-                    session.connection().call("Page.navigate", params, Duration.ofSeconds(3));
-                } catch (RuntimeException ignored) {
-                    // A dead page URL leaves the browser up. start still reports the host healthy.
+                    JsonNode result = session.connection().call("Page.navigate", params, Duration.ofSeconds(3));
+                    String errorText = result == null ? "" : result.path("errorText").asText("");
+                    if (!errorText.isBlank()) {
+                        navigated = false;
+                        navError = errorText;
+                    }
+                } catch (RuntimeException failure) {
+                    navigated = false;
+                    navError = failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
                 }
             }
+            boolean pageAttached = attachPage(session);
             long pid = ProcessHandle.current().pid();
             String base = "http://127.0.0.1:" + port;
-            writeCliSession(project, base, token, pid, headed, session.pid);
-            LiveBridgeFile.write(project, new LiveBridgeFile.Bridge("127.0.0.1", port, token, pid, id));
+            LiveHostFile.write(project, new LiveHostFile.Host(
+                    base, token, port, pid, session.pid, id, headed, browser, navigated, navError, pageAttached
+            ));
+            if (!navigated) System.err.println("error: navigation failed: " + navError);
             stopped.await();
         } catch (Exception failure) {
             String message = failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
@@ -88,6 +114,37 @@ public final class LiveBrowserHost {
             release(project, chrome.get(), server);
         }
         if (code != 0) System.exit(code);
+    }
+
+    /** Removes old {@code live-browser/<id>} directories. {@code keepId} null removes every id directory. */
+    public static void pruneProfiles(Path project, String keepId) {
+        if (project == null) return;
+        Path root = project.resolve(".pickleball").resolve("live-browser");
+        if (!Files.isDirectory(root)) return;
+        try (Stream<Path> children = Files.list(root)) {
+            for (Path child : children.toList()) {
+                if (!Files.isDirectory(child)) continue;
+                if (keepId != null && keepId.equals(String.valueOf(child.getFileName()))) continue;
+                deleteTree(child);
+            }
+        } catch (IOException ignored) {
+            // A leftover profile does not keep the browser up.
+        }
+    }
+
+    private static boolean attachPage(BrowserSession session) {
+        try {
+            LiveChromeDriver driver = new LiveChromeDriver(session);
+            AgentDriverHooks.template("live");
+            AgentDriverHooks.ready(driver);
+            AgentDriverHooks.template(null);
+            CompositeRuntime.joinBrowser(session.cdp);
+            return true;
+        } catch (RuntimeException failure) {
+            System.err.println("error: page attach " + failure.getMessage());
+            AgentDriverHooks.template(null);
+            return false;
+        }
     }
 
     private static HttpServer bindLoopback() throws IOException {
@@ -101,6 +158,11 @@ public final class LiveBrowserHost {
     }
 
     private static void release(Path project, BrowserSession session, HttpServer server) {
+        try {
+            AgentDriverHooks.quit();
+        } catch (RuntimeException ignored) {
+            // Chrome close still runs.
+        }
         if (session != null) {
             try {
                 session.close();
@@ -108,7 +170,7 @@ public final class LiveBrowserHost {
                 // The process is already leaving.
             }
         }
-        LiveBridgeFile.delete(project);
+        LiveHostFile.delete(project);
         if (server != null) {
             try {
                 server.stop(0);
@@ -118,13 +180,56 @@ public final class LiveBrowserHost {
         }
     }
 
-    private static void health(HttpExchange exchange, String token, boolean headed, BrowserSession session) throws IOException {
+    private static void health(
+            HttpExchange exchange,
+            String token,
+            boolean headed,
+            BrowserSession session,
+            Path project,
+            String sessionId
+    ) throws IOException {
         if (!authorized(exchange, token)) return;
+        boolean chromeAlive = session != null && session.pid > 0
+                && ProcessHandle.of(session.pid).map(ProcessHandle::isAlive).orElse(false);
+        boolean cdpOk = false;
+        String reason = "";
+        if (!chromeAlive) {
+            reason = "browser_lost";
+        } else if (cdpAnswers(session)) {
+            cdpOk = true;
+        } else {
+            reason = "browser_lost";
+        }
+        boolean ok = chromeAlive && cdpOk;
+        if (ok) {
+            WAS_OK.set(true);
+        } else if (WAS_OK.compareAndSet(true, false)) {
+            AgentEvents.append(project, "browser_lost", sessionId);
+        }
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("status", "ok");
+        body.put("status", ok ? "ok" : "down");
         body.put("headed", headed);
         body.put("chromePid", session == null ? 0 : session.pid);
+        if (!ok) body.put("reason", reason.isBlank() ? "browser_lost" : reason);
         send(exchange, 200, body);
+    }
+
+    /** Browser domain on a browser socket, or a page-domain call when the socket is already the page. */
+    private static boolean cdpAnswers(BrowserSession session) {
+        try {
+            session.connection().call("Browser.getVersion", Jsons.object(), Duration.ofSeconds(2));
+            return true;
+        } catch (RuntimeException browserDomain) {
+            try {
+                var params = Jsons.object();
+                params.put("expression", "1");
+                params.put("returnByValue", true);
+                session.connection().call("Runtime.evaluate", params, Duration.ofSeconds(2));
+                return true;
+            } catch (RuntimeException ignored) {
+                return false;
+            }
+        }
     }
 
     private static void command(HttpExchange exchange, String token, Path project) throws IOException {
@@ -172,16 +277,19 @@ public final class LiveBrowserHost {
         }
     }
 
-    private static void writeCliSession(Path project, String url, String token, long pid, boolean headed, long chromePid) throws IOException {
-        Path file = project.resolve(".pickleball").resolve("workbench").resolve("cli-session.json");
-        Files.createDirectories(file.getParent());
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("url", url);
-        body.put("token", token);
-        body.put("pid", pid);
-        body.put("mode", "cli-session");
-        body.put("headed", headed);
-        body.put("chromePid", chromePid);
-        Files.writeString(file, JSON.writeValueAsString(body) + "\n");
+    private static void deleteTree(Path root) {
+        if (root == null || !Files.exists(root)) return;
+        try (Stream<Path> walk = Files.walk(root)) {
+            List<Path> paths = walk.sorted(Comparator.reverseOrder()).toList();
+            for (Path path : paths) {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (IOException ignored) {
+                    // The next start tries again.
+                }
+            }
+        } catch (IOException ignored) {
+            // The next start tries again.
+        }
     }
 }

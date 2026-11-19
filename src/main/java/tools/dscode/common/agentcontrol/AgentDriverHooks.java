@@ -33,7 +33,7 @@ public final class AgentDriverHooks {
         } catch (RuntimeException failure) {
             cleanupFailure = failure;
         }
-        PageSurfaces.quitOwned();
+        PageSurfaces.quitAll();
         PageSurfaces.clearDriver();
         if (cleanupFailure != null) throw cleanupFailure;
     }

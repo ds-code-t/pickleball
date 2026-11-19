@@ -1613,6 +1613,7 @@ public final class WorkbenchAgentCommands {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private static int inspectPage(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        long startedNs = System.nanoTime();
         String html = readHtml(parsed, err);
         if (html == null && flag(parsed, "--html") != null) return 2;
         if (html != null) {
@@ -1626,13 +1627,17 @@ public final class WorkbenchAgentCommands {
             for (WorkbenchElementInspect.Hit hit : WorkbenchElementInspect.dump(html)) {
                 appendHit(text, hit.phrase(), hit.xpath(), hit.rawMatchCount(), hit.visibleCount());
             }
-            emitCompact(out, parsed.project(), "page", text);
+            if (html.getBytes(StandardCharsets.UTF_8).length > tools.dscode.common.agentfast.CompactReply.LIMIT) {
+                text.append("document=").append(html).append('\n');
+            }
+            emitCompact(out, parsed.project(), "page", text, startedNs);
             return 0;
         }
         return liveQuery(parsed, null, null, out, err);
     }
 
     private static int findElement(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        long startedNs = System.nanoTime();
         String category = flag(parsed, "--category");
         String query = flag(parsed, "--query");
         boolean engine = query != null && !query.isBlank();
@@ -1664,10 +1669,10 @@ public final class WorkbenchAgentCommands {
             if (category != null && !category.isBlank()) {
                 WorkbenchElementInspect.Hit hit = WorkbenchElementInspect.find(category, label, html);
                 appendHit(text, hit.phrase(), hit.xpath(), hit.rawMatchCount(), hit.visibleCount());
-                emitCompact(out, parsed.project(), "inspect", text);
+                emitCompact(out, parsed.project(), "inspect", text, startedNs);
                 return hit.xpath().isBlank() && !engine ? 1 : 0;
             }
-            emitCompact(out, parsed.project(), "inspect", text);
+            emitCompact(out, parsed.project(), "inspect", text, startedNs);
             return 0;
         }
         return liveQuery(parsed, category, label, out, err);
@@ -1686,8 +1691,9 @@ public final class WorkbenchAgentCommands {
         text.append("visibleCount=").append(visible).append('\n');
     }
 
-    private static void emitCompact(PrintStream out, Path project, String kind, StringBuilder text) {
-        String printed = CompactReply.shrinkText(project, kind, text.toString());
+    private static void emitCompact(PrintStream out, Path project, String kind, StringBuilder text, long startedNs) {
+        long elapsed = Math.max(0L, (System.nanoTime() - startedNs) / 1_000_000L);
+        String printed = CompactReply.withElapsed(CompactReply.shrinkText(project, kind, text.toString()), elapsed);
         if (!printed.endsWith("\n")) printed = printed + "\n";
         out.print(printed);
     }
@@ -1713,6 +1719,7 @@ public final class WorkbenchAgentCommands {
             PrintStream out,
             PrintStream err
     ) {
+        long startedNs = System.nanoTime();
         HttpClient http = HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(5)).build();
         java.util.Optional<WorkbenchSessionCommands.SessionState> session;
         try {
@@ -1806,7 +1813,7 @@ public final class WorkbenchAgentCommands {
                     }
                 }
             }
-            emitCompact(out, parsed.project(), "inspect-page".equals(op) ? "page" : "inspect", page);
+            emitCompact(out, parsed.project(), "inspect-page".equals(op) ? "page" : "inspect", page, startedNs);
             return 0;
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
@@ -1963,7 +1970,7 @@ public final class WorkbenchAgentCommands {
         List<String> extra = new ArrayList<>();
         // extra is filled below; the live-worker post uses the same maps.
         java.util.Optional<tools.dscode.control.protocol.LiveBridgeFile.Bridge> liveBridge =
-                tools.dscode.control.protocol.LiveBridgeFile.read(parsed.project());
+                livePageTarget(parsed.project());
         String[] forwarded = parsed.forwarded();
         if (forwarded != null) {
             for (int index = 0; index < forwarded.length; index++) {
@@ -1974,6 +1981,7 @@ public final class WorkbenchAgentCommands {
             }
         }
         if (liveBridge.isPresent()) {
+            long forwardStarted = System.nanoTime();
             tools.dscode.common.agentfast.AgentForward.Posted posted = tools.dscode.common.agentfast.AgentForward.post(
                     liveBridge.get(),
                     parsed.command(),
@@ -1987,7 +1995,8 @@ public final class WorkbenchAgentCommands {
                 err.println(posted.error());
                 return posted.exit() == 0 ? 1 : posted.exit();
             }
-            out.println(posted.bodyJson());
+            long totalMs = Math.max(0L, (System.nanoTime() - forwardStarted) / 1_000_000L);
+            out.println(tools.dscode.common.agentfast.ReplyFields.restamp(posted.bodyJson(), totalMs));
             if (posted.exit() != 0) {
                 String error = "agent command failed";
                 try {
@@ -1999,6 +2008,11 @@ public final class WorkbenchAgentCommands {
                 err.print(WorkbenchCliHelp.usageError(error, parsed.command()));
             }
             return posted.exit();
+        }
+        if (failFastWithoutBrowser(parsed.command(), args)) {
+            err.println("error: no live browser");
+            out.println("{\"ok\":false,\"error\":\"error: no live browser\"}");
+            return 1;
         }
         AgentControl.Result result = AgentControl.execute(
                 parsed.project(),
@@ -2022,6 +2036,50 @@ public final class WorkbenchAgentCommands {
             ));
         }
         return result.exit();
+    }
+
+    private static java.util.Optional<tools.dscode.control.protocol.LiveBridgeFile.Bridge> livePageTarget(java.nio.file.Path project) {
+        java.util.Optional<tools.dscode.control.protocol.LiveBridgeFile.Bridge> worker =
+                tools.dscode.control.protocol.LiveBridgeFile.read(project);
+        if (worker.isPresent() && alivePid(worker.get().pid())) return worker;
+        java.util.Optional<tools.dscode.control.protocol.LiveHostFile.Host> host =
+                tools.dscode.control.protocol.LiveHostFile.read(project);
+        if (host.isEmpty() || !alivePid(host.get().pid())) return java.util.Optional.empty();
+        tools.dscode.control.protocol.LiveHostFile.Host found = host.get();
+        String hostName = "127.0.0.1";
+        try {
+            java.net.URI uri = java.net.URI.create(found.url());
+            if (uri.getHost() != null && !uri.getHost().isBlank()) hostName = uri.getHost();
+        } catch (RuntimeException ignored) {
+            // The stored url is still the health base the parent wrote.
+        }
+        return java.util.Optional.of(new tools.dscode.control.protocol.LiveBridgeFile.Bridge(
+                hostName, found.port(), found.token(), found.pid(), found.sessionId()
+        ));
+    }
+
+    private static boolean alivePid(long pid) {
+        return pid > 0 && ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false);
+    }
+
+    private static final java.util.Set<String> LIVE_PAGE_VERBS = java.util.Set.of(
+            "highlight", "unhighlight", "overlay", "overlay-remove",
+            "label", "unlabel", "border", "unborder", "arrow", "unarrow",
+            "step-badge", "unstep-badge", "magnifier", "unmagnifier",
+            "spotlight", "unspotlight",
+            "html-write", "html-replace", "html-insert", "html-remove", "html-cleanup",
+            "screenshot", "observe", "capture-scenario"
+    );
+
+    /** Page verbs with no offline file and no live worker or start host. */
+    private static boolean failFastWithoutBrowser(String command, Map<String, String> args) {
+        if (command == null || !LIVE_PAGE_VERBS.contains(command)) return false;
+        if (args.containsKey("html") || args.containsKey("page")) return false;
+        if (("observe".equals(command) || "capture-scenario".equals(command)) && args.containsKey("events")) return false;
+        if ("screenshot".equals(command) && !args.containsKey("out")) return false;
+        if (("highlight".equals(command) || "unhighlight".equals(command)) && !args.containsKey("handle")) return false;
+        if (("overlay".equals(command) || "label".equals(command)) && !args.containsKey("text")) return false;
+        return true;
     }
 
     private static String boundRunId(WorkbenchCommandLine.Parsed parsed) {

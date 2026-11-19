@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.domengine.session.BrowserSession;
 import tools.dscode.common.agentcontrol.AgentControl;
 import tools.dscode.control.protocol.LiveBridgeFile;
+import tools.dscode.control.protocol.LiveHostFile;
 import tools.dscode.control.protocol.speed.ProcessTree;
 import tools.dscode.store.StoreEntities;
 import tools.dscode.store.StoreHistory;
@@ -46,13 +47,23 @@ final class ConsumerReadyCommands {
     }
 
     static int start(WorkbenchCommandLine.Parsed parsed, java.io.PrintStream out, java.io.PrintStream err) {
+        Path project = parsed.project();
+        if (hasToken(parsed, "--stop")) {
+            stopQuiet(project);
+            out.println("stopped=true");
+            return 0;
+        }
         String url = flag(parsed, "--url");
         String browser = flag(parsed, "--browser");
         if (url == null || url.isBlank() || browser == null || browser.isBlank()) {
             err.print(WorkbenchCliHelp.usageError("start requires --url and --browser", "start"));
             return 2;
         }
-        Path project = parsed.project();
+        String binary = resolveBrowser(browser.trim());
+        if (binary == null) {
+            err.println("error: unsupported --browser=" + browser.trim());
+            return 2;
+        }
         stopQuiet(project);
         Map<String, String> env = env(parsed);
         String id = "live" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
@@ -61,7 +72,7 @@ final class ConsumerReadyCommands {
         Path logFile = project.resolve(".pickleball").resolve("logs").resolve("live-browser.log");
         Process process;
         try {
-            process = spawnHost(project, id, url.trim(), browser.trim(), token, headed, logFile);
+            process = spawnHost(project, id, url.trim(), browser.trim(), token, headed, binary, logFile);
         } catch (IOException failure) {
             err.println("error: could not start the live browser\nfix: " + failure.getMessage() + "\n");
             return 1;
@@ -89,24 +100,40 @@ final class ConsumerReadyCommands {
             err.println("error: could not publish the live session\nfix: " + failure.getMessage() + "\n");
             return 1;
         }
+        Optional<LiveHostFile.Host> host = LiveHostFile.read(project);
+        boolean navigated = host.map(LiveHostFile.Host::navigated).orElse(true);
+        String navError = host.map(LiveHostFile.Host::navError).orElse("");
         out.println("session=" + id);
         out.println("url=" + url.trim());
         out.println("browser=" + browser.trim());
         if (!env.isEmpty()) out.println("env=" + envText(env));
         out.println("live=true");
         out.println("headed=" + headed);
+        out.println("navigated=" + navigated);
+        if (!navigated) {
+            out.println("error: navigation failed" + (navError == null || navError.isBlank() ? "" : ": " + navError));
+        }
         log(project, id, "start url=" + url.trim() + " browser=" + browser.trim() + " headed=" + headed);
         return 0;
     }
 
-    /** Stops a host left by {@code start}. A missing host is a no-op. */
+    /** Chrome, Chromium, or Edge. Null means the name is unsupported or the binary is missing. */
+    static String resolveBrowser(String name) {
+        String lower = name == null ? "" : name.toLowerCase(Locale.ROOT);
+        if (lower.contains("edge")) return BrowserSession.findEdge();
+        if (lower.contains("firefox")) return null;
+        if (lower.contains("chrome") || lower.contains("chromium")) return BrowserSession.findChrome();
+        return null;
+    }
+
+    /** Stops the host {@code start} recorded. A Workbench worker bridge is left running. */
     static void stopQuiet(Path project) {
         if (project == null) return;
-        long chromePid = chromePid(project);
-        Optional<LiveBridgeFile.Bridge> bridge = LiveBridgeFile.read(project);
-        if (bridge.isPresent()) {
-            postStop(bridge.get());
-            long pid = bridge.get().pid();
+        Optional<LiveHostFile.Host> host = LiveHostFile.read(project);
+        if (host.isPresent()) {
+            LiveHostFile.Host found = host.get();
+            postStop(found.url(), found.token());
+            long pid = found.pid();
             ProcessHandle.of(pid).ifPresent(handle -> {
                 try {
                     handle.onExit().get(5, TimeUnit.SECONDS);
@@ -115,9 +142,10 @@ final class ConsumerReadyCommands {
                 }
                 if (handle.isAlive()) ProcessTree.kill(pid);
             });
+            if (found.chromePid() > 0) ProcessTree.kill(found.chromePid());
         }
-        if (chromePid > 0) ProcessTree.kill(chromePid);
-        LiveBridgeFile.delete(project);
+        LiveHostFile.delete(project);
+        tools.dscode.common.agentfast.LiveBrowserHost.pruneProfiles(project, null);
     }
 
     static int doctor(WorkbenchCommandLine.Parsed parsed, java.io.PrintStream out, java.io.PrintStream err) {
@@ -126,14 +154,22 @@ final class ConsumerReadyCommands {
         String session = sessionId(project);
         if (session == null || session.isBlank()) session = "absent";
         CliHealth health = readCliHealth(project);
-        boolean bridge = LiveBridgeFile.read(project).isPresent();
+        Optional<LiveHostFile.Host> host = LiveHostFile.read(project);
+        boolean bridge = host.isPresent() && alive(host.get().pid());
+        if (!bridge) bridge = legacyHostAlive(project);
+        Optional<LiveBridgeFile.Bridge> workerBridge = LiveBridgeFile.read(project);
+        boolean worker = workerBridge.isPresent() && alive(workerBridge.get().pid());
+        boolean lease = worker || Files.isRegularFile(project.resolve(".pickleball/workbench/pause-hold"));
+        boolean page = host.isPresent() && host.get().pageAttached() && bridge;
         out.println("chrome=" + chrome);
         out.println("session=" + session);
         out.println("health=" + health.status());
         out.println("headed=" + health.headed());
         out.println("pid=" + health.pid());
         out.println("bridge=" + (bridge ? "present" : "absent"));
-        if (err == null) return 2;
+        out.println("worker=" + (worker ? "present" : "absent"));
+        out.println("lease=" + (lease ? "held" : "open"));
+        out.println("page=" + (page ? "attached" : "absent"));
         log(project, session, "doctor health=" + health.status());
         return 0;
     }
@@ -150,12 +186,20 @@ final class ConsumerReadyCommands {
             String browser,
             String token,
             boolean headed,
+            String binary,
             Path logFile
     ) throws IOException {
         Path argFile = project.resolve(".pickleball").resolve("live-browser").resolve(id).resolve("args.txt");
         Files.createDirectories(argFile.getParent());
         Files.createDirectories(logFile.getParent());
-        Files.writeString(logFile, "", StandardCharsets.UTF_8);
+        capLog(logFile);
+        Files.writeString(
+                logFile,
+                Instant.now() + " live-browser start id=" + id + "\n",
+                StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.APPEND
+        );
         String classpath = System.getProperty("java.class.path", "");
         String body = String.join("\n",
                 "-cp",
@@ -166,7 +210,8 @@ final class ConsumerReadyCommands {
                 quoteArg(url),
                 quoteArg(browser),
                 quoteArg(token),
-                headed ? "true" : "false"
+                headed ? "true" : "false",
+                quoteArg(binary)
         ) + "\n";
         Files.writeString(argFile, body, StandardCharsets.UTF_8);
         Path javaBin = Path.of(System.getProperty("java.home"), "bin", "java");
@@ -199,8 +244,8 @@ final class ConsumerReadyCommands {
                     err.println("error: live browser host exited\nfix: see " + logFile + "\n" + tail(logFile));
                     return false;
                 }
-                Optional<LiveBridgeFile.Bridge> bridge = LiveBridgeFile.read(project);
-                if (bridge.isPresent() && "ok".equals(healthStatus(bridge.get()))) return true;
+                Optional<LiveHostFile.Host> host = LiveHostFile.read(project);
+                if (host.isPresent() && "ok".equals(healthStatus(host.get()))) return true;
                 Thread.sleep(100L);
             }
         } catch (InterruptedException failure) {
@@ -212,11 +257,13 @@ final class ConsumerReadyCommands {
         return false;
     }
 
-    private static String healthStatus(LiveBridgeFile.Bridge bridge) {
+    private static String healthStatus(LiveHostFile.Host host) {
+        if (host == null || host.url() == null || host.url().isBlank()) return "down";
         try {
-            HttpRequest request = HttpRequest.newBuilder(URI.create("http://" + bridge.host() + ":" + bridge.port() + "/health"))
+            String base = host.url().endsWith("/") ? host.url().substring(0, host.url().length() - 1) : host.url();
+            HttpRequest request = HttpRequest.newBuilder(URI.create(base + "/health"))
                     .timeout(HEALTH_TIMEOUT)
-                    .header("Authorization", "Bearer " + bridge.token())
+                    .header("Authorization", "Bearer " + host.token())
                     .header("Accept", "application/json")
                     .GET()
                     .build();
@@ -231,11 +278,13 @@ final class ConsumerReadyCommands {
         }
     }
 
-    private static void postStop(LiveBridgeFile.Bridge bridge) {
+    private static void postStop(String url, String token) {
+        if (url == null || url.isBlank() || token == null || token.isBlank()) return;
         try {
-            HttpRequest request = HttpRequest.newBuilder(URI.create("http://" + bridge.host() + ":" + bridge.port() + "/v1/stop"))
+            String base = url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+            HttpRequest request = HttpRequest.newBuilder(URI.create(base + "/v1/stop"))
                     .timeout(HEALTH_TIMEOUT)
-                    .header("Authorization", "Bearer " + bridge.token())
+                    .header("Authorization", "Bearer " + token)
                     .header("Accept", "application/json")
                     .POST(HttpRequest.BodyPublishers.noBody())
                     .build();
@@ -244,6 +293,31 @@ final class ConsumerReadyCommands {
             Thread.currentThread().interrupt();
         } catch (Exception ignored) {
             // The process kill below is the stop that still runs.
+        }
+    }
+
+    private static void capLog(Path logFile) throws IOException {
+        if (logFile == null || !Files.isRegularFile(logFile) || Files.size(logFile) <= LOG_CAP) return;
+        byte[] all = Files.readAllBytes(logFile);
+        int keep = 256 * 1024;
+        int start = Math.max(0, all.length - keep);
+        while (start < all.length && all[start] != '\n') start++;
+        if (start < all.length) start++;
+        Files.write(logFile, java.util.Arrays.copyOfRange(all, start, all.length));
+    }
+
+    private static boolean alive(long pid) {
+        return pid > 0 && ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false);
+    }
+
+    private static boolean legacyHostAlive(Path project) {
+        Path file = project.resolve(".pickleball").resolve("workbench").resolve("cli-session.json");
+        if (!Files.isRegularFile(file)) return false;
+        try {
+            JsonNode node = JSON.readTree(file.toFile());
+            return alive(node.path("pid").asLong(0L));
+        } catch (IOException failure) {
+            return false;
         }
     }
 
@@ -258,17 +332,6 @@ final class ConsumerReadyCommands {
         }
     }
 
-    private static long chromePid(Path project) {
-        Path file = project.resolve(".pickleball").resolve("workbench").resolve("cli-session.json");
-        if (!Files.isRegularFile(file)) return 0L;
-        try {
-            JsonNode node = JSON.readTree(file.toFile());
-            return node.path("chromePid").asLong(0L);
-        } catch (IOException failure) {
-            return 0L;
-        }
-    }
-
     private record CliHealth(String status, String headed, String pid) {
         private static CliHealth absent() {
             return new CliHealth("absent", "absent", "absent");
@@ -276,6 +339,8 @@ final class ConsumerReadyCommands {
     }
 
     private static CliHealth readCliHealth(Path project) {
+        Optional<LiveHostFile.Host> host = LiveHostFile.read(project);
+        if (host.isPresent()) return healthOfHost(host.get());
         Path file = project.resolve(".pickleball").resolve("workbench").resolve("cli-session.json");
         if (!Files.isRegularFile(file)) return CliHealth.absent();
         try {
@@ -306,6 +371,16 @@ final class ConsumerReadyCommands {
         } catch (Exception failure) {
             return new CliHealth("down", "absent", "absent");
         }
+    }
+
+    private static CliHealth healthOfHost(LiveHostFile.Host host) {
+        String headed = Boolean.toString(host.headed());
+        String pidText = host.pid() > 0 ? Long.toString(host.pid()) : "absent";
+        if (!alive(host.pid())) return new CliHealth("down", headed, pidText);
+        if (host.chromePid() > 0 && !alive(host.chromePid())) return new CliHealth("down", headed, pidText);
+        String status = healthStatus(host);
+        if (!"ok".equals(status)) return new CliHealth("down", headed, pidText);
+        return new CliHealth("ok", headed, pidText);
     }
 
     private static String tail(Path logFile) {
@@ -606,6 +681,15 @@ final class ConsumerReadyCommands {
             if (token.contains("#") || token.startsWith("entity:") || token.startsWith("<entity:")) return token;
         }
         return null;
+    }
+
+    private static boolean hasToken(WorkbenchCommandLine.Parsed parsed, String name) {
+        String[] args = parsed.forwarded();
+        if (args == null || name == null) return false;
+        for (String token : args) {
+            if (name.equals(token) || (token != null && token.startsWith(name + "="))) return true;
+        }
+        return false;
     }
 
     private static String flag(WorkbenchCommandLine.Parsed parsed, String name) {

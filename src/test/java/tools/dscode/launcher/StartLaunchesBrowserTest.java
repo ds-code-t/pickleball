@@ -41,8 +41,9 @@ class StartLaunchesBrowserTest {
         boolean headless = java.awt.GraphicsEnvironment.isHeadless();
         assertTrue(started.out.contains(headless ? "headed=false" : "headed=true"), started.out);
         assertTrue(started.out.contains("browser=chrome"), started.out);
-        Path cli = temp.resolve(".pickleball/workbench/cli-session.json");
+        Path cli = temp.resolve(".pickleball/live-browser/current.json");
         assertTrue(Files.isRegularFile(cli), cli.toString());
+        assertFalse(Files.isRegularFile(temp.resolve(".pickleball/workbench/cli-session.json")));
         JsonNode node = JSON.readTree(cli.toFile());
         long pid = node.path("pid").asLong(0);
         long chromePid = node.path("chromePid").asLong(0);
@@ -70,6 +71,9 @@ class StartLaunchesBrowserTest {
         assertTrue(doctor.out.contains("health=ok"), doctor.out);
         assertTrue(doctor.out.contains(headless ? "headed=false" : "headed=true"), doctor.out);
         assertTrue(doctor.out.contains("bridge=present"), doctor.out);
+        assertTrue(doctor.out.contains("worker=absent"), doctor.out);
+        assertTrue(doctor.out.contains("page=attached"), doctor.out);
+        assertTrue(started.out.contains("navigated=true"), started.out);
         assertFalse(doctor.out.contains(token), "token must stay off doctor stdout");
     }
 

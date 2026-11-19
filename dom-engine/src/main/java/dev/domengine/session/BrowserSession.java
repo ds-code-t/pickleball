@@ -97,6 +97,20 @@ public final class BrowserSession implements AutoCloseable {
             List<String> allow,
             List<String> extra
     ) {
+        return launch(id, url, headed, process, profile, allow, extra, null);
+    }
+
+    /** {@code binary} is the browser executable. Null keeps {@link #findChrome()}. */
+    public static BrowserSession launch(
+            String id,
+            String url,
+            boolean headed,
+            boolean process,
+            Path profile,
+            List<String> allow,
+            List<String> extra,
+            String binary
+    ) {
         Path dir = profile;
         try {
             if (dir == null) dir = ChromeProcess.newProfile();
@@ -104,7 +118,7 @@ public final class BrowserSession implements AutoCloseable {
         } catch (IOException failure) {
             throw new CdpException("profile: " + failure.getMessage());
         }
-        String chrome = findChrome();
+        String chrome = binary == null || binary.isBlank() ? findChrome() : binary;
         if (chrome == null) {
             throw new CdpException("chrome not found on PATH (google-chrome, chromium, or chromium-browser)");
         }
@@ -226,6 +240,17 @@ public final class BrowserSession implements AutoCloseable {
         String env = System.getenv("DOMENGINE_CHROME");
         if (env != null && !env.isBlank()) return env;
         for (String name : List.of("google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "chrome")) {
+            String path = onPath(name);
+            if (path != null) return path;
+        }
+        return null;
+    }
+
+    /** Edge binary. Null when this machine has no Edge. Never falls through to Chrome. */
+    public static String findEdge() {
+        String env = System.getenv("DOMENGINE_EDGE");
+        if (env != null && !env.isBlank() && Files.isExecutable(Path.of(env))) return env;
+        for (String name : List.of("microsoft-edge", "microsoft-edge-stable", "msedge")) {
             String path = onPath(name);
             if (path != null) return path;
         }

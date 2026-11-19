@@ -260,6 +260,25 @@ public final class CompositeRuntime {
         return open;
     }
 
+    /**
+     * Joins the engine to a CDP HTTP endpoint already serving a browser.
+     * No-op unless this JVM decided {@code pkb_composite=on}. Does not change the scenario default.
+     */
+    public static void joinBrowser(String cdpHttp) {
+        if (cdpHttp == null || cdpHttp.isBlank()) return;
+        Decision now = current();
+        if (!now.primary) return;
+        String normalized = DirectControlProvider.withScheme(cdpHttp);
+        String key = Client.cdpKey(normalized);
+        String known = SESSIONS_BY_CDP.get(key);
+        if (known != null) {
+            rememberJoined(normalized);
+            if (client != null) client.focusSession(known);
+            return;
+        }
+        openSession(normalized, key);
+    }
+
     /** Opens a client when the binary is present. Does not throw. A second browser keeps its own session. */
     public static void attach(RemoteWebDriver driver) {
         try {

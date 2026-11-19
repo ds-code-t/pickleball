@@ -6,9 +6,12 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 
 /** Keeps inspect, page, and step replies at or under 2 KiB. Full text stays on disk. */
 public final class CompactReply {
@@ -66,16 +69,68 @@ public final class CompactReply {
         return sentence.length() <= 180 ? sentence : sentence.substring(0, 180);
     }
 
+    /** Puts {@code elapsedMs} on a compact JSON object, or a trailing line on plain text. */
+    public static String withElapsed(String printed, long elapsedMs) {
+        long ms = Math.max(0L, elapsedMs);
+        String trimmed = printed == null ? "" : printed.stripTrailing();
+        if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+            return trimmed.substring(0, trimmed.length() - 1) + ",\"elapsedMs\":" + ms + "}";
+        }
+        return trimmed + "\nelapsedMs=" + ms;
+    }
+
     private static Path write(Path project, String kind, String text) {
         Path dir = (project == null ? Path.of("") : project).resolve(".pickleball").resolve("agent-full");
+        if (!enabled()) return dir.resolve("disabled.json");
         try {
             Files.createDirectories(dir);
             String safe = kind == null || kind.isBlank() ? "reply" : kind.replaceAll("[^A-Za-z0-9_-]", "-");
-            Path file = dir.resolve(safe + "-" + System.currentTimeMillis() + "-" + SEQUENCE.incrementAndGet() + ".json");
+            String date = LocalDate.now().toString();
+            Path file = dir.resolve(safe + "-" + date + "-" + System.currentTimeMillis() + "-" + SEQUENCE.incrementAndGet() + ".json");
             Files.writeString(file, text);
+            prune(dir);
             return file;
         } catch (IOException failure) {
             return dir.resolve("unwritten.json");
         }
+    }
+
+    private static void prune(Path dir) throws IOException {
+        long max = maxBytes();
+        try (Stream<Path> listing = Files.list(dir)) {
+            var files = listing.filter(Files::isRegularFile).sorted(Comparator.comparing(Path::getFileName)).toList();
+            long total = 0L;
+            for (Path file : files) total += Files.size(file);
+            int index = 0;
+            while (total > max && index < files.size() - 1) {
+                long size = Files.size(files.get(index));
+                Files.deleteIfExists(files.get(index));
+                total -= size;
+                index++;
+            }
+        }
+    }
+
+    private static boolean enabled() {
+        String raw = setting("pkb_agent_full", "PKB_AGENT_FULL");
+        if (raw == null || raw.isBlank()) return true;
+        return !"off".equalsIgnoreCase(raw.trim()) && !"false".equalsIgnoreCase(raw.trim());
+    }
+
+    private static long maxBytes() {
+        String raw = setting("pkb_agent_full_max_bytes", "PKB_AGENT_FULL_MAX_BYTES");
+        if (raw == null || raw.isBlank()) return 1_048_576L;
+        try {
+            long parsed = Long.parseLong(raw.trim());
+            return parsed < 256 ? 256 : parsed;
+        } catch (NumberFormatException failure) {
+            return 1_048_576L;
+        }
+    }
+
+    private static String setting(String property, String env) {
+        String value = System.getProperty(property);
+        if (value != null && !value.isBlank()) return value;
+        return System.getenv(env);
     }
 }

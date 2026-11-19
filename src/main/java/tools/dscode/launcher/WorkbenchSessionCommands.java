@@ -1143,13 +1143,21 @@ public final class WorkbenchSessionCommands {
             if (view.has("result") && !view.get("result").isNull()) {
                 JsonNode resultNode = view.get("result");
                 String rendered = resultNode.toString();
-                if (rendered.contains("noop:true")) {
-                    err.println("WARNING: noop consumer glue (noop:true). The step reported SUCCESS without acting. Set pkb_noop_glue=fail to fail the step.");
-                }
+                tools.dscode.control.protocol.NoopNotice.warnIfPresent(rendered, err);
+                String reportRun = parsed.coordination().runId();
+                if (reportRun == null || reportRun.isBlank()) reportRun = id;
+                tools.dscode.control.protocol.NoopNotice.noteReport(parsed.project(), reportRun, rendered);
                 String errorLine = textOr(resultNode, "text", "");
                 if (errorLine.startsWith("error:")) out.println(errorLine);
-                if ("SUCCESS".equals(status)) out.println(CompactReply.shrinkText(parsed.project(), "step", rendered));
-                else out.println(CompactReply.shrinkText(parsed.project(), "step", failureJson(flags.text, resultNode)));
+                long elapsed = Math.max(0L, (System.nanoTime() - startedNs) / 1_000_000L);
+                if ("SUCCESS".equals(status)) {
+                    out.println(CompactReply.withElapsed(CompactReply.shrinkText(parsed.project(), "step", rendered), elapsed));
+                } else {
+                    out.println(CompactReply.withElapsed(
+                            CompactReply.shrinkText(parsed.project(), "step", failureJson(flags.text, resultNode)),
+                            elapsed
+                    ));
+                }
             }
             return terminalExit(status);
         }

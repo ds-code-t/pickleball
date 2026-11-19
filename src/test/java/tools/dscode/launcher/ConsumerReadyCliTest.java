@@ -44,8 +44,10 @@ class ConsumerReadyCliTest {
                 "--env=FOO=bar",
                 temp.toString()
         );
-        assertEquals(0, started.code, started.err);
+        assertEquals(0, started.code, started.err + started.out);
         assertTrue(started.out.contains("live=true"), started.out);
+        assertTrue(started.out.contains("navigated=false"), started.out);
+        assertTrue(started.out.contains("error:"), started.out);
         assertTrue(started.out.contains("browser=chrome"), started.out);
         assertTrue(started.out.contains("env=FOO=bar"), started.out);
         String session = session(started.out);

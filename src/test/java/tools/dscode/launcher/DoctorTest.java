@@ -2,6 +2,7 @@ package tools.dscode.launcher;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.control.protocol.LiveHostFile;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -11,21 +12,46 @@ import java.nio.file.Path;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Phase 3: doctor reports chrome and health without requiring a live session. */
+/** Phase 3: doctor reports chrome, the start host, and a dead host without a tautology. */
 class DoctorTest {
     @TempDir
     Path temp;
 
     @Test
     void covers_command_doctor() {
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        int code = WorkbenchAgentCommands.run(
+                new String[]{"doctor", temp.toString()},
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(stderr, true, StandardCharsets.UTF_8)
+        );
+        String out = stdout.toString(StandardCharsets.UTF_8);
+        String err = stderr.toString(StandardCharsets.UTF_8);
+        assertEquals(0, code, err);
+        assertTrue(out.contains("chrome="), out);
+        assertTrue(out.contains("chrome=present") || out.contains("chrome=absent"), out);
+        assertTrue(out.contains("health=absent"), out);
+        assertTrue(out.contains("session=absent"), out);
+        assertTrue(out.contains("bridge=absent"), out);
+        assertTrue(out.contains("worker=absent"), out);
+        assertTrue(out.contains("page=absent"), out);
+        assertTrue(out.contains("lease="), out);
+    }
+
+    @Test
+    void deadHostPidReportsHealthDown() throws Exception {
+        Process finished = new ProcessBuilder("true").start();
+        finished.waitFor();
+        LiveHostFile.write(temp, new LiveHostFile.Host(
+                "http://127.0.0.1:9", "token", 9, finished.pid(), finished.pid(),
+                "dead-host", false, "chrome", false, "", false
+        ));
         Capture reported = run("doctor", temp.toString());
         assertEquals(0, reported.code, reported.err);
-        assertTrue(reported.out.contains("chrome="), reported.out);
-        assertTrue(reported.out.contains("chrome=present") || reported.out.contains("chrome=absent"), reported.out);
-        assertTrue(reported.out.contains("health=absent"), reported.out);
-        assertTrue(reported.out.contains("session=absent"), reported.out);
-        assertTrue(reported.out.contains("bridge=absent"), reported.out);
-        assertTrue(WorkbenchAgentCommands.class.getName().contains("WorkbenchAgentCommands"));
+        assertTrue(reported.out.contains("health=down"), reported.out);
+        assertTrue(reported.out.contains("pid=" + finished.pid()), reported.out);
+        assertTrue(reported.out.contains("page=absent"), reported.out);
     }
 
     private Capture run(String... args) {

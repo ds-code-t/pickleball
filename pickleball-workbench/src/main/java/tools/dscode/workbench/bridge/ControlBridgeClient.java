@@ -40,6 +40,11 @@ public final class ControlBridgeClient {
         LAST_CLIENT_MILLIS.set(System.currentTimeMillis());
     }
 
+    /** Test and renewal seam. Production calls {@link #touch()}. */
+    public static void noteClientAt(long epochMillis) {
+        LAST_CLIENT_MILLIS.set(epochMillis);
+    }
+
     private final ObjectMapper json;
     private final HttpClient http;
     private final ControlBridgeDescriptor descriptor;

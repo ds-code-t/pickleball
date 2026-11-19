@@ -26,6 +26,17 @@ final class ChatCursor {
         Files.writeString(file, JSON.writeValueAsString(body) + "\n");
     }
 
+    static void advance(Path project, String runId, String channel, String afterId) throws IOException {
+        if (afterId == null || afterId.isBlank()) return;
+        String useChannel = channel == null || channel.isBlank() ? "run" : channel;
+        Path file = file(project, runId, useChannel);
+        Files.createDirectories(file.getParent());
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("channel", useChannel);
+        body.put("after", afterId);
+        Files.writeString(file, JSON.writeValueAsString(body) + "\n");
+    }
+
     static String after(Path project, String runId, String channel) {
         String useChannel = channel == null || channel.isBlank() ? "run" : channel;
         Path file = file(project, runId, useChannel);

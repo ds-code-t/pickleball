@@ -222,8 +222,17 @@ final class PageSurfaces {
     }
 
     static void quitOwned() {
+        quitMatching(true);
+    }
+
+    /** Quits every managed driver, including isolate and scenario drivers ({@code owned=false}). */
+    static void quitAll() {
+        quitMatching(false);
+    }
+
+    private static void quitMatching(boolean ownedOnly) {
         for (Managed managed : List.copyOf(MANAGED)) {
-            if (!managed.owned) continue;
+            if (ownedOnly && !managed.owned) continue;
             try {
                 managed.driver.quit();
             } catch (RuntimeException failure) {
@@ -378,17 +387,17 @@ final class PageSurfaces {
         String sentence = visual || "html".equals(kind) ? SurfaceAssets.sentence(kind) : HTML_SENTENCE;
         boolean stripped = rawHtml != null && !rawHtml.equals(neutralize(rawHtml));
         String html = labelElements(neutralize(rawHtml), kind, sentence);
-        SurfaceBox.View box = visual ? chooseBox(handle, geometryJson, x, y, width, height) : null;
-        int[] point = visual
-                ? (box == null ? null : new int[]{box.x(), box.y()})
-                : visualPoint(geometryJson, x, y);
         boolean liveOnly = page == null;
         if (liveOnly && managed().isEmpty()) {
             throw new IllegalStateException("no live browser; " + kind + " was not applied");
         }
-        if (visual && liveOnly && handle != null && !handle.isBlank() && !resolved(handle)) {
+        if (visual && liveOnly && handle != null && !handle.isBlank() && !resolved(handle) && !locateLiveHandle(handle)) {
             throw new IllegalArgumentException("unknown handle: " + handle);
         }
+        SurfaceBox.View box = visual ? chooseBox(handle, geometryJson, x, y, width, height) : null;
+        int[] point = visual
+                ? (box == null ? null : new int[]{box.x(), box.y()})
+                : visualPoint(geometryJson, x, y);
         if (visual && point == null && page != null) {
             throw new IllegalArgumentException(kind + " needs a visual-viewport box or x and y");
         }
@@ -1164,7 +1173,12 @@ final class PageSurfaces {
             } catch (IOException failure) {
                 throw new IllegalStateException(failure);
             }
-            return facade.evaluateIsolated("pkb-surface", helperFunction(System.identityHashCode(web)), json);
+            Object value = facade.evaluateIsolated("pkb-surface", helperFunction(System.identityHashCode(web)), json);
+            if (runtimeMissing(value)) {
+                RuntimeInstall.forget(System.identityHashCode(web));
+                value = facade.evaluateIsolated("pkb-surface", helperFunction(System.identityHashCode(web)), json);
+            }
+            return value;
         }
         if (executor == null) {
             throw new IllegalStateException("no live browser");
@@ -1172,7 +1186,8 @@ final class PageSurfaces {
         BrowserLog.warnOnce(
                 "page-surface-script",
                 "PageSurfaces used Selenium executeScript; no CDP or BiDi session");
-        if (tracksTarget(spec) && RuntimeInstall.consume(System.identityHashCode(web))) {
+        int key = System.identityHashCode(web);
+        if (tracksTarget(spec) && RuntimeInstall.consume(key)) {
             // Main-world fallback (D4): the runtime installs lazily, only for a placement that follows a target.
             try {
                 executor.executeScript(RUNTIME);
@@ -1180,7 +1195,22 @@ final class PageSurfaces {
                 BrowserLog.warnOnce("page-surface-runtime", "page runtime did not install: " + failure.getMessage());
             }
         }
-        return executor.executeScript(LIVE_HELPER, spec);
+        Object value = executor.executeScript(LIVE_HELPER, spec);
+        if (runtimeMissing(value)) {
+            RuntimeInstall.forget(key);
+            try {
+                executor.executeScript(RUNTIME);
+            } catch (RuntimeException failure) {
+                BrowserLog.warnOnce("page-surface-runtime", "page runtime did not install: " + failure.getMessage());
+            }
+            RuntimeInstall.consume(key);
+            value = executor.executeScript(LIVE_HELPER, spec);
+        }
+        return value;
+    }
+
+    private static boolean runtimeMissing(Object value) {
+        return value != null && String.valueOf(value).contains("runtime-missing");
     }
 
     private static final String RUNTIME_CALL = "var a = JSON.parse(raw); var ui = window.__pkbUi;"
@@ -1214,7 +1244,7 @@ final class PageSurfaces {
             installSurface(web, facade);
             String function = isolatedFunction(key, install);
             Object value = facade.evaluateIsolated("pkb-surface", function, json);
-            if (value == null && install && !function.contains("raisingLayer")) {
+            if (install && ((value == null && !function.contains("raisingLayer")) || runtimeMissing(value))) {
                 RuntimeInstall.forget(key);
                 function = isolatedFunction(key, true);
                 value = facade.evaluateIsolated("pkb-surface", function, json);
@@ -1224,7 +1254,7 @@ final class PageSurfaces {
         if (!(web instanceof JavascriptExecutor executor)) return null;
         if (install && RuntimeInstall.consume(key)) executor.executeScript(RUNTIME);
         Object value = executor.executeScript("var raw = arguments[0];" + RUNTIME_CALL, json);
-        if (value == null && install) {
+        if (install && (value == null || runtimeMissing(value))) {
             RuntimeInstall.forget(key);
             executor.executeScript(RUNTIME);
             RuntimeInstall.consume(key);
@@ -1332,6 +1362,7 @@ final class PageSurfaces {
         if (!SURFACE_PROTOCOL.add(System.identityHashCode(web))) return;
         // Same world as the helper, so one set of listeners queues events where drainIsolated reads them.
         facade.addPreloadIn(SurfaceAssets.js("html"), "pkb-surface");
+        facade.addPreloadIn(RUNTIME, "pkb-surface");
         facade.addBinding("pkbSurface", (name, payload) -> PUSHED.add(bindingEvent(name, payload)));
     }
 
@@ -1504,6 +1535,48 @@ final class PageSurfaces {
     private static int[] lookupGeometry(String handle) {
         if (handle == null || handle.isBlank()) return null;
         return GEOMETRY.get(handle);
+    }
+
+    /** A live {@code data-pkb-handle} or id is a resolved target. The geometry cache is filled from that box. */
+    private static boolean locateLiveHandle(String handle) {
+        WebDriver web = driver;
+        if (web == null && !managed().isEmpty()) web = managed().get(managed().size() - 1).driver();
+        if (!(web instanceof JavascriptExecutor executor)) return false;
+        Object value;
+        try {
+            value = executor.executeScript(
+                    "var h = arguments[0];"
+                            + " var el = document.querySelector('[data-pkb-handle=\"' + CSS.escape(h) + '\"]');"
+                            + " if (!el) el = document.getElementById(h);"
+                            + " if (!el || !el.getBoundingClientRect) return null;"
+                            + " var r = el.getBoundingClientRect();"
+                            + " return {x:r.x, y:r.y, w:r.width, h:r.height};",
+                    handle
+            );
+        } catch (RuntimeException failure) {
+            return false;
+        }
+        if (!(value instanceof Map<?, ?> map)) return false;
+        rememberBounds(
+                handle,
+                coordinate(map.get("x")),
+                coordinate(map.get("y")),
+                coordinate(map.get("w")),
+                coordinate(map.get("h")),
+                web,
+                currentHandle(web)
+        );
+        return resolved(handle);
+    }
+
+    private static double coordinate(Object value) {
+        if (value instanceof Number number) return number.doubleValue();
+        if (value == null) return 0;
+        try {
+            return Double.parseDouble(String.valueOf(value));
+        } catch (NumberFormatException failure) {
+            return 0;
+        }
     }
 
     private static boolean resolved(String handle) {

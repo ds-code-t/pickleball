@@ -15,6 +15,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -70,7 +71,7 @@ class UiCpuLoopTest {
         long elapsedMs = (System.nanoTime() - started) / 1_000_000L;
         assertFalse(raises.has("exceptionDetails"), raises.toString());
         int delta = raises.path("result").path("value").asInt(-1);
-        assertTrue(delta >= 1 && delta <= 6, "raiseCount delta=" + delta + " body=" + raises);
+        assertEquals(3, delta, "raiseCount delta=" + delta + " body=" + raises);
         assertTrue(elapsedMs < 5_000, "toggle dispatch took " + elapsedMs + "ms");
 
         long before = cpuTicks(session.pid);

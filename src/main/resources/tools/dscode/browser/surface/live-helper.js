@@ -202,8 +202,10 @@ if (!tracked && spec.anchor) {
   tracked = document.getElementById(spec.anchor)
     || document.querySelector('[data-pkb-handle="' + CSS.escape(String(spec.anchor)) + '"]');
 }
-if (tracked && op === 'append' && spec.kind && spec.kind !== 'html' && host.isConnected
-    && typeof window !== 'undefined' && window.__pkbUi && window.__pkbUi.track) {
+if (tracked && op === 'append' && spec.kind && spec.kind !== 'html' && host.isConnected) {
+  if (typeof window === 'undefined' || !window.__pkbUi || !window.__pkbUi.track) {
+    return {ok:false, error:'runtime-missing'};
+  }
   try { window.__pkbUi.track(host, tracked, spec); } catch (ignored) { /* placement stays static */ }
 }
 return {ok:true, id:spec.id, x:left, y:top};

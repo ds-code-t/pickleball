@@ -15,9 +15,8 @@ import java.nio.file.Path;
  * into a failure. The default stamps {@code noop:true} and the CLI warns.
  */
 public final class NoopGlue {
-    public static final String MARK = "noop:true";
-    public static final String WARNING =
-            "WARNING: noop consumer glue (noop:true). The step reported SUCCESS without acting. Set pkb_noop_glue=fail to fail the step.";
+    public static final String MARK = tools.dscode.control.protocol.NoopNotice.MARK;
+    public static final String WARNING = tools.dscode.control.protocol.NoopNotice.WARNING;
 
     private NoopGlue() {
     }
@@ -76,12 +75,7 @@ public final class NoopGlue {
     }
 
     public static void warnIfPresent(String rendered, Appendable err) {
-        if (rendered == null || err == null || !rendered.contains(MARK)) return;
-        try {
-            err.append(WARNING).append(System.lineSeparator());
-        } catch (IOException ignored) {
-            // The result line is already printed.
-        }
+        tools.dscode.control.protocol.NoopNotice.warnIfPresent(rendered, err);
     }
 
     static Boolean classFileEmpty(Method method) {

@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.launcher.WorkbenchAgentCommands;
 
+import java.awt.GraphicsEnvironment;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
@@ -40,7 +41,7 @@ class SelftestCpuBenchTest {
         assertFalse(out.contains("\"base64\""), out);
         JsonNode node = new ObjectMapper().readTree(out);
         assertTrue(node.path("elapsedMs").asLong(-1) >= 0, out);
-        assertFalse(node.path("headed").asBoolean(true), out);
+        assertEquals(!GraphicsEnvironment.isHeadless(), node.path("headed").asBoolean(!GraphicsEnvironment.isHeadless()), out);
         double cores = node.path("cores").asDouble(1);
         long p95 = node.path("p95Ms").asLong(9_999);
         System.out.println("MEASURE cores=" + cores + " p95Ms=" + p95 + " elapsedMs=" + node.path("elapsedMs").asLong());

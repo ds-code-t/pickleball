@@ -854,8 +854,23 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         if (result == null || !"SUCCESS".equals(result.status())) return result;
         try {
             var glue = CucumberStepInvoker.findGlueDefinition(text == null ? "" : text);
-            if (glue.isEmpty()) return result;
-            return NoopGlue.decorate(glue.get().method(), result);
+            java.lang.reflect.Method method = glue.isEmpty() ? null : glue.get().method();
+            if (method == null) {
+                method = tools.dscode.control.api.NativeDynamicSteps.methodFor(text);
+            }
+            if (method == null) return result;
+            ControlBridgeCallResult decorated = NoopGlue.decorate(method, result);
+            String rendered = decorated == null || decorated.valueText() == null ? "" : decorated.valueText();
+            NoopGlue.warnIfPresent(rendered, System.err);
+            String runId = System.getProperty("pkb_run_id");
+            if (runId != null && !runId.isBlank()) {
+                String projectProp = System.getProperty("pkb_project");
+                java.nio.file.Path project = projectProp == null || projectProp.isBlank()
+                        ? java.nio.file.Path.of("").toAbsolutePath()
+                        : java.nio.file.Path.of(projectProp);
+                tools.dscode.control.protocol.NoopNotice.noteReport(project, runId, rendered);
+            }
+            return decorated;
         } catch (Throwable ignored) {
             return result;
         }

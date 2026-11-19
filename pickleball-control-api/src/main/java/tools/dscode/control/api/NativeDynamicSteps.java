@@ -37,6 +37,27 @@ public final class NativeDynamicSteps {
         }
     }
 
+    /** Method the native registry would run for {@code text}, or null when nothing matches. */
+    public static java.lang.reflect.Method methodFor(String text) {
+        List<Class<?>> glue = new ArrayList<>(GLUE);
+        String property = System.getProperty("pkb_engine_glue");
+        if (property != null && !property.isBlank()) {
+            for (String name : property.split(",")) {
+                String trimmed = name.trim();
+                if (trimmed.isEmpty()) continue;
+                try {
+                    Class<?> type = Class.forName(trimmed);
+                    if (!glue.contains(type)) glue.add(type);
+                } catch (ClassNotFoundException failure) {
+                    return null;
+                }
+            }
+        }
+        StepMatch match = registry(glue).match(strip(text));
+        if (!match.matched() || match.step() == null) return null;
+        return match.step().method();
+    }
+
     public static ControlCallResult<Object> execute(String text, String argument) {
         List<Class<?>> glue = new ArrayList<>(GLUE);
         String property = System.getProperty("pkb_engine_glue");
