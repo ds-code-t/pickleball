@@ -35,6 +35,7 @@ public final class BrowserSession implements AutoCloseable {
     private final Process chrome;
     private final CdpConnection connection;
     private final SessionEvents events;
+    private final String socket;
     private volatile boolean closed;
     private volatile boolean killedProcess;
 
@@ -48,7 +49,8 @@ public final class BrowserSession implements AutoCloseable {
             List<String> allow,
             Process chrome,
             CdpConnection connection,
-            SessionEvents events
+            SessionEvents events,
+            String socket
     ) {
         this.id = id;
         this.cdp = cdp;
@@ -60,6 +62,7 @@ public final class BrowserSession implements AutoCloseable {
         this.chrome = chrome;
         this.connection = connection;
         this.events = events == null ? new SessionEvents() : events;
+        this.socket = socket == null ? "" : socket;
     }
 
     public static BrowserSession attach(String id, String cdp, boolean process, List<String> allow) {
@@ -72,7 +75,7 @@ public final class BrowserSession implements AutoCloseable {
         CdpConnection connection = CdpConnection.connect(URI.create(endpoint.webSocket), Duration.ofSeconds(10));
         SessionEvents events = watch(connection);
         EngineLog.info("session", "attached " + id + " " + browser);
-        return new BrowserSession(id, recordedCdp(endpoint), false, process, 0, null, allow, null, connection, events);
+        return new BrowserSession(id, recordedCdp(endpoint), false, process, 0, null, allow, null, connection, events, endpoint.webSocket);
     }
 
     public static BrowserSession reopen(String id, String cdp, boolean launched, boolean process, long pid, String profile) {
@@ -81,7 +84,7 @@ public final class BrowserSession implements AutoCloseable {
         SessionEvents events = watch(connection);
         EngineLog.info("session", "reopened " + id + " " + endpoint.http);
         Path dir = profile == null || profile.isBlank() ? null : Path.of(profile);
-        return new BrowserSession(id, recordedCdp(endpoint), launched, process, pid, dir, List.of(), null, connection, events);
+        return new BrowserSession(id, recordedCdp(endpoint), launched, process, pid, dir, List.of(), null, connection, events, endpoint.webSocket);
     }
 
     public static BrowserSession launch(String id, String url, boolean headed, boolean process, Path profile, List<String> allow) {
@@ -135,7 +138,12 @@ public final class BrowserSession implements AutoCloseable {
             awaitDocument(connection, url);
         }
         EngineLog.info("session", "launched " + id + " pid=" + processHandle.pid());
-        return new BrowserSession(id, endpoint.http, true, process, processHandle.pid(), dir, allow, processHandle, connection, events);
+        return new BrowserSession(id, endpoint.http, true, process, processHandle.pid(), dir, allow, processHandle, connection, events, endpoint.webSocket);
+    }
+
+    /** Page websocket this session is attached to. A browser-level URL is not returned. */
+    public String socket() {
+        return socket;
     }
 
     public CdpConnection connection() {

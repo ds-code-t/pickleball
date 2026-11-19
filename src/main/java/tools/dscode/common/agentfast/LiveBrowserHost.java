@@ -12,6 +12,8 @@ import tools.dscode.common.composite.CompositeRuntime;
 import tools.dscode.control.protocol.AgentEvents;
 import tools.dscode.control.protocol.LiveHostFile;
 
+import org.openqa.selenium.WebDriver;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
@@ -39,8 +41,37 @@ public final class LiveBrowserHost {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final AtomicBoolean WAS_OK = new AtomicBoolean(false);
     private static final AtomicReference<BrowserSession> CHROME = new AtomicReference<>();
+    private static final AtomicReference<WebDriver> PAGE = new AtomicReference<>();
     private static volatile Path PROJECT = Path.of("");
     private static volatile String SESSION_ID = "";
+
+    /** The browser this host launched. Null when this process is not the host. */
+    public static BrowserSession chrome() {
+        BrowserSession session = CHROME.get();
+        if (session == null || session.isClosed()) return null;
+        return session;
+    }
+
+    /** Page driver registered for the host. Null outside the host process. */
+    public static WebDriver page() {
+        return PAGE.get();
+    }
+
+    public static String sessionId() {
+        return SESSION_ID == null ? "" : SESSION_ID;
+    }
+
+    /** Target id of the page socket. Empty when this process has no page. */
+    public static String pageTargetId() {
+        BrowserSession session = chrome();
+        if (session == null) return "";
+        try {
+            JsonNode own = session.connection().call("Target.getTargetInfo", Jsons.object(), Duration.ofSeconds(2));
+            return own.path("targetInfo").path("targetId").asText("");
+        } catch (RuntimeException ignored) {
+            return "";
+        }
+    }
 
     private LiveBrowserHost() {
     }
@@ -141,6 +172,7 @@ public final class LiveBrowserHost {
     private static boolean attachPage(BrowserSession session) {
         try {
             LiveChromeDriver driver = new LiveChromeDriver(session);
+            PAGE.set(driver);
             AgentDriverHooks.template("live");
             AgentDriverHooks.ready(driver);
             AgentDriverHooks.template(null);
@@ -164,6 +196,7 @@ public final class LiveBrowserHost {
     }
 
     private static void release(Path project, BrowserSession session, HttpServer server) {
+        PAGE.set(null);
         try {
             AgentDriverHooks.releaseHost();
         } catch (RuntimeException ignored) {
@@ -217,6 +250,7 @@ public final class LiveBrowserHost {
         body.put("page", ok ? "attached" : "absent");
         body.put("headed", headed);
         body.put("chromePid", session == null ? 0 : session.pid);
+        if (session != null && session.socket() != null && !session.socket().isBlank()) body.put("cdp", session.socket());
         if (!ok) body.put("reason", reason.isBlank() ? "browser_lost" : reason);
         send(exchange, 200, body);
     }
@@ -277,6 +311,7 @@ public final class LiveBrowserHost {
         List<String> extra = new ArrayList<>();
         JsonNode rawExtra = request.get("extraArgs");
         if (rawExtra != null && rawExtra.isArray()) rawExtra.forEach(node -> extra.add(node.asText("")));
+        FallbackLog.beginRun(request.path("runId").asText(""));
         AgentControl.Result result = AgentControl.execute(
                 project,
                 request.path("runId").asText(""),

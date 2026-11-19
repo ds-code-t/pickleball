@@ -104,11 +104,14 @@ final class WorkbenchCliHelp {
             Map.entry("selftest", "Usage: selftest ui --cpu [--component=panel]"),
             Map.entry("snap", "Usage: snap [--target=browser:auto|browser:<id>|browser:cdp=<url>|desktop:<pid>|desktop:app~<name>|ref:<doc>:<handle>]"),
             Map.entry("find", "Usage: find --target=<selector> [--query=<text>]"),
-            Map.entry("act", "Usage: act --target=<selector> [--kind=<click|type>] [--value=<text>]"),
+            Map.entry("act", "Usage: act --target=<selector> [--kind=click|type|hover|press|select] [--query=<text>] [--ref=<ref>] [--value=<text>]"),
             Map.entry("wait", "Usage: wait --target=<selector> [--condition=mutation|network|load|navigation|mask|<text>] [--timeout=<ms>]"),
             Map.entry("watch", "Usage: watch --target=<selector> [--condition=mutation|network|load|navigation|mask] [--timeout=<ms>]"),
             Map.entry("explain", "Usage: explain --target=<selector> [--query=<text>]"),
-            Map.entry("capture", "Usage: capture --target=<selector> [--out=<file>]")
+            Map.entry("capture", "Usage: capture --target=<selector> --out=<file>"),
+            Map.entry("attach", "Usage: attach --target=<selector>"),
+            Map.entry("eval", "Usage: eval --target=<selector> --expr=<js> [--world=pkb|main]"),
+            Map.entry("ui", "Usage: ui --ops=<json array>")
     );
 
     private static final Map<String, String> FLAGS = Map.ofEntries(

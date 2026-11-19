@@ -44,7 +44,7 @@ final class WorkbenchCommandLine {
             "capture-scenario",
             "screenshot",
             "selftest",
-            "snap", "find", "act", "wait", "watch", "explain", "capture",
+            "snap", "find", "act", "wait", "watch", "explain", "capture", "attach", "eval", "ui",
             "help"
     );
     static final Set<String> SESSION_CLIENT_COMMANDS = Set.of(
@@ -73,7 +73,7 @@ final class WorkbenchCommandLine {
             "--query", "--exposure", "--target", "--pane", "--on-top", "--headless",
             "--mode", "--condition", "--timeout", "--ref", "--value", "--snap", "--within",
             "--budget", "--strict", "--rank", "--scroll-search", "--duration", "--expr",
-            "--world", "--clip", "--frame", "--kinds"
+            "--world", "--clip", "--frame", "--kinds", "--fixture", "--cdp-input"
     );
 
     private WorkbenchCommandLine() {

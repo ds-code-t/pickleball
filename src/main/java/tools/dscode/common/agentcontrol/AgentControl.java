@@ -138,13 +138,16 @@ public final class AgentControl {
                 case "guide-back" -> guideMove(project, runId, values, -1);
                 case "guide-done" -> guideDone(project, runId, values);
                 case "ask" -> ask(project, runId, values);
-                case "ui-apply" -> UiBatch.apply(project, runId, values, agentId);
+                case "ui", "ui-apply" -> UiBatch.apply(project, runId, values, agentId);
                 case "ui-poll" -> UiBatch.poll(project, runId, values, agentId);
                 case "ui-catalog" -> uiCatalog(values);
                 case "screenshot" -> screenshot(project, values);
                 case "selftest" -> selftest(project, values);
-                case "snap", "find", "act", "wait", "watch", "explain", "capture" ->
-                        new Result(0, tools.dscode.common.agentfast.TargetVerb.run(project, runId, op, values));
+                case "snap", "find", "act", "wait", "watch", "explain", "capture", "attach", "eval" -> {
+                    tools.dscode.common.agentfast.TargetVerb.Outcome outcome =
+                            tools.dscode.common.agentfast.TargetVerb.run(project, runId, op, values);
+                    yield new Result(outcome.exit(), outcome.body());
+                }
                 case "highlight" -> highlight(project, runId, values);
                 case "unhighlight" -> unhighlight(project, runId, values);
                 case "overlay" -> overlay(project, runId, values);

@@ -23,6 +23,13 @@ public final class PageActions {
     );
 
     private static final java.util.concurrent.ConcurrentHashMap<String, Long> FORCED = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final ThreadLocal<Boolean> CDP_INPUT = new ThreadLocal<>();
+
+    /** {@code false} skips {@code Input.dispatch*} so the caller can take the next chain step. */
+    public static void useCdpInput(boolean enabled) {
+        if (enabled) CDP_INPUT.remove();
+        else CDP_INPUT.set(Boolean.FALSE);
+    }
 
     private PageActions() {
     }
@@ -261,6 +268,7 @@ public final class PageActions {
     }
 
     private static void mouse(CdpConnection cdp, String type, double x, double y, String button, int count) {
+        if (Boolean.FALSE.equals(CDP_INPUT.get())) throw new CdpException("cdp input disabled");
         ObjectNode params = Jsons.object();
         params.put("type", type);
         params.put("x", x);

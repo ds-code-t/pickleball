@@ -14,7 +14,24 @@ Installing Pickleball with no control handler and never invoking the bundled con
 
 ## Target selector
 
-The same CLI verbs snap, find, act, wait, watch, explain, and capture take one target. `browser:<session>` may add `/tab:` and `/frame:`. `browser:cdp=<url>` keeps the url through the last `/tab:` or `/frame:`. `browser:auto` asks the live host. `desktop:<pid>` and `desktop:app~<name>` may add `/window:`. `ref:<docVersion:handle>` splits on the last colon. Desktop uses that same verb string and does not call a live desktop bus. With no live browser the reply is `applied=false` and `used` is `none`, `desktop`, or `ref`. wait and watch use `mode=event` when the condition is mutation, network, load, navigation, or mask, and `mode=poll` otherwise. Each of the locate, act, wait, and snapshot chains appends one line per run and reason to `.pickleball/logs/fallback-chain.jsonl` (date-stamped, size-capped, on unless `pkb_fallback_log=off`). On Chromium, `Runtime.addBinding` may include `executionContextName` `pkb-surface`.
+One target string selects the backend. `browser:auto` is the live page (the worker when its pid is alive, otherwise the browser `start` launched). `browser:<session>` is that session, and `/tab:` / `/frame:` select a tab or frame on it. `browser:cdp=<url>` attaches that endpoint. A `/devtools/page/` URL stays that page. A `/devtools/browser/` URL uses `/tab:<id>` when it is present, otherwise the live host page on that same browser, and does not take the last `Target.getTargets` page. `desktop:<pid>` and `desktop:app~<name>` may add `/window:`. They use the desktop engine (UIA, AX, or AT-SPI), or `--fixture=<file>` to replay a recorded tree. `ref:<docVersion:handle>` is a handle from an earlier `find` or `snap`. It splits on the last colon. A ref whose docVersion has moved is `stale_ref`.
+
+With no live browser the command exits 1 and the body is `ok:false` with `error: no live browser`. A missing desktop bus is `error: no desktop target <pid|app>`. An unknown session, pid, or app is `error: unknown target`. A verb that did not run is never `ok:true`.
+
+| Verb | Params | Result |
+|------|--------|--------|
+| attach | `--target` | Joins that browser or desktop target. |
+| snap | `--target --mode=compact\|find\|diff\|full` | Snapshot keyed by `docVersion`. `full` is a file under `.pickleball/agent-full/`. |
+| find | `--target --query` | Hits. Each hit has `ref`. |
+| act | `--target --kind=click\|type\|hover\|press\|select --query\|--ref --value` | Performs the action. `applied:true`. `--snap=diff` adds the change. |
+| wait | `--target --condition --timeout` | Waits. `mode=event` for mutation, network, load, navigation, or mask (the page `watchUntil` when it is installed). Otherwise it polls. Timeout exits 1 with `error: timeout`. |
+| watch | `--target --kinds --duration` | Events from the page socket for that duration. |
+| explain | `--target --query\|--ref` | Actionability report (`visible`, `enabled`, `actionable`). |
+| eval | `--target --expr --world=pkb\|main` | Browser only. Desktop returns `eval is browser only`. |
+| ui | `--ops` | The `ui-apply` batch. An op target may be `ref:<docVersion:handle>`. A stale ref misses. |
+| capture | `--target --out` | Writes a PNG. No base64 in the reply. |
+
+A chain logs a line only when a step fails and a later step serves the call, once per run, chain, and reason. The line is appended to `.pickleball/logs/fallback-chain.jsonl`: `{"run","chain","from","to","reason","at"}`. Example: `{"chain":"act","from":"cdp","to":"js","reason":"cdp input disabled"}`. `--cdp-input=off` skips CDP input and takes that next step. The log stays off when `pkb_fallback_log=off`. The long-lived host clears the de-dupe set when the run id changes. On Chromium, `Runtime.addBinding` may include `executionContextName` `pkb-surface`.
 
 ## MCP command registry
 

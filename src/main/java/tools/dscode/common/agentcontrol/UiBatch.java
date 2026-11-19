@@ -113,6 +113,11 @@ final class UiBatch {
         if (target == null || target.isBlank()) return null;
         String t = target.trim();
         if (t.startsWith("h:")) t = t.substring(2);
+        if (t.startsWith("ref:")) {
+            String selector = tools.dscode.common.agentfast.TargetVerb.anchorSelector(t);
+            if (selector == null || selector.isBlank()) return null;
+            t = selector;
+        }
         if (PageSurfaces.rememberedPoint(t) != null) return t;
         String raw = PageSurfaces.runtimeCall("resolve", Map.of("t", target.trim()), true);
         if (raw == null || "null".equals(raw)) return null;
