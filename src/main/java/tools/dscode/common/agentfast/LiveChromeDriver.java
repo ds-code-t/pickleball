@@ -293,9 +293,15 @@ public final class LiveChromeDriver implements WebDriver, TakesScreenshot, HasCa
             @Override
             public void refresh() {
                 ensurePage();
+                ObjectNode mark = Jsons.object();
+                mark.put("expression", "window.__pkbReloadMark=1");
+                mark.put("returnByValue", true);
+                session.connection().call("Runtime.evaluate", mark, pageSessionId, CALL);
                 int seen = navigationCount();
-                session.connection().call("Page.reload", Jsons.object(), pageSessionId, CALL);
-                awaitLoad(null, true, seen);
+                ObjectNode params = Jsons.object();
+                params.put("ignoreCache", true);
+                session.connection().call("Page.reload", params, pageSessionId, CALL);
+                awaitLoad(null, true, seen, true);
             }
         };
     }
@@ -313,34 +319,41 @@ public final class LiveChromeDriver implements WebDriver, TakesScreenshot, HasCa
         JsonNode entry = entries.get(index);
         int entryId = entry == null ? -1 : entry.path("id").asInt(-1);
         if (entryId < 0) throw new WebDriverException(delta < 0 ? "no back history" : "no forward history");
-        int seen = navigationCount();
+        String beforeHref = href();
         ObjectNode params = Jsons.object();
         params.put("entryId", entryId);
         session.connection().call("Page.navigateToHistoryEntry", params, pageSessionId, CALL);
         String target = entry.path("url").asText("");
-        awaitLoad(target.isBlank() ? null : target, true, seen);
+        awaitHistory(target.isBlank() ? null : target, beforeHref);
     }
 
     /**
      * Blocks until the document is complete. {@code requireNewNavigation} is set when the
      * destination URL is already showing, so a still-complete document is not treated as done.
+     * {@code requireFreshDocument} waits until a reload mark stamped on the old document is gone.
      */
     private void awaitLoad(String expectedUrl, boolean requireNewNavigation, int navigationsBefore) {
+        awaitLoad(expectedUrl, requireNewNavigation, navigationsBefore, false);
+    }
+
+    private void awaitLoad(String expectedUrl, boolean requireNewNavigation, int navigationsBefore, boolean requireFreshDocument) {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
         WebDriverException last = null;
         boolean sawLoading = false;
         while (System.nanoTime() < deadline) {
             try {
-                String value = readyAndHref();
-                int split = value.indexOf('\n');
-                String state = split < 0 ? value : value.substring(0, split);
-                String href = split < 0 ? "" : value.substring(split + 1);
+                String value = readyHrefMark();
+                String[] parts = value.split("\n", 3);
+                String state = parts.length > 0 ? parts[0] : "";
+                String href = parts.length > 1 ? parts[1] : "";
+                String mark = parts.length > 2 ? parts[2] : "0";
                 if (!"complete".equals(state)) sawLoading = true;
                 boolean navigated = !requireNewNavigation
                         || navigationCount() > navigationsBefore
                         || sawLoading;
                 boolean urlOk = expectedUrl == null || sameDocument(expectedUrl, href);
-                if (navigated && urlOk && "complete".equals(state)) return;
+                boolean fresh = !requireFreshDocument || "0".equals(mark);
+                if (navigated && urlOk && fresh && "complete".equals(state)) return;
             } catch (RuntimeException failure) {
                 last = failure instanceof WebDriverException web
                         ? web
@@ -358,9 +371,53 @@ public final class LiveChromeDriver implements WebDriver, TakesScreenshot, HasCa
                 + (expectedUrl == null ? "" : ": " + expectedUrl));
     }
 
+    /**
+     * History can restore from the back-forward cache without a loading event.
+     * A stale navigation count while the href is unchanged is not arrival.
+     */
+    private void awaitHistory(String expectedUrl, String beforeHref) {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
+        WebDriverException last = null;
+        boolean sawLoading = false;
+        while (System.nanoTime() < deadline) {
+            try {
+                String value = readyHrefMark();
+                String[] parts = value.split("\n", 3);
+                String state = parts.length > 0 ? parts[0] : "";
+                String href = parts.length > 1 ? parts[1] : "";
+                if (!"complete".equals(state)) sawLoading = true;
+                boolean left = beforeHref != null && !sameDocument(beforeHref, href);
+                boolean progressed = sawLoading || left;
+                boolean urlOk = expectedUrl == null || sameDocument(expectedUrl, href);
+                if (progressed && urlOk && "complete".equals(state)) return;
+            } catch (RuntimeException failure) {
+                last = failure instanceof WebDriverException web
+                        ? web
+                        : new WebDriverException(failure.getMessage(), failure);
+            }
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                throw new WebDriverException("document ready interrupted");
+            }
+        }
+        if (last != null) throw last;
+        throw new WebDriverException("timed out waiting for history"
+                + (expectedUrl == null ? "" : ": " + expectedUrl));
+    }
+
     private String readyAndHref() {
+        String value = readyHrefMark();
+        int split = value.indexOf('\n');
+        if (split < 0) return value;
+        int next = value.indexOf('\n', split + 1);
+        return next < 0 ? value : value.substring(0, next);
+    }
+
+    private String readyHrefMark() {
         ObjectNode params = Jsons.object();
-        params.put("expression", "document.readyState + '\\n' + String(location.href)");
+        params.put("expression", "document.readyState + '\\n' + String(location.href) + '\\n' + (window.__pkbReloadMark ? '1' : '0')");
         params.put("returnByValue", true);
         JsonNode result = session.connection().call("Runtime.evaluate", params, pageSessionId, CALL);
         if (result != null && result.has("exceptionDetails")) throw new WebDriverException("document not ready");
