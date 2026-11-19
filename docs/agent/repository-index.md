@@ -280,6 +280,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentcontrol/WindowRegistry.java`
 - `src/main/java/tools/dscode/common/agentfast/AgentForward.java`
 - `src/main/java/tools/dscode/common/agentfast/CompactReply.java`
+- `src/main/java/tools/dscode/common/agentfast/FallbackLog.java`
 - `src/main/java/tools/dscode/common/agentfast/LiveBrowserHost.java`
 - `src/main/java/tools/dscode/common/agentfast/LiveChromeDriver.java`
 - `src/main/java/tools/dscode/common/agentfast/ReplyFields.java`
@@ -287,6 +288,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentfast/ScreenshotReply.java`
 - `src/main/java/tools/dscode/common/agentfast/SelftestUi.java`
 - `src/main/java/tools/dscode/common/agentfast/StepTiming.java`
+- `src/main/java/tools/dscode/common/agentfast/TargetSelector.java`
+- `src/main/java/tools/dscode/common/agentfast/TargetVerb.java`
 - `src/main/java/tools/dscode/common/agentsurface/AgentSurfaceRouter.java`
 - `src/main/java/tools/dscode/common/agentsurface/NativeHighlight.java`
 - `src/main/java/tools/dscode/common/agentsurface/NativeOverlay.java`
@@ -948,10 +951,12 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/AgentFastCliTest.java`
 - `src/test/java/tools/dscode/launcher/CliForwardToWorkerTest.java`
 - `src/test/java/tools/dscode/launcher/ConsumerReadyCliTest.java`
+- `src/test/java/tools/dscode/launcher/DesktopSameVerbTest.java`
 - `src/test/java/tools/dscode/launcher/DoctorTest.java`
 - `src/test/java/tools/dscode/launcher/DomEngineCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/DomLogCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/EngineCliLaunchTest.java`
+- `src/test/java/tools/dscode/launcher/FallbackLoggedTest.java`
 - `src/test/java/tools/dscode/launcher/GuidanceCommandGoldenTest.java`
 - `src/test/java/tools/dscode/launcher/PickleballWorkbenchLauncherTest.java`
 - `src/test/java/tools/dscode/launcher/PopupVerbCoverageTest.java`
@@ -961,6 +966,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/StartDrivesPageTest.java`
 - `src/test/java/tools/dscode/launcher/StartLaunchesBrowserTest.java`
 - `src/test/java/tools/dscode/launcher/StoreCliLaunchTest.java`
+- `src/test/java/tools/dscode/launcher/TargetAgnosticApiTest.java`
 - `src/test/java/tools/dscode/launcher/VersionSwitchTest.java`
 - `src/test/java/tools/dscode/launcher/WarmJvmGlueTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchAgentCommandsTest.java`

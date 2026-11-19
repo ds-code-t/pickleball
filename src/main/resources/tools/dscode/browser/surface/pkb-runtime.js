@@ -468,6 +468,7 @@
     if (dialog) raiseLayer();
     if (relevant) {
       scrollersDirty = true;
+      bumpDoc();
       schedule();
     }
   }
@@ -1497,6 +1498,35 @@
     snapshot: snapshot,
     restoreWhenReady: restoreWhenReady,
     forget: forget,
-    resolve: resolve
+    resolve: resolve,
+    watchUntil: watchUntil,
+    docVersion: function () { return docVersion; }
   };
+
+  var docVersion = 0;
+  var docWatchers = [];
+  function bumpDoc() {
+    docVersion++;
+    var pending = docWatchers;
+    docWatchers = [];
+    for (var i = 0; i < pending.length; i++) pending[i]({ok: true, doc: docVersion});
+  }
+  function watchUntil(condition, timeoutMs) {
+    return new Promise(function (resolve) {
+      var finished = false;
+      function finish(body) {
+        if (finished) return;
+        finished = true;
+        resolve(body);
+      }
+      var timer = window.setTimeout(function () {
+        finish({ok: false, reason: 'timeout', doc: docVersion, condition: condition || ''});
+      }, timeoutMs == null ? 1000 : timeoutMs);
+      docWatchers.push(function (body) {
+        window.clearTimeout(timer);
+        body.condition = condition || '';
+        finish(body);
+      });
+    });
+  }
 })();

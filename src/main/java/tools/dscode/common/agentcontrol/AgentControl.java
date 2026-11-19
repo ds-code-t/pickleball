@@ -141,6 +141,8 @@ public final class AgentControl {
                 case "ui-catalog" -> uiCatalog(values);
                 case "screenshot" -> screenshot(project, values);
                 case "selftest" -> selftest(project, values);
+                case "snap", "find", "act", "wait", "watch", "explain", "capture" ->
+                        new Result(0, tools.dscode.common.agentfast.TargetVerb.run(project, runId, op, values));
                 case "highlight" -> highlight(project, runId, values);
                 case "unhighlight" -> unhighlight(project, runId, values);
                 case "overlay" -> overlay(project, runId, values);

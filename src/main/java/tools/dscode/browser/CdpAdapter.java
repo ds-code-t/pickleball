@@ -196,11 +196,21 @@ public final class CdpAdapter implements BrowserFacade {
 
     @Override
     public void addBinding(String name, BindingListener listener) {
+        addBinding(name, listener, null);
+    }
+
+    /** {@code executionContextName} is sent only when it is non-blank, so the two-argument call stays name-only. */
+    public void addBinding(String name, BindingListener listener, String executionContextName) {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("error: binding name is blank.\nfix: Pass the binding name.");
         }
         bindings.put(name, listener);
-        rpc.call("Runtime.addBinding", Map.of("name", name));
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("name", name);
+        if (executionContextName != null && !executionContextName.isBlank()) {
+            params.put("executionContextName", executionContextName);
+        }
+        rpc.call("Runtime.addBinding", params);
     }
 
     @Override

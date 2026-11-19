@@ -1363,7 +1363,11 @@ final class PageSurfaces {
         // Same world as the helper, so one set of listeners queues events where drainIsolated reads them.
         facade.addPreloadIn(SurfaceAssets.js("html"), "pkb-surface");
         facade.addPreloadIn(RUNTIME, "pkb-surface");
-        facade.addBinding("pkbSurface", (name, payload) -> PUSHED.add(bindingEvent(name, payload)));
+        if (facade instanceof CdpAdapter cdp) {
+            cdp.addBinding("pkbSurface", (name, payload) -> PUSHED.add(bindingEvent(name, payload)), "pkb-surface");
+        } else {
+            facade.addBinding("pkbSurface", (name, payload) -> PUSHED.add(bindingEvent(name, payload)));
+        }
     }
 
     private static Map<String, String> bindingEvent(String name, Object payload) {

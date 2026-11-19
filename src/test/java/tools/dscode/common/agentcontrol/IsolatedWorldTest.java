@@ -52,6 +52,9 @@ class IsolatedWorldTest {
         assertTrue(socket.methods().contains("Page.createIsolatedWorld"), socket.methods().toString());
         assertTrue(socket.methods().contains("Page.addScriptToEvaluateOnNewDocument"), socket.methods().toString());
         assertTrue(socket.methods().contains("Runtime.addBinding"), socket.methods().toString());
+        String binding = socket.sent().stream().filter(line -> line.contains("Runtime.addBinding")).findFirst().orElseThrow();
+        assertTrue(binding.contains("executionContextName"), binding);
+        assertTrue(binding.contains("pkb-surface"), binding);
         assertTrue(socket.methods().contains("Runtime.evaluate"), socket.methods().toString());
         String world = socket.sent().stream().filter(line -> line.contains("Page.createIsolatedWorld")).findFirst().orElseThrow();
         assertTrue(world.contains("pkb-surface"), world);

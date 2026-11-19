@@ -151,7 +151,9 @@ public final class WorkbenchAgentCommands {
                      "guide", "guide-next", "guide-back", "guide-done", "ask",
                      "panel-open", "panel-close",
                      "capture-scenario",
-                     "screenshot", "selftest" -> agentControl(parsed, safeOut, safeErr);
+                     "screenshot", "selftest",
+                     "snap", "find", "act", "wait", "watch", "explain", "capture" ->
+                        agentControl(parsed, safeOut, safeErr);
                 case "help" -> help(args, safeOut, safeErr);
                 default -> {
                     safeErr.print(WorkbenchCliHelp.unknown(parsed.command()));
@@ -1953,6 +1955,24 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "verbose");
         copyFlag(args, parsed, "chat-after");
         copyFlag(args, parsed, "component");
+        copyFlag(args, parsed, "mode");
+        copyFlag(args, parsed, "kind");
+        copyFlag(args, parsed, "condition");
+        copyFlag(args, parsed, "timeout");
+        copyFlag(args, parsed, "ref");
+        copyFlag(args, parsed, "value");
+        copyFlag(args, parsed, "snap");
+        copyFlag(args, parsed, "within");
+        copyFlag(args, parsed, "budget");
+        copyFlag(args, parsed, "strict");
+        copyFlag(args, parsed, "rank");
+        copyFlag(args, parsed, "scroll-search");
+        copyFlag(args, parsed, "duration");
+        copyFlag(args, parsed, "expr");
+        copyFlag(args, parsed, "world");
+        copyFlag(args, parsed, "clip");
+        copyFlag(args, parsed, "frame");
+        copyFlag(args, parsed, "kinds");
         if (hasFlag(parsed, "--cpu")) args.put("cpu", "true");
         if (parsed.forwarded() != null) {
             for (String token : parsed.forwarded()) {
