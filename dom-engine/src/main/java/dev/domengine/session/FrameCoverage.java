@@ -7,6 +7,8 @@ import dev.domengine.cdp.CdpConnection;
 import dev.domengine.json.Jsons;
 import dev.domengine.log.EngineLog;
 
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Set;
@@ -35,6 +37,11 @@ public final class FrameCoverage {
     private static final ConcurrentHashMap<CdpConnection, Map<String, String>> BY_SESSION = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<CdpConnection, Set<String>> SEEN_TARGETS = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<CdpConnection, Map<String, String>> URLS = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<CdpConnection, Map<String, String>> PARENTS = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<CdpConnection, Map<String, String>> SURFACE = new ConcurrentHashMap<>();
+    /** Isolated-world context ids, keyed by {@code s:} session and {@code f:} frame. */
+    private static final ConcurrentHashMap<CdpConnection, Map<String, Integer>> CONTEXTS = new ConcurrentHashMap<>();
+    private static volatile String SURFACE_RUNTIME;
 
     private FrameCoverage() {
     }
@@ -44,6 +51,11 @@ public final class FrameCoverage {
         if (connection == null || !ARMED.add(connection)) return;
         if (!OWNER.compareAndSet(null, connection)) return;
         connection.addEventListener(message -> onEvent(connection, message));
+        try {
+            connection.call("Page.enable", Jsons.object(), TIMEOUT);
+        } catch (RuntimeException failure) {
+            EngineLog.info("frame", "page " + failure.getMessage());
+        }
         ObjectNode auto = Jsons.object();
         auto.put("autoAttach", true);
         auto.put("waitForDebuggerOnStart", true);
@@ -75,6 +87,9 @@ public final class FrameCoverage {
         BY_SESSION.remove(connection);
         SEEN_TARGETS.remove(connection);
         URLS.remove(connection);
+        PARENTS.remove(connection);
+        SURFACE.remove(connection);
+        CONTEXTS.remove(connection);
         OWNER.compareAndSet(connection, null);
     }
 
@@ -110,28 +125,87 @@ public final class FrameCoverage {
         return Set.copyOf(frames.keySet());
     }
 
-    /** Last url seen for a child frame, or empty. */
+    /**
+     * Last url seen for a child frame, or empty.
+     * A paused OOPIF reports a blank url until navigation commits, so a blank
+     * entry is refreshed from that session's frame tree.
+     */
     public static String url(CdpConnection connection, String frameId) {
         if (connection == null || frameId == null) return "";
+        String known = storedUrl(connection, frameId);
+        if (!known.isBlank()) return known;
+        String session = sessionId(connection, frameId);
+        if (!session.isBlank()) refreshUrls(connection, session);
+        return storedUrl(connection, frameId);
+    }
+
+    private static String storedUrl(CdpConnection connection, String frameId) {
         Map<String, String> urls = URLS.get(connection);
         if (urls == null) return "";
         String url = urls.get(frameId);
         return url == null ? "" : url;
     }
 
-    /** The child document attribute written by the page after the preload global. */
-    public static String boot(CdpConnection connection, String sessionId) {
-        if (connection == null || sessionId == null || sessionId.isBlank()) return "";
+    /** Stores http(s) urls from a child session's frame tree, including nested frames. */
+    private static void refreshUrls(CdpConnection connection, String sessionId) {
+        if (connection == null || sessionId == null || sessionId.isBlank()) return;
         try {
-            ObjectNode params = Jsons.object();
-            params.put("expression", "document.documentElement && document.documentElement.getAttribute('data-boot') || ''");
-            params.put("returnByValue", true);
-            JsonNode value = connection.call("Runtime.evaluate", params, sessionId, TIMEOUT);
-            return value.path("result").path("value").asText("");
+            JsonNode tree = connection.call("Page.getFrameTree", Jsons.object(), sessionId, Duration.ofSeconds(2));
+            storeTree(connection, tree.path("frameTree"), "");
         } catch (RuntimeException failure) {
-            EngineLog.info("frame", "boot " + failure.getMessage());
-            return "";
+            EngineLog.info("frame", "url " + failure.getMessage());
         }
+    }
+
+    private static void storeTree(CdpConnection connection, JsonNode node, String parent) {
+        if (node == null || node.isMissingNode() || node.isNull()) return;
+        JsonNode frame = node.path("frame");
+        String id = frame.path("id").asText("");
+        String url = frame.path("url").asText("");
+        if (!id.isBlank()) {
+            if (!url.isBlank() && !"about:blank".equals(url)) {
+                URLS.computeIfAbsent(connection, key -> new ConcurrentHashMap<>()).put(id, url);
+            }
+            String reported = frame.path("parentId").asText("");
+            String parentId = !reported.isBlank() ? reported : parent;
+            if (!parentId.isBlank()) {
+                PARENTS.computeIfAbsent(connection, key -> new ConcurrentHashMap<>()).put(id, parentId);
+            }
+        }
+        JsonNode children = node.path("childFrames");
+        if (children != null && children.isArray()) {
+            for (JsonNode child : children) storeTree(connection, child, id);
+        }
+    }
+
+    /** Frame id remembered for this child session, or empty. */
+    public static String frameForSession(CdpConnection connection, String sessionId) {
+        if (connection == null || sessionId == null || sessionId.isBlank()) return "";
+        Map<String, String> sessions = BY_SESSION.get(connection);
+        if (sessions == null) return "";
+        String frameId = sessions.get(sessionId);
+        return frameId == null ? "" : frameId;
+    }
+
+    /** Parent frame id from {@code Page.frameAttached}, or empty. */
+    public static String parentOf(CdpConnection connection, String frameId) {
+        if (connection == null || frameId == null || frameId.isBlank()) return "";
+        Map<String, String> parents = PARENTS.get(connection);
+        if (parents == null) return "";
+        String parent = parents.get(frameId);
+        return parent == null ? "" : parent;
+    }
+
+    /**
+     * {@code before-page} when the surface runtime was in the pkb world before the page script ran.
+     * Empty when that check did not pass.
+     */
+    public static String surface(CdpConnection connection, String frameId) {
+        if (connection == null || frameId == null || frameId.isBlank()) return "";
+        Map<String, String> surfaces = SURFACE.get(connection);
+        if (surfaces == null) return "";
+        String value = surfaces.get(frameId);
+        return value == null ? "" : value;
     }
 
     /**
@@ -184,6 +258,35 @@ public final class FrameCoverage {
 
     private static void onEvent(CdpConnection connection, JsonNode message) {
         String method = message.path("method").asText("");
+        if ("Runtime.executionContextCreated".equals(method)) {
+            JsonNode context = message.path("params").path("context");
+            if (!"pkb-surface".equals(context.path("name").asText(""))) return;
+            int id = context.path("id").asInt(0);
+            if (id <= 0) return;
+            Map<String, Integer> contexts = CONTEXTS.computeIfAbsent(connection, key -> new ConcurrentHashMap<>());
+            String sessionId = message.path("sessionId").asText("");
+            if (!sessionId.isBlank()) contexts.put("s:" + sessionId, id);
+            String frame = context.path("auxData").path("frameId").asText("");
+            if (!frame.isBlank()) contexts.put("f:" + frame, id);
+            return;
+        }
+        if ("Page.frameAttached".equals(method)) {
+            String id = message.path("params").path("frameId").asText("");
+            String parent = message.path("params").path("parentFrameId").asText("");
+            if (!id.isBlank() && !parent.isBlank()) {
+                PARENTS.computeIfAbsent(connection, key -> new ConcurrentHashMap<>()).put(id, parent);
+            }
+            return;
+        }
+        if ("Page.frameNavigated".equals(method)) {
+            JsonNode frame = message.path("params").path("frame");
+            String id = frame.path("id").asText("");
+            String url = frame.path("url").asText("");
+            if (!id.isBlank() && !url.isBlank()) {
+                URLS.computeIfAbsent(connection, key -> new ConcurrentHashMap<>()).put(id, url);
+            }
+            return;
+        }
         if ("Target.targetInfoChanged".equals(method)) {
             JsonNode info = message.path("params").path("targetInfo");
             if ("iframe".equals(info.path("type").asText(""))) {
@@ -210,31 +313,29 @@ public final class FrameCoverage {
     }
 
     private static void armChild(CdpConnection connection, String sessionId, boolean waiting) {
+        String frameId = "";
+        String runtime = "";
         try {
             connection.call("Page.enable", Jsons.object(), sessionId, TIMEOUT);
-            ObjectNode preload = Jsons.object();
-            preload.put("source", "window.__pkbOopif='before-page'");
-            connection.call("Page.addScriptToEvaluateOnNewDocument", preload, sessionId, TIMEOUT);
-            ObjectNode mark = Jsons.object();
-            mark.put("expression", "window.__pkbOopif='before-page'");
-            mark.put("returnByValue", true);
-            connection.call("Runtime.evaluate", mark, sessionId, TIMEOUT);
-            JsonNode tree = connection.call("Page.getFrameTree", Jsons.object(), sessionId, TIMEOUT);
-            String frameId = tree.path("frameTree").path("frame").path("id").asText("");
-            if (!frameId.isBlank()) {
-                remember(connection, frameId, sessionId);
-                String url = tree.path("frameTree").path("frame").path("url").asText("");
-                if (!url.isBlank()) URLS.computeIfAbsent(connection, key -> new ConcurrentHashMap<>()).put(frameId, url);
-            }
             try {
-                ObjectNode world = Jsons.object();
-                if (!frameId.isBlank()) world.put("frameId", frameId);
-                world.put("worldName", "pkb-surface");
-                world.put("grantUniveralAccess", true);
-                connection.call("Page.createIsolatedWorld", world, sessionId, TIMEOUT);
+                connection.call("Runtime.enable", Jsons.object(), sessionId, TIMEOUT);
             } catch (RuntimeException ignored) {
-                EngineLog.info("frame", "pkb world skipped");
+                EngineLog.info("frame", "runtime enable skipped");
             }
+            runtime = surfaceRuntime();
+            if (!runtime.isBlank()) {
+                ObjectNode preload = Jsons.object();
+                // The trailer records whether this isolated script ran before the page script.
+                // Page.createIsolatedWorld hangs while the target is paused, so the preload
+                // carries that fact and the probe reads it after resume.
+                preload.put("source", runtime + BOOT_TRAILER);
+                preload.put("worldName", "pkb-surface");
+                connection.call("Page.addScriptToEvaluateOnNewDocument", preload, sessionId, Duration.ofSeconds(15));
+            }
+            JsonNode tree = connection.call("Page.getFrameTree", Jsons.object(), sessionId, TIMEOUT);
+            frameId = tree.path("frameTree").path("frame").path("id").asText("");
+            if (!frameId.isBlank()) remember(connection, frameId, sessionId);
+            storeTree(connection, tree.path("frameTree"), "");
             try {
                 ObjectNode binding = Jsons.object();
                 binding.put("name", "pkbSurface");
@@ -243,17 +344,212 @@ public final class FrameCoverage {
             } catch (RuntimeException ignored) {
                 EngineLog.info("frame", "binding skipped");
             }
+            // Nested cross-site frames live in this child target. Auto-attach has to be armed
+            // here, before the page is resumed, or the grandchild is never paused or grafted.
+            try {
+                ObjectNode nested = Jsons.object();
+                nested.put("autoAttach", true);
+                nested.put("waitForDebuggerOnStart", true);
+                nested.put("flatten", true);
+                ArrayNode nestedFilter = nested.putArray("filter");
+                nestedFilter.addObject().put("type", "iframe");
+                connection.call("Target.setAutoAttach", nested, sessionId, TIMEOUT);
+            } catch (RuntimeException ignored) {
+                EngineLog.info("frame", "nested auto-attach skipped");
+            }
         } catch (RuntimeException failure) {
             EngineLog.info("frame", "arm " + failure.getMessage());
         } finally {
-            if (waiting) {
-                try {
-                    connection.call("Runtime.runIfWaitingForDebugger", Jsons.object(), sessionId, TIMEOUT);
-                } catch (RuntimeException failure) {
-                    EngineLog.info("frame", "resume " + failure.getMessage());
+            // Resume even when the attach event omitted waitingForDebugger.
+            // A paused OOPIF never commits its url, so the parent tree stays blank.
+            if (waiting) EngineLog.info("frame", "resume " + sessionId);
+            try {
+                connection.call("Runtime.runIfWaitingForDebugger", Jsons.object(), sessionId, TIMEOUT);
+            } catch (RuntimeException failure) {
+                EngineLog.info("frame", "resume " + failure.getMessage());
+            }
+        }
+        if (frameId.isBlank()) return;
+        refreshUrls(connection, sessionId);
+        if (runtime.isBlank()) return;
+        String probed = probeSurface(connection, sessionId, frameId);
+        if ("before-page".equals(probed)) {
+            SURFACE.computeIfAbsent(connection, key -> new ConcurrentHashMap<>()).put(frameId, "before-page");
+        }
+    }
+
+    /** Set in the pkb-surface world by the preload, before the page's own script. */
+    private static final String BOOT_TRAILER =
+            "\n;try{globalThis.__pkbBoot=(document.documentElement&&document.documentElement.dataset"
+                    + "&&document.documentElement.dataset.ran==='page')?'late':'before-page';}"
+                    + "catch(e){globalThis.__pkbBoot='err';}";
+
+    /**
+     * Reads {@code __pkbUi} and the preload's boot mark from the pkb-surface world.
+     * The mark is taken when the preload runs, so a later page script cannot hide it.
+     */
+    private static String probeSurface(CdpConnection connection, String sessionId, String frameId) {
+        long deadline = System.nanoTime() + 3_000_000_000L;
+        long openAt = deadline - 1_000_000_000L;
+        String last = "no-context";
+        boolean opened = false;
+        while (System.nanoTime() < deadline) {
+            refreshUrls(connection, sessionId);
+            int contextId = isolatedContext(connection, sessionId, frameId);
+            if (contextId <= 0 && !opened && System.nanoTime() >= openAt) {
+                awaitReady(connection, sessionId);
+                contextId = openSurfaceWorld(connection, sessionId, frameId);
+                opened = true;
+            }
+            if (contextId <= 0) {
+                sleepBriefly();
+                continue;
+            }
+            last = readBoot(connection, sessionId, contextId);
+            if ("before-page".equals(last)) return last;
+            if (last.startsWith("boot=") && last.length() > "boot=".length()) return last;
+            sleepBriefly();
+        }
+        return last;
+    }
+
+    private static int isolatedContext(CdpConnection connection, String sessionId, String frameId) {
+        Map<String, Integer> contexts = CONTEXTS.get(connection);
+        if (contexts == null) return 0;
+        if (sessionId != null && !sessionId.isBlank()) {
+            Integer bySession = contexts.get("s:" + sessionId);
+            if (bySession != null && bySession > 0) return bySession;
+        }
+        if (frameId != null && !frameId.isBlank()) {
+            Integer byFrame = contexts.get("f:" + frameId);
+            if (byFrame != null && byFrame > 0) return byFrame;
+        }
+        return 0;
+    }
+
+    /** Opens the pkb-surface world after the document has left the debugger pause. */
+    private static int openSurfaceWorld(CdpConnection connection, String sessionId, String frameId) {
+        try {
+            String id = frameId;
+            JsonNode tree = connection.call("Page.getFrameTree", Jsons.object(), sessionId, Duration.ofSeconds(2));
+            String fresh = tree.path("frameTree").path("frame").path("id").asText("");
+            if (!fresh.isBlank()) id = fresh;
+            storeTree(connection, tree.path("frameTree"), "");
+            if (id == null || id.isBlank()) return 0;
+            ObjectNode world = Jsons.object();
+            world.put("frameId", id);
+            world.put("worldName", "pkb-surface");
+            world.put("grantUniveralAccess", true);
+            JsonNode created = connection.call("Page.createIsolatedWorld", world, sessionId, Duration.ofSeconds(2));
+            return created.path("executionContextId").asInt(0);
+        } catch (RuntimeException failure) {
+            EngineLog.info("frame", "world " + failure.getMessage());
+            return 0;
+        }
+    }
+
+    private static void awaitReady(CdpConnection connection, String sessionId) {
+        try {
+            ObjectNode ready = Jsons.object();
+            ready.put("expression", "document.readyState");
+            ready.put("returnByValue", true);
+            JsonNode state = connection.call("Runtime.evaluate", ready, sessionId, Duration.ofSeconds(1));
+            String value = state.path("result").path("value").asText("");
+            if ("complete".equals(value) || "interactive".equals(value)) return;
+        } catch (RuntimeException failure) {
+            EngineLog.info("frame", "ready " + failure.getMessage());
+        }
+    }
+
+    private static String readBoot(CdpConnection connection, String sessionId, int contextId) {
+        try {
+            ObjectNode kind = Jsons.object();
+            kind.put("expression", "({ui:typeof globalThis.__pkbUi,boot:String(globalThis.__pkbBoot||'')})");
+            kind.put("returnByValue", true);
+            kind.put("contextId", contextId);
+            JsonNode value = connection.call("Runtime.evaluate", kind, sessionId, TIMEOUT).path("result").path("value");
+            String ui = value.path("ui").asText("");
+            String boot = value.path("boot").asText("");
+            if (!"object".equals(ui)) return "ui=" + ui + " boot=" + boot;
+            return "before-page".equals(boot) ? "before-page" : "boot=" + boot;
+        } catch (RuntimeException failure) {
+            EngineLog.info("frame", "surface " + failure.getMessage());
+            return failure.getMessage() == null ? "err" : failure.getMessage();
+        }
+    }
+
+    private static void sleepBriefly() {
+        try {
+            Thread.sleep(50);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private static String surfaceRuntime() {
+        String cached = SURFACE_RUNTIME;
+        if (cached != null) return cached;
+        String script = readResource("/tools/dscode/browser/surface/pkb-runtime.js");
+        if (script == null || script.isBlank()) {
+            SURFACE_RUNTIME = "";
+            return "";
+        }
+        String css = readResource("/tools/dscode/browser/surface/panel.css");
+        if (css != null) script = script.replace("\"__PKB_PANEL_CSS__\"", jsQuote(css));
+        SURFACE_RUNTIME = script;
+        return script;
+    }
+
+    private static String readResource(String path) {
+        String relative = path.startsWith("/") ? path.substring(1) : path;
+        try (InputStream in = openResource(path, relative)) {
+            if (in == null) return null;
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (java.io.IOException failure) {
+            EngineLog.info("frame", "runtime " + failure.getMessage());
+            return null;
+        }
+    }
+
+    /** Classpath first, then the built resource directory the host is launched from. */
+    private static InputStream openResource(String path, String relative) throws java.io.IOException {
+        InputStream in = FrameCoverage.class.getResourceAsStream(path);
+        if (in != null) return in;
+        ClassLoader context = Thread.currentThread().getContextClassLoader();
+        if (context != null) {
+            in = context.getResourceAsStream(relative);
+            if (in != null) return in;
+        }
+        String classpath = System.getProperty("java.class.path", "");
+        for (String entry : classpath.split(java.io.File.pathSeparator)) {
+            if (entry.isBlank()) continue;
+            java.nio.file.Path file = java.nio.file.Path.of(entry).resolve(relative);
+            if (java.nio.file.Files.isRegularFile(file)) return java.nio.file.Files.newInputStream(file);
+        }
+        for (String root : new String[] {"build/resources/main", "src/main/resources"}) {
+            java.nio.file.Path file = java.nio.file.Path.of(root).resolve(relative);
+            if (java.nio.file.Files.isRegularFile(file)) return java.nio.file.Files.newInputStream(file);
+        }
+        return null;
+    }
+
+    private static String jsQuote(String text) {
+        StringBuilder out = new StringBuilder(text.length() + 2).append('"');
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            switch (c) {
+                case '\\' -> out.append("\\\\");
+                case '"' -> out.append("\\\"");
+                case '\n' -> out.append("\\n");
+                case '\r' -> out.append("\\r");
+                case '\t' -> out.append("\\t");
+                default -> {
+                    if (c < 0x20) out.append(String.format("\\u%04x", (int) c));
+                    else out.append(c);
                 }
             }
         }
+        return out.append('"').toString();
     }
 
     private static void remember(CdpConnection connection, String frameId, String sessionId) {

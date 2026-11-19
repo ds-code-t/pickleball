@@ -2,9 +2,23 @@
 // Runs once per document, in the pkb-surface isolated world when the session has CDP or BiDi.
 // It moves light-DOM placements with the CSS `translate` property, so the inline left/top that
 // Java wrote (the resolved box) stay as reported. Rings live in a shadow-root layer.
-(function () {
+(function pkbSurfaceInstall() {
   'use strict';
-  if (typeof window === 'undefined' || typeof document === 'undefined' || !document.documentElement) return;
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  // A preload can run before <html> exists. Retry once the element is inserted,
+  // which is still before the page's own scripts.
+  if (!document.documentElement) {
+    if (window.__pkbSurfaceWait) return;
+    window.__pkbSurfaceWait = true;
+    var wait = new MutationObserver(function () {
+      if (!document.documentElement) return;
+      wait.disconnect();
+      window.__pkbSurfaceWait = false;
+      pkbSurfaceInstall();
+    });
+    try { wait.observe(document, {childList: true, subtree: true}); } catch (ignored) { /* not observable yet */ }
+    return;
+  }
   var VERSION = '3.0.0-block';
   if (window.__pkbUi && window.__pkbUi.version === VERSION) return;
   if (window.__pkbUi && typeof window.__pkbUi.dispose === 'function') {

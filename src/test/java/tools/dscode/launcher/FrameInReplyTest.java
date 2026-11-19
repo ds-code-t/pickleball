@@ -18,6 +18,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -66,12 +67,38 @@ class FrameInReplyTest {
         assertEquals(0, started.code, started.err + started.out);
         assertTrue(started.out.contains("navigated=true"), started.out);
 
+        Capture listed = run("frame", "--target=browser:auto", "--list", "--run-id=frames");
+        assertEquals(0, listed.code, listed.err + listed.out);
+        String main = "";
+        String inner = "";
+        for (JsonNode frameRow : JSON.readTree(listed.out).path("frames")) {
+            String id = frameRow.path("id").asText("");
+            if (frameRow.path("parentId").asText("x").isBlank() && main.isBlank()) main = id;
+            String url = frameRow.path("url").asText("");
+            if (url.contains("srcdoc") || url.startsWith("about:")) inner = id;
+        }
+        assertFalse(main.isBlank(), listed.out);
+        assertFalse(inner.isBlank(), listed.out);
+        assertNotEquals(main, inner, listed.out);
+
         Capture found = run("find", "--target=browser:auto", "--query=Save", "--run-id=frames");
         assertEquals(0, found.code, found.err + found.out);
         JsonNode hit = JSON.readTree(found.out);
         String frame = hit.path("frame").asText("");
-        assertFalse(frame.isBlank(), found.out);
+        assertEquals(main, frame, found.out);
         assertEquals("Save", hit.path("hits").get(0).path("name").asText(), found.out);
+        assertEquals("same", hit.path("contexts").asText(""), found.out);
+
+        Capture painted = run("highlight", "--handle=save", "--target=browser:auto", "--preset=yellow", "--run-id=frames");
+        assertEquals(0, painted.code, painted.err + painted.out);
+        assertEquals(main, JSON.readTree(painted.out).path("frame").asText(""), painted.out);
+        assertTrue(JSON.readTree(painted.out).path("applied").asBoolean(), painted.out);
+
+        Capture missedPaint = run("highlight", "--handle=missing", "--target=browser:auto", "--preset=yellow", "--run-id=frames");
+        assertEquals(1, missedPaint.code, missedPaint.err + missedPaint.out);
+        JsonNode missedBody = JSON.readTree(missedPaint.out);
+        assertFalse(missedBody.path("applied").asBoolean(), missedPaint.out);
+        assertEquals(main, missedBody.path("frame").asText(""), missedPaint.out);
 
         Capture shot = run("snap", "--target=browser:auto", "--mode=compact", "--run-id=frames");
         assertEquals(0, shot.code, shot.err + shot.out);
@@ -93,10 +120,14 @@ class FrameInReplyTest {
         Capture outside = run("find", "--target=browser:auto", "--query=Save", "--run-id=frames");
         assertEquals(1, outside.code, outside.err + outside.out);
         assertTrue(outside.out.contains("not found"), outside.out);
+        assertEquals(inner, JSON.readTree(outside.out).path("frame").asText(""), outside.out);
 
         Capture inside = run("find", "--target=browser:auto", "--query=Inside", "--run-id=frames");
         assertEquals(0, inside.code, inside.err + inside.out);
-        assertEquals("Inside", JSON.readTree(inside.out).path("hits").get(0).path("name").asText(), inside.out);
+        JsonNode insideHit = JSON.readTree(inside.out);
+        assertEquals("Inside", insideHit.path("hits").get(0).path("name").asText(), inside.out);
+        assertEquals(inner, insideHit.path("frame").asText(""), inside.out);
+        assertEquals(inner, insideHit.path("hits").get(0).path("frame").asText(""), inside.out);
 
         Capture reset = run("frame", "--target=browser:auto", "--reset", "--run-id=frames");
         assertEquals(0, reset.code, reset.err + reset.out);

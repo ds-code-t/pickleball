@@ -223,10 +223,16 @@ public final class TargetVerb {
         Held page = openBrowser(resolved(target, args));
         try {
             Map<String, String> flags = scopedFrame(runId, target);
+            DomNode root = tree(page.session);
             List<DomNode> hits = args.get("scroll-search") == null
-                    ? locate(tree(page.session), query, flags)
+                    ? locate(root, query, flags)
                     : scrollFind(page.session, query, flags);
-            if (hits.isEmpty()) return fail("find", "not found");
+            if (hits.isEmpty()) {
+                Outcome missed = fail("find", "not found");
+                stamp(missed.body(), page.session.connection(), null);
+                putEntered(missed.body(), runId, page.session.connection());
+                return missed;
+            }
             String version = docVersion(page.session.connection());
             List<Map<String, Object>> rows = publish(runId, "browser", page.session.id, version, hits, query);
             remember(runId, page.session);
@@ -236,6 +242,8 @@ public final class TargetVerb {
             body.put("ref", rows.get(0).get("ref"));
             if (args.get("scroll-search") != null) body.put("scrollSearch", true);
             stamp(body, page.session.connection(), hits.get(0));
+            putEntered(body, runId, page.session.connection(), rows);
+            stampContexts(body, root);
             return ok(body);
         } finally {
             page.release();
@@ -291,6 +299,8 @@ public final class TargetVerb {
             if (!effect.applied()) {
                 Outcome failed = fail("act", "not applied");
                 failed.body().put("used", effect.used());
+                stamp(failed.body(), page.session.connection(), node);
+                putEntered(failed.body(), runId, page.session.connection());
                 return failed;
             }
             String after = docVersion(page.session.connection());
@@ -302,6 +312,7 @@ public final class TargetVerb {
                 body.put("snap", diffOf(titleBefore, title(page.session.connection()), before, after));
             }
             stamp(body, page.session.connection(), node);
+            putEntered(body, runId, page.session.connection());
             return ok(body);
         } finally {
             page.release();
@@ -416,6 +427,7 @@ public final class TargetVerb {
             else BASELINE.put(baselineKey(runId), picture + "\n" + version);
             body.put("virtualized", virtualized(page.session.connection()));
             stamp(body, page.session.connection(), root);
+            stampContexts(body, root);
             return ok(body);
         } finally {
             page.release();
@@ -665,6 +677,11 @@ public final class TargetVerb {
             if (inputOff) FallbackLog.note(project, runId, "act", "cdp", "js", "cdp input disabled");
             return new Effect(inputOff ? "js" : "cdp", false);
         }
+        String framed = cdpSessionOf(node);
+        if (!framed.isBlank()) return actInFrame(session.connection(), framed, kind, value, node);
+        if ("click".equals(kind) && insideFrame(node) && !closedShadow(acted)) {
+            return clickInPlace(session.connection(), node);
+        }
         if (inputOff) PageActions.useCdpInput(false);
         try {
             if (inputOff) {
@@ -701,26 +718,101 @@ public final class TargetVerb {
 
     /** One {@code element.click()} when the coordinate click did not change the page. */
     private static boolean clickByResolve(CdpConnection cdp, DomNode node) {
-        if (cdp == null || node == null || node.backendNodeId <= 0) return false;
+        return callOnNode(cdp, "", node, "function(){ this.click(); return true; }") != null;
+    }
+
+    /** One click on a same-origin frame node. Coordinates from that document miss the parent viewport. */
+    private static Effect clickInPlace(CdpConnection cdp, DomNode node) {
+        String before = pageMark(cdp);
+        if (callOnNode(cdp, "", node, "function(){ this.click(); return true; }") == null) return new Effect("cdp", false);
+        return new Effect("cdp", !before.equals(pageMark(cdp)));
+    }
+
+    /** Click, type, or select on the frame session that owns the node. One call, then a read-back. */
+    private static Effect actInFrame(CdpConnection cdp, String sessionId, String kind, String value, DomNode node) {
+        String before = pageMark(cdp, sessionId);
+        String script = switch (kind) {
+            case "type" -> "function(){ this.focus(); this.value=" + jsString(value)
+                    + "; this.dispatchEvent(new Event('input',{bubbles:true})); this.dispatchEvent(new Event('change',{bubbles:true})); return String(this.value); }";
+            case "select" -> "function(){ var box=this.tagName==='OPTION'?(this.closest('select')||this):this; if(!box||box.tagName!=='SELECT') return '';"
+                    + " var value=" + jsString(value) + "; var matched=false; for(var j=0;j<box.options.length;j++){ var o=box.options[j];"
+                    + " var label=(o.label||o.text||'').replace(/\\s+/g,' ').trim(); if(o.value===value||label===value){ o.selected=true; matched=true; break; } }"
+                    + " if(!matched) return ''; box.dispatchEvent(new Event('input',{bubbles:true})); box.dispatchEvent(new Event('change',{bubbles:true}));"
+                    + " var chosen=box.options[box.selectedIndex]; return chosen?String(chosen.value||chosen.text||'').trim():''; }";
+            case "click", "hover", "press" -> "function(){ this.click(); return true; }";
+            default -> "";
+        };
+        if (script.isBlank()) return new Effect("cdp", false);
+        String read = callOnNode(cdp, sessionId, node, script);
+        if (read == null) return new Effect("cdp", false);
+        if ("type".equals(kind) || "select".equals(kind)) return new Effect("cdp", valueMatches(value, read));
+        return new Effect("cdp", !before.equals(pageMark(cdp, sessionId)));
+    }
+
+    /** {@code null} when the node cannot be called. The result is the returned string. */
+    private static String callOnNode(CdpConnection cdp, String sessionId, DomNode node, String function) {
+        if (cdp == null || node == null || node.backendNodeId <= 0 || function == null || function.isBlank()) return null;
         try {
             ObjectNode resolve = Jsons.object();
             resolve.put("backendNodeId", node.backendNodeId);
-            JsonNode object = cdp.call("DOM.resolveNode", resolve, Duration.ofSeconds(5)).path("object");
-            String objectId = object.path("objectId").asText("");
-            if (objectId.isBlank()) return false;
+            JsonNode resolved = sessionId == null || sessionId.isBlank()
+                    ? cdp.call("DOM.resolveNode", resolve, Duration.ofSeconds(5))
+                    : cdp.call("DOM.resolveNode", resolve, sessionId, Duration.ofSeconds(5));
+            String objectId = resolved.path("object").path("objectId").asText("");
+            if (objectId.isBlank()) return null;
             ObjectNode call = Jsons.object();
             call.put("objectId", objectId);
-            call.put("functionDeclaration", "function(){ this.click(); return true; }");
+            call.put("functionDeclaration", function);
             call.put("returnByValue", true);
-            JsonNode called = cdp.call("Runtime.callFunctionOn", call, Duration.ofSeconds(5));
-            return !called.has("exceptionDetails");
+            JsonNode called = sessionId == null || sessionId.isBlank()
+                    ? cdp.call("Runtime.callFunctionOn", call, Duration.ofSeconds(5))
+                    : cdp.call("Runtime.callFunctionOn", call, sessionId, Duration.ofSeconds(5));
+            if (called.has("exceptionDetails")) return null;
+            return jsonText(called.path("result").path("value"));
         } catch (RuntimeException failure) {
-            return false;
+            return null;
         }
     }
 
+    private static String cdpSessionOf(DomNode node) {
+        for (DomNode cursor = node; cursor != null; cursor = cursor.parent) {
+            if (cursor.cdpSession != null && !cursor.cdpSession.isBlank()) return cursor.cdpSession;
+        }
+        return "";
+    }
+
+    private static boolean insideFrame(DomNode node) {
+        for (DomNode cursor = node == null ? null : node.parent; cursor != null; cursor = cursor.parent) {
+            if (cursor.iframe) return true;
+        }
+        return false;
+    }
+
     private static String pageMark(CdpConnection cdp) {
-        return title(cdp) + "\n" + docVersion(cdp);
+        return pageMark(cdp, "");
+    }
+
+    private static String pageMark(CdpConnection cdp, String sessionId) {
+        return evalText(cdp, sessionId, "document.title") + "\n" + docVersion(cdp, sessionId);
+    }
+
+    private static String docVersion(CdpConnection cdp, String sessionId) {
+        String expression = "(function(){var root=document.documentElement;if(!root)return '0:0';"
+                + "if(!window.__pkbDocWatch){window.__pkbDocCount=0;window.__pkbDocWatch=new MutationObserver(function(){window.__pkbDocCount++;});"
+                + "window.__pkbDocWatch.observe(root,{subtree:true,childList:true,attributes:true,characterData:true});}"
+                + "return location.href+':'+window.__pkbDocCount;})()";
+        String text = evalText(cdp, sessionId, expression);
+        return text.isBlank() ? "0:0" : text;
+    }
+
+    private static String evalText(CdpConnection cdp, String sessionId, String expression) {
+        ObjectNode params = Jsons.object();
+        params.put("returnByValue", true);
+        params.put("expression", expression);
+        JsonNode value = sessionId == null || sessionId.isBlank()
+                ? cdp.call("Runtime.evaluate", params, Duration.ofSeconds(5))
+                : cdp.call("Runtime.evaluate", params, sessionId, Duration.ofSeconds(5));
+        return value.path("result").path("value").asText("");
     }
 
     /** JS runs on the session that was targeted, including a {@code browser:cdp=} page. */
@@ -885,6 +977,14 @@ public final class TargetVerb {
         created.put("grantUniveralAccess", true);
         JsonNode worldNode = cdp.call("Page.createIsolatedWorld", created, Duration.ofSeconds(5));
         return worldNode.path("executionContextId").asInt(0);
+    }
+
+    public static String mainFrame(CdpConnection cdp) {
+        try {
+            return mainFrameId(cdp);
+        } catch (RuntimeException failure) {
+            return "";
+        }
     }
 
     private static String mainFrameId(CdpConnection cdp) {
@@ -1358,8 +1458,14 @@ public final class TargetVerb {
             row.put("handle", node.backendNodeId);
             if (node.frameId != null && !node.frameId.isBlank() && !"main".equals(node.frameId)) row.put("frame", node.frameId);
             else if (node.framePath != null && !node.framePath.isBlank()) row.put("frame", node.framePath);
+            String via = graftViaOf(node);
+            if (!via.isBlank()) row.put("via", via);
             String shadow = shadowModeOf(node);
             if (!shadow.isBlank()) row.put("shadow", shadow);
+            String shadowPath = shadowPathOf(node);
+            if (!shadowPath.isBlank()) {
+                row.put("shadow_path", shadowPath);
+            }
             rows.add(row);
         }
         return rows;
@@ -1646,12 +1752,21 @@ public final class TargetVerb {
         if (!id.isBlank()) {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("id", id);
-            row.put("parentId", parent);
-            row.put("url", frame.path("url").asText(""));
+            String reported = frame.path("parentId").asText("");
+            String parentId = !parent.isBlank() ? parent : reported;
+            if (parentId.isBlank()) parentId = FrameCoverage.parentOf(cdp, id);
+            row.put("parentId", parentId);
+            String url = frame.path("url").asText("");
+            if (url.isBlank() || "about:blank".equals(url)) {
+                String known = FrameCoverage.url(cdp, id);
+                if (!known.isBlank()) url = known;
+            }
+            row.put("url", url);
             row.put("name", frame.path("name").asText(""));
             String session = FrameCoverage.sessionId(cdp, id);
             row.put("session", !session.isBlank());
-            if (!session.isBlank()) row.put("boot", FrameCoverage.boot(cdp, session));
+            String surface = FrameCoverage.surface(cdp, id);
+            if (!surface.isBlank()) row.put("surface", surface);
             rows.add(row);
         }
         JsonNode children = node.path("childFrames");
@@ -1668,12 +1783,13 @@ public final class TargetVerb {
             if (id.isBlank() || !seen.add(id)) continue;
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("id", id);
-            row.put("parentId", "");
+            row.put("parentId", FrameCoverage.parentOf(cdp, id));
             row.put("url", FrameCoverage.url(cdp, id));
             row.put("name", "");
             String session = FrameCoverage.sessionId(cdp, id);
             row.put("session", !session.isBlank());
-            if (!session.isBlank()) row.put("boot", FrameCoverage.boot(cdp, session));
+            String surface = FrameCoverage.surface(cdp, id);
+            if (!surface.isBlank()) row.put("surface", surface);
             rows.add(row);
         }
     }
@@ -1703,6 +1819,7 @@ public final class TargetVerb {
     }
 
     private static List<DomNode> scrollFind(BrowserSession session, String query, Map<String, String> flags) {
+        String saved = scrollState(session.connection());
         List<DomNode> hits = locate(tree(session), query, flags);
         int stuck = 0;
         for (int step = 0; hits.isEmpty() && step < 40; step++) {
@@ -1714,12 +1831,49 @@ public final class TargetVerb {
             stuck = 0;
             hits = locate(tree(session), query, flags);
         }
-        if (!hits.isEmpty() && query != null && !query.isBlank()) {
+        if (hits.isEmpty()) {
+            restoreScroll(session.connection(), saved);
+            return hits;
+        }
+        if (query != null && !query.isBlank()) {
             reveal(session.connection(), query);
             List<DomNode> painted = locate(tree(session), query, flags);
             if (!painted.isEmpty()) hits = painted;
         }
         return hits;
+    }
+
+    private static String scrollState(CdpConnection cdp) {
+        ObjectNode params = Jsons.object();
+        params.put("expression", "(function(){function scrollable(el){var s=getComputedStyle(el);var oy=s.overflowY;"
+                + "return (oy==='auto'||oy==='scroll')&&el.scrollHeight>el.clientHeight+2;}"
+                + "var nodes=document.querySelectorAll('*');var tops=[];"
+                + "for(var i=0;i<nodes.length;i++){if(scrollable(nodes[i])) tops.push(nodes[i].scrollTop);}"
+                + "var root=document.scrollingElement; if(root) tops.push(root.scrollTop); return tops.join(',');})()");
+        params.put("returnByValue", true);
+        try {
+            return cdp.call("Runtime.evaluate", params, Duration.ofSeconds(5)).path("result").path("value").asText("");
+        } catch (RuntimeException failure) {
+            return "";
+        }
+    }
+
+    private static void restoreScroll(CdpConnection cdp, String saved) {
+        if (cdp == null || saved == null) return;
+        ObjectNode params = Jsons.object();
+        params.put("expression", "(function(){var saved=" + jsString(saved) + ".split(',');"
+                + "function scrollable(el){var s=getComputedStyle(el);var oy=s.overflowY;"
+                + "return (oy==='auto'||oy==='scroll')&&el.scrollHeight>el.clientHeight+2;}"
+                + "var nodes=document.querySelectorAll('*');var n=0;"
+                + "for(var i=0;i<nodes.length;i++){if(!scrollable(nodes[i])) continue;"
+                + "if(n<saved.length) nodes[i].scrollTop=Number(saved[n])||0; n++;}"
+                + "var root=document.scrollingElement; if(root&&n<saved.length) root.scrollTop=Number(saved[n])||0; return true;})()");
+        params.put("returnByValue", true);
+        try {
+            cdp.call("Runtime.evaluate", params, Duration.ofSeconds(5));
+        } catch (RuntimeException ignored) {
+            // A miss still reports not found when the scroll position cannot be put back.
+        }
     }
 
     /**
@@ -1759,10 +1913,13 @@ public final class TargetVerb {
         params.put("expression", "(function(){"
                 + "function scrollable(el){var s=getComputedStyle(el);var oy=s.overflowY;"
                 + "return (oy==='auto'||oy==='scroll')&&el.scrollHeight>el.clientHeight+2;}"
+                + "function virtual(el){return scrollable(el)&&el.scrollHeight>800&&el.children.length<30;}"
                 + "var nodes=document.querySelectorAll('*');var box=null;"
-                + "for(var i=0;i<nodes.length;i++){if(scrollable(nodes[i])){box=nodes[i];break;}}"
-                + "if(!box) box=document.scrollingElement||document.documentElement;"
+                + "for(var i=0;i<nodes.length;i++){if(virtual(nodes[i])){box=nodes[i];break;}}"
+                + "if(!box){var root=document.scrollingElement||document.documentElement; if(root&&scrollable(root)) box=root;}"
+                + "if(!box) return false;"
                 + "var before=box.scrollTop;box.scrollTop=before+Math.max(40,Math.floor(box.clientHeight*0.8));"
+                + "try{box.dispatchEvent(new Event('scroll'));}catch(e){}"
                 + "return box.scrollTop!==before;})()");
         params.put("returnByValue", true);
         try {
@@ -1794,7 +1951,8 @@ public final class TargetVerb {
 
     private static String shadowModeOf(DomNode node) {
         for (DomNode cursor = node; cursor != null; cursor = cursor.parent) {
-            if (cursor.shadowRoot && "closed".equalsIgnoreCase(cursor.shadowMode)) return "closed";
+            if (!cursor.shadowRoot || cursor.shadowMode == null || cursor.shadowMode.isBlank()) continue;
+            return "closed".equalsIgnoreCase(cursor.shadowMode) ? "closed" : "open";
         }
         return "";
     }
@@ -1810,17 +1968,115 @@ public final class TargetVerb {
             JsonNode object = cdp.call("DOM.resolveNode", resolve, Duration.ofSeconds(5)).path("object");
             String objectId = object.path("objectId").asText("");
             if (objectId.isBlank()) return null;
-            String before = pageMark(cdp);
             ObjectNode call = Jsons.object();
             call.put("objectId", objectId);
-            call.put("functionDeclaration", "function(){ this.click(); return document.title; }");
+            // Title, text, and attributes on the node. A closed-shadow dataset write is not in the light DOM.
+            call.put("functionDeclaration", "function(){ var before=String(this.outerHTML)+'\\n'+document.title;"
+                    + " this.click(); var after=String(this.outerHTML)+'\\n'+document.title;"
+                    + " return before===after?'same':'changed'; }");
             call.put("returnByValue", true);
             JsonNode called = cdp.call("Runtime.callFunctionOn", call, Duration.ofSeconds(5));
             if (called.has("exceptionDetails")) return new Effect("resolveNode", false);
-            return new Effect("resolveNode", !before.equals(pageMark(cdp)));
+            return new Effect("resolveNode", "changed".equals(called.path("result").path("value").asText("")));
         } catch (RuntimeException failure) {
             return new Effect("resolveNode", false);
         }
+    }
+
+    private static void putEntered(Map<String, Object> body, String runId, CdpConnection cdp) {
+        putEntered(body, runId, cdp, null);
+    }
+
+    /** A scoped find reports the entered frame's CDP id, not the main frame. */
+    private static void putEntered(Map<String, Object> body, String runId, CdpConnection cdp, List<Map<String, Object>> rows) {
+        String token = ENTERED.get(runId == null ? "" : runId);
+        if (token == null || token.isBlank() || cdp == null) return;
+        String id = resolveFrameId(cdp, token);
+        if (id.isBlank()) return;
+        body.put("frame", id);
+        if (rows == null) return;
+        for (Map<String, Object> row : rows) row.put("frame", id);
+    }
+
+    private static String resolveFrameId(CdpConnection cdp, String token) {
+        for (Map<String, Object> row : listFrames(cdp)) {
+            if (token.equals(String.valueOf(row.get("id"))) || token.equals(String.valueOf(row.get("name")))) {
+                return String.valueOf(row.get("id"));
+            }
+        }
+        DomNode owner = findFrameElement(tree(cdp), token);
+        if (owner == null) return token;
+        for (DomNode child : owner.children) {
+            if (child.nodeType == 9 && child.frameId != null && !child.frameId.isBlank() && !"main".equals(child.frameId)) {
+                return child.frameId;
+            }
+        }
+        if (owner.ownerFrameId != null && !owner.ownerFrameId.isBlank() && !owner.ownerFrameId.equals(owner.frameId)) {
+            return owner.ownerFrameId;
+        }
+        return token;
+    }
+
+    private static DomNode findFrameElement(DomNode node, String id) {
+        if (node == null) return null;
+        if (node.iframe && (id.equals(node.attributes.get("id")) || id.equals(node.attributes.get("name"))
+                || id.equals(node.ownerFrameId) || id.equals(node.frameId))) {
+            return node;
+        }
+        for (DomNode child : node.children) {
+            DomNode found = findFrameElement(child, id);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    /**
+     * Steps reach the main document, same-origin frames, and open shadow.
+     * An out-of-process frame or a closed shadow is reported as a difference.
+     */
+    private static void stampContexts(Map<String, Object> body, DomNode root) {
+        List<String> extra = new ArrayList<>();
+        collectContextDiff(root, extra);
+        if (extra.isEmpty()) {
+            body.put("contexts", "same");
+            return;
+        }
+        body.put("contexts", "diff");
+        body.put("contextDiff", "steps stay on the main document, same-origin frames, and open shadow; agent also has " + String.join(", ", extra));
+    }
+
+    private static void collectContextDiff(DomNode node, List<String> extra) {
+        if (node == null) return;
+        if (node.iframe) {
+            for (DomNode child : node.children) {
+                if (child.nodeType == 9 && child.cdpSession != null && !child.cdpSession.isBlank()) {
+                    String id = child.frameId == null || child.frameId.isBlank() ? node.ownerFrameId : child.frameId;
+                    extra.add("oopif " + id);
+                }
+            }
+        }
+        if (node.shadowRoot && "closed".equalsIgnoreCase(node.shadowMode)) {
+            String host = node.parent == null ? "" : selector(node.parent, "");
+            extra.add("closed-shadow " + host);
+        }
+        for (DomNode child : node.children) collectContextDiff(child, extra);
+        for (DomNode shadow : node.shadowRoots) collectContextDiff(shadow, extra);
+    }
+
+    private static String graftViaOf(DomNode node) {
+        for (DomNode cursor = node; cursor != null; cursor = cursor.parent) {
+            if (cursor.graftVia != null && !cursor.graftVia.isBlank()) return cursor.graftVia;
+        }
+        return "";
+    }
+
+    private static String shadowPathOf(DomNode node) {
+        if (node != null && node.shadowPath != null && !node.shadowPath.isBlank()) return node.shadowPath;
+        List<String> hosts = new ArrayList<>();
+        for (DomNode cursor = node; cursor != null; cursor = cursor.parent) {
+            if (cursor.shadowRoot && cursor.parent != null) hosts.add(0, selector(cursor.parent, ""));
+        }
+        return String.join(" >> ", hosts);
     }
 
     private static void stamp(Map<String, Object> body, CdpConnection cdp, DomNode node) {

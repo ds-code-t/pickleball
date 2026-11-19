@@ -40,7 +40,12 @@ class OopifAutoAttachTest {
         assumeTrue(BrowserSession.findChrome() != null, "skipped: chrome is not on PATH");
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/parent", exchange -> write(exchange, """
-                <!DOCTYPE html><html><head><title>Ready</title></head><body><p>Parent</p></body></html>
+                <!DOCTYPE html><html><head><title>Ready</title>
+                <script>
+                window.__hook = 'missing';
+                addEventListener('message', (e) => { if (e.data && e.data.hook) window.__hook = String(e.data.hook); });
+                </script>
+                </head><body><p>Parent</p></body></html>
                 """.getBytes(StandardCharsets.UTF_8)));
         server.createContext("/child", exchange -> write(exchange, child("Inner")));
         server.createContext("/late", exchange -> write(exchange, child("Late")));
@@ -63,6 +68,15 @@ class OopifAutoAttachTest {
             JsonNode first = awaitBoot("/child");
             String firstId = frameId(first, "/child");
             assertFalse(firstId.isBlank(), first.toString());
+            String hook = "missing";
+            for (int attempt = 0; attempt < 20 && "missing".equals(hook); attempt++) {
+                Capture read = run(
+                        "eval", "--target=browser:auto", "--world=main", "--run-id=oopif", "--expr=window.__hook");
+                assertEquals(0, read.code, read.err + read.out);
+                hook = JSON.readTree(read.out).path("value").asText("");
+                if ("missing".equals(hook)) Thread.sleep(100);
+            }
+            assertEquals("undefined", hook, first.toString());
 
             Capture found = run("find", "--target=browser:auto", "--query=Inner", "--run-id=oopif");
             assertEquals(0, found.code, found.err + found.out);
@@ -104,14 +118,16 @@ class OopifAutoAttachTest {
             String url = frame.path("url").asText("");
             if (!url.contains(path)) continue;
             if (!frame.path("session").asBoolean(false)) continue;
-            if (!"before-page".equals(frame.path("boot").asText(""))) continue;
+            if (frame.has("boot")) return "";
+            if (!"before-page".equals(frame.path("surface").asText(""))) continue;
             return frame.path("id").asText("");
         }
         return "";
     }
 
     private static byte[] child(String label) {
-        return ("<!DOCTYPE html><html><head><script>document.documentElement.dataset.boot=window.__pkbOopif||'missing'</script></head><body><button id=\"inner\">"
+        return ("<!DOCTYPE html><html><head><script>document.documentElement.dataset.ran='page';"
+                + "parent.postMessage({hook: typeof window.__pkbOopif}, '*');</script></head><body><button id=\"inner\">"
                 + label + "</button></body></html>").getBytes(StandardCharsets.UTF_8);
     }
 

@@ -199,65 +199,136 @@ public final class LiveTree {
      * on this target, so the child target is attached flattened and its document is grafted on.
      */
     private static void graftOutOfProcess(CdpConnection connection, DomNode root, Duration timeout) {
+        graftLevel(connection, root, timeout, 0);
+    }
+
+    /** Grafts empty frame owners, then empty owners inside each grafted child document. */
+    private static void graftLevel(CdpConnection connection, DomNode root, Duration timeout, int depth) {
+        if (root == null || depth > 6) return;
         List<DomNode> empty = new ArrayList<>();
         collectEmptyFrames(root, empty);
         if (empty.isEmpty()) return;
         boolean[] used = new boolean[empty.size()];
+        List<DomNode> grafted = new ArrayList<>();
         for (int index = 0; index < empty.size(); index++) {
-            String frameId = empty.get(index).ownerFrameId;
-            String sessionId = FrameCoverage.awaitSession(connection, frameId, 1500);
+            String sessionId = coverageSession(connection, empty.get(index), 1500);
             if (sessionId.isBlank()) continue;
-            if (graftSession(connection, empty.get(index), sessionId, timeout)) used[index] = true;
+            DomNode document = graftSession(connection, empty.get(index), sessionId, "coverage", timeout);
+            if (document != null) {
+                used[index] = true;
+                grafted.add(document);
+            }
         }
         boolean pending = false;
         for (boolean done : used) if (!done) pending = true;
-        if (!pending) return;
-        JsonNode listed;
-        try {
-            listed = connection.call("Target.getTargets", Jsons.object(), timeout);
-        } catch (RuntimeException failure) {
-            EngineLog.info("frame", "targets " + failure.getMessage());
-            return;
-        }
-        JsonNode infos = listed.path("targetInfos");
-        if (!infos.isArray()) return;
-        for (JsonNode info : infos) {
-            if (!"iframe".equals(info.path("type").asText(""))) continue;
-            String targetId = info.path("targetId").asText("");
-            String url = info.path("url").asText("");
-            int slot = matchFrame(empty, used, url);
-            if (slot < 0 || targetId.isBlank()) continue;
+        if (pending) {
+            JsonNode listed;
             try {
-                ObjectNode attach = Jsons.object();
-                attach.put("targetId", targetId);
-                attach.put("flatten", true);
-                JsonNode session = connection.call("Target.attachToTarget", attach, timeout);
-                String sessionId = session.path("sessionId").asText("");
-                if (sessionId.isBlank()) continue;
-                if (graftSession(connection, empty.get(slot), sessionId, timeout)) {
-                    used[slot] = true;
-                    EngineLog.info("frame", "oopif " + targetId);
-                }
+                listed = connection.call("Target.getTargets", Jsons.object(), timeout);
             } catch (RuntimeException failure) {
-                EngineLog.info("frame", "oopif " + failure.getMessage());
+                EngineLog.info("frame", "targets " + failure.getMessage());
+                listed = null;
+            }
+            JsonNode infos = listed == null ? null : listed.path("targetInfos");
+            if (infos != null && infos.isArray()) {
+                for (JsonNode info : infos) {
+                    if (!"iframe".equals(info.path("type").asText(""))) continue;
+                    String targetId = info.path("targetId").asText("");
+                    String url = info.path("url").asText("");
+                    int slot = matchFrame(empty, used, url);
+                    if (slot < 0 || targetId.isBlank()) continue;
+                    try {
+                        ObjectNode attach = Jsons.object();
+                        attach.put("targetId", targetId);
+                        attach.put("flatten", true);
+                        JsonNode session = connection.call("Target.attachToTarget", attach, timeout);
+                        String sessionId = session.path("sessionId").asText("");
+                        if (sessionId.isBlank()) continue;
+                        DomNode document = graftSession(connection, empty.get(slot), sessionId, "attach", timeout);
+                        if (document != null) {
+                            used[slot] = true;
+                            grafted.add(document);
+                            EngineLog.info("frame", "oopif " + targetId);
+                        }
+                    } catch (RuntimeException failure) {
+                        EngineLog.info("frame", "oopif " + failure.getMessage());
+                    }
+                }
+            }
+        }
+        for (DomNode document : grafted) graftLevel(connection, document, timeout, depth + 1);
+    }
+
+    /**
+     * Session that {@link FrameCoverage} already attached for this iframe.
+     * The iframe element's own frame id is the parent frame, so the child is matched by URL
+     * and then read through {@link FrameCoverage#awaitSession}. An empty result leaves the
+     * caller on the later {@code Target.attachToTarget} path.
+     */
+    private static String coverageSession(CdpConnection connection, DomNode frame, long waitMs) {
+        long deadline = System.nanoTime() + Math.max(0, waitMs) * 1_000_000L;
+        while (true) {
+            String frameId = childFrameId(connection, frame);
+            if (!frameId.isBlank()) {
+                long left = Math.max(0, (deadline - System.nanoTime()) / 1_000_000L);
+                String session = FrameCoverage.awaitSession(connection, frameId, Math.min(200, left));
+                if (!session.isBlank()) return session;
+            }
+            if (System.nanoTime() >= deadline) return "";
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                return "";
             }
         }
     }
 
+    /** Child frame whose url is this iframe's src. Blank until auto-attach has recorded it. */
+    private static String childFrameId(CdpConnection connection, DomNode frame) {
+        if (connection == null || frame == null) return "";
+        String src = frame.attributes.getOrDefault("src", "");
+        if (src.isBlank()) return "";
+        String suffix = "";
+        String partial = "";
+        for (String id : FrameCoverage.frameIds(connection)) {
+            String url = FrameCoverage.url(connection, id);
+            if (url == null || url.isBlank()) continue;
+            if (url.equals(src)) return id;
+            if (suffix.isBlank() && url.endsWith(src)) suffix = id;
+            if (partial.isBlank() && url.contains(src)) partial = id;
+        }
+        return !suffix.isBlank() ? suffix : partial;
+    }
+
     /** Reads the child document on an already attached flattened session. */
-    private static boolean graftSession(CdpConnection connection, DomNode frame, String sessionId, Duration timeout) {
+    private static DomNode graftSession(
+            CdpConnection connection,
+            DomNode frame,
+            String sessionId,
+            String via,
+            Duration timeout
+    ) {
         try {
             ObjectNode params = Jsons.object();
             params.put("pierce", true);
             params.put("depth", -1);
             JsonNode child = connection.call("DOM.getDocument", params, sessionId, timeout);
             DomNode document = DomNode.fromCdp(child.get("root"));
-            if (document == null) return false;
+            if (document == null) return null;
+            document.cdpSession = sessionId;
+            document.graftVia = via == null ? "" : via;
+            document.parent = frame;
+            String childFrame = FrameCoverage.frameForSession(connection, sessionId);
+            if (childFrame.isBlank()) childFrame = frame.ownerFrameId == null ? "" : frame.ownerFrameId;
+            document.assignFrames(childFrame.isBlank() ? frame.frameId : childFrame, new ArrayList<>());
             frame.children.add(document);
-            return true;
+            document.linkParents();
+            document.parent = frame;
+            return document;
         } catch (RuntimeException failure) {
             EngineLog.info("frame", "graft " + failure.getMessage());
-            return false;
+            return null;
         }
     }
 

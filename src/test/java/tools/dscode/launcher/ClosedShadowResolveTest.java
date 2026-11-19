@@ -65,6 +65,7 @@ class ClosedShadowResolveTest {
         JsonNode hit = JSON.readTree(found.out);
         assertEquals("Secret", hit.path("hits").get(0).path("name").asText(), found.out);
         assertEquals("closed", hit.path("hits").get(0).path("shadow").asText(), found.out);
+        assertEquals("/html[1]/body[1]/div[1]", hit.path("hits").get(0).path("shadow_path").asText(), found.out);
 
         Capture acted = run("act", "--target=browser:auto", "--query=Secret", "--kind=click", "--run-id=shadow");
         assertEquals(0, acted.code, acted.err + acted.out);
@@ -77,6 +78,68 @@ class ClosedShadowResolveTest {
                 "--expr=document.title");
         assertEquals(0, title.code, title.err + title.out);
         assertEquals("SecretClicked", JSON.readTree(title.out).path("value").asText(), title.out);
+    }
+
+    @Test
+    @Timeout(value = 180, unit = TimeUnit.SECONDS)
+    void closedShadowClickFiresOnceWhenTheTitleStays() throws Exception {
+        assumeTrue(BrowserSession.findChrome() != null, "skipped: chrome is not on PATH");
+        Path page = temp.resolve("once.html");
+        Files.writeString(page, """
+                <!DOCTYPE html><html><head><title>Ready</title></head><body>
+                <div id="host"></div>
+                <div id="openhost"></div>
+                <script>
+                const root = document.getElementById('host').attachShadow({mode:'closed'});
+                const button = document.createElement('button');
+                button.id = 'once';
+                button.textContent = 'Once';
+                button.style.pointerEvents = 'none';
+                window.__h = 0;
+                button.onclick = () => { window.__h++; button.dataset.n = String(window.__h); };
+                root.appendChild(button);
+                const open = document.getElementById('openhost').attachShadow({mode:'open'});
+                const other = document.createElement('button');
+                other.id = 'openbtn';
+                other.textContent = 'OpenBtn';
+                open.appendChild(other);
+                </script>
+                </body></html>
+                """);
+        Capture started = run("start", "--url=" + page.toUri(), "--browser=chrome-headless", "--run-id=once");
+        assertEquals(0, started.code, started.err + started.out);
+        assertTrue(started.out.contains("navigated=true"), started.out);
+
+        Capture open = run("find", "--target=browser:auto", "--query=OpenBtn", "--run-id=once");
+        assertEquals(0, open.code, open.err + open.out);
+        JsonNode openHit = JSON.readTree(open.out);
+        assertEquals("OpenBtn", openHit.path("hits").get(0).path("name").asText(), open.out);
+        assertEquals("open", openHit.path("hits").get(0).path("shadow").asText(), open.out);
+        assertEquals("/html[1]/body[1]/div[2]", openHit.path("hits").get(0).path("shadow_path").asText(), open.out);
+
+        Capture found = run("find", "--target=browser:auto", "--query=Once", "--run-id=once");
+        assertEquals(0, found.code, found.err + found.out);
+        JsonNode hit = JSON.readTree(found.out);
+        assertEquals("Once", hit.path("hits").get(0).path("name").asText(), found.out);
+        assertEquals("closed", hit.path("hits").get(0).path("shadow").asText(), found.out);
+        assertEquals("/html[1]/body[1]/div[1]", hit.path("hits").get(0).path("shadow_path").asText(), found.out);
+        assertEquals("diff", hit.path("contexts").asText(""), found.out);
+        assertEquals(
+                "steps stay on the main document, same-origin frames, and open shadow; agent also has closed-shadow #host",
+                hit.path("contextDiff").asText(""),
+                found.out);
+
+        Capture acted = run("act", "--target=browser:auto", "--query=Once", "--kind=click", "--run-id=once");
+        assertEquals(0, acted.code, acted.err + acted.out);
+        JsonNode act = JSON.readTree(acted.out);
+        assertTrue(act.path("applied").asBoolean(), acted.out);
+        assertEquals("resolveNode", act.path("used").asText(), acted.out);
+
+        Capture count = run(
+                "eval", "--target=browser:auto", "--world=main", "--run-id=once",
+                "--expr=String(window.__h) + '|' + document.title");
+        assertEquals(0, count.code, count.err + count.out);
+        assertEquals("1|Ready", JSON.readTree(count.out).path("value").asText(), count.out);
     }
 
     private Capture run(String... args) {

@@ -118,7 +118,23 @@ public final class AgentControl {
 
     private static Result timed(Result result, long started) {
         long elapsedMs = Math.max(0L, (System.nanoTime() - started) / 1_000_000L);
-        return new Result(result.exit(), ReplyFields.stamp(result.body(), elapsedMs));
+        Map<String, Object> body = result.body();
+        if (body != null && !body.containsKey("frame")) {
+            String frame = liveFrame();
+            if (!frame.isBlank()) body.put("frame", frame);
+        }
+        return new Result(result.exit(), ReplyFields.stamp(body, elapsedMs));
+    }
+
+    /** Main frame id when this process has a live browser. Empty otherwise. */
+    private static String liveFrame() {
+        try {
+            dev.domengine.session.BrowserSession host = tools.dscode.common.agentfast.LiveBrowserHost.chrome();
+            if (host == null || host.connection() == null || host.isClosed()) return "";
+            return tools.dscode.common.agentfast.TargetVerb.mainFrame(host.connection());
+        } catch (RuntimeException failure) {
+            return "";
+        }
     }
 
     static Result failure(int exit, String error) {

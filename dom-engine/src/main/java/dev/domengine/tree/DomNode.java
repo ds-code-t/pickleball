@@ -21,6 +21,10 @@ public final class DomNode {
     public String frameId = "main";
     /** CDP {@code frameId} on a frame owner or document. Distinct from {@link #frameId} after assign. */
     public String ownerFrameId = "";
+    /** Flattened session that owns a grafted child document. Empty on the main target. */
+    public String cdpSession = "";
+    /** {@code coverage} when the paused auto-attach session was grafted, or {@code attach} for a later attach. */
+    public String graftVia = "";
     public boolean iframe;
     public boolean shadowRoot;
     public String shadowMode = "";
@@ -220,13 +224,18 @@ public final class DomNode {
     public void assignFrames(String frameId, List<String> childFrames) {
         this.frameId = frameId == null || frameId.isBlank() ? "main" : frameId;
         if (iframe) {
-            String child;
-            if (ownerFrameId != null && !ownerFrameId.isBlank()) {
-                child = ownerFrameId;
-                childFrames.remove(ownerFrameId);
-            } else {
-                child = childFrames.isEmpty() ? this.frameId : childFrames.remove(0);
+            String child = "";
+            for (DomNode kid : children) {
+                if (kid.nodeType == 9 && kid.ownerFrameId != null && !kid.ownerFrameId.isBlank()) {
+                    child = kid.ownerFrameId;
+                    break;
+                }
             }
+            if (child.isBlank() && ownerFrameId != null && !ownerFrameId.isBlank() && !ownerFrameId.equals(frameId)) {
+                child = ownerFrameId;
+            }
+            if (child.isBlank()) child = childFrames.isEmpty() ? this.frameId : childFrames.remove(0);
+            else childFrames.remove(child);
             for (DomNode childNode : children) childNode.assignFrames(child, childFrames);
             return;
         }

@@ -100,6 +100,72 @@ class VirtualizedScrollTest {
         assertTrue(JSON.readTree(snap.out).path("virtualized").asBoolean(false), snap.out);
     }
 
+    @Test
+    @Timeout(value = 180, unit = TimeUnit.SECONDS)
+    void scrollSearchUsesTheVirtualListAndRestoresAfterAMiss() throws Exception {
+        assumeTrue(BrowserSession.findChrome() != null, "skipped: chrome is not on PATH");
+        Path page = temp.resolve("two-boxes.html");
+        Files.writeString(page, """
+                <!DOCTYPE html><html><body>
+                <div id="static" style="height:40px;overflow:auto">
+                  <div style="height:180px">Static head</div>
+                </div>
+                <div id="list" style="height:100px;overflow:auto">
+                  <div id="pad" style="height:2000px;position:relative"></div>
+                </div>
+                <script>
+                const list = document.getElementById('list');
+                const pad = document.getElementById('pad');
+                function render() {
+                  const start = Math.floor(list.scrollTop / 20);
+                  let html = '';
+                  for (let i = start; i < start + 6; i++) {
+                    html += '<div class="row" style="position:absolute;top:' + (i * 20) + 'px;height:20px">Row ' + i + '</div>';
+                  }
+                  pad.innerHTML = html;
+                }
+                list.addEventListener('scroll', render);
+                render();
+                </script>
+                </body></html>
+                """);
+        Capture started = run("start", "--url=" + page.toUri(), "--browser=chrome-headless", "--run-id=scroll-two");
+        assertEquals(0, started.code, started.err + started.out);
+        assertTrue(started.out.contains("navigated=true"), started.out);
+        assertEquals("0,0", scrolls(), started.out);
+
+        Capture found = run(
+                "find", "--target=browser:auto", "--query=Row 40", "--scroll-search=true", "--run-id=scroll-two");
+        assertEquals(0, found.code, found.err + found.out);
+        JsonNode hit = JSON.readTree(found.out);
+        assertTrue(hit.path("applied").asBoolean(), found.out);
+        assertEquals("Row 40", hit.path("hits").get(0).path("name").asText(), found.out);
+        String afterHit = scrolls();
+        assertTrue(afterHit.startsWith("0,"), afterHit);
+        int listTop = Integer.parseInt(afterHit.substring(2));
+        assertTrue(listTop > 0, afterHit);
+
+        Capture parked = run(
+                "eval", "--target=browser:auto", "--world=main", "--run-id=scroll-two",
+                "--expr=document.getElementById('static').scrollTop=25; document.getElementById('list').scrollTop=80; 'set'");
+        assertEquals(0, parked.code, parked.err + parked.out);
+        assertEquals("25,80", scrolls(), parked.out);
+
+        Capture missing = run(
+                "find", "--target=browser:auto", "--query=No Such Row", "--scroll-search=true", "--run-id=scroll-two");
+        assertEquals(1, missing.code, missing.err + missing.out);
+        assertTrue(missing.out.contains("not found"), missing.out);
+        assertEquals("25,80", scrolls(), missing.out);
+    }
+
+    private String scrolls() throws Exception {
+        Capture read = run(
+                "eval", "--target=browser:auto", "--world=main", "--run-id=scroll-two",
+                "--expr=document.getElementById('static').scrollTop + ',' + document.getElementById('list').scrollTop");
+        assertEquals(0, read.code, read.err + read.out);
+        return JSON.readTree(read.out).path("value").asText("");
+    }
+
     private Capture run(String... args) {
         String[] command = new String[args.length + 1];
         command[0] = args[0];

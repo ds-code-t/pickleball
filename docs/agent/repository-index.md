@@ -960,6 +960,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/DomLogCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/EngineCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/FallbackLoggedTest.java`
+- `src/test/java/tools/dscode/launcher/FrameActTest.java`
 - `src/test/java/tools/dscode/launcher/FrameInReplyTest.java`
 - `src/test/java/tools/dscode/launcher/GuidanceCommandGoldenTest.java`
 - `src/test/java/tools/dscode/launcher/OopifAutoAttachTest.java`
