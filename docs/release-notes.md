@@ -2,6 +2,8 @@
 
 ## 3.0.0
 
+Agent-fast phase 3. `start --url --browser` launches Chrome in a detached host, headless when the display is absent, and returns after `GET /health` is ok. `live-start` is `start`. `doctor` reports chrome, session, health, headed, pid, and the live bridge. Chat history and chat-poll use the cursor armed at session start. The warm path remains `classpath.cache` and `WorkbenchWarmMain`.
+
 Agent-fast phase 2. Every agent reply includes `elapsedMs` and a `timing` object. Inspect, page, and step text over 2 KiB is replaced by a compact object; the full text is written under `.pickleball/agent-full/`. `screenshot --out=<file>` writes the PNG and does not inline base64. A later call on the same page omits `pkb-runtime.js` when that runtime is already installed. `selftest ui --cpu` opens the panel in headless Chrome and reports idle CPU and UI-call p95. Per-step latency is appended to `.pickleball/logs/step-timing.jsonl`.
 
 Agent-fast phase 1. The in-page panel no longer re-enters `raiseLayer` on its own `toggle` event. Worker stop and restart quit the WebDriver, kill the browser process tree, and append `browser_lost`. The pause lease stays 120 seconds, renews every 30 seconds while a client heartbeat is attached, and `--hold` keeps it at 3600 seconds. A dropped client appends `session_ended`. CLI page verbs POST to the live worker when `.pickleball/workbench/live-bridge.json` is healthy and otherwise return `error: no live browser`. The PowerShell opener quotes `"-Dmdep.includeScope=test"` and puts `target/classes` and `target/test-classes` on the fallback classpath. Empty consumer glue is stamped `noop:true` and warned in the run report unless `pkb_noop_glue=fail`.

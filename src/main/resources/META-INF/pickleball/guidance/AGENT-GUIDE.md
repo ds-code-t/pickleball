@@ -59,9 +59,9 @@ Headless Workbench is not a headless browser. `isolate` and `execute-step` skip 
 
 `store entity use` records a read, write, or mention. Omit `--step` to use the active tracked step. The step id is `runId|featurePath|scenarioLine|examplesRow|stepOrd|sha256` of the step text (UTF-8). A plain step looks like `run|features/pay.feature|2||1|<64 hex>`.
 
-The search index is disposable FTS5 at `reports/diagnostic-runs/diagnostics.db` (table `record_fts`). JSON stays authoritative. A rebuild rewrites `run-index.json` and `run-catalog.json`. Delete `diagnostics.db` plus `-wal` and `-shm` to drop it. A missing file makes `query search` read the JSON. A present file is rebuilt only when a source is newer.
+The search index is disposable FTS5 at `reports/diagnostic-runs/diagnostics.db` (table `record_fts`). JSON stays authoritative. A rebuild rewrites `run-index.json` and `run-catalog.json`. Delete `diagnostics.db` plus `-wal` and `-shm` to drop it. A missing file makes `query search` read the JSON.
 
-`ui-catalog` once, `ui-apply` with a guide op, then `ui-poll`. selftest ui --cpu. Replies include elapsedMs. Inspect, page, and step stay within 2 KiB.
+`ui-catalog` once, `ui-apply` with a guide op, then `ui-poll`. selftest ui --cpu. Replies include elapsedMs. Inspect, page, and step stay within 2 KiB. Drive a live browser: `start --url= --browser=chrome`, `chat-send`, `chat_wait`.
 
 ## Generated guidance lifecycle
 

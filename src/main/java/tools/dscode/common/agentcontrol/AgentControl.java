@@ -13,6 +13,7 @@ import tools.dscode.common.composite.CompositeLog;
 import tools.dscode.common.composite.CompositeRuntime;
 import tools.dscode.common.driver.DriverConstruction;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -74,6 +75,11 @@ public final class AgentControl {
 
     public static String queryTab(WebDriver owner) {
         return PageSurfaces.focusedTabOf(owner);
+    }
+
+    /** Arms the session chat cursor at the current max id so later reads skip earlier lines. */
+    public static void armChatCursor(Path project, String runId) throws IOException {
+        ChatCursor.arm(project, runId, "run");
     }
 
     public static Result execute(
@@ -513,8 +519,15 @@ public final class AgentControl {
     private static Result chatHistory(Path project, String runId, Map<String, String> args) throws Exception {
         PageSurfaces.drainPanelChat(project, runId);
         int limit = integer(args.get("limit"), 100);
+        String after = cursorAfter(project, runId, args);
+        List<ChatLog.Message> rows = present(after)
+                ? new ArrayList<>(ChatLog.poll(project, runId, args.get("channel"), after))
+                : new ArrayList<>(ChatLog.history(project, runId, args.get("channel"), limit));
+        if (present(after) && limit > 0 && rows.size() > limit) {
+            rows = new ArrayList<>(rows.subList(rows.size() - limit, rows.size()));
+        }
         List<Map<String, Object>> messages = new ArrayList<>();
-        for (ChatLog.Message message : ChatLog.history(project, runId, args.get("channel"), limit)) {
+        for (ChatLog.Message message : rows) {
             messages.add(ChatLog.toMap(message));
         }
         Map<String, Object> body = ok("Chat history for this run channel.");
@@ -524,7 +537,7 @@ public final class AgentControl {
     }
 
     private static Result chatPoll(Path project, String runId, Map<String, String> args) throws Exception {
-        String after = present(args.get("after")) ? args.get("after") : args.get("id");
+        String after = cursorAfter(project, runId, args);
         long waitMillis = 0;
         if (present(args.get("wait"))) {
             try {
@@ -772,6 +785,12 @@ public final class AgentControl {
         body.put("ok", false);
         body.put("error", error);
         return new Result(exit, body);
+    }
+
+    private static String cursorAfter(Path project, String runId, Map<String, String> args) {
+        if (present(args.get("after"))) return args.get("after");
+        if (present(args.get("id"))) return args.get("id");
+        return ChatCursor.after(project, runId, args.get("channel"));
     }
 
     private static boolean present(String value) {

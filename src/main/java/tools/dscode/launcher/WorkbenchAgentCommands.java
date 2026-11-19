@@ -88,6 +88,7 @@ public final class WorkbenchAgentCommands {
             return switch (parsed.command()) {
                 case "export-guidance" -> exportGuidance(parsed, safeOut, safeErr);
                 case "start" -> ConsumerReadyCommands.start(parsed, safeOut, safeErr);
+                case "doctor" -> ConsumerReadyCommands.doctor(parsed, safeOut, safeErr);
                 case "chat_wait" -> ConsumerReadyCommands.chatWait(parsed, safeOut, safeErr);
                 case "history-summary" -> ConsumerReadyCommands.historySummary(parsed, safeOut, safeErr);
                 case "history-query" -> query(parsed, safeOut, safeErr);

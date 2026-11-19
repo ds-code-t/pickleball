@@ -1,11 +1,16 @@
 package tools.dscode.launcher;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.domengine.session.BrowserSession;
 import tools.dscode.common.agentcontrol.AgentControl;
+import tools.dscode.control.protocol.LiveBridgeFile;
+import tools.dscode.control.protocol.speed.ProcessTree;
 import tools.dscode.store.StoreEntities;
 import tools.dscode.store.StoreHistory;
 import tools.dscode.store.StorePaths;
 
+import java.awt.GraphicsEnvironment;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -19,8 +24,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Phase B1 verbs. Page commands with no {@code --run-id} use the session
@@ -32,6 +40,7 @@ final class ConsumerReadyCommands {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final long LOG_CAP = 1_048_576L;
     private static final Duration HEALTH_TIMEOUT = Duration.ofSeconds(2);
+    private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(HEALTH_TIMEOUT).build();
 
     private ConsumerReadyCommands() {
     }
@@ -43,19 +52,40 @@ final class ConsumerReadyCommands {
             err.print(WorkbenchCliHelp.usageError("start requires --url and --browser", "start"));
             return 2;
         }
+        Path project = parsed.project();
+        stopQuiet(project);
         Map<String, String> env = env(parsed);
         String id = "live" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("id", id);
-        body.put("url", url.trim());
-        body.put("browser", browser.trim());
-        body.put("env", env);
-        body.put("live", true);
+        String token = UUID.randomUUID().toString().replace("-", "");
+        boolean headed = showHeaded(browser);
+        Path logFile = project.resolve(".pickleball").resolve("logs").resolve("live-browser.log");
+        Process process;
         try {
-            Path file = sessionFile(parsed.project());
+            process = spawnHost(project, id, url.trim(), browser.trim(), token, headed, logFile);
+        } catch (IOException failure) {
+            err.println("error: could not start the live browser\nfix: " + failure.getMessage() + "\n");
+            return 1;
+        }
+        try {
+            if (!awaitHealthy(process, project, logFile, err)) {
+                destroyHost(process);
+                stopQuiet(project);
+                return 1;
+            }
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("id", id);
+            body.put("url", url.trim());
+            body.put("browser", browser.trim());
+            body.put("env", env);
+            body.put("live", true);
+            body.put("headed", headed);
+            Path file = sessionFile(project);
             Files.createDirectories(file.getParent());
             Files.writeString(file, JSON.writeValueAsString(body) + "\n", StandardCharsets.UTF_8);
+            AgentControl.armChatCursor(project, id);
         } catch (IOException failure) {
+            destroyHost(process);
+            stopQuiet(project);
             err.println("error: could not publish the live session\nfix: " + failure.getMessage() + "\n");
             return 1;
         }
@@ -64,8 +94,229 @@ final class ConsumerReadyCommands {
         out.println("browser=" + browser.trim());
         if (!env.isEmpty()) out.println("env=" + envText(env));
         out.println("live=true");
-        log(parsed.project(), id, "start url=" + url.trim() + " browser=" + browser.trim());
+        out.println("headed=" + headed);
+        log(project, id, "start url=" + url.trim() + " browser=" + browser.trim() + " headed=" + headed);
         return 0;
+    }
+
+    /** Stops a host left by {@code start}. A missing host is a no-op. */
+    static void stopQuiet(Path project) {
+        if (project == null) return;
+        long chromePid = chromePid(project);
+        Optional<LiveBridgeFile.Bridge> bridge = LiveBridgeFile.read(project);
+        if (bridge.isPresent()) {
+            postStop(bridge.get());
+            long pid = bridge.get().pid();
+            ProcessHandle.of(pid).ifPresent(handle -> {
+                try {
+                    handle.onExit().get(5, TimeUnit.SECONDS);
+                } catch (Exception ignored) {
+                    ProcessTree.kill(pid);
+                }
+                if (handle.isAlive()) ProcessTree.kill(pid);
+            });
+        }
+        if (chromePid > 0) ProcessTree.kill(chromePid);
+        LiveBridgeFile.delete(project);
+    }
+
+    static int doctor(WorkbenchCommandLine.Parsed parsed, java.io.PrintStream out, java.io.PrintStream err) {
+        Path project = parsed.project();
+        String chrome = BrowserSession.findChrome() == null ? "absent" : "present";
+        String session = sessionId(project);
+        if (session == null || session.isBlank()) session = "absent";
+        CliHealth health = readCliHealth(project);
+        boolean bridge = LiveBridgeFile.read(project).isPresent();
+        out.println("chrome=" + chrome);
+        out.println("session=" + session);
+        out.println("health=" + health.status());
+        out.println("headed=" + health.headed());
+        out.println("pid=" + health.pid());
+        out.println("bridge=" + (bridge ? "present" : "absent"));
+        if (err == null) return 2;
+        log(project, session, "doctor health=" + health.status());
+        return 0;
+    }
+
+    private static boolean showHeaded(String browser) {
+        if (GraphicsEnvironment.isHeadless()) return false;
+        return browser == null || !browser.toLowerCase(Locale.ROOT).contains("headless");
+    }
+
+    private static Process spawnHost(
+            Path project,
+            String id,
+            String url,
+            String browser,
+            String token,
+            boolean headed,
+            Path logFile
+    ) throws IOException {
+        Path argFile = project.resolve(".pickleball").resolve("live-browser").resolve(id).resolve("args.txt");
+        Files.createDirectories(argFile.getParent());
+        Files.createDirectories(logFile.getParent());
+        Files.writeString(logFile, "", StandardCharsets.UTF_8);
+        String classpath = System.getProperty("java.class.path", "");
+        String body = String.join("\n",
+                "-cp",
+                quoteArg(classpath),
+                "tools.dscode.common.agentfast.LiveBrowserHost",
+                quoteArg(project.toAbsolutePath().normalize().toString()),
+                quoteArg(id),
+                quoteArg(url),
+                quoteArg(browser),
+                quoteArg(token),
+                headed ? "true" : "false"
+        ) + "\n";
+        Files.writeString(argFile, body, StandardCharsets.UTF_8);
+        Path javaBin = Path.of(System.getProperty("java.home"), "bin", "java");
+        ProcessBuilder builder = new ProcessBuilder(javaBin.toString(), "@" + argFile.toAbsolutePath());
+        builder.directory(project.toFile());
+        builder.redirectOutput(ProcessBuilder.Redirect.appendTo(logFile.toFile()));
+        builder.redirectErrorStream(true);
+        return builder.start();
+    }
+
+    private static String quoteArg(String value) {
+        if (value == null || value.isEmpty()) return "\"\"";
+        boolean simple = true;
+        for (int index = 0; index < value.length(); index++) {
+            char ch = value.charAt(index);
+            if (ch <= ' ' || ch == '"' || ch == '\\' || ch == '#') {
+                simple = false;
+                break;
+            }
+        }
+        if (simple) return value;
+        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+    }
+
+    private static boolean awaitHealthy(Process process, Path project, Path logFile, java.io.PrintStream err) {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
+        try {
+            while (System.nanoTime() < deadline) {
+                if (!process.isAlive()) {
+                    err.println("error: live browser host exited\nfix: see " + logFile + "\n" + tail(logFile));
+                    return false;
+                }
+                Optional<LiveBridgeFile.Bridge> bridge = LiveBridgeFile.read(project);
+                if (bridge.isPresent() && "ok".equals(healthStatus(bridge.get()))) return true;
+                Thread.sleep(100L);
+            }
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            err.println("error: live browser host wait was interrupted\nfix: retry start\n");
+            return false;
+        }
+        err.println("error: live browser host did not become healthy\nfix: see " + logFile + "\n" + tail(logFile));
+        return false;
+    }
+
+    private static String healthStatus(LiveBridgeFile.Bridge bridge) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder(URI.create("http://" + bridge.host() + ":" + bridge.port() + "/health"))
+                    .timeout(HEALTH_TIMEOUT)
+                    .header("Authorization", "Bearer " + bridge.token())
+                    .header("Accept", "application/json")
+                    .GET()
+                    .build();
+            HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) return "down";
+            return JSON.readTree(response.body() == null ? "" : response.body()).path("status").asText("");
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            return "down";
+        } catch (Exception failure) {
+            return "down";
+        }
+    }
+
+    private static void postStop(LiveBridgeFile.Bridge bridge) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder(URI.create("http://" + bridge.host() + ":" + bridge.port() + "/v1/stop"))
+                    .timeout(HEALTH_TIMEOUT)
+                    .header("Authorization", "Bearer " + bridge.token())
+                    .header("Accept", "application/json")
+                    .POST(HttpRequest.BodyPublishers.noBody())
+                    .build();
+            HTTP.send(request, HttpResponse.BodyHandlers.discarding());
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+        } catch (Exception ignored) {
+            // The process kill below is the stop that still runs.
+        }
+    }
+
+    private static void destroyHost(Process process) {
+        if (process == null) return;
+        process.destroy();
+        try {
+            if (!process.waitFor(8, TimeUnit.SECONDS)) ProcessTree.kill(process.pid());
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            ProcessTree.kill(process.pid());
+        }
+    }
+
+    private static long chromePid(Path project) {
+        Path file = project.resolve(".pickleball").resolve("workbench").resolve("cli-session.json");
+        if (!Files.isRegularFile(file)) return 0L;
+        try {
+            JsonNode node = JSON.readTree(file.toFile());
+            return node.path("chromePid").asLong(0L);
+        } catch (IOException failure) {
+            return 0L;
+        }
+    }
+
+    private record CliHealth(String status, String headed, String pid) {
+        private static CliHealth absent() {
+            return new CliHealth("absent", "absent", "absent");
+        }
+    }
+
+    private static CliHealth readCliHealth(Path project) {
+        Path file = project.resolve(".pickleball").resolve("workbench").resolve("cli-session.json");
+        if (!Files.isRegularFile(file)) return CliHealth.absent();
+        try {
+            JsonNode node = JSON.readTree(file.toFile());
+            long pid = node.path("pid").asLong(0L);
+            String headed = node.has("headed") ? Boolean.toString(node.path("headed").asBoolean(false)) : "absent";
+            String pidText = pid > 0 ? Long.toString(pid) : "absent";
+            boolean alive = pid > 0 && ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false);
+            if (!alive) return new CliHealth("down", headed, pidText);
+            String url = node.path("url").asText("");
+            String token = node.path("token").asText("");
+            if (url.isBlank() || token.isBlank()) return new CliHealth("down", headed, pidText);
+            HttpRequest request = HttpRequest.newBuilder(URI.create(url.endsWith("/") ? url + "health" : url + "/health"))
+                    .timeout(HEALTH_TIMEOUT)
+                    .header("Authorization", "Bearer " + token)
+                    .header("Accept", "application/json")
+                    .GET()
+                    .build();
+            HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) return new CliHealth("down", headed, pidText);
+            JsonNode body = JSON.readTree(response.body() == null ? "" : response.body());
+            if (!"ok".equals(body.path("status").asText(""))) return new CliHealth("down", headed, pidText);
+            if (body.has("headed")) headed = Boolean.toString(body.path("headed").asBoolean(false));
+            return new CliHealth("ok", headed, pidText);
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            return new CliHealth("down", "absent", "absent");
+        } catch (Exception failure) {
+            return new CliHealth("down", "absent", "absent");
+        }
+    }
+
+    private static String tail(Path logFile) {
+        if (logFile == null || !Files.isRegularFile(logFile)) return "";
+        try {
+            String text = Files.readString(logFile);
+            int start = Math.max(0, text.length() - 1200);
+            return text.substring(start);
+        } catch (IOException failure) {
+            return "";
+        }
     }
 
     /** Blank when {@code start} has not published a session. */

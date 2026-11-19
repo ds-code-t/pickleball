@@ -265,6 +265,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentcontrol/AgentDriverHooks.java`
 - `src/main/java/tools/dscode/common/agentcontrol/AgentLaunch.java`
 - `src/main/java/tools/dscode/common/agentcontrol/AgentStore.java`
+- `src/main/java/tools/dscode/common/agentcontrol/ChatCursor.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ChatLog.java`
 - `src/main/java/tools/dscode/common/agentcontrol/LaunchTemplates.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ObserveEvents.java`
@@ -279,6 +280,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentcontrol/WindowRegistry.java`
 - `src/main/java/tools/dscode/common/agentfast/AgentForward.java`
 - `src/main/java/tools/dscode/common/agentfast/CompactReply.java`
+- `src/main/java/tools/dscode/common/agentfast/LiveBrowserHost.java`
 - `src/main/java/tools/dscode/common/agentfast/ReplyFields.java`
 - `src/main/java/tools/dscode/common/agentfast/RuntimeInstall.java`
 - `src/main/java/tools/dscode/common/agentfast/ScreenshotReply.java`
@@ -799,6 +801,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/browser/SurfaceAssetsTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/AgentLiveFixTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/BindingEventTest.java`
+- `src/test/java/tools/dscode/common/agentcontrol/ChatCursorTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/ChatLockChild.java`
 - `src/test/java/tools/dscode/common/agentcontrol/FallbackLogTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/IsolatedWorldTest.java`
@@ -943,6 +946,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/AgentFastCliTest.java`
 - `src/test/java/tools/dscode/launcher/CliForwardToWorkerTest.java`
 - `src/test/java/tools/dscode/launcher/ConsumerReadyCliTest.java`
+- `src/test/java/tools/dscode/launcher/DoctorTest.java`
 - `src/test/java/tools/dscode/launcher/DomEngineCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/DomLogCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/EngineCliLaunchTest.java`
@@ -952,6 +956,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/Release218RecommendationsTest.java`
 - `src/test/java/tools/dscode/launcher/SecretRedactionTest.java`
 - `src/test/java/tools/dscode/launcher/SessionHealthWaitTest.java`
+- `src/test/java/tools/dscode/launcher/StartLaunchesBrowserTest.java`
 - `src/test/java/tools/dscode/launcher/StoreCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/VersionSwitchTest.java`
 - `src/test/java/tools/dscode/launcher/WarmJvmGlueTest.java`

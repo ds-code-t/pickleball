@@ -84,6 +84,11 @@ final class ChatLog {
         return messages;
     }
 
+    static String latestId(Path project, String runId, String channel) throws IOException {
+        String useChannel = channel == null || channel.isBlank() ? "run" : channel;
+        return Long.toString(maxId(project, runId, useChannel));
+    }
+
     private static long maxId(Path project, String runId, String channel) throws IOException {
         long max = 0L;
         for (String line : AgentStore.readGroup(file(project, runId, channel))) {

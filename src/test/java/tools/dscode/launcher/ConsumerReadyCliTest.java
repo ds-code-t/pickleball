@@ -1,6 +1,7 @@
 package tools.dscode.launcher;
 
 import com.sun.net.httpserver.HttpServer;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.store.StoreScope;
@@ -24,6 +25,11 @@ class ConsumerReadyCliTest {
 
     @TempDir
     Path temp;
+
+    @AfterEach
+    void stopLiveBrowser() {
+        ConsumerReadyCommands.stopQuiet(temp);
+    }
 
     @Test
     void covers_command_start() throws Exception {

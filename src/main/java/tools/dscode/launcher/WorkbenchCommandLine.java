@@ -19,7 +19,7 @@ final class WorkbenchCommandLine {
             "sync", "worker-check", "live-check", "ui", "mcp", "isolate", "session-start", "session"
     );
     static final Set<String> AGENT_CORE_COMMANDS = Set.of(
-            "export-guidance", "hint", "discover-hint", "discover", "confirm", "plan", "validate", "resolve-runvars",
+            "export-guidance", "hint", "discover-hint", "doctor", "discover", "confirm", "plan", "validate", "resolve-runvars",
             "workspace-show", "workspace-edit", "workspace-seed",
             "short-log", "note", "inbox", "finish",
             "presence", "post", "history", "gc-runs", "gc-versions", "use-version",
@@ -164,7 +164,7 @@ final class WorkbenchCommandLine {
             args = rewritten;
         }
         ALIAS_NOTICES.get().clear();
-        args = sessionQueryArgs(normalizeFlags(args));
+        args = sessionQueryArgs(normalizeFlags(rewriteLiveStart(args)));
         Path cwd = Path.of("").toAbsolutePath().normalize();
         if (args == null || args.length == 0) {
             return new Parsed("ui", cwd, null, null, null, null, null, new String[]{"ui", cwd.toString()}, Coordination.empty(), null, false, false, false, List.of(), List.of(), null, null, false, null, false);
@@ -658,6 +658,14 @@ final class WorkbenchCommandLine {
      * Deprecated spellings of the canonical flags. {@code --runId} is {@code --run-id}.
      * {@code --to=all} is {@code --to=any}. {@code session info --run-id=} is the positional id.
      */
+    private static String[] rewriteLiveStart(String[] args) {
+        if (args == null || args.length == 0 || !"live-start".equals(args[0])) return args;
+        String[] copy = args.clone();
+        copy[0] = "start";
+        ALIAS_NOTICES.get().add("notice: live-start is start");
+        return copy;
+    }
+
     private static String[] normalizeFlags(String[] args) {
         if (args == null) return null;
         String[] copy = args.clone();

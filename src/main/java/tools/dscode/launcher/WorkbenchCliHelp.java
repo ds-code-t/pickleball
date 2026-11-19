@@ -20,6 +20,7 @@ final class WorkbenchCliHelp {
             Map.entry("validate", "Usage: validate [--tags=<expr>] [--name=<regex>] [--run-id=<id>] [--max-steps=<n>] [--all]\nReports undefined steps, ambiguous glue, and unresolved RUN SCENARIO targets. Outline rows are expanded. Core steps count as defined. A long suite prints progress and stops at a step cap unless --max-steps or --all is set, and reports how many scenarios were skipped. Runs nothing. A flag this command does not use, including --quiet, is rejected with error: and fix:."),
             Map.entry("hint", "Usage: hint [--json]"),
             Map.entry("discover-hint", "Usage: discover-hint [--json]"),
+            Map.entry("doctor", "Usage: doctor\nReports chrome, session, health, headed, pid, and bridge. No session still exits 0."),
             Map.entry("resolve-runvars", "Usage: resolve-runvars [--json]"),
             Map.entry("workspace-show", "Usage: workspace-show --run-id=<id> [--json]"),
             Map.entry("workspace-edit", "Usage: workspace-edit --run-id=<id> (--runvar=key=value | --config=<relative> --text=<body>) [--expect=<fingerprint>]"),
@@ -59,7 +60,7 @@ final class WorkbenchCliHelp {
             Map.entry("chat-send", "Usage: chat-send --text=<message> [--source=agent|human|system] [--channel=<name>] [--agent=<id>] [--run-id=<id>]"),
             Map.entry("chat-history", "Usage: chat-history [--channel=<name>] [--limit=<n>] [--run-id=<id>]"),
             Map.entry("chat-poll", "Usage: chat-poll [--channel=<name>] [--id=<after>] [--wait=<seconds>] [--run-id=<id>]"),
-            Map.entry("start", "Usage: start --url=<page> --browser=<chrome|edge|chrome-headless> [--env=KEY=VALUE] [--project=<dir>]\nPublishes a live session. Later page commands with no --run-id target that session."),
+            Map.entry("start", "Usage: start --url=<page> --browser=<chrome|edge|chrome-headless> [--env=KEY=VALUE] [--project=<dir>]\nPublishes a live session, opens the browser, and waits until GET /health is ok. Later page commands with no --run-id target that session. live-start is start."),
             Map.entry("chat_wait", "Usage: chat_wait [--timeout=<seconds>] [--run-id=<id>]\nBlocks until a chat message is stored, or until --timeout (default 30, max 120)."),
             Map.entry("history-summary", "Usage: history-summary\nPrints runs, passed, failed, skipped, and other from run records and the store."),
             Map.entry("history-query", "Usage: history-query <runs|get|query|search|props|errors|tail> [--run-id=<id>] [--text=<words>] [--limit=<n>]\nSame read as query. The store is the source of truth."),
@@ -177,7 +178,7 @@ final class WorkbenchCliHelp {
         text.append("coordination: short-log note inbox finish presence post history gc-runs gc-versions use-version export-guidance\n");
         text.append("descriptors: session list | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>\n");
         text.append("page: inspect-page find-element\n");
-        text.append("agent: observe launch windows tabs chat-send chat-history chat-poll chat_wait highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close panel-open panel-close guide guide-next guide-back guide-done ask ui-apply ui-poll ui-catalog capture-scenario screenshot selftest\n");
+        text.append("agent: observe launch windows tabs chat-send chat-history chat-poll chat_wait highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close panel-open panel-close guide guide-next guide-back guide-done ask ui-apply ui-poll ui-catalog capture-scenario screenshot selftest doctor\n");
         text.append("consumer: start history-summary history-query entity-lookup open-run bridge-health\n");
         text.append("retrieval: query runs | query get | query query | query search | query props | query errors | query tail\n");
         text.append("controller: sync worker-check live-check ui mcp session\n");
