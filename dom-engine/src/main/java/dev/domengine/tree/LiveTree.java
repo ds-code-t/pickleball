@@ -199,11 +199,20 @@ public final class LiveTree {
      * on this target, so the child target is attached flattened and its document is grafted on.
      */
     private static void graftOutOfProcess(CdpConnection connection, DomNode root, Duration timeout) {
-        graftLevel(connection, root, timeout, 0);
+        // One budget for every empty frame in this tree. A frame FrameCoverage already owns is not waited on.
+        long deadline = System.nanoTime() + 400_000_000L;
+        graftLevel(connection, root, timeout, 0, deadline, new java.util.HashMap<>());
     }
 
     /** Grafts empty frame owners, then empty owners inside each grafted child document. */
-    private static void graftLevel(CdpConnection connection, DomNode root, Duration timeout, int depth) {
+    private static void graftLevel(
+            CdpConnection connection,
+            DomNode root,
+            Duration timeout,
+            int depth,
+            long deadline,
+            Map<String, Long> owners
+    ) {
         if (root == null || depth > 6) return;
         List<DomNode> empty = new ArrayList<>();
         collectEmptyFrames(root, empty);
@@ -211,7 +220,7 @@ public final class LiveTree {
         boolean[] used = new boolean[empty.size()];
         List<DomNode> grafted = new ArrayList<>();
         for (int index = 0; index < empty.size(); index++) {
-            String sessionId = coverageSession(connection, empty.get(index), 1500);
+            String sessionId = coverageSession(connection, empty.get(index), deadline, owners);
             if (sessionId.isBlank()) continue;
             DomNode document = graftSession(connection, empty.get(index), sessionId, "coverage", timeout);
             if (document != null) {
@@ -256,27 +265,29 @@ public final class LiveTree {
                 }
             }
         }
-        for (DomNode document : grafted) graftLevel(connection, document, timeout, depth + 1);
+        for (DomNode document : grafted) graftLevel(connection, document, timeout, depth + 1, deadline, owners);
     }
 
     /**
      * Session that {@link FrameCoverage} already attached for this iframe.
-     * The iframe element's own frame id is the parent frame, so the child is matched by URL
-     * and then read through {@link FrameCoverage#awaitSession}. An empty result leaves the
-     * caller on the later {@code Target.attachToTarget} path.
+     * The child is the frame whose {@code DOM.getFrameOwner} backend node is this iframe.
+     * A known session returns at once. Unknown frames share one deadline for the whole tree.
      */
-    private static String coverageSession(CdpConnection connection, DomNode frame, long waitMs) {
-        long deadline = System.nanoTime() + Math.max(0, waitMs) * 1_000_000L;
+    private static String coverageSession(
+            CdpConnection connection,
+            DomNode frame,
+            long deadline,
+            Map<String, Long> owners
+    ) {
         while (true) {
-            String frameId = childFrameId(connection, frame);
+            String frameId = childFrameId(connection, frame, owners);
             if (!frameId.isBlank()) {
-                long left = Math.max(0, (deadline - System.nanoTime()) / 1_000_000L);
-                String session = FrameCoverage.awaitSession(connection, frameId, Math.min(200, left));
+                String session = FrameCoverage.sessionId(connection, frameId);
                 if (!session.isBlank()) return session;
             }
             if (System.nanoTime() >= deadline) return "";
             try {
-                Thread.sleep(50);
+                Thread.sleep(40);
             } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
                 return "";
@@ -284,21 +295,52 @@ public final class LiveTree {
         }
     }
 
-    /** Child frame whose url is this iframe's src. Blank until auto-attach has recorded it. */
-    private static String childFrameId(CdpConnection connection, DomNode frame) {
-        if (connection == null || frame == null) return "";
-        String src = frame.attributes.getOrDefault("src", "");
-        if (src.isBlank()) return "";
-        String suffix = "";
-        String partial = "";
+    /**
+     * Child frame whose owner element is this iframe. A redirected document keeps that owner.
+     * {@code DOM.getFrameOwner} is called on the session that built this iframe's backend id.
+     * A nested out-of-process document has its own ids, so the parent session does not match.
+     */
+    private static String childFrameId(CdpConnection connection, DomNode frame, Map<String, Long> owners) {
+        if (connection == null || frame == null || frame.backendNodeId <= 0) return "";
+        String own = frame.frameId == null ? "" : frame.frameId;
+        String session = ownerSession(frame);
         for (String id : FrameCoverage.frameIds(connection)) {
-            String url = FrameCoverage.url(connection, id);
-            if (url == null || url.isBlank()) continue;
-            if (url.equals(src)) return id;
-            if (suffix.isBlank() && url.endsWith(src)) suffix = id;
-            if (partial.isBlank() && url.contains(src)) partial = id;
+            if (id == null || id.isBlank() || id.equals(own)) continue;
+            if (ownerBackend(connection, session, id, owners) == frame.backendNodeId) return id;
         }
-        return !suffix.isBlank() ? suffix : partial;
+        return "";
+    }
+
+    /** Flattened session of the document that contains this iframe, or blank for the main document. */
+    private static String ownerSession(DomNode frame) {
+        for (DomNode cursor = frame; cursor != null; cursor = cursor.parent) {
+            if (cursor.cdpSession != null && !cursor.cdpSession.isBlank()) return cursor.cdpSession;
+        }
+        return "";
+    }
+
+    private static long ownerBackend(
+            CdpConnection connection,
+            String sessionId,
+            String frameId,
+            Map<String, Long> owners
+    ) {
+        String key = (sessionId == null ? "" : sessionId) + "\n" + frameId;
+        Long cached = owners.get(key);
+        if (cached != null) return cached;
+        long backend = 0;
+        try {
+            ObjectNode params = Jsons.object();
+            params.put("frameId", frameId);
+            JsonNode owner = sessionId == null || sessionId.isBlank()
+                    ? connection.call("DOM.getFrameOwner", params, Duration.ofSeconds(2))
+                    : connection.call("DOM.getFrameOwner", params, sessionId, Duration.ofSeconds(2));
+            backend = owner.path("backendNodeId").asLong(0);
+        } catch (RuntimeException failure) {
+            backend = 0;
+        }
+        owners.put(key, backend);
+        return backend;
     }
 
     /** Reads the child document on an already attached flattened session. */
@@ -344,14 +386,12 @@ public final class LiveTree {
     }
 
     private static int matchFrame(List<DomNode> frames, boolean[] used, String url) {
-        int fallback = -1;
         for (int i = 0; i < frames.size(); i++) {
             if (used[i]) continue;
             String src = frames.get(i).attributes.getOrDefault("src", "");
             if (!src.isBlank() && url != null && (url.equals(src) || url.endsWith(src) || url.contains(src))) return i;
-            if (fallback < 0) fallback = i;
         }
-        return fallback;
+        return -1;
     }
 
     public ObjectNode toJson() {
