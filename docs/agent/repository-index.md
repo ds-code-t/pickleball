@@ -83,6 +83,11 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/2.1.19-workbench-expansion-brainstorm.md`
 - `docs/maintainer/2.1.19-workbench-expansion-ideas.md`
 - `docs/maintainer/2.1.19-workbench-expansion-roadmap.md`
+- `docs/maintainer/3.0.0-agent-fast-design.md`
+- `docs/maintainer/3.0.0-agent-fast/browser-control-research.md`
+- `docs/maintainer/3.0.0-agent-fast/consumer-field-report-2026-11-18.md`
+- `docs/maintainer/3.0.0-agent-fast/evaluation.md`
+- `docs/maintainer/3.0.0-agent-fast/README.md`
 - `docs/maintainer/3.0.0-consumer-ready-handoff.md`
 - `docs/maintainer/3.0.0-consumer-report-2026-11-17/agent-blockers-digest.md`
 - `docs/maintainer/3.0.0-consumer-report-2026-11-17/agreed-plan.md`
@@ -121,6 +126,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/roadmaps/2.1.18-direct-control-handoff.md`
 - `docs/roadmaps/2.1.18-workbench-coverage-findings.md`
 - `docs/roadmaps/2.1.18-workbench-full-coverage.md`
+- `docs/roadmaps/3.0.0-agent-fast-roadmap.md`
 - `docs/roadmaps/3.0.0-consumer-ready-roadmap.md`
 - `docs/roadmaps/3.0.0-dalton-roadmap.md`
 - `docs/roadmaps/3.0.0-dalton-round2-roadmap.md`
