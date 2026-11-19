@@ -2,6 +2,8 @@ package tools.dscode.launcher;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.dscode.common.agentfast.CompactReply;
+import tools.dscode.common.agentfast.StepTiming;
 import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.common.runtime.ProcessTrees;
 import tools.dscode.control.protocol.FailureRecord;
@@ -1101,6 +1103,8 @@ public final class WorkbenchSessionCommands {
             PrintStream out,
             PrintStream err
     ) {
+        long startedNs = System.nanoTime();
+        try {
         String last = "";
         int transientFailures = 0;
         long deadline = waitDeadline(parsed, flags);
@@ -1144,10 +1148,13 @@ public final class WorkbenchSessionCommands {
                 }
                 String errorLine = textOr(resultNode, "text", "");
                 if (errorLine.startsWith("error:")) out.println(errorLine);
-                if ("SUCCESS".equals(status)) out.println(rendered);
-                else out.println(failureJson(flags.text, resultNode));
+                if ("SUCCESS".equals(status)) out.println(CompactReply.shrinkText(parsed.project(), "step", rendered));
+                else out.println(CompactReply.shrinkText(parsed.project(), "step", failureJson(flags.text, resultNode)));
             }
             return terminalExit(status);
+        }
+        } finally {
+            StepTiming.note(parsed.project(), id, Math.max(0L, (System.nanoTime() - startedNs) / 1_000_000L));
         }
     }
 

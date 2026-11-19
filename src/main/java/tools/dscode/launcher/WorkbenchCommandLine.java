@@ -42,6 +42,8 @@ final class WorkbenchCommandLine {
             "guide", "guide-next", "guide-back", "guide-done", "ask",
             "panel-open", "panel-close",
             "capture-scenario",
+            "screenshot",
+            "selftest",
             "help"
     );
     static final Set<String> SESSION_CLIENT_COMMANDS = Set.of(

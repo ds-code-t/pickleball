@@ -67,6 +67,8 @@
       "presence",
       "query",
       "resolve-runvars",
+      "screenshot",
+      "selftest",
       "session-hold",
       "session-info",
       "session-list",

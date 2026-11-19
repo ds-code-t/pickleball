@@ -11,6 +11,7 @@ import tools.dscode.browser.BrowserLog;
 import tools.dscode.browser.CdpAdapter;
 import tools.dscode.browser.ProtocolSelector;
 import tools.dscode.browser.SurfaceAssets;
+import tools.dscode.common.agentfast.RuntimeInstall;
 import tools.dscode.common.composite.CompositeLog;
 import tools.dscode.common.composite.CompositeRuntime;
 
@@ -1163,7 +1164,7 @@ final class PageSurfaces {
             } catch (IOException failure) {
                 throw new IllegalStateException(failure);
             }
-            return facade.evaluateIsolated("pkb-surface", helperFunction(), json);
+            return facade.evaluateIsolated("pkb-surface", helperFunction(System.identityHashCode(web)), json);
         }
         if (executor == null) {
             throw new IllegalStateException("no live browser");
@@ -1171,7 +1172,7 @@ final class PageSurfaces {
         BrowserLog.warnOnce(
                 "page-surface-script",
                 "PageSurfaces used Selenium executeScript; no CDP or BiDi session");
-        if (tracksTarget(spec)) {
+        if (tracksTarget(spec) && RuntimeInstall.consume(System.identityHashCode(web))) {
             // Main-world fallback (D4): the runtime installs lazily, only for a placement that follows a target.
             try {
                 executor.executeScript(RUNTIME);
@@ -1207,17 +1208,44 @@ final class PageSurfaces {
         } catch (IOException failure) {
             throw new IllegalStateException(failure);
         }
+        int key = System.identityHashCode(web);
         BrowserFacade facade = directPage(web);
         if (facade != null) {
             installSurface(web, facade);
-            Object value = facade.evaluateIsolated("pkb-surface",
-                    "function(raw){" + (install ? RUNTIME + "\n;" : "") + RUNTIME_CALL + "}", json);
+            String function = isolatedFunction(key, install);
+            Object value = facade.evaluateIsolated("pkb-surface", function, json);
+            if (value == null && install && !function.contains("raisingLayer")) {
+                RuntimeInstall.forget(key);
+                function = isolatedFunction(key, true);
+                value = facade.evaluateIsolated("pkb-surface", function, json);
+            }
             return value == null ? null : String.valueOf(value);
         }
         if (!(web instanceof JavascriptExecutor executor)) return null;
-        if (install) executor.executeScript(RUNTIME);
+        if (install && RuntimeInstall.consume(key)) executor.executeScript(RUNTIME);
         Object value = executor.executeScript("var raw = arguments[0];" + RUNTIME_CALL, json);
+        if (value == null && install) {
+            RuntimeInstall.forget(key);
+            executor.executeScript(RUNTIME);
+            RuntimeInstall.consume(key);
+            value = executor.executeScript("var raw = arguments[0];" + RUNTIME_CALL, json);
+        }
         return value == null ? null : String.valueOf(value);
+    }
+
+    /** Second call for the same driver omits {@code pkb-runtime.js}. Tests read this source. */
+    static String isolatedFunction(int driverKey, boolean install) {
+        return RuntimeInstall.function(driverKey, install, RUNTIME, RUNTIME_CALL);
+    }
+
+    static void resetRuntimeForTest() {
+        RuntimeInstall.reset();
+    }
+
+    static WebDriver liveDriver() {
+        if (driver != null) return driver;
+        List<Managed> all = managed();
+        return all.isEmpty() ? null : all.get(0).driver;
     }
 
     static String runtimeSource() {
@@ -1350,14 +1378,15 @@ final class PageSurfaces {
         return "cdp".equals(protocol) || "bidi".equals(protocol) ? opened : null;
     }
 
-    private static String helperFunction() {
+    private static String helperFunction(int driverKey) {
         int semi = LIVE_HELPER.indexOf(';');
         String body = LIVE_HELPER;
         if (semi > 0 && LIVE_HELPER.substring(0, semi).contains("arguments[0]")) {
             body = LIVE_HELPER.substring(semi + 1);
         }
-        // The runtime is idempotent: a second install in the same document returns at once.
-        return "function(raw){ var spec = JSON.parse(raw);\n" + RUNTIME + "\n;" + body + "}";
+        // The runtime is idempotent. Send the bytes once per driver, then omit them.
+        String runtime = RuntimeInstall.consume(driverKey) ? RUNTIME + "\n;" : "";
+        return "function(raw){ var spec = JSON.parse(raw);\n" + runtime + body + "}";
     }
 
     private record ParsedColors(double[] content, double[] border, boolean unsupported) {}

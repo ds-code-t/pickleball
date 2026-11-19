@@ -1,8 +1,13 @@
 package tools.dscode.common.agentcontrol;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.openqa.selenium.OutputType;
+import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.remote.RemoteWebDriver;
+import tools.dscode.common.agentfast.ReplyFields;
+import tools.dscode.common.agentfast.ScreenshotReply;
+import tools.dscode.common.agentfast.SelftestUi;
 import tools.dscode.common.agentsurface.AgentSurfaceRouter;
 import tools.dscode.common.composite.CompositeLog;
 import tools.dscode.common.composite.CompositeRuntime;
@@ -79,21 +84,27 @@ public final class AgentControl {
             List<String> extraArgs,
             String agentId
     ) {
+        long started = System.nanoTime();
         Map<String, String> values = args == null ? Map.of() : args;
         try {
             Optional<Result> routed = AgentSurfaceRouter.route(project, runId, op, values, agentId);
-            if (routed.isPresent()) return routed.get();
+            if (routed.isPresent()) return timed(routed.get(), started);
             if (values.get("scope") != null && !values.get("scope").isBlank()) UiState.scope(values.get("scope"));
             if (values.get("ttl") != null && !values.get("ttl").isBlank()) UiState.expires(values.get("ttl"), 0L);
             Result result = dispatch(project, runId, op, values, extraArgs, agentId);
             if (result.exit() == 0 && UiState.TRACKED.contains(op)) UiState.sync(project, runId, values);
             if (result.exit() == 0 && "html-cleanup".equals(op)) UiState.clear(project, runId);
-            return result;
+            return timed(result, started);
         } catch (IllegalArgumentException failure) {
-            return fail(2, failure.getMessage() == null ? "usage" : failure.getMessage());
+            return timed(fail(2, failure.getMessage() == null ? "usage" : failure.getMessage()), started);
         } catch (Exception failure) {
-            return fail(1, failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage());
+            return timed(fail(1, failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()), started);
         }
+    }
+
+    private static Result timed(Result result, long started) {
+        long elapsedMs = Math.max(0L, (System.nanoTime() - started) / 1_000_000L);
+        return new Result(result.exit(), ReplyFields.stamp(result.body(), elapsedMs));
     }
 
     static Result failure(int exit, String error) {
@@ -121,6 +132,8 @@ public final class AgentControl {
                 case "ui-apply" -> UiBatch.apply(project, runId, values, agentId);
                 case "ui-poll" -> UiBatch.poll(project, runId, values, agentId);
                 case "ui-catalog" -> uiCatalog(values);
+                case "screenshot" -> screenshot(project, values);
+                case "selftest" -> selftest(project, values);
                 case "highlight" -> highlight(project, runId, values);
                 case "unhighlight" -> unhighlight(project, runId, values);
                 case "overlay" -> overlay(project, runId, values);
@@ -375,6 +388,26 @@ public final class AgentControl {
             steps.add((Map<String, Object>) map);
         }
         return steps;
+    }
+
+    private static Result screenshot(Path project, Map<String, String> args) throws Exception {
+        String out = args.get("out");
+        if (!present(out)) return fail(2, "screenshot requires --out");
+        WebDriver web = PageSurfaces.liveDriver();
+        if (!(web instanceof TakesScreenshot shot)) return fail(1, "no live browser");
+        byte[] png = shot.getScreenshotAs(OutputType.BYTES);
+        Path file = Path.of(out);
+        if (!file.isAbsolute() && project != null) file = project.resolve(out);
+        Map<String, Object> body = ScreenshotReply.write(file, png);
+        return new Result(0, body);
+    }
+
+    private static Result selftest(Path project, Map<String, String> args) throws Exception {
+        boolean cpu = truth(args.get("cpu")) || truth(args.get("ui"));
+        if (!cpu) return fail(2, "selftest ui --cpu");
+        Map<String, Object> report = SelftestUi.cpu(project, args.get("component"));
+        if (Boolean.TRUE.equals(report.get("skipped"))) return new Result(1, report);
+        return new Result(Boolean.TRUE.equals(report.get("ok")) ? 0 : 1, report);
     }
 
     private static Result uiCatalog(Map<String, String> args) {

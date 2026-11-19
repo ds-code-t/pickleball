@@ -3,6 +3,7 @@ package tools.dscode.launcher;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import tools.dscode.common.agentcontrol.AgentControl;
+import tools.dscode.common.agentfast.CompactReply;
 import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner;
 import tools.dscode.common.reporting.diagnostic.LastDiscoverSnapshot;
@@ -148,7 +149,8 @@ public final class WorkbenchAgentCommands {
                      "ui-apply", "ui-poll", "ui-catalog",
                      "guide", "guide-next", "guide-back", "guide-done", "ask",
                      "panel-open", "panel-close",
-                     "capture-scenario" -> agentControl(parsed, safeOut, safeErr);
+                     "capture-scenario",
+                     "screenshot", "selftest" -> agentControl(parsed, safeOut, safeErr);
                 case "help" -> help(args, safeOut, safeErr);
                 default -> {
                     safeErr.print(WorkbenchCliHelp.unknown(parsed.command()));
@@ -1613,15 +1615,17 @@ public final class WorkbenchAgentCommands {
         String html = readHtml(parsed, err);
         if (html == null && flag(parsed, "--html") != null) return 2;
         if (html != null) {
-            out.println("source=offline-html");
+            StringBuilder text = new StringBuilder();
+            text.append("source=offline-html\n");
             String query = flag(parsed, "--query");
             if (query != null && !query.isBlank()) {
-                out.println("query=" + query);
-                out.println("note=offline html does not run the engine query");
+                text.append("query=").append(query).append('\n');
+                text.append("note=offline html does not run the engine query\n");
             }
             for (WorkbenchElementInspect.Hit hit : WorkbenchElementInspect.dump(html)) {
-                printHit(out, hit.phrase(), hit.xpath(), hit.rawMatchCount(), hit.visibleCount());
+                appendHit(text, hit.phrase(), hit.xpath(), hit.rawMatchCount(), hit.visibleCount());
             }
+            emitCompact(out, parsed.project(), "page", text);
             return 0;
         }
         return liveQuery(parsed, null, null, out, err);
@@ -1650,26 +1654,41 @@ public final class WorkbenchAgentCommands {
         if (htmlFlag != null) {
             String html = readHtml(parsed, err);
             if (html == null) return 2;
-            out.println("source=offline-html");
+            StringBuilder text = new StringBuilder();
+            text.append("source=offline-html\n");
             if (engine) {
-                out.println("query=" + query);
-                out.println("note=offline html does not run the engine query");
+                text.append("query=").append(query).append('\n');
+                text.append("note=offline html does not run the engine query\n");
             }
             if (category != null && !category.isBlank()) {
                 WorkbenchElementInspect.Hit hit = WorkbenchElementInspect.find(category, label, html);
-                printHit(out, hit.phrase(), hit.xpath(), hit.rawMatchCount(), hit.visibleCount());
+                appendHit(text, hit.phrase(), hit.xpath(), hit.rawMatchCount(), hit.visibleCount());
+                emitCompact(out, parsed.project(), "inspect", text);
                 return hit.xpath().isBlank() && !engine ? 1 : 0;
             }
+            emitCompact(out, parsed.project(), "inspect", text);
             return 0;
         }
         return liveQuery(parsed, category, label, out, err);
     }
 
     private static void printHit(PrintStream out, String phrase, String xpath, int raw, int visible) {
-        out.println("phrase=" + phrase);
-        out.println("xpath=" + xpath);
-        out.println("rawMatchCount=" + raw);
-        out.println("visibleCount=" + visible);
+        StringBuilder text = new StringBuilder();
+        appendHit(text, phrase, xpath, raw, visible);
+        out.print(text);
+    }
+
+    private static void appendHit(StringBuilder text, String phrase, String xpath, int raw, int visible) {
+        text.append("phrase=").append(phrase).append('\n');
+        text.append("xpath=").append(xpath).append('\n');
+        text.append("rawMatchCount=").append(raw).append('\n');
+        text.append("visibleCount=").append(visible).append('\n');
+    }
+
+    private static void emitCompact(PrintStream out, Path project, String kind, StringBuilder text) {
+        String printed = CompactReply.shrinkText(project, kind, text.toString());
+        if (!printed.endsWith("\n")) printed = printed + "\n";
+        out.print(printed);
     }
 
     /** Live inspect and find-element poll. Still in flight after this is {@code TIMEOUT}, exit {@link #LIVE_QUERY_TIMEOUT_EXIT}. */
@@ -1756,34 +1775,37 @@ public final class WorkbenchAgentCommands {
                 err.println(result.path("message").asText("Page query failed."));
                 return 1;
             }
-            out.println("source=" + result.path("source").asText("live-session"));
+            StringBuilder page = new StringBuilder();
+            page.append("source=").append(result.path("source").asText("live-session")).append('\n');
             JsonNode hits = result.get("hits");
             if (hits != null && hits.isArray()) {
                 for (JsonNode hit : hits) {
-                    printHit(
-                            out,
+                    appendHit(
+                            page,
                             hit.path("phrase").asText(""),
                             hit.path("xpath").asText(""),
                             hit.path("rawMatchCount").asInt(0),
                             hit.path("visibleCount").asInt(0)
                     );
-                    String forwarded = hit.path("query").asText("");
-                    if (!forwarded.isBlank()) out.println("query=" + forwarded);
+                    String forwardedQuery = hit.path("query").asText("");
+                    if (!forwardedQuery.isBlank()) page.append("query=").append(forwardedQuery).append('\n');
                     String shownExposure = hit.path("exposure").asText("");
-                    if (!shownExposure.isBlank()) out.println("exposure=" + shownExposure);
+                    if (!shownExposure.isBlank()) page.append("exposure=").append(shownExposure).append('\n');
                     JsonNode nodes = hit.get("nodes");
                     if (nodes != null && nodes.isArray()) {
                         for (JsonNode node : nodes) {
-                            out.println("node handle=" + node.path("handle").asText("")
-                                    + " rank=" + node.path("rank").asText("")
-                                    + " text=" + node.path("text").asText(""));
+                            page.append("node handle=").append(node.path("handle").asText(""))
+                                    .append(" rank=").append(node.path("rank").asText(""))
+                                    .append(" text=").append(node.path("text").asText(""))
+                                    .append('\n');
                             String sentence = node.path("humanSentence").asText("");
-                            if (!sentence.isBlank()) out.println("human=" + sentence);
-                            if (node.path("visualOnly").asBoolean(false)) out.println("visualOnly=true");
+                            if (!sentence.isBlank()) page.append("human=").append(sentence).append('\n');
+                            if (node.path("visualOnly").asBoolean(false)) page.append("visualOnly=true\n");
                         }
                     }
                 }
             }
+            emitCompact(out, parsed.project(), "inspect-page".equals(op) ? "page" : "inspect", page);
             return 0;
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
@@ -1923,6 +1945,12 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "verbose");
         copyFlag(args, parsed, "chat-after");
         copyFlag(args, parsed, "component");
+        if (hasFlag(parsed, "--cpu")) args.put("cpu", "true");
+        if (parsed.forwarded() != null) {
+            for (String token : parsed.forwarded()) {
+                if ("ui".equals(token)) args.put("ui", "true");
+            }
+        }
         if ("arrow".equals(parsed.command())) {
             if (parsed.coordination().inboxFrom() != null) args.put("from", parsed.coordination().inboxFrom());
             if (parsed.coordination().inboxTo() != null) args.put("to", parsed.coordination().inboxTo());

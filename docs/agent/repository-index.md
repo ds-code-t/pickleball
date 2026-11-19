@@ -278,6 +278,12 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentcontrol/VisualKinds.java`
 - `src/main/java/tools/dscode/common/agentcontrol/WindowRegistry.java`
 - `src/main/java/tools/dscode/common/agentfast/AgentForward.java`
+- `src/main/java/tools/dscode/common/agentfast/CompactReply.java`
+- `src/main/java/tools/dscode/common/agentfast/ReplyFields.java`
+- `src/main/java/tools/dscode/common/agentfast/RuntimeInstall.java`
+- `src/main/java/tools/dscode/common/agentfast/ScreenshotReply.java`
+- `src/main/java/tools/dscode/common/agentfast/SelftestUi.java`
+- `src/main/java/tools/dscode/common/agentfast/StepTiming.java`
 - `src/main/java/tools/dscode/common/agentsurface/AgentSurfaceRouter.java`
 - `src/main/java/tools/dscode/common/agentsurface/NativeHighlight.java`
 - `src/main/java/tools/dscode/common/agentsurface/NativeOverlay.java`
@@ -797,6 +803,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentcontrol/FallbackLogTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/IsolatedWorldTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/LiveChromeCdpTest.java`
+- `src/test/java/tools/dscode/common/agentcontrol/NoReinjectTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/OverlayFixtures.java`
 - `src/test/java/tools/dscode/common/agentcontrol/OverlayPollCursorTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/OverlayRuntimeLiveTest.java`
@@ -805,6 +812,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentcontrol/UiCatalogTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/UiChatVisibilityTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/UiStateTest.java`
+- `src/test/java/tools/dscode/common/agentfast/CompactReplyTest.java`
+- `src/test/java/tools/dscode/common/agentfast/SelftestCpuBenchTest.java`
+- `src/test/java/tools/dscode/common/agentfast/TimingFieldsTest.java`
 - `src/test/java/tools/dscode/common/agentfast/UiCpuLoopTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/AgentSurfaceRouterTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/live/AgentSurfacePopupLiveTest.java`
@@ -930,6 +940,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureSteps.java`
 - `src/test/java/tools/dscode/GuidancePackagingTest.java`
 - `src/test/java/tools/dscode/launcher/AgentExpansionTest.java`
+- `src/test/java/tools/dscode/launcher/AgentFastCliTest.java`
 - `src/test/java/tools/dscode/launcher/CliForwardToWorkerTest.java`
 - `src/test/java/tools/dscode/launcher/ConsumerReadyCliTest.java`
 - `src/test/java/tools/dscode/launcher/DomEngineCliLaunchTest.java`

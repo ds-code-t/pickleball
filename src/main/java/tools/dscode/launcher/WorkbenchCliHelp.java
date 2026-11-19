@@ -98,7 +98,9 @@ final class WorkbenchCliHelp {
             Map.entry("html-insert", "Usage: html-insert --handle=<id> --text=<html> [--where=before|after] [--html=<page>]"),
             Map.entry("html-remove", "Usage: html-remove --id=<id> [--html=<page>]"),
             Map.entry("html-cleanup", "Usage: html-cleanup [--html=<page>]"),
-            Map.entry("capture-scenario", "Usage: capture-scenario [--url=<substring>] [--since=<epoch-ms>] [--until=<epoch-ms>] [--events=<file>] [--out=<feature>] [--run-id=<id>]")
+            Map.entry("capture-scenario", "Usage: capture-scenario [--url=<substring>] [--since=<epoch-ms>] [--until=<epoch-ms>] [--events=<file>] [--out=<feature>] [--run-id=<id>]"),
+            Map.entry("screenshot", "Usage: screenshot --out=<file> [--run-id=<id>]"),
+            Map.entry("selftest", "Usage: selftest ui --cpu [--component=panel]")
     );
 
     private static final Map<String, String> FLAGS = Map.ofEntries(
@@ -175,7 +177,7 @@ final class WorkbenchCliHelp {
         text.append("coordination: short-log note inbox finish presence post history gc-runs gc-versions use-version export-guidance\n");
         text.append("descriptors: session list | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>\n");
         text.append("page: inspect-page find-element\n");
-        text.append("agent: observe launch windows tabs chat-send chat-history chat-poll chat_wait highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close panel-open panel-close guide guide-next guide-back guide-done ask ui-apply ui-poll ui-catalog capture-scenario\n");
+        text.append("agent: observe launch windows tabs chat-send chat-history chat-poll chat_wait highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close panel-open panel-close guide guide-next guide-back guide-done ask ui-apply ui-poll ui-catalog capture-scenario screenshot selftest\n");
         text.append("consumer: start history-summary history-query entity-lookup open-run bridge-health\n");
         text.append("retrieval: query runs | query get | query query | query search | query props | query errors | query tail\n");
         text.append("controller: sync worker-check live-check ui mcp session\n");
