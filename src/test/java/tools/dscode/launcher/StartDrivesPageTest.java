@@ -235,6 +235,10 @@ class StartDrivesPageTest {
         assertTrue(border.code != 0, border.out + border.err);
         assertTrue((border.out + border.err).contains("no live browser"), border.out + border.err);
         assertFalse((border.out + border.err).contains("unknown handle"), border.out + border.err);
+        run("live-stop", temp.toString());
+        lostAfterChromeDies("ui-poll");
+        run("live-stop", temp.toString());
+        lostAfterChromeDies("ui-catalog");
     }
 
     @Test
@@ -338,6 +342,21 @@ class StartDrivesPageTest {
         assertEquals(0, stopped.code, stopped.err + stopped.out);
         assertTrue(stopped.out.contains("stopped=false"), stopped.out);
         assertFalse(stopped.err.contains("notice: live-stop stops the start host"), stopped.err);
+    }
+
+    private void lostAfterChromeDies(String command) throws Exception {
+        Capture started = run("start", "--url=about:blank", "--browser=chrome-headless", temp.toString());
+        assertEquals(0, started.code, detail(started));
+        JsonNode node = JSON.readTree(temp.resolve(".pickleball/live-browser/current.json").toFile());
+        ProcessTree.kill(node.path("chromePid").asLong(0));
+        Capture poll = run(command, temp.toString());
+        assertEquals(0, poll.code, poll.out + poll.err);
+        assertFalse((poll.out + poll.err).contains("cdp connection is closed"), poll.out + poll.err);
+        assertFalse((poll.out + poll.err).contains("no live browser"), poll.out + poll.err);
+        assertEquals(1, countAgentEvent(poll.out, "browser_lost"), poll.out);
+        Capture again = run(command, temp.toString());
+        assertEquals(0, again.code, again.out + again.err);
+        assertEquals(0, countAgentEvent(again.out, "browser_lost"), again.out);
     }
 
     private int placedOnHost() throws Exception {

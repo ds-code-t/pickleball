@@ -204,8 +204,18 @@ final class UiBatch {
         while (true) {
             Map<String, String> eventArgs = new LinkedHashMap<>();
             eventArgs.put("after", after);
-            AgentControl.Result events = AgentControl.dispatch(project, runId, "overlay-poll", eventArgs, List.of(), agentId);
-            if (events.exit() != 0) return events;
+            AgentControl.Result events;
+            try {
+                events = AgentControl.dispatch(project, runId, "overlay-poll", eventArgs, List.of(), agentId);
+            } catch (RuntimeException failure) {
+                if (!pageGone(failure.getMessage())) throw failure;
+                events = emptyOverlay();
+            }
+            if (events.exit() != 0) {
+                Object error = events.body().get("error");
+                if (!pageGone(error == null ? "" : String.valueOf(error))) return events;
+                events = emptyOverlay();
+            }
             Map<String, String> chatArgs = new LinkedHashMap<>();
             if (chatAfter != null && !chatAfter.isBlank()) chatArgs.put("after", chatAfter);
             chatArgs.put("channel", args.getOrDefault("channel", "run"));
@@ -232,6 +242,24 @@ final class UiBatch {
             }
             Thread.sleep(250);
         }
+    }
+
+    /** Overlay drain fails once Chrome's page socket is gone. The poll still returns agent events. */
+    private static boolean pageGone(String message) {
+        if (message == null || message.isBlank()) return false;
+        return message.contains("cdp connection is closed")
+                || message.contains("no live browser")
+                || message.contains("tab enumeration failed")
+                || message.contains("input poll");
+    }
+
+    private static AgentControl.Result emptyOverlay() {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("ok", true);
+        body.put("count", 0);
+        body.put("events", List.of());
+        body.put("next", 0);
+        return new AgentControl.Result(0, body);
     }
 
     private static List<Map<String, Object>> compact(Object raw) {
