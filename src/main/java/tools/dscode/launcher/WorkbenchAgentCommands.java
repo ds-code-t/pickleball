@@ -152,7 +152,7 @@ public final class WorkbenchAgentCommands {
                      "panel-open", "panel-close",
                      "capture-scenario",
                      "screenshot", "selftest",
-                     "snap", "find", "act", "wait", "watch", "explain", "capture", "attach", "eval", "ui" ->
+                     "snap", "find", "act", "wait", "watch", "explain", "capture", "attach", "eval", "frame", "ui" ->
                         agentControl(parsed, safeOut, safeErr);
                 case "help" -> help(args, safeOut, safeErr);
                 default -> {
@@ -1980,9 +1980,12 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "world");
         copyFlag(args, parsed, "clip");
         copyFlag(args, parsed, "frame");
+        copyFlag(args, parsed, "enter");
         copyFlag(args, parsed, "kinds");
         copyFlag(args, parsed, "fixture");
         if (hasFlag(parsed, "--cpu")) args.put("cpu", "true");
+        if (hasFlag(parsed, "--list")) args.put("list", "true");
+        if (hasFlag(parsed, "--reset")) args.put("reset", "true");
         if (parsed.forwarded() != null) {
             for (String token : parsed.forwarded()) {
                 if ("ui".equals(token)) args.put("ui", "true");

@@ -77,7 +77,9 @@ public final class XPathIndex {
                 String nextFrame = framePath == null || framePath.isBlank()
                         ? child.xpath
                         : framePath + " >> " + child.xpath;
-                String nextId = "f" + child.backendNodeId;
+                String nextId = child.ownerFrameId != null && !child.ownerFrameId.isBlank()
+                        ? child.ownerFrameId
+                        : "f" + child.backendNodeId;
                 result.frames.add(new Frame(nextId, frameId, "", nextFrame, child.x, child.y));
                 assignSiblings(child.children, "", "", nextId, nextFrame, result);
                 continue;

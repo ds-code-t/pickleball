@@ -27,6 +27,11 @@ public final class CdpConnection implements AutoCloseable {
     private final AtomicLong ids = new AtomicLong();
     private final ConcurrentHashMap<Long, CompletableFuture<JsonNode>> pending = new ConcurrentHashMap<>();
     private final CopyOnWriteArrayList<Consumer<JsonNode>> eventListeners = new CopyOnWriteArrayList<>();
+    /**
+     * {@link WebSocket#sendText} throws {@code Send pending} when a second send starts
+     * before the first finishes. The frame attacher and the command thread share this socket.
+     */
+    private final Object sendLock = new Object();
     private volatile boolean closed;
 
     private CdpConnection(WebSocket socket) {
@@ -72,7 +77,9 @@ public final class CdpConnection implements AutoCloseable {
         pending.put(id, done);
         EngineLog.debug("cdp", method);
         try {
-            socket.sendText(Jsons.compact(request), true).join();
+            synchronized (sendLock) {
+                socket.sendText(Jsons.compact(request), true).join();
+            }
             Duration wait = timeout == null ? Duration.ofSeconds(10) : timeout;
             JsonNode response = done.get(wait.toMillis(), TimeUnit.MILLISECONDS);
             if (response.has("error")) {
@@ -107,7 +114,9 @@ public final class CdpConnection implements AutoCloseable {
         if (closed) return;
         closed = true;
         try {
-            socket.sendClose(WebSocket.NORMAL_CLOSURE, "bye").join();
+            synchronized (sendLock) {
+                socket.sendClose(WebSocket.NORMAL_CLOSURE, "bye").join();
+            }
         } catch (RuntimeException ignored) {
             socket.abort();
         }

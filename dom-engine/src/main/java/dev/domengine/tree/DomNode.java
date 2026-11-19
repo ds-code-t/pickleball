@@ -19,6 +19,8 @@ public final class DomNode {
     public String localName = "";
     public String nodeValue = "";
     public String frameId = "main";
+    /** CDP {@code frameId} on a frame owner or document. Distinct from {@link #frameId} after assign. */
+    public String ownerFrameId = "";
     public boolean iframe;
     public boolean shadowRoot;
     public String shadowMode = "";
@@ -100,6 +102,7 @@ public final class DomNode {
         node.nodeName = raw.path("nodeName").asText("");
         node.localName = raw.path("localName").asText("");
         node.nodeValue = raw.path("nodeValue").asText("");
+        node.ownerFrameId = raw.path("frameId").asText("");
         JsonNode attrs = raw.get("attributes");
         if (attrs != null && attrs.isArray()) {
             for (int i = 0; i + 1 < attrs.size(); i += 2) {
@@ -217,7 +220,13 @@ public final class DomNode {
     public void assignFrames(String frameId, List<String> childFrames) {
         this.frameId = frameId == null || frameId.isBlank() ? "main" : frameId;
         if (iframe) {
-            String child = childFrames.isEmpty() ? this.frameId : childFrames.remove(0);
+            String child;
+            if (ownerFrameId != null && !ownerFrameId.isBlank()) {
+                child = ownerFrameId;
+                childFrames.remove(ownerFrameId);
+            } else {
+                child = childFrames.isEmpty() ? this.frameId : childFrames.remove(0);
+            }
             for (DomNode childNode : children) childNode.assignFrames(child, childFrames);
             return;
         }

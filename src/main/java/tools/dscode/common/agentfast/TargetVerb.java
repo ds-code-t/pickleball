@@ -9,11 +9,13 @@ import dev.domengine.cdp.CdpException;
 import dev.domengine.desktop.DesktopTree;
 import dev.domengine.json.Jsons;
 import dev.domengine.query.Displayed;
+import dev.domengine.query.Frames;
 import dev.domengine.query.HtmlTree;
 import dev.domengine.query.LiveXPath;
 import dev.domengine.query.Query;
 import dev.domengine.query.RowStates;
 import dev.domengine.session.BrowserSession;
+import dev.domengine.session.FrameCoverage;
 import dev.domengine.session.SessionEvents;
 import dev.domengine.snapshot.CompositeSnapshots;
 import dev.domengine.snapshot.DesktopSnapshotProducer;
@@ -51,6 +53,8 @@ public final class TargetVerb {
         }
     });
     private static final ConcurrentHashMap<String, String> BASELINE = new ConcurrentHashMap<>();
+    /** Frame id chosen by {@code frame --enter} for this run. {@code frame --reset} clears it. */
+    private static final ConcurrentHashMap<String, String> ENTERED = new ConcurrentHashMap<>();
     private static final ThreadLocal<String> RUN = new ThreadLocal<>();
 
     private TargetVerb() {
@@ -105,6 +109,7 @@ public final class TargetVerb {
                 case "explain" -> explain(project, runId, target, values);
                 case "capture" -> capture(project, runId, target, values);
                 case "eval" -> eval(project, runId, target, values);
+                case "frame" -> frame(project, runId, target, values);
                 default -> fail(verb, "unknown agent command: " + verb);
             };
         } catch (Miss failure) {
@@ -138,6 +143,7 @@ public final class TargetVerb {
             body.put("cdp", page.session.socket());
             body.put("docVersion", version);
             body.put("session", page.session.id);
+            stamp(body, page.session.connection(), null);
             return ok(body);
         } finally {
             page.release();
@@ -151,8 +157,10 @@ public final class TargetVerb {
         }
         Held page = openBrowser(resolved(target, args));
         try {
-            DomNode root = tree(page.session);
-            List<DomNode> hits = locate(root, query, frameFlags(target));
+            Map<String, String> flags = scopedFrame(runId, target);
+            List<DomNode> hits = args.get("scroll-search") == null
+                    ? locate(tree(page.session), query, flags)
+                    : scrollFind(page.session, query, flags);
             if (hits.isEmpty()) return fail("find", "not found");
             String version = docVersion(page.session.connection());
             List<Map<String, Object>> rows = publish(runId, "browser", page.session.id, version, hits, query);
@@ -161,6 +169,8 @@ public final class TargetVerb {
             body.put("docVersion", version);
             body.put("hits", rows);
             body.put("ref", rows.get(0).get("ref"));
+            if (args.get("scroll-search") != null) body.put("scrollSearch", true);
+            stamp(body, page.session.connection(), hits.get(0));
             return ok(body);
         } finally {
             page.release();
@@ -179,6 +189,7 @@ public final class TargetVerb {
         body.put("ref", rows.get(0).get("ref"));
         body.put("session", session.id());
         body.put("applied", session.live());
+        stampDesktop(body, session);
         return ok(body);
     }
 
@@ -199,7 +210,7 @@ public final class TargetVerb {
                 if (node == null) return fail("act", "stale_ref");
                 query = hit.query;
             } else {
-                List<DomNode> hits = locate(root, query, frameFlags(target));
+                List<DomNode> hits = locate(root, query, scopedFrame(runId, target));
                 if (hits.isEmpty()) return fail("act", "not found");
                 if (hits.size() > 1) return fail("act", "ambiguous");
                 node = hits.get(0);
@@ -216,6 +227,7 @@ public final class TargetVerb {
             if ("diff".equals(blank(args.get("snap")))) {
                 body.put("snap", diffOf(titleBefore, title(page.session.connection()), before, after));
             }
+            stamp(body, page.session.connection(), node);
             return ok(body);
         } finally {
             page.release();
@@ -233,6 +245,7 @@ public final class TargetVerb {
         body.put("applied", live);
         body.put("docVersion", "desktop:" + after.sequence());
         body.put("session", after.id());
+        stampDesktop(body, after);
         return ok(body);
     }
 
@@ -248,6 +261,7 @@ public final class TargetVerb {
         body.put("applied", live);
         body.put("docVersion", "desktop:" + after.sequence());
         body.put("session", after.id());
+        stampDesktop(body, after);
         return ok(body);
     }
 
@@ -293,6 +307,8 @@ public final class TargetVerb {
             else body.put("lines", lines(rows));
             if ("diff".equals(mode)) body.put("diff", diffAgainst(runId, picture, version));
             else BASELINE.put(baselineKey(runId), picture + "\n" + version);
+            body.put("virtualized", virtualized(page.session.connection()));
+            stamp(body, page.session.connection(), root);
             return ok(body);
         } finally {
             page.release();
@@ -310,6 +326,7 @@ public final class TargetVerb {
         body.put("lines", lines(rows));
         body.put("applied", session.live());
         if ("diff".equals(mode)) body.put("diff", diffAgainst(runId, String.join("\n", lines(rows)), version));
+        stampDesktop(body, session);
         return ok(body);
     }
 
@@ -359,6 +376,7 @@ public final class TargetVerb {
             body.put("condition", condition);
             body.put("docVersion", docVersion(page.session.connection()));
             body.put("title", title(page.session.connection()));
+            stamp(body, page.session.connection(), null);
             return ok(body);
         } finally {
             page.release();
@@ -393,6 +411,7 @@ public final class TargetVerb {
             body.put("mode", "event");
             body.put("events", rows);
             body.put("docVersion", docVersion(page.session.connection()));
+            stamp(body, page.session.connection(), null);
             return ok(body);
         } finally {
             page.release();
@@ -407,6 +426,7 @@ public final class TargetVerb {
             Map<String, Object> body = base("explain", "desktop", "desktop", target);
             body.put("applied", session.live());
             body.put("report", report(hits.get(0), null));
+            stampDesktop(body, session);
             return ok(body);
         }
         Held page = openBrowser(resolved(target, args));
@@ -418,13 +438,14 @@ public final class TargetVerb {
                 if (stale(hit, page.session.connection())) return fail("explain", "stale_ref");
                 node = findNode(tree(page.session), "", hit.backend);
             } else {
-                List<DomNode> hits = locate(tree(page.session), blank(args.get("query")), frameFlags(target));
+                List<DomNode> hits = locate(tree(page.session), blank(args.get("query")), scopedFrame(runId, target));
                 node = hits.isEmpty() ? null : hits.get(0);
             }
             if (node == null) return fail("explain", "not found");
             Map<String, Object> body = base("explain", "cdp", "browser", target);
             body.put("report", report(node, page.session.connection()));
             body.put("docVersion", docVersion(page.session.connection()));
+            stamp(body, page.session.connection(), node);
             return ok(body);
         } finally {
             page.release();
@@ -466,6 +487,7 @@ public final class TargetVerb {
             Map<String, Object> body = base("capture", "cdp", "browser", target);
             body.put("path", file.toString());
             body.put("docVersion", docVersion(page.session.connection()));
+            stamp(body, page.session.connection(), null);
             return ok(body);
         } finally {
             page.release();
@@ -494,6 +516,7 @@ public final class TargetVerb {
             Map<String, Object> body = base("eval", "cdp", "browser", target);
             body.put("world", world);
             body.put("value", jsonText(value.path("result").path("value")));
+            stamp(body, page.session.connection(), null);
             return ok(body);
         } finally {
             page.release();
@@ -532,6 +555,10 @@ public final class TargetVerb {
         boolean disabled = cdpInputOff();
         if (disabled) PageActions.useCdpInput(false);
         try {
+            if ("click".equals(kind) && closedShadow(acted)) {
+                Effect closed = clickClosed(session.connection(), acted);
+                if (closed.applied()) return closed;
+            }
             LiveXPath.use(session.connection());
             try {
                 PageActions.act(session, verb, flags);
@@ -961,11 +988,24 @@ public final class TargetVerb {
         if (root != null) root.linkParents();
         Map<String, String> flags = new LinkedHashMap<>();
         if (extra != null) flags.putAll(extra);
+        DomNode search = root;
+        String frame = flags.get("frame");
+        if (frame != null && !frame.isBlank()) {
+            try {
+                search = Frames.scope(root, flags);
+            } catch (CdpException failure) {
+                String message = failure.getMessage() == null ? "" : failure.getMessage();
+                if (message.contains("not found")) return List.of();
+                throw failure;
+            }
+            // Query.run scopes again. The document is already the entered frame.
+            flags.remove("frame");
+        }
         if (query == null || query.isBlank()) flags.put("pipeline", "css=a, button, input, select, textarea");
         else flags.put("pipeline", "text=\"" + query.replace("\"", "") + "\"");
         List<DomNode> hits = new ArrayList<>();
         try {
-            ObjectNode found = Query.run(root, flags);
+            ObjectNode found = Query.run(search, flags);
             JsonNode nodes = found.get("nodes");
             if (nodes != null) {
                 for (JsonNode node : nodes) {
@@ -977,8 +1017,8 @@ public final class TargetVerb {
             String message = failure.getMessage() == null ? "" : failure.getMessage();
             if (!message.contains("not found") && !message.contains("query requires")) throw failure;
         }
-        if (query != null && !query.isBlank()) hits.addAll(named(root, query));
-        return deepest(controlsFor(root, hits));
+        if (query != null && !query.isBlank()) hits.addAll(named(search, query));
+        return deepest(controlsFor(search, hits));
     }
 
     /** A label's {@code for} points at the control. The query names that control. */
@@ -1116,7 +1156,10 @@ public final class TargetVerb {
             row.put("role", role(node));
             row.put("name", name(node));
             row.put("handle", node.backendNodeId);
-            if (node.framePath != null && !node.framePath.isBlank()) row.put("frame", node.framePath);
+            if (node.frameId != null && !node.frameId.isBlank() && !"main".equals(node.frameId)) row.put("frame", node.frameId);
+            else if (node.framePath != null && !node.framePath.isBlank()) row.put("frame", node.framePath);
+            String shadow = shadowModeOf(node);
+            if (!shadow.isBlank()) row.put("shadow", shadow);
             rows.add(row);
         }
         return rows;
@@ -1332,6 +1375,287 @@ public final class TargetVerb {
             throw new CdpException("snap full: " + failure.getMessage());
         }
         return file.toString();
+    }
+
+    private static Outcome frame(Path project, String runId, TargetSelector.Parsed target, Map<String, String> args) {
+        if ("desktop".equals(target.kind())) {
+            DesktopTree.Session session = openDesktop(target, args.get("fixture"));
+            Map<String, Object> body = base("frame", "desktop", "desktop", target);
+            body.put("applied", session.live());
+            List<Map<String, Object>> frames = new ArrayList<>();
+            if (session.root() != null) {
+                for (DomNode child : session.root().children) {
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    String name = child.accessibleName == null ? "" : child.accessibleName;
+                    row.put("id", name);
+                    row.put("role", child.role == null ? "" : child.role);
+                    frames.add(row);
+                }
+            }
+            body.put("frames", frames);
+            stampDesktop(body, session);
+            return ok(body);
+        }
+        Held page = openBrowser(resolved(target, args));
+        try {
+            CdpConnection cdp = page.session.connection();
+            String key = runId == null ? "" : runId;
+            if ("true".equals(args.get("reset"))) {
+                ENTERED.remove(key);
+                Map<String, Object> body = base("frame", "cdp", "browser", target);
+                body.put("entered", "");
+                stamp(body, cdp, null);
+                return ok(body);
+            }
+            String enter = blank(args.get("enter"));
+            if (!enter.isBlank()) {
+                if (!frameExists(cdp, enter)) return fail("frame", "unknown frame");
+                ENTERED.put(key, enter);
+                Map<String, Object> body = base("frame", "cdp", "browser", target);
+                body.put("entered", enter);
+                body.put("frame", enter);
+                return ok(body);
+            }
+            Map<String, Object> body = base("frame", "cdp", "browser", target);
+            body.put("frames", listFrames(cdp));
+            String entered = ENTERED.get(key);
+            if (entered != null) body.put("entered", entered);
+            stamp(body, cdp, null);
+            return ok(body);
+        } finally {
+            page.release();
+        }
+    }
+
+    private static List<Map<String, Object>> listFrames(CdpConnection cdp) {
+        FrameCoverage.harvest(cdp);
+        List<Map<String, Object>> rows = new ArrayList<>();
+        JsonNode tree = cdp.call("Page.getFrameTree", Jsons.object(), Duration.ofSeconds(5));
+        collectFrameRows(cdp, tree.path("frameTree"), "", rows);
+        addCoveredFrames(cdp, rows);
+        return rows;
+    }
+
+    private static void collectFrameRows(CdpConnection cdp, JsonNode node, String parent, List<Map<String, Object>> rows) {
+        if (node == null || node.isMissingNode()) return;
+        JsonNode frame = node.path("frame");
+        String id = frame.path("id").asText("");
+        if (!id.isBlank()) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", id);
+            row.put("parentId", parent);
+            row.put("url", frame.path("url").asText(""));
+            row.put("name", frame.path("name").asText(""));
+            String session = FrameCoverage.sessionId(cdp, id);
+            row.put("session", !session.isBlank());
+            if (!session.isBlank()) row.put("boot", FrameCoverage.boot(cdp, session));
+            rows.add(row);
+        }
+        JsonNode children = node.path("childFrames");
+        if (children != null && children.isArray()) {
+            for (JsonNode child : children) collectFrameRows(cdp, child, id, rows);
+        }
+    }
+
+    /** Auto-attached frames that the parent tree dropped after an out-of-process swap. */
+    private static void addCoveredFrames(CdpConnection cdp, List<Map<String, Object>> rows) {
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (Map<String, Object> row : rows) seen.add(String.valueOf(row.get("id")));
+        for (String id : FrameCoverage.frameIds(cdp)) {
+            if (id.isBlank() || !seen.add(id)) continue;
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", id);
+            row.put("parentId", "");
+            row.put("url", FrameCoverage.url(cdp, id));
+            row.put("name", "");
+            String session = FrameCoverage.sessionId(cdp, id);
+            row.put("session", !session.isBlank());
+            if (!session.isBlank()) row.put("boot", FrameCoverage.boot(cdp, session));
+            rows.add(row);
+        }
+    }
+
+    private static boolean frameExists(CdpConnection cdp, String id) {
+        for (Map<String, Object> row : listFrames(cdp)) {
+            if (id.equals(String.valueOf(row.get("id"))) || id.equals(String.valueOf(row.get("name")))) return true;
+        }
+        return findFrameOwner(tree(cdp), id);
+    }
+
+    private static boolean findFrameOwner(DomNode node, String id) {
+        if (node == null) return false;
+        if (node.iframe && (id.equals(node.attributes.get("id")) || id.equals(node.ownerFrameId) || id.equals(node.frameId))) {
+            return true;
+        }
+        for (DomNode child : node.children) if (findFrameOwner(child, id)) return true;
+        return false;
+    }
+
+    private static Map<String, String> scopedFrame(String runId, TargetSelector.Parsed target) {
+        Map<String, String> flags = frameFlags(target);
+        if (!flags.isEmpty()) return flags;
+        String entered = ENTERED.get(runId == null ? "" : runId);
+        if (entered == null || entered.isBlank()) return Map.of();
+        return Map.of("frame", entered);
+    }
+
+    private static List<DomNode> scrollFind(BrowserSession session, String query, Map<String, String> flags) {
+        List<DomNode> hits = locate(tree(session), query, flags);
+        int stuck = 0;
+        for (int step = 0; hits.isEmpty() && step < 40; step++) {
+            if (!scrollOnce(session.connection())) {
+                hits = locate(tree(session), query, flags);
+                if (!hits.isEmpty() || ++stuck >= 3) break;
+                continue;
+            }
+            stuck = 0;
+            hits = locate(tree(session), query, flags);
+        }
+        if (!hits.isEmpty() && query != null && !query.isBlank()) {
+            reveal(session.connection(), query);
+            List<DomNode> painted = locate(tree(session), query, flags);
+            if (!painted.isEmpty()) hits = painted;
+        }
+        return hits;
+    }
+
+    /**
+     * Aligns the matched text with the top of its overflow box.
+     * A virtualized row is often mounted on the clipped edge, where {@code innerText} omits it.
+     * Putting that row at the top of the scrollport keeps it in the mount window and on screen.
+     */
+    private static void reveal(CdpConnection cdp, String query) {
+        if (cdp == null || query == null || query.isBlank()) return;
+        String quoted = Jsons.MAPPER.valueToTree(query).toString();
+        ObjectNode params = Jsons.object();
+        params.put("expression", "(function(){"
+                + "var q=" + quoted + ";"
+                + "function text(el){return ((el.textContent||'')+'').replace(/\\s+/g,' ').trim();}"
+                + "var nodes=document.querySelectorAll('body *');var el=null;"
+                + "for(var i=0;i<nodes.length;i++){if(text(nodes[i])===q) el=nodes[i];}"
+                + "if(!el) return false;"
+                + "var box=el.parentElement;"
+                + "while(box){var s=getComputedStyle(box);var oy=s.overflowY;"
+                + "if((oy==='auto'||oy==='scroll')&&box.scrollHeight>box.clientHeight+2) break;"
+                + "box=box.parentElement;}"
+                + "if(!box){el.scrollIntoView({block:'start',inline:'nearest'});return true;}"
+                + "var row=el.getBoundingClientRect();var port=box.getBoundingClientRect();"
+                + "box.scrollTop+=row.top-port.top;"
+                + "return (document.body.innerText||'').indexOf(q)>=0;"
+                + "})()");
+        params.put("returnByValue", true);
+        try {
+            cdp.call("Runtime.evaluate", params, Duration.ofSeconds(5));
+        } catch (RuntimeException ignored) {
+            // The row is already in the tree. A later read reports whether it painted.
+        }
+    }
+
+    private static boolean scrollOnce(CdpConnection cdp) {
+        ObjectNode params = Jsons.object();
+        params.put("expression", "(function(){"
+                + "function scrollable(el){var s=getComputedStyle(el);var oy=s.overflowY;"
+                + "return (oy==='auto'||oy==='scroll')&&el.scrollHeight>el.clientHeight+2;}"
+                + "var nodes=document.querySelectorAll('*');var box=null;"
+                + "for(var i=0;i<nodes.length;i++){if(scrollable(nodes[i])){box=nodes[i];break;}}"
+                + "if(!box) box=document.scrollingElement||document.documentElement;"
+                + "var before=box.scrollTop;box.scrollTop=before+Math.max(40,Math.floor(box.clientHeight*0.8));"
+                + "return box.scrollTop!==before;})()");
+        params.put("returnByValue", true);
+        try {
+            JsonNode value = cdp.call("Runtime.evaluate", params, Duration.ofSeconds(5));
+            return value.path("result").path("value").asBoolean(false);
+        } catch (RuntimeException failure) {
+            return false;
+        }
+    }
+
+    private static boolean virtualized(CdpConnection cdp) {
+        ObjectNode params = Jsons.object();
+        params.put("expression", "(function(){var nodes=document.querySelectorAll('*');"
+                + "for(var i=0;i<nodes.length;i++){var el=nodes[i];var s=getComputedStyle(el);"
+                + "if((s.overflowY==='auto'||s.overflowY==='scroll')&&el.scrollHeight>el.clientHeight+80"
+                + "&&el.scrollHeight>800&&el.children.length<30) return true;}return false;})()");
+        params.put("returnByValue", true);
+        try {
+            JsonNode value = cdp.call("Runtime.evaluate", params, Duration.ofSeconds(5));
+            return value.path("result").path("value").asBoolean(false);
+        } catch (RuntimeException failure) {
+            return false;
+        }
+    }
+
+    private static boolean closedShadow(DomNode node) {
+        return "closed".equals(shadowModeOf(node));
+    }
+
+    private static String shadowModeOf(DomNode node) {
+        for (DomNode cursor = node; cursor != null; cursor = cursor.parent) {
+            if (cursor.shadowRoot && "closed".equalsIgnoreCase(cursor.shadowMode)) return "closed";
+        }
+        return "";
+    }
+
+    /** Clicks through {@code DOM.resolveNode} in the pkb world. Coordinate input misses {@code pointer-events:none}. */
+    private static Effect clickClosed(CdpConnection cdp, DomNode node) {
+        if (node == null || node.backendNodeId <= 0) return new Effect("resolveNode", false);
+        try {
+            int context = pkbContext(cdp);
+            ObjectNode resolve = Jsons.object();
+            resolve.put("backendNodeId", node.backendNodeId);
+            if (context > 0) resolve.put("executionContextId", context);
+            JsonNode object = cdp.call("DOM.resolveNode", resolve, Duration.ofSeconds(5)).path("object");
+            String objectId = object.path("objectId").asText("");
+            if (objectId.isBlank()) return new Effect("resolveNode", false);
+            String before = title(cdp);
+            ObjectNode call = Jsons.object();
+            call.put("objectId", objectId);
+            call.put("functionDeclaration", "function(){ this.click(); return document.title; }");
+            call.put("returnByValue", true);
+            JsonNode called = cdp.call("Runtime.callFunctionOn", call, Duration.ofSeconds(5));
+            if (called.has("exceptionDetails")) return new Effect("resolveNode", false);
+            String after = title(cdp);
+            return new Effect("resolveNode", !before.equals(after));
+        } catch (RuntimeException failure) {
+            return new Effect("resolveNode", false);
+        }
+    }
+
+    private static void stamp(Map<String, Object> body, CdpConnection cdp, DomNode node) {
+        Object existing = body.get("frame");
+        if (existing instanceof String text && !text.isBlank()) return;
+        String frame = "";
+        if (node != null && node.frameId != null && !node.frameId.isBlank() && !"main".equals(node.frameId)) frame = node.frameId;
+        if (frame.isBlank() && cdp != null) {
+            try {
+                frame = mainFrameId(cdp);
+            } catch (RuntimeException ignored) {
+                frame = "";
+            }
+        }
+        if (!frame.isBlank()) body.put("frame", frame);
+    }
+
+    private static void stampDesktop(Map<String, Object> body, DesktopTree.Session session) {
+        Object existing = body.get("frame");
+        if (existing instanceof String text && !text.isBlank()) return;
+        if (session == null || session.root() == null) return;
+        String window = windowName(session.root());
+        if (!window.isBlank()) body.put("frame", window);
+    }
+
+    /** The nearest window name. A control inside the window is not the frame. */
+    private static String windowName(DomNode node) {
+        if (node == null) return "";
+        if ("window".equalsIgnoreCase(node.role == null ? "" : node.role)) {
+            String name = node.accessibleName == null ? "" : node.accessibleName;
+            if (!name.isBlank()) return name;
+        }
+        for (DomNode child : node.children) {
+            String name = windowName(child);
+            if (!name.isBlank()) return name;
+        }
+        return "";
     }
 
     private static Map<String, String> frameFlags(TargetSelector.Parsed target) {

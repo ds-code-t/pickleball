@@ -2,6 +2,8 @@
 
 ## 3.0.0
 
+Agent-fast phase 5. `frame --list`, `frame --reset`, and `frame --enter` share the target selector. Replies carry `frame` (a desktop window name on the desktop backend). Out-of-process iframes auto-attach with `waitForDebuggerOnStart` and resume after the preload. Closed shadow clicks go through `DOM.resolveNode` in the pkb world. `find --scroll-search` scrolls a virtualized list until the row is mounted. `snap` reports `virtualized`.
+
 Agent-fast phase 4. snap, find, act, wait, watch, explain, and capture share one target selector: browser session, browser:cdp url, browser:auto, desktop pid or app~name, and ref split on the last colon. Desktop uses the same verb and does not call a live desktop bus. A missing browser returns applied=false. Fallback chains log once per run and reason in `.pickleball/logs/fallback-chain.jsonl` unless `pkb_fallback_log=off`. wait uses mode=event for mutation, network, load, navigation, and mask. Runtime.addBinding may set executionContextName pkb-surface.
 
 Agent-fast phase 3. `start --url --browser` launches Chrome in a detached host and returns after `GET /health` is ok. Headed follows the display: headless only when the graphics environment is headless or the browser name contains headless. The host writes `.pickleball/live-browser/current.json`. A live worker bridge wins over that host for page verbs. `live-stop` stops the host and Chrome and does not stop a worker. `live-start` is `start`. `doctor` reports chrome, session, health, headed, pid, page attachment, and whether a worker is present. Chat history and chat-poll use the cursor armed at session start. The warm path is `java -cp @classpath.cache tools.dscode.launcher.PickleballWorkbenchLauncher`.

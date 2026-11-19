@@ -77,7 +77,8 @@ public final class Frames {
     private static DomNode findFrame(DomNode node, String id) {
         if (node == null) return null;
         if (node.iframe && (id.equals(node.attributes.get("id")) || id.equals(node.id())
-                || id.equals(Long.toString(node.backendNodeId)) || id.equals(node.frameId))) {
+                || id.equals(Long.toString(node.backendNodeId)) || id.equals(node.frameId)
+                || id.equals(node.ownerFrameId))) {
             return node;
         }
         for (DomNode child : node.children) {

@@ -36,6 +36,7 @@
       "find",
       "find-element",
       "finish",
+      "frame",
       "gc-runs",
       "gc-versions",
       "guide",

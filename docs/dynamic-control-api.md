@@ -30,6 +30,9 @@ With no live browser the command exits 1 and the body is `ok:false` with `error:
 | eval | `--target --expr --world=pkb\|main` | Browser only. Desktop returns `eval is browser only`. |
 | ui | `--ops` | The `ui-apply` batch. An op target may be `ref:<docVersion:handle>`. A stale ref misses. |
 | capture | `--target --out` | Writes a PNG. No base64 in the reply. |
+| frame | `--target --list\|--reset\|--enter=<id>` | Lists frames, clears the entered frame, or scopes later find and snap to that frame. |
+
+A browser reply includes `frame` (the main frame id, the hit's frame, or the entered frame). A desktop reply includes `frame` as the window name. Cross-origin iframes stay attached: `Target.setAutoAttach` uses `waitForDebuggerOnStart`, and the child session is resumed only after the preload runs. `find` and `snap` walk that same pierced tree, including the grafted frame. A closed shadow click uses `DOM.resolveNode` in the `pkb-surface` world. `find --scroll-search=true` scrolls the overflow container until the query is in the tree. `snap` sets `virtualized` when that container is taller than its viewport.
 
 A chain logs a line only when a step fails and a later step serves the call, once per run, chain, and reason. The line is appended to `.pickleball/logs/fallback-chain.jsonl`: `{"run","chain","from","to","reason","at"}`. Example: `{"chain":"act","from":"cdp","to":"js","reason":"cdp input disabled"}`. The test property `pkb_cdp_input=off` skips CDP input and takes that next step. It is not a CLI flag. The log stays off when `pkb_fallback_log=off`. The long-lived host clears the de-dupe set when the run id changes. On Chromium, `Runtime.addBinding` may include `executionContextName` `pkb-surface`.
 

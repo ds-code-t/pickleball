@@ -952,6 +952,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/AgentExpansionTest.java`
 - `src/test/java/tools/dscode/launcher/AgentFastCliTest.java`
 - `src/test/java/tools/dscode/launcher/CliForwardToWorkerTest.java`
+- `src/test/java/tools/dscode/launcher/ClosedShadowResolveTest.java`
 - `src/test/java/tools/dscode/launcher/ConsumerReadyCliTest.java`
 - `src/test/java/tools/dscode/launcher/DesktopSameVerbTest.java`
 - `src/test/java/tools/dscode/launcher/DoctorTest.java`
@@ -959,7 +960,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/DomLogCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/EngineCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/FallbackLoggedTest.java`
+- `src/test/java/tools/dscode/launcher/FrameInReplyTest.java`
 - `src/test/java/tools/dscode/launcher/GuidanceCommandGoldenTest.java`
+- `src/test/java/tools/dscode/launcher/OopifAutoAttachTest.java`
 - `src/test/java/tools/dscode/launcher/PickleballWorkbenchLauncherTest.java`
 - `src/test/java/tools/dscode/launcher/PopupVerbCoverageTest.java`
 - `src/test/java/tools/dscode/launcher/Release218RecommendationsTest.java`
@@ -971,6 +974,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/TargetAgnosticApiTest.java`
 - `src/test/java/tools/dscode/launcher/TargetCoverageTest.java`
 - `src/test/java/tools/dscode/launcher/VersionSwitchTest.java`
+- `src/test/java/tools/dscode/launcher/VirtualizedScrollTest.java`
 - `src/test/java/tools/dscode/launcher/WarmJvmGlueTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchAgentCommandsTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchAgentUsabilityTest.java`
@@ -1554,6 +1558,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/query/RowStates.java`
 - `dom-engine/src/main/java/dev/domengine/session/BrowserSession.java`
 - `dom-engine/src/main/java/dev/domengine/session/ChromeProcess.java`
+- `dom-engine/src/main/java/dev/domengine/session/FrameCoverage.java`
 - `dom-engine/src/main/java/dev/domengine/session/SessionEvents.java`
 - `dom-engine/src/main/java/dev/domengine/session/SessionRegistry.java`
 - `dom-engine/src/main/java/dev/domengine/snapshot/CdpSnapshotProducer.java`

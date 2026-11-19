@@ -172,6 +172,7 @@ public final class BrowserSession implements AutoCloseable {
                 EngineLog.info("observe", domain + " refused: " + failure.getMessage());
             }
         }
+        FrameCoverage.arm(connection);
         return events;
     }
 
@@ -206,7 +207,10 @@ public final class BrowserSession implements AutoCloseable {
         } catch (RuntimeException ignored) {
             // Closing still wins if the pseudo-state clear fails.
         }
-        if (connection != null) connection.close();
+        if (connection != null) {
+            FrameCoverage.drop(connection);
+            connection.close();
+        }
         boolean killed = false;
         if (launched && chrome != null) {
             ChromeProcess.destroyTree(chrome);

@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.domengine.cdp.CdpConnection;
 import dev.domengine.json.Jsons;
 import dev.domengine.log.EngineLog;
+import dev.domengine.session.FrameCoverage;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -201,13 +202,18 @@ public final class LiveTree {
         List<DomNode> empty = new ArrayList<>();
         collectEmptyFrames(root, empty);
         if (empty.isEmpty()) return;
+        boolean[] used = new boolean[empty.size()];
+        for (int index = 0; index < empty.size(); index++) {
+            String frameId = empty.get(index).ownerFrameId;
+            String sessionId = FrameCoverage.awaitSession(connection, frameId, 1500);
+            if (sessionId.isBlank()) continue;
+            if (graftSession(connection, empty.get(index), sessionId, timeout)) used[index] = true;
+        }
+        boolean pending = false;
+        for (boolean done : used) if (!done) pending = true;
+        if (!pending) return;
         JsonNode listed;
         try {
-            ObjectNode auto = Jsons.object();
-            auto.put("autoAttach", true);
-            auto.put("waitForDebuggerOnStart", false);
-            auto.put("flatten", true);
-            connection.call("Target.setAutoAttach", auto, timeout);
             listed = connection.call("Target.getTargets", Jsons.object(), timeout);
         } catch (RuntimeException failure) {
             EngineLog.info("frame", "targets " + failure.getMessage());
@@ -215,7 +221,6 @@ public final class LiveTree {
         }
         JsonNode infos = listed.path("targetInfos");
         if (!infos.isArray()) return;
-        boolean[] used = new boolean[empty.size()];
         for (JsonNode info : infos) {
             if (!"iframe".equals(info.path("type").asText(""))) continue;
             String targetId = info.path("targetId").asText("");
@@ -229,17 +234,30 @@ public final class LiveTree {
                 JsonNode session = connection.call("Target.attachToTarget", attach, timeout);
                 String sessionId = session.path("sessionId").asText("");
                 if (sessionId.isBlank()) continue;
-                ObjectNode params = Jsons.object();
-                params.put("pierce", true);
-                params.put("depth", -1);
-                JsonNode child = connection.call("DOM.getDocument", params, sessionId, timeout);
-                DomNode document = DomNode.fromCdp(child.get("root"));
-                empty.get(slot).children.add(document);
-                used[slot] = true;
-                EngineLog.info("frame", "oopif " + targetId);
+                if (graftSession(connection, empty.get(slot), sessionId, timeout)) {
+                    used[slot] = true;
+                    EngineLog.info("frame", "oopif " + targetId);
+                }
             } catch (RuntimeException failure) {
                 EngineLog.info("frame", "oopif " + failure.getMessage());
             }
+        }
+    }
+
+    /** Reads the child document on an already attached flattened session. */
+    private static boolean graftSession(CdpConnection connection, DomNode frame, String sessionId, Duration timeout) {
+        try {
+            ObjectNode params = Jsons.object();
+            params.put("pierce", true);
+            params.put("depth", -1);
+            JsonNode child = connection.call("DOM.getDocument", params, sessionId, timeout);
+            DomNode document = DomNode.fromCdp(child.get("root"));
+            if (document == null) return false;
+            frame.children.add(document);
+            return true;
+        } catch (RuntimeException failure) {
+            EngineLog.info("frame", "graft " + failure.getMessage());
+            return false;
         }
     }
 
