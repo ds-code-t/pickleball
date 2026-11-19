@@ -77,11 +77,34 @@ class FallbackLoggedTest {
 
     @Test
     void covers_command_watch() throws Exception {
-        FallbackLog.resetForTests();
-        System.setProperty("pkb_fallback_log", "off");
-        Capture capture = run("find", "--target=browser:auto", "--query=Save", "--run-id=watch-off");
-        assertEquals(1, capture.code, capture.out + capture.err);
-        assertFalse(Files.exists(temp.resolve(".pickleball/logs/fallback-chain.jsonl")));
+        assumeTrue(BrowserSession.findChrome() != null, "skipped: chrome is not on PATH");
+        Path page = temp.resolve("watch.html");
+        Files.writeString(page, """
+                <!DOCTYPE html><html><head><title>Watch</title></head>
+                <body><button id="save">Save</button></body></html>
+                """);
+        Capture started = run("start", "--url=" + page.toUri(), "--browser=chrome-headless");
+        assertEquals(0, started.code, started.err + started.out);
+        String marker = "pkb-watch-" + System.nanoTime();
+        Capture logged = run(
+                "eval", "--target=browser:auto", "--world=main",
+                "--expr=console.log('" + marker + "')", "--run-id=watch");
+        assertEquals(0, logged.code, logged.err + logged.out);
+        long startedAt = System.nanoTime();
+        Capture watched = run(
+                "watch", "--target=browser:auto", "--kinds=console", "--duration=3000", "--run-id=watch");
+        assertEquals(0, watched.code, watched.err + watched.out);
+        JsonNode body = JSON.readTree(watched.out);
+        assertTrue(body.path("events").isArray(), watched.out);
+        boolean seen = false;
+        for (JsonNode event : body.path("events")) {
+            if (event.path("text").asText("").contains(marker)) {
+                seen = true;
+                assertFalse(event.path("kind").asText("").isBlank(), event.toString());
+            }
+        }
+        assertTrue(seen, watched.out);
+        assertTrue(System.nanoTime() - startedAt < java.util.concurrent.TimeUnit.SECONDS.toNanos(8), watched.out);
     }
 
     private JsonNode find(String query, String runId) throws Exception {
