@@ -72,6 +72,7 @@ class ClosedShadowResolveTest {
         JsonNode act = JSON.readTree(acted.out);
         assertTrue(act.path("applied").asBoolean(), acted.out);
         assertEquals("resolveNode", act.path("used").asText(), acted.out);
+        assertEquals("/html[1]/body[1]/div[1]", act.path("shadow_path").asText(""), acted.out);
 
         Capture title = run(
                 "eval", "--target=browser:auto", "--world=main", "--run-id=shadow",
@@ -117,6 +118,10 @@ class ClosedShadowResolveTest {
         assertEquals("open", openHit.path("hits").get(0).path("shadow").asText(), open.out);
         assertEquals("/html[1]/body[1]/div[2]", openHit.path("hits").get(0).path("shadow_path").asText(), open.out);
 
+        Capture openAct = run("act", "--target=browser:auto", "--query=OpenBtn", "--kind=click", "--run-id=once");
+        assertEquals(0, openAct.code, openAct.err + openAct.out);
+        assertEquals("/html[1]/body[1]/div[2]", JSON.readTree(openAct.out).path("shadow_path").asText(""), openAct.out);
+
         Capture found = run("find", "--target=browser:auto", "--query=Once", "--run-id=once");
         assertEquals(0, found.code, found.err + found.out);
         JsonNode hit = JSON.readTree(found.out);
@@ -134,6 +139,7 @@ class ClosedShadowResolveTest {
         JsonNode act = JSON.readTree(acted.out);
         assertTrue(act.path("applied").asBoolean(), acted.out);
         assertEquals("resolveNode", act.path("used").asText(), acted.out);
+        assertEquals("/html[1]/body[1]/div[1]", act.path("shadow_path").asText(""), acted.out);
 
         Capture count = run(
                 "eval", "--target=browser:auto", "--world=main", "--run-id=once",

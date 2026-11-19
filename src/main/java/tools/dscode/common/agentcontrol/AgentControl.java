@@ -716,7 +716,7 @@ public final class AgentControl {
                 }
                 String css = PageSurfaces.presetCss(args.get("preset"), args.get("style"));
                 tools.dscode.common.agentfast.TargetVerb.Outcome painted =
-                        tools.dscode.common.agentfast.TargetVerb.highlight(raw, args.get("handle"), css);
+                        tools.dscode.common.agentfast.TargetVerb.highlight(raw, args.get("handle"), css, runId);
                 return new Result(painted.exit(), painted.body());
             }
         }

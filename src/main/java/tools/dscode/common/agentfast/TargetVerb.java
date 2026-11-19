@@ -104,7 +104,7 @@ public final class TargetVerb {
      * Paints {@code handle} on the selected browser page. The host page is not touched.
      * {@code applied} is true only when that page reads back {@code data-pkb-style=style_modified}.
      */
-    public static Outcome highlight(String targetRaw, String handle, String css) {
+    public static Outcome highlight(String targetRaw, String handle, String css, String runId) {
         TargetSelector.Parsed target = TargetSelector.parse(targetRaw);
         if (target == null || "desktop".equals(target.kind()) || "none".equals(target.kind())) {
             Outcome failed = fail("highlight", "unknown target");
@@ -112,6 +112,7 @@ public final class TargetVerb {
             return failed;
         }
         Held page = openBrowser("ref".equals(target.kind()) ? TargetSelector.parse("browser:auto") : target);
+        CdpConnection cdp = page.session.connection();
         try {
             String sentence = tools.dscode.browser.SurfaceAssets.sentence("highlight");
             String script = "(function(){"
@@ -133,7 +134,10 @@ public final class TargetVerb {
             ObjectNode params = Jsons.object();
             params.put("expression", script);
             params.put("returnByValue", true);
-            JsonNode called = page.session.connection().call("Runtime.evaluate", params, Duration.ofSeconds(10));
+            String session = enteredSession(cdp, runId);
+            JsonNode called = session.isBlank()
+                    ? cdp.call("Runtime.evaluate", params, Duration.ofSeconds(10))
+                    : cdp.call("Runtime.evaluate", params, session, Duration.ofSeconds(10));
             JsonNode payload = called.path("result").path("value");
             boolean painted = payload.path("ok").asBoolean(false)
                     && "style_modified".equals(payload.path("style").asText(""));
@@ -142,6 +146,8 @@ public final class TargetVerb {
                 Outcome failed = fail("highlight", error);
                 failed.body().put("applied", false);
                 failed.body().put("handle", handle == null ? "" : handle);
+                stamp(failed.body(), cdp, null);
+                putEntered(failed.body(), runId, cdp);
                 return failed;
             }
             Map<String, Object> body = base("highlight", "cdp", "browser", target);
@@ -149,8 +155,17 @@ public final class TargetVerb {
             body.put("handle", handle);
             body.put("cdp", "style");
             body.put("labels", List.of("style_modified"));
-            stamp(body, page.session.connection(), null);
+            stamp(body, cdp, null);
+            putEntered(body, runId, cdp);
             return ok(body);
+        } catch (RuntimeException failure) {
+            String message = failure.getMessage() == null ? "highlight did not paint" : failure.getMessage();
+            Outcome failed = fail("highlight", message);
+            failed.body().put("applied", false);
+            failed.body().put("handle", handle == null ? "" : handle);
+            stamp(failed.body(), cdp, null);
+            putEntered(failed.body(), runId, cdp);
+            return failed;
         } finally {
             page.release();
         }
@@ -212,6 +227,7 @@ public final class TargetVerb {
             body.put("docVersion", version);
             body.put("session", page.session.id);
             stamp(body, page.session.connection(), null);
+            putEntered(body, runId, page.session.connection());
             return ok(body);
         } finally {
             page.release();
@@ -293,14 +309,35 @@ public final class TargetVerb {
             DomNode node;
             String query = blank(args.get("query"));
             if (hit != null) {
-                if (stale(hit, page.session.connection())) return fail("act", "stale_ref");
+                if (stale(hit, page.session.connection())) {
+                    Outcome missed = fail("act", "stale_ref");
+                    stamp(missed.body(), page.session.connection(), null);
+                    putEntered(missed.body(), runId, page.session.connection());
+                    return missed;
+                }
                 node = findNode(root, "", hit.backend);
-                if (node == null) return fail("act", "stale_ref");
+                if (node == null) {
+                    Outcome missed = fail("act", "stale_ref");
+                    stamp(missed.body(), page.session.connection(), null);
+                    putEntered(missed.body(), runId, page.session.connection());
+                    return missed;
+                }
                 query = hit.query;
             } else {
                 List<DomNode> hits = locate(root, query, scopedFrame(runId, target));
-                if (hits.isEmpty()) return fail("act", "not found");
-                if (hits.size() > 1) return fail("act", "ambiguous");
+                if (hits.isEmpty()) {
+                    Outcome missed = fail("act", "not found");
+                    stamp(missed.body(), page.session.connection(), null);
+                    putEntered(missed.body(), runId, page.session.connection());
+                    return missed;
+                }
+                if (hits.size() > 1) {
+                    Outcome missed = fail("act", "ambiguous");
+                    stamp(missed.body(), page.session.connection(), hits.get(0));
+                    putEntered(missed.body(), runId, page.session.connection());
+                    putShadow(missed.body(), hits.get(0));
+                    return missed;
+                }
                 node = hits.get(0);
             }
             String before = docVersion(page.session.connection());
@@ -319,6 +356,7 @@ public final class TargetVerb {
                 failed.body().put("reason", effect.reason());
                 stamp(failed.body(), page.session.connection(), node);
                 putEntered(failed.body(), runId, page.session.connection());
+                putShadow(failed.body(), node);
                 putSnapDiff(failed.body(), args, titleBefore, title(page.session.connection()), before, docVersion(page.session.connection()), linesBefore, linesAfter);
                 return failed;
             }
@@ -335,6 +373,7 @@ public final class TargetVerb {
                 putSnapDiff(body, args, titleBefore, titleAfter, before, after, linesBefore, linesAfter);
                 stamp(body, page.session.connection(), node);
                 putEntered(body, runId, page.session.connection());
+                putShadow(body, node);
                 return ok(body);
             }
             if (!effect.applied()) {
@@ -343,17 +382,26 @@ public final class TargetVerb {
                 failed.body().put("dispatched", false);
                 stamp(failed.body(), page.session.connection(), node);
                 putEntered(failed.body(), runId, page.session.connection());
+                putShadow(failed.body(), node);
                 putSnapDiff(failed.body(), args, titleBefore, title(page.session.connection()), before, docVersion(page.session.connection()), linesBefore, linesAfter);
                 return failed;
             }
             String condition = blank(args.get("condition"));
             if (!condition.isBlank()) {
-                boolean met = waitPoll(page.session.connection(), condition, query, timeoutMs(args));
+                boolean met = waitPoll(
+                        page.session.connection(),
+                        condition,
+                        query,
+                        timeoutMs(args),
+                        scopedFrame(runId, target),
+                        enteredSession(page.session.connection(), runId));
                 if (!met) {
                     Outcome failed = fail("act", "timeout");
                     failed.body().put("applied", true);
                     failed.body().put("condition", condition);
                     stamp(failed.body(), page.session.connection(), node);
+                    putEntered(failed.body(), runId, page.session.connection());
+                    putShadow(failed.body(), node);
                     return failed;
                 }
             }
@@ -374,6 +422,7 @@ public final class TargetVerb {
             putSnapDiff(body, args, titleBefore, titleAfter, before, after, linesBefore, linesAfter);
             stamp(body, page.session.connection(), node);
             putEntered(body, runId, page.session.connection());
+            putShadow(body, node);
             return ok(body);
         } finally {
             page.release();
@@ -400,7 +449,12 @@ public final class TargetVerb {
             boolean all = true;
             for (String[] pair : pairs) {
                 DomNode node = fieldNode(root, pair[0]);
-                if (node == null) return fail("form-fill", "not found");
+                if (node == null) {
+                    Outcome missed = fail("form-fill", "not found");
+                    stamp(missed.body(), page.session.connection(), null);
+                    putEntered(missed.body(), runId, page.session.connection());
+                    return missed;
+                }
                 Map<String, String> one = new LinkedHashMap<>();
                 one.put("kind", "type");
                 one.put("value", pair[1]);
@@ -418,12 +472,15 @@ public final class TargetVerb {
                 Outcome failed = fail("form-fill", "not applied");
                 failed.body().put("applied", false);
                 failed.body().put("fields", filled);
+                stamp(failed.body(), page.session.connection(), null);
+                putEntered(failed.body(), runId, page.session.connection());
                 return failed;
             }
             Map<String, Object> body = base("form-fill", "cdp", "browser", target);
             body.put("applied", true);
             body.put("fields", filled);
             stamp(body, page.session.connection(), null);
+            putEntered(body, runId, page.session.connection());
             return ok(body);
         } finally {
             page.release();
@@ -542,8 +599,17 @@ public final class TargetVerb {
         try {
             ObjectNode produced = CompositeSnapshots.browser(page.session, SnapshotOptions.fromFlags(Map.of()));
             DomNode root = tree(page.session);
+            DomNode shownRoot = root;
+            Map<String, String> scopeFlags = scopedFrame(runId, target);
+            if (!scopeFlags.isEmpty()) {
+                try {
+                    shownRoot = Frames.scope(root, scopeFlags);
+                } catch (CdpException ignored) {
+                    shownRoot = root;
+                }
+            }
             String version = docVersion(page.session.connection());
-            List<DomNode> shown = interactive(root);
+            List<DomNode> shown = interactive(shownRoot);
             RowStates.fill(page.session.connection(), optionNodes(shown));
             List<Map<String, Object>> rows = publish(runId, "browser", page.session.id, version, shown, "");
             String picture = picture(page.session.connection(), rows);
@@ -558,7 +624,8 @@ public final class TargetVerb {
             if ("diff".equals(mode)) body.put("diff", diffAgainst(runId, picture, version));
             else BASELINE.put(baselineKey(runId), picture + "\n" + version);
             body.put("virtualized", virtualized(page.session.connection()));
-            stamp(body, page.session.connection(), root);
+            stamp(body, page.session.connection(), shownRoot);
+            putEntered(body, runId, page.session.connection(), rows);
             stampContexts(body, root);
             return ok(body);
         } finally {
@@ -620,10 +687,17 @@ public final class TargetVerb {
         try {
             String before = docVersion(page.session.connection());
             String titleBefore = title(page.session.connection());
+            Map<String, String> flags = scopedFrame(runId, target);
+            String session = enteredSession(page.session.connection(), runId);
             boolean met;
-            if ("event".equals(mode)) met = waitEvent(project, runId, page.session.connection(), condition, timeout);
-            else met = waitPoll(page.session.connection(), condition, blank(args.get("query")), timeout);
-            if (!met) return fail("wait", "timeout");
+            if ("event".equals(mode)) met = waitEvent(project, runId, page.session.connection(), condition, timeout, session);
+            else met = waitPoll(page.session.connection(), condition, blank(args.get("query")), timeout, flags, session);
+            if (!met) {
+                Outcome failed = fail("wait", "timeout");
+                stamp(failed.body(), page.session.connection(), null);
+                putEntered(failed.body(), runId, page.session.connection());
+                return failed;
+            }
             String after = docVersion(page.session.connection());
             String titleAfter = title(page.session.connection());
             Map<String, Object> body = base("wait", "cdp", "browser", target);
@@ -633,6 +707,7 @@ public final class TargetVerb {
             body.put("title", titleAfter);
             putSnapDiff(body, args, titleBefore, titleAfter, before, after);
             stamp(body, page.session.connection(), null);
+            putEntered(body, runId, page.session.connection());
             return ok(body);
         } finally {
             page.release();
@@ -668,6 +743,7 @@ public final class TargetVerb {
             body.put("events", rows);
             body.put("docVersion", docVersion(page.session.connection()));
             stamp(body, page.session.connection(), null);
+            putEntered(body, runId, page.session.connection());
             return ok(body);
         } finally {
             page.release();
@@ -691,17 +767,28 @@ public final class TargetVerb {
             DomNode node;
             if (!ref.isBlank()) {
                 Hit hit = requireHit(ref);
-                if (stale(hit, page.session.connection())) return fail("explain", "stale_ref");
+                if (stale(hit, page.session.connection())) {
+                    Outcome missed = fail("explain", "stale_ref");
+                    stamp(missed.body(), page.session.connection(), null);
+                    putEntered(missed.body(), runId, page.session.connection());
+                    return missed;
+                }
                 node = findNode(tree(page.session), "", hit.backend);
             } else {
                 List<DomNode> hits = locate(tree(page.session), blank(args.get("query")), scopedFrame(runId, target));
                 node = hits.isEmpty() ? null : hits.get(0);
             }
-            if (node == null) return fail("explain", "not found");
+            if (node == null) {
+                Outcome missed = fail("explain", "not found");
+                stamp(missed.body(), page.session.connection(), null);
+                putEntered(missed.body(), runId, page.session.connection());
+                return missed;
+            }
             Map<String, Object> body = base("explain", "cdp", "browser", target);
             body.put("report", report(node, page.session.connection()));
             body.put("docVersion", docVersion(page.session.connection()));
             stamp(body, page.session.connection(), node);
+            putEntered(body, runId, page.session.connection());
             return ok(body);
         } finally {
             page.release();
@@ -744,6 +831,7 @@ public final class TargetVerb {
             body.put("path", file.toString());
             body.put("docVersion", docVersion(page.session.connection()));
             stamp(body, page.session.connection(), null);
+            putEntered(body, runId, page.session.connection());
             return ok(body);
         } finally {
             page.release();
@@ -767,12 +855,22 @@ public final class TargetVerb {
                 if (context <= 0) return fail("eval", "eval failed");
                 params.put("contextId", context);
             }
-            JsonNode value = page.session.connection().call("Runtime.evaluate", params, Duration.ofSeconds(10));
-            if (value.has("exceptionDetails")) return fail("eval", "eval failed");
+            // The pkb world is the main frame's isolated world. A main-world eval follows the entered session.
+            String session = "pkb".equals(world) ? "" : enteredSession(page.session.connection(), runId);
+            JsonNode value = session.isBlank()
+                    ? page.session.connection().call("Runtime.evaluate", params, Duration.ofSeconds(10))
+                    : page.session.connection().call("Runtime.evaluate", params, session, Duration.ofSeconds(10));
+            if (value.has("exceptionDetails")) {
+                Outcome failed = fail("eval", "eval failed");
+                stamp(failed.body(), page.session.connection(), null);
+                if (!session.isBlank()) putEntered(failed.body(), runId, page.session.connection());
+                return failed;
+            }
             Map<String, Object> body = base("eval", "cdp", "browser", target);
             body.put("world", world);
             body.put("value", jsonText(value.path("result").path("value")));
             stamp(body, page.session.connection(), null);
+            if (!session.isBlank()) putEntered(body, runId, page.session.connection());
             return ok(body);
         } finally {
             page.release();
@@ -1090,33 +1188,55 @@ public final class TargetVerb {
         }
     }
 
-    private static boolean waitPoll(CdpConnection cdp, String condition, String query, long timeout) {
+    private static boolean waitPoll(
+            CdpConnection cdp,
+            String condition,
+            String query,
+            long timeout,
+            Map<String, String> flags,
+            String sessionId
+    ) {
         long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(Math.max(0, timeout));
         while (true) {
-            if (conditionMet(cdp, condition, query)) return true;
+            if (conditionMet(cdp, condition, query, flags, sessionId)) return true;
             if (System.nanoTime() >= deadline) return false;
             sleep(50);
         }
     }
 
-    private static boolean conditionMet(CdpConnection cdp, String condition, String query) {
-        if (condition.startsWith("title=")) return condition.substring("title=".length()).equals(title(cdp));
+    /** Text and title checks run in the entered frame when that frame was scoped. */
+    private static boolean conditionMet(
+            CdpConnection cdp,
+            String condition,
+            String query,
+            Map<String, String> flags,
+            String sessionId
+    ) {
+        if (condition.startsWith("title=")) {
+            return condition.substring("title=".length()).equals(title(cdp, sessionId));
+        }
         String text = condition.startsWith("text=") ? condition.substring("text=".length()) : query;
         if (text == null || text.isBlank()) text = condition;
-        if (text.isBlank() || EVENT_CONDITIONS.contains(text)) return !title(cdp).isBlank();
+        if (text.isBlank() || EVENT_CONDITIONS.contains(text)) return !title(cdp, sessionId).isBlank();
         try {
-            return !locate(tree(cdp), text, Map.of()).isEmpty();
+            DomNode root = tree(cdp);
+            if (flags != null && flags.get("frame") != null && !flags.get("frame").isBlank()) {
+                root = Frames.scope(root, flags);
+            }
+            return !locate(root, text, Map.of()).isEmpty();
         } catch (RuntimeException failure) {
             return false;
         }
     }
 
-    private static boolean waitEvent(Path project, String runId, CdpConnection cdp, String condition, long timeout) {
-        String primary = evaluateWatch(cdp, condition, timeout);
-        if (primary.startsWith("watchUntil:")) {
-            return !primary.contains("\"ok\":false") && !primary.contains("timeout");
+    private static boolean waitEvent(Path project, String runId, CdpConnection cdp, String condition, long timeout, String sessionId) {
+        if (sessionId == null || sessionId.isBlank()) {
+            String primary = evaluateWatch(cdp, condition, timeout);
+            if (primary.startsWith("watchUntil:")) {
+                return !primary.contains("\"ok\":false") && !primary.contains("timeout");
+            }
+            FallbackLog.note(project, runId, "wait", "watcher", "mutation-observer", "pkb watchUntil was not on the page");
         }
-        FallbackLog.note(project, runId, "wait", "watcher", "mutation-observer", "pkb watchUntil was not on the page");
         ObjectNode params = Jsons.object();
         params.put("awaitPromise", true);
         params.put("returnByValue", true);
@@ -1126,7 +1246,10 @@ public final class TargetVerb {
                 + "var obs=new MutationObserver(function(){clearTimeout(timer);obs.disconnect();resolve('mutation');});"
                 + "obs.observe(document.documentElement,{subtree:true,childList:true,attributes:true,characterData:true});"
                 + "});})()");
-        JsonNode value = cdp.call("Runtime.evaluate", params, Duration.ofMillis(Math.max(1000, timeout + 2000)));
+        Duration budget = Duration.ofMillis(Math.max(1000, timeout + 2000));
+        JsonNode value = sessionId == null || sessionId.isBlank()
+                ? cdp.call("Runtime.evaluate", params, budget)
+                : cdp.call("Runtime.evaluate", params, sessionId, budget);
         String text = value.path("result").path("value").asText("");
         return text.contains("mutation") && !text.contains("timeout");
     }
@@ -1816,10 +1939,16 @@ public final class TargetVerb {
     }
 
     private static String title(CdpConnection cdp) {
+        return title(cdp, "");
+    }
+
+    private static String title(CdpConnection cdp, String sessionId) {
         ObjectNode params = Jsons.object();
         params.put("returnByValue", true);
         params.put("expression", "document.title");
-        JsonNode value = cdp.call("Runtime.evaluate", params, Duration.ofSeconds(5));
+        JsonNode value = sessionId == null || sessionId.isBlank()
+                ? cdp.call("Runtime.evaluate", params, Duration.ofSeconds(5))
+                : cdp.call("Runtime.evaluate", params, sessionId, Duration.ofSeconds(5));
         return value.path("result").path("value").asText("");
     }
 
@@ -1983,15 +2112,17 @@ public final class TargetVerb {
                 Map<String, Object> body = base("frame", "cdp", "browser", target);
                 body.put("entered", "");
                 stamp(body, cdp, null);
+                putEntered(body, runId, cdp);
                 return ok(body);
             }
             String enter = blank(args.get("enter"));
             if (!enter.isBlank()) {
                 if (!frameExists(cdp, enter)) return fail("frame", "unknown frame");
                 ENTERED.put(key, enter);
+                String id = resolveFrameId(cdp, enter);
                 Map<String, Object> body = base("frame", "cdp", "browser", target);
                 body.put("entered", enter);
-                body.put("frame", enter);
+                body.put("frame", id.isBlank() ? enter : id);
                 return ok(body);
             }
             Map<String, Object> body = base("frame", "cdp", "browser", target);
@@ -1999,6 +2130,7 @@ public final class TargetVerb {
             String entered = ENTERED.get(key);
             if (entered != null) body.put("entered", entered);
             stamp(body, cdp, null);
+            putEntered(body, runId, cdp);
             return ok(body);
         } finally {
             page.release();
@@ -2341,15 +2473,42 @@ public final class TargetVerb {
         putEntered(body, runId, cdp, null);
     }
 
-    /** A scoped find reports the entered frame's CDP id, not the main frame. */
+    /**
+     * Fills a blank or main-frame id with the entered frame's CDP id.
+     * A hit that already names its own frame, such as a nested grandchild, keeps that id.
+     */
     private static void putEntered(Map<String, Object> body, String runId, CdpConnection cdp, List<Map<String, Object>> rows) {
         String token = ENTERED.get(runId == null ? "" : runId);
         if (token == null || token.isBlank() || cdp == null) return;
         String id = resolveFrameId(cdp, token);
         if (id.isBlank()) return;
-        body.put("frame", id);
+        String main = "";
+        try {
+            main = mainFrameId(cdp);
+        } catch (RuntimeException ignored) {
+            main = "";
+        }
+        replaceGenericFrame(body, id, main);
         if (rows == null) return;
-        for (Map<String, Object> row : rows) row.put("frame", id);
+        for (Map<String, Object> row : rows) replaceGenericFrame(row, id, main);
+    }
+
+    private static void replaceGenericFrame(Map<String, Object> body, String id, String main) {
+        Object existing = body.get("frame");
+        if (existing instanceof String text && !text.isBlank() && !text.equals(main) && !"main".equals(text)) return;
+        body.put("frame", id);
+    }
+
+    private static void putShadow(Map<String, Object> body, DomNode node) {
+        String path = shadowPathOf(node);
+        if (!path.isBlank()) body.put("shadow_path", path);
+    }
+
+    /** CDP session of the entered frame, or empty when that frame is in-process. */
+    private static String enteredSession(CdpConnection cdp, String runId) {
+        String token = ENTERED.get(runId == null ? "" : runId);
+        if (token == null || token.isBlank() || cdp == null) return "";
+        return FrameCoverage.sessionId(cdp, resolveFrameId(cdp, token));
     }
 
     private static String resolveFrameId(CdpConnection cdp, String token) {

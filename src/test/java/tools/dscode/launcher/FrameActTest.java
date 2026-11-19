@@ -135,7 +135,61 @@ class FrameActTest {
 
             Capture entered = run("frame", "--target=browser:auto", "--enter=cross", "--run-id=frame-act");
             assertEquals(0, entered.code, entered.err + entered.out);
-            assertEquals("cross", JSON.readTree(entered.out).path("entered").asText(""), entered.out);
+            JsonNode enteredBody = JSON.readTree(entered.out);
+            assertEquals("cross", enteredBody.path("entered").asText(""), entered.out);
+            assertEquals(child, enteredBody.path("frame").asText(""), entered.out);
+            assertNotEquals("cross", enteredBody.path("frame").asText(""), entered.out);
+
+            Capture explained = run("explain", "--target=browser:auto", "--query=Entered", "--run-id=frame-act");
+            assertEquals(0, explained.code, explained.err + explained.out);
+            assertEquals(child, JSON.readTree(explained.out).path("frame").asText(""), explained.out);
+
+            Capture explainMiss = run("explain", "--target=browser:auto", "--query=Save", "--run-id=frame-act");
+            assertEquals(1, explainMiss.code, explainMiss.err + explainMiss.out);
+            assertEquals(child, JSON.readTree(explainMiss.out).path("frame").asText(""), explainMiss.out);
+
+            Capture waited = run(
+                    "wait", "--target=browser:auto", "--condition=text=Parent", "--timeout=400", "--run-id=frame-act");
+            assertEquals(1, waited.code, waited.err + waited.out);
+            assertEquals("timeout", JSON.readTree(waited.out).path("error").asText(""), waited.out);
+            assertEquals(child, JSON.readTree(waited.out).path("frame").asText(""), waited.out);
+
+            Capture scopedSnap = run("snap", "--target=browser:auto", "--mode=compact", "--run-id=frame-act");
+            assertEquals(0, scopedSnap.code, scopedSnap.err + scopedSnap.out);
+            JsonNode scopedShot = JSON.readTree(scopedSnap.out);
+            assertEquals(child, scopedShot.path("frame").asText(""), scopedSnap.out);
+            assertTrue(hitNamed(scopedShot, "Entered"), scopedSnap.out);
+            assertFalse(hitNamed(scopedShot, "BlankBtn"), scopedSnap.out);
+
+            Capture scopedInspect = run("inspect-page", "--target=browser:auto", "--run-id=frame-act");
+            assertEquals(0, scopedInspect.code, scopedInspect.err + scopedInspect.out);
+            assertEquals(child, JSON.readTree(scopedInspect.out).path("frame").asText(""), scopedInspect.out);
+
+            Capture href = run(
+                    "eval", "--target=browser:auto", "--world=main", "--run-id=frame-act", "--expr=location.href");
+            assertEquals(0, href.code, href.err + href.out);
+            JsonNode hrefBody = JSON.readTree(href.out);
+            assertTrue(hrefBody.path("value").asText("").contains("/child"), href.out);
+            assertEquals(child, hrefBody.path("frame").asText(""), href.out);
+
+            Capture highlightMiss = run(
+                    "highlight", "--handle=missing-handle", "--target=browser:auto",
+                    "--preset=yellow", "--run-id=frame-act");
+            assertEquals(1, highlightMiss.code, highlightMiss.err + highlightMiss.out);
+            assertEquals(child, JSON.readTree(highlightMiss.out).path("frame").asText(""), highlightMiss.out);
+
+            Capture actMiss = run(
+                    "act", "--target=browser:auto", "--query=NoSuchControl", "--kind=click", "--run-id=frame-act");
+            assertEquals(1, actMiss.code, actMiss.err + actMiss.out);
+            assertEquals("not found", JSON.readTree(actMiss.out).path("error").asText(""), actMiss.out);
+            assertEquals(child, JSON.readTree(actMiss.out).path("frame").asText(""), actMiss.out);
+
+            Capture grandWhileEntered = run("find", "--target=browser:auto", "--query=Grand", "--run-id=frame-act");
+            assertEquals(0, grandWhileEntered.code, grandWhileEntered.err + grandWhileEntered.out);
+            JsonNode grandEntered = JSON.readTree(grandWhileEntered.out);
+            assertEquals("Grand", grandEntered.path("hits").get(0).path("name").asText(), grandWhileEntered.out);
+            assertEquals(grand, grandEntered.path("hits").get(0).path("frame").asText(""), grandWhileEntered.out);
+            assertNotEquals(child, grandEntered.path("hits").get(0).path("frame").asText(""), grandWhileEntered.out);
 
             Capture scoped = run("act", "--target=browser:auto", "--query=Entered", "--kind=click", "--run-id=frame-act");
             assertEquals(0, scoped.code, scoped.err + scoped.out);
@@ -143,7 +197,8 @@ class FrameActTest {
             assertTrue(scopedBody.path("applied").asBoolean(), scoped.out);
             assertEquals(child, scopedBody.path("frame").asText(""), scoped.out);
             assertNotEquals("cross", scopedBody.path("frame").asText(""), scoped.out);
-            assertEquals("Entered:1", awaitTitle("Entered:1"), scoped.out);
+            assertEquals("Entered:1", eval("document.getElementById('entered').textContent"), scoped.out);
+            assertEquals("Entered:1", awaitParentTitle("Entered:1"), scoped.out);
 
             Capture reset = run("frame", "--target=browser:auto", "--reset", "--run-id=frame-act");
             assertEquals(0, reset.code, reset.err + reset.out);
@@ -187,6 +242,20 @@ class FrameActTest {
         return hook;
     }
 
+    /** Parent title. The pkb world stays on the main frame while a child frame is entered. */
+    private String awaitParentTitle(String expected) throws Exception {
+        String seen = "";
+        for (int attempt = 0; attempt < 20; attempt++) {
+            Capture read = run(
+                    "eval", "--target=browser:auto", "--world=pkb", "--run-id=frame-act", "--expr=document.title");
+            assertEquals(0, read.code, read.err + read.out);
+            seen = JSON.readTree(read.out).path("value").asText("");
+            if (expected.equals(seen)) return seen;
+            Thread.sleep(100);
+        }
+        return seen;
+    }
+
     private String awaitTitle(String expected) throws Exception {
         String seen = "";
         for (int attempt = 0; attempt < 20; attempt++) {
@@ -228,6 +297,13 @@ class FrameActTest {
             if (id.equals(frame.path("id").asText(""))) return frame.path("parentId").asText("");
         }
         return "";
+    }
+
+    private static boolean hitNamed(JsonNode body, String name) {
+        for (JsonNode row : body.path("hits")) {
+            if (name.equals(row.path("name").asText())) return true;
+        }
+        return false;
     }
 
     private static void assertNoBoot(JsonNode listed) {

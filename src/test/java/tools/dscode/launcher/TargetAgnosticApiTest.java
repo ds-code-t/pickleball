@@ -374,6 +374,49 @@ class TargetAgnosticApiTest {
 
     @Test
     @Timeout(value = 180, unit = TimeUnit.SECONDS)
+    void failedHighlightOnAnotherBrowserReportsThatBrowsersFrame() throws Exception {
+        assumeTrue(BrowserSession.findChrome() != null, "skipped: chrome is not on PATH");
+        Path hostPage = temp.resolve("host-frame.html");
+        Path otherPage = temp.resolve("other-frame.html");
+        Files.writeString(hostPage, "<!DOCTYPE html><html><head><title>Host</title></head><body><p>Host</p></body></html>");
+        Files.writeString(otherPage, "<!DOCTYPE html><html><head><title>Other</title></head><body><p>Other</p></body></html>");
+        Capture started = run("start", "--url=" + hostPage.toUri(), "--browser=chrome-headless", "--run-id=other-frame");
+        assertEquals(0, started.code, started.err + started.out);
+        Path profile = temp.resolve("other-frame-profile");
+        Files.createDirectories(profile);
+        BrowserSession other = BrowserSession.launch(
+                "other-frame", otherPage.toUri().toString(), false, true, profile, List.of());
+        try {
+            String socket = other.socket();
+            assertTrue(socket.contains("/devtools/page/"), socket);
+            String hostMain = mainFrame("browser:auto", "other-frame");
+            String otherMain = mainFrame("browser:cdp=" + socket, "other-frame");
+            assertFalse(hostMain.isBlank(), "host frame missing");
+            assertFalse(otherMain.isBlank(), "other frame missing");
+            assertFalse(hostMain.equals(otherMain), hostMain + " vs " + otherMain);
+            Capture missed = run(
+                    "highlight", "--handle=missing", "--target=browser:cdp=" + socket,
+                    "--preset=yellow", "--run-id=other-frame");
+            assertEquals(1, missed.code, missed.err + missed.out);
+            JsonNode body = JSON.readTree(missed.out);
+            assertFalse(body.path("applied").asBoolean(), missed.out);
+            assertEquals(otherMain, body.path("frame").asText(""), missed.out);
+        } finally {
+            other.close();
+        }
+    }
+
+    private String mainFrame(String target, String runId) throws Exception {
+        Capture listed = run("frame", "--target=" + target, "--list", "--run-id=" + runId);
+        assertEquals(0, listed.code, listed.err + listed.out);
+        for (JsonNode frame : JSON.readTree(listed.out).path("frames")) {
+            if (frame.path("parentId").asText("x").isEmpty()) return frame.path("id").asText("");
+        }
+        return "";
+    }
+
+    @Test
+    @Timeout(value = 180, unit = TimeUnit.SECONDS)
     void inertDisabledAndResetSelectAreNotApplied() throws Exception {
         assumeTrue(BrowserSession.findChrome() != null, "skipped: chrome is not on PATH");
         Path page = temp.resolve("honest.html");
