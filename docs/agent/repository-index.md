@@ -984,6 +984,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/Release218RecommendationsTest.java`
 - `src/test/java/tools/dscode/launcher/SecretRedactionTest.java`
 - `src/test/java/tools/dscode/launcher/SessionHealthWaitTest.java`
+- `src/test/java/tools/dscode/launcher/SnapBudgetTest.java`
 - `src/test/java/tools/dscode/launcher/SnapshotDiffOnActTest.java`
 - `src/test/java/tools/dscode/launcher/StartDrivesPageTest.java`
 - `src/test/java/tools/dscode/launcher/StartLaunchesBrowserTest.java`
