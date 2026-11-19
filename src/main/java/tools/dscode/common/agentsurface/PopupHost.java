@@ -59,14 +59,19 @@ public final class PopupHost {
         builder.redirectInput(ProcessBuilder.Redirect.PIPE);
         Process process = builder.start();
         process.getOutputStream().close();
-        long deadline = System.nanoTime() + Duration.ofSeconds(8).toNanos();
+        long budget = windows() ? Duration.ofSeconds(20).toNanos() : Duration.ofSeconds(8).toNanos();
+        long deadline = System.nanoTime() + budget;
         Map<String, Object> status = PopupStatus.read(project, runId);
         while (System.nanoTime() < deadline) {
             status = PopupStatus.read(project, runId);
-            if (status.get("port") instanceof Number && ((Number) status.get("port")).intValue() > 0) break;
-            Path hostFile = PopupLog.popupDir(project, runId).resolve("host.json");
             Object state = status.get("state");
-            if (Files.isRegularFile(hostFile) && ("closed".equals(state) || "closed-by-user".equals(state))) break;
+            boolean open = "open".equals(state)
+                    && alive(status.get("browserPid"))
+                    && alive(status.get("pid"));
+            if (open) break;
+            Path hostFile = PopupLog.popupDir(project, runId).resolve("host.json");
+            boolean hostUp = alive(process.pid()) || alive(status.get("pid"));
+            if (Files.isRegularFile(hostFile) && ("closed".equals(state) || "closed-by-user".equals(state)) && !hostUp) break;
             Thread.sleep(50);
         }
         status.put("reused", false);

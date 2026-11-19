@@ -92,7 +92,7 @@ public final class PopupHostMain {
             PopupOnTop.Attempt onTop = PopupConfig.onTop()
                     ? PopupOnTop.apply(browser.pid())
                     : new PopupOnTop.Attempt(false, "off", "pkb_agent_popup_on_top=false", List.of());
-            if (!onTop.applied()) {
+            if (PopupConfig.onTop() && !onTop.applied()) {
                 PopupLog.warn(project, runId, "ontop-unavailable", onTop.reason());
             }
             write(dir.resolve("host.json"), state(project, runId, ownerKind, ownerPid, bridge.port(), bridge.token(), browser.pid(), "open", false, onTop));
@@ -100,18 +100,25 @@ public final class PopupHostMain {
             long seen = 0;
             while (true) {
                 Thread.sleep(200);
+                boolean windowsRetry = PopupHost.windows()
+                        && System.currentTimeMillis() - launchedAt < SANDBOX_RETRY_WINDOW_MS;
+                boolean linuxSandbox = PopupLauncher.sandboxFailure(browserOut);
                 if (!browser.isAlive() && !noSandbox && System.currentTimeMillis() - launchedAt < SANDBOX_RETRY_WINDOW_MS
-                        && PopupLauncher.sandboxFailure(browserOut)) {
+                        && (linuxSandbox || windowsRetry)) {
                     // Chrome for Testing and other unpackaged builds exit at once when the Linux sandbox
-                    // cannot start. Relaunch once without it so the popup still opens.
+                    // cannot start. Windows CI can lose the browser before host.json is read; relaunch once.
+                    String detail = linuxSandbox
+                            ? PopupLauncher.sandboxLine(browserOut)
+                            : "browser exited before the popup reported open";
                     PopupLog.warn(project, runId, "sandbox-unavailable",
-                            "browser exited with code " + browser.exitValue() + " because its sandbox could not start; relaunching with --no-sandbox: " + PopupLauncher.sandboxLine(browserOut));
+                            "browser exited with code " + browser.exitValue() + "; relaunching with --no-sandbox: " + detail);
                     noSandbox = true;
                     PopupLauncher.destroyTree(browser);
                     delete(profile);
                     Files.createDirectories(profile);
                     argv = PopupLauncher.argv(located.path().get(), bridge.baseUrl(), profile, PopupConfig.width(), PopupConfig.height(),
                             origin[0], origin[1], PopupConfig.headless(), true);
+                    if (PopupHost.windows()) argv.add("--disable-gpu");
                     browser = PopupLauncher.start(argv, browserOut);
                     launchedAt = System.currentTimeMillis();
                     write(dir.resolve("host.json"), state(project, runId, ownerKind, ownerPid, bridge.port(), bridge.token(), browser.pid(), "open", false, onTop));
