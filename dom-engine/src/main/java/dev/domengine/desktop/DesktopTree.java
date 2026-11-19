@@ -13,9 +13,11 @@ import dev.domengine.premap.OneMatchException;
 import dev.domengine.query.Query;
 import dev.domengine.tree.DomNode;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -31,6 +33,11 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class DesktopTree {
     private static final ConcurrentHashMap<String, Session> SESSIONS = new ConcurrentHashMap<>();
+    /** Fixture path and which file a directory sequence has already loaded. */
+    private static final ConcurrentHashMap<String, FixtureCursor> FIXTURES = new ConcurrentHashMap<>();
+
+    private record FixtureCursor(Path path, int step) {
+    }
 
     private DesktopTree() {
     }
@@ -50,18 +57,66 @@ public final class DesktopTree {
     }
 
     public static Session attach(String id, Path fixture) {
-        if (fixture == null || !Files.isRegularFile(fixture)) throw new CdpException("desktop fixture not found");
+        if (fixture == null || (!Files.isRegularFile(fixture) && !Files.isDirectory(fixture))) {
+            throw new CdpException("desktop fixture not found");
+        }
         dev.domengine.premap.PreMapLookup.forget(id);
         try {
-            JsonNode json = Jsons.MAPPER.readTree(Files.readString(fixture));
-            DomNode root = project(json);
-            root.linkParents();
-            Session session = new Session(id, "fixture", root);
+            Path file = fixture;
+            if (Files.isDirectory(fixture)) {
+                List<Path> files = jsonFiles(fixture);
+                if (files.isEmpty()) throw new CdpException("desktop fixture not found");
+                file = files.get(0);
+            }
+            Session session = new Session(id, "fixture", readTree(file));
             SESSIONS.put(id, session);
+            FIXTURES.put(id, new FixtureCursor(fixture, 0));
             return session;
         } catch (CdpException failure) {
             throw failure;
         } catch (Exception failure) {
+            throw new CdpException("desktop fixture: " + failure.getMessage());
+        }
+    }
+
+    /**
+     * Loads the next JSON file in a directory fixture. A single file stays on the tree already loaded.
+     * The caller is the second read: a later {@code snap --mode=diff}.
+     */
+    public static Session reread(String id) {
+        Session session = require(id);
+        FixtureCursor cursor = FIXTURES.get(id);
+        if (cursor == null || session.live || !Files.isDirectory(cursor.path)) return session;
+        List<Path> files = jsonFiles(cursor.path);
+        int next = cursor.step + 1;
+        if (next >= files.size()) return session;
+        try {
+            Session updated = new Session(
+                    session.id, session.backend, readTree(files.get(next)),
+                    session.live, session.platform, session.window, session.sequence + 1);
+            SESSIONS.put(id, updated);
+            FIXTURES.put(id, new FixtureCursor(cursor.path, next));
+            return updated;
+        } catch (CdpException failure) {
+            throw failure;
+        } catch (Exception failure) {
+            throw new CdpException("desktop fixture: " + failure.getMessage());
+        }
+    }
+
+    private static DomNode readTree(Path file) throws IOException {
+        DomNode root = project(Jsons.MAPPER.readTree(Files.readString(file)));
+        root.linkParents();
+        return root;
+    }
+
+    private static List<Path> jsonFiles(Path dir) {
+        try (var listed = Files.list(dir)) {
+            return listed
+                    .filter(path -> path.getFileName().toString().endsWith(".json"))
+                    .sorted(Comparator.comparing(path -> path.getFileName().toString()))
+                    .toList();
+        } catch (IOException failure) {
             throw new CdpException("desktop fixture: " + failure.getMessage());
         }
     }
@@ -93,6 +148,7 @@ public final class DesktopTree {
 
     public static ObjectNode close(String id) {
         if (SESSIONS.remove(id) == null) throw new CdpException("session not found: " + id);
+        FIXTURES.remove(id);
         dev.domengine.premap.PreMapLookup.forget(id);
         ObjectNode node = Jsons.object();
         node.put("ok", true);
@@ -103,6 +159,7 @@ public final class DesktopTree {
 
     public static void resetForTests() {
         SESSIONS.clear();
+        FIXTURES.clear();
         AtSpi.useSessionBusForTests(null);
     }
 

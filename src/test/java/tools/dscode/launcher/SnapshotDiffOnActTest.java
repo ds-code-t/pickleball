@@ -110,7 +110,60 @@ class SnapshotDiffOnActTest {
         JsonNode body = JSON.readTree(acted.out);
         assertFalse(body.path("applied").asBoolean(), acted.out);
         assertEquals("desktop:0 -> desktop:1", body.path("snap").path("docVersion").asText(), acted.out);
-        assertTrue(body.path("snap").path("changed").asBoolean(), acted.out);
+        assertFalse(body.path("snap").path("changed").asBoolean(), acted.out);
+        assertEquals(0, body.path("snap").path("added").size(), acted.out);
+        assertEquals(0, body.path("snap").path("removed").size(), acted.out);
+        assertEquals(0, body.path("snap").path("updated").size(), acted.out);
+    }
+
+    @Test
+    void desktopSnapDiffIsEmptyAfterAnIdenticalSnap() throws Exception {
+        Path fixture = temp.resolve("same.json");
+        Files.writeString(fixture, NOTES);
+        Capture first = run("snap", "--target=desktop:app~Notes", "--fixture=" + fixture, "--run-id=desk-same");
+        assertEquals(0, first.code, first.err + first.out);
+        Capture second = run(
+                "snap", "--target=desktop:app~Notes", "--fixture=" + fixture,
+                "--mode=diff", "--run-id=desk-same");
+        assertEquals(0, second.code, second.err + second.out);
+        JsonNode body = JSON.readTree(second.out);
+        assertTrue(body.path("diff").isArray(), second.out);
+        assertEquals(0, body.path("diff").size(), second.out);
+    }
+
+    @Test
+    void desktopSnapDiffNamesTheButtonASecondReadAdds() throws Exception {
+        Path dir = temp.resolve("sequence");
+        Files.createDirectories(dir);
+        Files.writeString(dir.resolve("step-0.json"), NOTES);
+        Files.writeString(dir.resolve("step-1.json"), NOTES.replace(
+                "{\"role\":\"button\",\"name\":\"Save\",\"x\":10,\"y\":10,\"width\":40,\"height\":20}",
+                "{\"role\":\"button\",\"name\":\"Save\",\"x\":10,\"y\":10,\"width\":40,\"height\":20},"
+                        + "{\"role\":\"button\",\"name\":\"Extra\",\"x\":60,\"y\":10,\"width\":40,\"height\":20}"));
+        Capture first = run("snap", "--target=desktop:app~Notes", "--fixture=" + dir, "--run-id=desk-add");
+        assertEquals(0, first.code, first.err + first.out);
+        Capture second = run(
+                "snap", "--target=desktop:app~Notes", "--fixture=" + dir,
+                "--mode=diff", "--run-id=desk-add");
+        assertEquals(0, second.code, second.err + second.out);
+        JsonNode diff = JSON.readTree(second.out).path("diff");
+        assertEquals(1, diff.size(), second.out);
+        assertTrue(diff.get(0).asText().startsWith("- button \"Extra\""), second.out);
+    }
+
+    @Test
+    void desktopWaitSnapDiffIncludesTheSnap() throws Exception {
+        Path fixture = temp.resolve("wait.json");
+        Files.writeString(fixture, NOTES);
+        Capture waited = run(
+                "wait", "--target=desktop:app~Notes", "--fixture=" + fixture,
+                "--snap=diff", "--run-id=desk-wait");
+        assertEquals(0, waited.code, waited.err + waited.out);
+        JsonNode snap = JSON.readTree(waited.out).path("snap");
+        assertTrue(snap.isObject(), waited.out);
+        assertTrue(snap.path("changed").isBoolean(), waited.out);
+        assertFalse(snap.path("changed").asBoolean(), waited.out);
+        assertEquals(0, snap.path("added").size(), waited.out);
     }
 
     private Capture run(String... args) {
@@ -130,4 +183,10 @@ class SnapshotDiffOnActTest {
 
     private record Capture(int code, String out, String err) {
     }
+
+    private static final String NOTES = """
+            {"role":"window","name":"Notes","x":0,"y":0,"width":200,"height":100,"children":[
+              {"role":"button","name":"Save","x":10,"y":10,"width":40,"height":20}
+            ]}
+            """;
 }

@@ -511,6 +511,7 @@ public final class TargetVerb {
         DomNode node = findNode(session.root(), "", hit.backend);
         if (node == null) return staleRef("act");
         String beforeVersion = "desktop:" + session.sequence();
+        List<SnapRow> rowsBefore = desktopRows(session);
         boolean live = desktopAct(session, node, args);
         DesktopTree.Session after = DesktopTree.open(session.id());
         if (after == null) after = session;
@@ -519,7 +520,7 @@ public final class TargetVerb {
         String afterVersion = "desktop:" + after.sequence();
         body.put("docVersion", afterVersion);
         body.put("session", after.id());
-        putSnapDiff(body, args, "", "", beforeVersion, afterVersion);
+        putSnapDiff(body, args, "", "", beforeVersion, afterVersion, rowsBefore, desktopRows(after));
         stampDesktop(body, after);
         return ok(body);
     }
@@ -531,6 +532,7 @@ public final class TargetVerb {
         if (hits.isEmpty()) return fail("act", "not found");
         if (hits.size() > 1) return fail("act", "ambiguous");
         String beforeVersion = "desktop:" + session.sequence();
+        List<SnapRow> rowsBefore = desktopRows(session);
         boolean live = desktopAct(session, hits.get(0), args);
         DesktopTree.Session after = DesktopTree.open(session.id());
         if (after == null) after = session;
@@ -539,7 +541,7 @@ public final class TargetVerb {
         String afterVersion = "desktop:" + after.sequence();
         body.put("docVersion", afterVersion);
         body.put("session", after.id());
-        putSnapDiff(body, args, "", "", beforeVersion, afterVersion);
+        putSnapDiff(body, args, "", "", beforeVersion, afterVersion, rowsBefore, desktopRows(after));
         stampDesktop(body, after);
         return ok(body);
     }
@@ -638,6 +640,7 @@ public final class TargetVerb {
 
     private static Outcome snapDesktop(Path project, String runId, TargetSelector.Parsed target, Map<String, String> args, String mode) {
         DesktopTree.Session session = desktopSession(target, args);
+        if ("diff".equals(mode)) session = DesktopTree.reread(session.id());
         String version = "desktop:" + session.sequence();
         List<Map<String, Object>> rows = publish(runId, "desktop", session.id(), version, interactive(session.root()), "");
         Map<String, Object> body = base("snap", "desktop", "desktop", target);
@@ -646,7 +649,9 @@ public final class TargetVerb {
         body.put("hits", rows);
         body.put("lines", lines(rows));
         body.put("applied", session.live());
-        if ("diff".equals(mode)) body.put("diff", diffAgainst(runId, String.join("\n", lines(rows)), version));
+        String picture = desktopPicture(session);
+        if ("diff".equals(mode)) body.put("diff", desktopDiff(runId, picture));
+        else BASELINE.put(desktopBaselineKey(runId), picture);
         stampDesktop(body, session);
         return ok(body);
     }
@@ -660,6 +665,10 @@ public final class TargetVerb {
             long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(Math.max(0, timeout));
             DesktopTree.Session session = null;
             boolean met = false;
+            boolean wantDiff = "diff".equals(blank(args.get("snap")));
+            DesktopTree.Session opened = openDesktop(target, args.get("fixture"));
+            String beforeVersion = "desktop:" + opened.sequence();
+            List<SnapRow> rowsBefore = wantDiff ? desktopRows(opened) : List.of();
             String looked = condition.startsWith("text=") ? condition.substring("text=".length()) : blank(args.get("query"));
             while (true) {
                 session = openDesktop(target, args.get("fixture"));
@@ -678,12 +687,19 @@ public final class TargetVerb {
                 if (System.nanoTime() >= deadline) break;
                 sleep(50);
             }
-            if (!met) return fail("wait", "timeout");
+            String afterVersion = "desktop:" + (session == null ? opened.sequence() : session.sequence());
+            List<SnapRow> rowsAfter = wantDiff ? desktopRows(session == null ? opened : session) : List.of();
+            if (!met) {
+                Outcome failed = fail("wait", "timeout");
+                putSnapDiff(failed.body(), args, "", "", beforeVersion, afterVersion, rowsBefore, rowsAfter);
+                return failed;
+            }
             Map<String, Object> body = base("wait", "desktop", "desktop", target);
             body.put("applied", session.live());
             body.put("mode", mode);
             body.put("condition", condition);
-            body.put("docVersion", "desktop:" + session.sequence());
+            body.put("docVersion", afterVersion);
+            putSnapDiff(body, args, "", "", beforeVersion, afterVersion, rowsBefore, rowsAfter);
             return ok(body);
         }
         Held page = openBrowser(resolved(target, args));
@@ -2161,6 +2177,63 @@ public final class TargetVerb {
         }
         if (!previous.equals(picture + "\n" + version) && !previous.equals(picture)) diff.add(previous + " -> " + picture);
         return diff;
+    }
+
+    /** Compact desktop lines with no ref, so a version bump is not a change. */
+    private static String desktopPicture(DesktopTree.Session session) {
+        StringBuilder text = new StringBuilder();
+        if (session == null) return "";
+        for (DomNode node : interactive(session.root())) {
+            if (text.length() > 0) text.append('\n');
+            text.append(desktopLine(node));
+        }
+        return text.toString();
+    }
+
+    private static String desktopLine(DomNode node) {
+        StringBuilder line = new StringBuilder();
+        line.append("- ").append(role(node)).append(" \"").append(name(node).replace("\"", "'")).append("\"");
+        String value = node.nodeValue == null ? "" : node.nodeValue;
+        if (!value.isBlank()) line.append(" value=\"").append(value.replace("\"", "'")).append("\"");
+        return line.toString();
+    }
+
+    private static List<SnapRow> desktopRows(DesktopTree.Session session) {
+        List<SnapRow> rows = new ArrayList<>();
+        if (session == null || session.root() == null) return rows;
+        String version = "desktop:" + session.sequence();
+        for (DomNode node : interactive(session.root())) {
+            String roleName = role(node);
+            String shown = name(node);
+            String value = node.nodeValue == null ? "" : node.nodeValue;
+            String key = roleName + "\n" + shown + "\n" + value;
+            String ref = "ref:" + version + ":" + node.backendNodeId;
+            rows.add(new SnapRow(node.backendNodeId, key, desktopLine(node) + " [ref=" + ref + "]"));
+        }
+        return rows;
+    }
+
+    private static String desktopBaselineKey(String runId) {
+        return baselineKey(runId) + ":desktop";
+    }
+
+    /** Added compact lines, plus {@code removed } lines. An equal picture is an empty list. */
+    private static List<String> desktopDiff(String runId, String picture) {
+        String previous = BASELINE.put(desktopBaselineKey(runId), picture);
+        if (previous == null) return splitLines(picture);
+        if (previous.equals(picture)) return List.of();
+        List<String> left = new ArrayList<>(splitLines(previous));
+        List<String> diff = new ArrayList<>();
+        for (String line : splitLines(picture)) {
+            if (!left.remove(line)) diff.add(line);
+        }
+        for (String line : left) diff.add("removed " + line);
+        return diff;
+    }
+
+    private static List<String> splitLines(String picture) {
+        if (picture == null || picture.isBlank()) return List.of();
+        return new ArrayList<>(List.of(picture.split("\n", -1)));
     }
 
     private static void putSnapDiff(
