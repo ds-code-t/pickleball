@@ -6,6 +6,8 @@ import org.openqa.selenium.WebDriver;
  * Registers every driver the existing launcher already started.
  * Not a second launcher. Template launches are marked so session cleanup
  * can reach those instances without quitting a scenario driver early.
+ * The host page ({@code template=live}) is detached only from host release.
+ * Unowned drivers are quit only from worker release.
  */
 public final class AgentDriverHooks {
     private static final ThreadLocal<String> TEMPLATE = new ThreadLocal<>();
@@ -25,7 +27,35 @@ public final class AgentDriverHooks {
         PageSurfaces.manage(driver, owned ? template : "", owned);
     }
 
+    /**
+     * Scenario and surface cleanup. Quits template-owned drivers other than the host page.
+     * Does not quit unowned isolate drivers and does not detach the host {@code LiveChromeDriver}.
+     */
     public static void quit() {
+        RuntimeException cleanupFailure = null;
+        UiState.clearAll();
+        try {
+            PageSurfaces.cleanupExceptHost();
+        } catch (RuntimeException failure) {
+            cleanupFailure = failure;
+        }
+        PageSurfaces.quitOwned();
+        PageSurfaces.clearExceptHost();
+        if (cleanupFailure != null) throw cleanupFailure;
+    }
+
+    /** Worker stop and {@code POST /v1/browser/release}. */
+    public static void releaseUnowned() {
+        PageSurfaces.quitUnowned();
+    }
+
+    /** Quits the driver a caller launched. A host driver is ignored. */
+    public static void quitSession(WebDriver driver) {
+        PageSurfaces.quitOne(driver);
+    }
+
+    /** Host process release. The only path that detaches the host page driver. */
+    public static void releaseHost() {
         RuntimeException cleanupFailure = null;
         UiState.clearAll();
         try {
@@ -33,7 +63,9 @@ public final class AgentDriverHooks {
         } catch (RuntimeException failure) {
             cleanupFailure = failure;
         }
+        PageSurfaces.quitUnowned();
         PageSurfaces.quitAll();
+        PageSurfaces.quitHost();
         PageSurfaces.clearDriver();
         if (cleanupFailure != null) throw cleanupFailure;
     }

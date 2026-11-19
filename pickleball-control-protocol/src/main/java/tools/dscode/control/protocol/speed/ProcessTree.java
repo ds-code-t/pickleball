@@ -2,6 +2,7 @@ package tools.dscode.control.protocol.speed;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Kills a process and every descendant. The launcher, the warm JVM, and
@@ -17,6 +18,29 @@ public final class ProcessTree {
     public static void kill(long pid) {
         if (pid <= 0) return;
         ProcessHandle.of(pid).ifPresent(ProcessTree::kill);
+    }
+
+    /**
+     * Kills {@code pid} only when its start instant still matches {@code startedEpochMilli}.
+     * {@code startedEpochMilli <= 0} means the start was not recorded, so the pid is killed.
+     * Returns false when the process is already gone or the start instant moved (pid reuse).
+     */
+    public static boolean killIfStarted(long pid, long startedEpochMilli) {
+        if (pid <= 0) return false;
+        Optional<ProcessHandle> handle = ProcessHandle.of(pid);
+        if (handle.isEmpty()) return false;
+        if (!sameStart(handle.get(), startedEpochMilli)) return false;
+        kill(handle.get());
+        return true;
+    }
+
+    /** True when {@code startedEpochMilli} was not recorded or equals this process's start. */
+    public static boolean sameStart(ProcessHandle handle, long startedEpochMilli) {
+        if (handle == null) return false;
+        if (startedEpochMilli <= 0) return true;
+        Optional<java.time.Instant> actual = handle.info().startInstant();
+        if (actual.isEmpty()) return true;
+        return actual.get().toEpochMilli() == startedEpochMilli;
     }
 
     public static void kill(ProcessHandle handle) {

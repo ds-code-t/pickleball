@@ -1,7 +1,11 @@
 package tools.dscode.common.agentfast;
 
 import com.sun.net.httpserver.HttpServer;
+import dev.domengine.session.BrowserSession;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.control.protocol.LiveBridgeFile;
 import tools.dscode.control.protocol.PickleballLocalLayout;
@@ -14,6 +18,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -22,6 +27,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class TimingFieldsTest {
     @TempDir
     Path temp;
+
+    @AfterEach
+    void stopHost() {
+        WorkbenchAgentCommands.run(
+                new String[]{"live-stop", temp.toString()},
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8)
+        );
+    }
 
     @Test
     void freshCliWarmVerbAndExecuteStepCarryElapsedMs() throws Exception {
@@ -117,5 +131,38 @@ class TimingFieldsTest {
         } finally {
             server.stop(0);
         }
+    }
+
+    @Test
+    @Timeout(value = 120, unit = TimeUnit.SECONDS)
+    void liveHostPageVerbCarriesElapsedMs() throws Exception {
+        Assumptions.assumeTrue(BrowserSession.findChrome() != null, "skipped: chrome is not on PATH");
+        Path page = temp.resolve("save.html");
+        Files.writeString(page, """
+                <!DOCTYPE html><html><body>
+                <button id="save" data-pkb-handle="save">Save</button>
+                </body></html>
+                """);
+        ByteArrayOutputStream startOut = new ByteArrayOutputStream();
+        ByteArrayOutputStream startErr = new ByteArrayOutputStream();
+        int started = WorkbenchAgentCommands.run(
+                new String[]{"start", "--url=" + page.toUri(), "--browser=chrome", temp.toString()},
+                new PrintStream(startOut, true, StandardCharsets.UTF_8),
+                new PrintStream(startErr, true, StandardCharsets.UTF_8)
+        );
+        assertEquals(0, started, startOut.toString(StandardCharsets.UTF_8) + startErr.toString(StandardCharsets.UTF_8));
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        int code = WorkbenchAgentCommands.run(
+                new String[]{"highlight", "--handle=save", "--preset=yellow", temp.toString()},
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(stderr, true, StandardCharsets.UTF_8)
+        );
+        String out = stdout.toString(StandardCharsets.UTF_8);
+        assertEquals(0, code, out + stderr);
+        assertTrue(out.contains("\"elapsedMs\""), out);
+        assertTrue(out.contains("\"timing\""), out);
+        assertTrue(out.contains("\"totalMs\""), out);
+        assertTrue(out.contains("\"jvmMs\""), out);
     }
 }

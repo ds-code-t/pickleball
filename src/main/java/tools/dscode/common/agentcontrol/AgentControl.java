@@ -33,6 +33,7 @@ public final class AgentControl {
     }
 
     public static void cleanup() {
+        AgentDriverHooks.releaseUnowned();
         AgentDriverHooks.quit();
     }
 
@@ -81,6 +82,7 @@ public final class AgentControl {
     public static void armChatCursor(Path project, String runId) throws IOException {
         ChatCursor.arm(project, runId, "run");
         ChatCursor.arm(project, runId, "overlay");
+        EventCursor.arm(project, runId, null);
     }
 
     public static Result execute(
@@ -128,7 +130,7 @@ public final class AgentControl {
                 case "tabs" -> windows(project, runId, values, "tab");
                 case "chat-send" -> chatSend(project, runId, values, agentId);
                 case "chat-history" -> chatHistory(project, runId, values);
-                case "chat-poll" -> chatPoll(project, runId, values);
+                case "chat-poll" -> chatPoll(project, runId, values, agentId);
                 case "panel-open" -> panelOpen(project, runId, values, extraArgs, agentId);
                 case "panel-close" -> panelClose(project, runId, values, extraArgs, agentId);
                 case "guide" -> guide(project, runId, values);
@@ -335,8 +337,7 @@ public final class AgentControl {
         if (present(args.get("minimized"))) spec.put("min", Boolean.parseBoolean(args.get("minimized").trim()));
         boolean live = PageSurfaces.hasLivePage();
         if (!live && ("page".equals(target) || "auto".equals(target))) {
-            if ("page".equals(target)) return fail(1, "error: no live browser; panel did not open on the page");
-            return fail(1, "error: no live browser");
+            return fail(1, "no live browser");
         }
         if ("popup".equals(target)) {
             Result popup = execute(project, runId, "popup-open", args, extraArgs, agentId);
@@ -542,7 +543,7 @@ public final class AgentControl {
         return new Result(0, body);
     }
 
-    private static Result chatPoll(Path project, String runId, Map<String, String> args) throws Exception {
+    private static Result chatPoll(Path project, String runId, Map<String, String> args, String agentId) throws Exception {
         String after = cursorAfter(project, runId, args);
         long waitMillis = 0;
         if (present(args.get("wait"))) {
@@ -553,13 +554,20 @@ public final class AgentControl {
             }
         }
         long deadline = System.nanoTime() + waitMillis * 1_000_000L;
+        int eventCursor = EventCursor.after(project, runId, agentId);
         List<Map<String, Object>> messages = new ArrayList<>();
+        List<Map<String, String>> agentEvents = List.of();
+        int eventNext = eventCursor;
         while (true) {
+            messages.clear();
             PageSurfaces.drainPanelChat(project, runId);
             for (ChatLog.Message message : ChatLog.poll(project, runId, args.get("channel"), after)) {
                 messages.add(ChatLog.toMap(message));
             }
-            List<Map<String, String>> agentEvents = tools.dscode.control.protocol.AgentEvents.tail(project, 20);
+            tools.dscode.control.protocol.AgentEvents.Slice slice =
+                    tools.dscode.control.protocol.AgentEvents.after(project, runId, eventCursor);
+            agentEvents = slice.events();
+            eventNext = slice.next();
             if (!messages.isEmpty() || !agentEvents.isEmpty() || System.nanoTime() >= deadline) break;
             Thread.sleep(200);
         }
@@ -568,10 +576,11 @@ public final class AgentControl {
             Object last = messages.get(messages.size() - 1).get("id");
             if (last != null) ChatCursor.advance(project, runId, args.get("channel"), String.valueOf(last));
         }
+        EventCursor.advance(project, runId, agentId, eventNext);
         Map<String, Object> body = ok("Chat messages after the given id.");
         body.put("count", messages.size());
         body.put("messages", messages);
-        body.put("agentEvents", tools.dscode.control.protocol.AgentEvents.tail(project, 20));
+        body.put("agentEvents", agentEvents);
         return new Result(0, body);
     }
 

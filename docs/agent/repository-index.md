@@ -267,6 +267,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentcontrol/AgentStore.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ChatCursor.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ChatLog.java`
+- `src/main/java/tools/dscode/common/agentcontrol/EventCursor.java`
 - `src/main/java/tools/dscode/common/agentcontrol/LaunchTemplates.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ObserveEvents.java`
 - `src/main/java/tools/dscode/common/agentcontrol/PageSurfaces.java`
@@ -919,6 +920,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/control/protocol/PickleballLocalLayoutTest.java`
 - `src/test/java/tools/dscode/control/protocol/PickleballLocalStoreTest.java`
 - `src/test/java/tools/dscode/control/protocol/PickleballVersionTest.java`
+- `src/test/java/tools/dscode/control/protocol/speed/ProcessStartGuardTest.java`
 - `src/test/java/tools/dscode/control/protocol/WorkbenchFeatureIndexParityTest.java`
 - `src/test/java/tools/dscode/coredefinitions/NavigationStepsTest.java`
 - `src/test/java/tools/dscode/coredefinitions/RunTypeAliasTest.java`

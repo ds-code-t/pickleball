@@ -43,6 +43,53 @@ public final class AgentEvents {
         }
     }
 
+    public record Slice(List<Map<String, String>> events, int next) {
+    }
+
+    /** How many lines are in the event file. Zero when the file is absent. */
+    public static int lineCount(Path project) {
+        Path target = file(project);
+        if (!Files.isRegularFile(target)) return 0;
+        try {
+            return Files.readAllLines(target, StandardCharsets.UTF_8).size();
+        } catch (IOException ignored) {
+            return 0;
+        }
+    }
+
+    /**
+     * {@code browser_lost} and {@code session_ended} lines for {@code sessionId}
+     * whose file line number is greater than {@code afterLine}. {@code next} is the
+     * last line number scanned, so a cursor can move past other sessions.
+     */
+    public static Slice after(Path project, String sessionId, int afterLine) {
+        List<Map<String, String>> rows = new ArrayList<>();
+        Path target = file(project);
+        int next = Math.max(0, afterLine);
+        if (!Files.isRegularFile(target) || sessionId == null || sessionId.isBlank()) {
+            return new Slice(rows, next);
+        }
+        try {
+            int index = 0;
+            for (String line : Files.readAllLines(target, StandardCharsets.UTF_8)) {
+                index++;
+                if (index <= afterLine) continue;
+                next = index;
+                String event = jsonField(line, "event");
+                if (!"browser_lost".equals(event) && !"session_ended".equals(event)) continue;
+                if (!sessionId.equals(jsonField(line, "sessionId"))) continue;
+                Map<String, String> row = new LinkedHashMap<>();
+                row.put("event", event);
+                row.put("sessionId", sessionId);
+                row.put("at", jsonField(line, "at"));
+                rows.add(row);
+            }
+        } catch (IOException ignored) {
+            return new Slice(List.of(), next);
+        }
+        return new Slice(rows, next);
+    }
+
     /** Last {@code browser_lost} and {@code session_ended} lines, oldest first. At most {@code limit}. */
     public static List<Map<String, String>> tail(Path project, int limit) {
         List<Map<String, String>> rows = new ArrayList<>();

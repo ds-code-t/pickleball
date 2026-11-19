@@ -5,14 +5,17 @@ import tools.dscode.common.agentcontrol.AgentControl;
 import tools.dscode.common.agentcontrol.AgentDriverHooks;
 
 import java.awt.GraphicsEnvironment;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * Opens the in-page panel and samples idle CPU plus warm UI-op latency.
@@ -102,7 +105,7 @@ public final class SelftestUi {
         } finally {
             AgentDriverHooks.template(null);
             try {
-                AgentDriverHooks.quit();
+                AgentDriverHooks.quitSession(driver);
             } catch (RuntimeException ignored) {
                 // Chrome close still runs.
             }
@@ -111,15 +114,33 @@ public final class SelftestUi {
             } catch (RuntimeException ignored) {
                 // The report is already filled in.
             }
+            deleteTree(profile);
         }
     }
 
-    private static CpuSample cpuSample(long pid) {
-        if (Files.isRegularFile(Path.of("/proc/" + pid + "/stat"))) {
-            return CpuSample.ticks(cpuTicks(pid));
-        }
+    static CpuSample cpuSample(long pid, boolean procStat) {
+        if (procStat) return CpuSample.ticks(cpuTicks(pid));
         Optional<Long> nanos = cpuNanos(pid);
         return nanos.map(CpuSample::nanos).orElseGet(CpuSample::unsupported);
+    }
+
+    private static CpuSample cpuSample(long pid) {
+        return cpuSample(pid, Files.isRegularFile(Path.of("/proc/" + pid + "/stat")));
+    }
+
+    private static void deleteTree(Path root) {
+        if (root == null || !Files.exists(root)) return;
+        try (Stream<Path> walk = Files.walk(root)) {
+            for (Path path : walk.sorted(Comparator.reverseOrder()).toList()) {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (IOException ignored) {
+                    // A leftover file does not keep the profile as the session directory.
+                }
+            }
+        } catch (IOException ignored) {
+            // The next selftest recreates the directory.
+        }
     }
 
     private static long cpuTicks(long pid) {
@@ -161,7 +182,7 @@ public final class SelftestUi {
         return handle.info().totalCpuDuration().map(Duration::toNanos).orElse(0L);
     }
 
-    private record CpuSample(boolean supported, boolean ticks, long ticksValue, long nanos) {
+    record CpuSample(boolean supported, boolean ticks, long ticksValue, long nanos) {
         static CpuSample ticks(long value) {
             return new CpuSample(true, true, value, 0L);
         }

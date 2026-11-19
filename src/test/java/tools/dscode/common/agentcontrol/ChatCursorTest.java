@@ -86,6 +86,23 @@ class ChatCursorTest {
         Capture second = run("chat_wait", "--timeout=1", temp.toString());
         assertEquals(1, second.code, second.out + second.err);
         assertTrue(second.err.contains("timed out"), second.err);
+        java.util.regex.Matcher waited = java.util.regex.Pattern.compile("\"elapsedMs\":(\\d+)").matcher(second.out);
+        assertTrue(waited.find(), second.out);
+        long elapsedMs = Long.parseLong(waited.group(1));
+        assertTrue(elapsedMs >= 800, second.out);
+        assertTrue(second.out.contains("\"totalMs\":" + elapsedMs), second.out);
+    }
+
+    @Test
+    @Timeout(value = 20, unit = TimeUnit.SECONDS)
+    void otherSessionEventDoesNotShortenChatPollWait() {
+        tools.dscode.control.protocol.AgentEvents.append(temp, "session_ended", "other-session");
+        long started = System.nanoTime();
+        Capture poll = run("chat-poll", "--wait=3", "--run-id=this-session", temp.toString());
+        long elapsed = (System.nanoTime() - started) / 1_000_000L;
+        assertEquals(0, poll.code, poll.out + poll.err);
+        assertTrue(elapsed >= 2500, "elapsed " + elapsed + "\n" + poll.out + poll.err);
+        assertFalse(poll.out.contains("other-session"), poll.out);
     }
 
     private Capture run(String... args) {

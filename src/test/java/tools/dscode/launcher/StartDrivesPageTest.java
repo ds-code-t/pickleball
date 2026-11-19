@@ -2,6 +2,7 @@ package tools.dscode.launcher;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sun.net.httpserver.HttpServer;
 import dev.domengine.session.BrowserSession;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
@@ -13,6 +14,7 @@ import tools.dscode.control.protocol.speed.ProcessTree;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -22,6 +24,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -109,41 +112,102 @@ class StartDrivesPageTest {
         Capture doctor = run("doctor", temp.toString());
         assertEquals(0, doctor.code, doctor.err);
         assertTrue(doctor.out.contains("health=down"), doctor.out);
+        assertTrue(doctor.out.contains("page=absent"), doctor.out);
+        Capture stopped = run("live-stop", temp.toString());
+        assertEquals(0, stopped.code, stopped.err + stopped.out);
+        assertTrue(stopped.out.contains("stopped=true"), stopped.out);
+        assertFalse(Files.isRegularFile(current));
+    }
+
+    @Test
+    void startRefusesALiveWorkerAndForwardsThatSession() throws Exception {
+        Process worker = new ProcessBuilder("sleep", "180").redirectErrorStream(true).start();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        AtomicReference<String> posted = new AtomicReference<>("");
+        server.createContext("/v1/agent/command", exchange -> {
+            posted.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            byte[] response = "{\"exit\":0,\"body\":{\"ok\":true}}".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.start();
+        try {
+            int port = server.getAddress().getPort();
+            LiveBridgeFile.write(temp, new LiveBridgeFile.Bridge(
+                    "127.0.0.1", port, "worker-token", worker.pid(), "worker-session"
+            ));
+            Capture started = run("start", "--url=about:blank", "--browser=chrome", temp.toString());
+            assertEquals(2, started.code, detail(started));
+            assertEquals(
+                    "error: a Workbench worker is live\nfix: use the worker's browser or stop it\n",
+                    started.err
+            );
+            assertTrue(worker.isAlive(), "start killed the workbench worker");
+            assertFalse(Files.isRegularFile(temp.resolve(".pickleball/live-browser/current.json")));
+            assertFalse(Files.isRegularFile(temp.resolve(".pickleball/consumer-session.json")));
+            assertTrue(Files.isRegularFile(temp.resolve(".pickleball/workbench/live-bridge.json")));
+
+            Capture highlight = run("highlight", "--handle=save", "--preset=yellow", temp.toString());
+            assertEquals(0, highlight.code, detail(highlight));
+            assertTrue(posted.get().contains("\"runId\":\"worker-session\""), posted.get());
+
+            Capture stopped = run("live-stop", temp.toString());
+            assertEquals(0, stopped.code, stopped.err + stopped.out);
+            assertTrue(stopped.out.contains("stopped=false"), stopped.out);
+            assertTrue(worker.isAlive(), "live-stop killed the workbench worker");
+            assertTrue(Files.isRegularFile(temp.resolve(".pickleball/workbench/live-bridge.json")));
+        } finally {
+            server.stop(0);
+            worker.destroyForcibly();
+        }
     }
 
     @Test
     @Timeout(value = 180, unit = TimeUnit.SECONDS)
-    void liveStopLeavesTheWorkerAndRemovesHostState() throws Exception {
+    void doctorAfterChromeDiesAppendsBrowserLost() throws Exception {
         Assumptions.assumeTrue(BrowserSession.findChrome() != null, "skipped: chrome is not on PATH");
-        Process worker = new ProcessBuilder("sleep", "180").redirectErrorStream(true).start();
-        try {
-            LiveBridgeFile.write(temp, new LiveBridgeFile.Bridge(
-                    "127.0.0.1", 9, "worker-token", worker.pid(), "worker-session"
-            ));
-            Capture started = run("start", "--url=about:blank", "--browser=chrome", temp.toString());
-            assertEquals(0, started.code, detail(started));
-            assertTrue(worker.isAlive(), "start killed the workbench worker");
-            Path current = temp.resolve(".pickleball/live-browser/current.json");
-            JsonNode node = JSON.readTree(current.toFile());
-            long hostPid = node.path("pid").asLong(0);
-            long chromePid = node.path("chromePid").asLong(0);
-            String sessionId = node.path("sessionId").asText("");
-            assertFalse(Files.exists(temp.resolve(".pickleball/live-browser").resolve(sessionId).resolve("args.txt")));
-            assertFalse(Files.isRegularFile(temp.resolve(".pickleball/workbench/cli-session.json")));
-            assertTrue(Files.isRegularFile(temp.resolve(".pickleball/workbench/live-bridge.json")));
+        Capture started = run("start", "--url=about:blank", "--browser=chrome", temp.toString());
+        assertEquals(0, started.code, detail(started));
+        JsonNode node = JSON.readTree(temp.resolve(".pickleball/live-browser/current.json").toFile());
+        ProcessTree.kill(node.path("chromePid").asLong(0));
+        Capture doctor = run("doctor", temp.toString());
+        assertEquals(0, doctor.code, doctor.err + doctor.out);
+        assertTrue(doctor.out.contains("health=down"), doctor.out);
+        assertTrue(doctor.out.contains("page=absent"), doctor.out);
+        String events = Files.readString(temp.resolve(".pickleball/agent-events.jsonl"));
+        assertEquals(1, countEvent(events, "browser_lost"), events);
+        Capture again = run("doctor", temp.toString());
+        assertEquals(0, again.code, again.err);
+        String twice = Files.readString(temp.resolve(".pickleball/agent-events.jsonl"));
+        assertEquals(1, countEvent(twice, "browser_lost"), twice);
+        Capture border = run("border", "--handle=save", temp.toString());
+        assertTrue(border.code != 0, border.out + border.err);
+        assertTrue((border.out + border.err).contains("no live browser"), border.out + border.err);
+        assertFalse((border.out + border.err).contains("unknown handle"), border.out + border.err);
+    }
 
-            Capture stopped = run("live-stop", temp.toString());
-            assertEquals(0, stopped.code, stopped.err + stopped.out);
-            assertTrue(stopped.out.contains("stopped=true"), stopped.out);
-            assertFalse(alive(hostPid), "host still alive " + hostPid);
-            assertFalse(alive(chromePid), "chrome still alive " + chromePid);
-            assertFalse(Files.isRegularFile(current));
-            assertFalse(Files.exists(temp.resolve(".pickleball/live-browser").resolve(sessionId).resolve("args.txt")));
-            assertTrue(worker.isAlive(), "live-stop killed the workbench worker");
-            assertTrue(Files.isRegularFile(temp.resolve(".pickleball/workbench/live-bridge.json")));
-        } finally {
-            worker.destroyForcibly();
-        }
+    @Test
+    @Timeout(value = 180, unit = TimeUnit.SECONDS)
+    void selftestCpuLeavesTheHostPage() throws Exception {
+        Assumptions.assumeTrue(BrowserSession.findChrome() != null, "skipped: chrome is not on PATH");
+        Path page = temp.resolve("save.html");
+        Files.writeString(page, """
+                <!DOCTYPE html><html><body>
+                <button id="save" data-pkb-handle="save">Save</button>
+                </body></html>
+                """);
+        Capture started = run("start", "--url=" + page.toUri(), "--browser=chrome", temp.toString());
+        assertEquals(0, started.code, detail(started));
+        Capture selftest = run("selftest", temp.toString(), "ui", "--cpu");
+        assertFalse(Files.exists(temp.resolve(".pickleball/selftest-profile")), selftest.out + selftest.err);
+        Capture panel = run("panel-open", "--target=page", temp.toString());
+        assertEquals(0, panel.code, detail(panel) + selftest.out + selftest.err);
+        assertTrue(panel.out.contains("\"target\":\"page\""), panel.out);
+        Capture border = run("border", "--handle=save", temp.toString());
+        assertEquals(0, border.code, detail(border));
+        assertTrue(border.out.contains("\"handle\":\"save\"") || border.out.contains("save"), border.out);
     }
 
     @Test
@@ -175,7 +239,15 @@ class StartDrivesPageTest {
     void liveStopWithNoHostPrintsStopped() {
         Capture stopped = run("live-stop", temp.toString());
         assertEquals(0, stopped.code, stopped.err + stopped.out);
-        assertTrue(stopped.out.contains("stopped=true"), stopped.out);
+        assertTrue(stopped.out.contains("stopped=false"), stopped.out);
+    }
+
+    private static int countEvent(String events, String name) {
+        int count = 0;
+        for (String line : events.split("\n")) {
+            if (line.contains("\"event\":\"" + name + "\"")) count++;
+        }
+        return count;
     }
 
     private String waitForDown(int port, String token) throws Exception {

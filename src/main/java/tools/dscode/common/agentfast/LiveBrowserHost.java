@@ -19,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -37,6 +38,9 @@ import java.util.stream.Stream;
 public final class LiveBrowserHost {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final AtomicBoolean WAS_OK = new AtomicBoolean(false);
+    private static final AtomicReference<BrowserSession> CHROME = new AtomicReference<>();
+    private static volatile Path PROJECT = Path.of("");
+    private static volatile String SESSION_ID = "";
 
     private LiveBrowserHost() {
     }
@@ -49,7 +53,9 @@ public final class LiveBrowserHost {
             return;
         }
         Path project = Path.of(args[0]);
+        PROJECT = project;
         String id = args[1];
+        SESSION_ID = id;
         String pageUrl = args[2];
         String browser = args[3];
         String token = args[4];
@@ -57,19 +63,18 @@ public final class LiveBrowserHost {
         String binary = args.length >= 7 ? args[6] : "";
         Files.deleteIfExists(project.resolve(".pickleball").resolve("live-browser").resolve(id).resolve("args.txt"));
         CountDownLatch stopped = new CountDownLatch(1);
-        AtomicReference<BrowserSession> chrome = new AtomicReference<>();
         HttpServer server = bindLoopback();
         int port = server.getAddress().getPort();
         HttpServer listening = server;
-        server.createContext("/health", exchange -> health(exchange, token, headed, chrome.get(), project, id));
-        server.createContext("/v1/agent/command", exchange -> command(exchange, token, project));
+        server.createContext("/health", exchange -> health(exchange, token, headed, CHROME.get(), project, id));
+        server.createContext("/v1/agent/command", exchange -> command(exchange, token, project, id));
         server.createContext("/v1/stop", exchange -> {
             if (!authorized(exchange, token)) return;
             send(exchange, 200, Map.of("stopped", true));
             stopped.countDown();
         });
         server.start();
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> release(project, chrome.get(), listening)));
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> release(project, CHROME.get(), listening)));
         int code = 0;
         try {
             System.err.println("browser=" + browser + " headed=" + headed);
@@ -80,7 +85,7 @@ public final class LiveBrowserHost {
                     id, "about:blank", headed, true, profile, List.of(), List.of(),
                     binary == null || binary.isBlank() ? null : binary
             );
-            chrome.set(session);
+            CHROME.set(session);
             boolean navigated = true;
             String navError = "";
             if (pageUrl != null && !pageUrl.isBlank() && !"about:blank".equals(pageUrl)) {
@@ -102,7 +107,8 @@ public final class LiveBrowserHost {
             long pid = ProcessHandle.current().pid();
             String base = "http://127.0.0.1:" + port;
             LiveHostFile.write(project, new LiveHostFile.Host(
-                    base, token, port, pid, session.pid, id, headed, browser, navigated, navError, pageAttached
+                    base, token, port, pid, session.pid, id, headed, browser, navigated, navError, pageAttached,
+                    startMillis(ProcessHandle.current()), startMillis(ProcessHandle.of(session.pid).orElse(null))
             ));
             if (!navigated) System.err.println("error: navigation failed: " + navError);
             stopped.await();
@@ -111,7 +117,7 @@ public final class LiveBrowserHost {
             System.err.println("error: " + message);
             code = 1;
         } finally {
-            release(project, chrome.get(), server);
+            release(project, CHROME.get(), server);
         }
         if (code != 0) System.exit(code);
     }
@@ -159,7 +165,7 @@ public final class LiveBrowserHost {
 
     private static void release(Path project, BrowserSession session, HttpServer server) {
         try {
-            AgentDriverHooks.quit();
+            AgentDriverHooks.releaseHost();
         } catch (RuntimeException ignored) {
             // Chrome close still runs.
         }
@@ -203,15 +209,33 @@ public final class LiveBrowserHost {
         boolean ok = chromeAlive && cdpOk;
         if (ok) {
             WAS_OK.set(true);
-        } else if (WAS_OK.compareAndSet(true, false)) {
-            AgentEvents.append(project, "browser_lost", sessionId);
+        } else {
+            noteLost(project, sessionId);
         }
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("status", ok ? "ok" : "down");
+        body.put("page", ok ? "attached" : "absent");
         body.put("headed", headed);
         body.put("chromePid", session == null ? 0 : session.pid);
         if (!ok) body.put("reason", reason.isBlank() ? "browser_lost" : reason);
         send(exchange, 200, body);
+    }
+
+    private static long startMillis(ProcessHandle handle) {
+        if (handle == null) return 0L;
+        return handle.info().startInstant().map(Instant::toEpochMilli).orElse(0L);
+    }
+
+    private static boolean chromeAlive(BrowserSession session) {
+        return session != null && session.pid > 0
+                && ProcessHandle.of(session.pid).map(ProcessHandle::isAlive).orElse(false);
+    }
+
+    /** Appends {@code browser_lost} once, on the first true-to-false health transition. */
+    private static void noteLost(Path project, String sessionId) {
+        if (WAS_OK.compareAndSet(true, false)) {
+            AgentEvents.append(project, "browser_lost", sessionId);
+        }
     }
 
     /** Browser domain on a browser socket, or a page-domain call when the socket is already the page. */
@@ -232,12 +256,18 @@ public final class LiveBrowserHost {
         }
     }
 
-    private static void command(HttpExchange exchange, String token, Path project) throws IOException {
+    private static void command(HttpExchange exchange, String token, Path project, String sessionId) throws IOException {
         if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
             send(exchange, 405, Map.of("error", "POST"));
             return;
         }
         if (!authorized(exchange, token)) return;
+        BrowserSession session = CHROME.get();
+        if (!chromeAlive(session)) {
+            noteLost(project, sessionId);
+            send(exchange, 200, lostCommand());
+            return;
+        }
         JsonNode request = JSON.readTree(exchange.getRequestBody());
         Map<String, String> args = new LinkedHashMap<>();
         JsonNode rawArgs = request.get("args");
@@ -255,10 +285,30 @@ public final class LiveBrowserHost {
                 extra,
                 request.path("agentId").asText("")
         );
+        Map<String, Object> payload = new LinkedHashMap<>(result.body());
+        Object error = payload.get("error");
+        String errorText = error == null ? "" : String.valueOf(error);
+        int exit = result.exit();
+        if ((errorText.contains("unknown handle") || errorText.contains("no live browser")) && !cdpAnswers(session)) {
+            noteLost(project, sessionId);
+            payload.put("ok", false);
+            payload.put("error", "no live browser");
+            exit = 1;
+        }
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("exit", result.exit());
-        body.put("body", result.body());
+        body.put("exit", exit);
+        body.put("body", payload);
         send(exchange, 200, body);
+    }
+
+    private static Map<String, Object> lostCommand() {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("exit", 1);
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("ok", false);
+        payload.put("error", "no live browser");
+        body.put("body", payload);
+        return body;
     }
 
     private static boolean authorized(HttpExchange exchange, String token) throws IOException {

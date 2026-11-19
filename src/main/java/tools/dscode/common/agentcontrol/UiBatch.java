@@ -208,7 +208,7 @@ final class UiBatch {
             List<Map<String, Object>> eventRows = compact(events.body().get("events"));
             List<Map<String, Object>> chatRows = compact(chat.exit() == 0 ? chat.body().get("messages") : null);
             chatRows.removeIf(row -> "agent".equals(row.get("source")));
-            List<Map<String, String>> agentEvents = tools.dscode.control.protocol.AgentEvents.tail(project, 20);
+            List<Map<String, String>> agentEvents = eventRows(chat.exit() == 0 ? chat.body().get("agentEvents") : null);
             if (!eventRows.isEmpty() || !chatRows.isEmpty() || !agentEvents.isEmpty() || System.nanoTime() >= deadline) {
                 UiState.sync(project, runId, args);
                 Map<String, Object> body = new LinkedHashMap<>();
@@ -244,6 +244,20 @@ final class UiBatch {
                     if (key != null && value != null && !NOISE.contains(String.valueOf(key))) row.put(String.valueOf(key), value);
                 });
             }
+            rows.add(row);
+        }
+        return rows;
+    }
+
+    private static List<Map<String, String>> eventRows(Object raw) {
+        if (!(raw instanceof List<?> list)) return List.of();
+        List<Map<String, String>> rows = new ArrayList<>();
+        for (Object item : list) {
+            if (!(item instanceof Map<?, ?> map)) continue;
+            Map<String, String> row = new LinkedHashMap<>();
+            map.forEach((key, value) -> {
+                if (key != null && value != null) row.put(String.valueOf(key), String.valueOf(value));
+            });
             rows.add(row);
         }
         return rows;

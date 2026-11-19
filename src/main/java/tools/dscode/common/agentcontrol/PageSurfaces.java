@@ -88,7 +88,7 @@ final class PageSurfaces {
     private PageSurfaces() {
     }
 
-    record Managed(String id, WebDriver driver, String template, boolean owned) {
+    record Managed(String id, WebDriver driver, String template, boolean owned, boolean host) {
     }
 
     static void manage(WebDriver webDriver, String template, boolean owned) {
@@ -100,7 +100,8 @@ final class PageSurfaces {
         if (webDriver instanceof RemoteWebDriver remote && remote.getSessionId() != null) {
             id = remote.getSessionId().toString();
         }
-        MANAGED.add(new Managed(id, webDriver, template == null ? "" : template, owned));
+        String name = template == null ? "" : template;
+        MANAGED.add(new Managed(id, webDriver, name, owned, "live".equals(name)));
         driver = webDriver;
     }
 
@@ -211,9 +212,27 @@ final class PageSurfaces {
     }
 
     static void detach(WebDriver webDriver) {
+        forgetDriver(webDriver);
         MANAGED.removeIf(managed -> managed.driver == webDriver);
         if (driver == webDriver) {
             driver = MANAGED.isEmpty() ? null : MANAGED.get(MANAGED.size() - 1).driver;
+        }
+    }
+
+    /** A quit browser must not keep owning handles the host page still uses. */
+    private static void forgetDriver(WebDriver webDriver) {
+        if (webDriver == null) return;
+        FRAME_LIST.removeIf(owner -> owner.driver == webDriver);
+        HIGHLIGHT_SITES.removeIf(site -> site.driver == webDriver);
+        SURFACE_SITES.removeIf(site -> site.driver == webDriver);
+        java.util.List<String> handles = new java.util.ArrayList<>();
+        HANDLE_OWNERS.forEach((handle, owner) -> {
+            if (owner.driver == webDriver) handles.add(handle);
+        });
+        for (String handle : handles) {
+            HANDLE_OWNERS.remove(handle);
+            GEOMETRY.remove(handle);
+            BOUNDS.remove(handle);
         }
     }
 
@@ -225,21 +244,68 @@ final class PageSurfaces {
         quitMatching(true);
     }
 
-    /** Quits every managed driver, including isolate and scenario drivers ({@code owned=false}). */
+    /** Quits every non-host driver. The host driver stays until {@link #quitHost()}. */
     static void quitAll() {
-        quitMatching(false);
+        for (Managed managed : List.copyOf(MANAGED)) {
+            if (managed.host) continue;
+            quitManaged(managed);
+        }
+    }
+
+    /** Worker-stop and {@code /v1/browser/release}. Never the host driver. */
+    static void quitUnowned() {
+        for (Managed managed : List.copyOf(MANAGED)) {
+            if (managed.owned || managed.host) continue;
+            quitManaged(managed);
+        }
+    }
+
+    /** One driver the caller launched. The host driver is left attached. */
+    static void quitOne(WebDriver webDriver) {
+        if (webDriver == null) return;
+        for (Managed managed : List.copyOf(MANAGED)) {
+            if (managed.driver != webDriver || managed.host) continue;
+            quitManaged(managed);
+        }
+    }
+
+    /** Host release only. */
+    static void quitHost() {
+        for (Managed managed : List.copyOf(MANAGED)) {
+            if (!managed.host) continue;
+            quitManaged(managed);
+        }
     }
 
     private static void quitMatching(boolean ownedOnly) {
         for (Managed managed : List.copyOf(MANAGED)) {
+            if (managed.host) continue;
             if (ownedOnly && !managed.owned) continue;
-            try {
-                managed.driver.quit();
-            } catch (RuntimeException failure) {
-                CompositeLog.info("window", "quit skipped " + managed.id + " " + failure.getMessage());
-            }
-            detach(managed.driver);
+            quitManaged(managed);
         }
+    }
+
+    private static void quitManaged(Managed managed) {
+        try {
+            managed.driver.quit();
+        } catch (RuntimeException failure) {
+            CompositeLog.info("window", "quit skipped " + managed.id + " " + failure.getMessage());
+        }
+        detach(managed.driver);
+    }
+
+    /** Drops non-host drivers from the registry. A host driver stays the focused page. */
+    static void clearExceptHost() {
+        boolean hostPresent = false;
+        for (Managed managed : MANAGED) {
+            if (managed.host) hostPresent = true;
+        }
+        if (!hostPresent) {
+            clearDriver();
+            return;
+        }
+        MANAGED.removeIf(managed -> !managed.host);
+        driver = MANAGED.get(MANAGED.size() - 1).driver;
     }
 
     static WebDriver driver() {
@@ -563,7 +629,7 @@ final class PageSurfaces {
             write(page, html);
             clearUndos(page);
         }
-        cleanupManaged();
+        cleanupManaged(false);
         if (page != null && Files.isRegularFile(page)) {
             // File fixture already cleaned. Live drivers were cleaned above.
         }
@@ -608,8 +674,12 @@ final class PageSurfaces {
         return events;
     }
 
+    static void cleanupExceptHost() {
+        cleanupManaged(true);
+    }
+
     static void cleanupAll() {
-        cleanupManaged();
+        cleanupManaged(false);
         RuntimeException first = null;
         for (Path page : PAGES) {
             try {
@@ -626,13 +696,20 @@ final class PageSurfaces {
     }
 
     static void cleanupManaged() {
-        Hide hidden = hideHighlight(null);
-        if (hidden == Hide.FAILED) {
-            throw hideFailed();
+        cleanupManaged(false);
+    }
+
+    private static void cleanupManaged(boolean skipHost) {
+        if (!(skipHost && hostDriver(driver))) {
+            Hide hidden = hideHighlight(null);
+            if (hidden == Hide.FAILED) {
+                throw hideFailed();
+            }
         }
-        CDP_HIGHLIGHTS.clear();
+        if (!skipHost) CDP_HIGHLIGHTS.clear();
         RuntimeException first = null;
         for (Managed managed : List.copyOf(MANAGED)) {
+            if (skipHost && managed.host) continue;
             WebDriver web = managed.driver;
             try {
                 if (absent(web, null)) {
@@ -683,6 +760,14 @@ final class PageSurfaces {
             }
         }
         if (first != null) throw first;
+    }
+
+    private static boolean hostDriver(WebDriver web) {
+        if (web == null) return false;
+        for (Managed managed : MANAGED) {
+            if (managed.driver == web && managed.host) return true;
+        }
+        return false;
     }
 
     static int[] visualPoint(String geometryJson, Integer x, Integer y) {

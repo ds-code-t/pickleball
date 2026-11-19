@@ -751,7 +751,9 @@ class AgentExpansionTest {
         assertEquals(2, badTarget.code, badTarget.out + badTarget.err);
         Capture noPage = agent("panel-open", temp.toString(), "--run-id=panel", "--target=page");
         assertEquals(1, noPage.code, noPage.out + noPage.err);
-        assertTrue((noPage.out + noPage.err).contains("panel did not open"), noPage.out + noPage.err);
+        assertTrue((noPage.out + noPage.err).contains("error: no live browser"), noPage.out + noPage.err);
+        assertTrue((noPage.out + noPage.err).contains("fix: run start --url= --browser="), noPage.out + noPage.err);
+        assertFalse((noPage.out + noPage.err).contains("error: error:"), noPage.out + noPage.err);
     }
 
     @Test

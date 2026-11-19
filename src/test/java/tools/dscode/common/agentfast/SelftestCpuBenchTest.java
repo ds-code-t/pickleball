@@ -48,4 +48,13 @@ class SelftestCpuBenchTest {
         assertTrue(cores < 0.1, "cores=" + cores + " ticks=" + node.path("ticks") + " " + out);
         assertTrue(p95 <= 150, "p95Ms=" + p95 + " " + out);
     }
+
+    @Test
+    void cpuSampleWithoutProcUsesNanos() {
+        long pid = ProcessHandle.current().pid();
+        SelftestUi.CpuSample sample = SelftestUi.cpuSample(pid, false);
+        boolean hasNanos = ProcessHandle.current().info().totalCpuDuration().isPresent();
+        assertEquals(hasNanos, sample.supported());
+        if (hasNanos) assertFalse(sample.ticks());
+    }
 }

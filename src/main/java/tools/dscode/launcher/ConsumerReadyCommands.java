@@ -49,8 +49,8 @@ final class ConsumerReadyCommands {
     static int start(WorkbenchCommandLine.Parsed parsed, java.io.PrintStream out, java.io.PrintStream err) {
         Path project = parsed.project();
         if (hasToken(parsed, "--stop")) {
-            stopQuiet(project);
-            out.println("stopped=true");
+            boolean stopped = stopQuiet(project);
+            out.println(stopped ? "stopped=true" : "stopped=false");
             return 0;
         }
         String url = flag(parsed, "--url");
@@ -62,6 +62,12 @@ final class ConsumerReadyCommands {
         String binary = resolveBrowser(browser.trim());
         if (binary == null) {
             err.println("error: unsupported --browser=" + browser.trim());
+            return 2;
+        }
+        Optional<LiveBridgeFile.Bridge> worker = LiveBridgeFile.read(project);
+        if (worker.isPresent() && alive(worker.get().pid())) {
+            err.println("error: a Workbench worker is live");
+            err.println("fix: use the worker's browser or stop it");
             return 2;
         }
         stopQuiet(project);
@@ -127,25 +133,26 @@ final class ConsumerReadyCommands {
     }
 
     /** Stops the host {@code start} recorded. A Workbench worker bridge is left running. */
-    static void stopQuiet(Path project) {
-        if (project == null) return;
+    static boolean stopQuiet(Path project) {
+        if (project == null) return false;
         Optional<LiveHostFile.Host> host = LiveHostFile.read(project);
-        if (host.isPresent()) {
-            LiveHostFile.Host found = host.get();
-            postStop(found.url(), found.token());
-            long pid = found.pid();
-            ProcessHandle.of(pid).ifPresent(handle -> {
-                try {
-                    handle.onExit().get(5, TimeUnit.SECONDS);
-                } catch (Exception ignored) {
-                    ProcessTree.kill(pid);
-                }
-                if (handle.isAlive()) ProcessTree.kill(pid);
-            });
-            if (found.chromePid() > 0) ProcessTree.kill(found.chromePid());
-        }
+        if (host.isEmpty()) return false;
+        LiveHostFile.Host found = host.get();
+        postStop(found.url(), found.token());
+        long pid = found.pid();
+        ProcessHandle.of(pid).ifPresent(handle -> {
+            if (!ProcessTree.sameStart(handle, found.pidStarted())) return;
+            try {
+                handle.onExit().get(5, TimeUnit.SECONDS);
+            } catch (Exception ignored) {
+                ProcessTree.kill(pid);
+            }
+            if (handle.isAlive() && ProcessTree.sameStart(handle, found.pidStarted())) ProcessTree.kill(pid);
+        });
+        if (found.chromePid() > 0) ProcessTree.killIfStarted(found.chromePid(), found.chromeStarted());
         LiveHostFile.delete(project);
         tools.dscode.common.agentfast.LiveBrowserHost.pruneProfiles(project, null);
+        return true;
     }
 
     static int doctor(WorkbenchCommandLine.Parsed parsed, java.io.PrintStream out, java.io.PrintStream err) {
@@ -160,7 +167,7 @@ final class ConsumerReadyCommands {
         Optional<LiveBridgeFile.Bridge> workerBridge = LiveBridgeFile.read(project);
         boolean worker = workerBridge.isPresent() && alive(workerBridge.get().pid());
         boolean lease = worker || Files.isRegularFile(project.resolve(".pickleball/workbench/pause-hold"));
-        boolean page = host.isPresent() && host.get().pageAttached() && bridge;
+        boolean page = "attached".equals(health.page());
         out.println("chrome=" + chrome);
         out.println("session=" + session);
         out.println("health=" + health.status());
@@ -257,8 +264,17 @@ final class ConsumerReadyCommands {
         return false;
     }
 
+    private record HealthPayload(String status, String page) {
+    }
+
     private static String healthStatus(LiveHostFile.Host host) {
-        if (host == null || host.url() == null || host.url().isBlank()) return "down";
+        HealthPayload payload = fetchHealth(host);
+        return payload == null || payload.status().isBlank() ? "down" : payload.status();
+    }
+
+    /** GET /health while the host pid is alive, including after Chrome itself has died. */
+    private static HealthPayload fetchHealth(LiveHostFile.Host host) {
+        if (host == null || host.url() == null || host.url().isBlank()) return null;
         try {
             String base = host.url().endsWith("/") ? host.url().substring(0, host.url().length() - 1) : host.url();
             HttpRequest request = HttpRequest.newBuilder(URI.create(base + "/health"))
@@ -268,13 +284,14 @@ final class ConsumerReadyCommands {
                     .GET()
                     .build();
             HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) return "down";
-            return JSON.readTree(response.body() == null ? "" : response.body()).path("status").asText("");
+            if (response.statusCode() != 200) return new HealthPayload("down", "absent");
+            JsonNode node = JSON.readTree(response.body() == null ? "" : response.body());
+            return new HealthPayload(node.path("status").asText(""), node.path("page").asText(""));
         } catch (InterruptedException failure) {
             Thread.currentThread().interrupt();
-            return "down";
+            return new HealthPayload("down", "absent");
         } catch (Exception failure) {
-            return "down";
+            return new HealthPayload("down", "absent");
         }
     }
 
@@ -332,9 +349,9 @@ final class ConsumerReadyCommands {
         }
     }
 
-    private record CliHealth(String status, String headed, String pid) {
+    private record CliHealth(String status, String headed, String pid, String page) {
         private static CliHealth absent() {
-            return new CliHealth("absent", "absent", "absent");
+            return new CliHealth("absent", "absent", "absent", "absent");
         }
     }
 
@@ -349,10 +366,10 @@ final class ConsumerReadyCommands {
             String headed = node.has("headed") ? Boolean.toString(node.path("headed").asBoolean(false)) : "absent";
             String pidText = pid > 0 ? Long.toString(pid) : "absent";
             boolean alive = pid > 0 && ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false);
-            if (!alive) return new CliHealth("down", headed, pidText);
+            if (!alive) return new CliHealth("down", headed, pidText, "absent");
             String url = node.path("url").asText("");
             String token = node.path("token").asText("");
-            if (url.isBlank() || token.isBlank()) return new CliHealth("down", headed, pidText);
+            if (url.isBlank() || token.isBlank()) return new CliHealth("down", headed, pidText, "absent");
             HttpRequest request = HttpRequest.newBuilder(URI.create(url.endsWith("/") ? url + "health" : url + "/health"))
                     .timeout(HEALTH_TIMEOUT)
                     .header("Authorization", "Bearer " + token)
@@ -360,27 +377,30 @@ final class ConsumerReadyCommands {
                     .GET()
                     .build();
             HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) return new CliHealth("down", headed, pidText);
+            if (response.statusCode() != 200) return new CliHealth("down", headed, pidText, "absent");
             JsonNode body = JSON.readTree(response.body() == null ? "" : response.body());
-            if (!"ok".equals(body.path("status").asText(""))) return new CliHealth("down", headed, pidText);
+            if (!"ok".equals(body.path("status").asText(""))) return new CliHealth("down", headed, pidText, "absent");
             if (body.has("headed")) headed = Boolean.toString(body.path("headed").asBoolean(false));
-            return new CliHealth("ok", headed, pidText);
+            String page = "attached".equals(body.path("page").asText("")) ? "attached" : "absent";
+            return new CliHealth("ok", headed, pidText, page);
         } catch (InterruptedException failure) {
             Thread.currentThread().interrupt();
-            return new CliHealth("down", "absent", "absent");
+            return new CliHealth("down", "absent", "absent", "absent");
         } catch (Exception failure) {
-            return new CliHealth("down", "absent", "absent");
+            return new CliHealth("down", "absent", "absent", "absent");
         }
     }
 
     private static CliHealth healthOfHost(LiveHostFile.Host host) {
         String headed = Boolean.toString(host.headed());
         String pidText = host.pid() > 0 ? Long.toString(host.pid()) : "absent";
-        if (!alive(host.pid())) return new CliHealth("down", headed, pidText);
-        if (host.chromePid() > 0 && !alive(host.chromePid())) return new CliHealth("down", headed, pidText);
-        String status = healthStatus(host);
-        if (!"ok".equals(status)) return new CliHealth("down", headed, pidText);
-        return new CliHealth("ok", headed, pidText);
+        if (!alive(host.pid())) return new CliHealth("down", headed, pidText, "absent");
+        HealthPayload payload = fetchHealth(host);
+        if (payload == null || !"ok".equals(payload.status())) {
+            return new CliHealth("down", headed, pidText, "absent");
+        }
+        String page = "attached".equals(payload.page()) ? "attached" : "absent";
+        return new CliHealth("ok", headed, pidText, page);
     }
 
     private static String tail(Path logFile) {
@@ -410,7 +430,8 @@ final class ConsumerReadyCommands {
         }
         long timeoutMillis = timeoutMillis(parsed, err);
         if (timeoutMillis < 0) return 2;
-        long deadline = System.nanoTime() + timeoutMillis * 1_000_000L;
+        long startedNs = System.nanoTime();
+        long deadline = startedNs + timeoutMillis * 1_000_000L;
         try {
             while (true) {
                 AgentControl.Result polled = AgentControl.execute(
@@ -422,7 +443,9 @@ final class ConsumerReadyCommands {
                     return 0;
                 }
                 if (System.nanoTime() >= deadline) {
-                    out.println(JSON.writeValueAsString(polled.body()));
+                    long elapsed = Math.max(0L, (System.nanoTime() - startedNs) / 1_000_000L);
+                    out.println(tools.dscode.common.agentfast.ReplyFields.restamp(
+                            JSON.writeValueAsString(polled.body()), elapsed));
                     err.println("error: chat_wait timed out\nfix: chat-send, then chat_wait again.\n");
                     log(parsed.project(), runId, "chat_wait timeout");
                     return 1;

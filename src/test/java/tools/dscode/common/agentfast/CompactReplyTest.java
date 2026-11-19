@@ -28,7 +28,13 @@ class CompactReplyTest {
     @Test
     void oversizedInspectPageAndStepRepliesStayUnderTwoKib() throws Exception {
         Path html = temp.resolve("page.html");
-        Files.writeString(html, "<html><body>" + "x".repeat(4000) + "</body></html>");
+        StringBuilder page = new StringBuilder("<!DOCTYPE html><html><body>");
+        for (int index = 1; index <= 30; index++) {
+            String label = String.format("Save label %02d ", index) + "padding ".repeat(12);
+            page.append("<button id=\"save-").append(index).append("\">").append(label.strip()).append("</button>");
+        }
+        page.append("</body></html>");
+        Files.writeString(html, page.toString());
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
         int code = WorkbenchAgentCommands.run(
@@ -42,9 +48,15 @@ class CompactReplyTest {
         assertTrue(printed.getBytes(StandardCharsets.UTF_8).length <= CompactReply.LIMIT, printed);
         JsonNode compact = new ObjectMapper().readTree(printed);
         assertTrue(compact.path("compact").asBoolean(false), printed);
+        assertEquals(30, compact.path("hits").asInt(), printed);
+        assertTrue(compact.path("phrases").get(0).asText().contains("Save label 01"), printed);
+        assertFalse(printed.contains("document="), printed);
         Path full = Path.of(compact.path("full").asText());
+        assertTrue(full.getFileName().toString().endsWith(".txt"), full.toString());
         String original = Files.readString(full);
-        assertTrue(original.contains("x".repeat(4000)), "full file lost the page");
+        assertTrue(original.contains("Save label 01"), "full file lost the page");
+        assertTrue(original.contains("phrase=the \"Save label 30"), original);
+        assertFalse(original.contains("document="), original);
         assertTrue(Files.size(full) > CompactReply.LIMIT);
 
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);

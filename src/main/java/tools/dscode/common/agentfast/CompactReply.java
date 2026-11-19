@@ -7,8 +7,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
@@ -23,20 +25,29 @@ public final class CompactReply {
     }
 
     public static Map<String, Object> shrink(Path project, String kind, Map<String, Object> body) {
+        Map<String, Object> source = body == null ? Map.of() : body;
         String json;
         try {
-            json = JSON.writeValueAsString(body == null ? Map.of() : body);
+            json = JSON.writeValueAsString(source);
         } catch (IOException failure) {
-            json = String.valueOf(body);
+            json = String.valueOf(source);
         }
         if (json.getBytes(StandardCharsets.UTF_8).length <= LIMIT) {
-            return body == null ? Map.of() : body;
+            return new LinkedHashMap<>(source);
         }
-        Path full = write(project, kind, json);
-        Map<String, Object> compact = base(kind, json.getBytes(StandardCharsets.UTF_8).length, full);
-        if (body != null && body.get("elapsedMs") != null) compact.put("elapsedMs", body.get("elapsedMs"));
-        Object sentence = body == null ? null : body.get("sentence");
+        Object text = source.get("text");
+        boolean plain = text instanceof String;
+        String payload = plain ? (String) text : json;
+        Path full = write(project, kind, payload, plain);
+        Map<String, Object> compact = base(kind, payload.getBytes(StandardCharsets.UTF_8).length, full);
+        if (source.get("elapsedMs") != null) compact.put("elapsedMs", source.get("elapsedMs"));
+        if (source.get("hits") != null) compact.put("hits", source.get("hits"));
+        if (source.get("phrases") instanceof List<?> phrases && !phrases.isEmpty()) {
+            compact.put("phrases", new ArrayList<>(phrases));
+        }
+        Object sentence = source.get("sentence");
         if (sentence != null) compact.put("sentence", clip(String.valueOf(sentence)));
+        fit(compact);
         return compact;
     }
 
@@ -45,11 +56,61 @@ public final class CompactReply {
         String raw = text == null ? "" : text;
         byte[] bytes = raw.getBytes(StandardCharsets.UTF_8);
         if (bytes.length <= LIMIT) return raw;
-        Path full = write(project, kind, raw);
+        List<String> phrases = phrasesOf(raw);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("text", raw);
+        body.put("hits", phrases.size());
+        if (!phrases.isEmpty()) {
+            int keep = Math.min(8, phrases.size());
+            body.put("phrases", new ArrayList<>(phrases.subList(0, keep)));
+        }
+        String label = kind == null || kind.isBlank() ? "reply" : kind;
+        body.put("sentence", label + " has " + phrases.size() + " hits");
         try {
-            return JSON.writeValueAsString(base(kind, bytes.length, full));
+            return JSON.writeValueAsString(shrink(project, kind, body));
         } catch (IOException failure) {
             return "{\"ok\":true,\"compact\":true,\"bytes\":" + bytes.length + "}";
+        }
+    }
+
+    private static List<String> phrasesOf(String raw) {
+        List<String> phrases = new ArrayList<>();
+        for (String line : raw.split("\n", -1)) {
+            if (!line.startsWith("phrase=")) continue;
+            String phrase = line.substring("phrase=".length()).trim();
+            if (phrase.length() > 80) phrase = phrase.substring(0, 77) + "...";
+            phrases.add(phrase);
+        }
+        return phrases;
+    }
+
+    /** Drops trailing phrases, then shortens the sentence, until the object fits with room for elapsedMs. */
+    private static void fit(Map<String, Object> compact) {
+        int budget = LIMIT - 64;
+        while (jsonSize(compact) > budget) {
+            Object phrases = compact.get("phrases");
+            if (phrases instanceof List<?> list && !list.isEmpty()) {
+                List<Object> copy = new ArrayList<>(list);
+                copy.remove(copy.size() - 1);
+                if (copy.isEmpty()) compact.remove("phrases");
+                else compact.put("phrases", copy);
+                continue;
+            }
+            Object sentence = compact.get("sentence");
+            String text = sentence == null ? "" : String.valueOf(sentence);
+            if (text.length() > 24) {
+                compact.put("sentence", text.substring(0, text.length() / 2));
+                continue;
+            }
+            break;
+        }
+    }
+
+    private static int jsonSize(Map<String, Object> compact) {
+        try {
+            return JSON.writeValueAsString(compact).getBytes(StandardCharsets.UTF_8).length;
+        } catch (IOException failure) {
+            return LIMIT + 1;
         }
     }
 
@@ -79,14 +140,15 @@ public final class CompactReply {
         return trimmed + "\nelapsedMs=" + ms;
     }
 
-    private static Path write(Path project, String kind, String text) {
+    private static Path write(Path project, String kind, String text, boolean plainText) {
         Path dir = (project == null ? Path.of("") : project).resolve(".pickleball").resolve("agent-full");
         if (!enabled()) return dir.resolve("disabled.json");
         try {
             Files.createDirectories(dir);
             String safe = kind == null || kind.isBlank() ? "reply" : kind.replaceAll("[^A-Za-z0-9_-]", "-");
             String date = LocalDate.now().toString();
-            Path file = dir.resolve(safe + "-" + date + "-" + System.currentTimeMillis() + "-" + SEQUENCE.incrementAndGet() + ".json");
+            String extension = plainText ? ".txt" : ".json";
+            Path file = dir.resolve(safe + "-" + date + "-" + System.currentTimeMillis() + "-" + SEQUENCE.incrementAndGet() + extension);
             Files.writeString(file, text);
             prune(dir);
             return file;

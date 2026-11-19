@@ -35,7 +35,9 @@ public final class LiveHostFile {
             String browser,
             boolean navigated,
             String navError,
-            boolean pageAttached
+            boolean pageAttached,
+            long pidStarted,
+            long chromeStarted
     ) {
     }
 
@@ -55,6 +57,8 @@ public final class LiveHostFile {
                 + ",\"navigated\":" + host.navigated()
                 + ",\"navError\":\"" + escape(host.navError()) + "\""
                 + ",\"pageAttached\":" + host.pageAttached()
+                + ",\"pidStarted\":" + host.pidStarted()
+                + ",\"chromeStarted\":" + host.chromeStarted()
                 + "}\n";
         Files.writeString(target, json, StandardCharsets.UTF_8);
     }
@@ -76,7 +80,9 @@ public final class LiveHostFile {
                     field(text, "browser"),
                     !text.contains("\"navigated\":false"),
                     field(text, "navError"),
-                    text.contains("\"pageAttached\":true")
+                    text.contains("\"pageAttached\":true"),
+                    number(text, "pidStarted"),
+                    number(text, "chromeStarted")
             ));
         } catch (IOException failure) {
             return Optional.empty();

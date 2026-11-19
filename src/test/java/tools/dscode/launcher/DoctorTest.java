@@ -45,7 +45,7 @@ class DoctorTest {
         finished.waitFor();
         LiveHostFile.write(temp, new LiveHostFile.Host(
                 "http://127.0.0.1:9", "token", 9, finished.pid(), finished.pid(),
-                "dead-host", false, "chrome", false, "", false
+                "dead-host", false, "chrome", false, "", false, 0L, 0L
         ));
         Capture reported = run("doctor", temp.toString());
         assertEquals(0, reported.code, reported.err);

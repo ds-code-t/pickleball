@@ -1629,9 +1629,6 @@ public final class WorkbenchAgentCommands {
             for (WorkbenchElementInspect.Hit hit : WorkbenchElementInspect.dump(html)) {
                 appendHit(text, hit.phrase(), hit.xpath(), hit.rawMatchCount(), hit.visibleCount());
             }
-            if (html.getBytes(StandardCharsets.UTF_8).length > tools.dscode.common.agentfast.CompactReply.LIMIT) {
-                text.append("document=").append(html).append('\n');
-            }
             emitCompact(out, parsed.project(), "page", text, startedNs);
             return 0;
         }
@@ -2025,13 +2022,13 @@ public final class WorkbenchAgentCommands {
                 } catch (java.io.IOException ignored) {
                     // The body is already printed.
                 }
-                err.print(WorkbenchCliHelp.usageError(error, parsed.command()));
+                err.print(failureLine(error, parsed.command()));
             }
             return posted.exit();
         }
         if (failFastWithoutBrowser(parsed.command(), args)) {
-            err.println("error: no live browser");
-            out.println("{\"ok\":false,\"error\":\"error: no live browser\"}");
+            err.print(WorkbenchCliHelp.structured("no live browser", "run start --url= --browser="));
+            out.println("{\"ok\":false,\"error\":\"no live browser\"}");
             return 1;
         }
         AgentControl.Result result = AgentControl.execute(
@@ -2050,12 +2047,19 @@ public final class WorkbenchAgentCommands {
         }
         if (result.exit() != 0) {
             Object error = result.body().get("error");
-            err.print(WorkbenchCliHelp.usageError(
-                    error == null ? "agent command failed" : String.valueOf(error),
-                    parsed.command()
-            ));
+            err.print(failureLine(error == null ? "agent command failed" : String.valueOf(error), parsed.command()));
         }
         return result.exit();
+    }
+
+    /** One {@code error:} line. A missing browser names {@code start}, not the usage row. */
+    private static String failureLine(String error, String command) {
+        String text = error == null ? "agent command failed" : error.strip();
+        if (text.startsWith("error:")) text = text.substring("error:".length()).strip();
+        if (text.contains("no live browser")) {
+            return WorkbenchCliHelp.structured("no live browser", "run start --url= --browser=");
+        }
+        return WorkbenchCliHelp.usageError(text, command);
     }
 
     private static java.util.Optional<tools.dscode.control.protocol.LiveBridgeFile.Bridge> livePageTarget(java.nio.file.Path project) {
@@ -2105,6 +2109,9 @@ public final class WorkbenchAgentCommands {
     private static String boundRunId(WorkbenchCommandLine.Parsed parsed) {
         String runId = parsed.coordination().runId();
         if (runId != null && !runId.isBlank()) return runId;
+        java.util.Optional<tools.dscode.control.protocol.LiveBridgeFile.Bridge> worker =
+                tools.dscode.control.protocol.LiveBridgeFile.read(parsed.project());
+        if (worker.isPresent() && alivePid(worker.get().pid())) return worker.get().sessionId();
         return ConsumerReadyCommands.sessionId(parsed.project());
     }
 

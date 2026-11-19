@@ -326,8 +326,19 @@ public final class LiveChromeDriver implements WebDriver, TakesScreenshot, HasCa
         pageReady = true;
     }
 
-    /** Browser-level sockets need a flattened page session. A launch socket is already that page. */
+    /**
+     * Browser-level sockets need a flattened page session. A launch or attach
+     * socket is already that page. {@code Target.getTargets} on a page can list
+     * every tab and would pin this driver to a different one.
+     */
     private boolean attachFlattenedPage() {
+        try {
+            JsonNode own = session.connection().call("Target.getTargetInfo", Jsons.object(), CALL);
+            String ownType = own == null ? "" : own.path("targetInfo").path("type").asText("");
+            if ("page".equals(ownType)) return false;
+        } catch (RuntimeException ignored) {
+            // Browser targets still resolve a page through Target.getTargets.
+        }
         try {
             JsonNode targets = session.connection().call("Target.getTargets", Jsons.object(), CALL);
             String id = "";
