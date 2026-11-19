@@ -105,9 +105,10 @@ class FrameInReplyTest {
         JsonNode snap = JSON.readTree(shot.out);
         assertEquals(frame, snap.path("frame").asText(""), shot.out);
         boolean same = false;
-        for (JsonNode row : snap.path("hits")) {
-            if ("Save".equals(row.path("name").asText())) {
-                assertEquals(frame, row.path("frame").asText(""), shot.out);
+        for (JsonNode row : snap.path("lines")) {
+            String text = row.asText();
+            if (text.contains("\"Save\"")) {
+                assertTrue(text.contains("frame=" + frame), shot.out);
                 same = true;
             }
         }

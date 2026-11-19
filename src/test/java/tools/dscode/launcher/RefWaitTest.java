@@ -120,8 +120,13 @@ class RefWaitTest {
     }
 
     private static String refNamed(JsonNode body, String name) {
-        for (JsonNode hit : body.path("hits")) {
-            if (name.equals(hit.path("name").asText())) return hit.path("ref").asText();
+        for (JsonNode line : body.path("lines")) {
+            String text = line.asText();
+            if (text.contains("\"" + name + "\"")) {
+                int start = text.indexOf("[ref=");
+                int end = text.indexOf(']', start);
+                if (start > 0 && end > start) return text.substring(start + 5, end);
+            }
         }
         throw new AssertionError("no ref named " + name + " in " + body);
     }

@@ -1972,6 +1972,7 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "value");
         copyFlag(args, parsed, "snap");
         copyFlag(args, parsed, "within");
+        copyFlag(args, parsed, "depth");
         copyFlag(args, parsed, "budget");
         copyFlag(args, parsed, "strict");
         copyFlag(args, parsed, "rank");

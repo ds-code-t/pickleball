@@ -286,8 +286,8 @@ class FrameActTest {
     }
 
     private static boolean hitNamed(JsonNode body, String name) {
-        for (JsonNode row : body.path("hits")) {
-            if (name.equals(row.path("name").asText())) return true;
+        for (JsonNode line : body.path("lines")) {
+            if (line.asText().contains("\"" + name + "\"")) return true;
         }
         return false;
     }

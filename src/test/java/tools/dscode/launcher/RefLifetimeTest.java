@@ -124,9 +124,12 @@ class RefLifetimeTest {
 
     private static String saveRef(JsonNode body) {
         String ref = "";
-        for (JsonNode hit : body.path("hits")) {
-            if ("Save".equals(hit.path("name").asText()) || "Save later".equals(hit.path("name").asText())) {
-                ref = hit.path("ref").asText("");
+        for (JsonNode line : body.path("lines")) {
+            String text = line.asText();
+            if (text.contains("\"Save\"") || text.contains("\"Save later\"")) {
+                int start = text.indexOf("[ref=");
+                int end = text.indexOf(']', start);
+                if (start > 0 && end > start) ref = text.substring(start + 5, end);
             }
         }
         assertTrue(ref.startsWith("ref:"), body.toString());

@@ -17,9 +17,7 @@ import dev.domengine.query.RowStates;
 import dev.domengine.session.BrowserSession;
 import dev.domengine.session.FrameCoverage;
 import dev.domengine.session.SessionEvents;
-import dev.domengine.snapshot.CompositeSnapshots;
 import dev.domengine.snapshot.DesktopSnapshotProducer;
-import dev.domengine.snapshot.SnapshotOptions;
 import dev.domengine.tree.DomNode;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -39,7 +37,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Browser and desktop verbs on the existing engine path:
- * {@link Query#run}, {@link PageActions}, {@link CompositeSnapshots}, and {@link DesktopTree}.
+ * {@link Query#run}, {@link PageActions}, and {@link DesktopTree}.
  */
 public final class TargetVerb {
     private static final Set<String> EVENT_CONDITIONS = Set.of(
@@ -51,6 +49,10 @@ public final class TargetVerb {
     private static final int HIT_CAP = 256;
     /** How long a dispatched click waits for a visible change before it is reported quiet. */
     private static final long CLICK_SETTLE_MS = 500;
+    /** Default compact snap stops at this many lines. The rest is the full file. */
+    private static final int SNAP_LINE_BUDGET = 200;
+    /** Line text kept in the reply, leaving room for the JSON envelope under 16 KB. */
+    private static final int SNAP_BYTE_BUDGET = 12_000;
     /** Least-recently used refs drop once the cap is passed. */
     private static final Map<String, Hit> HITS = java.util.Collections.synchronizedMap(new LinkedHashMap<>(64, 0.75f, true) {
         @Override
@@ -602,7 +604,8 @@ public final class TargetVerb {
         if ("desktop".equals(target.kind())) return snapDesktop(project, runId, target, args, mode);
         Held page = openBrowser(resolved(target, args));
         try {
-            ObjectNode produced = CompositeSnapshots.browser(page.session, SnapshotOptions.fromFlags(Map.of()));
+            int depth = depthOf(args);
+            if (depth == Integer.MIN_VALUE) return fail("snap", "depth is a number");
             DomNode root = tree(page.session);
             DomNode shownRoot = root;
             Map<String, String> scopeFlags = scopedFrame(runId, target);
@@ -613,24 +616,28 @@ public final class TargetVerb {
                     shownRoot = root;
                 }
             }
+            String within = blank(args.get("within"));
+            if (!within.isBlank()) {
+                Hit scope = requireHit(within);
+                DomNode scoped = findNode(shownRoot, "", scope.backend);
+                if (scoped == null) return fail("snap", "not found");
+                shownRoot = scoped;
+            }
             String version = docVersion(page.session.connection());
-            List<DomNode> shown = interactive(shownRoot);
-            RowStates.fill(page.session.connection(), optionNodes(shown));
+            List<DomNode> shown = interactive(shownRoot, depth);
             List<Map<String, Object>> rows = publish(runId, "browser", page.session.id, version, shown, "", page.session.connection());
             String picture = picture(page.session.connection(), rows);
             Map<String, Object> body = base("snap", "cdp", "browser", target);
             body.put("mode", mode);
             body.put("docVersion", version);
-            body.put("doc_version", produced.path("doc_version").asText(version));
-            body.put("hits", rows);
-            if (!rows.isEmpty()) body.put("ref", rows.get(0).get("ref"));
-            if ("full".equals(mode)) body.put("full", writeFull(project, runId, produced));
-            else body.put("lines", lines(rows));
+            body.put("doc_version", version);
+            putEntered(body, runId, page.session.connection(), rows);
+            putBudgetedLines(body, rows, project, runId, "full".equals(mode));
             if ("diff".equals(mode)) body.put("diff", diffAgainst(runId, picture, version));
             else BASELINE.put(baselineKey(runId), picture + "\n" + version);
             body.put("virtualized", virtualized(page.session.connection()));
             stamp(body, page.session.connection(), shownRoot);
-            putEntered(body, runId, page.session.connection(), rows);
+            putEntered(body, runId, page.session.connection());
             stampContexts(body, root);
             return ok(body);
         } finally {
@@ -646,9 +653,8 @@ public final class TargetVerb {
         Map<String, Object> body = base("snap", "desktop", "desktop", target);
         body.put("mode", mode);
         body.put("docVersion", version);
-        body.put("hits", rows);
-        body.put("lines", lines(rows));
         body.put("applied", session.live());
+        putBudgetedLines(body, rows, project, runId, "full".equals(mode));
         String picture = desktopPicture(session);
         if ("diff".equals(mode)) body.put("diff", desktopDiff(runId, picture));
         else BASELINE.put(desktopBaselineKey(runId), picture);
@@ -1888,13 +1894,38 @@ public final class TargetVerb {
     }
 
     private static List<DomNode> interactive(DomNode root) {
+        return interactive(root, -1);
+    }
+
+    /** {@code depth} is how many levels under {@code root} to keep. Negative means the whole subtree. */
+    private static List<DomNode> interactive(DomNode root, int depth) {
         List<DomNode> hits = new ArrayList<>();
-        walk(root, node -> {
-            String tag = node.tag();
-            String role = node.role == null ? "" : node.role.toLowerCase(Locale.ROOT);
-            if (INTERACTIVE.contains(tag) || INTERACTIVE.contains(role) || "button".equals(role)) hits.add(node);
-        });
+        walkInteractive(root, depth, hits);
         return hits;
+    }
+
+    private static void walkInteractive(DomNode node, int depthLeft, List<DomNode> hits) {
+        if (node == null) return;
+        String tag = node.tag();
+        String roleName = node.role == null ? "" : node.role.toLowerCase(Locale.ROOT);
+        if (INTERACTIVE.contains(tag) || INTERACTIVE.contains(roleName) || "button".equals(roleName)) hits.add(node);
+        if (depthLeft == 0) return;
+        int next = depthLeft < 0 ? -1 : depthLeft - 1;
+        for (DomNode child : node.children) walkInteractive(child, next, hits);
+        for (DomNode shadow : node.shadowRoots) walkInteractive(shadow, next, hits);
+    }
+
+    /** Negative when {@code --depth} is not a number. {@link Integer#MIN_VALUE} is that failure. */
+    private static int depthOf(Map<String, String> args) {
+        String raw = blank(args.get("depth"));
+        if (raw.isBlank()) return -1;
+        try {
+            int depth = Integer.parseInt(raw);
+            if (depth < 0) return Integer.MIN_VALUE;
+            return depth;
+        } catch (NumberFormatException failure) {
+            return Integer.MIN_VALUE;
+        }
     }
 
     private static List<DomNode> deepest(List<DomNode> nodes) {
@@ -1987,12 +2018,69 @@ public final class TargetVerb {
         return query == null ? "" : query;
     }
 
-    private static List<String> lines(List<Map<String, Object>> rows) {
+    /**
+     * Section headers, then the compact lines. Over the line or byte budget, the reply keeps a prefix
+     * and the whole list is written under {@code .pickleball/agent-full/}. Hits are not copied beside the lines.
+     */
+    private static void putBudgetedLines(
+            Map<String, Object> body,
+            List<Map<String, Object>> rows,
+            Path project,
+            String runId,
+            boolean alwaysFull
+    ) {
+        List<String> all = sectioned(rows);
+        List<String> shown = new ArrayList<>();
+        int bytes = 0;
+        for (String line : all) {
+            int next = bytes + line.length() + 1;
+            if (shown.size() >= SNAP_LINE_BUDGET || (shown.size() > 0 && next > SNAP_BYTE_BUDGET)) break;
+            shown.add(line);
+            bytes = next;
+        }
+        body.put("lines", shown);
+        if (rows != null && !rows.isEmpty()) body.put("ref", rows.get(0).get("ref"));
+        boolean truncated = shown.size() < all.size();
+        if (truncated) body.put("truncated", true);
+        if (truncated || alwaysFull) body.put("full", writeLines(project, runId, all));
+    }
+
+    /** Interactable roles, in first-seen order, each under a {@code # role} header. */
+    private static List<String> sectioned(List<Map<String, Object>> rows) {
+        Map<String, List<String>> groups = new LinkedHashMap<>();
+        if (rows != null) {
+            for (Map<String, Object> row : rows) {
+                String roleName = String.valueOf(row.get("role"));
+                groups.computeIfAbsent(roleName, key -> new ArrayList<>()).add(snapLine(row));
+            }
+        }
         List<String> lines = new ArrayList<>();
-        for (Map<String, Object> row : rows) {
-            lines.add("- " + row.get("role") + " \"" + row.get("name") + "\" [ref=" + row.get("ref") + "]");
+        for (Map.Entry<String, List<String>> group : groups.entrySet()) {
+            lines.add("# " + group.getKey());
+            lines.addAll(group.getValue());
         }
         return lines;
+    }
+
+    private static String snapLine(Map<String, Object> row) {
+        StringBuilder line = new StringBuilder();
+        line.append("- ").append(row.get("role")).append(" \"").append(row.get("name")).append("\" [ref=")
+                .append(row.get("ref")).append("]");
+        Object frame = row.get("frame");
+        if (frame instanceof String text && !text.isBlank()) line.append(" frame=").append(text);
+        return line.toString();
+    }
+
+    private static String writeLines(Path project, String runId, List<String> lines) {
+        Path dir = (project == null ? Path.of(".") : project).resolve(".pickleball").resolve("agent-full");
+        Path file = dir.resolve("snap-" + (runId == null || runId.isBlank() ? "run" : runId) + ".txt");
+        try {
+            Files.createDirectories(dir);
+            Files.writeString(file, String.join("\n", lines) + "\n");
+        } catch (java.io.IOException failure) {
+            throw new CdpException("snap full: " + failure.getMessage());
+        }
+        return file.toString();
     }
 
     private static Map<String, Object> report(DomNode node, CdpConnection cdp) {

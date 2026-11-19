@@ -55,12 +55,11 @@ class CompactSnapshotTest {
         assertEquals("compact", body.path("mode").asText(), shot.out);
         assertFalse(body.has("document"), shot.out);
         assertFalse(body.has("full"), shot.out);
+        assertFalse(body.has("hits"), shot.out);
         assertFalse(shot.out.contains("<html"), shot.out);
-        JsonNode hit = body.path("hits").get(0);
-        assertEquals("button", hit.path("role").asText(), shot.out);
-        assertEquals("Save", hit.path("name").asText(), shot.out);
-        String ref = hit.path("ref").asText();
-        assertEquals("- button \"Save\" [ref=" + ref + "]", body.path("lines").get(0).asText(), shot.out);
+        String line = lineNamed(body, "Save");
+        String ref = refOn(line);
+        assertTrue(line.startsWith("- button \"Save\" [ref=" + ref + "]"), line);
 
         Capture acted = run("act", "--target=" + ref, "--kind=click", "--run-id=snap-ref");
         assertEquals(0, acted.code, acted.err + acted.out);
@@ -85,11 +84,10 @@ class CompactSnapshotTest {
         JsonNode body = JSON.readTree(shot.out);
         assertFalse(body.has("document"), shot.out);
         assertFalse(body.has("full"), shot.out);
-        JsonNode hit = body.path("hits").get(0);
-        assertEquals("button", hit.path("role").asText(), shot.out);
-        assertEquals("Save", hit.path("name").asText(), shot.out);
-        String ref = hit.path("ref").asText();
-        assertEquals("- button \"Save\" [ref=" + ref + "]", body.path("lines").get(0).asText(), shot.out);
+        assertFalse(body.has("hits"), shot.out);
+        String line = lineNamed(body, "Save");
+        String ref = refOn(line);
+        assertTrue(line.startsWith("- button \"Save\" [ref=" + ref + "]"), line);
         assertTrue(ref.startsWith("ref:desktop:0:"), ref);
 
         Capture acted = run("act", "--target=" + ref, "--kind=click", "--run-id=snap-desk");
@@ -115,5 +113,20 @@ class CompactSnapshotTest {
     }
 
     private record Capture(int code, String out, String err) {
+    }
+
+    private static String lineNamed(JsonNode body, String name) {
+        for (JsonNode line : body.path("lines")) {
+            String text = line.asText();
+            if (text.startsWith("- button \"" + name + "\"")) return text;
+        }
+        throw new AssertionError("no line named " + name + " in " + body);
+    }
+
+    private static String refOn(String line) {
+        int start = line.indexOf("[ref=");
+        int end = line.indexOf(']', start);
+        assertTrue(start > 0 && end > start, line);
+        return line.substring(start + 5, end);
     }
 }

@@ -72,7 +72,7 @@ final class WorkbenchCommandLine {
             "--stop-after", "--cursor", "--fields", "--config", "--from-run", "--expect",
             "--category", "--status", "--kind", "--scenario", "--html",
             "--query", "--exposure", "--target", "--pane", "--on-top", "--headless",
-            "--mode", "--condition", "--timeout", "--ref", "--value", "--snap", "--within",
+            "--mode", "--condition", "--timeout", "--ref", "--value", "--snap", "--within", "--depth",
             "--budget", "--strict", "--rank", "--scroll-search", "--duration", "--expr",
             "--world", "--clip", "--frame", "--kinds", "--fixture", "--enter", "--items"
     );
