@@ -963,6 +963,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/DoctorTest.java`
 - `src/test/java/tools/dscode/launcher/DomEngineCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/DomLogCliLaunchTest.java`
+- `src/test/java/tools/dscode/launcher/ElementSnapDiffTest.java`
 - `src/test/java/tools/dscode/launcher/EngineCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/FallbackLoggedTest.java`
 - `src/test/java/tools/dscode/launcher/FrameActTest.java`

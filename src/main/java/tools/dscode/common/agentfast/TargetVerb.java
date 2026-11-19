@@ -339,9 +339,11 @@ public final class TargetVerb {
             String kind = blank(args.get("kind"));
             if (kind.isBlank() || "click".equals(kind)) awaitMaskQuiet(page.session.connection(), timeoutMs(args));
             boolean wantDiff = "diff".equals(blank(args.get("snap")));
-            List<String> linesBefore = wantDiff ? visibleLines(page.session.connection()) : List.of();
+            List<SnapRow> rowsBefore = wantDiff
+                    ? elementRows(page.session.connection(), page.session.id, before) : List.of();
             Effect effect = perform(project, runId, page.session, node, args, query, selector(node, query));
-            List<String> linesAfter = wantDiff ? visibleLines(page.session.connection()) : List.of();
+            List<SnapRow> rowsAfter = wantDiff
+                    ? elementRows(page.session.connection(), page.session.id, docVersion(page.session.connection())) : List.of();
             if (effect.refused()) {
                 Outcome failed = fail("act", "could not land");
                 failed.body().put("used", effect.used());
@@ -351,7 +353,7 @@ public final class TargetVerb {
                 stamp(failed.body(), page.session.connection(), node);
                 putEntered(failed.body(), runId, page.session.connection());
                 putShadow(failed.body(), node);
-                putSnapDiff(failed.body(), args, titleBefore, title(page.session.connection()), before, docVersion(page.session.connection()), linesBefore, linesAfter);
+                putSnapDiff(failed.body(), args, titleBefore, title(page.session.connection()), before, docVersion(page.session.connection()), rowsBefore, rowsAfter);
                 return failed;
             }
             if (effect.quiet()) {
@@ -364,7 +366,7 @@ public final class TargetVerb {
                 body.put("reason", effect.reason());
                 body.put("kind", kind.isBlank() ? "click" : kind);
                 body.put("docVersion", after);
-                putSnapDiff(body, args, titleBefore, titleAfter, before, after, linesBefore, linesAfter);
+                putSnapDiff(body, args, titleBefore, titleAfter, before, after, rowsBefore, rowsAfter);
                 stamp(body, page.session.connection(), node);
                 putEntered(body, runId, page.session.connection());
                 putShadow(body, node);
@@ -377,7 +379,7 @@ public final class TargetVerb {
                 stamp(failed.body(), page.session.connection(), node);
                 putEntered(failed.body(), runId, page.session.connection());
                 putShadow(failed.body(), node);
-                putSnapDiff(failed.body(), args, titleBefore, title(page.session.connection()), before, docVersion(page.session.connection()), linesBefore, linesAfter);
+                putSnapDiff(failed.body(), args, titleBefore, title(page.session.connection()), before, docVersion(page.session.connection()), rowsBefore, rowsAfter);
                 return failed;
             }
             String condition = blank(args.get("condition"));
@@ -393,10 +395,17 @@ public final class TargetVerb {
                     Outcome failed = fail("act", "timeout");
                     failed.body().put("applied", true);
                     failed.body().put("condition", condition);
+                    String timedOut = docVersion(page.session.connection());
+                    List<SnapRow> timedRows = wantDiff
+                            ? elementRows(page.session.connection(), page.session.id, timedOut) : List.of();
+                    putSnapDiff(failed.body(), args, titleBefore, title(page.session.connection()), before, timedOut, rowsBefore, timedRows);
                     stamp(failed.body(), page.session.connection(), node);
                     putEntered(failed.body(), runId, page.session.connection());
                     putShadow(failed.body(), node);
                     return failed;
+                }
+                if (wantDiff) {
+                    rowsAfter = elementRows(page.session.connection(), page.session.id, docVersion(page.session.connection()));
                 }
             }
             String after = docVersion(page.session.connection());
@@ -413,7 +422,7 @@ public final class TargetVerb {
                 body.put("dispatched", true);
                 body.put("visible", true);
             }
-            putSnapDiff(body, args, titleBefore, titleAfter, before, after, linesBefore, linesAfter);
+            putSnapDiff(body, args, titleBefore, titleAfter, before, after, rowsBefore, rowsAfter);
             stamp(body, page.session.connection(), node);
             putEntered(body, runId, page.session.connection());
             putShadow(body, node);
@@ -681,6 +690,9 @@ public final class TargetVerb {
         try {
             String before = docVersion(page.session.connection());
             String titleBefore = title(page.session.connection());
+            boolean wantDiff = "diff".equals(blank(args.get("snap")));
+            List<SnapRow> rowsBefore = wantDiff
+                    ? elementRows(page.session.connection(), page.session.id, before) : List.of();
             Map<String, String> flags = scopedFrame(runId, target);
             String session = enteredSession(page.session.connection(), runId);
             String ref = blank(args.get("ref"));
@@ -695,6 +707,10 @@ public final class TargetVerb {
             }
             if (!met) {
                 Outcome failed = fail("wait", "timeout");
+                String after = docVersion(page.session.connection());
+                List<SnapRow> rowsAfter = wantDiff
+                        ? elementRows(page.session.connection(), page.session.id, after) : List.of();
+                putSnapDiff(failed.body(), args, titleBefore, title(page.session.connection()), before, after, rowsBefore, rowsAfter);
                 stamp(failed.body(), page.session.connection(), null);
                 putEntered(failed.body(), runId, page.session.connection());
                 return failed;
@@ -706,7 +722,9 @@ public final class TargetVerb {
             body.put("condition", condition);
             body.put("docVersion", after);
             body.put("title", titleAfter);
-            putSnapDiff(body, args, titleBefore, titleAfter, before, after);
+            List<SnapRow> rowsAfter = wantDiff
+                    ? elementRows(page.session.connection(), page.session.id, after) : List.of();
+            putSnapDiff(body, args, titleBefore, titleAfter, before, after, rowsBefore, rowsAfter);
             stamp(body, page.session.connection(), null);
             putEntered(body, runId, page.session.connection());
             return ok(body);
@@ -1059,21 +1077,55 @@ public final class TargetVerb {
 
     private static String docVersion(CdpConnection cdp, String sessionId) {
         String expression = "(function(){var root=document.documentElement;if(!root)return '0:0';"
-                + "if(!window.__pkbDocWatch){window.__pkbDocCount=0;window.__pkbDocWatch=new MutationObserver(function(records){"
+                + "var g=globalThis;"
+                + "if(!g.__pkbDocWatch){g.__pkbDocCount=0;g.__pkbDocWatch=new MutationObserver(function(records){"
                 + "for(var i=0;i<records.length;i++){var r=records[i];var t=r.target;"
                 + "if(r.type==='attributes'&&r.attributeName&&r.attributeName.indexOf('data-pkb-')===0) continue;"
                 + "if(t&&t.nodeType===1&&t.closest&&t.closest('[data-pkb-agent],[data-pkb-layer]')) continue;"
-                + "window.__pkbDocCount++;return;}});"
-                + "window.__pkbDocWatch.observe(root,{subtree:true,childList:true,attributes:true,characterData:true});}"
-                + "return location.href+':'+window.__pkbDocCount;})()";
-        String text = evalText(cdp, sessionId, expression);
+                + "g.__pkbDocCount++;return;}});"
+                + "g.__pkbDocWatch.observe(root,{subtree:true,childList:true,attributes:true,characterData:true});}"
+                + "return location.href+':'+g.__pkbDocCount;})()";
+        String text = evalText(cdp, sessionId, expression, pkbWorld(cdp, sessionId));
         return text.isBlank() ? "0:0" : text;
     }
 
+    /** Isolated world for this session's document. The page's main world is not written. */
+    private static int pkbWorld(CdpConnection cdp, String sessionId) {
+        String frame;
+        try {
+            if (sessionId == null || sessionId.isBlank()) {
+                frame = mainFrameId(cdp);
+            } else {
+                JsonNode tree = cdp.call("Page.getFrameTree", Jsons.object(), sessionId, Duration.ofSeconds(5));
+                frame = tree.path("frameTree").path("frame").path("id").asText("");
+            }
+        } catch (RuntimeException failure) {
+            return 0;
+        }
+        if (frame.isBlank()) return 0;
+        ObjectNode created = Jsons.object();
+        created.put("frameId", frame);
+        created.put("worldName", "pkb-surface");
+        created.put("grantUniveralAccess", true);
+        try {
+            JsonNode worldNode = sessionId == null || sessionId.isBlank()
+                    ? cdp.call("Page.createIsolatedWorld", created, Duration.ofSeconds(5))
+                    : cdp.call("Page.createIsolatedWorld", created, sessionId, Duration.ofSeconds(5));
+            return worldNode.path("executionContextId").asInt(0);
+        } catch (RuntimeException failure) {
+            return 0;
+        }
+    }
+
     private static String evalText(CdpConnection cdp, String sessionId, String expression) {
+        return evalText(cdp, sessionId, expression, 0);
+    }
+
+    private static String evalText(CdpConnection cdp, String sessionId, String expression, int contextId) {
         ObjectNode params = Jsons.object();
         params.put("returnByValue", true);
         params.put("expression", expression);
+        if (contextId > 0) params.put("contextId", contextId);
         JsonNode value = sessionId == null || sessionId.isBlank()
                 ? cdp.call("Runtime.evaluate", params, Duration.ofSeconds(5))
                 : cdp.call("Runtime.evaluate", params, sessionId, Duration.ofSeconds(5));
@@ -2052,19 +2104,7 @@ public final class TargetVerb {
     }
 
     private static String docVersion(CdpConnection cdp) {
-        ObjectNode params = Jsons.object();
-        params.put("returnByValue", true);
-        params.put("expression", "(function(){var root=document.documentElement;if(!root)return '0:0';"
-                + "if(!window.__pkbDocWatch){window.__pkbDocCount=0;window.__pkbDocWatch=new MutationObserver(function(records){"
-                + "for(var i=0;i<records.length;i++){var r=records[i];var t=r.target;"
-                + "if(r.type==='attributes'&&r.attributeName&&r.attributeName.indexOf('data-pkb-')===0) continue;"
-                + "if(t&&t.nodeType===1&&t.closest&&t.closest('[data-pkb-agent],[data-pkb-layer]')) continue;"
-                + "window.__pkbDocCount++;return;}});"
-                + "window.__pkbDocWatch.observe(root,{subtree:true,childList:true,attributes:true,characterData:true});}"
-                + "return location.href+':'+window.__pkbDocCount;})()");
-        JsonNode value = cdp.call("Runtime.evaluate", params, Duration.ofSeconds(5));
-        String text = value.path("result").path("value").asText("");
-        return text.isBlank() ? "0:0" : text;
+        return docVersion(cdp, "");
     }
 
     private static String title(CdpConnection cdp) {
@@ -2141,52 +2181,174 @@ public final class TargetVerb {
             String titleAfter,
             String before,
             String after,
-            List<String> beforeLines,
-            List<String> afterLines
+            List<SnapRow> beforeRows,
+            List<SnapRow> afterRows
     ) {
         if (!"diff".equals(blank(args == null ? null : args.get("snap")))) return;
         Map<String, Object> diff = diffOf(titleBefore, titleAfter, before, after);
-        if (beforeLines != null && afterLines != null) {
+        if (beforeRows != null && afterRows != null) {
             List<String> added = new ArrayList<>();
             List<String> removed = new ArrayList<>();
-            lineDiff(beforeLines, afterLines, added, removed);
+            List<String> updated = new ArrayList<>();
+            Map<Long, SnapRow> beforeBy = new LinkedHashMap<>();
+            for (SnapRow row : beforeRows) beforeBy.put(row.backend(), row);
+            Map<Long, SnapRow> afterBy = new LinkedHashMap<>();
+            for (SnapRow row : afterRows) afterBy.put(row.backend(), row);
+            for (SnapRow row : afterRows) {
+                SnapRow prior = beforeBy.get(row.backend());
+                if (prior == null) added.add(row.line());
+                else if (!prior.key().equals(row.key())) updated.add(row.line());
+            }
+            for (SnapRow row : beforeRows) {
+                if (!afterBy.containsKey(row.backend())) removed.add(row.line());
+            }
             diff.put("added", added);
             diff.put("removed", removed);
-            if (!added.isEmpty() || !removed.isEmpty()) diff.put("changed", true);
+            diff.put("updated", updated);
+            boolean titleChanged = titleBefore != null && titleAfter != null && !titleBefore.equals(titleAfter);
+            boolean urlChanged = !urlOfVersion(before).equals(urlOfVersion(after));
+            diff.put("changed", titleChanged || urlChanged || !added.isEmpty() || !removed.isEmpty() || !updated.isEmpty());
         }
         body.put("snap", diff);
     }
 
-    /** Direct text of light-DOM elements. Pickleball's own nodes are left out. */
-    private static List<String> visibleLines(CdpConnection cdp) {
-        String text = evalText(cdp, "", "(function(){ var out=[];"
-                + " function walk(node){ if(!node||node.nodeType!==1) return;"
-                + " if(node.hasAttribute&&(node.hasAttribute('data-pkb-agent')||node.hasAttribute('data-pkb-layer'))) return;"
-                + " var tag=(node.tagName||'').toLowerCase();"
-                + " if(tag==='script'||tag==='style'||tag==='noscript') return;"
-                + " var text=''; for(var c=node.firstChild;c;c=c.nextSibling){ if(c.nodeType===3) text+=c.nodeValue; }"
-                + " text=text.replace(/\\s+/g,' ').trim();"
-                + " if(text) out.push('- '+tag+' \"'+text.replace(/\\\\/g,'\\\\\\\\').replace(/\"/g,'\\\\\"')+'\"');"
-                + " for(var i=0;i<node.children.length;i++) walk(node.children[i]); }"
-                + " if(document.body) walk(document.body); return out.join('\\n'); })()");
-        if (text.isBlank()) return List.of();
-        List<String> lines = new ArrayList<>();
-        for (String line : text.split("\n")) {
-            if (!line.isBlank()) lines.add(line);
-        }
-        return lines;
+    /** The document URL stored in front of the mutation count. */
+    private static String urlOfVersion(String version) {
+        if (version == null || version.isBlank()) return "";
+        int colon = version.lastIndexOf(':');
+        return colon < 0 ? version : version.substring(0, colon);
     }
 
-    private static void lineDiff(List<String> before, List<String> after, List<String> added, List<String> removed) {
-        Map<String, Integer> counts = new LinkedHashMap<>();
-        for (String line : before) counts.merge(line, 1, Integer::sum);
-        for (String line : after) {
-            int have = counts.getOrDefault(line, 0);
-            if (have > 0) counts.put(line, have - 1);
-            else added.add(line);
+    /** Interactive nodes and nodes with their own text. Pickleball's layer is left out. */
+    private static List<SnapRow> elementRows(CdpConnection cdp, String sessionId, String version) {
+        DomNode root = tree(cdp);
+        stampRoles(cdp, root);
+        List<DomNode> nodes = new ArrayList<>();
+        collectSnap(root, false, nodes);
+        Map<String, String[]> frames = frameIndex(cdp);
+        List<SnapRow> rows = new ArrayList<>();
+        for (DomNode node : nodes) rows.add(snapRow(cdp, sessionId, version, node, frames));
+        return rows;
+    }
+
+    /** Copies computed roles onto the DOM nodes. A missing tree leaves {@link #role} on the tag. */
+    private static void stampRoles(CdpConnection cdp, DomNode root) {
+        if (cdp == null || root == null) return;
+        JsonNode nodes;
+        try {
+            nodes = cdp.call("Accessibility.getFullAXTree", Jsons.object(), Duration.ofSeconds(8)).path("nodes");
+        } catch (RuntimeException failure) {
+            return;
         }
-        for (Map.Entry<String, Integer> entry : counts.entrySet()) {
-            for (int i = 0; i < entry.getValue(); i++) removed.add(entry.getKey());
+        if (!nodes.isArray()) return;
+        Map<Long, DomNode> byId = new LinkedHashMap<>();
+        indexBackend(root, byId);
+        for (JsonNode ax : nodes) {
+            if (ax.path("ignored").asBoolean(false)) continue;
+            long id = ax.path("backendDOMNodeId").asLong(0);
+            DomNode node = byId.get(id);
+            if (node == null) continue;
+            String roleName = ax.path("role").path("value").asText("");
+            if (!roleName.isBlank()) node.role = roleName;
+            String accessible = ax.path("name").path("value").asText("");
+            if (!accessible.isBlank()) node.accessibleName = accessible;
+        }
+    }
+
+    private static void indexBackend(DomNode node, Map<Long, DomNode> byId) {
+        if (node == null) return;
+        if (node.backendNodeId > 0) byId.put(node.backendNodeId, node);
+        for (DomNode child : node.children) indexBackend(child, byId);
+        for (DomNode shadow : node.shadowRoots) indexBackend(shadow, byId);
+    }
+
+    private static void collectSnap(DomNode node, boolean insidePkb, List<DomNode> into) {
+        if (node == null) return;
+        boolean pkb = insidePkb
+                || node.attributes.containsKey("data-pkb-agent")
+                || node.attributes.containsKey("data-pkb-layer");
+        if (!pkb && node.nodeType == 1) {
+            String tag = node.tag();
+            if (!"script".equals(tag) && !"style".equals(tag) && !"noscript".equals(tag)) {
+                String text = ownText(node);
+                String roleName = role(node);
+                boolean keep = !text.isBlank()
+                        || INTERACTIVE.contains(tag)
+                        || INTERACTIVE.contains(roleName)
+                        || "listitem".equals(roleName)
+                        || "li".equals(tag);
+                if (keep && node.backendNodeId > 0) into.add(node);
+            }
+        }
+        if (pkb) return;
+        for (DomNode child : node.children) collectSnap(child, false, into);
+        for (DomNode shadow : node.shadowRoots) collectSnap(shadow, false, into);
+    }
+
+    private static String ownText(DomNode node) {
+        StringBuilder text = new StringBuilder();
+        for (DomNode child : node.children) {
+            if (child.nodeType == 3 && child.nodeValue != null) text.append(child.nodeValue);
+        }
+        return text.toString().replaceAll("\\s+", " ").trim();
+    }
+
+    private static SnapRow snapRow(
+            CdpConnection cdp,
+            String sessionId,
+            String version,
+            DomNode node,
+            Map<String, String[]> frames
+    ) {
+        String text = ownText(node);
+        String shown = text.isBlank() ? name(node) : text;
+        String tag = node.tag();
+        String value = null;
+        if ("input".equals(tag) || "textarea".equals(tag) || "select".equals(tag)) value = controlValue(cdp, node);
+        String type = attr(node, "type").toLowerCase(Locale.ROOT);
+        String roleName = role(node);
+        String checked = null;
+        if ("checkbox".equals(type) || "radio".equals(type) || "checkbox".equals(roleName) || "radio".equals(roleName)) {
+            checked = checkedOf(cdp, node);
+        }
+        String key = roleName + "\n" + text + "\n" + (value == null ? "" : value) + "\n" + (checked == null ? "" : checked);
+        String frameId = node.frameId == null ? "" : node.frameId;
+        String[] identity = frames.get(frameId);
+        if (identity == null && !frames.isEmpty()) {
+            Map.Entry<String, String[]> top = frames.entrySet().iterator().next();
+            frameId = top.getKey();
+            identity = top.getValue();
+        }
+        String url = identity == null ? "" : identity[0];
+        String loader = identity == null ? "" : identity[1];
+        String ref = "ref:" + version + ":" + node.backendNodeId;
+        HITS.put(ref, new Hit(
+                "browser", sessionId == null ? "" : sessionId, node.backendNodeId, version, selector(node, shown), shown,
+                frameId, url, loader, roleName, shown));
+        StringBuilder line = new StringBuilder();
+        line.append("- ").append(roleName).append(" \"").append(shown.replace("\"", "'")).append("\"");
+        if (value != null) line.append(" value=\"").append(value.replace("\"", "'")).append("\"");
+        if (checked != null) line.append(" checked=").append(checked);
+        line.append(" [ref=").append(ref).append("]");
+        return new SnapRow(node.backendNodeId, key, line.toString());
+    }
+
+    private static String checkedOf(CdpConnection cdp, DomNode node) {
+        if (cdp == null || node == null || node.backendNodeId <= 0) return "false";
+        try {
+            ObjectNode params = Jsons.object();
+            params.put("backendNodeId", node.backendNodeId);
+            JsonNode resolved = cdp.call("DOM.resolveNode", params, Duration.ofSeconds(5));
+            String objectId = resolved.path("object").path("objectId").asText("");
+            if (objectId.isBlank()) return "false";
+            ObjectNode call = Jsons.object();
+            call.put("objectId", objectId);
+            call.put("functionDeclaration", "function(){ return this.checked===true; }");
+            call.put("returnByValue", true);
+            return cdp.call("Runtime.callFunctionOn", call, Duration.ofSeconds(5))
+                    .path("result").path("value").asBoolean(false) ? "true" : "false";
+        } catch (RuntimeException failure) {
+            return "false";
         }
     }
 
@@ -2866,6 +3028,9 @@ public final class TargetVerb {
         boolean quiet() {
             return "dispatched".equals(disposition);
         }
+    }
+
+    private record SnapRow(long backend, String key, String line) {
     }
 
     private record Hit(
