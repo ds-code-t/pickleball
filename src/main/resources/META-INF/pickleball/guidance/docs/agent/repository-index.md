@@ -879,6 +879,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/JsFallbackHonestyTest.java`
 - `src/test/java/tools/dscode/launcher/MaskQuietTest.java`
 - `src/test/java/tools/dscode/launcher/NavigateDataFileTest.java`
+- `src/test/java/tools/dscode/launcher/OffsetFrameClickTest.java`
 - `src/test/java/tools/dscode/launcher/OneCallActTest.java`
 - `src/test/java/tools/dscode/launcher/OopifAutoAttachTest.java`
 - `src/test/java/tools/dscode/launcher/OverlapTest.java`

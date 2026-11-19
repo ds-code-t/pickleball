@@ -1,5 +1,7 @@
 package tools.dscode.common.agentfast;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import dev.domengine.session.BrowserSession;
 import org.junit.jupiter.api.AfterEach;
@@ -25,6 +27,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TimingFieldsTest {
+    private static final ObjectMapper JSON = new ObjectMapper();
+
     @TempDir
     Path temp;
 
@@ -188,23 +192,48 @@ class TimingFieldsTest {
                 new PrintStream(startErr, true, StandardCharsets.UTF_8)
         );
         assertEquals(0, started, startOut.toString(StandardCharsets.UTF_8) + startErr.toString(StandardCharsets.UTF_8));
-        long began = System.nanoTime();
-        Process process = new ProcessBuilder(
-                Path.of(System.getProperty("java.home"), "bin", "java").toString(),
-                "-cp",
-                System.getProperty("java.class.path"),
-                "tools.dscode.launcher.PickleballWorkbenchLauncher",
-                "highlight",
-                temp.toString(),
-                "--handle=save",
-                "--preset=yellow"
-        ).redirectErrorStream(true).directory(temp.toFile()).start();
-        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        int code = process.waitFor();
-        long realWarmMs = Math.max(0L, (System.nanoTime() - began) / 1_000_000L);
-        System.out.println("MEASURE realWarmMs=" + realWarmMs);
-        assertEquals(0, code, output);
-        assertTrue(output.contains("elapsedMs"), output);
-        assertTrue(realWarmMs < 4000, "realWarmMs=" + realWarmMs + " " + output);
+        long[] samples = new long[2];
+        for (int sample = 0; sample < samples.length; sample++) {
+            long began = System.nanoTime();
+            Process process = new ProcessBuilder(
+                    Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                    "-cp",
+                    System.getProperty("java.class.path"),
+                    "tools.dscode.launcher.PickleballWorkbenchLauncher",
+                    "highlight",
+                    temp.toString(),
+                    "--handle=save",
+                    "--preset=yellow"
+            ).redirectErrorStream(true).directory(temp.toFile()).start();
+            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            int code = process.waitFor();
+            samples[sample] = Math.max(0L, (System.nanoTime() - began) / 1_000_000L);
+            assertEquals(0, code, output);
+            assertTrue(output.contains("elapsedMs"), output);
+            JsonNode body = JSON.readTree(output);
+            assertTrue(body.path("ok").asBoolean(), output);
+            assertEquals("style_modified", body.path("codes").path(0).asText(""), output);
+        }
+        long realWarmMs = Math.min(samples[0], samples[1]);
+        System.out.println("MEASURE realWarmMs=" + samples[0] + " " + samples[1] + " min=" + realWarmMs);
+        // Fresh CLI against a live Chrome. The minimum of two samples is the warm path. Bound is 1500 ms.
+        assertTrue(realWarmMs <= 1500, "realWarmMs=" + samples[0] + "," + samples[1]);
+        String paint = eval(
+                "document.getElementById('save').getAttribute('data-pkb-style')"
+                        + "+'|'+getComputedStyle(document.getElementById('save')).backgroundColor");
+        assertEquals("style_modified|rgb(255, 243, 160)", paint);
+    }
+
+    private String eval(String expression) throws Exception {
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        int code = WorkbenchAgentCommands.run(
+                new String[]{"eval", "--target=browser:auto", "--expr=" + expression, "--world=main", temp.toString()},
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(stderr, true, StandardCharsets.UTF_8)
+        );
+        String out = stdout.toString(StandardCharsets.UTF_8);
+        assertEquals(0, code, out + stderr.toString(StandardCharsets.UTF_8));
+        return JSON.readTree(out).path("value").asText("");
     }
 }
