@@ -252,7 +252,8 @@ Usage: sync
 Usage: tabs [--switch=<handle>] [--close=<handle>] [--run-id=<id>]
 
 # help ui
-Usage: ui --ops=<json array>
+Usage: ui [--ops=<json array>]
+Without --ops, ui opens the Workbench controller. With --ops, ui applies a catalog batch (same as ui-apply).
 
 # help unhighlight
 Usage: unhighlight [--handle=<id>] [--html=<page>]

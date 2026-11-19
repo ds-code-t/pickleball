@@ -2,6 +2,8 @@
 
 ## 3.0.0
 
+Agent-fast verification. A compact inspect or page reply keeps `source=`, `query=`, `note=`, and the first `xpath=` from the offline text; the full text stays under `.pickleball/agent-full/`. Bare `ui` without `--ops` opens the Workbench controller. `ui --ops` applies a catalog batch.
+
 Agent-fast phase 5. `frame --list`, `frame --reset`, and `frame --enter` share the target selector. Replies carry `frame` (a desktop window name on the desktop backend). Out-of-process iframes auto-attach with `waitForDebuggerOnStart` and resume after the preload. Closed shadow clicks go through `DOM.resolveNode` in the pkb world. `find --scroll-search` scrolls a virtualized list until the row is mounted. `snap` reports `virtualized`.
 
 Agent-fast phase 4. snap, find, act, wait, watch, explain, and capture share one target selector: browser session, browser:cdp url, browser:auto, desktop pid or app~name, and ref split on the last colon. Desktop uses the same verb and does not call a live desktop bus. A missing browser returns applied=false. Fallback chains log once per run and reason in `.pickleball/logs/fallback-chain.jsonl` unless `pkb_fallback_log=off`. wait uses mode=event for mutation, network, load, navigation, and mask. Runtime.addBinding may set executionContextName pkb-surface.

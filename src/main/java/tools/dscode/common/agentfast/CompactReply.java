@@ -45,6 +45,7 @@ public final class CompactReply {
         if (source.get("phrases") instanceof List<?> phrases && !phrases.isEmpty()) {
             compact.put("phrases", new ArrayList<>(phrases));
         }
+        if (source.get("kept") instanceof String kept && !kept.isBlank()) compact.put("kept", kept);
         Object sentence = source.get("sentence");
         if (sentence != null) compact.put("sentence", clip(String.valueOf(sentence)));
         fit(compact);
@@ -64,6 +65,8 @@ public final class CompactReply {
             int keep = Math.min(8, phrases.size());
             body.put("phrases", new ArrayList<>(phrases.subList(0, keep)));
         }
+        String kept = keptLines(raw);
+        if (!kept.isBlank()) body.put("kept", kept);
         String label = kind == null || kind.isBlank() ? "reply" : kind;
         body.put("sentence", label + " has " + phrases.size() + " hits");
         try {
@@ -71,6 +74,37 @@ public final class CompactReply {
         } catch (IOException failure) {
             return "{\"ok\":true,\"compact\":true,\"bytes\":" + bytes.length + "}";
         }
+    }
+
+    /**
+     * Identity lines an agent still needs when the body is on disk:
+     * {@code source=}, {@code query=}, {@code note=}, and the first xpath and counts.
+     */
+    static String keptLines(String raw) {
+        StringBuilder kept = new StringBuilder();
+        boolean xpath = false;
+        boolean rawCount = false;
+        boolean visible = false;
+        for (String line : raw.split("\n", -1)) {
+            String stored = null;
+            if (line.startsWith("source=") || line.startsWith("query=") || line.startsWith("note=")) {
+                stored = line;
+            } else if (!xpath && line.startsWith("xpath=")) {
+                xpath = true;
+                String value = line.substring("xpath=".length());
+                stored = value.length() > 60 ? "xpath=" + value.substring(0, 57) + "..." : line;
+            } else if (!rawCount && line.startsWith("rawMatchCount=")) {
+                rawCount = true;
+                stored = line;
+            } else if (!visible && line.startsWith("visibleCount=")) {
+                visible = true;
+                stored = line;
+            }
+            if (stored == null) continue;
+            if (kept.length() > 0) kept.append('\n');
+            kept.append(stored);
+        }
+        return kept.toString();
     }
 
     private static List<String> phrasesOf(String raw) {
@@ -100,6 +134,12 @@ public final class CompactReply {
             String text = sentence == null ? "" : String.valueOf(sentence);
             if (text.length() > 24) {
                 compact.put("sentence", text.substring(0, text.length() / 2));
+                continue;
+            }
+            Object kept = compact.get("kept");
+            String lines = kept == null ? "" : String.valueOf(kept);
+            if (lines.length() > 160) {
+                compact.put("kept", lines.substring(0, 157) + "...");
                 continue;
             }
             break;

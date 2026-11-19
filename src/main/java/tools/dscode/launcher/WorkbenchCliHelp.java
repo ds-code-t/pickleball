@@ -111,7 +111,7 @@ final class WorkbenchCliHelp {
             Map.entry("capture", "Usage: capture --target=<selector> --out=<file>"),
             Map.entry("attach", "Usage: attach --target=<selector>"),
             Map.entry("eval", "Usage: eval --target=<selector> --expr=<js> [--world=pkb|main]"),
-            Map.entry("ui", "Usage: ui --ops=<json array>")
+            Map.entry("ui", "Usage: ui [--ops=<json array>]\nWithout --ops, ui opens the Workbench controller. With --ops, ui applies a catalog batch (same as ui-apply).")
     );
 
     private static final Map<String, String> FLAGS = Map.ofEntries(

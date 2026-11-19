@@ -50,6 +50,8 @@ class CompactReplyTest {
         assertTrue(compact.path("compact").asBoolean(false), printed);
         assertEquals(30, compact.path("hits").asInt(), printed);
         assertTrue(compact.path("phrases").get(0).asText().contains("Save label 01"), printed);
+        assertTrue(printed.contains("source=offline-html"), printed);
+        assertTrue(printed.contains("xpath="), printed);
         assertFalse(printed.contains("document="), printed);
         Path full = Path.of(compact.path("full").asText());
         assertTrue(full.getFileName().toString().endsWith(".txt"), full.toString());

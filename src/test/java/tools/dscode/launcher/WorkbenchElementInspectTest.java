@@ -147,11 +147,14 @@ class WorkbenchElementInspectTest {
             assertEquals(0, line.raw);
             assertEquals(0, line.visible);
         }
-        assertTrue(text.contains("phrase=the \"Save\" Button"), text);
-        assertTrue(text.contains("phrase=the \"Login\" Link"), text);
-        assertTrue(text.contains("xpath=//*[self::button or @role='button']"), text);
-        assertTrue(text.contains("rawMatchCount=0"), text);
-        assertTrue(text.contains("visibleCount=0"), text);
+        String facts = offlineBody(text);
+        assertTrue(facts.contains("phrase=the \"Save\" Button"), facts);
+        assertTrue(facts.contains("phrase=the \"Login\" Link"), facts);
+        assertTrue(facts.contains("xpath=//*[self::button or @role='button']"), facts);
+        assertTrue(facts.contains("rawMatchCount=0"), facts);
+        assertTrue(facts.contains("visibleCount=0"), facts);
+        assertTrue(text.contains("source=offline-html"), text);
+        assertTrue(text.contains("xpath="), text);
     }
 
     @Test
@@ -174,7 +177,8 @@ class WorkbenchElementInspectTest {
                     xpath=//button[@id='save']
                     rawMatchCount=2
                     visibleCount=1
-                    """, text);
+                    """, withoutElapsed(text), text);
+            assertTrue(text.matches("(?s).*\\nelapsedMs=\\d+\\n?"), text);
             assertTrue(session.lastPost().contains("\"op\":\"find-element\""), session.lastPost());
             assertTrue(session.lastPost().contains("\"category\":\"Button\""), session.lastPost());
             assertTrue(session.lastPost().contains("\"text\":\"Save\""), session.lastPost());
@@ -199,7 +203,8 @@ class WorkbenchElementInspectTest {
                     xpath=//a[@href='/login']
                     rawMatchCount=1
                     visibleCount=1
-                    """, pageText);
+                    """, withoutElapsed(pageText), pageText);
+            assertTrue(pageText.matches("(?s).*\\nelapsedMs=\\d+\\n?"), pageText);
             assertTrue(session.lastPost().contains("\"op\":\"inspect-page\""), session.lastPost());
             assertFalse(session.lastPost().contains("category"), session.lastPost());
             assertFalse(session.lastPost().contains("exposure"), session.lastPost());
@@ -252,7 +257,7 @@ class WorkbenchElementInspectTest {
         }
     }
 
-    private static void assertOfflineFind(String text, String html, String category, String label) {
+    private static void assertOfflineFind(String text, String html, String category, String label) throws Exception {
         List<PrintedHit> printed = parseHits(text);
         assertEquals(1, printed.size(), text);
         PrintedHit line = printed.get(0);
@@ -272,14 +277,34 @@ class WorkbenchElementInspectTest {
         assertTrue(text.contains("visibleCount=0"), text);
     }
 
+    /** Compact JSON points at the full offline text. A short reply is already that text. */
+    private static String offlineBody(String text) throws Exception {
+        String trimmed = text == null ? "" : text.strip();
+        if (!trimmed.startsWith("{")) return text;
+        com.fasterxml.jackson.databind.JsonNode node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(trimmed);
+        return Files.readString(Path.of(node.path("full").asText()));
+    }
+
+    private static String withoutElapsed(String text) {
+        return text.replaceFirst("\\nelapsedMs=\\d+\\n?$", "\n");
+    }
+
     /** XPathy assigns a fresh node id on every build. The expression around those ids is the dictionary. */
     private static String xpathShape(String xpath) {
         return xpath.replaceAll("\\d+>-?\\d+", "#");
     }
 
-    private static List<PrintedHit> parseHits(String text) {
-        String[] lines = text.split("\n", -1);
-        assertTrue(lines.length > 0 && lines[0].equals("source=offline-html"), text);
+    private static List<PrintedHit> parseHits(String text) throws Exception {
+        String body = text;
+        String trimmed = text == null ? "" : text.strip();
+        if (trimmed.startsWith("{")) {
+            com.fasterxml.jackson.databind.JsonNode node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(trimmed);
+            assertTrue(trimmed.contains("source=offline-html"), text);
+            assertTrue(trimmed.contains("xpath="), text);
+            body = Files.readString(Path.of(node.path("full").asText()));
+        }
+        String[] lines = body.split("\n", -1);
+        assertTrue(lines.length > 0 && lines[0].equals("source=offline-html"), body);
         List<PrintedHit> hits = new java.util.ArrayList<>();
         int index = 1;
         while (index < lines.length && lines[index].isEmpty()) index++;

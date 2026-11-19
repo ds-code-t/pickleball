@@ -408,8 +408,8 @@ class WorkbenchCliSurfaceCoverageTest {
         Path html = writePage();
         Capture capture = agent("inspect-page", temp.toString(), "--html=" + html);
         assertEquals(0, capture.code, capture.err);
-        assertTrue(capture.out.contains("source=offline-html"));
-        assertTrue(capture.out.contains("the \"Save\" Button"), capture.out);
+        assertTrue(capture.out.contains("source=offline-html"), capture.out);
+        assertTrue(visibleFact(capture.out, "the \"Save\" Button"), capture.out);
     }
 
     @Test
@@ -1437,6 +1437,25 @@ class WorkbenchCliSurfaceCoverageTest {
         Files.writeString(bat, "@echo off\r\n");
         List<String> gradleCommand = ConsumerMavenTestRunner.command(gradle, workspace, Map.of());
         assertEquals(bat.toString(), gradleCommand.get(0), gradleCommand.toString());
+    }
+
+    /** Plain text, a compact phrase, or the full file. A missing fact still fails. */
+    private static boolean visibleFact(String out, String fact) {
+        if (out != null && out.contains(fact)) return true;
+        String trimmed = out == null ? "" : out.strip();
+        if (!trimmed.startsWith("{")) return false;
+        try {
+            com.fasterxml.jackson.databind.JsonNode node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(trimmed);
+            com.fasterxml.jackson.databind.JsonNode phrases = node.path("phrases");
+            if (phrases.isArray()) {
+                for (com.fasterxml.jackson.databind.JsonNode phrase : phrases) {
+                    if (fact.equals(phrase.asText()) || phrase.asText().contains(fact)) return true;
+                }
+            }
+            return node.path("kept").asText("").contains(fact);
+        } catch (IOException failure) {
+            return false;
+        }
     }
 
     private Capture last;

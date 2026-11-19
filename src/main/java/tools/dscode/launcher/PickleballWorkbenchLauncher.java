@@ -220,7 +220,7 @@ public final class PickleballWorkbenchLauncher {
             PickleballLocalStore.ensureQuietly(project);
         }
 
-        if (WorkbenchCommandLine.isAgentCoreCommand(parsed.command())) {
+        if (WorkbenchCommandLine.isAgentCoreCommand(parsed.command()) && !controllerUiWithoutOps(parsed.command(), args)) {
             int exitCode = WorkbenchAgentCommands.run(args, System.out, System.err);
             if (exitCode != 0) exitProcess(exitCode);
             return;
@@ -276,6 +276,20 @@ public final class PickleballWorkbenchLauncher {
             return;
         }
         halt.accept(code);
+    }
+
+    /**
+     * Bare {@code ui} is the controller window. {@code ui --ops} is the catalog batch
+     * and stays in this process. A missing {@code --ops} must fail closed on the controller jar.
+     */
+    private static boolean controllerUiWithoutOps(String command, String[] args) {
+        if (!"ui".equals(command)) return false;
+        if (args == null) return true;
+        for (String token : args) {
+            if (token == null) continue;
+            if ("--ops".equals(token) || token.startsWith("--ops=")) return false;
+        }
+        return true;
     }
 
     /**
