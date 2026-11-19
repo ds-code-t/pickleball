@@ -782,6 +782,7 @@ public final class WorkbenchSessionCommands {
     ) {
         Integer refused = refusedDriver(parsed, err);
         if (refused != null) return refused;
+        if ("worker-start".equals(parsed.command())) notePauseHold(parsed);
         SessionState state = requireSession(parsed, http);
         return postAndMaybeWait(parsed, state, flags, commandBody(parsed, flags), out, err, http);
     }
@@ -799,7 +800,31 @@ public final class WorkbenchSessionCommands {
         if (flags.stopAfter != null && !flags.stopAfter.isBlank()) body.put("stopAfter", flags.stopAfter);
         if (parsed.coordination().agentId() != null) body.put("agent", parsed.coordination().agentId());
         if (parsed.coordination().runId() != null) body.put("runId", parsed.coordination().runId());
+        if ("worker-start".equals(parsed.command()) && pauseHoldRequested(parsed)) body.put("hold", true);
         return body;
+    }
+
+    /** Writes `.pickleball/workbench/pause-hold` so the controller JVM keeps the 3600s lease. */
+    private static void notePauseHold(WorkbenchCommandLine.Parsed parsed) {
+        if (!pauseHoldRequested(parsed) || parsed.project() == null) return;
+        try {
+            Path file = parsed.project().resolve(".pickleball/workbench/pause-hold");
+            java.nio.file.Files.createDirectories(file.getParent());
+            java.nio.file.Files.writeString(file, "hold\n");
+        } catch (java.io.IOException ignored) {
+            // The env var PKB_PAUSE_HOLD still holds the lease inside this JVM.
+        }
+    }
+
+    private static boolean pauseHoldRequested(WorkbenchCommandLine.Parsed parsed) {
+        String[] forwarded = parsed.forwarded();
+        if (forwarded != null) {
+            for (String token : forwarded) {
+                if ("--hold".equals(token) || "--hold=true".equals(token)) return true;
+            }
+        }
+        String env = System.getenv("PKB_PAUSE_HOLD");
+        return env != null && ("true".equalsIgnoreCase(env) || "1".equals(env) || "on".equalsIgnoreCase(env));
     }
 
     private static int postAndMaybeWait(
@@ -1113,9 +1138,13 @@ public final class WorkbenchSessionCommands {
             out.println("DONE " + id + " " + status);
             if (view.has("result") && !view.get("result").isNull()) {
                 JsonNode resultNode = view.get("result");
+                String rendered = resultNode.toString();
+                if (rendered.contains("noop:true")) {
+                    err.println("WARNING: noop consumer glue (noop:true). The step reported SUCCESS without acting. Set pkb_noop_glue=fail to fail the step.");
+                }
                 String errorLine = textOr(resultNode, "text", "");
                 if (errorLine.startsWith("error:")) out.println(errorLine);
-                if ("SUCCESS".equals(status)) out.println(resultNode.toString());
+                if ("SUCCESS".equals(status)) out.println(rendered);
                 else out.println(failureJson(flags.text, resultNode));
             }
             return terminalExit(status);

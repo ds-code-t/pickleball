@@ -1932,6 +1932,9 @@ public final class WorkbenchAgentCommands {
         if (parsed.coordination().id() != null) args.put("id", parsed.coordination().id());
         if (hasFlag(parsed, "--start")) args.put("start", "true");
         List<String> extra = new ArrayList<>();
+        // extra is filled below; the live-worker post uses the same maps.
+        java.util.Optional<tools.dscode.control.protocol.LiveBridgeFile.Bridge> liveBridge =
+                tools.dscode.control.protocol.LiveBridgeFile.read(parsed.project());
         String[] forwarded = parsed.forwarded();
         if (forwarded != null) {
             for (int index = 0; index < forwarded.length; index++) {
@@ -1940,6 +1943,33 @@ public final class WorkbenchAgentCommands {
                 if (token.startsWith("--arg=")) extra.add(token.substring("--arg=".length()));
                 else if ("--arg".equals(token) && index + 1 < forwarded.length) extra.add(forwarded[++index]);
             }
+        }
+        if (liveBridge.isPresent()) {
+            tools.dscode.common.agentfast.AgentForward.Posted posted = tools.dscode.common.agentfast.AgentForward.post(
+                    liveBridge.get(),
+                    parsed.command(),
+                    args,
+                    extra,
+                    parsed.project(),
+                    boundRunId(parsed),
+                    parsed.coordination().agentId()
+            );
+            if (posted.error() != null && !posted.error().isBlank()) {
+                err.println(posted.error());
+                return posted.exit() == 0 ? 1 : posted.exit();
+            }
+            out.println(posted.bodyJson());
+            if (posted.exit() != 0) {
+                String error = "agent command failed";
+                try {
+                    var node = JSON.readTree(posted.bodyJson());
+                    if (node.has("error") && !node.get("error").isNull()) error = node.get("error").asText(error);
+                } catch (java.io.IOException ignored) {
+                    // The body is already printed.
+                }
+                err.print(WorkbenchCliHelp.usageError(error, parsed.command()));
+            }
+            return posted.exit();
         }
         AgentControl.Result result = AgentControl.execute(
                 parsed.project(),

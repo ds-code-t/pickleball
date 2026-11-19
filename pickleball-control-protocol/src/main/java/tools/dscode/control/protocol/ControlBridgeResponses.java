@@ -10,4 +10,6 @@ public final class ControlBridgeResponses {
     public record Removal(boolean removed) { }
     public record ClearResult(int removed) { }
     public record AgentCommandResult(int exit, Map<String, Object> body) { }
+    /** Worker quit acknowledgement. {@code event} is {@code browser_lost} when the driver was released. */
+    public record BrowserRelease(boolean released, String event) { }
 }

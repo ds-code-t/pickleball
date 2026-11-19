@@ -242,6 +242,10 @@ final class ControlBridgeRuntime implements AutoCloseable {
                     );
             return new AgentCommandResult(result.exit(), result.body());
         }));
+        server.createContext("/v1/browser/release", exchange -> handle(exchange, "POST", () -> {
+            tools.dscode.common.agentcontrol.AgentDriverHooks.quit();
+            return new BrowserRelease(true, "browser_lost");
+        }));
         server.createContext("/v1/breakpoints", exchange -> handle(exchange, "GET", coordinator::breakpoints));
         server.createContext("/v1/breakpoints/add", exchange -> handle(exchange, "POST", () -> {
             BreakpointAddRequest request = readRequired(exchange, BreakpointAddRequest.class);

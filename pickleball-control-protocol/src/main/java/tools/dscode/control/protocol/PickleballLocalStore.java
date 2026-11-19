@@ -725,7 +725,7 @@ public final class PickleballLocalStore {
                 $mvnw = Join-Path $project 'mvnw.cmd'
                 if (Test-Path $mvnw) {
                   New-Item -ItemType Directory -Force -Path (Split-Path $resolved) | Out-Null
-                  & $mvnw -q org.apache.maven.plugins:maven-dependency-plugin:3.8.1:build-classpath -Dmdep.includeScope=test "-Dmdep.outputFile=$resolved" 2>$null
+                  & $mvnw -q org.apache.maven.plugins:maven-dependency-plugin:3.8.1:build-classpath "-Dmdep.includeScope=test" "-Dmdep.outputFile=$resolved" 2>$null
                   if ((Test-Path $resolved) -and (Get-Item $resolved).Length -gt 0) {
                     & $java -cp "@$resolved" tools.dscode.launcher.PickleballWorkbenchLauncher @args
                     exit $LASTEXITCODE
@@ -737,7 +737,8 @@ public final class PickleballLocalStore {
                   exit $LASTEXITCODE
                 }
                 $env:PKB_OPEN_BOOTSTRAP = '1'
-                & $java -jar $jar @args
+                $cp = ((Join-Path $project 'target/test-classes') + ';' + (Join-Path $project 'target/classes') + ';' + $jar)
+                & $java -cp $cp tools.dscode.launcher.PickleballWorkbenchLauncher @args
                 """;
     }
 

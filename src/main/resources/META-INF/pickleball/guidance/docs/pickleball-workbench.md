@@ -37,6 +37,8 @@ PKB_CONTROL_BRIDGE_PAUSE_FIRST_SCENARIO
 
 Pickleball may accept `PKB_STUDIO_BRIDGE_*` as deprecated compatibility input aliases only. Workbench emits only the neutral names.
 
+The interactive pause lease is 120 seconds and is renewed every 30 seconds while a client is attached. Attachment is a heartbeat: bridge calls and the controller health poll count, and the manager's own renew pause does not. One failed renew is retried. Three failed renews, a dead worker, or 120 seconds without a heartbeat end the session and append `session_ended` to `.pickleball/agent-events.jsonl`. `worker-start --hold`, `PKB_PAUSE_HOLD=true`, or the file `.pickleball/workbench/pause-hold` keeps the lease at 3600 seconds for as long as the process stays alive. Stopping or restarting the worker posts `POST /v1/browser/release` (WebDriver quit), kills the process tree, deletes `.pickleball/workbench/live-bridge.json`, and appends `browser_lost`. That bridge file is how the CLI posts page verbs to `POST /v1/agent/command`. Empty consumer glue is stamped `noop:true` on the step result and the execute-step report prints a WARNING. `pkb_noop_glue=fail` turns that stamp into a FAILED step. Logging for these paths is off unless `pkb_agent_log` is set. The file is `.pickleball/logs/agent-fast.log`, date-stamped, filtered by `pkb_agent_log_entity`, and capped at 1 MiB. It does not record tokens.
+
 ## Launch from a consumer project
 
 The normal `tools.dscode:pickleball:<version>` test dependency already carries the matching controller at:

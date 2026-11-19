@@ -293,17 +293,6 @@ public final class AgentControl {
     private static Result panelOpen(Path project, String runId, Map<String, String> args, List<String> extraArgs, String agentId) throws Exception {
         String target = present(args.get("target")) ? args.get("target").trim().toLowerCase(java.util.Locale.ROOT) : "auto";
         if (!target.matches("auto|page|popup")) return fail(2, "panel-open --target must be auto, page, or popup");
-        if ("popup".equals(target) || ("auto".equals(target) && !PageSurfaces.hasLivePage())) {
-            Result popup = execute(project, runId, "popup-open", args, extraArgs, agentId);
-            if (popup.body() instanceof Map<?, ?> map) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> body = new LinkedHashMap<>((Map<String, Object>) map);
-                body.put("op", "panel-open");
-                body.putIfAbsent("target", "popup");
-                return new Result(popup.exit(), body);
-            }
-            return popup;
-        }
         Map<String, Object> spec = new LinkedHashMap<>();
         for (String key : List.of("x", "y", "width", "height")) {
             if (!present(args.get(key))) continue;
@@ -319,6 +308,22 @@ public final class AgentControl {
         if (present(theme)) spec.put("theme", theme.trim());
         if (present(args.get("title"))) spec.put("title", args.get("title").trim());
         if (present(args.get("minimized"))) spec.put("min", Boolean.parseBoolean(args.get("minimized").trim()));
+        boolean live = PageSurfaces.hasLivePage();
+        if (!live && ("page".equals(target) || "auto".equals(target))) {
+            if ("page".equals(target)) return fail(1, "error: no live browser; panel did not open on the page");
+            return fail(1, "error: no live browser");
+        }
+        if ("popup".equals(target)) {
+            Result popup = execute(project, runId, "popup-open", args, extraArgs, agentId);
+            if (popup.body() instanceof Map<?, ?> map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> body = new LinkedHashMap<>((Map<String, Object>) map);
+                body.put("op", "panel-open");
+                body.putIfAbsent("target", "popup");
+                return new Result(popup.exit(), body);
+            }
+            return popup;
+        }
         PageSurfaces.drainPanelChat(project, runId);
         List<Map<String, Object>> history = new ArrayList<>();
         for (ChatLog.Message message : ChatLog.history(project, runId, null, 50)) history.add(panelRow(message));

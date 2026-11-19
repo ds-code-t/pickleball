@@ -12,7 +12,7 @@ Pickleball Workbench is the one front door. Do not open the GUI for your own tes
 
 only change `exec.args`: `-Dexec.args=discover`, `-Dexec.args=isolate`, `execute-step`, `confirm`.
 
-`start --url= --browser= --env=` publishes a live session later page commands use when `--run-id` is omitted. `chat_wait` blocks until chat arrives. `history-summary` and `history-query` read runs. `entity-lookup` reads one entity. `open-run` opens Explorer or Tracking. `bridge-health` reads the bridge. Those verbs launch with `java -cp` on the consumer classpath, not a fat jar.
+`start --url= --browser= --env=` records a session id. Page verbs need a live browser or print `error: no live browser`. `chat_wait` blocks until chat arrives. `history-summary` and `history-query` read runs. `entity-lookup` reads one entity. `open-run` opens Explorer or Tracking. `bridge-health` reads the bridge. Those verbs launch with `java -cp` on the consumer classpath, not a fat jar.
 
 ### Live isolation loop
 

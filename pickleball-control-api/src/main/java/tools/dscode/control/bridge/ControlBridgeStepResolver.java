@@ -57,6 +57,8 @@ final class ControlBridgeStepResolver {
         String sourcePath = dynamic || method == null
                 ? ""
                 : findSourcePath(method.getDeclaringClass());
+        String detail = dynamic ? "Pickleball framework/dynamic step." : "";
+        if (!dynamic && NoopGlue.consumerEmpty(method)) detail = "noop:true";
         return new ControlBridgeStepResolution(
                 dynamic ? ControlBridgeStepResolution.DYNAMIC : ControlBridgeStepResolution.CONSUMER_GLUE,
                 pattern == null ? "" : pattern,
@@ -64,7 +66,7 @@ final class ControlBridgeStepResolver {
                 methodName,
                 sourcePath,
                 snippet(method, pattern),
-                dynamic ? "Pickleball framework/dynamic step." : ""
+                detail
         );
     }
 

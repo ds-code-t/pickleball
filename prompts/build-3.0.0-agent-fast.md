@@ -13,7 +13,7 @@ You are a fresh Grok Build session with no chat memory, running headless via the
 - Do not add Playwright, Chrome DevTools MCP, or any Node dependency. Borrow designs only. Flag (in the scoreboard) any new external download, licensing or distribution implication before adding it.
 - CLI-first: Workbench, MCP and Gradle tasks only forward to the CLI. No new layers or parallel catalogs; extend the existing dispatcher, runtime, CDP client and snapshot producer.
 - Toggleable, per-entity, date-stamped, size-capped logging (same pattern as StoreLog / EngineLog).
-- Docs rewritten in place; history only in `docs/release-notes.md`. Never truncate `AGENTS.md` or `docs/agent/feature-map.md` (compare `wc -c` before push). Exported guidance never links to `docs/maintainer/`, `docs/roadmaps/` or `prompts/`.
+- Docs rewritten in place; history only in `docs/release-notes.md`. Never edit `.github/` workflow files. Never truncate `AGENTS.md` or `docs/agent/feature-map.md` (compare `wc -c` before push). Exported guidance never links to `docs/maintainer/`, `docs/roadmaps/` or `prompts/`.
 - Do not use port 8765 for anything long-lived; leave it free when tests finish.
 - HELD (do not run): full multi-module regression, `validate --all`, Maven `@all`, audit fixes F1–F12.
 
@@ -26,7 +26,7 @@ You are a fresh Grok Build session with no chat memory, running headless via the
 Branch docs win over this prompt on repo facts. Locked decisions are not up for re-debate.
 
 ## First step
-Add `3.0.0-agent-fast` to CI `push.branches` in the workflow files if missing, run the pre-push checks below (the repository index is currently stale), commit and push.
+Do NOT edit `.github/` (draft PR #26 already runs both CI workflows on every push via `pull_request`). Run the pre-push checks below, then start Phase 1.
 
 ## Phases (all mandatory, in order)
 1. Critical bugs B1, B4, B5, B2/P3, B14, B16.

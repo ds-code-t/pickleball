@@ -126,13 +126,22 @@
   }
 
   // The top layer keeps rings above a modal <dialog>; the newest top-layer entry paints last.
+  // hide+show is intentional when a new dialog appears, but toggle on this layer must not re-enter.
+  var raisingLayer = false;
+  var raiseCount = 0;
   function raiseLayer() {
+    if (raisingLayer) return;
     if (!layer || !layer.isConnected || typeof layer.showPopover !== 'function') return;
+    raisingLayer = true;
+    raiseCount++;
     try {
       if (!layer.hasAttribute('popover')) layer.setAttribute('popover', 'manual');
-      if (layer.matches(':popover-open')) layer.hidePopover();
+      var open = false;
+      try { open = layer.matches(':popover-open'); } catch (ignored) { open = false; }
+      if (open) layer.hidePopover();
       layer.showPopover();
     } catch (ignored) { /* z-index fallback */ }
+    finally { raisingLayer = false; }
   }
 
   function ours(node) {
@@ -477,7 +486,11 @@
     on(window, 'pageshow', schedule);
     on(document, 'transitionend', schedule, true);
     on(document, 'animationend', schedule, true);
-    on(document, 'toggle', function () { raiseLayer(); schedule(); }, true);
+    on(document, 'toggle', function (event) {
+      if (event && event.target === layer) return;
+      raiseLayer();
+      schedule();
+    }, true);
     on(document, 'visibilitychange', function () {
       paused = document.hidden;
       if (!paused) schedule();
@@ -1467,6 +1480,7 @@
     state: state,
     dispose: dispose,
     raise: raiseLayer,
+    raiseCount: function () { return raiseCount; },
     panelOpen: panelOpen,
     panelClose: panelClose,
     panelState: panelState,

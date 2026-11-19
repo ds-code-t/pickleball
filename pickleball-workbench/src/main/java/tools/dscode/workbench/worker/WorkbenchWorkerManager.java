@@ -1,13 +1,15 @@
 package tools.dscode.workbench.worker;
 
+import tools.dscode.control.protocol.AgentEvents;
 import tools.dscode.control.protocol.ControlBridgeBreakpoint;
 import tools.dscode.control.protocol.ControlBridgeCallResult;
 import tools.dscode.control.protocol.ControlBridgeDescriptor;
 import tools.dscode.control.protocol.ControlBridgeScenarioStatus;
 import tools.dscode.control.protocol.ControlProtocol;
+import tools.dscode.control.protocol.LiveBridgeFile;
 import tools.dscode.control.protocol.Workspace;
-import tools.dscode.workbench.bridge.BridgeHealthReport;
 import tools.dscode.workbench.bridge.ControlBridgeClient;
+import tools.dscode.workbench.bridge.BridgeHealthReport;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.sync.WorkbenchSynchronizer;
 import tools.dscode.workbench.terminal.WorkerLogFiles;
@@ -29,6 +31,7 @@ import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /** Owns one persistent interactive consumer worker for a Workbench controller session. */
 public final class WorkbenchWorkerManager implements AutoCloseable {
@@ -45,8 +48,6 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
     static final List<String> STARTUP_STAGES = List.of(
             "compile", "classpath", "worker-launch", "anchor-parse", "paused"
     );
-    static final Duration GRACEFUL_STOP_TIMEOUT = Duration.ofSeconds(10);
-    static final Duration TERMINATE_TIMEOUT = Duration.ofSeconds(5);
 
     private final Path projectRoot;
     private final Map<String, String> workerSystemProperties;
@@ -114,6 +115,8 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
                     started, timing
             );
             active = session;
+            writeLiveBridge(token, session);
+            ControlBridgeClient.touch();
             scheduleLeaseRenewal(session);
             return status();
         } catch (IOException failure) {
@@ -198,21 +201,19 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
         }
 
         stopLeaseRenewal(session.renewal());
-        if (session.process().isAlive()) {
-            try {
-                session.client().resume(session.scenarioId());
-            } catch (RuntimeException ignored) {
-                // Continue to bounded process shutdown when the bridge is already gone.
-            }
-
-            if (!awaitExit(session.process(), GRACEFUL_STOP_TIMEOUT)) {
-                session.process().destroy();
-                if (!awaitExit(session.process(), TERMINATE_TIMEOUT)) {
-                    session.process().destroyForcibly();
-                    awaitExit(session.process(), TERMINATE_TIMEOUT);
-                }
-            }
-        }
+        WorkerShutdown.release(
+                session.process(),
+                () -> {
+                    try {
+                        session.client().resume(session.scenarioId());
+                    } catch (RuntimeException ignored) {
+                        // The release call still asks the worker to quit its driver.
+                    }
+                    session.client().releaseBrowser();
+                },
+                projectRoot,
+                session.sessionId()
+        );
         return stoppedStatus(session);
     }
 
@@ -433,7 +434,8 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
                         return thread;
                     });
                     return new WorkerSession(
-                            sessionId, process, client, interactive.scenarioId(), renewal, stdout, stderr
+                            sessionId, process, client, interactive.scenarioId(), renewal, stdout, stderr,
+                            new AtomicInteger()
                     );
                 }
             }
@@ -754,20 +756,58 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
                 && scenario.stepText().contains(INTERACTIVE_PAUSE_STEP);
     }
 
-    private static void scheduleLeaseRenewal(WorkerSession session) {
+    private void scheduleLeaseRenewal(WorkerSession session) {
         session.renewal().scheduleAtFixedRate(() -> {
-            if (!session.process().isAlive()) return;
+            boolean alive = session.process().isAlive();
+            boolean hold = LeasePolicy.holdEnabled(projectRoot);
+            long now = System.currentTimeMillis();
+            int before = session.renewFailures().get();
+            LeasePolicy.Decision plan = LeasePolicy.decide(
+                    alive, hold, ControlBridgeClient.lastClientMillis(), now, before, true
+            );
+            if (!alive || !plan.renew()) {
+                AgentEvents.append(projectRoot, "session_ended", session.sessionId());
+                session.renewal().shutdown();
+                return;
+            }
+            boolean pauseOk;
             try {
                 ControlBridgeCallResult result = session.client().pause(
-                        session.scenarioId(), 5, PAUSE_LEASE_SECONDS
+                        session.scenarioId(), 5, plan.leaseSeconds(), false
                 );
-                if (!"SUCCESS".equals(result.status())) {
-                    session.renewal().shutdown();
-                }
+                pauseOk = "SUCCESS".equals(result.status());
             } catch (RuntimeException ignored) {
-                session.renewal().shutdown();
+                pauseOk = false;
             }
+            if (pauseOk) session.renewFailures().set(0);
+            else session.renewFailures().incrementAndGet();
+            LeasePolicy.Decision after = LeasePolicy.decide(
+                    session.process().isAlive(),
+                    hold,
+                    ControlBridgeClient.lastClientMillis(),
+                    System.currentTimeMillis(),
+                    before,
+                    pauseOk
+            );
+            if (after.sessionEnded()) AgentEvents.append(projectRoot, "session_ended", session.sessionId());
+            if (after.stopRenewal()) session.renewal().shutdown();
         }, LEASE_RENEW_SECONDS, LEASE_RENEW_SECONDS, TimeUnit.SECONDS);
+    }
+
+    private void writeLiveBridge(String token, WorkerSession session) {
+        try {
+            String host = session.client().descriptor().host();
+            if (host == null || host.isBlank()) host = "127.0.0.1";
+            LiveBridgeFile.write(projectRoot, new LiveBridgeFile.Bridge(
+                    host,
+                    session.client().descriptor().port(),
+                    token,
+                    session.process().pid(),
+                    session.sessionId()
+            ));
+        } catch (IOException failure) {
+            // The worker is still paused. The CLI falls back until the file exists.
+        }
     }
 
     private static void stopLeaseRenewal(ScheduledExecutorService renewal) {
@@ -805,15 +845,6 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
                 "bin",
                 WorkbenchProjectOs.isWindows() ? "java.exe" : "java"
         );
-    }
-
-    private static boolean awaitExit(Process process, Duration timeout) {
-        try {
-            return process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS);
-        } catch (InterruptedException failure) {
-            Thread.currentThread().interrupt();
-            return false;
-        }
     }
 
     private static void sleep(long milliseconds) {
@@ -858,7 +889,8 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
             String scenarioId,
             ScheduledExecutorService renewal,
             Path stdout,
-            Path stderr
+            Path stderr,
+            AtomicInteger renewFailures
     ) { }
 
     private static final class WorkbenchProjectOs {

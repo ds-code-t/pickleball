@@ -2,6 +2,7 @@ package tools.dscode.control.bridge;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.cucumber.core.runner.CucumberStepInvoker;
 import io.cucumber.core.runner.CurrentScenarioState;
 import io.cucumber.core.runner.GlobalState;
 import io.cucumber.core.runner.StepExtension;
@@ -286,13 +287,13 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
             ControlCallResult<Object> nativeResult = DynamicControl.executeStep(text, argument == null ? "" : argument);
             Object value = nativeResult.value();
             var error = nativeResult.error();
-            return new ControlBridgeCallResult(
+            return noteNoop(text, new ControlBridgeCallResult(
                     nativeResult.status().name(),
                     value == null ? null : value.getClass().getName(),
                     value == null ? null : clipped(Objects.toString(value)),
                     error == null ? null : bridgeError(error.type(), error.message(), error.stackTrace()),
                     status()
-            );
+            ));
         }
         ScenarioLane lane = selectedLane(normalizeScenarioId(scenarioId));
         if (lane == null) {
@@ -302,9 +303,9 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
                 lane,
                 commandTimeout(timeoutSeconds),
                 () -> {
-                    ControlBridgeCallResult result = fromControlResult(
+                    ControlBridgeCallResult result = noteNoop(text, fromControlResult(
                             DynamicControl.executeStep(text, argument == null ? "" : argument), lane
-                    );
+                    ));
                     if (eventRecorder != null) {
                         eventRecorder.recordExecutedStep(lane.scenarioId, lane.scenarioName, text, result.status());
                     }
@@ -847,6 +848,17 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
 
     private static List<String> dataSources(NodeMap map) {
         return map.getDataSources().stream().map(Enum::name).sorted().toList();
+    }
+
+    private ControlBridgeCallResult noteNoop(String text, ControlBridgeCallResult result) {
+        if (result == null || !"SUCCESS".equals(result.status())) return result;
+        try {
+            var glue = CucumberStepInvoker.findGlueDefinition(text == null ? "" : text);
+            if (glue.isEmpty()) return result;
+            return NoopGlue.decorate(glue.get().method(), result);
+        } catch (Throwable ignored) {
+            return result;
+        }
     }
 
     private ControlBridgeCallResult fromControlResult(ControlCallResult<Object> result, ScenarioLane lane) {

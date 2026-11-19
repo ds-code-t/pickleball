@@ -18,6 +18,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Workbench-side HTTP client for the consumer-hosted Pickleball control bridge.
@@ -28,6 +29,16 @@ import java.util.Objects;
 public final class ControlBridgeClient {
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration READ_TIMEOUT = Duration.ofSeconds(10);
+    /** Last external client call. Lease renewal pause does not update this. */
+    private static final AtomicLong LAST_CLIENT_MILLIS = new AtomicLong(System.currentTimeMillis());
+
+    public static long lastClientMillis() {
+        return LAST_CLIENT_MILLIS.get();
+    }
+
+    public static void touch() {
+        LAST_CLIENT_MILLIS.set(System.currentTimeMillis());
+    }
 
     private final ObjectMapper json;
     private final HttpClient http;
@@ -85,6 +96,7 @@ public final class ControlBridgeClient {
 
     /** Short timeout. A spinning selector is HTTP 503 here, not a hung page call. */
     public BridgeHealthReport health() {
+        touch();
         HttpRequest request = HttpRequest.newBuilder(uri("/v1/health"))
                 .timeout(Duration.ofSeconds(2))
                 .header("Authorization", "Bearer " + token)
@@ -125,12 +137,29 @@ public final class ControlBridgeClient {
     }
 
     public ControlBridgeCallResult pause(String scenarioId, Integer waitSeconds, Integer leaseSeconds) {
+        return pause(scenarioId, waitSeconds, leaseSeconds, true);
+    }
+
+    /**
+     * @param countHeartbeat false for the manager's own 30s lease renew, which is not a client heartbeat
+     */
+    public ControlBridgeCallResult pause(
+            String scenarioId, Integer waitSeconds, Integer leaseSeconds, boolean countHeartbeat
+    ) {
         int wait = waitSeconds == null ? 30 : waitSeconds;
         return request(
                 "POST", "/v1/pause",
                 new PauseRequest(scenarioId, waitSeconds, leaseSeconds),
                 ControlBridgeCallResult.class,
-                Duration.ofSeconds(Math.max(10, wait + 5L))
+                Duration.ofSeconds(Math.max(10, wait + 5L)),
+                countHeartbeat
+        );
+    }
+
+    public BrowserRelease releaseBrowser() {
+        return request(
+                "POST", "/v1/browser/release", null,
+                BrowserRelease.class, Duration.ofSeconds(8)
         );
     }
 
@@ -459,6 +488,18 @@ public final class ControlBridgeClient {
             Class<T> responseType,
             Duration timeout
     ) {
+        return request(method, path, body, responseType, timeout, true);
+    }
+
+    private <T> T request(
+            String method,
+            String path,
+            Object body,
+            Class<T> responseType,
+            Duration timeout,
+            boolean countHeartbeat
+    ) {
+        if (countHeartbeat) touch();
         HttpRequest.Builder request = HttpRequest.newBuilder(uri(path))
                 .timeout(timeout)
                 .header("Authorization", "Bearer " + token)
