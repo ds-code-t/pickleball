@@ -197,8 +197,8 @@ public final class FrameCoverage {
     }
 
     /**
-     * {@code before-page} when the surface runtime was in the pkb world before the page script ran.
-     * Empty when that check did not pass.
+     * {@code ready} when {@code __pkbUi} is an object in that frame's pkb-surface world.
+     * Empty when that check did not pass. The check does not read page attributes.
      */
     public static String surface(CdpConnection connection, String frameId) {
         if (connection == null || frameId == null || frameId.isBlank()) return "";
@@ -325,10 +325,7 @@ public final class FrameCoverage {
             runtime = surfaceRuntime();
             if (!runtime.isBlank()) {
                 ObjectNode preload = Jsons.object();
-                // The trailer records whether this isolated script ran before the page script.
-                // Page.createIsolatedWorld hangs while the target is paused, so the preload
-                // carries that fact and the probe reads it after resume.
-                preload.put("source", runtime + BOOT_TRAILER);
+                preload.put("source", runtime);
                 preload.put("worldName", "pkb-surface");
                 connection.call("Page.addScriptToEvaluateOnNewDocument", preload, sessionId, Duration.ofSeconds(15));
             }
@@ -373,20 +370,14 @@ public final class FrameCoverage {
         refreshUrls(connection, sessionId);
         if (runtime.isBlank()) return;
         String probed = probeSurface(connection, sessionId, frameId);
-        if ("before-page".equals(probed)) {
-            SURFACE.computeIfAbsent(connection, key -> new ConcurrentHashMap<>()).put(frameId, "before-page");
+        if ("ready".equals(probed)) {
+            SURFACE.computeIfAbsent(connection, key -> new ConcurrentHashMap<>()).put(frameId, "ready");
         }
     }
 
-    /** Set in the pkb-surface world by the preload, before the page's own script. */
-    private static final String BOOT_TRAILER =
-            "\n;try{globalThis.__pkbBoot=(document.documentElement&&document.documentElement.dataset"
-                    + "&&document.documentElement.dataset.ran==='page')?'late':'before-page';}"
-                    + "catch(e){globalThis.__pkbBoot='err';}";
-
     /**
-     * Reads {@code __pkbUi} and the preload's boot mark from the pkb-surface world.
-     * The mark is taken when the preload runs, so a later page script cannot hide it.
+     * Reads {@code typeof __pkbUi} from the pkb-surface world on this frame's session.
+     * {@code ready} means that value is {@code object}. Page attributes are not consulted.
      */
     private static String probeSurface(CdpConnection connection, String sessionId, String frameId) {
         long deadline = System.nanoTime() + 3_000_000_000L;
@@ -406,8 +397,8 @@ public final class FrameCoverage {
                 continue;
             }
             last = readBoot(connection, sessionId, contextId);
-            if ("before-page".equals(last)) return last;
-            if (last.startsWith("boot=") && last.length() > "boot=".length()) return last;
+            if ("ready".equals(last)) return last;
+            if (last.startsWith("ui=") && !"ui=undefined".equals(last)) return last;
             sleepBriefly();
         }
         return last;
@@ -464,14 +455,12 @@ public final class FrameCoverage {
     private static String readBoot(CdpConnection connection, String sessionId, int contextId) {
         try {
             ObjectNode kind = Jsons.object();
-            kind.put("expression", "({ui:typeof globalThis.__pkbUi,boot:String(globalThis.__pkbBoot||'')})");
+            kind.put("expression", "typeof globalThis.__pkbUi");
             kind.put("returnByValue", true);
             kind.put("contextId", contextId);
             JsonNode value = connection.call("Runtime.evaluate", kind, sessionId, TIMEOUT).path("result").path("value");
-            String ui = value.path("ui").asText("");
-            String boot = value.path("boot").asText("");
-            if (!"object".equals(ui)) return "ui=" + ui + " boot=" + boot;
-            return "before-page".equals(boot) ? "before-page" : "boot=" + boot;
+            String ui = value.asText("");
+            return "object".equals(ui) ? "ready" : "ui=" + ui;
         } catch (RuntimeException failure) {
             EngineLog.info("frame", "surface " + failure.getMessage());
             return failure.getMessage() == null ? "err" : failure.getMessage();

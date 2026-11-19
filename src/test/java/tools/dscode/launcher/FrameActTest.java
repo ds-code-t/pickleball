@@ -198,10 +198,10 @@ class FrameActTest {
             assertEquals(child, scopedBody.path("frame").asText(""), scoped.out);
             assertNotEquals("cross", scopedBody.path("frame").asText(""), scoped.out);
             assertEquals("Entered:1", eval("document.getElementById('entered').textContent"), scoped.out);
-            assertEquals("Entered:1", awaitParentTitle("Entered:1"), scoped.out);
 
             Capture reset = run("frame", "--target=browser:auto", "--reset", "--run-id=frame-act");
             assertEquals(0, reset.code, reset.err + reset.out);
+            assertEquals("Entered:1", awaitTitle("Entered:1"), reset.out);
 
             Capture nested = run("find", "--target=browser:auto", "--query=Grand", "--run-id=frame-act");
             assertEquals(0, nested.code, nested.err + nested.out);
@@ -240,20 +240,6 @@ class FrameActTest {
             Thread.sleep(100);
         }
         return hook;
-    }
-
-    /** Parent title. The pkb world stays on the main frame while a child frame is entered. */
-    private String awaitParentTitle(String expected) throws Exception {
-        String seen = "";
-        for (int attempt = 0; attempt < 20; attempt++) {
-            Capture read = run(
-                    "eval", "--target=browser:auto", "--world=pkb", "--run-id=frame-act", "--expr=document.title");
-            assertEquals(0, read.code, read.err + read.out);
-            seen = JSON.readTree(read.out).path("value").asText("");
-            if (expected.equals(seen)) return seen;
-            Thread.sleep(100);
-        }
-        return seen;
     }
 
     private String awaitTitle(String expected) throws Exception {
@@ -316,7 +302,6 @@ class FrameActTest {
         return ("""
                 <!DOCTYPE html><html><head>
                 <script>
-                document.documentElement.dataset.ran = 'page';
                 parent.postMessage({hook: typeof window.__pkbOopif}, '*');
                 </script>
                 </head><body>

@@ -850,13 +850,19 @@ public final class TargetVerb {
             ObjectNode params = Jsons.object();
             params.put("expression", expr);
             params.put("returnByValue", true);
+            String session = enteredSession(page.session.connection(), runId);
             if ("pkb".equals(world)) {
-                int context = pkbContext(page.session.connection());
-                if (context <= 0) return fail("eval", "eval failed");
+                int context = session.isBlank()
+                        ? pkbContext(page.session.connection())
+                        : pkbContext(page.session.connection(), session, runId);
+                if (context <= 0) {
+                    Outcome failed = fail("eval", "eval failed");
+                    stamp(failed.body(), page.session.connection(), null);
+                    if (!session.isBlank()) putEntered(failed.body(), runId, page.session.connection());
+                    return failed;
+                }
                 params.put("contextId", context);
             }
-            // The pkb world is the main frame's isolated world. A main-world eval follows the entered session.
-            String session = "pkb".equals(world) ? "" : enteredSession(page.session.connection(), runId);
             JsonNode value = session.isBlank()
                     ? page.session.connection().call("Runtime.evaluate", params, Duration.ofSeconds(10))
                     : page.session.connection().call("Runtime.evaluate", params, session, Duration.ofSeconds(10));
@@ -1280,13 +1286,26 @@ public final class TargetVerb {
 
     /** Reuse the surface world on the main frame. {@code Page.createIsolatedWorld} returns the existing name. */
     private static int pkbContext(CdpConnection cdp) {
-        String frame = mainFrameId(cdp);
+        return pkbContext(cdp, "", null);
+    }
+
+    /** Surface world of the entered frame when {@code sessionId} is that frame's CDP session. */
+    private static int pkbContext(CdpConnection cdp, String sessionId, String runId) {
+        String frame;
+        if (sessionId == null || sessionId.isBlank()) {
+            frame = mainFrameId(cdp);
+        } else {
+            String token = ENTERED.get(runId == null ? "" : runId);
+            frame = token == null ? "" : resolveFrameId(cdp, token);
+        }
         if (frame.isBlank()) return 0;
         ObjectNode created = Jsons.object();
         created.put("frameId", frame);
         created.put("worldName", "pkb-surface");
         created.put("grantUniveralAccess", true);
-        JsonNode worldNode = cdp.call("Page.createIsolatedWorld", created, Duration.ofSeconds(5));
+        JsonNode worldNode = sessionId == null || sessionId.isBlank()
+                ? cdp.call("Page.createIsolatedWorld", created, Duration.ofSeconds(5))
+                : cdp.call("Page.createIsolatedWorld", created, sessionId, Duration.ofSeconds(5));
         return worldNode.path("executionContextId").asInt(0);
     }
 

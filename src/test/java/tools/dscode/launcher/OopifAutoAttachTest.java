@@ -78,6 +78,20 @@ class OopifAutoAttachTest {
             }
             assertEquals("undefined", hook, first.toString());
 
+            Capture entered = run("frame", "--target=browser:auto", "--enter=cross", "--run-id=oopif");
+            assertEquals(0, entered.code, entered.err + entered.out);
+            assertEquals(firstId, JSON.readTree(entered.out).path("frame").asText(""), entered.out);
+            Capture ui = run(
+                    "eval", "--target=browser:auto", "--world=pkb", "--run-id=oopif",
+                    "--expr=typeof globalThis.__pkbUi + '|' + location.href");
+            assertEquals(0, ui.code, ui.err + ui.out);
+            JsonNode uiBody = JSON.readTree(ui.out);
+            String uiValue = uiBody.path("value").asText("");
+            assertTrue(uiValue.startsWith("object|"), ui.out);
+            assertTrue(uiValue.contains("/child"), ui.out);
+            assertEquals(firstId, uiBody.path("frame").asText(""), ui.out);
+            assertNotEquals("before-page", surfaceOf(first, "/child"), first.toString());
+
             Capture found = run("find", "--target=browser:auto", "--query=Inner", "--run-id=oopif");
             assertEquals(0, found.code, found.err + found.out);
             JsonNode hit = JSON.readTree(found.out);
@@ -85,6 +99,9 @@ class OopifAutoAttachTest {
             assertEquals(firstId, hit.path("hits").get(0).path("frame").asText(), found.out);
             assertEquals(firstId, hit.path("frame").asText(), found.out);
             assertTrue(hit.path("applied").asBoolean(), found.out);
+
+            Capture reset = run("frame", "--target=browser:auto", "--reset", "--run-id=oopif");
+            assertEquals(0, reset.code, reset.err + reset.out);
 
             String lateUrl = "http://localhost:" + port + "/late";
             Capture second = run(
@@ -119,14 +136,21 @@ class OopifAutoAttachTest {
             if (!url.contains(path)) continue;
             if (!frame.path("session").asBoolean(false)) continue;
             if (frame.has("boot")) return "";
-            if (!"before-page".equals(frame.path("surface").asText(""))) continue;
+            if (!"ready".equals(frame.path("surface").asText(""))) continue;
             return frame.path("id").asText("");
         }
         return "";
     }
 
+    private static String surfaceOf(JsonNode listed, String path) {
+        for (JsonNode frame : listed.path("frames")) {
+            if (frame.path("url").asText("").contains(path)) return frame.path("surface").asText("");
+        }
+        return "";
+    }
+
     private static byte[] child(String label) {
-        return ("<!DOCTYPE html><html><head><script>document.documentElement.dataset.ran='page';"
+        return ("<!DOCTYPE html><html><head><script>"
                 + "parent.postMessage({hook: typeof window.__pkbOopif}, '*');</script></head><body><button id=\"inner\">"
                 + label + "</button></body></html>").getBytes(StandardCharsets.UTF_8);
     }
