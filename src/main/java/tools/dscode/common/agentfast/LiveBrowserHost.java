@@ -27,6 +27,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -173,13 +174,17 @@ public final class LiveBrowserHost {
         try {
             LiveChromeDriver driver = new LiveChromeDriver(session);
             PAGE.set(driver);
-            AgentDriverHooks.template("live");
-            AgentDriverHooks.ready(driver);
-            AgentDriverHooks.template(null);
+            AgentDriverHooks.host(true);
+            try {
+                AgentDriverHooks.ready(driver);
+            } finally {
+                AgentDriverHooks.host(false);
+            }
             CompositeRuntime.joinBrowser(session.cdp);
             return true;
         } catch (RuntimeException failure) {
             System.err.println("error: page attach " + failure.getMessage());
+            AgentDriverHooks.host(false);
             AgentDriverHooks.template(null);
             return false;
         }
@@ -290,19 +295,32 @@ public final class LiveBrowserHost {
         }
     }
 
+    /**
+     * Chat and catalog reads do not need the page. They still run after Chrome
+     * dies so the caller can see the one {@code browser_lost} row. Page verbs
+     * are refused here; a later CDP failure must not be rewritten into the same
+     * error, or this gate would be untestable.
+     */
+    private static final Set<String> EVENTS_WITHOUT_PAGE = Set.of(
+            "chat-poll", "chat_wait", "chat-send", "chat-history", "ui-poll", "ui-catalog"
+    );
+
     private static void command(HttpExchange exchange, String token, Path project, String sessionId) throws IOException {
         if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
             send(exchange, 405, Map.of("error", "POST"));
             return;
         }
         if (!authorized(exchange, token)) return;
+        JsonNode request = JSON.readTree(exchange.getRequestBody());
+        String op = request.path("op").asText("");
         BrowserSession session = CHROME.get();
         if (!chromeAlive(session)) {
             noteLost(project, sessionId);
-            send(exchange, 200, lostCommand());
-            return;
+            if (!EVENTS_WITHOUT_PAGE.contains(op)) {
+                send(exchange, 200, lostCommand());
+                return;
+            }
         }
-        JsonNode request = JSON.readTree(exchange.getRequestBody());
         Map<String, String> args = new LinkedHashMap<>();
         JsonNode rawArgs = request.get("args");
         if (rawArgs != null && rawArgs.isObject()) {
@@ -315,7 +333,7 @@ public final class LiveBrowserHost {
         AgentControl.Result result = AgentControl.execute(
                 project,
                 request.path("runId").asText(""),
-                request.path("op").asText(""),
+                op,
                 args,
                 extra,
                 request.path("agentId").asText("")
@@ -323,15 +341,11 @@ public final class LiveBrowserHost {
         Map<String, Object> payload = new LinkedHashMap<>(result.body());
         Object error = payload.get("error");
         String errorText = error == null ? "" : String.valueOf(error);
-        int exit = result.exit();
         if ((errorText.contains("unknown handle") || errorText.contains("no live browser")) && !cdpAnswers(session)) {
             noteLost(project, sessionId);
-            payload.put("ok", false);
-            payload.put("error", "no live browser");
-            exit = 1;
         }
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("exit", exit);
+        body.put("exit", result.exit());
         body.put("body", payload);
         send(exchange, 200, body);
     }

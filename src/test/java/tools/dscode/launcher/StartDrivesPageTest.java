@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.control.protocol.LiveBridgeFile;
+import tools.dscode.control.protocol.LiveHostFile;
 import tools.dscode.control.protocol.speed.ProcessTree;
 
 import java.io.ByteArrayOutputStream;
@@ -156,6 +157,7 @@ class StartDrivesPageTest {
             Capture stopped = run("live-stop", temp.toString());
             assertEquals(0, stopped.code, stopped.err + stopped.out);
             assertTrue(stopped.out.contains("stopped=false"), stopped.out);
+            assertFalse(stopped.err.contains("notice: live-stop stops the start host"), stopped.err);
             assertTrue(worker.isAlive(), "live-stop killed the workbench worker");
             assertTrue(Files.isRegularFile(temp.resolve(".pickleball/workbench/live-bridge.json")));
         } finally {
@@ -205,9 +207,104 @@ class StartDrivesPageTest {
         Capture panel = run("panel-open", "--target=page", temp.toString());
         assertEquals(0, panel.code, detail(panel) + selftest.out + selftest.err);
         assertTrue(panel.out.contains("\"target\":\"page\""), panel.out);
+        int before = placedOnHost();
         Capture border = run("border", "--handle=save", temp.toString());
         assertEquals(0, border.code, detail(border));
-        assertTrue(border.out.contains("\"handle\":\"save\"") || border.out.contains("save"), border.out);
+        assertFalse(border.out.contains("\"target\":\"popup\""), border.out);
+        assertEquals(before + 1, placedOnHost(), border.out);
+    }
+
+    @Test
+    @Timeout(value = 180, unit = TimeUnit.SECONDS)
+    void chatPollAfterChromeDiesReturnsBrowserLostOnce() throws Exception {
+        Assumptions.assumeTrue(BrowserSession.findChrome() != null, "skipped: chrome is not on PATH");
+        Capture started = run("start", "--url=about:blank", "--browser=chrome-headless", temp.toString());
+        assertEquals(0, started.code, detail(started));
+        JsonNode node = JSON.readTree(temp.resolve(".pickleball/live-browser/current.json").toFile());
+        ProcessTree.kill(node.path("chromePid").asLong(0));
+        Capture poll = run("chat-poll", temp.toString());
+        assertEquals(0, poll.code, poll.out + poll.err);
+        assertFalse((poll.out + poll.err).contains("no live browser"), poll.out + poll.err);
+        assertEquals(1, countAgentEvent(poll.out, "browser_lost"), poll.out);
+        Capture again = run("chat-poll", temp.toString());
+        assertEquals(0, again.code, again.out + again.err);
+        assertEquals(0, countAgentEvent(again.out, "browser_lost"), again.out);
+        String events = Files.readString(temp.resolve(".pickleball/agent-events.jsonl"));
+        assertEquals(1, countEvent(events, "browser_lost"), events);
+        Capture border = run("border", "--handle=save", temp.toString());
+        assertTrue(border.code != 0, border.out + border.err);
+        assertTrue((border.out + border.err).contains("no live browser"), border.out + border.err);
+        assertFalse((border.out + border.err).contains("unknown handle"), border.out + border.err);
+    }
+
+    @Test
+    @Timeout(value = 180, unit = TimeUnit.SECONDS)
+    void liveStopKillsTheHostAndChrome() throws Exception {
+        Assumptions.assumeTrue(BrowserSession.findChrome() != null, "skipped: chrome is not on PATH");
+        Capture started = run("start", "--url=about:blank", "--browser=chrome-headless", temp.toString());
+        assertEquals(0, started.code, detail(started));
+        Path current = temp.resolve(".pickleball/live-browser/current.json");
+        JsonNode node = JSON.readTree(current.toFile());
+        long hostPid = node.path("pid").asLong(0);
+        long chromePid = node.path("chromePid").asLong(0);
+        String sessionId = node.path("sessionId").asText("");
+        assertTrue(node.path("pidStarted").asLong(0) > 0, node.toString());
+        assertTrue(node.path("chromeStarted").asLong(0) > 0, node.toString());
+        assertTrue(alive(hostPid));
+        assertTrue(alive(chromePid));
+        Capture stopped = run("live-stop", temp.toString());
+        assertEquals(0, stopped.code, stopped.err + stopped.out);
+        assertTrue(stopped.out.contains("stopped=true"), stopped.out);
+        assertTrue(stopped.err.contains("notice: live-stop stops the start host"), stopped.err);
+        assertFalse(alive(hostPid), "host pid still alive");
+        assertFalse(alive(chromePid), "chrome pid still alive");
+        assertFalse(Files.isRegularFile(current));
+        assertFalse(Files.exists(temp.resolve(".pickleball/live-browser").resolve(sessionId)), sessionId);
+    }
+
+    @Test
+    void liveStopLeavesAProcessWhoseStartTimeDoesNotMatch() throws Exception {
+        Process host = new ProcessBuilder("sleep", "180").redirectErrorStream(true).start();
+        Process chrome = new ProcessBuilder("sleep", "180").redirectErrorStream(true).start();
+        try {
+            LiveHostFile.write(temp, new LiveHostFile.Host(
+                    "http://127.0.0.1:9", "token", 9, host.pid(), chrome.pid(), "sess",
+                    false, "chrome", true, "", false, 1L, 1L
+            ));
+            Capture stopped = run("live-stop", temp.toString());
+            assertEquals(0, stopped.code, stopped.err + stopped.out);
+            assertTrue(stopped.out.contains("stopped=false"), stopped.out);
+            assertFalse(stopped.err.contains("notice: live-stop stops the start host"), stopped.err);
+            assertTrue(host.isAlive(), "live-stop killed an unrelated host pid");
+            assertTrue(chrome.isAlive(), "live-stop killed an unrelated chrome pid");
+            assertFalse(Files.isRegularFile(temp.resolve(".pickleball/live-browser/current.json")));
+        } finally {
+            host.destroyForcibly();
+            chrome.destroyForcibly();
+        }
+    }
+
+    @Test
+    void liveStopDoesNotKillPidsWithNoRecordedStartTimes() throws Exception {
+        Process host = new ProcessBuilder("sleep", "180").redirectErrorStream(true).start();
+        Process chrome = new ProcessBuilder("sleep", "180").redirectErrorStream(true).start();
+        try {
+            LiveHostFile.write(temp, new LiveHostFile.Host(
+                    "http://127.0.0.1:9", "token", 9, host.pid(), chrome.pid(), "sess",
+                    false, "chrome", true, "", false, 0L, 0L
+            ));
+            Capture stopped = run("live-stop", temp.toString());
+            assertEquals(0, stopped.code, stopped.err + stopped.out);
+            assertTrue(stopped.out.contains("stopped=false"), stopped.out);
+            assertTrue(stopped.err.contains("notice: live-stop deleted a state file with no recorded start times"), stopped.err);
+            assertFalse(stopped.err.contains("notice: live-stop stops the start host"), stopped.err);
+            assertTrue(host.isAlive(), "live-stop killed a pid with no recorded start time");
+            assertTrue(chrome.isAlive(), "live-stop killed a chrome pid with no recorded start time");
+            assertFalse(Files.isRegularFile(temp.resolve(".pickleball/live-browser/current.json")));
+        } finally {
+            host.destroyForcibly();
+            chrome.destroyForcibly();
+        }
     }
 
     @Test
@@ -240,6 +337,27 @@ class StartDrivesPageTest {
         Capture stopped = run("live-stop", temp.toString());
         assertEquals(0, stopped.code, stopped.err + stopped.out);
         assertTrue(stopped.out.contains("stopped=false"), stopped.out);
+        assertFalse(stopped.err.contains("notice: live-stop stops the start host"), stopped.err);
+    }
+
+    private int placedOnHost() throws Exception {
+        String expr = "(function(){function n(r){var c=r.querySelectorAll('[data-pkb-id]').length;"
+                + "r.querySelectorAll('*').forEach(function(e){if(e.shadowRoot)c+=n(e.shadowRoot)});return c}"
+                + "return n(document)})()";
+        Capture counted = run(
+                "eval", "--target=browser:auto", "--world=main", "--expr=" + expr, temp.toString());
+        assertEquals(0, counted.code, detail(counted));
+        return Integer.parseInt(JSON.readTree(counted.out).path("value").asText("").trim());
+    }
+
+    private static int countAgentEvent(String body, String name) throws Exception {
+        int count = 0;
+        JsonNode events = JSON.readTree(body).path("agentEvents");
+        if (!events.isArray()) return 0;
+        for (JsonNode event : events) {
+            if (name.equals(event.path("event").asText(""))) count++;
+        }
+        return count;
     }
 
     private static int countEvent(String events, String name) {

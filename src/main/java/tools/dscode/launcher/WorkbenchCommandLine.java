@@ -675,7 +675,6 @@ final class WorkbenchCommandLine {
             copy[0] = "start";
             copy[1] = "--stop";
             System.arraycopy(args, 1, copy, 2, args.length - 1);
-            ALIAS_NOTICES.get().add("notice: live-stop stops the start host");
             return copy;
         }
         return args;

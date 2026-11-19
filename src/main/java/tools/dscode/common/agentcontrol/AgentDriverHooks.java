@@ -6,11 +6,13 @@ import org.openqa.selenium.WebDriver;
  * Registers every driver the existing launcher already started.
  * Not a second launcher. Template launches are marked so session cleanup
  * can reach those instances without quitting a scenario driver early.
- * The host page ({@code template=live}) is detached only from host release.
+ * The host page is marked with {@link #host(boolean)}, not by its template name,
+ * and is detached only from host release.
  * Unowned drivers are quit only from worker release.
  */
 public final class AgentDriverHooks {
     private static final ThreadLocal<String> TEMPLATE = new ThreadLocal<>();
+    private static final ThreadLocal<Boolean> HOST = new ThreadLocal<>();
 
     private AgentDriverHooks() {
     }
@@ -21,10 +23,16 @@ public final class AgentDriverHooks {
         else TEMPLATE.set(name);
     }
 
+    /** The start host page. A template named {@code live} is not the host. */
+    public static void host(boolean host) {
+        if (host) HOST.set(Boolean.TRUE);
+        else HOST.remove();
+    }
+
     public static void ready(WebDriver driver) {
         String template = TEMPLATE.get();
         boolean owned = template != null && !template.isBlank();
-        PageSurfaces.manage(driver, owned ? template : "", owned);
+        PageSurfaces.manage(driver, owned ? template : "", owned, Boolean.TRUE.equals(HOST.get()));
     }
 
     /**

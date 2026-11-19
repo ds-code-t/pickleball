@@ -92,6 +92,10 @@ final class PageSurfaces {
     }
 
     static void manage(WebDriver webDriver, String template, boolean owned) {
+        manage(webDriver, template, owned, false);
+    }
+
+    static void manage(WebDriver webDriver, String template, boolean owned, boolean host) {
         if (webDriver == null) return;
         for (Managed managed : MANAGED) {
             if (managed.driver == webDriver) return;
@@ -101,7 +105,7 @@ final class PageSurfaces {
             id = remote.getSessionId().toString();
         }
         String name = template == null ? "" : template;
-        MANAGED.add(new Managed(id, webDriver, name, owned, "live".equals(name)));
+        MANAGED.add(new Managed(id, webDriver, name, owned, host));
         driver = webDriver;
     }
 

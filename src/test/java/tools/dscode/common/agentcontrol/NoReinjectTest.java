@@ -5,23 +5,29 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.domengine.cdp.CdpConnection;
 import dev.domengine.json.Jsons;
 import dev.domengine.session.BrowserSession;
+import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.openqa.selenium.WebDriverException;
 import tools.dscode.common.agentfast.LiveChromeDriver;
 import tools.dscode.common.agentfast.RuntimeInstall;
 
+import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -74,6 +80,7 @@ class NoReinjectTest {
         Path page = temp.resolve("save.html");
         Files.writeString(page, "<!DOCTYPE html><html><body><button id=\"save\" data-pkb-handle=\"save\">Save</button></body></html>");
         driver.get(page.toUri().toString());
+        waitForElement(driver, "save");
         Map<String, Object> first = PageSurfaces.place(null, "append", "save", null, "", "border", null, null, null, temp);
         int afterFirst = RuntimeInstall.inclusions();
         assertTrue(afterFirst >= 1, String.valueOf(first));
@@ -104,6 +111,7 @@ class NoReinjectTest {
         Path other = temp.resolve("other-tab.html");
         Files.writeString(other, "<!DOCTYPE html><html><body><button id=\"other\" data-pkb-handle=\"other\">Other</button></body></html>");
         first.get(page.toUri().toString());
+        waitForElement(first, "save");
         Map<String, Object> painted = PageSurfaces.place(null, "append", "save", null, "", "border", null, null, null, temp);
         int afterFirst = RuntimeInstall.inclusions();
         assertTrue(afterFirst >= 1, String.valueOf(painted));
@@ -123,6 +131,7 @@ class NoReinjectTest {
             assertTrue(PageSurfaces.focus(second), "second tab did not focus");
             // createTarget's navigation does not wait, and a loaded file URL can still be about:blank under load.
             second.get(other.toUri().toString());
+            waitForElement(second, "other");
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
             String ready = "no";
             String href = "";
@@ -156,6 +165,76 @@ class NoReinjectTest {
         } finally {
             secondSession.close();
         }
+    }
+
+    @Test
+    @Timeout(value = 90, unit = TimeUnit.SECONDS)
+    void navigationWaitsAndHistoryMoves() throws Exception {
+        Assumptions.assumeTrue(BrowserSession.findChrome() != null, "skipped: chrome is not on PATH");
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/slow", exchange -> {
+            try {
+                Thread.sleep(800);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+            byte[] body = "<!DOCTYPE html><html><head><title>Delayed</title></head><body>slow</body></html>"
+                    .getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "text/html");
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+        server.start();
+        Path profile = temp.resolve("profile-nav");
+        Files.createDirectories(profile);
+        session = BrowserSession.launch("noreinject-nav", "about:blank", false, true, profile, java.util.List.of());
+        LiveChromeDriver driver = new LiveChromeDriver(session);
+        try {
+            if (historyIndex(driver) == 0) {
+                assertThrows(WebDriverException.class, () -> driver.navigate().back());
+            }
+            String slow = "http://127.0.0.1:" + server.getAddress().getPort() + "/slow";
+            driver.get(slow);
+            assertEquals("Delayed", String.valueOf(driver.executeScript("return document.title")));
+            long beforeRefresh = System.nanoTime();
+            driver.navigate().refresh();
+            long refreshMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - beforeRefresh);
+            assertTrue(refreshMs >= 500, "refresh returned in " + refreshMs + "ms");
+            assertEquals("Delayed", String.valueOf(driver.executeScript("return document.title")));
+            Path back = temp.resolve("back.html");
+            Files.writeString(back, "<!DOCTYPE html><html><head><title>BackPage</title></head><body>back</body></html>");
+            driver.get(back.toUri().toString());
+            assertEquals("BackPage", String.valueOf(driver.executeScript("return document.title")));
+            driver.navigate().back();
+            assertEquals("Delayed", String.valueOf(driver.executeScript("return document.title")));
+            driver.navigate().forward();
+            assertEquals("BackPage", String.valueOf(driver.executeScript("return document.title")));
+            assertThrows(WebDriverException.class, () -> driver.navigate().forward());
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    private static int historyIndex(LiveChromeDriver driver) {
+        Object info = driver.executeCdpCommand("Page.getNavigationHistory", Map.of());
+        if (!(info instanceof Map<?, ?> map)) return -1;
+        Object index = map.get("currentIndex");
+        return index instanceof Number number ? number.intValue() : -1;
+    }
+
+    private static void waitForElement(LiveChromeDriver driver, String id) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        String ready = "no";
+        String href = "";
+        while (System.nanoTime() < deadline) {
+            href = String.valueOf(driver.executeScript("return location.href"));
+            ready = String.valueOf(driver.executeScript(
+                    "return document.getElementById('" + id + "') ? 'yes' : 'no'"));
+            if ("yes".equals(ready)) return;
+            Thread.sleep(100);
+        }
+        assertEquals("yes", ready, "page did not expose " + id + " href=" + href);
     }
 
     /** Opens a second page on the browser target. A page socket cannot create tabs. */

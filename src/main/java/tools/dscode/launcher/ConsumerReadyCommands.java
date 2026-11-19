@@ -49,8 +49,12 @@ final class ConsumerReadyCommands {
     static int start(WorkbenchCommandLine.Parsed parsed, java.io.PrintStream out, java.io.PrintStream err) {
         Path project = parsed.project();
         if (hasToken(parsed, "--stop")) {
-            boolean stopped = stopQuiet(project);
-            out.println(stopped ? "stopped=true" : "stopped=false");
+            StopOutcome outcome = stopOwned(project);
+            if (outcome.stopped()) err.println("notice: live-stop stops the start host");
+            else if (outcome.unrecorded()) {
+                err.println("notice: live-stop deleted a state file with no recorded start times");
+            }
+            out.println(outcome.stopped() ? "stopped=true" : "stopped=false");
             return 0;
         }
         String url = flag(parsed, "--url");
@@ -134,25 +138,51 @@ final class ConsumerReadyCommands {
 
     /** Stops the host {@code start} recorded. A Workbench worker bridge is left running. */
     static boolean stopQuiet(Path project) {
-        if (project == null) return false;
+        return stopOwned(project).stopped();
+    }
+
+    /**
+     * {@code stopped} is true only when an owned pid was alive and this call stopped it.
+     * A start time of 0 was not recorded. {@link ProcessTree#sameStart} treats that as a
+     * match, so this method must not call it for those pids.
+     */
+    private record StopOutcome(boolean stopped, boolean unrecorded) {
+    }
+
+    private static StopOutcome stopOwned(Path project) {
+        if (project == null) return new StopOutcome(false, false);
         Optional<LiveHostFile.Host> host = LiveHostFile.read(project);
-        if (host.isEmpty()) return false;
+        if (host.isEmpty()) return new StopOutcome(false, false);
         LiveHostFile.Host found = host.get();
-        postStop(found.url(), found.token());
-        long pid = found.pid();
-        ProcessHandle.of(pid).ifPresent(handle -> {
-            if (!ProcessTree.sameStart(handle, found.pidStarted())) return;
-            try {
-                handle.onExit().get(5, TimeUnit.SECONDS);
-            } catch (Exception ignored) {
-                ProcessTree.kill(pid);
+        boolean hostRecorded = found.pidStarted() > 0;
+        boolean chromeRecorded = found.chromeStarted() > 0;
+        if (!hostRecorded && !chromeRecorded) {
+            LiveHostFile.delete(project);
+            tools.dscode.common.agentfast.LiveBrowserHost.pruneProfiles(project, null);
+            return new StopOutcome(false, true);
+        }
+        boolean stopped = false;
+        if (hostRecorded) {
+            ProcessHandle handle = ProcessHandle.of(found.pid()).orElse(null);
+            if (handle != null && handle.isAlive() && ProcessTree.sameStart(handle, found.pidStarted())) {
+                postStop(found.url(), found.token());
+                long pid = found.pid();
+                try {
+                    handle.onExit().get(5, TimeUnit.SECONDS);
+                } catch (Exception ignored) {
+                    ProcessTree.kill(pid);
+                }
+                if (handle.isAlive() && ProcessTree.sameStart(handle, found.pidStarted())) ProcessTree.kill(pid);
+                stopped = true;
             }
-            if (handle.isAlive() && ProcessTree.sameStart(handle, found.pidStarted())) ProcessTree.kill(pid);
-        });
-        if (found.chromePid() > 0) ProcessTree.killIfStarted(found.chromePid(), found.chromeStarted());
+        }
+        if (chromeRecorded && found.chromePid() > 0
+                && ProcessTree.killIfStarted(found.chromePid(), found.chromeStarted())) {
+            stopped = true;
+        }
         LiveHostFile.delete(project);
         tools.dscode.common.agentfast.LiveBrowserHost.pruneProfiles(project, null);
-        return true;
+        return new StopOutcome(stopped, false);
     }
 
     static int doctor(WorkbenchCommandLine.Parsed parsed, java.io.PrintStream out, java.io.PrintStream err) {

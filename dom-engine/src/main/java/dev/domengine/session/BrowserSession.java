@@ -415,7 +415,30 @@ public final class BrowserSession implements AutoCloseable {
         return discoverHttp(stripPath(cdp), pageId);
     }
 
+    /**
+     * Chrome accepts {@code /json/version} before {@code /json/list} has a page.
+     * A missing page is retried. Any other discover failure is returned at once.
+     */
     private static Endpoint discoverHttp(String base, String pageId) {
+        // start waits 20s for a healthy host, so this retry stays inside that budget.
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (true) {
+            try {
+                return discoverHttpOnce(base, pageId);
+            } catch (CdpException failure) {
+                String message = failure.getMessage() == null ? "" : failure.getMessage();
+                if (!message.contains("no page target") || System.nanoTime() >= deadline) throw failure;
+            }
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException failure) {
+                Thread.currentThread().interrupt();
+                throw new CdpException("cdp discover interrupted");
+            }
+        }
+    }
+
+    private static Endpoint discoverHttpOnce(String base, String pageId) {
         HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
         String http = stripPath(base);
         try {

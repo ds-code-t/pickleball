@@ -29,6 +29,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Page driver for a Chrome process {@link BrowserSession} already launched.
@@ -45,6 +46,8 @@ public final class LiveChromeDriver implements WebDriver, TakesScreenshot, HasCa
     private String pageSessionId;
     /** True after the page socket is known. A null session id means this connection is already the page. */
     private boolean pageReady;
+    /** {@link #quit()} closed this driver. Later commands fail instead of reattaching. */
+    private boolean released;
 
     public LiveChromeDriver(BrowserSession session) {
         if (session == null) throw new IllegalArgumentException("browser session is missing");
@@ -168,15 +171,23 @@ public final class LiveChromeDriver implements WebDriver, TakesScreenshot, HasCa
 
     @Override
     public void quit() {
-        if (pageSessionId == null || pageSessionId.isBlank()) return;
-        try {
-            ObjectNode params = Jsons.object();
-            params.put("sessionId", pageSessionId);
-            session.connection().call("Target.detachFromTarget", params, CALL);
-        } catch (RuntimeException ignored) {
-            // The host still owns Chrome.
+        if (released) return;
+        released = true;
+        if (pageSessionId != null && !pageSessionId.isBlank()) {
+            try {
+                ObjectNode params = Jsons.object();
+                params.put("sessionId", pageSessionId);
+                session.connection().call("Target.detachFromTarget", params, CALL);
+            } catch (RuntimeException ignored) {
+                // The host still owns Chrome.
+            }
+            pageSessionId = null;
         }
-        pageSessionId = null;
+        try {
+            session.connection().close();
+        } catch (RuntimeException ignored) {
+            // The browser process stays up until the host closes it.
+        }
     }
 
     @Override
@@ -247,18 +258,26 @@ public final class LiveChromeDriver implements WebDriver, TakesScreenshot, HasCa
         return new Navigation() {
             @Override
             public void back() {
+                moveHistory(-1);
             }
 
             @Override
             public void forward() {
+                moveHistory(1);
             }
 
             @Override
             public void to(String url) {
                 ensurePage();
+                String target = url == null || url.isBlank() ? "about:blank" : url;
+                boolean same = sameDocument(target, href());
+                int seen = navigationCount();
                 ObjectNode params = Jsons.object();
-                params.put("url", url == null ? "about:blank" : url);
-                session.connection().call("Page.navigate", params, pageSessionId, CALL);
+                params.put("url", target);
+                JsonNode navigated = session.connection().call("Page.navigate", params, pageSessionId, CALL);
+                String errorText = navigated == null ? "" : navigated.path("errorText").asText("");
+                if (!errorText.isBlank()) throw new WebDriverException(errorText);
+                awaitLoad(target, same, seen);
             }
 
             @Override
@@ -269,9 +288,106 @@ public final class LiveChromeDriver implements WebDriver, TakesScreenshot, HasCa
             @Override
             public void refresh() {
                 ensurePage();
+                int seen = navigationCount();
                 session.connection().call("Page.reload", Jsons.object(), pageSessionId, CALL);
+                awaitLoad(null, true, seen);
             }
         };
+    }
+
+    /** {@code delta} is -1 for back and +1 for forward. A missing entry throws. */
+    private void moveHistory(int delta) {
+        ensurePage();
+        JsonNode history = session.connection().call("Page.getNavigationHistory", Jsons.object(), pageSessionId, CALL);
+        int current = history == null ? -1 : history.path("currentIndex").asInt(-1);
+        JsonNode entries = history == null ? null : history.get("entries");
+        int index = current + delta;
+        if (current < 0 || entries == null || !entries.isArray() || index < 0 || index >= entries.size()) {
+            throw new WebDriverException(delta < 0 ? "no back history" : "no forward history");
+        }
+        JsonNode entry = entries.get(index);
+        int entryId = entry == null ? -1 : entry.path("id").asInt(-1);
+        if (entryId < 0) throw new WebDriverException(delta < 0 ? "no back history" : "no forward history");
+        int seen = navigationCount();
+        ObjectNode params = Jsons.object();
+        params.put("entryId", entryId);
+        session.connection().call("Page.navigateToHistoryEntry", params, pageSessionId, CALL);
+        String target = entry.path("url").asText("");
+        awaitLoad(target.isBlank() ? null : target, true, seen);
+    }
+
+    /**
+     * Blocks until the document is complete. {@code requireNewNavigation} is set when the
+     * destination URL is already showing, so a still-complete document is not treated as done.
+     */
+    private void awaitLoad(String expectedUrl, boolean requireNewNavigation, int navigationsBefore) {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
+        WebDriverException last = null;
+        boolean sawLoading = false;
+        while (System.nanoTime() < deadline) {
+            try {
+                String value = readyAndHref();
+                int split = value.indexOf('\n');
+                String state = split < 0 ? value : value.substring(0, split);
+                String href = split < 0 ? "" : value.substring(split + 1);
+                if (!"complete".equals(state)) sawLoading = true;
+                boolean navigated = !requireNewNavigation
+                        || navigationCount() > navigationsBefore
+                        || sawLoading;
+                boolean urlOk = expectedUrl == null || sameDocument(expectedUrl, href);
+                if (navigated && urlOk && "complete".equals(state)) return;
+            } catch (RuntimeException failure) {
+                last = failure instanceof WebDriverException web
+                        ? web
+                        : new WebDriverException(failure.getMessage(), failure);
+            }
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                throw new WebDriverException("document ready interrupted");
+            }
+        }
+        if (last != null) throw last;
+        throw new WebDriverException("timed out waiting for document load"
+                + (expectedUrl == null ? "" : ": " + expectedUrl));
+    }
+
+    private String readyAndHref() {
+        ObjectNode params = Jsons.object();
+        params.put("expression", "document.readyState + '\\n' + String(location.href)");
+        params.put("returnByValue", true);
+        JsonNode result = session.connection().call("Runtime.evaluate", params, pageSessionId, CALL);
+        if (result != null && result.has("exceptionDetails")) throw new WebDriverException("document not ready");
+        return result == null ? "" : result.path("result").path("value").asText("");
+    }
+
+    private String href() {
+        try {
+            String value = readyAndHref();
+            int split = value.indexOf('\n');
+            return split < 0 ? "" : value.substring(split + 1);
+        } catch (RuntimeException failure) {
+            return "";
+        }
+    }
+
+    private int navigationCount() {
+        int count = 0;
+        for (com.fasterxml.jackson.databind.node.ObjectNode row : session.events().snapshot()) {
+            if ("navigation".equals(row.path("kind").asText(""))) count++;
+        }
+        return count;
+    }
+
+    private static boolean sameDocument(String requested, String href) {
+        if (requested == null || href == null) return false;
+        return stripFragment(requested).equals(stripFragment(href));
+    }
+
+    private static String stripFragment(String value) {
+        int hash = value.indexOf('#');
+        return hash < 0 ? value : value.substring(0, hash);
     }
 
     @Override
@@ -321,6 +437,7 @@ public final class LiveChromeDriver implements WebDriver, TakesScreenshot, HasCa
     }
 
     private void ensurePage() {
+        if (released) throw new WebDriverException("driver is quit");
         if (pageReady) return;
         if (!attachFlattenedPage()) useCurrentPageSocket();
         pageReady = true;
