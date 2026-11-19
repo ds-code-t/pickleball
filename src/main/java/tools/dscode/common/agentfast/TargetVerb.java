@@ -308,9 +308,7 @@ public final class TargetVerb {
             body.put("applied", true);
             body.put("docVersion", after);
             body.put("kind", blank(args.get("kind")).isBlank() ? "click" : blank(args.get("kind")));
-            if ("diff".equals(blank(args.get("snap")))) {
-                body.put("snap", diffOf(titleBefore, title(page.session.connection()), before, after));
-            }
+            putSnapDiff(body, args, titleBefore, title(page.session.connection()), before, after);
             stamp(body, page.session.connection(), node);
             putEntered(body, runId, page.session.connection());
             return ok(body);
@@ -324,13 +322,16 @@ public final class TargetVerb {
         DesktopTree.Session session = DesktopTree.require(hit.sessionId);
         DomNode node = findNode(session.root(), "", hit.backend);
         if (node == null) return fail("act", "stale_ref");
+        String beforeVersion = "desktop:" + session.sequence();
         boolean live = desktopAct(session, node, args);
         DesktopTree.Session after = DesktopTree.open(session.id());
         if (after == null) after = session;
         Map<String, Object> body = base("act", "desktop", "desktop", TargetSelector.parse("desktop:" + hit.sessionId));
         body.put("applied", live);
-        body.put("docVersion", "desktop:" + after.sequence());
+        String afterVersion = "desktop:" + after.sequence();
+        body.put("docVersion", afterVersion);
         body.put("session", after.id());
+        putSnapDiff(body, args, "", "", beforeVersion, afterVersion);
         stampDesktop(body, after);
         return ok(body);
     }
@@ -341,13 +342,16 @@ public final class TargetVerb {
         List<DomNode> hits = locate(session.root(), query, Map.of());
         if (hits.isEmpty()) return fail("act", "not found");
         if (hits.size() > 1) return fail("act", "ambiguous");
+        String beforeVersion = "desktop:" + session.sequence();
         boolean live = desktopAct(session, hits.get(0), args);
         DesktopTree.Session after = DesktopTree.open(session.id());
         if (after == null) after = session;
         Map<String, Object> body = base("act", "desktop", "desktop", target);
         body.put("applied", live);
-        body.put("docVersion", "desktop:" + after.sequence());
+        String afterVersion = "desktop:" + after.sequence();
+        body.put("docVersion", afterVersion);
         body.put("session", after.id());
+        putSnapDiff(body, args, "", "", beforeVersion, afterVersion);
         stampDesktop(body, after);
         return ok(body);
     }
@@ -486,15 +490,20 @@ public final class TargetVerb {
         }
         Held page = openBrowser(resolved(target, args));
         try {
+            String before = docVersion(page.session.connection());
+            String titleBefore = title(page.session.connection());
             boolean met;
             if ("event".equals(mode)) met = waitEvent(project, runId, page.session.connection(), condition, timeout);
             else met = waitPoll(page.session.connection(), condition, blank(args.get("query")), timeout);
             if (!met) return fail("wait", "timeout");
+            String after = docVersion(page.session.connection());
+            String titleAfter = title(page.session.connection());
             Map<String, Object> body = base("wait", "cdp", "browser", target);
             body.put("mode", mode);
             body.put("condition", condition);
-            body.put("docVersion", docVersion(page.session.connection()));
-            body.put("title", title(page.session.connection()));
+            body.put("docVersion", after);
+            body.put("title", titleAfter);
+            putSnapDiff(body, args, titleBefore, titleAfter, before, after);
             stamp(body, page.session.connection(), null);
             return ok(body);
         } finally {
@@ -1666,11 +1675,26 @@ public final class TargetVerb {
         return diff;
     }
 
+    private static void putSnapDiff(
+            Map<String, Object> body,
+            Map<String, String> args,
+            String titleBefore,
+            String titleAfter,
+            String before,
+            String after
+    ) {
+        if (!"diff".equals(blank(args == null ? null : args.get("snap")))) return;
+        body.put("snap", diffOf(titleBefore, titleAfter, before, after));
+    }
+
     private static Map<String, Object> diffOf(String titleBefore, String titleAfter, String before, String after) {
         Map<String, Object> diff = new LinkedHashMap<>();
-        diff.put("title", titleBefore + " -> " + titleAfter);
+        if (titleBefore != null && titleAfter != null && (!titleBefore.isEmpty() || !titleAfter.isEmpty())) {
+            diff.put("title", titleBefore + " -> " + titleAfter);
+        }
         diff.put("docVersion", before + " -> " + after);
-        diff.put("changed", !titleBefore.equals(titleAfter) || !before.equals(after));
+        boolean titleChanged = titleBefore != null && titleAfter != null && !titleBefore.equals(titleAfter);
+        diff.put("changed", titleChanged || !before.equals(after));
         return diff;
     }
 

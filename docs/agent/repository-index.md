@@ -953,6 +953,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/AgentFastCliTest.java`
 - `src/test/java/tools/dscode/launcher/CliForwardToWorkerTest.java`
 - `src/test/java/tools/dscode/launcher/ClosedShadowResolveTest.java`
+- `src/test/java/tools/dscode/launcher/CompactSnapshotTest.java`
 - `src/test/java/tools/dscode/launcher/ConsumerReadyCliTest.java`
 - `src/test/java/tools/dscode/launcher/DesktopSameVerbTest.java`
 - `src/test/java/tools/dscode/launcher/DoctorTest.java`
@@ -969,6 +970,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/Release218RecommendationsTest.java`
 - `src/test/java/tools/dscode/launcher/SecretRedactionTest.java`
 - `src/test/java/tools/dscode/launcher/SessionHealthWaitTest.java`
+- `src/test/java/tools/dscode/launcher/SnapshotDiffOnActTest.java`
 - `src/test/java/tools/dscode/launcher/StartDrivesPageTest.java`
 - `src/test/java/tools/dscode/launcher/StartLaunchesBrowserTest.java`
 - `src/test/java/tools/dscode/launcher/StoreCliLaunchTest.java`

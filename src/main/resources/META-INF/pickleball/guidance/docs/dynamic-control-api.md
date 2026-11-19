@@ -21,10 +21,10 @@ With no live browser the command exits 1 and the body is `ok:false` with `error:
 | Verb | Params | Result |
 |------|--------|--------|
 | attach | `--target` | Joins that browser or desktop target. |
-| snap | `--target --mode=compact\|find\|diff\|full` | Snapshot keyed by `docVersion`. `full` is a file under `.pickleball/agent-full/`. |
+| snap | `--target --mode=compact\|find\|diff\|full` | Compact by default: lines such as `- button "Save" [ref=...]` and a `ref` a later `act` reuses, on the browser and on the desktop. That reply has no document tree. `full` is a file under `.pickleball/agent-full/`. |
 | find | `--target --query` | Hits. Each hit has `ref`. |
-| act | `--target --kind=click\|type\|hover\|press\|select --query\|--ref --value` | Performs the action. `applied` is true only when the effect is read back. A disabled or inert control is `applied:false`. `--snap=diff` adds the change. |
-| wait | `--target --condition --timeout` | Waits. `mode=event` for mutation, network, load, navigation, or mask (the page `watchUntil` when it is installed). Otherwise it polls. Timeout exits 1 with `error: timeout`. |
+| act | `--target --kind=click\|type\|hover\|press\|select --query\|--ref --value` | Performs the action. `applied` is true only when the effect is read back. A disabled or inert control is `applied:false`. `--snap=diff` adds the title and `docVersion` change. A desktop fixture diff is the version bump. |
+| wait | `--target --condition --timeout` | Waits. `mode=event` for mutation, network, load, navigation, or mask (the page `watchUntil` when it is installed). Otherwise it polls. Timeout exits 1 with `error: timeout`. `--snap=diff` adds the same title and `docVersion` change. |
 | watch | `--target --kinds --duration` | Returns at the first matching event, or when the duration ends with none. |
 | explain | `--target --query\|--ref` | Actionability report (`visible`, `enabled`, `actionable`). |
 | eval | `--target --expr --world=pkb\|main` | Browser only. Desktop returns `eval is browser only`. |
