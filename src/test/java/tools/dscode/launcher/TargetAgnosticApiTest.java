@@ -3,17 +3,23 @@ package tools.dscode.launcher;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.domengine.session.BrowserSession;
+import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.openqa.selenium.WindowType;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeOptions;
 import tools.dscode.common.agentcontrol.AgentControl;
 import tools.dscode.common.agentcontrol.AgentDriverHooks;
 import tools.dscode.common.agentfast.LiveBrowserHost;
 import tools.dscode.common.agentfast.LiveChromeDriver;
+import tools.dscode.control.protocol.LiveBridgeFile;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -42,6 +48,7 @@ class TargetAgnosticApiTest {
 
     @AfterEach
     void stopLiveBrowser() {
+        System.clearProperty("pkb_cdp_input");
         ConsumerReadyCommands.stopQuiet(temp);
     }
 
@@ -67,7 +74,7 @@ class TargetAgnosticApiTest {
         Files.writeString(page, """
                 <!DOCTYPE html>
                 <html><head><title>Ready</title></head>
-                <body><button id="save" onclick="document.title='Saved';this.textContent='Saved'">Save</button></body>
+                <body><button id="save" onclick="window.__n=(window.__n||0)+1;document.title='Saved:'+window.__n;this.textContent='Saved:'+window.__n">Save</button></body>
                 </html>
                 """);
         Capture started = run("start", "--url=" + page.toUri(), "--browser=chrome-headless");
@@ -85,12 +92,13 @@ class TargetAgnosticApiTest {
         JsonNode act = JSON.readTree(acted.out);
         assertTrue(act.path("applied").asBoolean(), acted.out);
         JsonNode title = eval("document.title");
-        assertEquals("Saved", title.path("value").asText(), title.toString());
+        assertEquals("Saved:1", title.path("value").asText(), title.toString());
 
         Capture diff = run("snap", "--target=browser:auto", "--mode=diff", "--run-id=live");
         assertEquals(0, diff.code, diff.err + diff.out);
-        assertTrue(diff.out.contains("Saved"), diff.out);
-        assertTrue(diff.out.contains("Ready") || diff.out.contains("->"), diff.out);
+        JsonNode diffBody = JSON.readTree(diff.out);
+        assertTrue(diffBody.path("diff").isArray(), diff.out);
+        assertEquals("Ready -> Saved:1\nbutton Saved:1", diffBody.path("diff").get(0).asText(), diff.out);
 
         Capture armed = run(
                 "eval", "--target=browser:auto", "--world=main", "--run-id=live",
@@ -102,7 +110,7 @@ class TargetAgnosticApiTest {
         assertEquals(0, waited.code, waited.err + waited.out);
         JsonNode wait = JSON.readTree(waited.out);
         assertTrue(wait.path("applied").asBoolean(), waited.out);
-        assertEquals("Saved", wait.path("title").asText(), waited.out);
+        assertEquals("Saved:1", wait.path("title").asText(), waited.out);
         assertEquals("poll", wait.path("mode").asText(), waited.out);
         assertTrue(waitedMs >= 300, "wait returned before Arrived: " + waitedMs + " " + waited.out);
 
@@ -116,13 +124,14 @@ class TargetAgnosticApiTest {
 
         String socket = healthCdp();
         assertTrue(socket.contains("/devtools/page/"), socket);
-        JsonNode again = retryFind("browser:cdp=" + socket, "Saved");
+        JsonNode again = retryFind("browser:cdp=" + socket, "Saved:1");
         assertTrue(again.path("applied").asBoolean(), again.toString());
+        assertEquals("button", again.path("hits").get(0).path("role").asText(), again.toString());
         String cdpRef = again.path("ref").asText();
         Capture refAct = run("act", "--target=browser:cdp=" + socket, "--ref=" + cdpRef, "--kind=click", "--run-id=live-cdp");
         assertEquals(0, refAct.code, refAct.err + refAct.out);
         assertTrue(JSON.readTree(refAct.out).path("applied").asBoolean(), refAct.out);
-        assertEquals("Saved", eval("document.title").path("value").asText());
+        assertEquals("Saved:2", eval("document.title").path("value").asText(), refAct.out);
     }
 
     @Test
@@ -137,6 +146,7 @@ class TargetAgnosticApiTest {
                 <body>
                 <button id="save">Save</button>
                 <button id="go" aria-label="Launch">X</button>
+                <input id="searchbox" aria-label="Search" placeholder="Find">
                 <label for="city">City</label><input id="city" placeholder="Town">
                 <label for="color">Color</label>
                 <select id="color"><option>Red</option><option>Blue</option><option>Red</option></select>
@@ -156,8 +166,9 @@ class TargetAgnosticApiTest {
 
         JsonNode launch = retryFind("browser:auto", "Launch");
         assertEquals("button", launch.path("hits").get(0).path("role").asText(), launch.toString());
-        String launchName = launch.path("hits").get(0).path("name").asText();
-        assertTrue("Launch".equals(launchName) || "X".equals(launchName), launch.toString());
+        assertEquals("Launch", launch.path("hits").get(0).path("name").asText(), launch.toString());
+        JsonNode search = retryFind("browser:auto", "searchbox");
+        assertEquals("Search", search.path("hits").get(0).path("name").asText(), search.toString());
         JsonNode city = retryFind("browser:auto", "City");
         JsonNode town = retryFind("browser:auto", "Town");
         JsonNode byId = retryFind("browser:auto", "city");
@@ -248,12 +259,21 @@ class TargetAgnosticApiTest {
         assertEquals((byte) 0x89, bytes[0]);
         assertEquals((byte) 0x50, bytes[1]);
 
+        String marker = "pkb-observe-" + System.nanoTime();
+        Capture armedObserve = run(
+                "eval", "--target=browser:auto", "--world=main", "--run-id=names",
+                "--expr=setTimeout(function(){console.log('" + marker + "');},300); 'armed'");
+        assertEquals("armed", JSON.readTree(armedObserve.out).path("value").asText(), armedObserve.out);
         Capture observed = run(
-                "observe", "--target=browser:auto", "--wait-ms=200", "--type=console", "--run-id=names");
+                "observe", "--target=browser:auto", "--wait-ms=2000", "--type=console", "--run-id=names");
         assertEquals(0, observed.code, observed.err + observed.out);
         JsonNode watch = JSON.readTree(observed.out);
         assertEquals("watch", watch.path("op").asText(), observed.out);
-        assertTrue(watch.path("events").isArray(), observed.out);
+        boolean sawMarker = false;
+        for (JsonNode event : watch.path("events")) {
+            if (event.path("text").asText("").contains(marker)) sawMarker = true;
+        }
+        assertTrue(sawMarker, observed.out);
 
         String countExpr = "(function(){var n=0;function w(r){if(!r||!r.querySelectorAll)return;n+=r.querySelectorAll('[data-pkb-id]').length;var all=r.querySelectorAll('*');for(var i=0;i<all.length;i++){if(all[i].shadowRoot)w(all[i].shadowRoot);}}w(document);return String(n);})()";
         String before = eval(countExpr).path("value").asText();
@@ -313,6 +333,198 @@ class TargetAgnosticApiTest {
             }
             session.close();
         }
+    }
+
+    @Test
+    @Timeout(value = 180, unit = TimeUnit.SECONDS)
+    void highlightPaintsTheSelectedBrowserNotTheHost() throws Exception {
+        assumeTrue(BrowserSession.findChrome() != null, "skipped: chrome is not on PATH");
+        Path hostPage = temp.resolve("host.html");
+        Path otherPage = temp.resolve("other.html");
+        String button = "<button id=\"save\">Save</button>";
+        Files.writeString(hostPage, "<!DOCTYPE html><html><head><title>Host</title></head><body>" + button + "</body></html>");
+        Files.writeString(otherPage, "<!DOCTYPE html><html><head><title>Other</title></head><body>" + button + "</body></html>");
+        Capture started = run("start", "--url=" + hostPage.toUri(), "--browser=chrome-headless");
+        assertEquals(0, started.code, started.err + started.out);
+        Path profile = temp.resolve("other-profile");
+        Files.createDirectories(profile);
+        BrowserSession other = BrowserSession.launch("other-page", otherPage.toUri().toString(), false, true, profile, List.of());
+        try {
+            String socket = other.socket();
+            assertTrue(socket.contains("/devtools/page/"), socket);
+            Capture painted = run(
+                    "highlight", "--handle=save", "--target=browser:cdp=" + socket,
+                    "--preset=yellow", "--run-id=paint");
+            assertEquals(0, painted.code, painted.err + painted.out);
+            assertTrue(JSON.readTree(painted.out).path("applied").asBoolean(), painted.out);
+            String read = "document.getElementById('save').getAttribute('data-pkb-style')+'|'+document.getElementById('save').getAttribute('data-pkb-css')";
+            Capture onTarget = run("eval", "--target=browser:cdp=" + socket, "--expr=" + read, "--world=main", "--run-id=paint");
+            assertEquals(0, onTarget.code, onTarget.err + onTarget.out);
+            String targetValue = JSON.readTree(onTarget.out).path("value").asText();
+            assertTrue(targetValue.startsWith("style_modified|"), targetValue);
+            assertTrue(targetValue.contains("background-color:#fff3a0"), targetValue);
+            Capture onHost = run("eval", "--target=browser:auto", "--expr=" + read, "--world=main", "--run-id=paint");
+            assertEquals(0, onHost.code, onHost.err + onHost.out);
+            String hostValue = JSON.readTree(onHost.out).path("value").asText();
+            assertFalse(hostValue.startsWith("style_modified"), hostValue);
+        } finally {
+            other.close();
+        }
+    }
+
+    @Test
+    @Timeout(value = 180, unit = TimeUnit.SECONDS)
+    void inertDisabledAndResetSelectAreNotApplied() throws Exception {
+        assumeTrue(BrowserSession.findChrome() != null, "skipped: chrome is not on PATH");
+        Path page = temp.resolve("honest.html");
+        Files.writeString(page, """
+                <!DOCTYPE html><html><head><title>Ready</title></head><body>
+                <button id="save" onclick="window.__n=(window.__n||0)+1;document.title='Saved:'+window.__n">Save</button>
+                <button id="off" disabled onclick="document.title='Nope'">Off</button>
+                <button id="still" inert onclick="document.title='InertClicked'">Still</button>
+                <select id="color" onchange="this.value='Red'"><option>Red</option><option>Blue</option></select>
+                </body></html>
+                """);
+        assertHonest(page, false);
+        ConsumerReadyCommands.stopQuiet(temp);
+        System.setProperty("pkb_cdp_input", "off");
+        assertHonest(page, true);
+    }
+
+    @Test
+    void actRejectsAnUnknownFlagBeforeItRuns() {
+        Map<String, String> args = new LinkedHashMap<>();
+        args.put("target", "browser:auto");
+        args.put("cdp-input", "off");
+        AgentControl.Result rejected = AgentControl.execute(temp, "flags", "act", args, List.of(), "");
+        assertEquals(2, rejected.exit(), String.valueOf(rejected.body()));
+        assertEquals(Boolean.FALSE, rejected.body().get("applied"));
+        assertTrue(String.valueOf(rejected.body().get("error")).contains("does not use --cdp-input"), String.valueOf(rejected.body()));
+    }
+
+    @Test
+    @Timeout(value = 180, unit = TimeUnit.SECONDS)
+    void workerChromeDriverActsOnTheCurrentTab() throws Exception {
+        assumeTrue(BrowserSession.findChrome() != null, "skipped: chrome is not on PATH");
+        assertNull(LiveBrowserHost.chrome());
+        Path decoy = temp.resolve("decoy.html");
+        Path save = temp.resolve("save-tab.html");
+        Files.writeString(decoy, """
+                <!DOCTYPE html><html><head><title>Decoy</title></head>
+                <body><button id="decoy">Decoy</button></body></html>
+                """);
+        Files.writeString(save, """
+                <!DOCTYPE html><html><head><title>Ready</title></head>
+                <body><button id="save" onclick="document.title='Saved'">Save</button></body></html>
+                """);
+        ChromeOptions options = new ChromeOptions();
+        options.setBinary(BrowserSession.findChrome());
+        options.addArguments("--headless=new", "--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--remote-allow-origins=*");
+        ChromeDriver driver;
+        try {
+            driver = new ChromeDriver(options);
+        } catch (RuntimeException failure) {
+            assumeTrue(false, "skipped: ChromeDriver did not start: " + failure.getMessage());
+            return;
+        }
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/v1/agent/command", exchange -> {
+            JsonNode request = JSON.readTree(exchange.getRequestBody().readAllBytes());
+            Map<String, String> args = new LinkedHashMap<>();
+            if (request.path("args").isObject()) {
+                request.path("args").fields().forEachRemaining(entry -> args.put(entry.getKey(), entry.getValue().asText("")));
+            }
+            AgentControl.Result result = AgentControl.execute(
+                    temp, request.path("runId").asText(""), request.path("op").asText(""), args, List.of(), request.path("agentId").asText(""));
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("exit", result.exit());
+            payload.put("body", result.body());
+            byte[] response = JSON.writeValueAsBytes(payload);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.start();
+        try {
+            driver.get(decoy.toUri().toString());
+            String decoyHandle = driver.getWindowHandle();
+            driver.switchTo().newWindow(WindowType.TAB);
+            driver.get(save.toUri().toString());
+            String saveHandle = driver.getWindowHandle();
+            assertEquals("Ready", driver.getTitle());
+            AgentDriverHooks.template("worker");
+            AgentDriverHooks.host(false);
+            AgentDriverHooks.ready(driver);
+            AgentDriverHooks.template(null);
+            LiveBridgeFile.write(temp, new LiveBridgeFile.Bridge(
+                    "127.0.0.1", server.getAddress().getPort(), "worker-token", ProcessHandle.current().pid(), "worker-tab"));
+            Capture found = run("find", "--target=browser:auto", "--query=Save", "--run-id=worker-tab");
+            assertEquals(0, found.code, found.err + found.out);
+            JsonNode hit = JSON.readTree(found.out);
+            assertEquals("Save", hit.path("hits").get(0).path("name").asText(), found.out);
+            assertFalse(found.out.contains("Decoy"), found.out);
+            Capture acted = run("act", "--target=" + hit.path("ref").asText(), "--kind=click", "--run-id=worker-tab");
+            assertEquals(0, acted.code, acted.err + acted.out);
+            assertTrue(JSON.readTree(acted.out).path("applied").asBoolean(), acted.out);
+            driver.switchTo().window(saveHandle);
+            assertEquals("Saved", driver.getTitle());
+            driver.switchTo().window(decoyHandle);
+            assertEquals("Decoy", driver.getTitle());
+        } finally {
+            AgentDriverHooks.host(false);
+            AgentDriverHooks.template(null);
+            try {
+                AgentDriverHooks.quit();
+            } catch (RuntimeException ignored) {
+                // The driver quit below still stops Chrome.
+            }
+            try {
+                driver.quit();
+            } catch (RuntimeException ignored) {
+                // Already quit with the worker hooks.
+            }
+            server.stop(0);
+            LiveBridgeFile.delete(temp);
+        }
+    }
+
+    private void assertHonest(Path page, boolean js) throws Exception {
+        Capture started = run("start", "--url=" + page.toUri(), "--browser=chrome-headless");
+        assertEquals(0, started.code, started.err + started.out);
+        JsonNode off = retryFind("browser:auto", "Off");
+        Capture offAct = run("act", "--target=" + off.path("ref").asText(), "--kind=click", "--run-id=honest");
+        assertEquals(1, offAct.code, offAct.err + offAct.out);
+        assertFalse(JSON.readTree(offAct.out).path("applied").asBoolean(), offAct.out);
+        if (js) assertEquals("js", JSON.readTree(offAct.out).path("used").asText(), offAct.out);
+        assertEquals("Ready", eval("document.title").path("value").asText(), offAct.out);
+        JsonNode still = retryFind("browser:auto", "Still");
+        Capture stillAct = run("act", "--target=" + still.path("ref").asText(), "--kind=click", "--run-id=honest");
+        assertEquals(1, stillAct.code, stillAct.err + stillAct.out);
+        assertFalse(JSON.readTree(stillAct.out).path("applied").asBoolean(), stillAct.out);
+        if (js) assertEquals("js", JSON.readTree(stillAct.out).path("used").asText(), stillAct.out);
+        assertEquals("Ready", eval("document.title").path("value").asText(), stillAct.out);
+        JsonNode color = retryFind("browser:auto", "color");
+        String colorRef = "";
+        for (JsonNode hit : color.path("hits")) {
+            String role = hit.path("role").asText();
+            if ("select".equals(role) || "combobox".equals(role)) colorRef = hit.path("ref").asText();
+        }
+        assertFalse(colorRef.isBlank(), color.toString());
+        Capture selected = run("act", "--target=" + colorRef, "--kind=select", "--value=Blue", "--run-id=honest");
+        assertEquals(1, selected.code, selected.err + selected.out);
+        assertFalse(JSON.readTree(selected.out).path("applied").asBoolean(), selected.out);
+        if (js) assertEquals("js", JSON.readTree(selected.out).path("used").asText(), selected.out);
+        assertEquals("Red", eval("document.getElementById('color').value").path("value").asText(), selected.out);
+        JsonNode save = retryFind("browser:auto", "Save");
+        Capture acted = run("act", "--target=" + save.path("ref").asText(), "--kind=click", "--run-id=honest");
+        assertEquals(0, acted.code, acted.err + acted.out);
+        assertTrue(JSON.readTree(acted.out).path("applied").asBoolean(), acted.out);
+        if (js) {
+            assertEquals("js", JSON.readTree(acted.out).path("used").asText(), acted.out);
+            assertEquals("true", eval("document.querySelector('[data-pkb-synthetic]')===null").path("value").asText(), acted.out);
+        }
+        assertEquals("Saved:1", eval("document.title").path("value").asText(), acted.out);
     }
 
     private JsonNode explain(String query) throws Exception {

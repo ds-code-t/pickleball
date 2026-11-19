@@ -6,7 +6,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
-import java.util.Set;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -15,7 +17,9 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class FallbackLog {
     static final int DEFAULT_MAX_BYTES = 1_048_576;
-    private static final Set<String> SEEN = ConcurrentHashMap.newKeySet();
+    /** Reasons remembered for one run. Older keys drop after this many. */
+    private static final int RUN_CAP = 64;
+    private static final Map<String, LinkedHashSet<String>> BY_RUN = new ConcurrentHashMap<>();
 
     private FallbackLog() {
     }
@@ -35,7 +39,7 @@ public final class FallbackLog {
         String safeRun = runId == null ? "" : runId;
         String safeFrom = from == null ? "" : from;
         String safeTo = to == null ? "" : to;
-        if (!SEEN.add(safeRun + "|" + safeChain + "|" + safeReason)) return;
+        if (!remember(safeRun, safeChain + "|" + safeReason)) return;
         Path file = project.resolve(".pickleball").resolve("logs").resolve("fallback-chain.jsonl");
         StringBuilder line = new StringBuilder();
         line.append("{\"run\":\"").append(escape(safeRun)).append("\",\"chain\":\"").append(escape(safeChain)).append('"');
@@ -51,20 +55,38 @@ public final class FallbackLog {
         }
     }
 
-    /** Drops remembered reasons when the long-lived host starts a different run. */
+    /**
+     * Notes the run the host is serving. Other runs keep their own de-dupe sets.
+     * A later command with a different run id does not forget this run's reasons.
+     */
     public static void beginRun(String runId) {
         String safe = runId == null ? "" : runId;
-        if (safe.equals(CURRENT_RUN)) return;
         CURRENT_RUN = safe;
-        SEEN.clear();
+        BY_RUN.computeIfAbsent(safe, id -> new LinkedHashSet<>());
     }
 
     public static void resetForTests() {
-        SEEN.clear();
+        BY_RUN.clear();
         CURRENT_RUN = "";
     }
 
     private static volatile String CURRENT_RUN = "";
+
+    private static boolean remember(String run, String key) {
+        LinkedHashSet<String> seen = BY_RUN.computeIfAbsent(run, id -> new LinkedHashSet<>());
+        synchronized (seen) {
+            if (seen.contains(key)) return false;
+            if (seen.size() >= RUN_CAP) {
+                Iterator<String> iterator = seen.iterator();
+                if (iterator.hasNext()) {
+                    iterator.next();
+                    iterator.remove();
+                }
+            }
+            seen.add(key);
+            return true;
+        }
+    }
 
     private static void trim(Path file) throws IOException {
         byte[] bytes = Files.readAllBytes(file);

@@ -41,6 +41,11 @@ final class WorkbenchCliFlags {
             "validate", List.of(
                     "--tags", "--tags-file", "--tags-b64", "--name", "--run-id",
                     "--max-steps", "--all"
+            ),
+            "act", List.of(
+                    "--target", "--kind", "--query", "--ref", "--value", "--snap",
+                    "--run-id", "--agent", "--agent-id", "--fixture", "--timeout", "--frame",
+                    "--group", "--sequence"
             )
     );
 

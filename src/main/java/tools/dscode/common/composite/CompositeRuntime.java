@@ -442,7 +442,7 @@ public final class CompositeRuntime {
      * has no CDP command. The joined address stays the browser endpoint; the
      * engine uses this id to open the page socket.
      */
-    static String pageTargetId(WebDriver driver) {
+    public static String pageTargetId(WebDriver driver) {
         if (driver == null) return null;
         try {
             java.lang.reflect.Method method = driver.getClass().getMethod(

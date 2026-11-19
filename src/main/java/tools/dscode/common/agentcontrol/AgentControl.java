@@ -145,7 +145,7 @@ public final class AgentControl {
                 case "ask" -> ask(project, runId, values);
                 case "ui", "ui-apply" -> UiBatch.apply(project, runId, values, agentId);
                 case "ui-poll" -> UiBatch.poll(project, runId, values, agentId);
-                case "ui-catalog" -> uiCatalog(values);
+                case "ui-catalog" -> uiCatalog(project, runId, values, agentId);
                 case "screenshot" -> screenshot(project, values);
                 case "selftest" -> selftest(project, values);
                 case "snap", "find", "act", "wait", "watch", "explain", "capture", "attach", "eval", "frame" -> {
@@ -431,14 +431,19 @@ public final class AgentControl {
         return new Result(Boolean.TRUE.equals(report.get("ok")) ? 0 : 1, report);
     }
 
-    private static Result uiCatalog(Map<String, String> args) {
+    private static Result uiCatalog(Path project, String runId, Map<String, String> args, String agentId) throws Exception {
         String only = args.get("component");
         if (present(only) && UiCatalog.component(only.trim()) == null) {
             return fail(2, "ui-catalog --component must be one of " + String.join(", ", UiCatalog.components().keySet()));
         }
+        int eventCursor = EventCursor.after(project, runId, agentId);
+        tools.dscode.control.protocol.AgentEvents.Slice slice =
+                tools.dscode.control.protocol.AgentEvents.after(project, runId, eventCursor);
+        EventCursor.advance(project, runId, agentId, slice.next());
         Map<String, Object> body = ok("Page UI components for ui-apply: options as type=default; help, an example op, and how to undo it.");
         body.put("op", "ui-catalog");
         body.put("components", UiCatalog.describe(present(only) ? only.trim() : null));
+        body.put("agentEvents", slice.events());
         return new Result(0, body);
     }
 
@@ -604,6 +609,10 @@ public final class AgentControl {
                     failed.body().put("applied", false);
                     return failed;
                 }
+                String css = PageSurfaces.presetCss(args.get("preset"), args.get("style"));
+                tools.dscode.common.agentfast.TargetVerb.Outcome painted =
+                        tools.dscode.common.agentfast.TargetVerb.highlight(raw, args.get("handle"), css);
+                return new Result(painted.exit(), painted.body());
             }
         }
         Map<String, Object> painted = PageSurfaces.highlight(

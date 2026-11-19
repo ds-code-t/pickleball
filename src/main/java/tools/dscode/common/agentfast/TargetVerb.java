@@ -21,6 +21,10 @@ import dev.domengine.snapshot.CompositeSnapshots;
 import dev.domengine.snapshot.DesktopSnapshotProducer;
 import dev.domengine.snapshot.SnapshotOptions;
 import dev.domengine.tree.DomNode;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -63,6 +67,11 @@ public final class TargetVerb {
     public record Outcome(int exit, Map<String, Object> body) {
     }
 
+    private static final Set<String> ACT_KEYS = Set.of(
+            "target", "kind", "query", "ref", "value", "snap", "run-id", "agent", "agent-id",
+            "fixture", "timeout", "frame", "group", "sequence"
+    );
+
     /** CSS or text selector for a fresh {@code ref:}. Null when the ref is unknown or stale. */
     public static String anchorSelector(String raw) {
         String ref = raw == null ? "" : raw.trim();
@@ -86,6 +95,62 @@ public final class TargetVerb {
         } catch (RuntimeException failure) {
             String message = failure.getMessage();
             return message == null || message.isBlank() ? "unknown target" : message;
+        }
+    }
+
+    /**
+     * Paints {@code handle} on the selected browser page. The host page is not touched.
+     * {@code applied} is true only when that page reads back {@code data-pkb-style=style_modified}.
+     */
+    public static Outcome highlight(String targetRaw, String handle, String css) {
+        TargetSelector.Parsed target = TargetSelector.parse(targetRaw);
+        if (target == null || "desktop".equals(target.kind()) || "none".equals(target.kind())) {
+            Outcome failed = fail("highlight", "unknown target");
+            failed.body().put("applied", false);
+            return failed;
+        }
+        Held page = openBrowser("ref".equals(target.kind()) ? TargetSelector.parse("browser:auto") : target);
+        try {
+            String sentence = tools.dscode.browser.SurfaceAssets.sentence("highlight");
+            String script = "(function(){"
+                    + "var handle=" + jsString(handle) + ",css=" + jsString(css) + ",sentence=" + jsString(sentence) + ";"
+                    + "var el=document.getElementById(handle);"
+                    + "if(!el){var all=document.querySelectorAll('[data-pkb-handle],[data-pkb-id]');"
+                    + "for(var i=0;i<all.length;i++){var mark=all[i].getAttribute('data-pkb-handle')||all[i].getAttribute('data-pkb-id');"
+                    + "if(mark===handle){el=all[i];break;}}}"
+                    + "if(!el) return {ok:false,error:'unknown handle'};"
+                    + "if(!el.hasAttribute('data-pkb-original-style')) el.setAttribute('data-pkb-original-style', el.getAttribute('style')||'');"
+                    + "var original=el.getAttribute('data-pkb-original-style')||'';"
+                    + "var joined=original; if(joined&&css&&joined.trim().slice(-1)!==';') joined+=';';"
+                    + "el.setAttribute('style', joined+css);"
+                    + "el.setAttribute('data-pkb-style','style_modified');"
+                    + "el.setAttribute('data-pkb-sentence', sentence);"
+                    + "el.setAttribute('data-pkb-css', css);"
+                    + "return {ok:true,style:el.getAttribute('data-pkb-style'),css:el.getAttribute('data-pkb-css')};"
+                    + "})()";
+            ObjectNode params = Jsons.object();
+            params.put("expression", script);
+            params.put("returnByValue", true);
+            JsonNode called = page.session.connection().call("Runtime.evaluate", params, Duration.ofSeconds(10));
+            JsonNode payload = called.path("result").path("value");
+            boolean painted = payload.path("ok").asBoolean(false)
+                    && "style_modified".equals(payload.path("style").asText(""));
+            if (!painted) {
+                String error = payload.path("error").asText("highlight did not paint");
+                Outcome failed = fail("highlight", error);
+                failed.body().put("applied", false);
+                failed.body().put("handle", handle == null ? "" : handle);
+                return failed;
+            }
+            Map<String, Object> body = base("highlight", "cdp", "browser", target);
+            body.put("applied", true);
+            body.put("handle", handle);
+            body.put("cdp", "style");
+            body.put("labels", List.of("style_modified"));
+            stamp(body, page.session.connection(), null);
+            return ok(body);
+        } finally {
+            page.release();
         }
     }
 
@@ -194,6 +259,11 @@ public final class TargetVerb {
     }
 
     private static Outcome act(Path project, String runId, TargetSelector.Parsed target, Map<String, String> args) {
+        for (String key : args.keySet()) {
+            if (key != null && !key.isBlank() && !ACT_KEYS.contains(key)) {
+                return fail("act", "act does not use --" + key);
+            }
+        }
         String ref = blank(args.get("ref"));
         if (ref.isBlank() && "ref".equals(target.kind())) ref = target.raw();
         Hit hit = ref.isBlank() ? null : requireHit(ref);
@@ -218,7 +288,11 @@ public final class TargetVerb {
             String before = docVersion(page.session.connection());
             String titleBefore = title(page.session.connection());
             Effect effect = perform(project, runId, page.session, node, args, query, selector(node, query));
-            if (!effect.applied()) return fail("act", "not applied");
+            if (!effect.applied()) {
+                Outcome failed = fail("act", "not applied");
+                failed.body().put("used", effect.used());
+                return failed;
+            }
             String after = docVersion(page.session.connection());
             Map<String, Object> body = base("act", effect.used(), "browser", target);
             body.put("applied", true);
@@ -240,7 +314,8 @@ public final class TargetVerb {
         DomNode node = findNode(session.root(), "", hit.backend);
         if (node == null) return fail("act", "stale_ref");
         boolean live = desktopAct(session, node, args);
-        DesktopTree.Session after = DesktopTree.require(session.id());
+        DesktopTree.Session after = DesktopTree.open(session.id());
+        if (after == null) after = session;
         Map<String, Object> body = base("act", "desktop", "desktop", TargetSelector.parse("desktop:" + hit.sessionId));
         body.put("applied", live);
         body.put("docVersion", "desktop:" + after.sequence());
@@ -256,7 +331,8 @@ public final class TargetVerb {
         if (hits.isEmpty()) return fail("act", "not found");
         if (hits.size() > 1) return fail("act", "ambiguous");
         boolean live = desktopAct(session, hits.get(0), args);
-        DesktopTree.Session after = DesktopTree.require(session.id());
+        DesktopTree.Session after = DesktopTree.open(session.id());
+        if (after == null) after = session;
         Map<String, Object> body = base("act", "desktop", "desktop", target);
         body.put("applied", live);
         body.put("docVersion", "desktop:" + after.sequence());
@@ -265,10 +341,14 @@ public final class TargetVerb {
         return ok(body);
     }
 
-    /** True only after a live platform action returns. A fixture bump is not applied. */
+    /**
+     * A fixture click still bumps the tree and reports applied false.
+     * A live click is applied only when a later walk shows a tree change, or the window has gone.
+     */
     private static boolean desktopAct(DesktopTree.Session session, DomNode node, Map<String, String> args) {
         String kind = blank(args.get("kind"));
         if (kind.isBlank()) kind = "click";
+        String before = desktopFingerprint(session);
         Map<String, String> flags = new LinkedHashMap<>();
         flags.put("text", blank(args.get("value")));
         switch (kind) {
@@ -276,7 +356,34 @@ public final class TargetVerb {
             case "click", "hover", "press", "select" -> DesktopTree.click(session, node);
             default -> throw new Miss("unknown kind " + kind);
         }
-        return session.live();
+        if (!session.live()) return false;
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(1500);
+        while (true) {
+            try {
+                DesktopTree.walk(session.id());
+                DesktopTree.Session fresh = DesktopTree.require(session.id());
+                if (!before.equals(desktopFingerprint(fresh))) return true;
+            } catch (RuntimeException gone) {
+                return true;
+            }
+            if (System.nanoTime() >= deadline) return false;
+            sleep(50);
+        }
+    }
+
+    /** Stable role, name, and value. Node ids are renumbered on every walk and are not part of the effect. */
+    private static String desktopFingerprint(DesktopTree.Session session) {
+        StringBuilder text = new StringBuilder();
+        fingerprint(session == null ? null : session.root(), text);
+        return text.toString();
+    }
+
+    private static void fingerprint(DomNode node, StringBuilder text) {
+        if (node == null) return;
+        text.append(node.role == null ? "" : node.role).append('|');
+        text.append(node.accessibleName == null ? "" : node.accessibleName).append('|');
+        text.append(node.nodeValue == null ? "" : node.nodeValue).append('\n');
+        for (DomNode child : node.children) fingerprint(child, text);
     }
 
     private static Map<String, String> flagsWithNode(DesktopTree.Session session, DomNode node, Map<String, String> flags) {
@@ -552,13 +659,23 @@ public final class TargetVerb {
         flags.put("node-id", Long.toString(acted.backendNodeId));
         if ("type".equals(verb)) flags.put("text", value);
         if ("key".equals(verb)) flags.put("key", value);
-        boolean disabled = cdpInputOff();
-        if (disabled) PageActions.useCdpInput(false);
+        DomNode control = "select".equals(kind) ? selectOf(node) : node;
+        boolean inputOff = cdpInputOff();
+        if (disabled(control)) {
+            if (inputOff) FallbackLog.note(project, runId, "act", "cdp", "js", "cdp input disabled");
+            return new Effect(inputOff ? "js" : "cdp", false);
+        }
+        if (inputOff) PageActions.useCdpInput(false);
         try {
+            if (inputOff) {
+                FallbackLog.note(project, runId, "act", "cdp", "js", "cdp input disabled");
+                return jsAct(session.connection(), kind, query, selector, value, node);
+            }
             if ("click".equals(kind) && closedShadow(acted)) {
                 Effect closed = clickClosed(session.connection(), acted);
-                if (closed.applied()) return closed;
+                if (closed != null) return closed;
             }
+            String before = pageMark(session.connection());
             LiveXPath.use(session.connection());
             try {
                 PageActions.act(session, verb, flags);
@@ -567,10 +684,14 @@ public final class TargetVerb {
             }
             if ("select".equals(kind)) return new Effect("cdp", valueMatches(value, controlValue(session.connection(), selectOf(acted))));
             if ("type".equals(kind)) return new Effect("cdp", valueMatches(value, controlValue(session.connection(), node)));
-            return new Effect("cdp", true);
+            if (!before.equals(pageMark(session.connection()))) return new Effect("cdp", true);
+            if ("click".equals(kind) && clickByResolve(session.connection(), acted)) {
+                return new Effect("cdp", !before.equals(pageMark(session.connection())));
+            }
+            return new Effect("cdp", false);
         } catch (CdpException failure) {
             String message = failure.getMessage() == null ? "" : failure.getMessage();
-            if (!disabled && !message.contains("cdp input") && !message.contains("Input.")) throw failure;
+            if (!inputOff && !message.contains("cdp input") && !message.contains("Input.")) throw failure;
             FallbackLog.note(project, runId, "act", "cdp", "js", message.isBlank() ? "cdp input disabled" : message);
             return jsAct(session.connection(), kind, query, selector, value, node);
         } finally {
@@ -578,9 +699,33 @@ public final class TargetVerb {
         }
     }
 
+    /** One {@code element.click()} when the coordinate click did not change the page. */
+    private static boolean clickByResolve(CdpConnection cdp, DomNode node) {
+        if (cdp == null || node == null || node.backendNodeId <= 0) return false;
+        try {
+            ObjectNode resolve = Jsons.object();
+            resolve.put("backendNodeId", node.backendNodeId);
+            JsonNode object = cdp.call("DOM.resolveNode", resolve, Duration.ofSeconds(5)).path("object");
+            String objectId = object.path("objectId").asText("");
+            if (objectId.isBlank()) return false;
+            ObjectNode call = Jsons.object();
+            call.put("objectId", objectId);
+            call.put("functionDeclaration", "function(){ this.click(); return true; }");
+            call.put("returnByValue", true);
+            JsonNode called = cdp.call("Runtime.callFunctionOn", call, Duration.ofSeconds(5));
+            return !called.has("exceptionDetails");
+        } catch (RuntimeException failure) {
+            return false;
+        }
+    }
+
+    private static String pageMark(CdpConnection cdp) {
+        return title(cdp) + "\n" + docVersion(cdp);
+    }
+
     /** JS runs on the session that was targeted, including a {@code browser:cdp=} page. */
     private static Effect jsAct(CdpConnection cdp, String kind, String query, String selector, String value, DomNode node) {
-        String before = docVersion(cdp) + "\n" + title(cdp);
+        String before = pageMark(cdp);
         String script = ""
                 + "(function(){"
                 + "var kind=" + jsString(kind) + ",q=" + jsString(query) + ",sel=" + jsString(selector) + ",value=" + jsString(value) + ";"
@@ -590,7 +735,6 @@ public final class TargetVerb {
                 + "for(var i=0;i<all.length;i++){if(text(all[i])===q||all[i].id===q){el=all[i];break;}}}"
                 + "if(!el) return {ok:false};"
                 + "if(el.tagName==='LABEL'&&el.htmlFor){var linked=document.getElementById(el.htmlFor); if(linked) el=linked;}"
-                + "el.setAttribute('data-pkb-synthetic','1');"
                 + "if(kind==='type'){el.focus(); el.value=value; el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); return {ok:true,value:String(el.value)};}"
                 + "if(kind==='select'){var box=el.tagName==='OPTION'?(el.closest('select')||el):el; if(!box||box.tagName!=='SELECT') return {ok:false};"
                 + "var matched=false; for(var j=0;j<box.options.length;j++){var o=box.options[j]; var label=(o.label||o.text||'').replace(/\\s+/g,' ').trim();"
@@ -611,8 +755,7 @@ public final class TargetVerb {
             if (!valueMatches(value, read) && node != null) read = controlValue(cdp, "select".equals(kind) ? selectOf(node) : node);
             return new Effect("js", valueMatches(value, read));
         }
-        String after = docVersion(cdp) + "\n" + title(cdp);
-        return new Effect("js", !before.equals(after));
+        return new Effect("js", !before.equals(pageMark(cdp)));
     }
 
     private static boolean cdpInputOff() {
@@ -967,13 +1110,51 @@ public final class TargetVerb {
         String address = tools.dscode.common.composite.CompositeRuntime.cdpAddress(has.getCapabilities());
         if (address == null || address.isBlank()) return null;
         String cdp = address.contains("://") ? address : "http://" + address;
+        String pageId = tools.dscode.common.composite.CompositeRuntime.pageTargetId(driver);
+        if (pageId == null || pageId.isBlank()) pageId = pageIdForUrl(cdp, currentUrl(driver));
         try {
             BrowserSession attached = BrowserSession.attach(
-                    "worker" + Long.toUnsignedString(System.nanoTime()), cdp, false, List.of(), null);
+                    "worker" + Long.toUnsignedString(System.nanoTime()),
+                    cdp,
+                    false,
+                    List.of(),
+                    pageId == null || pageId.isBlank() ? null : pageId);
             return new Held(attached, true);
         } catch (RuntimeException failure) {
             return null;
         }
+    }
+
+    private static String currentUrl(org.openqa.selenium.WebDriver driver) {
+        try {
+            return driver.getCurrentUrl();
+        } catch (RuntimeException failure) {
+            return "";
+        }
+    }
+
+    /** Page id whose {@code /json/list} url is the driver's current page. Blank when none match. */
+    private static String pageIdForUrl(String cdp, String url) {
+        if (url == null || url.isBlank() || cdp == null || cdp.isBlank()) return "";
+        String http = cdp.startsWith("ws") ? "http" + cdp.substring(2) : cdp;
+        int slash = http.indexOf("/devtools");
+        if (slash > 0) http = http.substring(0, slash);
+        try {
+            HttpRequest list = HttpRequest.newBuilder(URI.create(http + "/json/list"))
+                    .GET()
+                    .timeout(Duration.ofSeconds(5))
+                    .build();
+            HttpResponse<String> body = HttpClient.newHttpClient().send(list, HttpResponse.BodyHandlers.ofString());
+            JsonNode pages = Jsons.MAPPER.readTree(body.body());
+            if (!pages.isArray()) return "";
+            for (JsonNode page : pages) {
+                if (!"page".equals(page.path("type").asText())) continue;
+                if (url.equals(page.path("url").asText(""))) return page.path("id").asText("");
+            }
+        } catch (Exception failure) {
+            return "";
+        }
+        return "";
     }
 
     private static boolean names(DomNode node, String label) {
@@ -1018,7 +1199,26 @@ public final class TargetVerb {
             if (!message.contains("not found") && !message.contains("query requires")) throw failure;
         }
         if (query != null && !query.isBlank()) hits.addAll(named(search, query));
-        return deepest(controlsFor(search, hits));
+        return deepest(controlsFor(search, preferBody(hits)));
+    }
+
+    /**
+     * A document title can share the visible label (the button text is copied into {@code document.title}).
+     * The clickable hit is the control in the body. A head-only match, such as the title itself, stays.
+     */
+    private static List<DomNode> preferBody(List<DomNode> hits) {
+        List<DomNode> body = new ArrayList<>();
+        for (DomNode node : hits) {
+            if (!inHead(node)) body.add(node);
+        }
+        return body.isEmpty() ? hits : body;
+    }
+
+    private static boolean inHead(DomNode node) {
+        for (DomNode cursor = node; cursor != null; cursor = cursor.parent) {
+            if ("head".equals(cursor.tag())) return true;
+        }
+        return false;
     }
 
     /** A label's {@code for} points at the control. The query names that control. */
@@ -1202,6 +1402,7 @@ public final class TargetVerb {
     private static boolean disabled(DomNode node) {
         if (node == null) return true;
         if (node.attributes.containsKey("disabled")) return true;
+        if (node.attributes.containsKey("inert")) return true;
         String aria = node.attributes.get("aria-disabled");
         if (aria != null && !aria.isBlank() && !"false".equalsIgnoreCase(aria) && !"0".equals(aria)) return true;
         if (node.liveState != null && node.liveState.path("disabled").asBoolean(false)) return true;
@@ -1226,6 +1427,8 @@ public final class TargetVerb {
             if (!selected.isBlank()) return selected;
             if (!label.isBlank()) return label;
         }
+        String aria = attr(node, "aria-label");
+        if (!aria.isBlank()) return aria;
         if (node.accessibleName != null && !node.accessibleName.isBlank()) return node.accessibleName;
         String text = HtmlTree.textOf(node);
         if (!text.isBlank()) return text.length() > 80 ? text.substring(0, 80) : text;
@@ -1606,16 +1809,15 @@ public final class TargetVerb {
             if (context > 0) resolve.put("executionContextId", context);
             JsonNode object = cdp.call("DOM.resolveNode", resolve, Duration.ofSeconds(5)).path("object");
             String objectId = object.path("objectId").asText("");
-            if (objectId.isBlank()) return new Effect("resolveNode", false);
-            String before = title(cdp);
+            if (objectId.isBlank()) return null;
+            String before = pageMark(cdp);
             ObjectNode call = Jsons.object();
             call.put("objectId", objectId);
             call.put("functionDeclaration", "function(){ this.click(); return document.title; }");
             call.put("returnByValue", true);
             JsonNode called = cdp.call("Runtime.callFunctionOn", call, Duration.ofSeconds(5));
             if (called.has("exceptionDetails")) return new Effect("resolveNode", false);
-            String after = title(cdp);
-            return new Effect("resolveNode", !before.equals(after));
+            return new Effect("resolveNode", !before.equals(pageMark(cdp)));
         } catch (RuntimeException failure) {
             return new Effect("resolveNode", false);
         }
@@ -1698,7 +1900,8 @@ public final class TargetVerb {
         body.put("op", op == null ? "" : op);
         body.put("applied", false);
         body.put("error", error == null ? "failed" : error);
-        return new Outcome(error != null && error.startsWith("unknown kind") ? 2 : 1, body);
+        boolean usage = error != null && (error.startsWith("unknown kind") || error.contains("does not use"));
+        return new Outcome(usage ? 2 : 1, body);
     }
 
     private static String chain(String op) {

@@ -30,6 +30,17 @@ class WorkbenchCommandLineTest {
         assertTrue(WorkbenchCommandLine.parse(new String[]{"confirm", "--quiet"}).quiet());
         assertTrue(WorkbenchCommandLine.parse(new String[]{"validate", "--tags=@smoke", "--all", "--max-steps=4"}).allSteps());
         assertTrue(WorkbenchCliHelp.usage("validate").contains("--quiet"));
+        IllegalArgumentException act = assertThrows(
+                IllegalArgumentException.class,
+                () -> WorkbenchCommandLine.parse(new String[]{"act", "--target=browser:auto", "--cdp-input=off"})
+        );
+        assertTrue(act.getMessage().contains("error: act does not use --cdp-input"), act.getMessage());
+        assertTrue(act.getMessage().contains("fix:"), act.getMessage());
+        WorkbenchCommandLine.parse(new String[]{
+                "act", "--target=browser:auto", "--kind=click", "--query=Save", "--ref=ref:1",
+                "--value=Blue", "--snap=diff", "--run-id=r", "--agent=a", "--agent-id=a",
+                "--fixture=tree.json", "--timeout=1000", "--frame=main", "--group=g", "--sequence=1"
+        });
     }
 
     @Test

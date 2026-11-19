@@ -76,6 +76,9 @@ class FallbackLoggedTest {
         assertTrue(first.path("applied").asBoolean(), fallback.out);
         assertEquals("js", first.path("used").asText(), fallback.out);
         assertEquals("Saved:1", eval("document.title", "fell").path("value").asText(), fallback.out);
+        assertEquals("true", eval("document.querySelector('[data-pkb-synthetic]')===null", "fell").path("value").asText(), fallback.out);
+        Capture other = run("eval", "--target=browser:auto", "--expr=1+1", "--world=main", "--run-id=other");
+        assertEquals(0, other.code, other.err + other.out);
         assertTrue(Files.isRegularFile(log), "fallback log");
         List<String> lines = Files.readAllLines(log);
         assertEquals(1, lines.size(), lines.toString());
@@ -105,6 +108,7 @@ class FallbackLoggedTest {
                 "act", "--target=" + color.path("ref").asText(), "--kind=select", "--value=Blue", "--run-id=fell");
         assertEquals(0, selected.code, selected.err + selected.out);
         assertTrue(JSON.readTree(selected.out).path("applied").asBoolean(), selected.out);
+        assertEquals("js", JSON.readTree(selected.out).path("used").asText(), selected.out);
         assertEquals("Blue", eval("document.getElementById('color').value", "fell").path("value").asText(), selected.out);
         assertEquals(1, Files.readAllLines(log).size(), "type and select reuse the one act fallback line");
     }
