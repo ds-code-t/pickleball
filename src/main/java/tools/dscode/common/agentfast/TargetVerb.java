@@ -34,6 +34,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 
 /**
  * Browser and desktop verbs on the existing engine path:
@@ -61,6 +63,8 @@ public final class TargetVerb {
         }
     });
     private static final ConcurrentHashMap<String, String> BASELINE = new ConcurrentHashMap<>();
+    /** Ids for {@code --snap=auto} files. One id names the before and after pair. */
+    private static final AtomicInteger AUTO_SEQ = new AtomicInteger();
     /** Frame id chosen by {@code frame --enter} for this run. {@code frame --reset} clears it. */
     private static final ConcurrentHashMap<String, String> ENTERED = new ConcurrentHashMap<>();
     private static final ThreadLocal<String> RUN = new ThreadLocal<>();
@@ -341,8 +345,10 @@ public final class TargetVerb {
             String kind = blank(args.get("kind"));
             if (kind.isBlank() || "click".equals(kind)) awaitMaskQuiet(page.session.connection(), timeoutMs(args));
             boolean wantDiff = "diff".equals(blank(args.get("snap")));
+            boolean wantAuto = "auto".equals(blank(args.get("snap")));
             List<SnapRow> rowsBefore = wantDiff
                     ? elementRows(page.session.connection(), page.session.id, before) : List.of();
+            List<String> autoBefore = wantAuto ? compactBrowser(page.session, runId, target) : List.of();
             Effect effect = perform(project, runId, page.session, node, args, query, selector(node, query));
             List<SnapRow> rowsAfter = wantDiff
                     ? elementRows(page.session.connection(), page.session.id, docVersion(page.session.connection())) : List.of();
@@ -356,6 +362,7 @@ public final class TargetVerb {
                 putEntered(failed.body(), runId, page.session.connection());
                 putShadow(failed.body(), node);
                 putSnapDiff(failed.body(), args, titleBefore, title(page.session.connection()), before, docVersion(page.session.connection()), rowsBefore, rowsAfter);
+                putAutoSnap(failed.body(), args, project, runId, autoBefore, () -> compactBrowser(page.session, runId, target));
                 return failed;
             }
             if (effect.quiet()) {
@@ -369,6 +376,7 @@ public final class TargetVerb {
                 body.put("kind", kind.isBlank() ? "click" : kind);
                 body.put("docVersion", after);
                 putSnapDiff(body, args, titleBefore, titleAfter, before, after, rowsBefore, rowsAfter);
+                putAutoSnap(body, args, project, runId, autoBefore, () -> compactBrowser(page.session, runId, target));
                 stamp(body, page.session.connection(), node);
                 putEntered(body, runId, page.session.connection());
                 putShadow(body, node);
@@ -382,6 +390,7 @@ public final class TargetVerb {
                 putEntered(failed.body(), runId, page.session.connection());
                 putShadow(failed.body(), node);
                 putSnapDiff(failed.body(), args, titleBefore, title(page.session.connection()), before, docVersion(page.session.connection()), rowsBefore, rowsAfter);
+                putAutoSnap(failed.body(), args, project, runId, autoBefore, () -> compactBrowser(page.session, runId, target));
                 return failed;
             }
             String condition = blank(args.get("condition"));
@@ -401,6 +410,7 @@ public final class TargetVerb {
                     List<SnapRow> timedRows = wantDiff
                             ? elementRows(page.session.connection(), page.session.id, timedOut) : List.of();
                     putSnapDiff(failed.body(), args, titleBefore, title(page.session.connection()), before, timedOut, rowsBefore, timedRows);
+                    putAutoSnap(failed.body(), args, project, runId, autoBefore, () -> compactBrowser(page.session, runId, target));
                     stamp(failed.body(), page.session.connection(), node);
                     putEntered(failed.body(), runId, page.session.connection());
                     putShadow(failed.body(), node);
@@ -425,6 +435,7 @@ public final class TargetVerb {
                 body.put("visible", true);
             }
             putSnapDiff(body, args, titleBefore, titleAfter, before, after, rowsBefore, rowsAfter);
+            putAutoSnap(body, args, project, runId, autoBefore, () -> compactBrowser(page.session, runId, target));
             stamp(body, page.session.connection(), node);
             putEntered(body, runId, page.session.connection());
             putShadow(body, node);
@@ -514,6 +525,8 @@ public final class TargetVerb {
         if (node == null) return staleRef("act");
         String beforeVersion = "desktop:" + session.sequence();
         List<SnapRow> rowsBefore = desktopRows(session);
+        boolean wantAuto = "auto".equals(blank(args.get("snap")));
+        List<String> autoBefore = wantAuto ? compactDesktop(session, runId) : List.of();
         boolean live = desktopAct(session, node, args);
         DesktopTree.Session after = DesktopTree.open(session.id());
         if (after == null) after = session;
@@ -523,6 +536,8 @@ public final class TargetVerb {
         body.put("docVersion", afterVersion);
         body.put("session", after.id());
         putSnapDiff(body, args, "", "", beforeVersion, afterVersion, rowsBefore, desktopRows(after));
+        DesktopTree.Session snapped = after;
+        putAutoSnap(body, args, project, runId, autoBefore, () -> compactDesktop(snapped, runId));
         stampDesktop(body, after);
         return ok(body);
     }
@@ -535,6 +550,8 @@ public final class TargetVerb {
         if (hits.size() > 1) return fail("act", "ambiguous");
         String beforeVersion = "desktop:" + session.sequence();
         List<SnapRow> rowsBefore = desktopRows(session);
+        boolean wantAuto = "auto".equals(blank(args.get("snap")));
+        List<String> autoBefore = wantAuto ? compactDesktop(session, runId) : List.of();
         boolean live = desktopAct(session, hits.get(0), args);
         DesktopTree.Session after = DesktopTree.open(session.id());
         if (after == null) after = session;
@@ -544,6 +561,8 @@ public final class TargetVerb {
         body.put("docVersion", afterVersion);
         body.put("session", after.id());
         putSnapDiff(body, args, "", "", beforeVersion, afterVersion, rowsBefore, desktopRows(after));
+        DesktopTree.Session snapped = after;
+        putAutoSnap(body, args, project, runId, autoBefore, () -> compactDesktop(snapped, runId));
         stampDesktop(body, after);
         return ok(body);
     }
@@ -672,9 +691,11 @@ public final class TargetVerb {
             DesktopTree.Session session = null;
             boolean met = false;
             boolean wantDiff = "diff".equals(blank(args.get("snap")));
+            boolean wantAuto = "auto".equals(blank(args.get("snap")));
             DesktopTree.Session opened = openDesktop(target, args.get("fixture"));
             String beforeVersion = "desktop:" + opened.sequence();
             List<SnapRow> rowsBefore = wantDiff ? desktopRows(opened) : List.of();
+            List<String> autoBefore = wantAuto ? compactDesktop(opened, runId) : List.of();
             String looked = condition.startsWith("text=") ? condition.substring("text=".length()) : blank(args.get("query"));
             while (true) {
                 session = openDesktop(target, args.get("fixture"));
@@ -695,9 +716,11 @@ public final class TargetVerb {
             }
             String afterVersion = "desktop:" + (session == null ? opened.sequence() : session.sequence());
             List<SnapRow> rowsAfter = wantDiff ? desktopRows(session == null ? opened : session) : List.of();
+            DesktopTree.Session snapped = session == null ? opened : session;
             if (!met) {
                 Outcome failed = fail("wait", "timeout");
                 putSnapDiff(failed.body(), args, "", "", beforeVersion, afterVersion, rowsBefore, rowsAfter);
+                putAutoSnap(failed.body(), args, project, runId, autoBefore, () -> compactDesktop(snapped, runId));
                 return failed;
             }
             Map<String, Object> body = base("wait", "desktop", "desktop", target);
@@ -706,6 +729,7 @@ public final class TargetVerb {
             body.put("condition", condition);
             body.put("docVersion", afterVersion);
             putSnapDiff(body, args, "", "", beforeVersion, afterVersion, rowsBefore, rowsAfter);
+            putAutoSnap(body, args, project, runId, autoBefore, () -> compactDesktop(snapped, runId));
             return ok(body);
         }
         Held page = openBrowser(resolved(target, args));
@@ -713,8 +737,10 @@ public final class TargetVerb {
             String before = docVersion(page.session.connection());
             String titleBefore = title(page.session.connection());
             boolean wantDiff = "diff".equals(blank(args.get("snap")));
+            boolean wantAuto = "auto".equals(blank(args.get("snap")));
             List<SnapRow> rowsBefore = wantDiff
                     ? elementRows(page.session.connection(), page.session.id, before) : List.of();
+            List<String> autoBefore = wantAuto ? compactBrowser(page.session, runId, target) : List.of();
             Map<String, String> flags = scopedFrame(runId, target);
             String session = enteredSession(page.session.connection(), runId);
             String ref = blank(args.get("ref"));
@@ -733,6 +759,7 @@ public final class TargetVerb {
                 List<SnapRow> rowsAfter = wantDiff
                         ? elementRows(page.session.connection(), page.session.id, after) : List.of();
                 putSnapDiff(failed.body(), args, titleBefore, title(page.session.connection()), before, after, rowsBefore, rowsAfter);
+                putAutoSnap(failed.body(), args, project, runId, autoBefore, () -> compactBrowser(page.session, runId, target));
                 stamp(failed.body(), page.session.connection(), null);
                 putEntered(failed.body(), runId, page.session.connection());
                 return failed;
@@ -747,6 +774,7 @@ public final class TargetVerb {
             List<SnapRow> rowsAfter = wantDiff
                     ? elementRows(page.session.connection(), page.session.id, after) : List.of();
             putSnapDiff(body, args, titleBefore, titleAfter, before, after, rowsBefore, rowsAfter);
+            putAutoSnap(body, args, project, runId, autoBefore, () -> compactBrowser(page.session, runId, target));
             stamp(body, page.session.connection(), null);
             putEntered(body, runId, page.session.connection());
             return ok(body);
@@ -2081,6 +2109,72 @@ public final class TargetVerb {
             throw new CdpException("snap full: " + failure.getMessage());
         }
         return file.toString();
+    }
+
+    /**
+     * Compact interactable lines for the document this call is in.
+     * Same lines as {@code snap}, with no reply budget.
+     */
+    private static List<String> compactBrowser(BrowserSession session, String runId, TargetSelector.Parsed target) {
+        DomNode root = tree(session);
+        DomNode shown = root;
+        Map<String, String> scopeFlags = scopedFrame(runId, target);
+        if (!scopeFlags.isEmpty()) {
+            try {
+                shown = Frames.scope(root, scopeFlags);
+            } catch (CdpException ignored) {
+                shown = root;
+            }
+        }
+        String version = docVersion(session.connection());
+        List<Map<String, Object>> rows = publish(
+                runId, "browser", session.id, version, interactive(shown), "", session.connection());
+        return sectioned(rows);
+    }
+
+    private static List<String> compactDesktop(DesktopTree.Session session, String runId) {
+        if (session == null || session.root() == null) return List.of();
+        String version = "desktop:" + session.sequence();
+        List<Map<String, Object>> rows = publish(
+                runId, "desktop", session.id(), version, interactive(session.root()), "");
+        return sectioned(rows);
+    }
+
+    /**
+     * Writes the pre/post compact snapshot and returns its id on {@code snapshot}.
+     * The lines stay in the file. {@code --snap=auto} is the only caller.
+     */
+    private static void putAutoSnap(
+            Map<String, Object> body,
+            Map<String, String> args,
+            Path project,
+            String runId,
+            List<String> before,
+            Supplier<List<String>> after
+    ) {
+        if (!"auto".equals(blank(args == null ? null : args.get("snap")))) return;
+        String raw = runId == null || runId.isBlank() ? "run" : runId;
+        String safe = raw.replaceAll("[^A-Za-z0-9._-]", "_");
+        String id = "auto-" + safe + "-" + AUTO_SEQ.incrementAndGet();
+        List<String> lines = new ArrayList<>();
+        lines.add("## before");
+        if (before != null) lines.addAll(before);
+        lines.add("## after");
+        List<String> later = after == null ? List.of() : after.get();
+        if (later != null) lines.addAll(later);
+        writeNamed(project, id, lines);
+        body.put("snapshot", id);
+    }
+
+    private static void writeNamed(Path project, String id, List<String> lines) {
+        Path dir = (project == null ? Path.of(".") : project).resolve(".pickleball").resolve("agent-full");
+        Path file = dir.resolve(id + ".txt");
+        try {
+            Files.createDirectories(dir);
+            Files.writeString(file, String.join("\n", lines) + "\n");
+        } catch (java.io.IOException failure) {
+            throw new CdpException("auto snap: " + failure.getMessage());
+        }
     }
 
     private static Map<String, Object> report(DomNode node, CdpConnection cdp) {
