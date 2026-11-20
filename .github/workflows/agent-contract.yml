@@ -501,8 +501,179 @@ jobs:
         if: always()
         run: ./gradlew --no-daemon :test --tests tools.dscode.common.seleniumextensions.LiveFirefoxSnapshotTest
 
+  agent-fast:
+    name: Agent-fast Phases 1-7 (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Chrome for the agent-fast tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${RUNNER_OS}" = "Linux" ]; then
+            meta="$(python3 - <<'PY'
+            import json, urllib.request
+            data = json.load(urllib.request.urlopen("https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json"))
+            stable = data["channels"]["Stable"]
+            def url(kind):
+                return next(item["url"] for item in stable["downloads"][kind] if item["platform"] == "linux64")
+            print(stable["version"])
+            print(url("chrome"))
+            print(url("chromedriver"))
+            PY
+            )"
+            version="$(printf '%s\n' "$meta" | sed -n '1p')"
+            url="$(printf '%s\n' "$meta" | sed -n '2p')"
+            driver="$(printf '%s\n' "$meta" | sed -n '3p')"
+            curl -fsSL -o /tmp/chrome-linux64.zip "$url"
+            unzip -q /tmp/chrome-linux64.zip -d "$RUNNER_TEMP/chrome"
+            curl -fsSL -o /tmp/chromedriver-linux64.zip "$driver"
+            unzip -q /tmp/chromedriver-linux64.zip -d "$RUNNER_TEMP/chrome"
+            chrome="$RUNNER_TEMP/chrome/chrome-linux64/chrome"
+            bindir="$RUNNER_TEMP/chrome/bin"
+            mkdir -p "$bindir"
+            ln -sfn "$chrome" "$bindir/google-chrome"
+            ln -sfn "$chrome" "$bindir/google-chrome-stable"
+            ln -sfn "$chrome" "$bindir/chrome"
+            ln -sfn "$RUNNER_TEMP/chrome/chromedriver-linux64/chromedriver" "$bindir/chromedriver"
+            echo "$bindir" >> "$GITHUB_PATH"
+            {
+              echo "DOMENGINE_CHROME<<EOF"
+              echo "$chrome"
+              echo "EOF"
+            } >> "$GITHUB_ENV"
+            "$chrome" --version
+            echo "chrome-for-testing $version"
+          elif [ "${RUNNER_OS}" = "Windows" ]; then
+            chrome='C:\Program Files\Google\Chrome\Application\chrome.exe'
+            test -f "$chrome"
+            {
+              echo "DOMENGINE_CHROME<<EOF"
+              echo "$chrome"
+              echo "EOF"
+            } >> "$GITHUB_ENV"
+          else
+            chrome="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+            test -x "$chrome"
+            {
+              echo "DOMENGINE_CHROME<<EOF"
+              echo "$chrome"
+              echo "EOF"
+            } >> "$GITHUB_ENV"
+            "$chrome" --version
+          fi
+
+      - name: Agent-fast Phase 1-7 tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon :test \
+            --tests tools.dscode.common.agentfast.UiCpuLoopTest \
+            --tests tools.dscode.common.agentcontrol.UnownedDriverQuitTest \
+            --tests tools.dscode.launcher.CliForwardToWorkerTest \
+            --tests tools.dscode.control.protocol.speed.ProcessStartGuardTest \
+            --tests tools.dscode.launcher.GuidanceCommandGoldenTest \
+            --tests tools.dscode.launcher.WorkbenchAgentUsabilityTest \
+            --tests tools.dscode.launcher.WorkbenchCliCoverageGateTest \
+            --tests tools.dscode.launcher.WorkbenchCliSurfaceCoverageTest \
+            --tests tools.dscode.browser.SurfaceAssetsTest \
+            --tests tools.dscode.common.agentfast.CompactReplyTest \
+            --tests tools.dscode.common.agentfast.TimingFieldsTest \
+            --tests tools.dscode.common.agentfast.SelftestCpuBenchTest \
+            --tests tools.dscode.common.agentcontrol.NoReinjectTest \
+            --tests tools.dscode.launcher.StartDrivesPageTest \
+            --tests tools.dscode.launcher.StartLaunchesBrowserTest \
+            --tests tools.dscode.common.agentcontrol.ChatCursorTest \
+            --tests tools.dscode.launcher.ConsumerReadyCliTest \
+            --tests tools.dscode.launcher.DoctorTest \
+            --tests tools.dscode.launcher.TargetAgnosticApiTest \
+            --tests tools.dscode.launcher.DesktopSameVerbTest \
+            --tests tools.dscode.launcher.FallbackLoggedTest \
+            --tests tools.dscode.launcher.TargetCoverageTest \
+            --tests tools.dscode.launcher.OopifAutoAttachTest \
+            --tests tools.dscode.launcher.FrameInReplyTest \
+            --tests tools.dscode.launcher.ClosedShadowResolveTest \
+            --tests tools.dscode.launcher.VirtualizedScrollTest \
+            --tests tools.dscode.launcher.FrameActTest \
+            --tests tools.dscode.launcher.CompactSnapshotTest \
+            --tests tools.dscode.launcher.SnapshotDiffOnActTest \
+            --tests tools.dscode.launcher.RefLifetimeTest \
+            --tests tools.dscode.launcher.RefWaitTest \
+            --tests tools.dscode.launcher.ElementSnapDiffTest \
+            --tests tools.dscode.launcher.SnapBudgetTest \
+            --tests tools.dscode.launcher.AutoSnapshotTest \
+            --tests tools.dscode.common.agentfast.FallbackRunCapTest \
+            --tests tools.dscode.launcher.OneCallActTest \
+            --tests tools.dscode.launcher.ConfirmTest \
+            --tests tools.dscode.launcher.VisibleFlagTest \
+            --tests tools.dscode.launcher.OverlapTest \
+            --tests tools.dscode.launcher.NavigateDataFileTest \
+            --tests tools.dscode.launcher.MaskQuietTest \
+            --tests tools.dscode.launcher.ActConditionCoverTest \
+            --tests tools.dscode.launcher.AskIdTest \
+            --tests tools.dscode.launcher.FormFillKindTest \
+            --tests tools.dscode.launcher.PlacementNowTest \
+            --tests tools.dscode.launcher.FrameRestoreTest \
+            --tests tools.dscode.launcher.ClickOnceTest \
+            --tests tools.dscode.launcher.JsFallbackHonestyTest \
+            --tests tools.dscode.launcher.BrowserLostRunIdTest \
+            --tests tools.dscode.launcher.RedirectedFrameTest \
+            --tests tools.dscode.launcher.OffsetFrameClickTest \
+            --tests tools.dscode.store.spike.EmbeddedMultiProcessTest \
+            --tests tools.dscode.store.sql.StoreConcurrencyTest
+          ./gradlew --no-daemon :pickleball-workbench:test \
+            --tests tools.dscode.workbench.worker.WorkerRestartBrowserTest \
+            --tests tools.dscode.workbench.worker.LeaseHoldTest \
+            --tests tools.dscode.workbench.worker.LeaseRenewTickTest
+          ./gradlew --no-daemon :pickleball-control-protocol:test \
+            --tests tools.dscode.control.protocol.OpenerQuoteTest
+          ./gradlew --no-daemon :pickleball-control-api:test \
+            --tests tools.dscode.control.bridge.NoopGlueFlagTest
+          ./gradlew --no-daemon :dom-engine:test \
+            --tests dev.domengine.LiveChromeQueryFlagsTest \
+            --tests dev.domengine.snapshot.XPathIndexTest
+          fail=0
+          for name in \
+            ClickOnceTest FrameActTest FrameRestoreTest WorkbenchCliSurfaceCoverageTest \
+            JsFallbackHonestyTest BrowserLostRunIdTest MaskQuietTest RefLifetimeTest \
+            AskIdTest FormFillKindTest ActConditionCoverTest VisibleFlagTest \
+            VirtualizedScrollTest RedirectedFrameTest OffsetFrameClickTest \
+            NavigateDataFileTest SnapBudgetTest ElementSnapDiffTest AutoSnapshotTest \
+            OopifAutoAttachTest ClosedShadowResolveTest PlacementNowTest
+          do
+            report="$(find . -path "*/test-results/test/TEST-*${name}.xml" | head -1)"
+            if [ -z "${report}" ]; then
+              echo "missing result for ${name}"
+              fail=1
+              continue
+            fi
+            if grep -q '<skipped' "${report}"; then
+              echo "${name} skipped on ${RUNNER_OS}:"
+              grep -A2 '<skipped' "${report}" || true
+              fail=1
+            fi
+          done
+          test "${fail}" = "0"
+          echo "${RUNNER_OS} agent-fast Phase 1-7 tests ran" >> "$GITHUB_STEP_SUMMARY"
+
   gate:
-    needs: [windows, macos, dom-engine-live]
+    needs: [windows, macos, dom-engine-live, agent-fast]
     if: always()
     runs-on: windows-latest
     steps:
@@ -518,9 +689,10 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Block the release unless Windows, macOS, and live Chrome passed
+      - name: Block the release unless Windows, macOS, live Chrome, and agent-fast passed
         shell: bash
         run: |
           test "${{ needs.windows.result }}" = "success"
           test "${{ needs.macos.result }}" = "success"
           test "${{ needs.dom-engine-live.result }}" = "success"
+          test "${{ needs.agent-fast.result }}" = "success"
