@@ -41,6 +41,48 @@ public final class AgentControl {
         AgentDriverHooks.quit();
     }
 
+    /** Puts the live Selenium document back on the top frame. A missing driver is a no-op. */
+    public static void resetLiveDocument() {
+        WebDriver web = PageSurfaces.liveDriver();
+        if (web == null) return;
+        try {
+            tools.dscode.common.composite.ElementOperations.defaultContent(web);
+        } catch (RuntimeException ignored) {
+            // The CLI entered map is already cleared.
+        }
+    }
+
+    /**
+     * Enters an iframe or frame whose id, name, or title is {@code token}.
+     * A miss, including a cross-site CDP id, leaves the driver where it was after the reset attempt.
+     */
+    public static void enterNamedFrame(String token) {
+        if (token == null || token.isBlank()) return;
+        WebDriver web = PageSurfaces.liveDriver();
+        if (web == null) return;
+        try {
+            tools.dscode.common.composite.ElementOperations.defaultContent(web);
+            String want = token.trim();
+            for (org.openqa.selenium.WebElement frame : web.findElements(org.openqa.selenium.By.cssSelector("iframe, frame"))) {
+                if (want.equals(attr(frame, "id")) || want.equals(attr(frame, "name")) || want.equals(attr(frame, "title"))) {
+                    tools.dscode.common.composite.ElementOperations.enterFrame(web, frame);
+                    return;
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // CDP enter still scopes later agent calls.
+        }
+    }
+
+    private static String attr(org.openqa.selenium.WebElement element, String name) {
+        try {
+            String value = element.getAttribute(name);
+            return value == null ? "" : value.trim();
+        } catch (RuntimeException ignored) {
+            return "";
+        }
+    }
+
     /** Geometry already resolved for a ranked handle. Overlay placement looks this up. */
     public static void rememberGeometry(String handle, double x, double y) {
         PageSurfaces.rememberGeometry(handle, x, y);

@@ -7,6 +7,7 @@ import tools.dscode.control.protocol.ControlBridgeCallResult;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ControlBridgeNativeStepTest {
     @Test
@@ -17,7 +18,8 @@ class ControlBridgeNativeStepTest {
         )) {
             ControlBridgeCallResult result = coordinator.executeStep(null, "native control echo \"hi\"", "", 5);
             assertEquals("SUCCESS", result.status());
-            assertEquals("hi", result.valueText());
+            assertTrue(result.valueText() != null && result.valueText().startsWith("hi"), result.valueText());
+            assertTrue(result.valueText().contains("frame="), result.valueText());
         }
     }
 }

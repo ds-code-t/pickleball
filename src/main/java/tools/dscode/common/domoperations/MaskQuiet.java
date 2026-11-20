@@ -126,6 +126,18 @@ public final class MaskQuiet {
         }
     }
 
+    /** Fails when a covering mask is still up after the wait. A miss is not a failure. */
+    public static void requireClear(WebDriver driver, WebElement element, long timeoutMs) {
+        failIfStuck(await(driver, element, timeoutMs));
+    }
+
+    static void failIfStuck(Wait wait) {
+        if (wait != null && wait.waitedMs() > 0 && !wait.maskCleared()) {
+            throw new IllegalStateException(
+                    "error: loading mask still covers the click. fix: wait until the mask clears, then click again.");
+        }
+    }
+
     private static boolean covers(WebDriver driver, JavascriptExecutor js, WebElement element) {
         Duration previous = null;
         try {

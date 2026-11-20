@@ -719,6 +719,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentcontrol/ChatCursorTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/ChatLockChild.java`
 - `src/test/java/tools/dscode/common/agentcontrol/FallbackLogTest.java`
+- `src/test/java/tools/dscode/common/agentcontrol/ForgetLeavesPanelTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/IsolatedWorldTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/LiveChromeCdpTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/NoReinjectTest.java`
@@ -733,6 +734,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentcontrol/UnownedDriverQuitTest.java`
 - `src/test/java/tools/dscode/common/agentfast/CompactReplyTest.java`
 - `src/test/java/tools/dscode/common/agentfast/FallbackRunCapTest.java`
+- `src/test/java/tools/dscode/common/agentfast/LiveReplyRulesTest.java`
 - `src/test/java/tools/dscode/common/agentfast/SelftestCpuBenchTest.java`
 - `src/test/java/tools/dscode/common/agentfast/TimingFieldsTest.java`
 - `src/test/java/tools/dscode/common/agentfast/UiCpuLoopTest.java`
@@ -765,6 +767,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/composite/CompositeLocationTest.java`
 - `src/test/java/tools/dscode/common/composite/ContextAnchorReproTest.java`
 - `src/test/java/tools/dscode/common/composite/ContextNestGateTest.java`
+- `src/test/java/tools/dscode/common/composite/CurrentFramePathTest.java`
 - `src/test/java/tools/dscode/common/composite/DefaultPathTest.java`
 - `src/test/java/tools/dscode/common/composite/DictionaryLayerBoundaryTest.java`
 - `src/test/java/tools/dscode/common/composite/DomAccessGuardTest.java`
@@ -791,6 +794,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/coordination/RunConfigIsolationTest.java`
 - `src/test/java/tools/dscode/common/dataelements/NamespaceXmlTest.java`
 - `src/test/java/tools/dscode/common/domoperations/LoadingCategoryDefinitionTest.java`
+- `src/test/java/tools/dscode/common/domoperations/MaskQuietRulesTest.java`
 - `src/test/java/tools/dscode/common/domoperations/NestAnchorReproTest.java`
 - `src/test/java/tools/dscode/common/domoperations/PositionSelectionTest.java`
 - `src/test/java/tools/dscode/common/driver/ApplyDebugPortTest.java`

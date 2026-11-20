@@ -131,6 +131,14 @@ final class UiBatch {
         return value instanceof Number number ? number.doubleValue() : 0;
     }
 
+    /** Visibility and overlap stay on the row even when --verbose is off. */
+    private static void copyPlacement(Map<String, Object> row, Map<String, Object> body) {
+        if (row == null || body == null) return;
+        for (String key : List.of("visible", "hidden", "hiddenReason", "overlaps", "lost")) {
+            if (body.containsKey(key)) row.put(key, body.get(key));
+        }
+    }
+
     static AgentControl.Result apply(Path project, String runId, Map<String, String> args, String agentId) throws Exception {
         List<Map<String, Object>> ops = parse(project, args.get("ops"));
         boolean verbose = "true".equalsIgnoreCase(String.valueOf(args.get("verbose")));
@@ -179,6 +187,7 @@ final class UiBatch {
                 row.put("ok", false);
                 row.put("error", String.valueOf(result.body().getOrDefault("error", "failed")));
             }
+            copyPlacement(row, result.body());
             if (verbose) row.put("body", result.body());
             rows.add(row);
         }

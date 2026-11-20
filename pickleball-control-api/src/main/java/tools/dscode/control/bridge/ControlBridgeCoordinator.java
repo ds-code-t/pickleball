@@ -287,13 +287,13 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
             ControlCallResult<Object> nativeResult = DynamicControl.executeStep(text, argument == null ? "" : argument);
             Object value = nativeResult.value();
             var error = nativeResult.error();
-            return noteNoop(text, new ControlBridgeCallResult(
+            return noteFrame(noteNoop(text, new ControlBridgeCallResult(
                     nativeResult.status().name(),
                     value == null ? null : value.getClass().getName(),
                     value == null ? null : clipped(Objects.toString(value)),
                     error == null ? null : bridgeError(error.type(), error.message(), error.stackTrace()),
                     status()
-            ));
+            )));
         }
         ScenarioLane lane = selectedLane(normalizeScenarioId(scenarioId));
         if (lane == null) {
@@ -303,9 +303,9 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
                 lane,
                 commandTimeout(timeoutSeconds),
                 () -> {
-                    ControlBridgeCallResult result = noteNoop(text, fromControlResult(
+                    ControlBridgeCallResult result = noteFrame(noteNoop(text, fromControlResult(
                             DynamicControl.executeStep(text, argument == null ? "" : argument), lane
-                    ));
+                    )));
                     if (eventRecorder != null) {
                         eventRecorder.recordExecutedStep(lane.scenarioId, lane.scenarioName, text, result.status());
                     }
@@ -874,6 +874,22 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         } catch (Throwable ignored) {
             return result;
         }
+    }
+
+    /** The driver frame after the step, appended so a reply always names it. */
+    private ControlBridgeCallResult noteFrame(ControlBridgeCallResult result) {
+        if (result == null) return null;
+        String path = "top";
+        try {
+            String current = tools.dscode.common.composite.ElementOperations.currentFramePath();
+            if (current != null && !current.isBlank()) path = current;
+        } catch (Throwable ignored) {
+            path = "top";
+        }
+        String text = result.valueText();
+        if (text != null && text.contains(" frame=")) return result;
+        String stamped = text == null || text.isBlank() ? "frame=" + path : text + " frame=" + path;
+        return new ControlBridgeCallResult(result.status(), result.valueType(), stamped, result.error(), result.runtime());
     }
 
     private ControlBridgeCallResult fromControlResult(ControlCallResult<Object> result, ScenarioLane lane) {

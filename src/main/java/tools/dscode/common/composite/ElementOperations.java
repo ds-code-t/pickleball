@@ -64,6 +64,19 @@ public final class ElementOperations {
         return joined.toString();
     }
 
+    /** Path of frames this thread is in now. {@code top} when the stack is empty. */
+    public static String currentFramePath() {
+        List<FrameNote> stack = FRAMES.get();
+        if (stack.isEmpty()) return "top";
+        StringBuilder joined = new StringBuilder();
+        for (FrameNote note : stack) {
+            String name = note.name == null || note.name.isBlank() ? "?" : note.name;
+            if (!joined.isEmpty()) joined.append('/');
+            joined.append(name);
+        }
+        return joined.toString();
+    }
+
     /**
      * Snapshot of the notes. {@link tools.dscode.common.seleniumextensions.AllContextsScan}
      * rewinds to this after it puts the driver back, so its own switches are not frames the step entered.
@@ -204,6 +217,7 @@ public final class ElementOperations {
         tools.dscode.common.domoperations.MaskQuiet.await(driver, raw == null ? element : raw, 3_000L);
         if (raw instanceof CompositeWebElement composite) {
             composite.click();
+            tools.dscode.common.domoperations.MaskQuiet.requireClear(driver, raw, 3_000L);
             return;
         }
         if (primary()) {
@@ -212,6 +226,7 @@ public final class ElementOperations {
             library(driver);
         }
         raw.click();
+        tools.dscode.common.domoperations.MaskQuiet.requireClear(driver, raw == null ? element : raw, 3_000L);
     }
 
     /**
@@ -441,6 +456,16 @@ public final class ElementOperations {
               if (el.disabled) return false;
               return el.getAttribute('aria-disabled') !== 'true';
             }
+            function labelHit(name, query) {
+              var left = norm(name);
+              var right = norm(query);
+              if (!left || !right) return false;
+              if (left.toLowerCase() === right.toLowerCase()) return true;
+              if (left.length <= right.length) return false;
+              if (left.slice(left.length - right.length).toLowerCase() !== right.toLowerCase()) return false;
+              var before = left.charAt(left.length - right.length - 1);
+              return !(/[0-9A-Za-z]/).test(before);
+            }
             var out = [];
             var all = document.querySelectorAll('body *');
             for (var i = 0; i < all.length; i++) {
@@ -449,7 +474,7 @@ public final class ElementOperations {
               var label = norm(el.getAttribute('aria-label'));
               var role = norm(el.getAttribute('role'));
               if (!role) role = el.tagName.toLowerCase();
-              var hit = kind === 'role' ? role === wanted : (text === wanted || label === wanted);
+              var hit = kind === 'role' ? role === wanted : (labelHit(text, wanted) || labelHit(label, wanted) || labelHit(norm(el.innerText), wanted));
               if (!hit) continue;
               var box = el.getBoundingClientRect();
               out.push({

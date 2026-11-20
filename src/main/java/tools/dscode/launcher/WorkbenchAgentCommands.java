@@ -118,6 +118,7 @@ public final class WorkbenchAgentCommands {
                         parsed.coordination().runId(),
                         parsed.maxSteps(),
                         parsed.allSteps(),
+                        parsed.noopGlue(),
                         safeOut,
                         safeErr
                 );
@@ -1623,6 +1624,7 @@ public final class WorkbenchAgentCommands {
         if (html != null) {
             StringBuilder text = new StringBuilder();
             text.append("source=offline-html\n");
+            text.append("frame=").append(tools.dscode.common.composite.ElementOperations.currentFramePath()).append('\n');
             String query = flag(parsed, "--query");
             if (query != null && !query.isBlank()) {
                 text.append("query=").append(query).append('\n');
@@ -1664,6 +1666,7 @@ public final class WorkbenchAgentCommands {
             if (html == null) return 2;
             StringBuilder text = new StringBuilder();
             text.append("source=offline-html\n");
+            text.append("frame=").append(tools.dscode.common.composite.ElementOperations.currentFramePath()).append('\n');
             if (engine) {
                 text.append("query=").append(query).append('\n');
                 text.append("note=offline html does not run the engine query\n");
@@ -1787,6 +1790,7 @@ public final class WorkbenchAgentCommands {
             }
             StringBuilder page = new StringBuilder();
             page.append("source=").append(result.path("source").asText("live-session")).append('\n');
+            page.append("frame=").append(tools.dscode.common.composite.ElementOperations.currentFramePath()).append('\n');
             JsonNode hits = result.get("hits");
             if (hits != null && hits.isArray()) {
                 for (JsonNode hit : hits) {

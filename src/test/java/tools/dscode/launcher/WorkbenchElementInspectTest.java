@@ -173,6 +173,7 @@ class WorkbenchElementInspectTest {
             String text = stdout.toString(StandardCharsets.UTF_8).replace("\r\n", "\n");
             assertEquals("""
                     source=live-session
+                    frame=top
                     phrase=the "Save" Button
                     xpath=//button[@id='save']
                     rawMatchCount=2
@@ -195,6 +196,7 @@ class WorkbenchElementInspectTest {
             String pageText = pageOut.toString(StandardCharsets.UTF_8).replace("\r\n", "\n");
             assertEquals("""
                     source=live-session
+                    frame=top
                     phrase=the "Save" Button
                     xpath=//button[@id='save']
                     rawMatchCount=1
@@ -307,7 +309,7 @@ class WorkbenchElementInspectTest {
         assertTrue(lines.length > 0 && lines[0].equals("source=offline-html"), body);
         List<PrintedHit> hits = new java.util.ArrayList<>();
         int index = 1;
-        while (index < lines.length && lines[index].isEmpty()) index++;
+        while (index < lines.length && (lines[index].isEmpty() || lines[index].startsWith("frame="))) index++;
         while (index < lines.length && !lines[index].isEmpty()) {
             assertTrue(lines[index].startsWith("phrase="), text);
             String phrase = lines[index].substring("phrase=".length());

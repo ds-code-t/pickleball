@@ -1457,8 +1457,11 @@
     restoreState = null;
     if (restoreTimer) { clearInterval(restoreTimer); restoreTimer = 0; }
     try { sessionStorage.removeItem('pkb-ui'); } catch (ignored) { /* storage blocked */ }
-    withdraw();
-    return true;
+    items.forEach(function (item) { if (item.host && item.host.isConnected) item.host.remove(); });
+    clear();
+    pendingItems = [];
+    restoreApplied = false;
+    return {cleared: true, panel: !!panel};
   }
 
   // A Selenium-only session has no preload; with pkb_ui_page_state=session the digest kept in
