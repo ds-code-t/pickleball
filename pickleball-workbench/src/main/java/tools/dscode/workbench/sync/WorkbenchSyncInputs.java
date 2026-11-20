@@ -1,5 +1,7 @@
 package tools.dscode.workbench.sync;
 
+import tools.dscode.control.protocol.speed.SplitInputFingerprint;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -207,27 +209,7 @@ public record WorkbenchSyncInputs(
     }
 
     private static String fingerprintFiles(Path projectRoot, List<Path> files) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            Path root = projectRoot.toAbsolutePath().normalize();
-            List<Path> ordered = files.stream()
-                    .map(path -> path.toAbsolutePath().normalize())
-                    .sorted(Comparator.comparing(path -> relativeKey(root, path)))
-                    .toList();
-            for (Path file : ordered) {
-                digest.update(relativeKey(root, file).getBytes(StandardCharsets.UTF_8));
-                digest.update((byte) 0);
-                if (Files.isRegularFile(file)) {
-                    updateFileDigest(digest, file);
-                } else {
-                    digest.update("MISSING".getBytes(StandardCharsets.UTF_8));
-                }
-                digest.update((byte) 0);
-            }
-            return HexFormat.of().formatHex(digest.digest());
-        } catch (Exception failure) {
-            throw new IllegalStateException("Could not fingerprint Workbench source inputs.", failure);
-        }
+        return SplitInputFingerprint.digestFiles(projectRoot, files);
     }
 
     private static String relativeKey(Path root, Path file) {

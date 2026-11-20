@@ -22,6 +22,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from pathlib import Path
 
@@ -91,6 +92,16 @@ def main() -> int:
         action="store_true",
         help="run only the report-7 consumer scenarios (still requires a published build)",
     )
+    parser.add_argument(
+        "--observed-2-20-hook-only",
+        action="store_true",
+        help="run only the 2.20.0 bug 5 warm lifecycle-hook block",
+    )
+    parser.add_argument(
+        "--observed-2-20-only",
+        action="store_true",
+        help="run only the 2.20.0 bugs 3 and 4 multi-run blocks",
+    )
     args = parser.parse_args()
     if args.publish:
         publish()
@@ -106,6 +117,28 @@ def main() -> int:
             stop_report7(timings)
             write_timings(timings)
         print("consumer-sim report7 recorded")
+        return 0
+    if args.observed_2_20_hook_only:
+        timings = []
+        try:
+            prepare_tree()
+            run_stage(timings, "test-compile", [], maven_args=["-q", "test-compile"], allow_exit={0})
+            try:
+                _observed_hook(timings)
+            finally:
+                _observed_cleanup()
+        finally:
+            write_timings(timings)
+        print("consumer-sim observed-2.20 hook recorded")
+        return 0
+    if args.observed_2_20_only:
+        timings = []
+        try:
+            prepare_tree()
+            observed_2_20(timings)
+        finally:
+            write_timings(timings)
+        print("consumer-sim observed-2.20 recorded")
         return 0
     timings: list[dict] = []
     try:
@@ -237,6 +270,7 @@ def main() -> int:
         finished = assert_record(RUN)
         stopped = str(finished.get("stoppedAt") or "")
         assert_true(stopped.strip() != "", "finish did not set stoppedAt on " + RUN)
+        observed_2_20(timings)
         report7(timings)
     finally:
         warm_before_stop = warm_pids()
@@ -288,41 +322,65 @@ def prepare_tree() -> None:
             classpath.unlink(missing_ok=True)
         for classpath in state.glob(f"v/*/workbench/{name}"):
             classpath.unlink(missing_ok=True)
-    for handle in list(state.glob("workbench/warm-jvm.v1")) + list(state.glob("v/*/workbench/warm-jvm.v1")):
+    for handle in warm_handles():
         stop_warm(handle)
         handle.unlink(missing_ok=True)
 
 
 def stop_warm(handle: Path) -> None:
+    pid = pid_from_handle(handle)
+    if pid is None:
+        return
+    if os.name == "nt":
+        subprocess.run(
+            ["taskkill", "/PID", str(pid), "/T", "/F"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    else:
+        try:
+            os.kill(pid, 15)
+        except OSError:
+            return
+
+
+def warm_handles() -> list[Path]:
+    state = CONSUMER / ".pickleball"
+    if not state.is_dir():
+        return []
+    found: list[Path] = []
+    for pattern in (
+        "workbench/warm-jvm.v1",
+        "v/*/workbench/warm-jvm.v1",
+        "workbench/warm/slot-*/warm-jvm.v2",
+        "v/*/workbench/warm/slot-*/warm-jvm.v2",
+        "workbench/warm/slot-*/warm-jvm.pid",
+        "v/*/workbench/warm/slot-*/warm-jvm.pid",
+    ):
+        found.extend(state.glob(pattern))
+    return found
+
+
+def pid_from_handle(handle: Path) -> int | None:
     try:
         lines = handle.read_text(encoding="utf-8", errors="replace").splitlines()
-        if len(lines) >= 2 and lines[1].strip().isdigit():
-            pid = int(lines[1].strip())
-            if os.name == "nt":
-                subprocess.run(
-                    ["taskkill", "/PID", str(pid), "/T", "/F"],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-            else:
-                os.kill(pid, 15)
     except OSError:
-        return
+        return None
+    if not lines:
+        return None
+    if lines[0].strip().isdigit():
+        return int(lines[0].strip())
+    if len(lines) >= 2 and lines[1].strip().isdigit():
+        return int(lines[1].strip())
+    return None
 
 
 def warm_pids() -> list[int]:
-    state = CONSUMER / ".pickleball"
     pids: list[int] = []
-    if not state.is_dir():
-        return pids
-    handles = list(state.glob("workbench/warm-jvm.v1")) + list(state.glob("v/*/workbench/warm-jvm.v1"))
-    for handle in handles:
-        try:
-            lines = handle.read_text(encoding="utf-8", errors="replace").splitlines()
-        except OSError:
-            continue
-        if len(lines) >= 2 and lines[1].strip().isdigit():
-            pids.append(int(lines[1].strip()))
+    for handle in warm_handles():
+        pid = pid_from_handle(handle)
+        if pid is not None and pid not in pids:
+            pids.append(pid)
     return pids
 
 
@@ -605,7 +663,7 @@ def exec_java(args: list[str], timeout: int) -> subprocess.CompletedProcess:
     return maven_cmd(command, timeout)
 
 
-def launcher(args: list[str], timeout: int) -> subprocess.CompletedProcess:
+def launcher(args: list[str], timeout: int, extra_env: dict | None = None) -> subprocess.CompletedProcess:
     command = [
         java_executable(),
         "-cp",
@@ -613,6 +671,10 @@ def launcher(args: list[str], timeout: int) -> subprocess.CompletedProcess:
         "tools.dscode.launcher.PickleballWorkbenchLauncher",
         *args,
     ]
+    env = None
+    if extra_env:
+        env = os.environ.copy()
+        env.update(extra_env)
     try:
         return subprocess.run(
             command,
@@ -623,6 +685,7 @@ def launcher(args: list[str], timeout: int) -> subprocess.CompletedProcess:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             timeout=timeout,
+            env=env,
         )
     except subprocess.TimeoutExpired as failure:
         stdout = failure.stdout or ""
@@ -1944,6 +2007,446 @@ def _snippet(text: str, *needles: str) -> str:
 
 def stop_report7(timings: list[dict]) -> None:
     _report7_cleanup()
+
+
+def observed_2_20(timings: list[dict]) -> None:
+    """Bugs 3 and 4. Multi-run discover against the real consumer. Not @all."""
+    try:
+        _observed_bug3(timings)
+        _observed_bug4(timings)
+        _observed_hook(timings)
+    finally:
+        _observed_cleanup()
+
+
+HOOK_TAGS = "@lifecycle-before-run-hook"
+HOOK_FEATURE = "src/test/resources/features/lifecycle-before-run-hook.feature"
+
+
+def _observed_hook(timings: list[dict]) -> None:
+    """Bug 5. The consumer runner's BEFORE_CUCUMBER_RUN hook must run on every warm run.
+
+    A fresh warm JVM, the same JVM reused, a JVM started after a resource edit
+    re-pins the generation, and the sequential control path. The probe scenario
+    fails when the hook did not run, so PASSED is the proof.
+    """
+    feature = CONSUMER / HOOK_FEATURE
+    original = feature.read_text(encoding="utf-8")
+    launcher(["warm-stop", "--all"], 60)
+    try:
+        fresh = _observed_discover(timings, "observed220-hook-fresh", HOOK_TAGS, None, 300)
+        _observed_passed(fresh, "observed220-hook-fresh")
+        timing = _timing_text("observed220-hook-fresh")
+        assert_true("action=start" in timing, "hook run 1 did not start a warm JVM\n" + timing[-1500:])
+        _assert_hook_ran("observed220-hook-fresh", fresh)
+
+        reused = _observed_discover(timings, "observed220-hook-reused", HOOK_TAGS, None, 180)
+        _observed_passed(reused, "observed220-hook-reused")
+        timing = _timing_text("observed220-hook-reused")
+        assert_true("action=reuse" in timing, "hook run 2 did not reuse the warm JVM\n" + timing[-1500:])
+        _assert_hook_ran("observed220-hook-reused", reused)
+
+        before = _active_generation()
+        feature.write_text(original + "\n", encoding="utf-8", newline="\n")
+        repinned = _observed_discover(timings, "observed220-hook-repin", HOOK_TAGS, None, 300)
+        _observed_passed(repinned, "observed220-hook-repin")
+        after = _active_generation()
+        assert_true(after != "" and after != before, f"hook run 3 did not publish a new generation ({before} -> {after})")
+        _assert_hook_ran("observed220-hook-repin", repinned)
+
+        again = _observed_discover(timings, "observed220-hook-repin-reused", HOOK_TAGS, None, 180)
+        _observed_passed(again, "observed220-hook-repin-reused")
+        timing = _timing_text("observed220-hook-repin-reused")
+        assert_true("action=reuse" in timing, "hook run 4 did not reuse the re-pinned warm JVM\n" + timing[-1500:])
+        _assert_hook_ran("observed220-hook-repin-reused", again)
+
+        sequential = _observed_discover(
+            timings, "observed220-hook-sequential", HOOK_TAGS, {"PKB_WORKBENCH_SPEED": "sequential"}, 600
+        )
+        _observed_passed(sequential, "observed220-hook-sequential")
+        _assert_hook_ran("observed220-hook-sequential", sequential)
+    finally:
+        feature.write_text(original, encoding="utf-8", newline="\n")
+    print("observed-2.20 bug5 PASS", flush=True)
+
+
+def _assert_hook_ran(run_id: str, result: subprocess.CompletedProcess) -> None:
+    text = (result.stdout or "") + "\n" + (result.stderr or "")
+    assert_true("no consumer PickleballRunner subclass was found" not in text, f"{run_id} fell back to the default suite\n" + text[-2000:])
+    evidence = _observed_evidence(run_id, result)
+    assert_true("lifecycle-before-run-hook-ok" in evidence, f"{run_id} did not run the hook probe step")
+
+
+def _observed_cleanup() -> None:
+    for relative in (
+        "src/test/resources/features/sim-called-component.feature",
+        "src/test/resources/features/sim-observed-caller.feature",
+        "src/test/resources/features/sim-observed-long.feature",
+        "src/test/resources/features/sim-observed-short.feature",
+        "src/test/resources/features/sim-observed-iso-a.feature",
+        "src/test/resources/features/sim-observed-iso-b.feature",
+        "src/test/java/com/example/observed220/Observed220Marker.java",
+    ):
+        path = CONSUMER / relative
+        if path.is_file():
+            path.unlink()
+    glue = CONSUMER / "src/test/java/com/example/observed220"
+    if glue.is_dir():
+        shutil.rmtree(glue, ignore_errors=True)
+    try:
+        launcher(["warm-stop", "--all"], 60)
+    except SystemExit:
+        pass
+
+
+def _observed_bug3(timings: list[dict]) -> None:
+    called = CONSUMER / "src/test/resources/features/sim-called-component.feature"
+    caller = CONSUMER / "src/test/resources/features/sim-observed-caller.feature"
+    glue = CONSUMER / "src/test/java/com/example/observed220/Observed220Marker.java"
+    called.parent.mkdir(parents=True, exist_ok=True)
+    glue.parent.mkdir(parents=True, exist_ok=True)
+    called.write_text(
+        "Feature: Observed 220 called component\n"
+        "\n"
+        "  @observed220-called\n"
+        "  Scenario: Called step\n"
+        "    * INFO: observed-220-OLD\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    caller.write_text(
+        "@observed220-caller\n"
+        "Feature: Observed 220 caller\n"
+        "\n"
+        "  @observed220\n"
+        "  Scenario: Call the classpath feature\n"
+        "    * RUN SCENARIOS\n"
+        "      | Run Tags             |\n"
+        "      | @observed220-called  |\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    glue.write_text(
+        "package com.example.observed220;\n"
+        "public final class Observed220Marker {\n"
+        "    public static final int MARK = 1;\n"
+        "}\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    first = _observed_discover(timings, "observed220-a", "@observed220", None, 300)
+    _observed_passed(first, "observed220-a")
+    evidence = _observed_evidence("observed220-a", first)
+    assert_true("observed-220-OLD" in evidence, "run A did not log the called step")
+    called.write_text(called.read_text(encoding="utf-8").replace("observed-220-OLD", "observed-220-NEW"), encoding="utf-8", newline="\n")
+    before = _active_generation()
+    second = _observed_discover(timings, "observed220-b", "@observed220", None, 300)
+    _observed_passed(second, "observed220-b")
+    timing = _timing_text("observed220-b")
+    assert_true("stage=sync mode=resources" in timing, "run B missing stage=sync mode=resources\n" + timing[-1500:])
+    after = _active_generation()
+    assert_true(after != "" and after != before, f"run B did not publish a new generation ({before} -> {after})")
+    evidence = _observed_evidence("observed220-b", second)
+    assert_true("observed-220-NEW" in evidence, "run B did not log the edited called step")
+    assert_true("observed-220-OLD" not in evidence, "run B still logged the stale called step")
+    same = _active_generation()
+    third = _observed_discover(timings, "observed220-c", "@observed220", None, 180)
+    _observed_passed(third, "observed220-c")
+    timing = _timing_text("observed220-c")
+    assert_true("stage=sync mode=skip" in timing, "run C missing stage=sync mode=skip\n" + timing[-1500:])
+    assert_true(_active_generation() == same, "run C changed generation with no edit")
+    glue.write_text(glue.read_text(encoding="utf-8").replace("MARK = 1", "MARK = 2"), encoding="utf-8", newline="\n")
+    fourth = _observed_discover(timings, "observed220-d", "@observed220", None, 300)
+    _observed_passed(fourth, "observed220-d")
+    timing = _timing_text("observed220-d")
+    assert_true("stage=sync mode=full" in timing, "run D missing stage=sync mode=full\n" + timing[-1500:])
+    print("observed-2.20 bug3 PASS", flush=True)
+
+
+def _observed_bug4(timings: list[dict]) -> None:
+    long_feature = CONSUMER / "src/test/resources/features/sim-observed-long.feature"
+    short_feature = CONSUMER / "src/test/resources/features/sim-observed-short.feature"
+    iso_a = CONSUMER / "src/test/resources/features/sim-observed-iso-a.feature"
+    iso_b = CONSUMER / "src/test/resources/features/sim-observed-iso-b.feature"
+    long_feature.write_text(
+        "@observed220-long\n"
+        "Feature: Observed 220 long\n"
+        "  Scenario: Hold the warm JVM\n"
+        "    * , wait 40 seconds\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    short_feature.write_text(
+        "@observed220-short\n"
+        "Feature: Observed 220 short\n"
+        "  Scenario: Short sibling\n"
+        "    * INFO: observed-220-short\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    iso_a.write_text(
+        "@observed220-iso-a\n"
+        "Feature: Observed 220 iso a\n"
+        "  Scenario: Side a\n"
+        "    * , wait 15 seconds\n"
+        "    * , save \"iso-a-marker\" as \"observed220side\"\n"
+        "    * INFO: iso-a-marker\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    iso_b.write_text(
+        "@observed220-iso-b\n"
+        "Feature: Observed 220 iso b\n"
+        "  Scenario: Side b\n"
+        "    * , save \"iso-b-marker\" as \"observed220side\"\n"
+        "    * INFO: iso-b-marker\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    launcher(["warm-stop", "--all"], 60)
+    # Touch a resource the long scenario does not read so the sibling syncs.
+    short_feature.write_text(short_feature.read_text(encoding="utf-8") + "\n", encoding="utf-8", newline="\n")
+    _observed_overlap(timings, "slot2", "2", None, False)
+    _observed_overlap(timings, "cap1", "1", None, True)
+    _observed_overlap(timings, "wait", "1", ["--warm-wait=120"], False)
+    proc = _start_long(timings, "observed220-stop-l", "2")
+    try:
+        _wait_busy(proc, "observed220-stop-l", 240)
+        stopped = launcher(["stop", "--run-id=observed220-stop-s"], 60)
+        missing = launcher(["isolate", "--run-id=sim-missing-workspace", "--agent=consumer-sim"], 60)
+        assert_true(proc.poll() is None, "stop or isolate killed the in-flight warm run")
+        assert_true(missing.returncode != 0, "missing isolate should fail")
+        _note_stage(timings, "observed220-stop-other", stopped)
+        _note_stage(timings, "observed220-isolate-missing", missing)
+    finally:
+        code, out, err = _finish_bg(proc, 180)
+    combined = out + "\n" + err
+    assert_true(code == 0 and "summary status=PASSED" in combined, "in-flight run failed after stop/isolate\n" + combined[-2000:])
+    assert_true("connection dropped" not in combined and "LAUNCH_ERROR" not in combined, combined[-2000:])
+    left = _start_long(timings, "observed220-iso-a", "2", "@observed220-iso-a")
+    try:
+        _wait_busy(left, "observed220-iso-a", 240)
+        right = _observed_discover(timings, "observed220-iso-b", "@observed220-iso-b", {"PKB_WORKBENCH_WARM_POOL_MAX": "2"}, 180)
+        _observed_passed(right, "observed220-iso-b")
+        assert_true("slot=2" in _timing_text("observed220-iso-b"), "iso run B did not take slot 2")
+    finally:
+        code, out, err = _finish_bg(left, 180)
+    assert_true(code == 0 and "summary status=PASSED" in (out + err), "iso run A failed\n" + (out + err)[-2000:])
+    _assert_isolated("observed220-iso-a", "iso-a-marker", "iso-b-marker")
+    _assert_isolated("observed220-iso-b", "iso-b-marker", "iso-a-marker")
+    launcher(["warm-stop", "--all"], 60)
+    launcher(["stop", "--run-id=observed220-iso-a"], 30)
+    assert_warm_dead(warm_pids())
+    print("observed-2.20 bug4 PASS", flush=True)
+
+
+def _observed_overlap(timings: list[dict], name: str, pool: str, extra: list[str] | None, refuse: bool) -> None:
+    launcher(["warm-stop", "--all"], 60)
+    proc = _start_long(timings, f"observed220-{name}-l", pool)
+    try:
+        _wait_busy(proc, f"observed220-{name}-l", 240)
+        env = {"PKB_WORKBENCH_WARM_POOL_MAX": pool}
+        started = time.monotonic()
+        short = _observed_discover(timings, f"observed220-{name}-s", "@observed220-short", env, 180, extra)
+        elapsed = time.monotonic() - started
+        text = (short.stdout or "") + "\n" + (short.stderr or "")
+        if refuse:
+            assert_true(short.returncode == 2, f"{name} short exit {short.returncode}, expected 2\n" + text[-1500:])
+            assert_true("warm JVMs are busy" in text, f"{name} missing busy refusal\n" + text[-1500:])
+            assert_true(proc.poll() is None, f"{name} refusal killed the long run")
+        else:
+            _observed_passed(short, f"observed220-{name}-s")
+            if extra and any(item.startswith("--warm-wait=") for item in extra):
+                assert_true(elapsed >= 15, f"{name} returned in {elapsed:.1f}s; it did not wait")
+            else:
+                assert_true("slot=2" in _timing_text(f"observed220-{name}-s"), f"{name} short did not use slot 2")
+                assert_true(proc.poll() is None, f"{name} long run ended before the short run")
+    finally:
+        code, out, err = _finish_bg(proc, 180)
+    combined = out + "\n" + err
+    assert_true(code == 0 and "summary status=PASSED" in combined, f"{name} long run failed\n" + combined[-2000:])
+    assert_true("connection dropped" not in combined and "LAUNCH_ERROR" not in combined, combined[-2000:])
+
+
+def _start_long(timings: list[dict], run_id: str, pool: str, tags: str = "@observed220-long") -> subprocess.Popen:
+    return _launch_bg(_discover_args(run_id, tags), {"PKB_WORKBENCH_WARM_POOL_MAX": pool}, timings, run_id)
+
+
+def _discover_args(run_id: str, tags: str, extra: list[str] | None = None) -> list[str]:
+    args = [
+        "discover",
+        "--run-id=" + run_id,
+        "--tags=" + tags,
+        "--runvar=pkb_browser=CHROME_HEADLESS",
+        "--retention=failed",
+        "--agent=consumer-sim",
+    ]
+    if extra:
+        args.extend(extra)
+    return args
+
+
+def _observed_discover(timings, run_id, tags, env, timeout, extra=None):
+    started = time.monotonic()
+    result = launcher(_discover_args(run_id, tags, extra), timeout, env)
+    _note_stage(timings, run_id, result, time.monotonic() - started)
+    return result
+
+
+def _launch_bg(args, env, timings, stage) -> subprocess.Popen:
+    command = [
+        java_executable(),
+        "-cp",
+        test_classpath(),
+        "tools.dscode.launcher.PickleballWorkbenchLauncher",
+        *args,
+    ]
+    merged = os.environ.copy()
+    merged.update(env or {})
+    proc = subprocess.Popen(
+        command,
+        cwd=CONSUMER,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=merged,
+    )
+    proc._out = []
+    proc._err = []
+    proc._out_thread = threading.Thread(target=_drain, args=(proc.stdout, proc._out), daemon=True)
+    proc._err_thread = threading.Thread(target=_drain, args=(proc.stderr, proc._err), daemon=True)
+    proc._out_thread.start()
+    proc._err_thread.start()
+    proc._stage = stage
+    proc._started = time.monotonic()
+    timings.append({"stage": stage + "-bg", "seconds": 0, "exit": None, "stdout": "", "stderr": ""})
+    print(f"stage={stage}-bg started", flush=True)
+    return proc
+
+
+def _drain(pipe, sink) -> None:
+    try:
+        sink.append(pipe.read() if pipe is not None else "")
+    except Exception as failure:
+        sink.append(str(failure))
+
+
+def _finish_bg(proc: subprocess.Popen, timeout: int):
+    try:
+        proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait(timeout=15)
+        raise SystemExit("consumer-sim: background discover timed out: " + getattr(proc, "_stage", ""))
+    proc._out_thread.join(timeout=10)
+    proc._err_thread.join(timeout=10)
+    out = "".join(proc._out)
+    err = "".join(proc._err)
+    seconds = round(time.monotonic() - proc._started, 3)
+    print(f"stage={proc._stage} exit={proc.returncode} seconds={seconds}", flush=True)
+    if proc.returncode not in (0, 2):
+        print(out[-1500:], flush=True)
+        print(err[-1500:], file=sys.stderr, flush=True)
+    return proc.returncode, out, err
+
+
+def _wait_busy(proc: subprocess.Popen, run_id: str, timeout: int) -> None:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if run_id in _busy_run_ids():
+            return
+        if proc.poll() is not None:
+            proc._out_thread.join(timeout=5)
+            proc._err_thread.join(timeout=5)
+            out = "".join(proc._out)
+            err = "".join(proc._err)
+            raise SystemExit(f"consumer-sim: {run_id} exited {proc.returncode} before it was busy\n{out[-2000:]}\n{err[-2000:]}")
+        time.sleep(0.25)
+    raise SystemExit("consumer-sim: timed out waiting for busy " + run_id)
+
+
+def _busy_run_ids() -> set[str]:
+    state = CONSUMER / ".pickleball"
+    found = set()
+    if not state.is_dir():
+        return found
+    for path in list(state.glob("workbench/warm/slot-*/busy")) + list(state.glob("v/*/workbench/warm/slot-*/busy")):
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace").strip()
+        except OSError:
+            continue
+        if text:
+            found.add(text)
+    return found
+
+
+def _active_generation() -> str:
+    state = CONSUMER / ".pickleball"
+    files = list(state.glob("workbench/warm/active-generation.txt")) + list(state.glob("v/*/workbench/warm/active-generation.txt"))
+    if not files:
+        return ""
+    try:
+        lines = files[0].read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return ""
+    return lines[0].strip() if lines else ""
+
+
+def _timing_text(run_id: str) -> str:
+    path = CONSUMER / ".pickleball" / "runs" / run_id / "launch-timing.txt"
+    if not path.is_file():
+        return ""
+    return path.read_text(encoding="utf-8", errors="replace")
+
+
+def _observed_evidence(run_id: str, result: subprocess.CompletedProcess) -> str:
+    chunks = [result.stdout or "", result.stderr or ""]
+    root = CONSUMER / ".pickleball" / "runs" / run_id
+    if root.is_dir():
+        for path in root.rglob("*"):
+            if not path.is_file() or path.suffix == ".feature":
+                continue
+            if path.stat().st_size > 2_000_000:
+                continue
+            name = path.name
+            if name.endswith((".jsonl", ".json", ".txt", ".log")) or "console" in name or "event" in name:
+                try:
+                    chunks.append(path.read_text(encoding="utf-8", errors="replace"))
+                except OSError:
+                    continue
+    events = launcher(["events", "--run-id=" + run_id], 60)
+    chunks.append(events.stdout or "")
+    chunks.append(events.stderr or "")
+    return "\n".join(chunks)
+
+
+def _observed_passed(result: subprocess.CompletedProcess, run_id: str) -> None:
+    text = (result.stdout or "") + "\n" + (result.stderr or "")
+    assert_true(result.returncode == 0, f"{run_id} exit {result.returncode}\n" + text[-2000:])
+    assert_true("summary status=PASSED" in text, f"{run_id} was not PASSED\n" + text[-2000:])
+
+
+def _assert_isolated(run_id: str, own: str, other: str) -> None:
+    record = json.dumps(assert_record(run_id))
+    evidence = _observed_evidence(run_id, subprocess.CompletedProcess([], 0, "", ""))
+    blob = record + "\n" + evidence
+    assert_true(own in blob, f"{run_id} missing {own}")
+    assert_true(other not in blob, f"{run_id} leaked {other}")
+
+
+def _note_stage(timings, stage, result, seconds=None) -> None:
+    if seconds is None:
+        seconds = 0
+    timings.append({
+        "stage": stage,
+        "seconds": round(seconds, 3),
+        "exit": result.returncode,
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+    })
+    print(f"stage={stage} exit={result.returncode} seconds={round(seconds, 3)}", flush=True)
 
 
 def write_timings(timings: list[dict]) -> None:

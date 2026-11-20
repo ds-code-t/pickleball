@@ -98,7 +98,7 @@ Internal prefixed `INFO:` / `ERROR:` / `FAIL ERROR:` steps used by Pickleball it
 | `, ensure ...` | long-form hard assertion |
 | `, verify ...` | long-form soft assertion |
 
-`ASSERT:` and `SOFT ASSERT:` reuse the same clause syntax that follows `IF:` and the same `, ensure` / `, verify` evaluation path. Do not use `IF:` when a false result should fail the scenario.
+`ASSERT:` and `SOFT ASSERT:` reuse the same clause syntax that follows `IF:` and the same `, ensure` / `, verify` evaluation path. Do not use `IF:` when a false result should fail the scenario. A `number`, `integer`, or `decimal` qualifier compares numerically; see [Dynamic steps](dynamic-steps.md).
 
 Each clause may be:
 

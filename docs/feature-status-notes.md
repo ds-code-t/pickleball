@@ -14,6 +14,10 @@ Confirm whether this should become a supported alias of a future `between`, and 
 
 ## Action wording awaiting verification
 
+### `-ed` / `-ing` action forms and `of "x"`
+
+Not restored. The `-ed` and `-ing` action forms and the `of "x"` filter alias were removed and are not part of the phrase language. An unmatched verb can pass without running an action. A missing filter can broaden a match. Do not bring either back without a documented contract and tests.
+
 ### `run step`
 
 Confirm the public syntax, return behavior, error handling, and reporting before documenting it as a normal action.

@@ -4,7 +4,11 @@ import tools.dscode.common.reporting.diagnostic.ReportRetentionPolicy;
 import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.Workspace;
+import tools.dscode.control.protocol.AgentLog;
+import tools.dscode.control.protocol.speed.ClasspathCache;
 import tools.dscode.control.protocol.speed.InputFingerprint;
+import tools.dscode.control.protocol.speed.SplitInputFingerprint;
+import tools.dscode.control.protocol.speed.WarmGeneration;
 import tools.dscode.testengine.DynamicSuiteBootstrap;
 import tools.dscode.testengine.PKB_props;
 import tools.dscode.testengine.PickleballRunner;
@@ -15,6 +19,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -210,28 +215,153 @@ public final class WorkspaceLaunch {
         }
     }
 
+    /**
+     * A cache hit compares split fingerprints under {@code warm/sync.lock}.
+     * Build or Java changes compile. Resource changes process test resources.
+     * An unchanged tree skips the wrapper. Either way the warm JVM is pinned
+     * to a copied generation, not to {@code target/}.
+     */
     private static boolean warmClasspathLocked(Path root, Path runFolder, Appendable warnings) {
-        String hash = InputFingerprint.lockHash(root);
         Path state = PickleballLocalLayout.workbenchStateRoot(root);
-        tools.dscode.control.protocol.speed.ClasspathCache.Hit hit =
-                tools.dscode.control.protocol.speed.ClasspathCache.load(state, hash);
-        if (hit.hit() && tools.dscode.control.protocol.speed.ClasspathCache.hasProjectOutput(root, hit.entries())) {
-            try {
-                publishSeedClasspath(root, hit.entries());
-                WorkbenchLaunchTiming.note(runFolder, "compile", "cache-hit");
-                return true;
-            } catch (IOException failure) {
-                warn(warnings, "WARNING: classpath cache was not published: " + failure.getMessage());
+        try (WarmGeneration.Lock ignored = WarmGeneration.Lock.open(state)) {
+            String hash = InputFingerprint.lockHash(root);
+            ClasspathCache.Hit hit = ClasspathCache.load(state, hash);
+            if (hit.hit() && ClasspathCache.hasProjectOutput(root, hit.entries())) {
+                if (syncCachedHit(root, state, runFolder, warnings, hit)) return true;
             }
+            WorkbenchLaunchTiming.note(runFolder, "compile", "start");
+            boolean compiled = compileAndPublishClasspath(root, warnings);
+            WorkbenchLaunchTiming.note(runFolder, "compile", compiled ? "exit=0" : "exit=failed");
+            if (compiled) {
+                List<String> seed = readClasspathLines(state.resolve(PickleballLocalLayout.SEED_CLASSPATH_FILE));
+                WorkbenchSpeed.remember(root, seed.isEmpty() ? cachedClasspath(root) : seed);
+                publishGeneration(root, state, runFolder, null, null);
+            }
+            return compiled;
+        } catch (IOException failure) {
+            warn(warnings, "WARNING: classpath sync lock failed: " + failure.getMessage());
+            return false;
         }
-        WorkbenchLaunchTiming.note(runFolder, "compile", "start");
-        boolean compiled = compileAndPublishClasspath(root, warnings);
-        WorkbenchLaunchTiming.note(runFolder, "compile", compiled ? "exit=0" : "exit=failed");
-        if (compiled) {
-            List<String> seed = readClasspathLines(state.resolve(PickleballLocalLayout.SEED_CLASSPATH_FILE));
-            WorkbenchSpeed.remember(root, seed.isEmpty() ? cachedClasspath(root) : seed);
+    }
+
+    private static boolean syncCachedHit(
+            Path root,
+            Path state,
+            Path runFolder,
+            Appendable warnings,
+            ClasspathCache.Hit hit
+    ) {
+        SplitInputFingerprint.Observation observed = SplitInputFingerprint.observe(root, state);
+        SplitInputFingerprint.Mode mode = SplitInputFingerprint.decide(
+                SplitInputFingerprint.load(state), observed.parts()
+        );
+        boolean ran = switch (mode) {
+            case SKIP -> true;
+            case RESOURCES -> runProcessTestResources(root, runFolder, warnings);
+            case FULL -> runTestCompile(root, warnings);
+        };
+        if (!ran) return false;
+        try {
+            publishSeedClasspath(root, hit.entries());
+            publishGeneration(root, state, runFolder, mode.wire, observed);
+            WorkbenchLaunchTiming.note(runFolder, "compile", "cache-hit");
+            return true;
+        } catch (IOException failure) {
+            warn(warnings, "WARNING: classpath cache was not published: " + failure.getMessage());
+            return false;
         }
-        return compiled;
+    }
+
+    private static void publishGeneration(
+            Path root,
+            Path state,
+            Path runFolder,
+            String mode,
+            SplitInputFingerprint.Observation observed
+    ) {
+        try {
+            SplitInputFingerprint.Observation snapshot = observed == null
+                    ? SplitInputFingerprint.observe(root, state)
+                    : observed;
+            SplitInputFingerprint.store(state, snapshot);
+            WarmGeneration.Snapshot copy = WarmGeneration.materialize(root, state, snapshot.parts());
+            if (mode != null) noteSync(root, runFolder, mode, copy);
+            WarmGeneration.gc(state, copy.hash());
+        } catch (IOException failure) {
+            // The wrapper path still has target/. A later hit tries the copy again.
+        }
+    }
+
+    private static void noteSync(Path project, Path runFolder, String mode, WarmGeneration.Snapshot snapshot) {
+        WorkbenchLaunchTiming.note(runFolder, "sync mode=" + mode, "");
+        if (snapshot != null && snapshot.hash() != null) {
+            WorkbenchLaunchTiming.note(
+                    runFolder,
+                    "materialize gen=" + snapshot.hash()
+                            + " files=" + snapshot.files()
+                            + " bytes=" + snapshot.bytes()
+                            + " ms=" + snapshot.millis(),
+                    ""
+            );
+        }
+        try {
+            String runId = runFolder == null || runFolder.getFileName() == null ? "-" : runFolder.getFileName().toString();
+            String purpose = "mode=" + mode + (snapshot == null || snapshot.hash() == null ? "" : " gen=" + snapshot.hash());
+            AgentLog.append(project, Instant.now(), "launcher", runId, "sync", purpose, null);
+        } catch (IOException ignored) {
+            // The launch-timing line is the record the next command reads.
+        }
+    }
+
+    /** {@code process-test-resources} / {@code processTestResources}, offline first, then once online. */
+    private static boolean runProcessTestResources(Path root, Path runFolder, Appendable warnings) {
+        try {
+            List<String> command = tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner.processTestResourcesCommand(root, true);
+            java.io.ByteArrayOutputStream sink = new java.io.ByteArrayOutputStream();
+            PrintStream quiet = new PrintStream(sink, true, StandardCharsets.UTF_8);
+            int exit = tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner.run(root, command, quiet, quiet);
+            String text = sink.toString(StandardCharsets.UTF_8);
+            if (exit != 0 && tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner.offlineResolutionFailure(text)) {
+                WorkbenchLaunchTiming.note(runFolder, "maven-retry-online", "offlineExit=" + exit);
+                sink.reset();
+                exit = tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner.run(
+                        root,
+                        tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner.withoutOffline(command),
+                        quiet,
+                        quiet
+                );
+            }
+            if (exit != 0) {
+                warn(warnings, "WARNING: process-test-resources exited " + exit + ".");
+                return false;
+            }
+            return true;
+        } catch (RuntimeException failure) {
+            warn(warnings, "WARNING: process-test-resources did not run: " + failure.getMessage());
+            return false;
+        }
+    }
+
+    /** Java inputs changed. Compile tests. Do not resolve dependencies again. */
+    private static boolean runTestCompile(Path root, Appendable warnings) {
+        try {
+            java.io.ByteArrayOutputStream sink = new java.io.ByteArrayOutputStream();
+            PrintStream quiet = new PrintStream(sink, true, StandardCharsets.UTF_8);
+            int exit = tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner.run(
+                    root,
+                    tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner.compileCommand(root),
+                    quiet,
+                    quiet
+            );
+            if (exit != 0) {
+                warn(warnings, "WARNING: test-compile exited " + exit + ".");
+                return false;
+            }
+            return true;
+        } catch (RuntimeException failure) {
+            warn(warnings, "WARNING: test-compile did not run: " + failure.getMessage());
+            return false;
+        }
     }
 
     /**

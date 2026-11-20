@@ -1,10 +1,12 @@
 package tools.dscode.testengine;
 
 import tools.dscode.control.protocol.ControlProtocol;
+import tools.dscode.control.protocol.speed.WarmGeneration;
 
 import org.junit.platform.commons.support.ReflectionSupport;
 import org.junit.platform.engine.EngineDiscoveryRequest;
 import org.junit.platform.engine.discovery.ClassSelector;
+import org.junit.platform.engine.discovery.DirectorySelector;
 import org.junit.platform.engine.discovery.PackageSelector;
 
 import java.io.File;
@@ -24,6 +26,7 @@ import java.util.stream.Collectors;
 
 import static io.cucumber.core.options.Constants.GLUE_PROPERTY_NAME;
 import static tools.dscode.common.reporting.logging.LogForwarder.logDebug;
+import static tools.dscode.common.reporting.logging.LogForwarder.logWarn;
 
 public final class DynamicSuiteBootstrap {
     /** Internal direct-worker contract; not a Pickleball RunVar. */
@@ -183,6 +186,15 @@ public final class DynamicSuiteBootstrap {
         }
 
         debug("No DynamicSuiteBase subclass found in consumer test output roots. Using default suite.");
+        String warning = noConsumerRunnerWarning(discoveryRequest);
+        if (warning != null) {
+            System.err.println(warning);
+            try {
+                logWarn(warning);
+            } catch (RuntimeException ignored) {
+                // Logging may not be ready during discovery; stderr already has it.
+            }
+        }
         return new DefaultDynamicSuite();
     }
 
@@ -389,8 +401,29 @@ public final class DynamicSuiteBootstrap {
                 || s.endsWith("/build/classes/java/test/")
                 || s.endsWith("/build/classes/kotlin/test/")
                 || s.endsWith("/build/classes/test/")
-                || s.endsWith("/workbench/live/classes/");
+                || s.endsWith("/workbench/live/classes/")
+                || isWarmGenerationTestClasses(s);
     }
+
+    /**
+     * True for a warm-JVM generation copy, {@code .../workbench/warm/gen-<hash>/test-classes[/]}.
+     * Warm JVMs run from that immutable copy instead of {@code target/test-classes}
+     * (2.20.0 bug 5). Backslashes are normalized so Windows paths match too.
+     */
+    static boolean isWarmGenerationTestClasses(String path) {
+        if (path == null || path.isBlank()) return false;
+        String s = path.replace('\\', '/');
+        if (s.endsWith("/")) s = s.substring(0, s.length() - 1);
+        if (!s.endsWith("/test-classes")) return false;
+        String parent = s.substring(0, s.length() - "/test-classes".length());
+        int slash = parent.lastIndexOf('/');
+        if (slash < 0) return false;
+        String generation = parent.substring(slash + 1);
+        if (!generation.startsWith("gen-") || generation.length() == "gen-".length()) return false;
+        return parent.substring(0, slash).endsWith("/workbench/" + WARM_DIRECTORY);
+    }
+
+    private static final String WARM_DIRECTORY = WarmGeneration.DIRECTORY;
 
     /**
      * {@code java.class.path} entries, plus the file URLs of the context class
@@ -495,6 +528,44 @@ public final class DynamicSuiteBootstrap {
             names.add(c.getName());
         }
         return names.toString();
+    }
+
+    /**
+     * Warning text when discovery fell back to the built-in suite in a context that
+     * expected a consumer runner (a directory selector, a Workbench test-output root,
+     * or a warm generation), else null. Without a runner no
+     * {@code @LifecycleHook} method is registered, so this must never be silent.
+     */
+    static String noConsumerRunnerWarning(EngineDiscoveryRequest discoveryRequest) {
+        boolean expected = present(System.getProperty(WORKBENCH_TEST_OUTPUT_ROOT_PROPERTY))
+                || present(System.getProperty(WARM_TEST_CLASSES_PROPERTY));
+        if (!expected && discoveryRequest != null) {
+            try {
+                expected = !discoveryRequest.getSelectorsByType(DirectorySelector.class).isEmpty();
+            } catch (RuntimeException ignored) {
+                expected = false;
+            }
+        }
+        if (!expected) return null;
+        List<String> scanned = new ArrayList<>();
+        for (URI root : classpathRoots()) {
+            if (isPreferredTestOutputRoot(root)) scanned.add(root.toString());
+        }
+        return "WARNING: [Pickleball] no consumer PickleballRunner subclass was found, so "
+                + "@LifecycleHook methods (BEFORE_CUCUMBER_RUN and the rest) will not run and "
+                + "runner defaults are not applied. Preferred test-output roots scanned: "
+                + (scanned.isEmpty() ? "none" : String.join(", ", scanned))
+                + ". " + WORKBENCH_TEST_OUTPUT_ROOT_PROPERTY + "="
+                + System.getProperty(WORKBENCH_TEST_OUTPUT_ROOT_PROPERTY, "")
+                + ". Fix: compile the tests so exactly one runner is in the test output, "
+                + "or point " + WORKBENCH_TEST_OUTPUT_ROOT_PROPERTY + " at the folder that holds it.";
+    }
+
+    /** Set on every warm run to that run's generation test-classes copy. */
+    static final String WARM_TEST_CLASSES_PROPERTY = WarmGeneration.TEST_CLASSES_PROPERTY;
+
+    private static boolean present(String value) {
+        return value != null && !value.isBlank();
     }
 
     private static void debug(String message) {

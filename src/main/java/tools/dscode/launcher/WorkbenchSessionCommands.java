@@ -936,7 +936,9 @@ public final class WorkbenchSessionCommands {
     ) {
         Integer refused = refusedDriver(parsed, err);
         if (refused != null) return refused;
-        WorkbenchSpeed.release(parsed.project());
+        String runId = parsed.coordination().runId();
+        if (runId != null && !runId.isBlank()) WorkbenchSpeed.releaseRun(parsed.project(), runId);
+        else WorkbenchSpeed.release(parsed.project());
         Optional<SessionState> state = resolveSession(parsed, http);
         if (state.isEmpty()) {
             out.println("ACK SESSION already-stopped");

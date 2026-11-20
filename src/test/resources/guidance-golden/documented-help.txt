@@ -7,25 +7,25 @@ Timing is .pickleball/runs/<id>/launch-timing.txt. A cache hit skips Maven. Stde
 Do not pass pkb_run_profile. Do not open the GUI to test yourself. isolate is the headless session.
 run: discover confirm plan validate hint discover-hint resolve-runvars
 workspace: workspace-show workspace-edit workspace-seed
-session: isolate session-start execute-step status events stop kill open-scenario example play from-here pause insert-step update-step diagnostic-run save refresh session-sync worker-start worker-restart worker-stop open-window close-window show-run
+session: isolate session-start execute-step status events stop kill open-scenario example play from-here pause insert-step update-step diagnostic-run save refresh session-sync worker-start worker-restart worker-stop open-window close-window show-run warm-status warm-stop
 coordination: short-log note inbox finish presence post history gc-runs gc-versions use-version export-guidance
 descriptors: session list | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>
 page: inspect-page find-element
 retrieval: query runs | query get | query query | query search | query props | query errors | query tail
 controller: sync worker-check live-check ui mcp session
-all: close-window confirm diagnostic-run discover discover-hint events example execute-step export-guidance find-element finish from-here gc-runs gc-versions help hint history inbox insert-step inspect-page isolate kill live-check mcp note open-scenario open-window pause plan play post presence query refresh resolve-runvars save session session-hold session-info session-list session-release session-start session-sync short-log show-run status stop sync ui update-step use-version validate worker-check worker-restart worker-start worker-stop workspace-edit workspace-seed workspace-show
+all: close-window confirm diagnostic-run discover discover-hint events example execute-step export-guidance find-element finish from-here gc-runs gc-versions help hint history inbox insert-step inspect-page isolate kill live-check mcp note open-scenario open-window pause plan play post presence query refresh resolve-runvars save session session-hold session-info session-list session-release session-start session-sync short-log show-run status stop sync ui update-step use-version validate warm-status warm-stop worker-check worker-restart worker-start worker-stop workspace-edit workspace-seed workspace-show
 
 # help close-window
 Usage: close-window
 
 # help confirm
-Usage: confirm [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<path:line>] [--quiet] [--runvar=key=value] [--run-id=<id>] [--agent=<id>] [--run-timeout=<seconds>]
+Usage: confirm [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<path:line>] [--quiet] [--runvar=key=value] [--run-id=<id>] [--agent=<id>] [--run-timeout=<seconds>] [--warm-wait=<seconds>]
 
 # help diagnostic-run
 Usage: diagnostic-run --run=<id> [--run-id=<live-session>]
 
 # help discover
-Usage: discover [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<path:line>] [--plan] [--quiet] [--refresh] [--no-narrow|--full-scan] [--runvar=key=value] [--retention=all|failed|none] [--run-id=<id>] [--agent=<id>] [--run-timeout=<seconds>]
+Usage: discover [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<path:line>] [--plan] [--quiet] [--refresh] [--no-narrow|--full-scan] [--runvar=key=value] [--retention=all|failed|none] [--run-id=<id>] [--agent=<id>] [--run-timeout=<seconds>] [--warm-wait=<seconds>]
 
 # help discover-hint
 Usage: discover-hint [--json]
@@ -66,13 +66,13 @@ Timing is .pickleball/runs/<id>/launch-timing.txt. A cache hit skips Maven. Stde
 Do not pass pkb_run_profile. Do not open the GUI to test yourself. isolate is the headless session.
 run: discover confirm plan validate hint discover-hint resolve-runvars
 workspace: workspace-show workspace-edit workspace-seed
-session: isolate session-start execute-step status events stop kill open-scenario example play from-here pause insert-step update-step diagnostic-run save refresh session-sync worker-start worker-restart worker-stop open-window close-window show-run
+session: isolate session-start execute-step status events stop kill open-scenario example play from-here pause insert-step update-step diagnostic-run save refresh session-sync worker-start worker-restart worker-stop open-window close-window show-run warm-status warm-stop
 coordination: short-log note inbox finish presence post history gc-runs gc-versions use-version export-guidance
 descriptors: session list | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>
 page: inspect-page find-element
 retrieval: query runs | query get | query query | query search | query props | query errors | query tail
 controller: sync worker-check live-check ui mcp session
-all: close-window confirm diagnostic-run discover discover-hint events example execute-step export-guidance find-element finish from-here gc-runs gc-versions help hint history inbox insert-step inspect-page isolate kill live-check mcp note open-scenario open-window pause plan play post presence query refresh resolve-runvars save session session-hold session-info session-list session-release session-start session-sync short-log show-run status stop sync ui update-step use-version validate worker-check worker-restart worker-start worker-stop workspace-edit workspace-seed workspace-show
+all: close-window confirm diagnostic-run discover discover-hint events example execute-step export-guidance find-element finish from-here gc-runs gc-versions help hint history inbox insert-step inspect-page isolate kill live-check mcp note open-scenario open-window pause plan play post presence query refresh resolve-runvars save session session-hold session-info session-list session-release session-start session-sync short-log show-run status stop sync ui update-step use-version validate warm-status warm-stop worker-check worker-restart worker-start worker-stop workspace-edit workspace-seed workspace-show
 
 # help hint
 Usage: hint [--json]
@@ -165,6 +165,12 @@ Usage: use-version --version=<safe-version>
 # help validate
 Usage: validate [--tags=<expr>] [--name=<regex>] [--run-id=<id>] [--max-steps=<n>] [--all]
 Reports undefined steps, ambiguous glue, and unresolved RUN SCENARIO targets. Outline rows are expanded. Core steps count as defined. A long suite prints progress and stops at a step cap unless --max-steps or --all is set, and reports how many scenarios were skipped. Runs nothing. A flag this command does not use, including --quiet, is rejected with error: and fix:.
+
+# help warm-status
+Usage: warm-status [--json]
+
+# help warm-stop
+Usage: warm-stop --all
 
 # help worker-restart
 Usage: worker-restart

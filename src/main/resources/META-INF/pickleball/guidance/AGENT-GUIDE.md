@@ -4,7 +4,7 @@ First-read only. Longer notes: `docs/workbench-agent-detail.md`.
 
 ## Tool chooser
 
-Pickleball Workbench is the one front door. Do not open the GUI for your own testing. While testing for yourself, stay headless. When a window is already open, only one agent is the one driver on their own run id. Agents are not daemons. Read `run-catalog.json`. Pass `--retention` on discover. Do not start a live worker except isolate and execute-step. **Live debug** is isolate, then execute-step. Never supply `pkb_run_profile` as input. `stop` kills the warm JVM.
+Pickleball Workbench is the one front door. Do not open the GUI for your own testing. While testing for yourself, stay headless. When a window is already open, only one agent is one driver on their own run id. Agents are not daemons. Read `run-catalog.json`. Pass `--retention` on discover. Do not start a live worker except isolate and execute-step. **Live debug** is isolate, then execute-step. Never supply `pkb_run_profile` as input. `stop` releases idle warm JVMs.
 
 Run `mvnw` or `mvnw.cmd` (`gradlew` or `gradlew.bat`). Do not require a machine-wide Maven or Gradle install.
 

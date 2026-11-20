@@ -15,6 +15,8 @@ import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDict
 public final class PickleballTests extends PickleballRunner {
     private static final int TEST_SITE_PORT = 8765;
     private static LocalTestSite testSite;
+    /** Set by {@link #beforeRun()}; read by the lifecycle-hook probe scenario (2.20.0 bug 5). */
+    private static volatile boolean beforeCucumberRunFired;
 
     @Override
     public void globalTestDefaults() {
@@ -38,8 +40,14 @@ public final class PickleballTests extends PickleballRunner {
 
     @LifecycleHook(Phase.BEFORE_CUCUMBER_RUN)
     public static void beforeRun() {
+        beforeCucumberRunFired = true;
         registerProjectElementVocabulary();
         testSite = LocalTestSite.start(TEST_SITE_PORT);
+    }
+
+    /** True once this run's BEFORE_CUCUMBER_RUN hook ran in this class loader. */
+    public static boolean beforeCucumberRunFired() {
+        return beforeCucumberRunFired;
     }
 
     private static void registerProjectElementVocabulary() {

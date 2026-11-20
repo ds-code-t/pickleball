@@ -15,4 +15,13 @@ public final class ConfigurationValidationSteps {
             );
         }
     }
+
+    @Given("the consumer runner BEFORE_CUCUMBER_RUN hook has run")
+    public static void consumerRunnerBeforeRunHookRan() {
+        if (!PickleballTests.beforeCucumberRunFired()) {
+            throw new AssertionError(
+                    "PickleballTests @LifecycleHook(Phase.BEFORE_CUCUMBER_RUN) did not run in this launch"
+            );
+        }
+    }
 }

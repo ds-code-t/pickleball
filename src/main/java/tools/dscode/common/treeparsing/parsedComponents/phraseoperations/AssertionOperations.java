@@ -4,6 +4,7 @@ import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.assertions.ValueWrapperCompareReducer;
 import tools.dscode.common.assertions.ValueWrapperComparisons;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
+import tools.dscode.common.exceptions.SoftRuntimeException;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.ElementType;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
@@ -15,6 +16,7 @@ import java.util.regex.Pattern;
 
 import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
 import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
+import static tools.dscode.common.reporting.logging.LogForwarder.logWarn;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.RETURNS_VALUE;
 import static tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatching.processElementMatches;
 
@@ -25,14 +27,20 @@ public enum AssertionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Assertion " + this.name());
+            ElementMatch firstElement = phraseData.getElementMatchBeforeOperation(RETURNS_VALUE);
+            ElementMatch secondElement = phraseData.getElementMatchAfterOperation(RETURNS_VALUE);
+            if (rejectNonNumeric(phraseData, firstElement, secondElement)) {
+                return;
+            }
+            boolean qualified = numericQualifier(firstElement) || numericQualifier(secondElement);
             int repetition = phraseData.getRepetition();
             ValueWrapper margin = phraseData.getMargin();
 
-            ElementMatch firstElement = phraseData.getElementMatchBeforeOperation(RETURNS_VALUE);
-            ElementMatch secondElement = phraseData.getElementMatchAfterOperation(RETURNS_VALUE);
             phraseData.result = Attempt.run(repetition, 500, () -> {
                 return ValueWrapperCompareReducer.eval(
-                        (left, right) -> ValueWrapperComparisons.equals(left, right, margin),
+                        (left, right) -> qualified
+                                ? ValueWrapperComparisons.numericEquals(left, right, margin)
+                                : ValueWrapperComparisons.equals(left, right, margin),
                         firstElement.getComparisonValues(),
                         secondElement.getComparisonValues(),
                         getModeSet(phraseData)
@@ -45,11 +53,13 @@ public enum AssertionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Assertion " + this.name());
-            int repetition = phraseData.getRepetition();
-            ValueWrapper margin = phraseData.getMargin();
-
             ElementMatch firstElement = phraseData.getElementMatchBeforeOperation(RETURNS_VALUE);
             ElementMatch secondElement = phraseData.getElementMatchAfterOperation(RETURNS_VALUE);
+            if (rejectNonNumeric(phraseData, firstElement, secondElement)) {
+                return;
+            }
+            int repetition = phraseData.getRepetition();
+            ValueWrapper margin = phraseData.getMargin();
 
             phraseData.result = Attempt.run(repetition, 500, () -> {
                 return ValueWrapperCompareReducer.eval(
@@ -67,11 +77,13 @@ public enum AssertionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Assertion " + this.name());
-            int repetition = phraseData.getRepetition();
-            ValueWrapper margin = phraseData.getMargin();
-
             ElementMatch firstElement = phraseData.getElementMatchBeforeOperation(RETURNS_VALUE);
             ElementMatch secondElement = phraseData.getElementMatchAfterOperation(RETURNS_VALUE);
+            if (rejectNonNumeric(phraseData, firstElement, secondElement)) {
+                return;
+            }
+            int repetition = phraseData.getRepetition();
+            ValueWrapper margin = phraseData.getMargin();
 
             phraseData.result = Attempt.run(repetition, 500, () -> {
                 return ValueWrapperCompareReducer.eval(
@@ -88,11 +100,13 @@ public enum AssertionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Assertion " + this.name());
-            int repetition = phraseData.getRepetition();
-            ValueWrapper margin = phraseData.getMargin();
-
             ElementMatch firstElement = phraseData.getElementMatchBeforeOperation(RETURNS_VALUE);
             ElementMatch secondElement = phraseData.getElementMatchAfterOperation(RETURNS_VALUE);
+            if (rejectNonNumeric(phraseData, firstElement, secondElement)) {
+                return;
+            }
+            int repetition = phraseData.getRepetition();
+            ValueWrapper margin = phraseData.getMargin();
 
             phraseData.result = Attempt.run(repetition, 500, () -> {
                 return ValueWrapperCompareReducer.eval(
@@ -110,11 +124,13 @@ public enum AssertionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Assertion " + this.name());
-            int repetition = phraseData.getRepetition();
-            ValueWrapper margin = phraseData.getMargin();
-
             ElementMatch firstElement = phraseData.getElementMatchBeforeOperation(RETURNS_VALUE);
             ElementMatch secondElement = phraseData.getElementMatchAfterOperation(RETURNS_VALUE);
+            if (rejectNonNumeric(phraseData, firstElement, secondElement)) {
+                return;
+            }
+            int repetition = phraseData.getRepetition();
+            ValueWrapper margin = phraseData.getMargin();
 
             phraseData.result = Attempt.run(repetition, 500, () -> {
                 return ValueWrapperCompareReducer.eval(
@@ -548,6 +564,91 @@ public enum AssertionOperations implements OperationsInterface {
         );
     }
 
+
+    private static boolean rejectNonNumeric(PhraseData phraseData, ElementMatch first, ElementMatch second) {
+        if (!numericQualifier(first) && !numericQualifier(second)) {
+            return false;
+        }
+        String problem = qualifiedProblem(first, second);
+        if (problem == null) {
+            return false;
+        }
+        if (conditionalPhrase(phraseData)) {
+            logWarn(problem);
+            phraseData.result = new Attempt.Result(Boolean.FALSE, null);
+            return true;
+        }
+        if (softPhrase(phraseData)) {
+            throw new SoftRuntimeException(problem);
+        }
+        throw new IllegalArgumentException(problem);
+    }
+
+    private static boolean numericQualifier(ElementMatch element) {
+        return element != null
+                && element.elementTypes != null
+                && element.elementTypes.contains(ElementType.NUMERIC_VALUE);
+    }
+
+    private static boolean integerQualifier(ElementMatch element) {
+        if (!numericQualifier(element) || element.category == null) {
+            return false;
+        }
+        return element.category.trim().equalsIgnoreCase("integer");
+    }
+
+    private static String qualifiedProblem(ElementMatch first, ElementMatch second) {
+        boolean integerOnly = integerQualifier(first) || integerQualifier(second);
+        String problem = problemOn(first, integerOnly);
+        return problem != null ? problem : problemOn(second, integerOnly);
+    }
+
+    private static String problemOn(ElementMatch element, boolean integerOnly) {
+        if (element == null) {
+            return qualifierMessage(null, integerOnly);
+        }
+        List<ValueWrapper> values = element.getComparisonValues();
+        if (values == null || values.isEmpty()) {
+            return qualifierMessage(null, integerOnly);
+        }
+        for (ValueWrapper value : values) {
+            if (value == null || !value.isQualifiedNumeric(integerOnly)) {
+                return qualifierMessage(value, integerOnly);
+            }
+        }
+        return null;
+    }
+
+    private static String qualifierMessage(ValueWrapper value, boolean integerOnly) {
+        String shown = value == null || value.asNormalizedText() == null ? "" : value.asNormalizedText();
+        if (integerOnly) {
+            return "integer qualifier: '" + shown + "' is not an integer";
+        }
+        return "number qualifier: '" + shown + "' is not a number";
+    }
+
+    private static boolean conditionalPhrase(PhraseData phrase) {
+        if (phrase.untilPhrase) {
+            return true;
+        }
+        String type = phrase.getAssertionType();
+        if (type != null && type.equalsIgnoreCase("conditional")) {
+            return true;
+        }
+        String conditional = phrase.getConditional() == null ? "" : phrase.getConditional().trim().toLowerCase();
+        if (conditional.equals("if") || conditional.equals("until") || conditional.startsWith("else")) {
+            return true;
+        }
+        return phrase.assertionChainMembership != null && phrase.assertionChainMembership.ownerIsConditional();
+    }
+
+    private static boolean softPhrase(PhraseData phrase) {
+        if (phrase.getAssertionType() != null && phrase.getAssertionType().equalsIgnoreCase("verify")) {
+            return true;
+        }
+        return phrase.assertionChainMembership != null
+                && "verify".equalsIgnoreCase(phrase.assertionChainMembership.ownerAssertionType());
+    }
 
     public static AssertionOperations
 
