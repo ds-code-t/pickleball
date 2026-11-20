@@ -46,6 +46,9 @@ public class NavigationSteps {
             return address;
         }
         String candidate = text == null ? "" : text.trim();
+        if (tools.dscode.common.agentfast.FixturePages.isFixture(candidate)) {
+            return tools.dscode.common.agentfast.FixturePages.resolve(candidate);
+        }
         if (isNavigable(candidate)) return candidate;
         if (candidate.indexOf('<') >= 0 && candidate.indexOf('>') > candidate.indexOf('<')) {
             try {

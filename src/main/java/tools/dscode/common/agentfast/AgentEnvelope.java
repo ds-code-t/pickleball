@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import tools.dscode.control.protocol.LiveBridgeFile;
+import tools.dscode.control.protocol.LiveHostFile;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -148,6 +149,10 @@ public final class AgentEnvelope {
         try {
             var bridge = LiveBridgeFile.read(project);
             up = bridge.isPresent() && bridge.get().pid() > 0;
+            if (!up) {
+                var host = LiveHostFile.read(project);
+                up = host.isPresent() && host.get().pid() > 0;
+            }
         } catch (RuntimeException ignored) {
             up = false;
         }

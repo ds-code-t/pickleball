@@ -74,7 +74,7 @@ public final class TargetVerb {
     private static final Set<String> ACT_KEYS = Set.of(
             "target", "kind", "query", "ref", "value", "snap", "run-id", "agent", "agent-id",
             "fixture", "timeout", "condition", "frame", "group", "sequence",
-            "format", "fields", "where", "limit", "budget"
+            "format", "fields", "where", "limit", "budget", "pick"
     );
 
     /** CSS or text selector for a fresh {@code ref:}. Null when the ref is unknown or stale. */
@@ -182,6 +182,9 @@ public final class TargetVerb {
         RUN.set(runId);
         try {
             TargetSelector.Parsed target = TargetSelector.parse(values.get("target"));
+            if (needsLiveTarget(verb) && (target.raw().isBlank() || "none".equals(target.kind())) && liveBrowserPresent()) {
+                target = TargetSelector.parse("browser:auto");
+            }
             if ("ref".equals(target.kind()) && values.get("ref") == null) {
                 values = new LinkedHashMap<>(values);
                 values.put("ref", target.raw());
@@ -212,6 +215,23 @@ public final class TargetVerb {
             return fail(verb, message);
         } finally {
             RUN.remove();
+        }
+    }
+
+    /** Page verbs with no selector use the browser this process already has open. */
+    private static boolean needsLiveTarget(String verb) {
+        return switch (verb == null ? "" : verb) {
+            case "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "eval" -> true;
+            default -> false;
+        };
+    }
+
+    private static boolean liveBrowserPresent() {
+        if (LiveBrowserHost.chrome() != null) return true;
+        try {
+            return tools.dscode.common.agentcontrol.AgentControl.scenarioDriver() != null;
+        } catch (RuntimeException failure) {
+            return false;
         }
     }
 
@@ -330,16 +350,23 @@ public final class TargetVerb {
                     putEntered(missed.body(), runId, page.session.connection());
                     return missed;
                 }
-                if (hits.size() > 1) {
-                    Outcome missed = fail("act", "ambiguous");
-                    missed.body().put("candidates", publish(runId, "browser", page.session.id, docVersion(page.session.connection()), hits, query, page.session.connection()));
-                    missed.body().put("fix", "pass --ref or a tighter --query");
-                    stamp(missed.body(), page.session.connection(), hits.get(0));
-                    putEntered(missed.body(), runId, page.session.connection());
-                    putShadow(missed.body(), hits.get(0));
-                    return missed;
+                if (hits.size() > 1 || !blank(args.get("pick")).isBlank()) {
+                    DomNode chosen = blank(args.get("pick")).isBlank() ? null : pickHit(hits, args.get("pick"));
+                    if (chosen == null) {
+                        Outcome missed = fail("act", "ambiguous");
+                        missed.body().put("candidates", publish(runId, "browser", page.session.id, docVersion(page.session.connection()), hits, query, page.session.connection()));
+                        missed.body().put("fix", blank(args.get("pick")).isBlank()
+                                ? "pass --ref or a tighter --query"
+                                : "pass --pick as a 1-based index or the accessible name");
+                        stamp(missed.body(), page.session.connection(), hits.get(0));
+                        putEntered(missed.body(), runId, page.session.connection());
+                        putShadow(missed.body(), hits.get(0));
+                        return missed;
+                    }
+                    node = chosen;
+                } else {
+                    node = hits.get(0);
                 }
-                node = hits.get(0);
             }
             String before = docVersion(page.session.connection());
             String titleBefore = title(page.session.connection());
@@ -423,6 +450,7 @@ public final class TargetVerb {
                 putEntered(body, runId, page.session.connection());
                 putShadow(body, node);
                 putMask(body, mask);
+                putReadBack(body, node, true);
                 return ok(body);
             }
             if (effect.quiet()) {
@@ -441,6 +469,7 @@ public final class TargetVerb {
                 putEntered(body, runId, page.session.connection());
                 putShadow(body, node);
                 putMask(body, mask);
+                putReadBack(body, node, true);
                 return ok(body);
             }
             if (!effect.applied()) {
@@ -471,6 +500,7 @@ public final class TargetVerb {
             putEntered(body, runId, page.session.connection());
             putShadow(body, node);
             putMask(body, mask);
+            putReadBack(body, node, true);
             return ok(body);
         } finally {
             page.release();
@@ -737,6 +767,7 @@ public final class TargetVerb {
         DesktopTree.Session snapped = after;
         putAutoSnap(body, args, project, runId, autoBefore, () -> compactDesktop(snapped, runId));
         stampDesktop(body, after);
+        putReadBack(body, node, true);
         return ok(body);
     }
 
@@ -745,17 +776,24 @@ public final class TargetVerb {
         String query = blank(args.get("query"));
         List<DomNode> hits = locate(session.root(), query, Map.of());
         if (hits.isEmpty()) return fail("act", "not found");
-        if (hits.size() > 1) {
-            Outcome missed = fail("act", "ambiguous");
-            missed.body().put("candidates", publish(runId, "desktop", session.id(), "desktop:" + session.sequence(), hits, query));
-            missed.body().put("fix", "pass --ref or a tighter --query");
-            return missed;
+        DomNode node = hits.get(0);
+        if (hits.size() > 1 || !blank(args.get("pick")).isBlank()) {
+            DomNode chosen = blank(args.get("pick")).isBlank() ? null : pickHit(hits, args.get("pick"));
+            if (chosen == null) {
+                Outcome missed = fail("act", "ambiguous");
+                missed.body().put("candidates", publish(runId, "desktop", session.id(), "desktop:" + session.sequence(), hits, query));
+                missed.body().put("fix", blank(args.get("pick")).isBlank()
+                        ? "pass --ref or a tighter --query"
+                        : "pass --pick as a 1-based index or the accessible name");
+                return missed;
+            }
+            node = chosen;
         }
         String beforeVersion = "desktop:" + session.sequence();
         List<SnapRow> rowsBefore = desktopRows(session);
         boolean wantAuto = "auto".equals(blank(args.get("snap")));
         List<String> autoBefore = wantAuto ? compactDesktop(session, runId) : List.of();
-        boolean live = desktopAct(session, hits.get(0), args);
+        boolean live = desktopAct(session, node, args);
         DesktopTree.Session after = DesktopTree.open(session.id());
         if (after == null) after = session;
         Map<String, Object> body = base("act", "desktop", "desktop", target);
@@ -767,6 +805,7 @@ public final class TargetVerb {
         DesktopTree.Session snapped = after;
         putAutoSnap(body, args, project, runId, autoBefore, () -> compactDesktop(snapped, runId));
         stampDesktop(body, after);
+        putReadBack(body, node, true);
         return ok(body);
     }
 
@@ -998,6 +1037,37 @@ public final class TargetVerb {
                     return fail("watch", "duration is milliseconds");
                 }
             }
+            String until = blank(args.get("until"));
+            String ref = blank(args.get("ref"));
+            if (!until.isBlank()) {
+                String before = docVersion(page.session.connection());
+                long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(Math.max(duration, 1L));
+                boolean met = false;
+                while (System.nanoTime() < deadline) {
+                    if (untilMet(page.session, until, ref, before)) {
+                        met = true;
+                        break;
+                    }
+                    sleep(40);
+                }
+                if (!met) {
+                    Outcome failed = fail("watch", "timeout");
+                    failed.body().put("until", until);
+                    if (!ref.isBlank()) failed.body().put("ref", ref);
+                    stamp(failed.body(), page.session.connection(), null);
+                    putEntered(failed.body(), runId, page.session.connection());
+                    return failed;
+                }
+                Map<String, Object> body = base("watch", "cdp", "browser", target);
+                body.put("mode", "until");
+                body.put("until", until);
+                body.put("met", true);
+                if (!ref.isBlank()) body.put("ref", ref);
+                body.put("docVersion", docVersion(page.session.connection()));
+                stamp(body, page.session.connection(), null);
+                putEntered(body, runId, page.session.connection());
+                return ok(body);
+            }
             String kinds = blank(args.get("kinds"));
             if (kinds.isBlank()) kinds = blank(args.get("condition"));
             long since = System.currentTimeMillis();
@@ -1019,6 +1089,84 @@ public final class TargetVerb {
             return ok(body);
         } finally {
             page.release();
+        }
+    }
+
+    /** Same snapshot as the ambiguous find. Index is 1-based. A name matches the accessible name or id. */
+    private static DomNode pickHit(List<DomNode> hits, String pick) {
+        if (hits == null || hits.isEmpty() || pick == null || pick.isBlank()) return null;
+        String token = pick.trim();
+        if (token.matches("\\d+")) {
+            int index = Integer.parseInt(token);
+            if (index < 1 || index > hits.size()) return null;
+            return hits.get(index - 1);
+        }
+        for (DomNode node : hits) {
+            String id = node.attributes.get("id");
+            if (id != null && id.equalsIgnoreCase(token)) return node;
+            if (name(node).equalsIgnoreCase(token)) return node;
+            String accessible = node.accessibleName == null ? "" : node.accessibleName;
+            if (!accessible.isBlank() && accessible.equalsIgnoreCase(token)) return node;
+        }
+        return null;
+    }
+
+    private static void putReadBack(Map<String, Object> body, DomNode node, boolean settled) {
+        boolean visible = node != null && node.displayed && !node.states.contains("hidden");
+        boolean enabled = node != null && !node.states.contains("disabled") && !node.attributes.containsKey("disabled");
+        Object reason = body.get("reason");
+        boolean covered = reason != null && String.valueOf(reason).toLowerCase(Locale.ROOT).contains("cover");
+        Map<String, Object> checked = new LinkedHashMap<>();
+        checked.put("visible", visible || Boolean.TRUE.equals(body.get("visible")));
+        checked.put("enabled", enabled);
+        checked.put("covered", covered);
+        checked.put("settled", settled);
+        body.put("checked", checked);
+        body.put("settleMs", CLICK_SETTLE_MS);
+    }
+
+    private static boolean untilMet(BrowserSession session, String until, String ref, String before) {
+        String token = until == null ? "" : until.trim();
+        String lower = token.toLowerCase(Locale.ROOT);
+        CdpConnection cdp = session.connection();
+        if ("mutation".equals(lower) || "change".equals(lower)) {
+            return !before.equals(docVersion(cdp));
+        }
+        if (lower.startsWith("text=")) {
+            String needle = token.substring("text=".length());
+            String text = evalText(cdp, "document.body?document.body.innerText:''");
+            return text != null && text.contains(needle);
+        }
+        if ("visible".equals(lower) || "hidden".equals(lower)) {
+            String selector = selectorOfRef(ref);
+            String expression = selector.isBlank()
+                    ? "!!document.body"
+                    : "(function(){var el=document.querySelector(" + jsString(selector) + ");"
+                    + "if(!el)return false;var r=el.getBoundingClientRect();var s=getComputedStyle(el);"
+                    + "return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none';})()";
+            boolean visible = "true".equals(evalText(cdp, expression));
+            return "visible".equals(lower) ? visible : !visible;
+        }
+        if ("click".equals(lower)) {
+            List<ObjectNode> events = session.events().read(
+                    new SessionEvents.Filter("", "", 0L, null, 40), 1L);
+            for (ObjectNode event : events) {
+                String kind = event.path("kind").asText(event.path("method").asText("")).toLowerCase(Locale.ROOT);
+                if (kind.contains("click")) return true;
+            }
+            return false;
+        }
+        return false;
+    }
+
+    private static String selectorOfRef(String ref) {
+        if (ref == null || ref.isBlank()) return "";
+        try {
+            Hit hit = requireHit(ref);
+            if (hit == null || hit.selector == null) return "";
+            return hit.selector;
+        } catch (Miss missing) {
+            return "";
         }
     }
 

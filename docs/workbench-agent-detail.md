@@ -183,6 +183,26 @@ A hit keeps its long ref: value and adds a short id such as s1.h42. The short id
 
 `snap` lines are `- role "name" [ref=...] id=s1.h42 visible=true enabled=true interactive=true frame=top`. `--format=lines` prints the envelope as lines and is smaller than JSON. The default print stays JSON. `--fields`, `--where`, `--limit`, and `--budget` narrow the reply. The default cap is 200 lines and 16 KB. Overflow sets truncated and writes the full text under `.pickleball/agent-full/`. A bare token is letters, digits, and `_./:@+-`. A newline or a non-ASCII value is a JSON string. Diff lists stay inside that same cap.
 
+## Composite verbs
+
+One command opens a ready browser. `start --url-key=URL.app --browser=chrome --headed --hold --panel --size=1280x800` navigates, optionally opens the panel, and prints the envelope with session, browser, and frame. `live-start` is that same `start`. `--url` is a literal. `fixture:panel` is a data URL with a Save button. A missing URL key is exit 2. `--env=` still publishes session variables.
+
+`call chat-send --text=hello` forwards one MCP tool name to the shell verb. Args may be `--args-file=args.json`, `--args-b64=`, or `--args=-` on stdin. The controller is the same `.pickleball/agent-controller.json` from `controller-start`. A tool with no shell verb returns unavailable. `call` cannot call itself.
+
+`chat-turn --text=ready --until=human --timeout=120` sends as the agent, then waits for a human message. `--until=answer` or `--until=click` waits for that page event. Timeout is seconds, 0 to 120. The fix on timeout is `chat-send --source=human`, then `chat-turn` again.
+
+`act --query=Save --pick=1` finds and acts in one snapshot, so the ref cannot go stale between find and click. `--pick` is a 1-based index or the accessible name. A blank pick with several hits stays ambiguous. The success reply includes checked (visible, enabled, covered) and settleMs 500.
+
+`ui-verify` lists every placement: visible, rect, and overlaps. No live browser is exit 1, with fix `run start --url= --browser=`.
+
+`execute-steps --file=steps.json --stop-on-fail` runs a JSON array of op and args, or lines of `verb text`. One envelope lists each row. `--stop-on-fail` stops at the first non-zero exit.
+
+`watch --ref=s1.h1 --until=visible` polls until mutation, change, visible, hidden, `text=`, or click. A miss is timeout. With no `--until`, watch still returns the first matching event.
+
+`chat_wait` returns human messages only. `--from=any` or `--from=all` disables that filter. `--channel` selects the session channel (default run, under `.pickleball/runs/<session>/agent/chat/`). The cursor still advances past the agent's own lines, so the next wait does not return them.
+
+`doctor` prints leaseLeft, orphans, frame, and placed, plus chrome, session, and health. `--hold=30s` arms the lease. Orphans are Chrome processes for this project that are not the current host. `selftest ui --cpu` looks up Chrome on PATH, then Windows Program Files and LOCALAPPDATA, macOS applications, and the usual Linux paths. The idle sample is 2 seconds. `DOMENGINE_CHROME` is used only when that file exists.
+
 ## First-read
 
 Keep first-read small. After a successful export:

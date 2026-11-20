@@ -286,6 +286,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentfast/AgentForward.java`
 - `src/main/java/tools/dscode/common/agentfast/CompactReply.java`
 - `src/main/java/tools/dscode/common/agentfast/FallbackLog.java`
+- `src/main/java/tools/dscode/common/agentfast/FixturePages.java`
 - `src/main/java/tools/dscode/common/agentfast/LineView.java`
 - `src/main/java/tools/dscode/common/agentfast/LiveBrowserHost.java`
 - `src/main/java/tools/dscode/common/agentfast/LiveChromeDriver.java`
@@ -652,11 +653,14 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/engine/source/StoreScenarioSource.java`
 - `src/main/java/tools/dscode/internal/ValuesSupport.java`
 - `src/main/java/tools/dscode/launcher/AgentController.java`
+- `src/main/java/tools/dscode/launcher/CompositeCommands.java`
 - `src/main/java/tools/dscode/launcher/ConsumerReadyCommands.java`
+- `src/main/java/tools/dscode/launcher/LeaseHold.java`
 - `src/main/java/tools/dscode/launcher/PickleballWorkbenchLauncher.java`
 - `src/main/java/tools/dscode/launcher/PkbMain.java`
 - `src/main/java/tools/dscode/launcher/QuietWarnings.java`
 - `src/main/java/tools/dscode/launcher/SessionHealthWait.java`
+- `src/main/java/tools/dscode/launcher/UrlKeys.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchAgentCommands.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchCliErrors.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchCliFlags.java`
@@ -979,6 +983,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/CliForwardToWorkerTest.java`
 - `src/test/java/tools/dscode/launcher/ClosedShadowResolveTest.java`
 - `src/test/java/tools/dscode/launcher/CompactSnapshotTest.java`
+- `src/test/java/tools/dscode/launcher/CompositeVerbsCliTest.java`
 - `src/test/java/tools/dscode/launcher/ConfirmTest.java`
 - `src/test/java/tools/dscode/launcher/ConsumerReadyCliTest.java`
 - `src/test/java/tools/dscode/launcher/DesktopSameVerbTest.java`

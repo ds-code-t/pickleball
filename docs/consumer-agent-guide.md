@@ -12,8 +12,7 @@ Workbench is the one front door. Do not open the GUI for your own testing. While
 
 only change `exec.args`: `-Dexec.args=discover`, `-Dexec.args=isolate`, `execute-step`, `confirm`.
 
-`start --url= --browser= --env=` opens a browser, else `error: no live browser`. `doctor` reports health. `live-stop` stops the host and Chrome and leaves a worker. `frame`, `inspect-page`, and `act` are in help. `chat_wait` blocks until chat. `history-summary` and `history-query` read runs. `entity-lookup` reads one entity. `open-run` opens Explorer or Tracking. `bridge-health` reads the bridge. Warm: `java -cp @classpath.cache tools.dscode.launcher.PickleballWorkbenchLauncher`.
-`--target`: browser:auto, browser:cdp=<url>, desktop:<pid|app~name>, ref:<doc:handle>. Verbs: attach, snap, find, act, wait, watch, explain, eval, ui, capture.
+`start --url-key=URL.app --browser=chrome --headed --panel` opens Chrome (live-start is start; also `--url`, `--hold`, `--size`). Then `chat-turn --text=hi --until=human --timeout=120`, `act --query=Save --pick=1`, `ui-verify`, `doctor`. `call chat-send --args-file=args.json` uses `.pickleball/agent-controller.json`. `execute-steps --file=steps.json --stop-on-fail`. `watch --ref=s1.h1 --until=visible`. `chat_wait` ignores own messages unless `--from=any`. Else `error: no live browser`. `live-stop` leaves a worker. Warm: `java -cp @classpath.cache tools.dscode.launcher.PickleballWorkbenchLauncher`.
 
 ### Live isolation loop
 

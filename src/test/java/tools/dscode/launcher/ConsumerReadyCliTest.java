@@ -68,6 +68,12 @@ class ConsumerReadyCliTest {
         assertTrue(empty.err.contains("timed out"), empty.err);
         Capture sent = run("chat-send", "--text=wait-for-me", temp.toString());
         assertEquals(0, sent.code, sent.err);
+        Capture ignored = run("chat_wait", "--timeout=0", temp.toString());
+        assertEquals(1, ignored.code, ignored.out + ignored.err);
+        assertTrue(ignored.err.contains("timed out"), ignored.err);
+        assertFalse(ignored.out.contains("wait-for-me"), ignored.out);
+        Capture human = run("chat-send", "--source=human", "--text=wait-for-me", temp.toString());
+        assertEquals(0, human.code, human.err);
         Capture waited = run("chat_wait", "--timeout=0", temp.toString());
         assertEquals(0, waited.code, waited.err);
         assertTrue(waited.out.contains("wait-for-me"), waited.out);
