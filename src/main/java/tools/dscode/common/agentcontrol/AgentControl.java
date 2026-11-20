@@ -202,6 +202,8 @@ public final class AgentControl {
                 case "chat-send" -> chatSend(project, runId, values, agentId);
                 case "chat-history" -> chatHistory(project, runId, values);
                 case "chat-poll" -> chatPoll(project, runId, values, agentId);
+                case "chat-turn" -> chatTurn(project, runId, values, agentId);
+                case "ui-verify" -> uiVerify(project, runId);
                 case "panel-open" -> panelOpen(project, runId, values, extraArgs, agentId);
                 case "panel-close" -> panelClose(project, runId, values, extraArgs, agentId);
                 case "guide" -> guide(project, runId, values);
@@ -753,15 +755,21 @@ public final class AgentControl {
                 return fail(2, "chat-poll --wait is seconds, up to 25");
             }
         }
+        String from = args.get("from");
+        boolean filter = present(from) && !"any".equalsIgnoreCase(from) && !"all".equalsIgnoreCase(from);
         long deadline = System.nanoTime() + waitMillis * 1_000_000L;
         int eventCursor = EventCursor.after(project, runId, agentId);
         List<Map<String, Object>> messages = new ArrayList<>();
         List<Map<String, String>> agentEvents = List.of();
         int eventNext = eventCursor;
+        String lastRawId = null;
         while (true) {
             messages.clear();
+            lastRawId = null;
             PageSurfaces.drainPanelChat(project, runId);
             for (ChatLog.Message message : ChatLog.poll(project, runId, args.get("channel"), after)) {
+                lastRawId = message.id();
+                if (filter && (message.source() == null || !from.equalsIgnoreCase(message.source()))) continue;
                 messages.add(ChatLog.toMap(message));
             }
             tools.dscode.control.protocol.AgentEvents.Slice slice =
@@ -772,15 +780,157 @@ public final class AgentControl {
             Thread.sleep(200);
         }
         boolean explicit = present(args.get("after")) || present(args.get("id"));
-        if (!explicit && !messages.isEmpty()) {
-            Object last = messages.get(messages.size() - 1).get("id");
-            if (last != null) ChatCursor.advance(project, runId, args.get("channel"), String.valueOf(last));
+        if (!explicit) {
+            String advanceTo = null;
+            if (!messages.isEmpty()) {
+                Object last = messages.get(messages.size() - 1).get("id");
+                if (last != null) advanceTo = String.valueOf(last);
+            }
+            if (filter && lastRawId != null) advanceTo = lastRawId;
+            if (advanceTo != null) ChatCursor.advance(project, runId, args.get("channel"), advanceTo);
         }
         EventCursor.advance(project, runId, agentId, eventNext);
         Map<String, Object> body = ok("Chat messages after the given id.");
         body.put("count", messages.size());
         body.put("messages", messages);
         body.put("agentEvents", agentEvents);
+        return new Result(0, body);
+    }
+
+    /**
+     * Sends one agent line, then waits for a human message, an answer, or a click.
+     * {@code --timeout} is seconds from 0 to 120. The default is 30.
+     */
+    private static Result chatTurn(Path project, String runId, Map<String, String> args, String agentId) throws Exception {
+        if (!present(args.get("text"))) return fail(2, "chat-turn requires --text");
+        String until = present(args.get("until")) ? args.get("until").trim().toLowerCase(java.util.Locale.ROOT) : "human";
+        if (!until.equals("human") && !until.equals("answer") && !until.equals("click")) {
+            return fail(2, "chat-turn --until is human, answer, or click");
+        }
+        long timeoutSec = 30;
+        if (present(args.get("timeout"))) {
+            try {
+                timeoutSec = Long.parseLong(args.get("timeout").trim());
+            } catch (NumberFormatException failure) {
+                return fail(2, "chat-turn --timeout is seconds from 0 to 120");
+            }
+            if (timeoutSec < 0 || timeoutSec > 120) return fail(2, "chat-turn --timeout is seconds from 0 to 120");
+        }
+        Map<String, String> send = new LinkedHashMap<>();
+        send.put("text", args.get("text"));
+        send.put("source", "agent");
+        if (present(args.get("channel"))) send.put("channel", args.get("channel"));
+        Result sent = chatSend(project, runId, send, agentId);
+        if (sent.exit() != 0) return sent;
+        int eventsAt = 0;
+        try {
+            eventsAt = PageSurfaces.pollInput(project, runId).size();
+        } catch (RuntimeException | IOException ignored) {
+            eventsAt = 0;
+        }
+        Map<String, String> poll = new LinkedHashMap<>();
+        poll.put("from", "human");
+        if (present(args.get("channel"))) poll.put("channel", args.get("channel"));
+        long deadline = System.nanoTime() + timeoutSec * 1_000_000_000L;
+        while (true) {
+            if ("human".equals(until) || "answer".equals(until)) {
+                Result polled = chatPoll(project, runId, poll, agentId);
+                Object messages = polled.body().get("messages");
+                if (messages instanceof List<?> list && !list.isEmpty()) {
+                    Map<String, Object> body = ok("human".equals(until) ? "human replied" : "answer received");
+                    body.put("op", "chat-turn");
+                    body.put("until", until);
+                    body.put("messages", list);
+                    body.put("lines", list);
+                    body.put("count", list.size());
+                    return new Result(0, body);
+                }
+            }
+            if ("answer".equals(until) || "click".equals(until)) {
+                List<Map<String, Object>> events;
+                try {
+                    events = PageSurfaces.pollInput(project, runId, eventsAt);
+                } catch (RuntimeException | IOException ignored) {
+                    events = List.of();
+                }
+                for (Map<String, Object> event : events) {
+                    String kind = String.valueOf(event.getOrDefault("type",
+                            event.getOrDefault("kind", event.getOrDefault("op", event.getOrDefault("name", "")))));
+                    String token = kind.toLowerCase(java.util.Locale.ROOT);
+                    boolean click = "click".equals(until) && token.contains("click");
+                    boolean answer = "answer".equals(until)
+                            && (token.contains("answer") || event.get("value") != null || event.get("choice") != null);
+                    if (!click && !answer) continue;
+                    Map<String, Object> body = ok(click ? "click received" : "answer received");
+                    body.put("op", "chat-turn");
+                    body.put("until", until);
+                    body.put("events", List.of(event));
+                    body.put("lines", List.of(event));
+                    body.put("count", 1);
+                    return new Result(0, body);
+                }
+            }
+            if (System.nanoTime() >= deadline) {
+                Result failed = fail(1, "timeout");
+                failed.body().put("op", "chat-turn");
+                failed.body().put("until", until);
+                failed.body().put("fix", "chat-send --source=human, then chat-turn again");
+                return failed;
+            }
+            Thread.sleep(50L);
+        }
+    }
+
+    /** Visible, rect, and overlaps for every placement on the live page. */
+    private static Result uiVerify(Path project, String runId) {
+        if (PageSurfaces.liveDriver() == null && tools.dscode.common.agentfast.LiveBrowserHost.page() == null) {
+            Result failed = fail(1, "no live browser");
+            failed.body().put("op", "ui-verify");
+            failed.body().put("fix", "run start --url= --browser=");
+            return failed;
+        }
+        List<Map<String, Object>> boxes = liveBoxes();
+        List<Map<String, Object>> lines = new ArrayList<>();
+        for (int index = 0; index < boxes.size(); index++) {
+            Map<String, Object> box = boxes.get(index);
+            double x = boxNumber(box.get("x"));
+            double y = boxNumber(box.get("y"));
+            double w = boxNumber(box.get("w"));
+            double h = boxNumber(box.get("h"));
+            List<String> overlaps = new ArrayList<>();
+            if (w > 0 && h > 0) {
+                for (int other = 0; other < boxes.size(); other++) {
+                    if (other == index) continue;
+                    Map<String, Object> box2 = boxes.get(other);
+                    String id = String.valueOf(box2.get("id"));
+                    if (id.isBlank() || "null".equals(id) || overlaps.contains(id)) continue;
+                    double ox = boxNumber(box2.get("x"));
+                    double oy = boxNumber(box2.get("y"));
+                    double ow = boxNumber(box2.get("w"));
+                    double oh = boxNumber(box2.get("h"));
+                    if (ow <= 0 || oh <= 0) continue;
+                    boolean apart = x + w <= ox || ox + ow <= x || y + h <= oy || oy + oh <= y;
+                    if (!apart) overlaps.add(id);
+                }
+            }
+            Map<String, Object> rect = new LinkedHashMap<>();
+            rect.put("x", box.get("x"));
+            rect.put("y", box.get("y"));
+            rect.put("w", box.get("w"));
+            rect.put("h", box.get("h"));
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", box.get("id"));
+            row.put("visible", w > 0 && h > 0);
+            row.put("rect", rect);
+            row.put("overlaps", overlaps);
+            lines.add(row);
+        }
+        Map<String, Object> body = ok(lines.isEmpty() ? "no placements" : "placements checked");
+        body.put("op", "ui-verify");
+        body.put("placed", lines.size());
+        body.put("placements", lines);
+        body.put("lines", lines);
+        body.put("count", lines.size());
         return new Result(0, body);
     }
 

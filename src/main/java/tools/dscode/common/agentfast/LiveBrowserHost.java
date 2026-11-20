@@ -12,6 +12,7 @@ import tools.dscode.common.composite.CompositeRuntime;
 import tools.dscode.control.protocol.AgentEvents;
 import tools.dscode.control.protocol.LiveHostFile;
 
+import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
 
 import java.io.IOException;
@@ -93,6 +94,12 @@ public final class LiveBrowserHost {
         String token = args[4];
         boolean headed = Boolean.parseBoolean(args[5]);
         String binary = args.length >= 7 ? args[6] : "";
+        String size = args.length >= 8 ? args[7] : "";
+        List<String> extra = new ArrayList<>();
+        if (size != null && !size.isBlank()) {
+            String normalized = size.trim().toLowerCase(java.util.Locale.ROOT).replace('x', ',');
+            extra.add("--window-size=" + normalized);
+        }
         Files.deleteIfExists(project.resolve(".pickleball").resolve("live-browser").resolve(id).resolve("args.txt"));
         CountDownLatch stopped = new CountDownLatch(1);
         HttpServer server = bindLoopback();
@@ -114,7 +121,7 @@ public final class LiveBrowserHost {
             Path profile = project.resolve(".pickleball").resolve("live-browser").resolve(id).resolve("profile");
             Files.createDirectories(profile);
             BrowserSession session = BrowserSession.launch(
-                    id, "about:blank", headed, true, profile, List.of(), List.of(),
+                    id, "about:blank", headed, true, profile, List.of(), extra,
                     binary == null || binary.isBlank() ? null : binary
             );
             CHROME.set(session);
@@ -308,6 +315,27 @@ public final class LiveBrowserHost {
         body.put("chromePid", session == null ? 0 : session.pid);
         if (session != null && session.socket() != null && !session.socket().isBlank()) body.put("cdp", session.socket());
         if (!ok) body.put("reason", reason.isBlank() ? "browser_lost" : reason);
+        String frame = "top";
+        int placed = 0;
+        if (ok && session != null) {
+            try {
+                String id = TargetVerb.mainFrame(session.connection());
+                if (id != null && !id.isBlank()) frame = id;
+            } catch (RuntimeException ignored) {
+                frame = "top";
+            }
+        }
+        WebDriver page = PAGE.get();
+        if (page instanceof JavascriptExecutor js) {
+            try {
+                Object raw = js.executeScript("return document.querySelectorAll('[data-pkb-id]').length");
+                if (raw instanceof Number number) placed = number.intValue();
+            } catch (RuntimeException ignored) {
+                placed = 0;
+            }
+        }
+        body.put("frame", frame);
+        body.put("placed", placed);
         send(exchange, 200, body);
     }
 
@@ -353,7 +381,7 @@ public final class LiveBrowserHost {
      * error, or this gate would be untestable.
      */
     private static final Set<String> EVENTS_WITHOUT_PAGE = Set.of(
-            "chat-poll", "chat_wait", "chat-send", "chat-history", "ui-poll", "ui-catalog"
+            "chat-poll", "chat_wait", "chat-send", "chat-history", "chat-turn", "ui-poll", "ui-catalog"
     );
 
     private static void command(HttpExchange exchange, String token, Path project, String sessionId) throws IOException {

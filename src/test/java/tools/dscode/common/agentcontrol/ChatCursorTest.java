@@ -78,7 +78,7 @@ class ChatCursorTest {
         Assumptions.assumeTrue(BrowserSession.findChrome() != null, "skipped: no Chrome binary on this machine");
         Capture started = run("start", "--url=about:blank", "--browser=chrome", temp.toString());
         assertEquals(0, started.code, started.out + started.err);
-        Capture sent = run("chat-send", "--text=cursor-line", temp.toString());
+        Capture sent = run("chat-send", "--source=human", "--text=cursor-line", temp.toString());
         assertEquals(0, sent.code, sent.out + sent.err);
         Capture first = run("chat_wait", "--timeout=5", temp.toString());
         assertEquals(0, first.code, first.out + first.err);

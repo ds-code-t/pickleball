@@ -37,6 +37,10 @@ class DoctorTest {
         assertTrue(out.contains("worker=absent"), out);
         assertTrue(out.contains("page=absent"), out);
         assertTrue(out.contains("lease="), out);
+        assertTrue(out.contains("leaseLeft="), out);
+        assertTrue(out.contains("orphans="), out);
+        assertTrue(out.contains("frame="), out);
+        assertTrue(out.contains("placed="), out);
     }
 
     @Test

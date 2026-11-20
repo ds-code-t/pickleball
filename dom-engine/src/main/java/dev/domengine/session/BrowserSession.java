@@ -16,6 +16,7 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
@@ -250,23 +251,67 @@ public final class BrowserSession implements AutoCloseable {
 
     public static String findChrome() {
         String env = System.getenv("DOMENGINE_CHROME");
-        if (env != null && !env.isBlank()) return env;
+        if (env != null && !env.isBlank() && Files.isRegularFile(Path.of(env))) return env;
         for (String name : List.of("google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "chrome")) {
             String path = onPath(name);
             if (path != null) return path;
         }
+        for (String candidate : chromeCandidates()) {
+            if (Files.isRegularFile(Path.of(candidate))) return candidate;
+        }
         return null;
     }
 
-    /** Edge binary. Null when this machine has no Edge. Never falls through to Chrome. */
     public static String findEdge() {
         String env = System.getenv("DOMENGINE_EDGE");
-        if (env != null && !env.isBlank() && Files.isExecutable(Path.of(env))) return env;
+        if (env != null && !env.isBlank() && Files.isRegularFile(Path.of(env))) return env;
         for (String name : List.of("microsoft-edge", "microsoft-edge-stable", "msedge")) {
             String path = onPath(name);
             if (path != null) return path;
         }
+        for (String candidate : edgeCandidates()) {
+            if (Files.isRegularFile(Path.of(candidate))) return candidate;
+        }
         return null;
+    }
+
+    /** Windows, macOS, and Linux install paths. PATH is checked first. */
+    private static List<String> chromeCandidates() {
+        List<String> found = new ArrayList<>();
+        String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+        if (os.contains("win")) {
+            String local = System.getenv("LOCALAPPDATA");
+            String pf = System.getenv("PROGRAMFILES");
+            String pf86 = System.getenv("PROGRAMFILES(X86)");
+            if (local != null) found.add(local + "\\Google\\Chrome\\Application\\chrome.exe");
+            if (pf != null) found.add(pf + "\\Google\\Chrome\\Application\\chrome.exe");
+            if (pf86 != null) found.add(pf86 + "\\Google\\Chrome\\Application\\chrome.exe");
+        } else if (os.contains("mac")) {
+            found.add("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome");
+            found.add("/Applications/Chromium.app/Contents/MacOS/Chromium");
+        }
+        found.add("/usr/bin/google-chrome");
+        found.add("/usr/bin/google-chrome-stable");
+        found.add("/usr/bin/chromium");
+        found.add("/usr/bin/chromium-browser");
+        found.add("/snap/bin/chromium");
+        return found;
+    }
+
+    private static List<String> edgeCandidates() {
+        List<String> found = new ArrayList<>();
+        String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+        if (os.contains("win")) {
+            String pf = System.getenv("PROGRAMFILES");
+            String pf86 = System.getenv("PROGRAMFILES(X86)");
+            if (pf86 != null) found.add(pf86 + "\\Microsoft\\Edge\\Application\\msedge.exe");
+            if (pf != null) found.add(pf + "\\Microsoft\\Edge\\Application\\msedge.exe");
+        } else if (os.contains("mac")) {
+            found.add("/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge");
+        }
+        found.add("/usr/bin/microsoft-edge");
+        found.add("/usr/bin/microsoft-edge-stable");
+        return found;
     }
 
     private static String onPath(String name) {

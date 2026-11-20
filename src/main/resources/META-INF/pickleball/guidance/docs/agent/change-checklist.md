@@ -12,7 +12,7 @@ Use this checklist for changes to Pickleball behavior. Coding agents should comp
 
 ## Implement
 
-- [ ] Make the smallest coherent implementation change.
+- [ ] Register a new Workbench verb in the command line, help, CLI inventory, and guidance golden. Keep `docs/consumer-agent-guide.md` at most 5120 UTF-8 LF bytes.
 - [ ] Preserve Java 21 compatibility.
 - [ ] Preserve established public behavior unless a breaking change was requested.
 - [ ] Avoid unrelated refactoring.

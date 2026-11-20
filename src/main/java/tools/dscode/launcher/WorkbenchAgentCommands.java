@@ -88,6 +88,8 @@ public final class WorkbenchAgentCommands {
             return switch (parsed.command()) {
                 case "export-guidance" -> exportGuidance(parsed, safeOut, safeErr);
                 case "start" -> ConsumerReadyCommands.start(parsed, safeOut, safeErr);
+                case "call" -> CompositeCommands.call(parsed, safeOut, safeErr);
+                case "execute-steps" -> CompositeCommands.executeSteps(parsed, safeOut, safeErr);
                 case "doctor" -> ConsumerReadyCommands.doctor(parsed, safeOut, safeErr);
                 case "chat_wait" -> ConsumerReadyCommands.chatWait(parsed, safeOut, safeErr);
                 case "history-summary" -> ConsumerReadyCommands.historySummary(parsed, safeOut, safeErr);
@@ -156,7 +158,8 @@ public final class WorkbenchAgentCommands {
                      "capture-scenario",
                      "screenshot", "selftest",
                      "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame",
-                     "ask-and-wait", "pin", "toast", "checklist", "ui", "ref" ->
+                     "ask-and-wait", "pin", "toast", "checklist", "ui", "ref",
+                     "chat-turn", "ui-verify" ->
                         agentControl(parsed, safeOut, safeErr);
                 case "help" -> help(args, safeOut, safeErr);
                 default -> {
@@ -2006,6 +2009,7 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "fields");
         copyFlag(args, parsed, "items");
         copyFlag(args, parsed, "check");
+        copyFlag(args, parsed, "pick");
         if (hasFlag(parsed, "--cpu")) args.put("cpu", "true");
         if (hasFlag(parsed, "--list")) args.put("list", "true");
         if (hasFlag(parsed, "--reset")) args.put("reset", "true");
@@ -2028,6 +2032,9 @@ public final class WorkbenchAgentCommands {
         if ("arrow".equals(parsed.command())) {
             if (parsed.coordination().inboxFrom() != null) args.put("from", parsed.coordination().inboxFrom());
             if (parsed.coordination().inboxTo() != null) args.put("to", parsed.coordination().inboxTo());
+        }
+        if ("chat-poll".equals(command) && parsed.coordination().inboxFrom() != null) {
+            args.put("from", parsed.coordination().inboxFrom());
         }
         if (parsed.coordination().text() != null) args.put("text", parsed.coordination().text());
         if (parsed.coordination().limit() != null) args.put("limit", parsed.coordination().limit().toString());

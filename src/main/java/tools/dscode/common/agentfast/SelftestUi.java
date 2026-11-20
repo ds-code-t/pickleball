@@ -78,9 +78,9 @@ public final class SelftestUi {
             }
             Arrays.sort(samples);
             long p95 = samples[18];
-            Thread.sleep(500);
+            Thread.sleep(2000);
             CpuSample before = cpuSample(session.pid);
-            Thread.sleep(500);
+            Thread.sleep(2000);
             CpuSample after = cpuSample(session.pid);
             if (!before.supported() || !after.supported()) {
                 body.put("ok", false);
@@ -92,11 +92,11 @@ public final class SelftestUi {
                 return body;
             }
             double cores = before.ticks()
-                    ? (after.ticksValue() - before.ticksValue()) / 100.0 / 0.5
-                    : (after.nanos() - before.nanos()) / 1_000_000_000.0 / 0.5;
+                    ? (after.ticksValue() - before.ticksValue()) / 100.0 / 2.0
+                    : (after.nanos() - before.nanos()) / 1_000_000_000.0 / 2.0;
             body.put("p95Ms", p95);
             body.put("cores", cores);
-            body.put("idleWindowMs", 500);
+            body.put("idleWindowMs", 2000);
             body.put("ticks", before.ticks() ? after.ticksValue() - before.ticksValue() : 0);
             boolean ok = cores < 0.1 && p95 <= 150;
             body.put("ok", ok);

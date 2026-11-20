@@ -23,6 +23,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -58,6 +59,18 @@ final class ConsumerReadyCommands {
             return 0;
         }
         String url = flag(parsed, "--url");
+        String urlKey = flag(parsed, "--url-key");
+        if ((url == null || url.isBlank()) && urlKey != null && !urlKey.isBlank()) {
+            url = UrlKeys.resolve(project, urlKey);
+            if (url == null || url.isBlank()) {
+                err.println("error: --url-key=" + urlKey.trim() + " did not resolve");
+                err.println("fix: pass --url= or a URL.* key in the project configs");
+                return 2;
+            }
+        }
+        if (url != null && tools.dscode.common.agentfast.FixturePages.isFixture(url)) {
+            url = tools.dscode.common.agentfast.FixturePages.resolve(url);
+        }
         String browser = flag(parsed, "--browser");
         if (url == null || url.isBlank() || browser == null || browser.isBlank()) {
             err.print(WorkbenchCliHelp.usageError("start requires --url and --browser", "start"));
@@ -68,6 +81,11 @@ final class ConsumerReadyCommands {
             err.println("error: unsupported --browser=" + browser.trim());
             return 2;
         }
+        String size = flag(parsed, "--size");
+        if (size != null && !size.isBlank() && !size.trim().matches("\\d+[xX,]\\d+")) {
+            err.print(WorkbenchCliHelp.usageError("start --size is WxH, for example 1600x1000", "start"));
+            return 2;
+        }
         Optional<LiveBridgeFile.Bridge> worker = LiveBridgeFile.read(project);
         if (worker.isPresent() && alive(worker.get().pid())) {
             err.println("error: a Workbench worker is live");
@@ -75,14 +93,23 @@ final class ConsumerReadyCommands {
             return 2;
         }
         stopQuiet(project);
+        String hold = flag(parsed, "--hold");
+        if (hold != null && !hold.isBlank()) {
+            try {
+                LeaseHold.arm(project, hold);
+            } catch (RuntimeException | IOException failure) {
+                err.println("error: could not hold the lease\nfix: " + failure.getMessage() + "\n");
+                return 1;
+            }
+        }
         Map<String, String> env = env(parsed);
         String id = "live" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
         String token = UUID.randomUUID().toString().replace("-", "");
-        boolean headed = showHeaded(browser);
+        boolean headed = headed(parsed, browser);
         Path logFile = project.resolve(".pickleball").resolve("logs").resolve("live-browser.log");
         Process process;
         try {
-            process = spawnHost(project, id, url.trim(), browser.trim(), token, headed, binary, logFile);
+            process = spawnHost(project, id, url.trim(), browser.trim(), token, headed, binary, logFile, size);
         } catch (IOException failure) {
             err.println("error: could not start the live browser\nfix: " + failure.getMessage() + "\n");
             return 1;
@@ -100,6 +127,7 @@ final class ConsumerReadyCommands {
             body.put("env", env);
             body.put("live", true);
             body.put("headed", headed);
+            if (size != null && !size.isBlank()) body.put("size", size.trim());
             Path file = sessionFile(project);
             Files.createDirectories(file.getParent());
             Files.writeString(file, JSON.writeValueAsString(body) + "\n", StandardCharsets.UTF_8);
@@ -113,6 +141,19 @@ final class ConsumerReadyCommands {
         Optional<LiveHostFile.Host> host = LiveHostFile.read(project);
         boolean navigated = host.map(LiveHostFile.Host::navigated).orElse(true);
         String navError = host.map(LiveHostFile.Host::navError).orElse("");
+        boolean panel = hasToken(parsed, "--panel");
+        boolean panelOpen = false;
+        if (panel) {
+            java.io.ByteArrayOutputStream panelOut = new java.io.ByteArrayOutputStream();
+            java.io.ByteArrayOutputStream panelErr = new java.io.ByteArrayOutputStream();
+            int panelCode = WorkbenchAgentCommands.run(
+                    new String[]{"panel-open", "--target=page", project.toString()},
+                    new java.io.PrintStream(panelOut, true, StandardCharsets.UTF_8),
+                    new java.io.PrintStream(panelErr, true, StandardCharsets.UTF_8)
+            );
+            panelOpen = panelCode == 0;
+            if (!panelOpen) err.print(panelErr.toString(StandardCharsets.UTF_8));
+        }
         out.println("session=" + id);
         out.println("url=" + url.trim());
         out.println("browser=" + browser.trim());
@@ -120,11 +161,47 @@ final class ConsumerReadyCommands {
         out.println("live=true");
         out.println("headed=" + headed);
         out.println("navigated=" + navigated);
+        if (size != null && !size.isBlank()) out.println("size=" + size.trim());
+        if (panel) out.println("panel=" + (panelOpen ? "open" : "closed"));
         if (!navigated) {
             out.println("error: navigation failed" + (navError == null || navError.isBlank() ? "" : ": " + navError));
         }
+        Map<String, Object> envelope = new LinkedHashMap<>();
+        envelope.put("ok", navigated && (!panel || panelOpen));
+        envelope.put("session", id);
+        envelope.put("runId", id);
+        envelope.put("url", url.trim());
+        envelope.put("browser", browser.trim());
+        envelope.put("live", true);
+        envelope.put("headed", headed);
+        envelope.put("navigated", navigated);
+        envelope.put("ready", navigated && (!panel || panelOpen));
+        envelope.put("frame", "top");
+        if (size != null && !size.isBlank()) envelope.put("size", size.trim());
+        if (panel) envelope.put("panel", panelOpen ? "open" : "closed");
+        envelope.put("sentence", panelOpen ? "live browser ready, panel open" : "live browser ready");
+        if (!navigated) envelope.put("error", "navigation failed");
+        else if (panel && !panelOpen) envelope.put("error", "panel did not open");
+        try {
+            Map<String, Object> stamped = tools.dscode.common.agentfast.AgentEnvelope.apply(
+                    envelope, navigated && (!panel || panelOpen) ? 0 : 1, "start", project, id);
+            out.println(JSON.writeValueAsString(stamped));
+        } catch (IOException ignored) {
+            // The line fields above are already the session id.
+        }
         log(project, id, "start url=" + url.trim() + " browser=" + browser.trim() + " headed=" + headed);
-        return 0;
+        if (!navigated) return 0;
+        return panel && !panelOpen ? 1 : 0;
+    }
+
+    private static boolean headed(WorkbenchCommandLine.Parsed parsed, String browser) {
+        if (hasToken(parsed, "--headed")) {
+            String value = flag(parsed, "--headed");
+            boolean request = value == null || value.isBlank() || "true".equalsIgnoreCase(value) || "1".equals(value);
+            if ("false".equalsIgnoreCase(value) || "0".equals(value)) request = false;
+            return request && !GraphicsEnvironment.isHeadless();
+        }
+        return showHeaded(browser);
     }
 
     /** Chrome, Chromium, or Edge. Null means the name is unsupported or the binary is missing. */
@@ -207,8 +284,75 @@ final class ConsumerReadyCommands {
         out.println("worker=" + (worker ? "present" : "absent"));
         out.println("lease=" + (lease ? "held" : "open"));
         out.println("page=" + (page ? "attached" : "absent"));
+        out.println("leaseLeft=" + LeaseHold.left(project));
+        long chromePid = host.map(LiveHostFile.Host::chromePid).orElse(0L);
+        out.println("orphans=" + orphans(project, chromePid));
+        JsonNode healthBody = healthBody(project);
+        String frame = healthBody == null ? "top" : healthBody.path("frame").asText("top");
+        if (frame == null || frame.isBlank()) frame = "top";
+        int placed = healthBody == null ? 0 : healthBody.path("placed").asInt(0);
+        out.println("frame=" + frame);
+        out.println("placed=" + placed);
         log(project, session, "doctor health=" + health.status());
         return 0;
+    }
+
+    /** Chrome or Chromium processes whose command line names this project and is not the live host. */
+    private static String orphans(Path project, long chromePid) {
+        Path proc = Path.of("/proc");
+        if (project == null || !Files.isDirectory(proc)) return "none";
+        String needle = project.toAbsolutePath().normalize().toString();
+        List<String> found = new ArrayList<>();
+        try (var children = Files.list(proc)) {
+            for (Path child : children.toList()) {
+                String name = child.getFileName().toString();
+                if (name.isEmpty() || !name.chars().allMatch(Character::isDigit)) continue;
+                long pid;
+                try {
+                    pid = Long.parseLong(name);
+                } catch (NumberFormatException ignored) {
+                    continue;
+                }
+                if (pid == chromePid || pid == ProcessHandle.current().pid()) continue;
+                String command;
+                try {
+                    command = Files.readString(child.resolve("cmdline")).replace('\0', ' ');
+                } catch (IOException ignored) {
+                    continue;
+                }
+                String lower = command.toLowerCase(Locale.ROOT);
+                if (!lower.contains("chrome") && !lower.contains("chromium")) continue;
+                if (!command.contains(needle) || !lower.contains("pickleball")) continue;
+                found.add(Long.toString(pid));
+            }
+        } catch (IOException ignored) {
+            return "none";
+        }
+        return found.isEmpty() ? "none" : String.join(",", found);
+    }
+
+    /** Full GET /health body, including frame and placed when the host sends them. */
+    private static JsonNode healthBody(Path project) {
+        Optional<LiveHostFile.Host> host = LiveHostFile.read(project);
+        if (host.isEmpty() || host.get().url() == null || host.get().url().isBlank()) return null;
+        try {
+            String base = host.get().url();
+            if (base.endsWith("/")) base = base.substring(0, base.length() - 1);
+            HttpRequest request = HttpRequest.newBuilder(URI.create(base + "/health"))
+                    .timeout(HEALTH_TIMEOUT)
+                    .header("Authorization", "Bearer " + host.get().token())
+                    .header("Accept", "application/json")
+                    .GET()
+                    .build();
+            HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200 || response.body() == null || response.body().isBlank()) return null;
+            return JSON.readTree(response.body());
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            return null;
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private static boolean showHeaded(String browser) {
@@ -224,7 +368,8 @@ final class ConsumerReadyCommands {
             String token,
             boolean headed,
             String binary,
-            Path logFile
+            Path logFile,
+            String size
     ) throws IOException {
         Path argFile = project.resolve(".pickleball").resolve("live-browser").resolve(id).resolve("args.txt");
         Files.createDirectories(argFile.getParent());
@@ -250,7 +395,8 @@ final class ConsumerReadyCommands {
                 quoteArg(browser),
                 quoteArg(token),
                 headed ? "true" : "false",
-                quoteArg(binary)
+                quoteArg(binary),
+                quoteArg(size == null ? "" : size.trim())
         ) + "\n";
         Files.writeString(argFile, body, StandardCharsets.UTF_8);
         Path javaBin = Path.of(System.getProperty("java.home"), "bin", "java");
@@ -462,12 +608,18 @@ final class ConsumerReadyCommands {
         }
         long timeoutMillis = timeoutMillis(parsed, err);
         if (timeoutMillis < 0) return 2;
+        String from = parsed.coordination().inboxFrom();
+        if (from == null || from.isBlank()) from = "human";
+        Map<String, String> pollArgs = new LinkedHashMap<>();
+        if (!"any".equalsIgnoreCase(from) && !"all".equalsIgnoreCase(from)) pollArgs.put("from", from);
+        String channel = flag(parsed, "--channel");
+        if (channel != null && !channel.isBlank()) pollArgs.put("channel", channel);
         long startedNs = System.nanoTime();
         long deadline = startedNs + timeoutMillis * 1_000_000L;
         try {
             while (true) {
                 AgentControl.Result polled = AgentControl.execute(
-                        parsed.project(), runId, "chat-poll", Map.of(), List.of(), parsed.coordination().agentId());
+                        parsed.project(), runId, "chat-poll", pollArgs, List.of(), parsed.coordination().agentId());
                 int count = count(polled.body());
                 if (count > 0) {
                     out.println(JSON.writeValueAsString(polled.body()));

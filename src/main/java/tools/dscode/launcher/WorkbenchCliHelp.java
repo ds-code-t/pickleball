@@ -20,7 +20,7 @@ final class WorkbenchCliHelp {
             Map.entry("validate", "Usage: validate [--tags=<expr>] [--name=<regex>] [--run-id=<id>] [--max-steps=<n>] [--all] [--noop]\nReports undefined steps, ambiguous glue, and unresolved RUN SCENARIO targets. Outline rows are expanded. Core steps count as defined. A long suite prints progress and stops at a step cap unless --max-steps or --all is set, and reports how many scenarios were skipped. --noop lists empty consumer step definitions (noop:true) and exits 1 when any are found. A non-empty body is not listed. Runs nothing. A flag this command does not use, including --quiet, is rejected with error: and fix:."),
             Map.entry("hint", "Usage: hint [--json]"),
             Map.entry("discover-hint", "Usage: discover-hint [--json]"),
-            Map.entry("doctor", "Usage: doctor\nReports chrome, session, health, headed, pid, and bridge. No session still exits 0."),
+            Map.entry("doctor", "Usage: doctor\nReports chrome, session, health, headed, pid, bridge, worker, lease, leaseLeft, orphans, frame, and placed. No session still exits 0."),
             Map.entry("resolve-runvars", "Usage: resolve-runvars [--json]"),
             Map.entry("workspace-show", "Usage: workspace-show --run-id=<id> [--json]"),
             Map.entry("workspace-edit", "Usage: workspace-edit --run-id=<id> (--runvar=key=value | --config=<relative> --text=<body>) [--expect=<fingerprint>]"),
@@ -60,8 +60,12 @@ final class WorkbenchCliHelp {
             Map.entry("chat-send", "Usage: chat-send --text=<message> [--source=agent|human|system] [--channel=<name>] [--agent=<id>] [--run-id=<id>]"),
             Map.entry("chat-history", "Usage: chat-history [--channel=<name>] [--limit=<n>] [--run-id=<id>]"),
             Map.entry("chat-poll", "Usage: chat-poll [--channel=<name>] [--id=<after>] [--wait=<seconds>] [--run-id=<id>]"),
-            Map.entry("start", "Usage: start --url=<page> --browser=<chrome|edge|chrome-headless> [--env=KEY=VALUE] [--project=<dir>]\nPublishes a live session, opens the browser, and waits until GET /health is ok. Later page commands with no --run-id target that session. live-start is start."),
-            Map.entry("chat_wait", "Usage: chat_wait [--timeout=<seconds>] [--run-id=<id>]\nBlocks until a chat message is stored, or until --timeout (default 30, max 120)."),
+            Map.entry("start", "Usage: start --url=<page> | --url-key=<URL.key> --browser=<chrome|edge|chrome-headless> [--headed] [--hold=<seconds|forever>] [--panel] [--size=1600x1000] [--env=KEY=VALUE]\nOpens the browser, navigates, and waits until GET /health is ok. fixture: names a built-in page. --panel opens the page panel. live-start is start. The reply includes the agent envelope."),
+            Map.entry("chat_wait", "Usage: chat_wait [--timeout=<seconds>] [--from=human|any] [--channel=<name>] [--run-id=<id>]\nBlocks until a chat message from --from is stored (default human). Own agent messages are ignored. --timeout default 30, max 120. 0 returns immediately."),
+            Map.entry("call", "Usage: call <tool> [--args-file=<json>] [--args-b64=<base64>] [--args=<json>|-] [--text=<message>]\nForwards one MCP tool to the shell. The controller is .pickleball/agent-controller.json. The reply is the agent envelope. An unmapped tool is error unavailable."),
+            Map.entry("chat-turn", "Usage: chat-turn --text=<message> [--until=human|answer|click] [--timeout=<seconds>] [--channel=<name>] [--run-id=<id>]\nSends the text as the agent, then waits for a human, an answer, or a click. --timeout default 30, max 120."),
+            Map.entry("execute-steps", "Usage: execute-steps --file=<steps.json> [--stop-on-fail]\nRuns a JSON array of {op,args} or one verb per line. One envelope lists each step. --stop-on-fail stops at the first failure."),
+            Map.entry("ui-verify", "Usage: ui-verify [--run-id=<id>]\nReads every placement: visible, rect, and overlaps. Needs a live browser."),
             Map.entry("history-summary", "Usage: history-summary\nPrints runs, passed, failed, skipped, and other from run records and the store."),
             Map.entry("history-query", "Usage: history-query <runs|get|query|search|props|errors|tail> [--run-id=<id>] [--text=<words>] [--limit=<n>]\nSame read as query. The store is the source of truth."),
             Map.entry("entity-lookup", "Usage: entity-lookup --ref=<entity:Type#id.field>\nPrints the field value. A miss prints miss and exits 1."),
@@ -105,14 +109,14 @@ final class WorkbenchCliHelp {
             Map.entry("html-cleanup", "Usage: html-cleanup [--html=<page>]"),
             Map.entry("capture-scenario", "Usage: capture-scenario [--url=<substring>] [--since=<epoch-ms>] [--until=<epoch-ms>] [--events=<file>] [--out=<feature>] [--run-id=<id>]"),
             Map.entry("screenshot", "Usage: screenshot --out=<file> [--run-id=<id>]"),
-            Map.entry("selftest", "Usage: selftest ui --cpu [--component=panel]\nselftest ui --component=pages"),
+            Map.entry("selftest", "Usage: selftest ui --cpu [--component=panel]\nselftest ui --component=pages\nChrome is found on PATH, then Windows LOCALAPPDATA and Program Files, macOS applications, and the usual Linux paths. The idle window is 2000 ms."),
             Map.entry("snap", "Usage: snap [--target=browser:auto|browser:<id>|browser:cdp=<url>|desktop:<pid>|desktop:app~<name>|ref:<doc>:<handle>] [--format=lines|json] [--fields=<a,b>] [--where=<role=button>] [--limit=<n>] [--budget=<bytes>]"),
             Map.entry("find", "Usage: find --target=<selector> [--query=<text>]"),
-            Map.entry("act", "Usage: act --target=<selector> [--kind=click|type|hover|press|select] [--query=<text>] [--ref=<ref>] [--value=<text>] [--condition=title=<text>|text=<text>|url=<text>|ref=<id>:selected] [--snap=diff|auto] [--timeout=<ms>]"),
+            Map.entry("act", "Usage: act --target=<selector> [--kind=click|type|hover|press|select] [--query=<text>] [--ref=<ref>] [--pick=<n|name>] [--value=<text>] [--condition=title=<text>|text=<text>|url=<text>|ref=<id>:selected] [--snap=diff|auto] [--timeout=<ms>]\n--pick chooses one hit in the same snapshot, so the ref cannot go stale. A success includes checked and settleMs."),
             Map.entry("form-fill", "Usage: form-fill --target=<selector> --fields=id=value|id=value"),
             Map.entry("wait", "Usage: wait --target=<selector> [--ref=<ref>] [--condition=mutation|network|load|navigation|mask|visible|hidden|enabled|detached|text=<text>|<text>] [--timeout=<ms>]"),
             Map.entry("wait-for", "Usage: wait-for --target=<selector> --condition=<text> [--timeout=<ms>]"),
-            Map.entry("watch", "Usage: watch --target=<selector> [--kinds=<kinds>] [--duration=<ms>]"),
+            Map.entry("watch", "Usage: watch --target=<selector> [--ref=<ref>] [--until=mutation|change|visible|hidden|text=<text>|click] [--kinds=<kinds>] [--duration=<ms>]"),
             Map.entry("explain", "Usage: explain --target=<selector> [--query=<text>]"),
             Map.entry("capture", "Usage: capture --target=<selector> --out=<file>"),
             Map.entry("attach", "Usage: attach --target=<selector>"),
@@ -202,7 +206,7 @@ final class WorkbenchCliHelp {
         text.append("coordination: short-log note inbox finish presence post history gc-runs gc-versions use-version export-guidance\n");
         text.append("descriptors: session list | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>\n");
         text.append("page: inspect-page find-element\n");
-        text.append("agent: observe launch windows tabs chat-send chat-history chat-poll chat_wait highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close panel-open panel-close guide guide-next guide-back guide-done ask ask-and-wait pin toast checklist ui-apply ui-poll ui-catalog capture-scenario screenshot selftest doctor act form-fill snap find frame wait wait-for watch explain capture attach eval ref controller-start controller-stop controller-status controller-ping\n");
+        text.append("agent: observe launch windows tabs chat-send chat-history chat-poll chat_wait chat-turn highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close panel-open panel-close guide guide-next guide-back guide-done ask ask-and-wait pin toast checklist ui-apply ui-poll ui-catalog ui-verify capture-scenario screenshot selftest doctor act form-fill snap find frame wait wait-for watch explain capture attach eval ref controller-start controller-stop controller-status controller-ping call execute-steps\n");
         text.append("consumer: start live-stop history-summary history-query entity-lookup open-run bridge-health\n");
         text.append("retrieval: query runs | query get | query query | query search | query props | query errors | query tail\n");
         text.append("controller: sync worker-check live-check ui mcp session\n");

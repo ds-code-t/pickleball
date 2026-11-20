@@ -43,7 +43,7 @@ final class WorkbenchCliFlags {
                     "--max-steps", "--all", "--noop"
             ),
             "act", List.of(
-                    "--target", "--kind", "--query", "--ref", "--value", "--snap",
+                    "--target", "--kind", "--query", "--ref", "--value", "--snap", "--pick",
                     "--run-id", "--agent", "--agent-id", "--fixture", "--timeout", "--condition", "--frame",
                     "--group", "--sequence"
             )

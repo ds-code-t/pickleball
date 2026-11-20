@@ -26,8 +26,9 @@ final class WorkbenchCommandLine {
             "inspect-page", "find-element", "query",
             "session-list", "session-info", "session-hold", "session-release",
             "observe", "launch", "windows", "tabs",
-            "chat-send", "chat-history", "chat-poll", "chat_wait",
+            "chat-send", "chat-history", "chat-poll", "chat_wait", "chat-turn",
             "history-summary", "history-query", "entity-lookup", "open-run", "bridge-health", "start",
+            "call", "execute-steps",
             "highlight", "unhighlight",
             "overlay", "overlay-poll", "overlay-remove",
             "label", "unlabel",
@@ -38,7 +39,7 @@ final class WorkbenchCommandLine {
             "spotlight", "unspotlight",
             "html-write", "html-replace", "html-insert", "html-remove", "html-cleanup",
             "popup-open", "popup-status", "popup-close",
-            "ui-apply", "ui-poll", "ui-catalog",
+            "ui-apply", "ui-poll", "ui-catalog", "ui-verify",
             "guide", "guide-next", "guide-back", "guide-done", "ask",
             "panel-open", "panel-close",
             "capture-scenario",
@@ -75,7 +76,8 @@ final class WorkbenchCommandLine {
             "--query", "--exposure", "--target", "--pane", "--on-top", "--headless",
             "--mode", "--condition", "--timeout", "--ref", "--value", "--snap", "--within", "--depth",
             "--budget", "--strict", "--rank", "--scroll-search", "--duration", "--expr",
-            "--world", "--clip", "--frame", "--kinds", "--fixture", "--enter", "--items"
+            "--world", "--clip", "--frame", "--kinds", "--fixture", "--enter", "--items",
+            "--args-file", "--file", "--url-key", "--size", "--hold", "--pick", "--until"
     );
 
     private WorkbenchCommandLine() {
