@@ -171,6 +171,18 @@ After Discover has found the failing scenario, use the session that is already o
 - `.pickleball/investigations/` is project history, not generated guidance. New handoffs always go there. A legacy `v/<version>/investigations/<id>` tree is still readable when the root path for that id is absent. `export-guidance` leaves both trees alone.
 - `export-guidance` does **not** copy this consumer's own features into `.pickleball` for testing. It still materializes full `docs/` plus the example-consumer snapshot for on-demand/human use.
 
+## Agent data and the persistent controller
+
+`controller-start` starts one process for this project. The handle is `.pickleball/agent-controller.json` (pid, port, token). The warm client is `java -cp <classpath> tools.dscode.launcher.PkbMain <verb>`. That class does not load the rest of Pickleball. It sends one JSON line and reads one JSON line, so a warm verb stays under 500 ms. `controller-stop` exits that process and deletes the handle. `controller-status` prints running=true or running=false. `controller-ping` returns the envelope and does not run a page verb. A verb with no controller starts one. MCP and the live worker bridge (`POST /v1/agent/command` when `.pickleball/workbench/live-bridge.json` is alive) still run the same verbs. The log is `.pickleball/agent-controller.log`.
+
+Every call returns one envelope. The fields are v, ok, op, ms, state, sum, items, next, trunc, and err. state is session, browser (up or down), frame, and lease (held or none). It is present on success and on failure. err is null on success. On failure it has code, msg, fix, and candidates when the match was ambiguous. An ambiguous `act` lists those candidates. stale_ref says to run `snap` or `find` again. no live browser says to run `start`. Older fields stay: error, lines, ref, elapsedMs.
+
+`next` is one opaque cursor. Pass it back as `--cursor`. The same token reads the same chat and ui-poll position again. `chat-poll` and `ui-poll` share it. A numeric overlay index is also kept as seq.
+
+A hit keeps its long ref: value and adds a short id such as s1.h42. The short id follows that DOM node (the backend id), including when the document version changes. `ref` expands the short id to the full value. `--target`, `--ref`, and `--within` accept the short id. It is stale_ref when that node is removed, when its role or name no longer matches, or when that document's URL or loader changes.
+
+`snap` lines are `- role "name" [ref=...] id=s1.h42 visible=true enabled=true interactive=true frame=top`. `--format=lines` prints the envelope as lines and is smaller than JSON. The default print stays JSON. `--fields`, `--where`, `--limit`, and `--budget` narrow the reply. The default cap is 200 lines and 16 KB. Overflow sets truncated and writes the full text under `.pickleball/agent-full/`. A bare token is letters, digits, and `_./:@+-`. A newline or a non-ASCII value is a JSON string. Diff lists stay inside that same cap.
+
 ## First-read
 
 Keep first-read small. After a successful export:

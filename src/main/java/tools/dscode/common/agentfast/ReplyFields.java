@@ -38,6 +38,7 @@ public final class ReplyFields {
             timing.put("totalMs", ms);
             copy.set("timing", timing);
             copy.put("elapsedMs", ms);
+            if (copy.has("v")) copy.put("ms", ms);
             return JSON.writeValueAsString(copy);
         } catch (Exception failure) {
             return raw + "\nelapsedMs=" + ms;

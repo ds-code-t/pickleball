@@ -132,6 +132,8 @@ public final class WorkbenchAgentCommands {
                 case "gc-runs" -> gcRuns(parsed, safeOut, safeErr);
                 case "gc-versions" -> gcVersions(parsed, safeOut, safeErr);
                 case "use-version" -> useVersion(parsed, safeOut, safeErr);
+                case "controller-start", "controller-stop", "controller-status", "controller-ping" ->
+                        controllerClient(args, safeErr);
                 case "inspect-page" -> inspectPage(parsed, safeOut, safeErr);
                 case "find-element" -> findElement(parsed, safeOut, safeErr);
                 case "query" -> query(parsed, safeOut, safeErr);
@@ -154,7 +156,7 @@ public final class WorkbenchAgentCommands {
                      "capture-scenario",
                      "screenshot", "selftest",
                      "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame",
-                     "ask-and-wait", "pin", "toast", "checklist", "ui" ->
+                     "ask-and-wait", "pin", "toast", "checklist", "ui", "ref" ->
                         agentControl(parsed, safeOut, safeErr);
                 case "help" -> help(args, safeOut, safeErr);
                 default -> {
@@ -180,6 +182,16 @@ public final class WorkbenchAgentCommands {
             SecretRedactor.noteAll(Workspace.readRunVars(workspace));
         } catch (RuntimeException ignored) {
             // The command's own read reports "Workbench <command> failed:".
+        }
+    }
+
+    private static int controllerClient(String[] args, PrintStream err) {
+        try {
+            return PkbMain.run(args);
+        } catch (Exception failure) {
+            err.println("error: " + (failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()));
+            err.println("fix: controller-start");
+            return 1;
         }
     }
 
@@ -1983,6 +1995,8 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "scroll-search");
         copyFlag(args, parsed, "duration");
         copyFlag(args, parsed, "expr");
+        copyFlag(args, parsed, "format");
+        copyFlag(args, parsed, "cursor");
         copyFlag(args, parsed, "world");
         copyFlag(args, parsed, "clip");
         copyFlag(args, parsed, "frame");
@@ -2048,7 +2062,15 @@ public final class WorkbenchAgentCommands {
                 return posted.exit() == 0 ? 1 : posted.exit();
             }
             long totalMs = Math.max(0L, (System.nanoTime() - forwardStarted) / 1_000_000L);
-            out.println(tools.dscode.common.agentfast.ReplyFields.restamp(posted.bodyJson(), totalMs));
+            String printed = tools.dscode.common.agentfast.AgentEnvelope.ensure(
+                    tools.dscode.common.agentfast.ReplyFields.restamp(posted.bodyJson(), totalMs),
+                    command,
+                    totalMs,
+                    parsed.project(),
+                    boundRunId(parsed)
+            );
+            if ("lines".equals(args.get("format"))) printed = tools.dscode.common.agentfast.AgentEnvelope.renderLines(printed);
+            out.println(printed);
             if (posted.exit() != 0) {
                 String error = "agent command failed";
                 try {
@@ -2063,7 +2085,13 @@ public final class WorkbenchAgentCommands {
         }
         if (failFastWithoutBrowser(command, args)) {
             err.print(WorkbenchCliHelp.structured("no live browser", "run start --url= --browser="));
-            out.println("{\"ok\":false,\"error\":\"no live browser\"}");
+            out.println(tools.dscode.common.agentfast.AgentEnvelope.ensure(
+                    "{\"ok\":false,\"error\":\"no live browser\",\"op\":\"" + command + "\"}",
+                    command,
+                    0,
+                    parsed.project(),
+                    boundRunId(parsed)
+            ));
             return 1;
         }
         AgentControl.Result result = AgentControl.execute(
@@ -2075,7 +2103,15 @@ public final class WorkbenchAgentCommands {
                 parsed.coordination().agentId()
         );
         try {
-            out.println(JSON.writeValueAsString(result.body()));
+            String printed = tools.dscode.common.agentfast.AgentEnvelope.ensure(
+                    JSON.writeValueAsString(result.body()),
+                    command,
+                    0,
+                    parsed.project(),
+                    boundRunId(parsed)
+            );
+            if ("lines".equals(args.get("format"))) printed = tools.dscode.common.agentfast.AgentEnvelope.renderLines(printed);
+            out.println(printed);
         } catch (java.io.IOException failure) {
             err.println(failure.getMessage());
             return 1;
