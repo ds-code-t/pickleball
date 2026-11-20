@@ -77,7 +77,7 @@ final class WorkbenchCliHelp {
             Map.entry("guide-back", "Usage: guide-back [--id=<guide>] [--run-id=<id>]"),
             Map.entry("guide-done", "Usage: guide-done [--id=<guide>] [--run-id=<id>]"),
             Map.entry("ask", "Usage: ask --say=<question> [--choices=Yes,No] [--handle=<target>] [--id=<question>] [--sensitive=true] [--run-id=<id>]"),
-            Map.entry("ask-and-wait", "Usage: ask-and-wait --say=<question> [--choices=a,b] [--timeout=<ms>]"),
+            Map.entry("ask-and-wait", "Usage: ask-and-wait --say=<question> [--choices=a,b] [--id=<id>] [--timeout=<ms>]"),
             Map.entry("pin", "Usage: pin --text=<comment>"),
             Map.entry("toast", "Usage: toast --text=<message>"),
             Map.entry("checklist", "Usage: checklist --items=a|b|c"),

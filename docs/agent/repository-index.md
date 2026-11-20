@@ -952,6 +952,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/GuidancePackagingTest.java`
 - `src/test/java/tools/dscode/launcher/AgentExpansionTest.java`
 - `src/test/java/tools/dscode/launcher/AgentFastCliTest.java`
+- `src/test/java/tools/dscode/launcher/AskIdTest.java`
 - `src/test/java/tools/dscode/launcher/AutoSnapshotTest.java`
 - `src/test/java/tools/dscode/launcher/BrowserLostRunIdTest.java`
 - `src/test/java/tools/dscode/launcher/ClickOnceTest.java`

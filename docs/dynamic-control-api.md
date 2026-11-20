@@ -33,7 +33,7 @@ With no live browser the command exits 1 and the body is `ok:false` with `error:
 | ui | `--ops` | The `ui-apply` batch. An op target may be `ref:<docVersion:handle>`. A stale ref misses. |
 | capture | `--target --out` | Writes a PNG. No base64 in the reply. |
 | frame | `--target --list\|--reset\|--enter=<id>` | Lists frames, clears the entered frame (`entered` is empty), or scopes later find, act, snap, inspect-page, eval, wait, explain, and highlight to that frame. The `frame --enter` reply's `frame` is that frame's CDP id, and `entered` stays the token. Snap keeps each hit's own frame. |
-| ask-and-wait | `--say --choices --timeout` | Shows the question and returns `value` when the page answers. |
+| ask-and-wait | `--say --choices --id --timeout` | Shows one question and returns `value` only for an answer to that question's id that arrives after the question is shown. Each call gets its own id unless `--id` is set. Timeout exits 1 with `error: timeout`, no `value`, and the question is removed. |
 | pin | `--text` | Pins that comment on the page. |
 | toast | `--text` | Shows the message, then removes it. |
 | checklist | `--items` | Places the items. Items are separated by `\|`. |

@@ -20,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * One controller for observe, launch, windows, chat, highlight, overlay, HTML,
@@ -28,6 +29,9 @@ import java.util.Optional;
 public final class AgentControl {
     public record Result(int exit, Map<String, Object> body) {
     }
+
+    /** Each ask without {@code --id} gets the next id. {@code q1} is not reused. */
+    private static final AtomicInteger ASK_SEQ = new AtomicInteger();
 
     private AgentControl() {
     }
@@ -516,7 +520,7 @@ public final class AgentControl {
     private static Result ask(Path project, String runId, Map<String, String> args) throws Exception {
         if (!present(args.get("say"))) return fail(2, "ask requires --say=<question>");
         Map<String, Object> spec = new LinkedHashMap<>();
-        spec.put("id", present(args.get("id")) ? args.get("id").trim() : "q1");
+        spec.put("id", present(args.get("id")) ? args.get("id").trim() : "q" + ASK_SEQ.incrementAndGet());
         spec.put("say", args.get("say").trim());
         if (present(args.get("choices"))) {
             List<String> choices = new ArrayList<>();
@@ -537,27 +541,35 @@ public final class AgentControl {
     }
 
     private static Result askAndWait(Path project, String runId, Map<String, String> args) throws Exception {
+        int before = inputCount(project, runId);
         Result shown = ask(project, runId, args);
         if (shown.exit() != 0) return shown;
-        String id = String.valueOf(shown.body().getOrDefault("id", "q1"));
+        String id = String.valueOf(shown.body().getOrDefault("id", ""));
         long timeout = 3000L;
         if (present(args.get("timeout"))) {
             try {
                 timeout = Long.parseLong(args.get("timeout").trim());
             } catch (NumberFormatException failure) {
+                PageSurfaces.runtimeCall("askClose", id, false);
                 return fail(2, "timeout is milliseconds");
             }
         }
         long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(Math.max(0, timeout));
         Map<String, Object> answer = null;
         while (true) {
-            for (Map<String, Object> event : PageSurfaces.pollInput(project, runId)) {
-                if ("answer".equals(String.valueOf(event.get("type"))) && id.equals(String.valueOf(event.get("id")))) {
-                    answer = event;
-                }
+            for (Map<String, Object> event : PageSurfaces.pollInput(project, runId, before)) {
+                if (!"answer".equals(String.valueOf(event.get("type")))) continue;
+                if (!id.equals(String.valueOf(event.get("id")))) continue;
+                answer = event;
             }
             if (answer != null) break;
-            if (System.nanoTime() >= deadline) return fail(1, "timeout");
+            if (System.nanoTime() >= deadline) {
+                PageSurfaces.runtimeCall("askClose", id, false);
+                Result failed = fail(1, "timeout");
+                failed.body().put("op", "ask-and-wait");
+                failed.body().put("id", id);
+                return failed;
+            }
             Thread.sleep(50);
         }
         Map<String, Object> body = ok("Answer received.");
@@ -567,6 +579,15 @@ public final class AgentControl {
         body.put("value", value == null ? "" : value);
         body.put("applied", value != null && !String.valueOf(value).isBlank());
         return new Result(0, body);
+    }
+
+    /** Events already stored before this ask. A later answer is the only one this call accepts. */
+    private static int inputCount(Path project, String runId) {
+        try {
+            return PageSurfaces.pollInput(project, runId).size();
+        } catch (RuntimeException | java.io.IOException ignored) {
+            return 0;
+        }
     }
 
     /** pin, toast, checklist, and the status banner. Toast leaves the page on its own. */
