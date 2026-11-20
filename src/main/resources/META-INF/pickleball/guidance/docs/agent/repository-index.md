@@ -850,6 +850,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/engine/match/StepRegistryTest.java`
 - `src/test/java/tools/dscode/engine/NativeDataExecutionTest.java`
 - `src/test/java/tools/dscode/engine/NativeDynamicExecutionTest.java`
+- `src/test/java/tools/dscode/engine/navfile/NavFileGlue.java`
 - `src/test/java/tools/dscode/engine/parity/DualRunSetupTest.java`
 - `src/test/java/tools/dscode/engine/parity/EchoParityGlue.java`
 - `src/test/java/tools/dscode/engine/parity/ParityHarnessTest.java`

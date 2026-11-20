@@ -1,35 +1,50 @@
 package tools.dscode.launcher;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.domengine.session.BrowserSession;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeOptions;
 import tools.dscode.coredefinitions.NavigationSteps;
+import tools.dscode.engine.EngineOptions;
+import tools.dscode.engine.PickleballEngine;
+import tools.dscode.engine.model.RunResult;
+import tools.dscode.engine.model.Status;
+import tools.dscode.engine.model.StepResult;
+import tools.dscode.engine.navfile.NavFileGlue;
 
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
-/** Phase 7: file, data, and about:blank resolve and load in Chrome. */
+/** Phase 7: file, data, and about:blank resolve and load in Chrome through the navigate step. */
 class NavigateDataFileTest {
-    private static final ObjectMapper JSON = new ObjectMapper();
-
     @TempDir
     Path temp;
 
     @AfterEach
     void stop() {
         ConsumerReadyCommands.stopQuiet(temp);
+        ChromeDriver engine = NavFileGlue.driver;
+        NavFileGlue.driver = null;
+        if (engine != null) {
+            try {
+                engine.quit();
+            } catch (RuntimeException ignored) {
+                // The assertion already ran.
+            }
+        }
     }
 
     @Test
@@ -54,41 +69,62 @@ class NavigateDataFileTest {
         String fileUrl = page.toUri().toString();
         assertTrue(fileUrl.startsWith("file:"), fileUrl);
         assertEquals(fileUrl, NavigationSteps.addressAfterConfigLookup(fileUrl, null));
-        openAndRead(fileUrl, "file-nav", "document.title", "FilePage");
+
+        ChromeOptions options = new ChromeOptions();
+        options.setBinary(BrowserSession.findChrome());
+        options.addArguments("--headless=new", "--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage");
+        NavFileGlue.driver = new ChromeDriver(options);
+
+        assertNotEquals("FilePage", read("document.title"), "the file page was already open");
+        RunResult file = navigate(fileUrl, "the file page loads");
+        assertEquals(Status.PASSED, file.status(), file.toString());
+        StepResult fileStep = navigateStep(file);
+        assertEquals("navigate to: " + fileUrl, fileStep.text(), fileStep.toString());
+        assertEquals(Status.PASSED, fileStep.status(), fileStep.toString());
+        assertEquals("FilePage", read("document.title"));
 
         String dataUrl = "data:text/html,<title>DataPage</title>";
         assertEquals(dataUrl, NavigationSteps.addressAfterConfigLookup(dataUrl, null));
-        openAndRead(dataUrl, "data-nav", "document.title", "DataPage");
+        assertNotEquals("DataPage", read("document.title"), "the data page was already open");
+        RunResult data = navigate(dataUrl, "the data page loads");
+        assertEquals(Status.PASSED, data.status(), data.toString());
+        StepResult dataStep = navigateStep(data);
+        assertEquals("navigate to: " + dataUrl, dataStep.text(), dataStep.toString());
+        assertEquals(Status.PASSED, dataStep.status(), dataStep.toString());
+        assertEquals("DataPage", read("document.title"));
+        assertTrue(read("location.href").startsWith("data:"), read("location.href"));
 
-        openAndRead("about:blank", "blank-nav", "location.href", "about:blank");
+        assertNotEquals("about:blank", read("location.href"), "the blank page was already open");
+        RunResult blank = navigate("about:blank", "the blank page loads");
+        assertEquals(Status.PASSED, blank.status(), blank.toString());
+        StepResult blankStep = navigateStep(blank);
+        assertEquals("navigate to: about:blank", blankStep.text(), blankStep.toString());
+        assertEquals(Status.PASSED, blankStep.status(), blankStep.toString());
+        assertEquals("about:blank", read("location.href"));
     }
 
-    private void openAndRead(String url, String runId, String expr, String expected) throws Exception {
-        Capture started = run("start", "--url=" + url, "--browser=chrome-headless", "--run-id=" + runId);
-        assertEquals(0, started.code, started.err + started.out);
-        assertTrue(started.out.contains("navigated=true"), started.out);
-        assertTrue(started.out.contains("url=" + url), started.out);
-        Capture read = run("eval", "--target=browser:auto", "--world=main", "--run-id=" + runId, "--expr=" + expr);
-        assertEquals(0, read.code, read.err + read.out);
-        assertEquals(expected, JSON.readTree(read.out).path("value").asText(), read.out);
-        ConsumerReadyCommands.stopQuiet(temp);
+    private RunResult navigate(String url, String scenario) {
+        String feature = "Feature: Navigate literals\n"
+                + "  Scenario: " + scenario + "\n"
+                + "    Given the chrome page is ready\n"
+                + "    When navigate to: " + url + "\n";
+        return PickleballEngine.run(
+                feature,
+                EngineOptions.of(NavFileGlue.class).project(temp).scenario(scenario));
     }
 
-    private Capture run(String... args) {
-        String[] command = new String[args.length + 1];
-        command[0] = args[0];
-        command[1] = temp.toString();
-        System.arraycopy(args, 1, command, 2, args.length - 1);
-        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
-        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
-        int code = WorkbenchAgentCommands.run(
-                command,
-                new PrintStream(stdout, true, StandardCharsets.UTF_8),
-                new PrintStream(stderr, true, StandardCharsets.UTF_8)
-        );
-        return new Capture(code, stdout.toString(StandardCharsets.UTF_8), stderr.toString(StandardCharsets.UTF_8));
+    private static StepResult navigateStep(RunResult result) {
+        assertFalse(result.scenarios().isEmpty(), result.toString());
+        List<StepResult> found = new ArrayList<>();
+        for (StepResult step : result.scenarios().getFirst().steps()) {
+            if (step.text() != null && step.text().startsWith("navigate to:")) found.add(step);
+        }
+        assertEquals(1, found.size(), result.toString());
+        return found.getFirst();
     }
 
-    private record Capture(int code, String out, String err) {
+    private static String read(String expression) {
+        Object value = NavFileGlue.driver.executeScript("return " + expression);
+        return value == null ? "" : String.valueOf(value);
     }
 }

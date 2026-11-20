@@ -192,7 +192,7 @@ class TimingFieldsTest {
                 new PrintStream(startErr, true, StandardCharsets.UTF_8)
         );
         assertEquals(0, started, startOut.toString(StandardCharsets.UTF_8) + startErr.toString(StandardCharsets.UTF_8));
-        long[] samples = new long[2];
+        long[] samples = new long[3];
         for (int sample = 0; sample < samples.length; sample++) {
             long began = System.nanoTime();
             Process process = new ProcessBuilder(
@@ -214,10 +214,10 @@ class TimingFieldsTest {
             assertTrue(body.path("ok").asBoolean(), output);
             assertEquals("style_modified", body.path("codes").path(0).asText(""), output);
         }
-        long realWarmMs = Math.min(samples[0], samples[1]);
-        System.out.println("MEASURE realWarmMs=" + samples[0] + " " + samples[1] + " min=" + realWarmMs);
-        // Fresh CLI against a live Chrome. The minimum of two samples is the warm path. Bound is 1500 ms.
-        assertTrue(realWarmMs <= 1500, "realWarmMs=" + samples[0] + "," + samples[1]);
+        long realWarmMs = Math.min(samples[0], Math.min(samples[1], samples[2]));
+        System.out.println("MEASURE realWarmMs=" + samples[0] + " " + samples[1] + " " + samples[2] + " min=" + realWarmMs);
+        // Fresh CLI against an already-started Chrome. The minimum of three samples is the warm path. Bound is 1000 ms.
+        assertTrue(realWarmMs <= 1000, "realWarmMs=" + samples[0] + "," + samples[1] + "," + samples[2]);
         String paint = eval(
                 "document.getElementById('save').getAttribute('data-pkb-style')"
                         + "+'|'+getComputedStyle(document.getElementById('save')).backgroundColor");
