@@ -1,3 +1,12 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        // The portal does not always proxy a plugin's Maven Central dependencies.
+        // A cold Gradle cache then fails configuration looking only at plugins.gradle.org.
+        mavenCentral()
+    }
+}
+
 rootProject.name = 'pickleball'
 
 include 'pickleball-control-api'
