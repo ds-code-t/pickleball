@@ -523,62 +523,55 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Chrome for the agent-fast tests
+      - name: Chrome for Testing on Linux
+        if: runner.os == 'Linux'
         shell: bash
         run: |
           set -euo pipefail
-          if [ "${RUNNER_OS}" = "Linux" ]; then
-            meta="$(python3 - <<'PY'
-            import json, urllib.request
-            data = json.load(urllib.request.urlopen("https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json"))
-            stable = data["channels"]["Stable"]
-            def url(kind):
-                return next(item["url"] for item in stable["downloads"][kind] if item["platform"] == "linux64")
-            print(stable["version"])
-            print(url("chrome"))
-            print(url("chromedriver"))
-            PY
-            )"
-            version="$(printf '%s\n' "$meta" | sed -n '1p')"
-            url="$(printf '%s\n' "$meta" | sed -n '2p')"
-            driver="$(printf '%s\n' "$meta" | sed -n '3p')"
-            curl -fsSL -o /tmp/chrome-linux64.zip "$url"
-            unzip -q /tmp/chrome-linux64.zip -d "$RUNNER_TEMP/chrome"
-            curl -fsSL -o /tmp/chromedriver-linux64.zip "$driver"
-            unzip -q /tmp/chromedriver-linux64.zip -d "$RUNNER_TEMP/chrome"
-            chrome="$RUNNER_TEMP/chrome/chrome-linux64/chrome"
-            bindir="$RUNNER_TEMP/chrome/bin"
-            mkdir -p "$bindir"
-            ln -sfn "$chrome" "$bindir/google-chrome"
-            ln -sfn "$chrome" "$bindir/google-chrome-stable"
-            ln -sfn "$chrome" "$bindir/chrome"
-            ln -sfn "$RUNNER_TEMP/chrome/chromedriver-linux64/chromedriver" "$bindir/chromedriver"
-            echo "$bindir" >> "$GITHUB_PATH"
-            {
-              echo "DOMENGINE_CHROME<<EOF"
-              echo "$chrome"
-              echo "EOF"
-            } >> "$GITHUB_ENV"
-            "$chrome" --version
-            echo "chrome-for-testing $version"
-          elif [ "${RUNNER_OS}" = "Windows" ]; then
+          meta="$(python3 - <<'PY'
+          import json, urllib.request
+          data = json.load(urllib.request.urlopen("https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json"))
+          stable = data["channels"]["Stable"]
+          def url(kind):
+              return next(item["url"] for item in stable["downloads"][kind] if item["platform"] == "linux64")
+          print(stable["version"])
+          print(url("chrome"))
+          print(url("chromedriver"))
+          PY
+          )"
+          version="$(printf '%s\n' "$meta" | sed -n '1p')"
+          url="$(printf '%s\n' "$meta" | sed -n '2p')"
+          driver="$(printf '%s\n' "$meta" | sed -n '3p')"
+          curl -fsSL -o /tmp/chrome-linux64.zip "$url"
+          unzip -q /tmp/chrome-linux64.zip -d "$RUNNER_TEMP/chrome"
+          curl -fsSL -o /tmp/chromedriver-linux64.zip "$driver"
+          unzip -q /tmp/chromedriver-linux64.zip -d "$RUNNER_TEMP/chrome"
+          chrome="$RUNNER_TEMP/chrome/chrome-linux64/chrome"
+          bindir="$RUNNER_TEMP/chrome/bin"
+          mkdir -p "$bindir"
+          ln -sfn "$chrome" "$bindir/google-chrome"
+          ln -sfn "$chrome" "$bindir/google-chrome-stable"
+          ln -sfn "$chrome" "$bindir/chrome"
+          ln -sfn "$RUNNER_TEMP/chrome/chromedriver-linux64/chromedriver" "$bindir/chromedriver"
+          echo "$bindir" >> "$GITHUB_PATH"
+          echo "DOMENGINE_CHROME=$chrome" >> "$GITHUB_ENV"
+          "$chrome" --version
+          echo "chrome-for-testing $version"
+
+      - name: Chrome on Windows and macOS
+        if: runner.os != 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${RUNNER_OS}" = "Windows" ]; then
             chrome='C:\Program Files\Google\Chrome\Application\chrome.exe'
             test -f "$chrome"
-            {
-              echo "DOMENGINE_CHROME<<EOF"
-              echo "$chrome"
-              echo "EOF"
-            } >> "$GITHUB_ENV"
           else
             chrome="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
             test -x "$chrome"
-            {
-              echo "DOMENGINE_CHROME<<EOF"
-              echo "$chrome"
-              echo "EOF"
-            } >> "$GITHUB_ENV"
             "$chrome" --version
           fi
+          echo "DOMENGINE_CHROME=$chrome" >> "$GITHUB_ENV"
 
       - name: Agent-fast Phase 1-7 tests
         shell: bash
