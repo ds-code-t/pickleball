@@ -1436,7 +1436,16 @@ class WorkbenchCliSurfaceCoverageTest {
         Path bat = gradle.resolve("gradlew.bat");
         Files.writeString(bat, "@echo off\r\n");
         List<String> gradleCommand = ConsumerMavenTestRunner.command(gradle, workspace, Map.of());
-        assertEquals(bat.toString(), gradleCommand.get(0), gradleCommand.toString());
+        boolean windows = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win");
+        if (windows) {
+            assertEquals("cmd.exe", gradleCommand.get(0), gradleCommand.toString());
+            assertEquals("/d", gradleCommand.get(1), gradleCommand.toString());
+            assertEquals("/c", gradleCommand.get(2), gradleCommand.toString());
+            assertEquals(bat.toString(), gradleCommand.get(3), gradleCommand.toString());
+        } else {
+            assertEquals(bat.toString(), gradleCommand.get(0), gradleCommand.toString());
+        }
+        assertTrue(gradleCommand.stream().noneMatch(item -> item.equals("build")), gradleCommand.toString());
     }
 
     /** Plain text, a compact phrase, or the full file. A missing fact still fails. */

@@ -138,7 +138,11 @@ final class ConsumerReadyCommands {
 
     /** Stops the host {@code start} recorded. A Workbench worker bridge is left running. */
     static boolean stopQuiet(Path project) {
-        return stopOwned(project).stopped();
+        boolean stopped = stopOwned(project).stopped();
+        if (project != null) {
+            dev.domengine.session.ChromeProcess.releaseProfile(project.resolve(".pickleball"));
+        }
+        return stopped;
     }
 
     /**
@@ -256,8 +260,10 @@ final class ConsumerReadyCommands {
         Path javaBin = Path.of(System.getProperty("java.home"), "bin", "java");
         ProcessBuilder builder = new ProcessBuilder(javaBin.toString(), "@" + argFile.toAbsolutePath());
         builder.directory(project.toFile());
-        builder.redirectOutput(ProcessBuilder.Redirect.appendTo(logFile.toFile()));
-        builder.redirectErrorStream(true);
+        // The host opens the log itself. A parent Redirect.appendTo keeps the file
+        // handle open in this JVM, and Windows then cannot delete the temp project.
+        builder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
+        builder.redirectError(ProcessBuilder.Redirect.DISCARD);
         return builder.start();
     }
 

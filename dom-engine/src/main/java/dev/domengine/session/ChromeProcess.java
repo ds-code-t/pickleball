@@ -253,19 +253,123 @@ public final class ChromeProcess {
      */
     public static boolean releaseProfile(Path profile) {
         if (profile == null) return false;
-        String marker = profile.toAbsolutePath().toString();
+        List<String> markers = new ArrayList<>();
+        markers.add(profile.toAbsolutePath().toString());
+        try {
+            String real = profile.toRealPath().toString();
+            if (!markers.contains(real)) markers.add(real);
+        } catch (IOException ignored) {
+            // The directory can already be gone. The recorded path is still the marker.
+        }
         boolean signaled = false;
         for (ProcessHandle handle : ProcessHandle.allProcesses().toList()) {
-            if (!commandLine(handle).contains(marker)) continue;
+            if (handle.pid() == ProcessHandle.current().pid()) continue;
+            if (!namesAny(commandLine(handle), markers)) continue;
             signaled = true;
-            handle.descendants().forEach(child -> {
-                child.destroy();
-                child.destroyForcibly();
-            });
-            handle.destroy();
-            handle.destroyForcibly();
+            destroyHandle(handle);
+        }
+        if (!signaled && isWindows()) signaled = signalWindows(markers);
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (System.nanoTime() < deadline) {
+            boolean alive = false;
+            for (ProcessHandle handle : ProcessHandle.allProcesses().toList()) {
+                if (handle.pid() == ProcessHandle.current().pid()) continue;
+                if (namesAny(commandLine(handle), markers) && handle.isAlive()) {
+                    alive = true;
+                    destroyHandle(handle);
+                }
+            }
+            if (!alive) break;
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                break;
+            }
         }
         return signaled;
+    }
+
+    private static void destroyHandle(ProcessHandle handle) {
+        handle.descendants().forEach(child -> {
+            child.destroy();
+            child.destroyForcibly();
+        });
+        handle.destroy();
+        handle.destroyForcibly();
+    }
+
+    private static boolean namesAny(String command, List<String> markers) {
+        for (String marker : markers) {
+            if (names(command, marker)) return true;
+        }
+        return false;
+    }
+
+    /** Path match that ignores slash direction and, on Windows, letter case. */
+    private static boolean names(String command, String marker) {
+        if (command == null || command.isEmpty() || marker == null || marker.isEmpty()) return false;
+        if (command.contains(marker)) return true;
+        String hay = command.replace('\\', '/');
+        String needle = marker.replace('\\', '/');
+        if (isWindows()) {
+            hay = hay.toLowerCase(java.util.Locale.ROOT);
+            needle = needle.toLowerCase(java.util.Locale.ROOT);
+        }
+        return hay.contains(needle);
+    }
+
+    private static boolean isWindows() {
+        return System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win");
+    }
+
+    /**
+     * Windows often leaves {@code ProcessHandle.Info.commandLine} empty.
+     * One CIM query finds the processes that still name the profile.
+     */
+    private static boolean signalWindows(List<String> markers) {
+        boolean signaled = false;
+        for (String marker : markers) {
+            for (long pid : windowsPids(marker)) {
+                if (pid <= 0 || pid == ProcessHandle.current().pid()) continue;
+                ProcessHandle.of(pid).ifPresent(ChromeProcess::destroyHandle);
+                signaled = true;
+            }
+        }
+        return signaled;
+    }
+
+    private static List<Long> windowsPids(String marker) {
+        ProcessBuilder builder = new ProcessBuilder(
+                "powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
+                "$n=$env:PKB_PROFILE; if ($n) { Get-CimInstance Win32_Process | "
+                        + "Where-Object { $_.CommandLine -and $_.CommandLine.ToLowerInvariant().Contains($n.ToLowerInvariant()) } | "
+                        + "ForEach-Object { $_.ProcessId } }"
+        );
+        builder.environment().put("PKB_PROFILE", marker);
+        builder.redirectError(ProcessBuilder.Redirect.DISCARD);
+        try {
+            Process process = builder.start();
+            String text = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            if (!process.waitFor(15, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                return List.of();
+            }
+            List<Long> pids = new ArrayList<>();
+            for (String line : text.split("\\R")) {
+                String trimmed = line.trim();
+                if (trimmed.isEmpty()) continue;
+                try {
+                    pids.add(Long.parseLong(trimmed));
+                } catch (NumberFormatException ignored) {
+                    // A CIM header is not a pid.
+                }
+            }
+            return pids;
+        } catch (IOException | InterruptedException failure) {
+            if (failure instanceof InterruptedException) Thread.currentThread().interrupt();
+            return List.of();
+        }
     }
 
     /** Deletes a profile directory, retrying while Chrome still has files open. */

@@ -74,6 +74,20 @@ public final class LiveBrowserHost {
         }
     }
 
+    /** Append host stdout and stderr to the project log. The parent does not hold that file. */
+    private static void attachLog(Path project) {
+        try {
+            Path logFile = project.resolve(".pickleball").resolve("logs").resolve("live-browser.log");
+            Files.createDirectories(logFile.getParent());
+            OutputStream file = new java.io.FileOutputStream(logFile.toFile(), true);
+            java.io.PrintStream both = new java.io.PrintStream(file, true, StandardCharsets.UTF_8);
+            System.setOut(both);
+            System.setErr(both);
+        } catch (IOException failure) {
+            // The inherited streams still show a launch that cannot open the log.
+        }
+    }
+
     private LiveBrowserHost() {
     }
 
@@ -86,6 +100,7 @@ public final class LiveBrowserHost {
         }
         Path project = Path.of(args[0]);
         PROJECT = project;
+        attachLog(project);
         String id = args[1];
         SESSION_ID = id;
         String pageUrl = args[2];

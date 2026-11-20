@@ -101,7 +101,7 @@ class WorkbenchAgentUsabilityTest {
         assertTrue(unknown.contains("error: Unknown Workbench command: disover"), unknown);
         assertTrue(unknown.contains("fix: discover"), unknown);
         assertFalse(unknown.contains("fix: Usage: help <command>"), unknown);
-        String golden = Files.readString(Path.of("src/test/resources/workbench-help-golden.txt"));
+        String golden = Files.readString(Path.of("src/test/resources/workbench-help-golden.txt")).replace("\r\n", "\n");
         assertEquals(golden, WorkbenchCliHelp.catalog());
         assertEquals(golden, WorkbenchCliHelp.forTopic("help"));
         assertEquals(

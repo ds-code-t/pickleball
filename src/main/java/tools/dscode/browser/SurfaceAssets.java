@@ -184,7 +184,7 @@ public final class SurfaceAssets {
                         "error: missing surface asset " + path
                                 + "\nfix: Ship it under src/main/resources" + path + ".");
             }
-            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8).replace("\r\n", "\n");
         } catch (IOException failure) {
             throw new IllegalStateException(
                     "error: could not read surface asset " + path
