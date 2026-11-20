@@ -592,21 +592,16 @@ public final class AgentControl {
 
     /** pin, toast, checklist, and the status banner. Toast leaves the page on its own. */
     private static Result surfaceCard(Path project, String runId, String op, Map<String, String> args) throws Exception {
+        if ("checklist".equals(op) && present(args.get("check"))) return checkItem(args);
         String text;
         if ("checklist".equals(op)) {
-            String items = args.get("items");
-            if (!present(items)) return fail(2, "checklist requires --items");
-            StringBuilder html = new StringBuilder();
-            for (String item : items.split("\\|")) {
-                if (item.isBlank()) continue;
-                html.append(item.trim()).append(' ');
-            }
-            if (html.isEmpty()) return fail(2, "checklist requires --items");
-            text = html.toString().trim();
+            text = checklistHtml(args.get("items"));
+            if (text == null) return fail(2, "checklist requires --items");
         } else {
-            text = args.get("text");
-            if (!present(text)) return fail(2, op + " requires --text");
+            if (!present(args.get("text"))) return fail(2, op + " requires --text");
+            text = "<div data-pkb-card=\"" + op + "\">" + escapeCard(args.get("text").trim()) + "</div>";
         }
+        int top = nextCardTop();
         Map<String, Object> placed = PageSurfaces.place(
                 explicitPage(project, args),
                 "append",
@@ -615,13 +610,14 @@ public final class AgentControl {
                 text,
                 "label",
                 24,
-                24,
+                top,
                 null,
                 AgentStore.root(project, runId)
         );
         placed.put("ok", true);
         placed.put("op", op);
         placed.put("kind", op);
+        stampOverlaps(placed);
         if ("toast".equals(op)) {
             placed.put("transient", true);
             String id = String.valueOf(placed.get("id"));
@@ -872,11 +868,7 @@ public final class AgentControl {
         return new Result(0, placed);
     }
 
-    private record Seen(String run, String id, int x, int y, int w, int h) {}
-
-    private static final List<Seen> SEEN = java.util.Collections.synchronizedList(new ArrayList<>());
-
-    /** visible, hidden, and lost describe the target. overlaps names other placements on this run. */
+    /** visible, hidden, and lost describe the target. overlaps names placements on the page now. */
     private static void stampSeen(Map<String, Object> placed, String handle, String runId) {
         WebDriver web = PageSurfaces.liveDriver();
         if (web instanceof org.openqa.selenium.JavascriptExecutor js && present(handle)) {
@@ -897,26 +889,223 @@ public final class AgentControl {
                 placed.put("lost", true);
             }
         }
-        int x = seenNumber(placed.get("x"));
-        int y = seenNumber(placed.get("y"));
-        int w = seenNumber(placed.get("width"));
-        int h = seenNumber(placed.get("height"));
-        String id = String.valueOf(placed.getOrDefault("id", ""));
-        List<String> overlaps = new ArrayList<>();
-        if (w > 0 && h > 0 && !id.isBlank()) {
-            String run = runId == null ? "" : runId;
-            synchronized (SEEN) {
-                if (SEEN.size() > 64) SEEN.subList(0, SEEN.size() - 64).clear();
-                for (Seen seen : SEEN) {
-                    if (!run.equals(seen.run) || seen.id.equals(id)) continue;
-                    boolean apart = x + w <= seen.x || seen.x + seen.w <= x || y + h <= seen.y || seen.y + seen.h <= y;
-                    if (!apart) overlaps.add(seen.id);
+        stampOverlaps(placed);
+    }
+
+    /** Boxes of the placements on the page, including open shadow roots such as pkb-layer. */
+    private static List<Map<String, Object>> liveBoxes() {
+        WebDriver web = PageSurfaces.liveDriver();
+        if (!(web instanceof org.openqa.selenium.JavascriptExecutor js)) return List.of();
+        try {
+            Object raw = js.executeScript(LIVE_BOXES);
+            if (!(raw instanceof List<?> rows)) return List.of();
+            List<Map<String, Object>> boxes = new ArrayList<>();
+            for (Object row : rows) {
+                if (row instanceof Map<?, ?> map) {
+                    Map<String, Object> box = new LinkedHashMap<>();
+                    map.forEach((key, value) -> box.put(String.valueOf(key), value));
+                    boxes.add(box);
                 }
-                SEEN.add(new Seen(run, id, x, y, w, h));
             }
-            placed.put("overlaps", overlaps);
+            return boxes;
+        } catch (RuntimeException ignored) {
+            return List.of();
         }
     }
+
+    /** Names every other placement whose box intersects this one. A removed placement is already gone. */
+    private static void stampOverlaps(Map<String, Object> placed) {
+        String id = String.valueOf(placed.getOrDefault("id", ""));
+        if (id.isBlank() || "null".equals(id)) return;
+        List<Map<String, Object>> boxes = liveBoxes();
+        Map<String, Object> self = null;
+        for (Map<String, Object> box : boxes) {
+            if (id.equals(String.valueOf(box.get("id")))) {
+                self = box;
+                break;
+            }
+        }
+        if (self == null) return;
+        double x = boxNumber(self.get("x"));
+        double y = boxNumber(self.get("y"));
+        double w = boxNumber(self.get("w"));
+        double h = boxNumber(self.get("h"));
+        List<String> overlaps = new ArrayList<>();
+        if (w > 0 && h > 0) {
+            for (Map<String, Object> box : boxes) {
+                String other = String.valueOf(box.get("id"));
+                if (other.isBlank() || other.equals(id) || overlaps.contains(other)) continue;
+                double ox = boxNumber(box.get("x"));
+                double oy = boxNumber(box.get("y"));
+                double ow = boxNumber(box.get("w"));
+                double oh = boxNumber(box.get("h"));
+                if (ow <= 0 || oh <= 0) continue;
+                boolean apart = x + w <= ox || ox + ow <= x || y + h <= oy || oy + oh <= y;
+                if (!apart) overlaps.add(other);
+            }
+        }
+        placed.put("overlaps", overlaps);
+    }
+
+    /** Default cards stack under the cards already on the page. Explicit overlay coordinates are left alone. */
+    private static int nextCardTop() {
+        double bottom = 16;
+        boolean found = false;
+        for (Map<String, Object> box : liveBoxes()) {
+            if (!truth(box.get("card"))) continue;
+            double edge = boxNumber(box.get("y")) + boxNumber(box.get("h"));
+            if (!found || edge > bottom) bottom = edge;
+            found = true;
+        }
+        if (!found) return 24;
+        return Math.max(24, (int) Math.ceil(bottom + 8));
+    }
+
+    private static Result checkItem(Map<String, String> args) {
+        if (!present(args.get("id"))) return fail(2, "checklist --check requires --id");
+        int index;
+        try {
+            index = Integer.parseInt(args.get("check").trim());
+        } catch (NumberFormatException failure) {
+            return fail(2, "checklist --check must be a whole number");
+        }
+        if (index < 1) return fail(2, "checklist --check must be a whole number");
+        WebDriver web = PageSurfaces.liveDriver();
+        if (!(web instanceof org.openqa.selenium.JavascriptExecutor js)) return fail(1, "not found");
+        Object raw;
+        try {
+            raw = js.executeScript(CHECK_ITEM, args.get("id").trim(), index);
+        } catch (RuntimeException failure) {
+            return fail(1, "not found");
+        }
+        if (!(raw instanceof Map<?, ?> map) || !truth(map.get("found"))) return fail(1, "not found");
+        Map<String, Object> body = ok("Checklist item updated.");
+        body.put("op", "checklist");
+        body.put("id", args.get("id").trim());
+        body.put("applied", false);
+        Object rows = map.get("rows");
+        body.put("items", rows == null ? List.of() : rows);
+        if (rows instanceof List<?> list) {
+            for (Object row : list) {
+                if (!(row instanceof Map<?, ?> item)) continue;
+                if (!sameIndex(index, item.get("n"))) continue;
+                body.put("applied", truth(item.get("checked")));
+                body.put("checked", index);
+                body.put("text", item.get("text"));
+            }
+        }
+        return new Result(truth(body.get("applied")) ? 0 : 1, body);
+    }
+
+    private static boolean truth(Object value) {
+        return Boolean.TRUE.equals(value) || "true".equalsIgnoreCase(String.valueOf(value));
+    }
+
+    private static boolean sameIndex(int index, Object value) {
+        if (value instanceof Number number) return number.doubleValue() == index;
+        if (value == null) return false;
+        try {
+            return Integer.parseInt(String.valueOf(value).trim()) == index;
+        } catch (NumberFormatException failure) {
+            return false;
+        }
+    }
+
+    private static String checklistHtml(String items) {
+        if (!present(items)) return null;
+        StringBuilder html = new StringBuilder();
+        html.append("<div data-pkb-card=\"checklist\">");
+        int count = 0;
+        for (String item : items.split("\\|")) {
+            if (item.isBlank()) continue;
+            count++;
+            html.append("<div data-pkb-check=\"").append(count).append("\" data-pkb-checked=\"false\">")
+                    .append(escapeCard(item.trim())).append("</div>");
+        }
+        html.append("</div>");
+        return count == 0 ? null : html.toString();
+    }
+
+    private static String escapeCard(String value) {
+        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
+    }
+
+    private static double boxNumber(Object value) {
+        if (value instanceof Number number) return number.doubleValue();
+        if (value == null) return 0;
+        try {
+            return Double.parseDouble(String.valueOf(value).trim());
+        } catch (NumberFormatException failure) {
+            return 0;
+        }
+    }
+
+    private static final String LIVE_BOXES = """
+            var out = [];
+            var seen = new Set();
+            function addRoot(root) {
+              if (!root || seen.has(root) || !root.querySelectorAll) return;
+              seen.add(root);
+              var nodes = root.querySelectorAll('[data-pkb-id]');
+              for (var i = 0; i < nodes.length; i++) {
+                var el = nodes[i];
+                var id = el.getAttribute('data-pkb-id') || '';
+                if (!id) continue;
+                if (el.parentElement && el.parentElement.getAttribute('data-pkb-id') === id) continue;
+                var rect = el.getBoundingClientRect();
+                var card = el.hasAttribute('data-pkb-card') || !!el.querySelector('[data-pkb-card]');
+                out.push({id: id, x: rect.left, y: rect.top, w: rect.width, h: rect.height, card: card});
+              }
+              var all = root.querySelectorAll('*');
+              for (var j = 0; j < all.length; j++) {
+                if (all[j].shadowRoot) addRoot(all[j].shadowRoot);
+              }
+            }
+            addRoot(document);
+            return out;
+            """;
+
+    private static final String CHECK_ITEM = """
+            var id = String(arguments[0]);
+            var want = String(arguments[1]);
+            var seen = new Set();
+            function find(root) {
+              if (!root || seen.has(root) || !root.querySelectorAll) return null;
+              seen.add(root);
+              var nodes = root.querySelectorAll('[data-pkb-id]');
+              for (var i = 0; i < nodes.length; i++) {
+                var el = nodes[i];
+                if (el.getAttribute('data-pkb-id') !== id) continue;
+                if (el.parentElement && el.parentElement.getAttribute('data-pkb-id') === id) continue;
+                return el;
+              }
+              var all = root.querySelectorAll('*');
+              for (var j = 0; j < all.length; j++) {
+                if (!all[j].shadowRoot) continue;
+                var hit = find(all[j].shadowRoot);
+                if (hit) return hit;
+              }
+              return null;
+            }
+            var host = find(document);
+            if (!host) return {found: false, rows: []};
+            var rows = host.querySelectorAll('[data-pkb-check]');
+            var out = [];
+            var matched = false;
+            for (var n = 0; n < rows.length; n++) {
+              var row = rows[n];
+              if (row.getAttribute('data-pkb-check') === want) {
+                row.setAttribute('data-pkb-checked', 'true');
+                matched = true;
+              }
+              out.push({
+                n: Number(row.getAttribute('data-pkb-check')),
+                text: (row.textContent || '').replace(/\\s+/g, ' ').trim(),
+                checked: row.getAttribute('data-pkb-checked') === 'true'
+              });
+            }
+            return {found: matched, rows: out};
+            """;
 
     /**
      * A handle is visible only with a non-zero box the user can scroll into, opacity above 0, and a free centre.

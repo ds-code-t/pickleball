@@ -1987,6 +1987,7 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "fixture");
         copyFlag(args, parsed, "fields");
         copyFlag(args, parsed, "items");
+        copyFlag(args, parsed, "check");
         if (hasFlag(parsed, "--cpu")) args.put("cpu", "true");
         if (hasFlag(parsed, "--list")) args.put("list", "true");
         if (hasFlag(parsed, "--reset")) args.put("reset", "true");

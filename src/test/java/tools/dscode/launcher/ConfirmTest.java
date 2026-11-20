@@ -23,6 +23,45 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 /** Phase 7: ask-and-wait returns the page answer. pin, toast, and checklist read back. */
 class ConfirmTest {
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final String PIN_CARDS = """
+            (function(){
+              var out = [];
+              function walk(root, seen) {
+                if (!root || !root.querySelectorAll || seen.has(root)) return;
+                seen.add(root);
+                var nodes = root.querySelectorAll('[data-pkb-card="pin"]');
+                for (var i = 0; i < nodes.length; i++) {
+                  out.push((nodes[i].textContent || '').replace(/\\s+/g, ' ').trim());
+                }
+                var all = root.querySelectorAll('*');
+                for (var j = 0; j < all.length; j++) if (all[j].shadowRoot) walk(all[j].shadowRoot, seen);
+              }
+              walk(document, new Set());
+              return JSON.stringify(out);
+            })()
+            """;
+    private static final String CHECK_ROWS = """
+            (function(){
+              var out = [];
+              function walk(root, seen) {
+                if (!root || !root.querySelectorAll || seen.has(root)) return;
+                seen.add(root);
+                var nodes = root.querySelectorAll('[data-pkb-check]');
+                for (var i = 0; i < nodes.length; i++) {
+                  var row = nodes[i];
+                  out.push({
+                    n: Number(row.getAttribute('data-pkb-check')),
+                    text: (row.textContent || '').replace(/\\s+/g, ' ').trim(),
+                    checked: row.getAttribute('data-pkb-checked') === 'true'
+                  });
+                }
+                var all = root.querySelectorAll('*');
+                for (var j = 0; j < all.length; j++) if (all[j].shadowRoot) walk(all[j].shadowRoot, seen);
+              }
+              walk(document, new Set());
+              return JSON.stringify(out);
+            })()
+            """;
     private static final String PAGE_TEXT = """
             (function(){
               var text = document.body ? document.body.innerText : '';
@@ -92,9 +131,9 @@ class ConfirmTest {
         Capture placed = run("pin", "--text=Pinned note", "--target=browser:auto", "--run-id=pin-note");
         assertEquals(0, placed.code, placed.err + placed.out);
         assertEquals("pin", JSON.readTree(placed.out).path("op").asText(), placed.out);
-        String text = eval(PAGE_TEXT, "pin-note");
-        assertTrue(text.contains("Pinned note"), text);
-        assertFalse(text.contains("Other note"), text);
+        JsonNode pins = JSON.readTree(eval(PIN_CARDS, "pin-note"));
+        assertEquals(1, pins.size(), pins.toString());
+        assertEquals("Pinned note", pins.get(0).asText(), pins.toString());
     }
 
     @Test
@@ -108,10 +147,14 @@ class ConfirmTest {
         Capture placed = run("checklist", "--items=Alpha|Beta", "--target=browser:auto", "--run-id=check-note");
         assertEquals(0, placed.code, placed.err + placed.out);
         assertEquals("checklist", JSON.readTree(placed.out).path("op").asText(), placed.out);
-        String text = eval(PAGE_TEXT, "check-note");
-        assertTrue(text.contains("Alpha"), text);
-        assertTrue(text.contains("Beta"), text);
-        assertFalse(text.contains("Gamma"), text);
+        JsonNode rows = JSON.readTree(eval(CHECK_ROWS, "check-note"));
+        assertEquals(2, rows.size(), rows.toString());
+        assertEquals(1, rows.get(0).path("n").asInt(), rows.toString());
+        assertEquals("Alpha", rows.get(0).path("text").asText(), rows.toString());
+        assertFalse(rows.get(0).path("checked").asBoolean(), rows.toString());
+        assertEquals(2, rows.get(1).path("n").asInt(), rows.toString());
+        assertEquals("Beta", rows.get(1).path("text").asText(), rows.toString());
+        assertFalse(rows.get(1).path("checked").asBoolean(), rows.toString());
     }
 
     @Test

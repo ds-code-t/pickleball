@@ -80,7 +80,7 @@ final class WorkbenchCliHelp {
             Map.entry("ask-and-wait", "Usage: ask-and-wait --say=<question> [--choices=a,b] [--id=<id>] [--timeout=<ms>]"),
             Map.entry("pin", "Usage: pin --text=<comment>"),
             Map.entry("toast", "Usage: toast --text=<message>"),
-            Map.entry("checklist", "Usage: checklist --items=a|b|c"),
+            Map.entry("checklist", "Usage: checklist --items=a|b|c [--id=<id> --check=<n>]"),
             Map.entry("ui-apply", "Usage: ui-apply --ops=<json array>|@file.json [--verbose=true] [--scope=page|origin|run] [--ttl=<seconds>] [--run-id=<id>]  (op: {\"c\":\"label\",\"t\":\"#email\",\"text\":\"Email\"}; see ui-catalog)"),
             Map.entry("ui-poll", "Usage: ui-poll [--after=<n>] [--chat-after=<id>] [--wait=<seconds, up to 25>] [--channel=<name>] [--run-id=<id>]"),
             Map.entry("ui-catalog", "Usage: ui-catalog [--component=<name>] [--json]"),
