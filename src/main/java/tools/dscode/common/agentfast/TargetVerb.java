@@ -445,7 +445,7 @@ public final class TargetVerb {
         }
     }
 
-    /** One call fills each id=value field and reads the value back. */
+    /** One call fills each field and reads it back. A missing key writes nothing. */
     private static Outcome formFill(Path project, String runId, TargetSelector.Parsed target, Map<String, String> args) {
         if ("desktop".equals(target.kind())) return fail("form-fill", "form-fill is browser only");
         String raw = blank(args.get("fields"));
@@ -461,27 +461,28 @@ public final class TargetVerb {
         Held page = openBrowser(resolved(target, args));
         try {
             DomNode root = tree(page.session);
-            List<Map<String, Object>> filled = new ArrayList<>();
-            boolean all = true;
+            List<DomNode> nodes = new ArrayList<>();
+            List<String> missing = new ArrayList<>();
             for (String[] pair : pairs) {
                 DomNode node = fieldNode(root, pair[0]);
-                if (node == null) {
-                    Outcome missed = fail("form-fill", "not found");
-                    stamp(missed.body(), page.session.connection(), null);
-                    putEntered(missed.body(), runId, page.session.connection());
-                    return missed;
-                }
-                Map<String, String> one = new LinkedHashMap<>();
-                one.put("kind", "type");
-                one.put("value", pair[1]);
-                Effect effect = perform(project, runId, page.session, node, one, pair[0], selector(node, pair[0]));
-                String read = controlValue(page.session.connection(), node);
-                boolean stuck = effect.applied() && pair[1].equals(read);
-                if (!stuck) all = false;
-                Map<String, Object> row = new LinkedHashMap<>();
-                row.put("field", pair[0]);
-                row.put("value", read);
-                row.put("applied", stuck);
+                nodes.add(node);
+                if (node == null) missing.add(pair[0]);
+            }
+            if (!missing.isEmpty()) {
+                Outcome missed = fail("form-fill", "not found");
+                missed.body().put("missing", missing);
+                missed.body().put("fields", unread(page.session.connection(), pairs, nodes));
+                stamp(missed.body(), page.session.connection(), null);
+                putEntered(missed.body(), runId, page.session.connection());
+                return missed;
+            }
+            List<Map<String, Object>> filled = new ArrayList<>();
+            boolean all = true;
+            for (int i = 0; i < pairs.size(); i++) {
+                String[] pair = pairs.get(i);
+                DomNode node = nodes.get(i);
+                Map<String, Object> row = writeField(project, runId, page.session, node, pair[0], pair[1]);
+                if (!Boolean.TRUE.equals(row.get("applied"))) all = false;
                 filled.add(row);
             }
             if (!all) {
@@ -503,16 +504,181 @@ public final class TargetVerb {
         }
     }
 
-    private static DomNode fieldNode(DomNode node, String key) {
-        if (node == null || key == null || key.isBlank()) return null;
-        if (key.equals(node.attributes.get("id")) || key.equals(node.attributes.get("name"))) return node;
-        if (key.equals(node.accessibleName)) return node;
+    /** Read-back rows for a fill that wrote nothing. A missing key has no value. */
+    private static List<Map<String, Object>> unread(CdpConnection cdp, List<String[]> pairs, List<DomNode> nodes) {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (int i = 0; i < pairs.size(); i++) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("field", pairs.get(i)[0]);
+            DomNode node = nodes.get(i);
+            if (node == null) {
+                row.put("found", false);
+            } else {
+                row.put("value", readField(cdp, node));
+                row.put("applied", false);
+            }
+            rows.add(row);
+        }
+        return rows;
+    }
+
+    /**
+     * Select uses the select path. A checkbox or radio sets checked. Text is typed only after focus
+     * is confirmed on that node, so a later field cannot land in the previous one.
+     */
+    private static Map<String, Object> writeField(
+            Path project,
+            String runId,
+            BrowserSession session,
+            DomNode node,
+            String key,
+            String value
+    ) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("field", key);
+        String kind = fieldKind(node);
+        row.put("kind", kind);
+        CdpConnection cdp = session.connection();
+        if ("checkbox".equals(kind) || "radio".equals(kind)) {
+            boolean want = "true".equalsIgnoreCase(value) || "on".equalsIgnoreCase(value);
+            if (!focusConfirmed(cdp, node)) {
+                row.put("value", readField(cdp, node));
+                row.put("applied", false);
+                return row;
+            }
+            String read = callOnNode(cdp, cdpSessionOf(node), node, ""
+                    + "function(){ this.checked=" + want + ";"
+                    + " this.dispatchEvent(new Event('input',{bubbles:true}));"
+                    + " this.dispatchEvent(new Event('change',{bubbles:true}));"
+                    + " return this.checked?'true':'false'; }");
+            boolean stuck = read != null && want == "true".equals(read);
+            row.put("value", read == null ? readField(cdp, node) : read);
+            row.put("applied", stuck);
+            return row;
+        }
+        if ("text".equals(kind) && !focusConfirmed(cdp, node)) {
+            row.put("value", readField(cdp, node));
+            row.put("applied", false);
+            return row;
+        }
+        Map<String, String> one = new LinkedHashMap<>();
+        one.put("kind", "select".equals(kind) ? "select" : "type");
+        one.put("value", value);
+        Effect effect;
+        try {
+            effect = perform(project, runId, session, node, one, key, selector(node, key));
+        } catch (Miss missing) {
+            row.put("value", readField(cdp, node));
+            row.put("applied", false);
+            row.put("error", missing.error);
+            return row;
+        }
+        String read = readField(cdp, node);
+        boolean stuck = effect.applied() && valueMatches(value, read);
+        row.put("value", read);
+        row.put("applied", stuck);
+        return row;
+    }
+
+    private static String readField(CdpConnection cdp, DomNode node) {
+        if (node == null) return "";
+        String kind = fieldKind(node);
+        if ("checkbox".equals(kind) || "radio".equals(kind)) return checkedOf(cdp, node);
+        if ("select".equals(kind)) return controlValue(cdp, selectOf(node));
+        return controlValue(cdp, node);
+    }
+
+    private static String fieldKind(DomNode node) {
+        if (node == null) return "text";
+        String tag = node.tag();
+        if ("select".equals(tag) || "option".equals(tag)) return "select";
+        String type = attr(node, "type").toLowerCase(Locale.ROOT);
+        String roleName = node.role == null ? "" : node.role.toLowerCase(Locale.ROOT);
+        if ("checkbox".equals(type) || "checkbox".equals(roleName)) return "checkbox";
+        if ("radio".equals(type) || "radio".equals(roleName)) return "radio";
+        return "text";
+    }
+
+    /** Focuses the node and reports whether it is the active element. */
+    private static boolean focusConfirmed(CdpConnection cdp, DomNode node) {
+        String read = callOnNode(cdp, cdpSessionOf(node), node,
+                "function(){ this.focus(); return document.activeElement===this; }");
+        return "true".equals(read);
+    }
+
+    private static DomNode fieldNode(DomNode root, String key) {
+        if (root == null || key == null || key.isBlank()) return null;
+        DomNode direct = matchField(root, key);
+        if (direct != null) return direct;
+        return controlForLabel(root, key);
+    }
+
+    private static DomNode matchField(DomNode node, String key) {
+        if (node == null) return null;
+        if (node.nodeType == 1 && isField(node)) {
+            if (key.equals(attr(node, "id")) || key.equals(attr(node, "name"))) return node;
+            if (key.equals(node.accessibleName)) return node;
+        }
         for (DomNode child : node.children) {
-            DomNode found = fieldNode(child, key);
+            DomNode found = matchField(child, key);
             if (found != null) return found;
         }
         for (DomNode shadow : node.shadowRoots) {
-            DomNode found = fieldNode(shadow, key);
+            DomNode found = matchField(shadow, key);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    private static boolean isField(DomNode node) {
+        String tag = node.tag();
+        return "input".equals(tag) || "textarea".equals(tag) || "select".equals(tag) || "option".equals(tag);
+    }
+
+    /** The control named by a label's text, via {@code for} or by wrapping that control. */
+    private static DomNode controlForLabel(DomNode node, String key) {
+        if (node == null) return null;
+        if ("label".equals(node.tag()) && key.equals(HtmlTree.textOf(node).replaceAll("\\s+", " ").trim())) {
+            String forId = attr(node, "for");
+            if (!forId.isBlank()) {
+                DomNode root = node;
+                while (root.parent != null) root = root.parent;
+                DomNode target = findId(root, forId);
+                if (target != null && isField(target)) return target;
+            }
+            DomNode wrapped = firstField(node);
+            if (wrapped != null) return wrapped;
+        }
+        for (DomNode child : node.children) {
+            DomNode found = controlForLabel(child, key);
+            if (found != null) return found;
+        }
+        for (DomNode shadow : node.shadowRoots) {
+            DomNode found = controlForLabel(shadow, key);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    private static DomNode findId(DomNode node, String id) {
+        if (node == null) return null;
+        if (id.equals(attr(node, "id"))) return node;
+        for (DomNode child : node.children) {
+            DomNode found = findId(child, id);
+            if (found != null) return found;
+        }
+        for (DomNode shadow : node.shadowRoots) {
+            DomNode found = findId(shadow, id);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    private static DomNode firstField(DomNode node) {
+        if (node == null) return null;
+        for (DomNode child : node.children) {
+            if (isField(child)) return child;
+            DomNode found = firstField(child);
             if (found != null) return found;
         }
         return null;
