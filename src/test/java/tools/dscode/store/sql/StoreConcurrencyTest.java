@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -14,6 +15,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class StoreConcurrencyTest {
     @TempDir
@@ -60,6 +62,18 @@ class StoreConcurrencyTest {
         for (Future<?> future : futures) future.get(5, TimeUnit.SECONDS);
         assertEquals(Integer.toString(threads),
                 store.session().scalar("SELECT value FROM schema_meta WHERE `key` = 'counter'"));
+    }
+
+    @Test
+    void aDatabaseFileLockIsRetried() throws Exception {
+        SQLException locked = new SQLException("[SQLITE_BUSY] The database file is locked");
+        assertTrue(SqlDialect.conflict(locked), locked.getMessage());
+        int[] runs = {0};
+        SqlDialect.retry("rows", () -> {
+            runs[0]++;
+            if (runs[0] == 1) throw locked;
+        });
+        assertEquals(2, runs[0]);
     }
 
     @Test

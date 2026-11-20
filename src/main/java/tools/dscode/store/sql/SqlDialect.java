@@ -612,8 +612,43 @@ public final class SqlDialect {
                 || message.contains("try restarting")
                 || message.contains("lock wait")
                 || message.contains("database is locked")
+                || message.contains("database file is locked")
                 || message.contains("sqlite_busy")
+                || message.contains("sqlite_locked")
                 || "40001".equals(state);
+    }
+
+    /**
+     * One immediate write. The connection's busy timeout waits out a lock, and a
+     * timeout still retries. A commit that already landed is not written again.
+     */
+    public static void immediate(java.sql.Connection connection, String table, SqlTask body) throws SQLException {
+        retry(table, () -> {
+            try (java.sql.Statement statement = connection.createStatement()) {
+                statement.execute("BEGIN IMMEDIATE");
+            }
+            try {
+                body.run();
+                try (java.sql.Statement statement = connection.createStatement()) {
+                    statement.execute("COMMIT");
+                }
+            } catch (SQLException failure) {
+                if (conflict(failure) && !rollback(connection)) return;
+                rollback(connection);
+                throw failure;
+            }
+        });
+    }
+
+    /** @return false when no transaction was open, so a failed commit had already landed */
+    private static boolean rollback(java.sql.Connection connection) {
+        try (java.sql.Statement statement = connection.createStatement()) {
+            statement.execute("ROLLBACK");
+            return true;
+        } catch (SQLException failure) {
+            String message = failure.getMessage() == null ? "" : failure.getMessage().toLowerCase(Locale.ROOT);
+            return !message.contains("no transaction");
+        }
     }
 
     public static void retry(String table, SqlTask task) throws SQLException {

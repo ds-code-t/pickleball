@@ -6,6 +6,8 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import tools.dscode.store.sql.SqlDialect;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -104,18 +106,15 @@ class EmbeddedMultiProcessTest {
             }
             for (int n = 0; n < inserts; n++) {
                 long started = System.nanoTime();
-                try (Statement statement = connection.createStatement()) {
-                    statement.execute("BEGIN IMMEDIATE");
-                }
-                try (PreparedStatement statement = connection.prepareStatement(
-                        "INSERT INTO rows(worker, n) VALUES (?, ?)")) {
-                    statement.setInt(1, worker);
-                    statement.setInt(2, n);
-                    statement.executeUpdate();
-                }
-                try (Statement statement = connection.createStatement()) {
-                    statement.execute("COMMIT");
-                }
+                int row = n;
+                SqlDialect.immediate(connection, "rows", () -> {
+                    try (PreparedStatement statement = connection.prepareStatement(
+                            "INSERT INTO rows(worker, n) VALUES (?, ?)")) {
+                        statement.setInt(1, worker);
+                        statement.setInt(2, row);
+                        statement.executeUpdate();
+                    }
+                });
                 long millis = (System.nanoTime() - started) / 1_000_000L;
                 out.append(millis).append('\n');
             }
