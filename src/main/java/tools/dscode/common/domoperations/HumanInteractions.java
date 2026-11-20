@@ -124,6 +124,7 @@ public final class HumanInteractions {
     public static void click(WebDriver driver, WebElement el) {
         rejectForeignContext(el);
         Objects.requireNonNull(el, "element must not be null");
+        MaskQuiet.await(driver, el, 3_000L);
         if (tools.dscode.common.composite.ElementOperations.primary()) {
             tools.dscode.common.composite.ElementOperations.click(driver, el);
             return;

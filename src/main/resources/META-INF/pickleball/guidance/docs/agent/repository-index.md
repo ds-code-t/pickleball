@@ -319,6 +319,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/domoperations/HumanInteractions.java`
 - `src/main/java/tools/dscode/common/domoperations/KeyParser.java`
 - `src/main/java/tools/dscode/common/domoperations/LeanWaits.java`
+- `src/main/java/tools/dscode/common/domoperations/MaskQuiet.java`
 - `src/main/java/tools/dscode/common/domoperations/NestedByLocator.java`
 - `src/main/java/tools/dscode/common/domoperations/PositionSelection.java`
 - `src/main/java/tools/dscode/common/domoperations/SeleniumUtils.java`
@@ -844,6 +845,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/engine/convert/CucumberModelConverterTest.java`
 - `src/test/java/tools/dscode/engine/convert/NeutralDataTest.java`
 - `src/test/java/tools/dscode/engine/EngineConfigTest.java`
+- `src/test/java/tools/dscode/engine/maskquiet/MaskPageGlue.java`
 - `src/test/java/tools/dscode/engine/match/StepRegistryTest.java`
 - `src/test/java/tools/dscode/engine/NativeDataExecutionTest.java`
 - `src/test/java/tools/dscode/engine/NativeDynamicExecutionTest.java`

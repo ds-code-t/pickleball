@@ -77,11 +77,14 @@ public final class CdpConnection implements AutoCloseable {
         pending.put(id, done);
         EngineLog.debug("cdp", method);
         try {
-            synchronized (sendLock) {
-                socket.sendText(Jsons.compact(request), true).join();
-            }
             Duration wait = timeout == null ? Duration.ofSeconds(10) : timeout;
-            JsonNode response = done.get(wait.toMillis(), TimeUnit.MILLISECONDS);
+            long budget = Math.max(1L, wait.toMillis());
+            long started = System.nanoTime();
+            synchronized (sendLock) {
+                socket.sendText(Jsons.compact(request), true).get(budget, TimeUnit.MILLISECONDS);
+            }
+            long left = budget - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
+            JsonNode response = done.get(Math.max(1L, left), TimeUnit.MILLISECONDS);
             if (response.has("error")) {
                 throw new CdpException(method + " " + response.get("error"));
             }

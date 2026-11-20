@@ -101,6 +101,7 @@ public final class ElementOperations {
 
     public static void click(WebDriver driver, WebElement element) {
         WebElement raw = unwrap(element);
+        tools.dscode.common.domoperations.MaskQuiet.await(driver, raw == null ? element : raw, 3_000L);
         if (raw instanceof CompositeWebElement composite) {
             composite.click();
             return;

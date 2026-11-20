@@ -343,7 +343,10 @@ public final class TargetVerb {
             String before = docVersion(page.session.connection());
             String titleBefore = title(page.session.connection());
             String kind = blank(args.get("kind"));
-            if (kind.isBlank() || "click".equals(kind)) awaitMaskQuiet(page.session.connection(), timeoutMs(args));
+            tools.dscode.common.domoperations.MaskQuiet.Wait mask = null;
+            if (kind.isBlank() || "click".equals(kind)) {
+                mask = awaitMaskQuiet(page.session.connection(), node, timeoutMs(args));
+            }
             boolean wantDiff = "diff".equals(blank(args.get("snap")));
             boolean wantAuto = "auto".equals(blank(args.get("snap")));
             List<SnapRow> rowsBefore = wantDiff
@@ -366,6 +369,7 @@ public final class TargetVerb {
                 putShadow(failed.body(), node);
                 putSnapDiff(failed.body(), args, titleBefore, title(page.session.connection()), before, docVersion(page.session.connection()), rowsBefore, rowsAfter);
                 putAutoSnap(failed.body(), args, project, runId, autoBefore, () -> compactBrowser(page.session, runId, target));
+                putMask(failed.body(), mask);
                 return failed;
             }
             String condition = blank(args.get("condition"));
@@ -399,6 +403,7 @@ public final class TargetVerb {
                     stamp(failed.body(), page.session.connection(), node);
                     putEntered(failed.body(), runId, page.session.connection());
                     putShadow(failed.body(), node);
+                    putMask(failed.body(), mask);
                     return failed;
                 }
                 Map<String, Object> body = base("act", effect.used(), "browser", target);
@@ -416,6 +421,7 @@ public final class TargetVerb {
                 stamp(body, page.session.connection(), node);
                 putEntered(body, runId, page.session.connection());
                 putShadow(body, node);
+                putMask(body, mask);
                 return ok(body);
             }
             if (effect.quiet()) {
@@ -433,6 +439,7 @@ public final class TargetVerb {
                 stamp(body, page.session.connection(), node);
                 putEntered(body, runId, page.session.connection());
                 putShadow(body, node);
+                putMask(body, mask);
                 return ok(body);
             }
             if (!effect.applied()) {
@@ -444,6 +451,7 @@ public final class TargetVerb {
                 putShadow(failed.body(), node);
                 putSnapDiff(failed.body(), args, titleBefore, title(page.session.connection()), before, docVersion(page.session.connection()), rowsBefore, rowsAfter);
                 putAutoSnap(failed.body(), args, project, runId, autoBefore, () -> compactBrowser(page.session, runId, target));
+                putMask(failed.body(), mask);
                 return failed;
             }
             String after = docVersion(page.session.connection());
@@ -461,6 +469,7 @@ public final class TargetVerb {
             stamp(body, page.session.connection(), node);
             putEntered(body, runId, page.session.connection());
             putShadow(body, node);
+            putMask(body, mask);
             return ok(body);
         } finally {
             page.release();
@@ -1496,29 +1505,40 @@ public final class TargetVerb {
         }
     }
 
-    /** A visible aria-busy or progressbar holds a click until it leaves, or the timeout ends. */
-    private static void awaitMaskQuiet(CdpConnection cdp, long timeout) {
-        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(Math.max(0, timeout));
-        while (maskBusy(cdp)) {
-            if (System.nanoTime() >= deadline) return;
+    /** A loading mask holds the click only when it covers that click. The check itself cannot run forever. */
+    private static tools.dscode.common.domoperations.MaskQuiet.Wait awaitMaskQuiet(CdpConnection cdp, DomNode node, long timeout) {
+        long start = System.nanoTime();
+        if (!maskCovers(cdp, node)) return new tools.dscode.common.domoperations.MaskQuiet.Wait(0, false);
+        long deadline = start + TimeUnit.MILLISECONDS.toNanos(Math.max(0, timeout));
+        while (true) {
+            if (System.nanoTime() >= deadline) {
+                return new tools.dscode.common.domoperations.MaskQuiet.Wait(elapsedMs(start), false);
+            }
             sleep(50);
+            if (!maskCovers(cdp, node)) {
+                return new tools.dscode.common.domoperations.MaskQuiet.Wait(Math.max(1, elapsedMs(start)), true);
+            }
         }
     }
 
-    private static boolean maskBusy(CdpConnection cdp) {
-        ObjectNode params = Jsons.object();
-        params.put("returnByValue", true);
-        params.put("expression", ""
-                + "(function(){var nodes=document.querySelectorAll('[aria-busy=\"true\"],[role=\"progressbar\"]');"
-                + "for(var i=0;i<nodes.length;i++){var el=nodes[i];var s=getComputedStyle(el);"
-                + "if(s.display==='none'||s.visibility==='hidden'||el.hidden)continue;"
-                + "if(el.getClientRects().length>0)return true;}return false;})()");
-        try {
-            JsonNode value = cdp.call("Runtime.evaluate", params, Duration.ofSeconds(5));
-            return value.path("result").path("value").asBoolean(false);
-        } catch (RuntimeException failure) {
-            return false;
-        }
+    private static boolean maskCovers(CdpConnection cdp, DomNode node) {
+        String read = callOnNode(
+                cdp,
+                cdpSessionOf(node),
+                node,
+                "function(){" + tools.dscode.common.domoperations.MaskQuiet.COVERS + "}"
+        );
+        return "true".equals(read);
+    }
+
+    private static long elapsedMs(long start) {
+        return Math.max(0, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start));
+    }
+
+    private static void putMask(Map<String, Object> body, tools.dscode.common.domoperations.MaskQuiet.Wait mask) {
+        if (body == null || mask == null) return;
+        body.put("waitedMs", mask.waitedMs());
+        body.put("maskCleared", mask.maskCleared());
     }
 
     /** Polls one ref until that node matches {@code condition}, or the timeout ends. */
