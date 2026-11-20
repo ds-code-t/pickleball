@@ -2537,11 +2537,28 @@ public final class TargetVerb {
         LiveXPath.use(cdp);
         try {
             DomNode root = dev.domengine.tree.LiveTree.read(cdp).root;
-            if (root != null) root.linkParents();
+            if (root != null) {
+                root.linkParents();
+                List<DomNode> options = new ArrayList<>();
+                collectSelectOptions(root, options);
+                if (!options.isEmpty()) RowStates.fill(cdp, options);
+            }
             return root;
         } finally {
             LiveXPath.use(null);
         }
+    }
+
+    /** Direct options of each select. The compact name uses the option that is selected now. */
+    private static void collectSelectOptions(DomNode node, List<DomNode> into) {
+        if (node == null) return;
+        if ("select".equals(node.tag())) {
+            for (DomNode child : node.children) {
+                if ("option".equals(child.tag()) && child.liveState == null) into.add(child);
+            }
+        }
+        for (DomNode child : node.children) collectSelectOptions(child, into);
+        for (DomNode shadow : node.shadowRoots) collectSelectOptions(shadow, into);
     }
 
     private static String docVersion(CdpConnection cdp) {
