@@ -11,12 +11,15 @@ session: isolate session-start execute-step status events stop kill open-scenari
 coordination: short-log note inbox finish presence post history gc-runs gc-versions use-version export-guidance
 descriptors: session list | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>
 page: inspect-page find-element
-agent: observe launch windows tabs chat-send chat-history chat-poll chat_wait highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close panel-open panel-close guide guide-next guide-back guide-done ask ask-and-wait pin toast checklist ui-apply ui-poll ui-catalog capture-scenario screenshot selftest doctor act form-fill snap find wait wait-for watch explain capture attach eval
-consumer: start history-summary history-query entity-lookup open-run bridge-health
+agent: observe launch windows tabs chat-send chat-history chat-poll chat_wait highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close panel-open panel-close guide guide-next guide-back guide-done ask ask-and-wait pin toast checklist ui-apply ui-poll ui-catalog capture-scenario screenshot selftest doctor act form-fill snap find frame wait wait-for watch explain capture attach eval
+consumer: start live-stop history-summary history-query entity-lookup open-run bridge-health
 retrieval: query runs | query get | query query | query search | query props | query errors | query tail
 controller: sync worker-check live-check ui mcp session
 dashboard: dashboard [--project=<dir>] [--out=<file>]
 all: act arrow ask ask-and-wait attach border bridge-health capture capture-scenario chat-history chat-poll chat-send chat_wait checklist close-window confirm diagnostic-run discover discover-hint doctor entity-lookup eval events example execute-step explain export-guidance find find-element finish form-fill frame from-here gc-runs gc-versions guide guide-back guide-done guide-next help highlight hint history history-query history-summary html-cleanup html-insert html-remove html-replace html-write inbox insert-step inspect-page isolate kill label launch live-check magnifier mcp note observe open-run open-scenario open-window overlay overlay-poll overlay-remove panel-close panel-open pause pin plan play popup-close popup-open popup-status post presence query refresh resolve-runvars save screenshot selftest session session-hold session-info session-list session-release session-start session-sync short-log show-run snap spotlight start status step-badge stop sync tabs toast ui ui-apply ui-catalog ui-poll unarrow unborder unhighlight unlabel unmagnifier unspotlight unstep-badge update-step use-version validate wait wait-for watch windows worker-check worker-restart worker-start worker-stop workspace-edit workspace-seed workspace-show
+
+# help act
+Usage: act --target=<selector> [--kind=click|type|hover|press|select] [--query=<text>] [--ref=<ref>] [--value=<text>] [--condition=title=<text>|text=<text>|url=<text>|ref=<id>:selected] [--snap=diff|auto] [--timeout=<ms>]
 
 # help bridge-health
 Usage: bridge-health --url=<bridge-base>
@@ -75,6 +78,10 @@ Usage: find-element (--category=<Button> [--text=<label>] | --query=<selector>) 
 # help finish
 Usage: finish --run-id=<id> [--learned=<one line>] [--status=PASSED|FAILED|EMPTY|TIMEOUT|STOPPED]
 
+# help frame
+Usage: frame --target=<selector> [--list] [--reset] [--enter=<id|name>]
+Lists frames, returns later steps to the top document, or enters a frame. --reset clears the entered frame and the Selenium driver. --enter scopes later find, act, snap, and inspect to that frame, and enters an iframe with that id, name, or title when the driver can see it. Replies include frame.
+
 # help from-here
 Usage: from-here
 
@@ -97,8 +104,8 @@ session: isolate session-start execute-step status events stop kill open-scenari
 coordination: short-log note inbox finish presence post history gc-runs gc-versions use-version export-guidance
 descriptors: session list | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>
 page: inspect-page find-element
-agent: observe launch windows tabs chat-send chat-history chat-poll chat_wait highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close panel-open panel-close guide guide-next guide-back guide-done ask ask-and-wait pin toast checklist ui-apply ui-poll ui-catalog capture-scenario screenshot selftest doctor act form-fill snap find wait wait-for watch explain capture attach eval
-consumer: start history-summary history-query entity-lookup open-run bridge-health
+agent: observe launch windows tabs chat-send chat-history chat-poll chat_wait highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close panel-open panel-close guide guide-next guide-back guide-done ask ask-and-wait pin toast checklist ui-apply ui-poll ui-catalog capture-scenario screenshot selftest doctor act form-fill snap find frame wait wait-for watch explain capture attach eval
+consumer: start live-stop history-summary history-query entity-lookup open-run bridge-health
 retrieval: query runs | query get | query query | query search | query props | query errors | query tail
 controller: sync worker-check live-check ui mcp session
 dashboard: dashboard [--project=<dir>] [--out=<file>]
@@ -143,7 +150,8 @@ Usage: inbox --write --to=<agent-id|any> --text=<one line> [--from=<agent-id>] [
 Usage: insert-step --text=<gherkin>
 
 # help inspect-page
-Usage: inspect-page
+Usage: inspect-page [--query=<selector>] [--html=<file>] [--target=<selector>]
+Lists interactive elements and the phrase that would target each one. It takes no category. The reply names the current frame. --target uses the same page as snap.
 
 # help isolate
 Usage: isolate [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--runvar=key=value] [--run-id=<id>] [--agent=<id>] [--session-file=<path>]

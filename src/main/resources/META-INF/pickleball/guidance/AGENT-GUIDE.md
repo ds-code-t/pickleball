@@ -12,7 +12,7 @@ Workbench is the one front door. Do not open the GUI for your own testing. While
 
 only change `exec.args`: `-Dexec.args=discover`, `-Dexec.args=isolate`, `execute-step`, `confirm`.
 
-`start --url= --browser= --env=` opens a browser, else `error: no live browser`. `doctor` reports health. `live-stop` stops the host, leaves a worker. `chat_wait` blocks until chat. `history-summary` and `history-query` read runs. `entity-lookup` reads one entity. `open-run` opens Explorer or Tracking. `bridge-health` reads the bridge. Warm: `java -cp @classpath.cache tools.dscode.launcher.PickleballWorkbenchLauncher`.
+`start --url= --browser= --env=` opens a browser, else `error: no live browser`. `doctor` reports health. `live-stop` stops the host and Chrome and leaves a worker. `frame`, `inspect-page`, and `act` are in help. `chat_wait` blocks until chat. `history-summary` and `history-query` read runs. `entity-lookup` reads one entity. `open-run` opens Explorer or Tracking. `bridge-health` reads the bridge. Warm: `java -cp @classpath.cache tools.dscode.launcher.PickleballWorkbenchLauncher`.
 `--target`: browser:auto, browser:cdp=<url>, desktop:<pid|app~name>, ref:<doc:handle>. Verbs: attach, snap, find, act, wait, watch, explain, eval, ui, capture.
 
 ### Live isolation loop

@@ -108,7 +108,7 @@ final class WorkbenchCliHelp {
             Map.entry("selftest", "Usage: selftest ui --cpu [--component=panel]\nselftest ui --component=pages"),
             Map.entry("snap", "Usage: snap [--target=browser:auto|browser:<id>|browser:cdp=<url>|desktop:<pid>|desktop:app~<name>|ref:<doc>:<handle>]"),
             Map.entry("find", "Usage: find --target=<selector> [--query=<text>]"),
-            Map.entry("act", "Usage: act --target=<selector> [--kind=click|type|hover|press|select] [--query=<text>] [--ref=<ref>] [--value=<text>] [--condition=title=<text>] [--timeout=<ms>]"),
+            Map.entry("act", "Usage: act --target=<selector> [--kind=click|type|hover|press|select] [--query=<text>] [--ref=<ref>] [--value=<text>] [--condition=title=<text>|text=<text>|url=<text>|ref=<id>:selected] [--snap=diff|auto] [--timeout=<ms>]"),
             Map.entry("form-fill", "Usage: form-fill --target=<selector> --fields=id=value|id=value"),
             Map.entry("wait", "Usage: wait --target=<selector> [--ref=<ref>] [--condition=mutation|network|load|navigation|mask|visible|hidden|enabled|detached|text=<text>|<text>] [--timeout=<ms>]"),
             Map.entry("wait-for", "Usage: wait-for --target=<selector> --condition=<text> [--timeout=<ms>]"),
@@ -117,7 +117,10 @@ final class WorkbenchCliHelp {
             Map.entry("capture", "Usage: capture --target=<selector> --out=<file>"),
             Map.entry("attach", "Usage: attach --target=<selector>"),
             Map.entry("eval", "Usage: eval --target=<selector> --expr=<js> [--world=pkb|main]"),
-            Map.entry("ui", "Usage: ui [--ops=<json array>]\nWithout --ops, ui opens the Workbench controller. With --ops, ui applies a catalog batch (same as ui-apply).")
+            Map.entry("ui", "Usage: ui [--ops=<json array>]\nWithout --ops, ui opens the Workbench controller. With --ops, ui applies a catalog batch (same as ui-apply)."),
+            Map.entry("frame", "Usage: frame --target=<selector> [--list] [--reset] [--enter=<id|name>]\nLists frames, returns later steps to the top document, or enters a frame. --reset clears the entered frame and the Selenium driver. --enter scopes later find, act, snap, and inspect to that frame, and enters an iframe with that id, name, or title when the driver can see it. Replies include frame."),
+            Map.entry("inspect-page", "Usage: inspect-page [--query=<selector>] [--html=<file>] [--target=<selector>]\nLists interactive elements and the phrase that would target each one. It takes no category. The reply names the current frame. --target uses the same page as snap."),
+            Map.entry("live-stop", "Usage: live-stop\nStops the start host and Chrome. It does not stop a Workbench worker.")
     );
 
     private static final Map<String, String> FLAGS = Map.ofEntries(
@@ -194,8 +197,8 @@ final class WorkbenchCliHelp {
         text.append("coordination: short-log note inbox finish presence post history gc-runs gc-versions use-version export-guidance\n");
         text.append("descriptors: session list | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>\n");
         text.append("page: inspect-page find-element\n");
-        text.append("agent: observe launch windows tabs chat-send chat-history chat-poll chat_wait highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close panel-open panel-close guide guide-next guide-back guide-done ask ask-and-wait pin toast checklist ui-apply ui-poll ui-catalog capture-scenario screenshot selftest doctor act form-fill snap find wait wait-for watch explain capture attach eval\n");
-        text.append("consumer: start history-summary history-query entity-lookup open-run bridge-health\n");
+        text.append("agent: observe launch windows tabs chat-send chat-history chat-poll chat_wait highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close panel-open panel-close guide guide-next guide-back guide-done ask ask-and-wait pin toast checklist ui-apply ui-poll ui-catalog capture-scenario screenshot selftest doctor act form-fill snap find frame wait wait-for watch explain capture attach eval\n");
+        text.append("consumer: start live-stop history-summary history-query entity-lookup open-run bridge-health\n");
         text.append("retrieval: query runs | query get | query query | query search | query props | query errors | query tail\n");
         text.append("controller: sync worker-check live-check ui mcp session\n");
         text.append("dashboard: dashboard [--project=<dir>] [--out=<file>]\n");
