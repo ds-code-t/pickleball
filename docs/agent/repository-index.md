@@ -88,6 +88,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-agent-fast/consumer-field-report-2026-11-18.md`
 - `docs/maintainer/3.0.0-agent-fast/evaluation.md`
 - `docs/maintainer/3.0.0-agent-fast/README.md`
+- `docs/maintainer/3.0.0-agent-fast/verification-final.md`
 - `docs/maintainer/3.0.0-consumer-ready-handoff.md`
 - `docs/maintainer/3.0.0-consumer-report-2026-11-17/agent-blockers-digest.md`
 - `docs/maintainer/3.0.0-consumer-report-2026-11-17/agreed-plan.md`
