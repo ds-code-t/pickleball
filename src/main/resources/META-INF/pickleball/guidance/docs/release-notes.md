@@ -1,6 +1,6 @@
 # Release notes
 
-## 2.20.0
+## 2.2.0
 
 - A plain `attach`, `attaches`, or `create and attach` names `InternalFileInput` again when the phrase does not name an HTML element or the `it` placeholder. `attach the "testFile.pdf" file` uploads that file. Naming `InternalFileInput` yourself is unchanged. A capitalized category such as `File` stays the named element. The lowercase word `file` is not a category. A normal `mvn test` is affected.
 
