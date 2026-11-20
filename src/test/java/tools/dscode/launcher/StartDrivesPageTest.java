@@ -143,7 +143,7 @@ class StartDrivesPageTest {
             assertEquals(2, started.code, detail(started));
             assertEquals(
                     "error: a Workbench worker is live\nfix: use the worker's browser or stop it\n",
-                    started.err
+                    started.err.replace("\r\n", "\n")
             );
             assertTrue(worker.isAlive(), "start killed the workbench worker");
             assertFalse(Files.isRegularFile(temp.resolve(".pickleball/live-browser/current.json")));

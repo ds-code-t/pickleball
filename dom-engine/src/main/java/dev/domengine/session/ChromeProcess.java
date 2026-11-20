@@ -28,11 +28,13 @@ public final class ChromeProcess {
 
     private final Process process;
     private final Path profile;
+    private final Path launchLog;
     private final int port;
 
-    private ChromeProcess(Process process, Path profile, int port) {
+    private ChromeProcess(Process process, Path profile, int port, Path launchLog) {
         this.process = process;
         this.profile = profile;
+        this.launchLog = launchLog;
         this.port = port;
     }
 
@@ -86,26 +88,44 @@ public final class ChromeProcess {
 
     private static ChromeProcess spawn(String binary, Path dir, boolean headless, List<String> extraArgs, String initialUrl, long portWaitSeconds) {
         List<String> command = command(binary, dir, headless, extraArgs, initialUrl);
+        Path log;
+        try {
+            log = Files.createTempFile("pickleball-chrome-", ".log");
+        } catch (IOException failure) {
+            throw new CdpException("chrome launch log: " + failure.getMessage());
+        }
         Process handle;
         try {
             ProcessBuilder builder = new ProcessBuilder(command)
                     .redirectErrorStream(true)
-                    .redirectOutput(ProcessBuilder.Redirect.DISCARD);
+                    .redirectOutput(ProcessBuilder.Redirect.appendTo(log.toFile()));
+            // Not the caller's cwd. A Windows child keeps that directory locked after it is reparented.
+            builder.directory(Path.of(System.getProperty("java.io.tmpdir", ".")).toFile());
             // The JVM bus stays as-is so AT-SPI can use it. Only this browser child changes.
             sanitizeSessionBus(builder.environment());
             handle = builder.start();
         } catch (IOException failure) {
+            try {
+                Files.deleteIfExists(log);
+            } catch (IOException ignored) {
+                // The temp log is outside the profile.
+            }
             throw new CdpException("chrome launch: " + failure.getMessage());
         }
         int chosen;
         try {
-            chosen = awaitPort(dir, handle, portWaitSeconds);
+            chosen = awaitPort(dir, handle, portWaitSeconds, log);
         } catch (RuntimeException failure) {
             destroyTree(handle);
             releaseProfile(dir);
+            try {
+                Files.deleteIfExists(log);
+            } catch (IOException ignored) {
+                // Windows may still have the redirect handle. The file is not in the profile.
+            }
             throw failure;
         }
-        return new ChromeProcess(handle, dir, chosen);
+        return new ChromeProcess(handle, dir, chosen, log);
     }
 
     private static List<String> command(String binary, Path dir, boolean headless, List<String> extraArgs, String initialUrl) {
@@ -219,6 +239,13 @@ public final class ChromeProcess {
     public void destroyTree() {
         destroyTree(process);
         releaseProfile(profile);
+        if (launchLog != null) {
+            try {
+                Files.deleteIfExists(launchLog);
+            } catch (IOException ignored) {
+                // The redirect handle can outlive the process on Windows. The log is not in the profile.
+            }
+        }
     }
 
     public static void destroyTree(Process process) {
@@ -298,7 +325,7 @@ public final class ChromeProcess {
             signaled = true;
             destroyHandle(handle);
         }
-        if (!signaled && isWindows()) signaled = signalWindows(markers);
+        if (!signaled && isWindows() && Files.isDirectory(profile)) signaled = signalWindows(markers);
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
         while (signaled && System.nanoTime() < deadline) {
             boolean alive = false;
@@ -437,7 +464,7 @@ public final class ChromeProcess {
         }
     }
 
-    private static int awaitPort(Path profile, Process process, long timeoutSeconds) {
+    private static int awaitPort(Path profile, Process process, long timeoutSeconds, Path log) {
         Path file = profile.resolve("DevToolsActivePort");
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds);
         while (System.nanoTime() < deadline) {
@@ -458,7 +485,7 @@ public final class ChromeProcess {
                 exit = null;
             }
         }
-        String tail = launchTail(profile);
+        String tail = launchTail(log);
         throw new CdpException("timed out waiting for DevToolsActivePort"
                 + (exit == null ? "" : " launcher-exit=" + exit)
                 + (tail.isEmpty() ? "" : " log=" + tail));
@@ -475,9 +502,8 @@ public final class ChromeProcess {
         }
     }
 
-    private static String launchTail(Path profile) {
-        Path log = profile.resolve("launch.log");
-        if (!Files.isRegularFile(log)) return "";
+    private static String launchTail(Path log) {
+        if (log == null || !Files.isRegularFile(log)) return "";
         try {
             return collapseLog(Files.readString(log));
         } catch (IOException failure) {

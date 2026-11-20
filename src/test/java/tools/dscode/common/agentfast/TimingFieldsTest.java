@@ -92,7 +92,7 @@ class TimingFieldsTest {
                         temp.toString(),
                         "--handle=save",
                         "--preset=yellow"
-                ).redirectErrorStream(true).directory(temp.toFile()).start();
+                ).redirectErrorStream(true).directory(workDir()).start();
                 String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
                 int code = process.waitFor();
                 samples[sample] = Math.max(0L, (System.nanoTime() - started) / 1_000_000L);
@@ -211,7 +211,7 @@ class TimingFieldsTest {
                     temp.toString(),
                     "--handle=save",
                     "--preset=yellow"
-            ).redirectErrorStream(true).directory(temp.toFile()).start();
+            ).redirectErrorStream(true).directory(workDir()).start();
             String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
             int code = process.waitFor();
             samples[sample] = Math.max(0L, (System.nanoTime() - began) / 1_000_000L);
@@ -235,6 +235,10 @@ class TimingFieldsTest {
                 "document.getElementById('save').getAttribute('data-pkb-style')"
                         + "+'|'+getComputedStyle(document.getElementById('save')).backgroundColor");
         assertEquals("style_modified|rgb(255, 243, 160)", paint);
+    }
+
+    private static java.io.File workDir() {
+        return Path.of(System.getProperty("java.io.tmpdir", ".")).toFile();
     }
 
     private static long elapsedOf(String output) {

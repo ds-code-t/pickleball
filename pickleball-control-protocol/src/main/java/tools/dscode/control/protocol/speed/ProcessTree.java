@@ -1,8 +1,11 @@
 package tools.dscode.control.protocol.speed;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Kills a process and every descendant. The launcher, the warm JVM, and
@@ -85,6 +88,27 @@ public final class ProcessTree {
         } catch (RuntimeException ignored) {
             // The process can exit between the snapshot and the kill.
         }
+        taskkill(handle.pid());
+    }
+
+    /** Windows reparents Chrome. {@code taskkill /T} still reaches that tree. No-op elsewhere. */
+    private static void taskkill(long pid) {
+        if (pid <= 0 || !isWindows()) return;
+        try {
+            Process killer = new ProcessBuilder("taskkill", "/F", "/T", "/PID", Long.toString(pid))
+                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                    .start();
+            if (!killer.waitFor(5, TimeUnit.SECONDS)) killer.destroyForcibly();
+        } catch (IOException ignored) {
+            // taskkill is absent. destroyForcibly already ran.
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private static boolean isWindows() {
+        return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
     }
 
     private static boolean alive(ProcessHandle handle) {

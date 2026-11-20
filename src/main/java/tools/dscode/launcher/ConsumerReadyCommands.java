@@ -50,6 +50,11 @@ final class ConsumerReadyCommands {
         Path project = parsed.project();
         if (hasToken(parsed, "--stop")) {
             StopOutcome outcome = stopOwned(project);
+            // Chrome on Windows reparents away from the host. The recorded pid can already be dead
+            // while the browser still has the profile open.
+            if (project != null) {
+                dev.domengine.session.ChromeProcess.releaseProfile(project.resolve(".pickleball"));
+            }
             if (outcome.stopped()) err.println("notice: live-stop stops the start host");
             else if (outcome.unrecorded()) {
                 err.println("notice: live-stop deleted a state file with no recorded start times");
@@ -259,7 +264,9 @@ final class ConsumerReadyCommands {
         Files.writeString(argFile, body, StandardCharsets.UTF_8);
         Path javaBin = Path.of(System.getProperty("java.home"), "bin", "java");
         ProcessBuilder builder = new ProcessBuilder(javaBin.toString(), "@" + argFile.toAbsolutePath());
-        builder.directory(project.toFile());
+        // Not the project directory. On Windows the child's cwd, and the parent's process
+        // handle to that directory, stop JUnit from deleting a temp project after the test.
+        builder.directory(Path.of(System.getProperty("java.io.tmpdir", ".")).toFile());
         // The host opens the log itself. A parent Redirect.appendTo keeps the file
         // handle open in this JVM, and Windows then cannot delete the temp project.
         builder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
@@ -282,7 +289,9 @@ final class ConsumerReadyCommands {
     }
 
     private static boolean awaitHealthy(Process process, Path project, Path logFile, java.io.PrintStream err) {
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
+        // Chrome's own port wait is 45s. A 20s parent budget declared the host unhealthy
+        // while it was still starting on a busy Windows runner.
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
         try {
             while (System.nanoTime() < deadline) {
                 if (!process.isAlive()) {
