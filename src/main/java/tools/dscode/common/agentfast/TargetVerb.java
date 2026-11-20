@@ -2964,7 +2964,7 @@ public final class TargetVerb {
             if (parentId.isBlank()) parentId = FrameCoverage.parentOf(cdp, id);
             row.put("parentId", parentId);
             String url = frame.path("url").asText("");
-            if (url.isBlank() || "about:blank".equals(url)) {
+            if (url.isBlank() || "about:blank".equals(url) || ":".equals(url)) {
                 String known = FrameCoverage.url(cdp, id);
                 if (!known.isBlank()) url = known;
             }

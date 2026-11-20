@@ -30,6 +30,12 @@ public final class FrameCoverage {
         thread.setDaemon(true);
         return thread;
     });
+    /** Surface probes. Kept off the attach thread so a paused sibling is resumed at once. */
+    private static final ExecutorService PROBES = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "pkb-oopif-probe");
+        thread.setDaemon(true);
+        return thread;
+    });
     private static final Set<CdpConnection> ARMED = ConcurrentHashMap.newKeySet();
     /** One socket owns auto-attach. A second attach to the same browser must not pause frames again. */
     private static final AtomicReference<CdpConnection> OWNER = new AtomicReference<>();
@@ -163,7 +169,7 @@ public final class FrameCoverage {
         String id = frame.path("id").asText("");
         String url = frame.path("url").asText("");
         if (!id.isBlank()) {
-            if (!url.isBlank() && !"about:blank".equals(url)) {
+            if (usefulUrl(url)) {
                 URLS.computeIfAbsent(connection, key -> new ConcurrentHashMap<>()).put(id, url);
             }
             String reported = frame.path("parentId").asText("");
@@ -228,7 +234,7 @@ public final class FrameCoverage {
             String type = info.path("type").asText("");
             String url = info.path("url").asText("");
             String targetId = info.path("targetId").asText("");
-            if (!targetId.isBlank() && !url.isBlank()) {
+            if (!targetId.isBlank() && usefulUrl(url)) {
                 URLS.computeIfAbsent(connection, key -> new ConcurrentHashMap<>()).put(targetId, url);
             }
             if (!"iframe".equals(type) || targetId.isBlank()) continue;
@@ -282,7 +288,7 @@ public final class FrameCoverage {
             JsonNode frame = message.path("params").path("frame");
             String id = frame.path("id").asText("");
             String url = frame.path("url").asText("");
-            if (!id.isBlank() && !url.isBlank()) {
+            if (!id.isBlank() && usefulUrl(url)) {
                 URLS.computeIfAbsent(connection, key -> new ConcurrentHashMap<>()).put(id, url);
             }
             return;
@@ -292,7 +298,7 @@ public final class FrameCoverage {
             if ("iframe".equals(info.path("type").asText(""))) {
                 String id = info.path("targetId").asText("");
                 String url = info.path("url").asText("");
-                if (!id.isBlank() && !url.isBlank()) {
+                if (!id.isBlank() && usefulUrl(url)) {
                     URLS.computeIfAbsent(connection, key -> new ConcurrentHashMap<>()).put(id, url);
                 }
             }
@@ -366,13 +372,14 @@ public final class FrameCoverage {
                 EngineLog.info("frame", "resume " + failure.getMessage());
             }
         }
-        if (frameId.isBlank()) return;
-        refreshUrls(connection, sessionId);
-        if (runtime.isBlank()) return;
-        String probed = probeSurface(connection, sessionId, frameId);
-        if ("ready".equals(probed)) {
-            SURFACE.computeIfAbsent(connection, key -> new ConcurrentHashMap<>()).put(frameId, "ready");
-        }
+        if (frameId.isBlank() || runtime.isBlank()) return;
+        String probedFrame = frameId;
+        PROBES.execute(() -> {
+            String probed = probeSurface(connection, sessionId, probedFrame);
+            if ("ready".equals(probed)) {
+                SURFACE.computeIfAbsent(connection, key -> new ConcurrentHashMap<>()).put(probedFrame, "ready");
+            }
+        });
     }
 
     /**
@@ -473,6 +480,11 @@ public final class FrameCoverage {
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    /** A paused or unloaded frame reports {@code :} or {@code about:blank}. Those are not documents. */
+    private static boolean usefulUrl(String url) {
+        return url != null && !url.isBlank() && !":".equals(url) && !"about:blank".equals(url);
     }
 
     private static String surfaceRuntime() {
