@@ -78,6 +78,66 @@ class VisibleFlagTest {
         assertEquals("unknown handle: absent", JSON.readTree(missing.out).path("error").asText(), missing.out);
     }
 
+    @Test
+    @Timeout(value = 180, unit = TimeUnit.SECONDS)
+    void visibleRequiresABoxTheUserCanSee() throws Exception {
+        assumeTrue(BrowserSession.findChrome() != null, "skipped: chrome is not on PATH");
+        Path page = temp.resolve("reasons.html");
+        Files.writeString(page, """
+                <!DOCTYPE html><html><head><title>See</title>
+                <style>html,body{margin:0} button,div{font:16px sans-serif}</style>
+                </head><body>
+                <button id="ok" data-pkb-handle="ok">Ok</button>
+                <button id="off" data-pkb-handle="off" style="position:fixed;left:-9999px;top:8px">Off</button>
+                <button id="ghost" data-pkb-handle="ghost" style="opacity:0">Ghost</button>
+                <div id="dot" data-pkb-handle="dot" style="width:0;height:0;overflow:hidden"></div>
+                <span style="position:relative;display:inline-block">
+                  <button id="under" data-pkb-handle="under">Under</button>
+                  <div style="position:absolute;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.25)"></div>
+                </span>
+                <div style="height:4000px"></div>
+                <button id="below" data-pkb-handle="below">Below</button>
+                </body></html>
+                """);
+        Capture started = run("start", "--url=" + page.toUri(), "--browser=chrome-headless", "--run-id=reasons");
+        assertEquals(0, started.code, started.err + started.out);
+        assertTrue(started.out.contains("navigated=true"), started.out);
+        assertEquals("below", eval(
+                "var r=document.getElementById('below').getBoundingClientRect();"
+                        + "r.top>window.innerHeight?'below':'seen'",
+                "reasons"));
+
+        assertSeen("ok", true, "");
+        assertSeen("off", false, "offscreen");
+        assertSeen("ghost", false, "transparent");
+        assertSeen("dot", false, "zero-size");
+        assertSeen("under", false, "covered");
+        assertSeen("below", true, "");
+    }
+
+    private void assertSeen(String handle, boolean visible, String reason) throws Exception {
+        Capture labeled = run(
+                "label", "--text=On " + handle, "--handle=" + handle,
+                "--target=browser:auto", "--run-id=reasons");
+        assertEquals(0, labeled.code, labeled.err + labeled.out);
+        JsonNode body = JSON.readTree(labeled.out);
+        assertTrue(body.path("ok").asBoolean(), labeled.out);
+        assertEquals(visible, body.path("visible").asBoolean(), labeled.out);
+        assertEquals(!visible, body.path("hidden").asBoolean(), labeled.out);
+        assertFalse(body.path("lost").asBoolean(), labeled.out);
+        if (reason.isEmpty()) {
+            assertFalse(body.has("hiddenReason"), labeled.out);
+        } else {
+            assertEquals(reason, body.path("hiddenReason").asText(), labeled.out);
+        }
+    }
+
+    private String eval(String expr, String runId) throws Exception {
+        Capture read = run("eval", "--target=browser:auto", "--world=main", "--run-id=" + runId, "--expr=" + expr);
+        assertEquals(0, read.code, read.err + read.out);
+        return JSON.readTree(read.out).path("value").asText();
+    }
+
     private Capture run(String... args) {
         String[] command = new String[args.length + 1];
         command[0] = args[0];

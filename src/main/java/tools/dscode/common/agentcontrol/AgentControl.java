@@ -881,20 +881,15 @@ public final class AgentControl {
         WebDriver web = PageSurfaces.liveDriver();
         if (web instanceof org.openqa.selenium.JavascriptExecutor js && present(handle)) {
             try {
-                Object raw = js.executeScript(
-                        "var h=arguments[0];"
-                                + "var el=document.querySelector('[data-pkb-handle=\"'+CSS.escape(h)+'\"]');"
-                                + "if(!el) el=document.getElementById(h);"
-                                + "if(!el) return {lost:true,visible:false,hidden:true};"
-                                + "var s=getComputedStyle(el);"
-                                + "var shown=el.getClientRects().length>0 && s.display!=='none' && s.visibility!=='hidden' && !el.hidden;"
-                                + "return {lost:false,visible:shown,hidden:!shown};",
-                        handle
-                );
+                Object raw = js.executeScript(SEEN_SCRIPT, handle);
                 if (raw instanceof Map<?, ?> map) {
                     placed.put("visible", Boolean.TRUE.equals(map.get("visible")));
                     placed.put("hidden", Boolean.TRUE.equals(map.get("hidden")));
                     placed.put("lost", Boolean.TRUE.equals(map.get("lost")));
+                    Object reason = map.get("hiddenReason");
+                    if (reason != null && !String.valueOf(reason).isBlank()) {
+                        placed.put("hiddenReason", String.valueOf(reason));
+                    }
                 }
             } catch (RuntimeException ignored) {
                 placed.put("visible", false);
@@ -922,6 +917,96 @@ public final class AgentControl {
             placed.put("overlaps", overlaps);
         }
     }
+
+    /**
+     * A handle is visible only with a non-zero box the user can scroll into, opacity above 0, and a free centre.
+     * {@code display:none} stays hidden with no reason, so the older flag reply does not grow a new cause.
+     */
+    private static final String SEEN_SCRIPT = """
+            var h = arguments[0];
+            var el = document.querySelector('[data-pkb-handle="' + CSS.escape(h) + '"]');
+            if (!el) el = document.getElementById(h);
+            if (!el) return {lost:true, visible:false, hidden:true};
+            var style = getComputedStyle(el);
+            if (style.display === 'none' || style.visibility === 'hidden' || el.hidden) {
+              return {lost:false, visible:false, hidden:true};
+            }
+            var opacity = 1;
+            for (var node = el; node && node.nodeType === 1; node = node.parentElement) {
+              var parsed = parseFloat(getComputedStyle(node).opacity);
+              if (!isNaN(parsed)) opacity *= parsed;
+              if (opacity <= 0) return {lost:false, visible:false, hidden:true, hiddenReason:'transparent'};
+            }
+            var rect = el.getBoundingClientRect();
+            if (rect.width < 1 || rect.height < 1) {
+              return {lost:false, visible:false, hidden:true, hiddenReason:'zero-size'};
+            }
+            function overlaps(a0, a1, b0, b1) { return a1 > b0 && a0 < b1; }
+            var viewW = window.innerWidth || document.documentElement.clientWidth;
+            var viewH = window.innerHeight || document.documentElement.clientHeight;
+            var onScreen = rect.bottom > 0 && rect.right > 0 && rect.top < viewH && rect.left < viewW;
+            function scrollable(target, box) {
+              if (getComputedStyle(target).position === 'fixed') return false;
+              var doc = document.scrollingElement || document.documentElement;
+              var top = box.top + window.scrollY;
+              var left = box.left + window.scrollX;
+              var maxX = Math.max(0, doc.scrollWidth - viewW);
+              var maxY = Math.max(0, doc.scrollHeight - viewH);
+              if (overlaps(left, left + box.width, 0, maxX + viewW)
+                  && overlaps(top, top + box.height, 0, maxY + viewH)) return true;
+              var parent = target.parentElement;
+              while (parent) {
+                var parentStyle = getComputedStyle(parent);
+                var scrollY = (parentStyle.overflowY === 'auto' || parentStyle.overflowY === 'scroll')
+                    && parent.scrollHeight > parent.clientHeight + 1;
+                var scrollX = (parentStyle.overflowX === 'auto' || parentStyle.overflowX === 'scroll')
+                    && parent.scrollWidth > parent.clientWidth + 1;
+                if (scrollY || scrollX) {
+                  var parentBox = parent.getBoundingClientRect();
+                  var relTop = box.top - parentBox.top + parent.scrollTop;
+                  var relLeft = box.left - parentBox.left + parent.scrollLeft;
+                  var inY = overlaps(relTop, relTop + box.height, 0, parent.scrollHeight);
+                  var inX = overlaps(relLeft, relLeft + box.width, 0, parent.scrollWidth);
+                  if ((scrollY && inY && inX) || (scrollX && inX && inY)) return true;
+                }
+                parent = parent.parentElement;
+              }
+              return false;
+            }
+            if (!onScreen && !scrollable(el, rect)) {
+              return {lost:false, visible:false, hidden:true, hiddenReason:'offscreen'};
+            }
+            var x = rect.left + rect.width / 2;
+            var y = rect.top + rect.height / 2;
+            var stack = document.elementsFromPoint ? document.elementsFromPoint(x, y) : [];
+            if (!stack.length && document.elementFromPoint) {
+              var one = document.elementFromPoint(x, y);
+              stack = one ? [one] : [];
+            }
+            for (var i = 0; i < stack.length; i++) {
+              var top = stack[i];
+              var guard = 0;
+              while (top && top.shadowRoot && guard++ < 8) {
+                var inner = top.shadowRoot.elementFromPoint(x, y);
+                if (!inner || inner === top) break;
+                top = inner;
+              }
+              if (!top || top === el || (el.contains && el.contains(top))) break;
+              var cursor = el;
+              var hops = 0;
+              var ancestor = false;
+              while (cursor && hops++ < 30) {
+                if (cursor === top) { ancestor = true; break; }
+                var root = cursor.getRootNode ? cursor.getRootNode() : null;
+                if (root && root.host) cursor = root.host;
+                else cursor = cursor.parentElement;
+              }
+              if (ancestor) break;
+              if (top.closest && top.closest('[data-pkb-agent],[data-pkb-layer]')) continue;
+              return {lost:false, visible:false, hidden:true, hiddenReason:'covered'};
+            }
+            return {lost:false, visible:true, hidden:false};
+            """;
 
     private static int seenNumber(Object value) {
         if (value instanceof Number number) return number.intValue();
