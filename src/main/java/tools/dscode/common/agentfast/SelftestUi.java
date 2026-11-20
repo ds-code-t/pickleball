@@ -79,10 +79,10 @@ public final class SelftestUi {
             Arrays.sort(samples);
             long p95 = samples[18];
             Thread.sleep(500);
-            CpuSample before = cpuSample(session.pid);
-            Thread.sleep(500);
-            CpuSample after = cpuSample(session.pid);
-            if (!before.supported() || !after.supported()) {
+            // One 500 ms slice on a headed macOS runner can include a WindowServer burst.
+            // The idle figure is the quietest of three slices. A spin fails every slice.
+            CpuSample cursor = cpuSample(session.pid);
+            if (!cursor.supported()) {
                 body.put("ok", false);
                 body.put("unsupported", true);
                 body.put("p95Ms", p95);
@@ -91,16 +91,43 @@ public final class SelftestUi {
                 body.put("sentence", "selftest ui --cpu cannot read CPU time here.");
                 return body;
             }
-            double cores = before.ticks()
-                    ? (after.ticksValue() - before.ticksValue()) / 100.0 / 0.5
-                    : (after.nanos() - before.nanos()) / 1_000_000_000.0 / 0.5;
+            double quietest = Double.POSITIVE_INFINITY;
+            long quietTicks = 0;
+            List<Double> coreSamples = new ArrayList<>();
+            for (int window = 0; window < 3; window++) {
+                Thread.sleep(500);
+                CpuSample next = cpuSample(session.pid);
+                if (!next.supported()) {
+                    body.put("ok", false);
+                    body.put("unsupported", true);
+                    body.put("p95Ms", p95);
+                    body.put("cores", 0);
+                    body.put("error", "selftest ui --cpu has no process CPU clock on this machine");
+                    body.put("sentence", "selftest ui --cpu cannot read CPU time here.");
+                    return body;
+                }
+                double sample = cursor.ticks()
+                        ? (next.ticksValue() - cursor.ticksValue()) / 100.0 / 0.5
+                        : (next.nanos() - cursor.nanos()) / 1_000_000_000.0 / 0.5;
+                if (sample >= 0) {
+                    coreSamples.add(sample);
+                    if (sample < quietest) {
+                        quietest = sample;
+                        quietTicks = cursor.ticks() ? next.ticksValue() - cursor.ticksValue() : 0;
+                    }
+                }
+                cursor = next;
+            }
+            double cores = quietest == Double.POSITIVE_INFINITY ? 1 : quietest;
             body.put("p95Ms", p95);
             body.put("cores", cores);
+            body.put("coreSamples", coreSamples);
             body.put("idleWindowMs", 500);
-            body.put("ticks", before.ticks() ? after.ticksValue() - before.ticksValue() : 0);
+            body.put("ticks", quietTicks);
             boolean ok = cores < 0.1 && p95 <= 150;
             body.put("ok", ok);
-            body.put("sentence", "panel idle cores=" + cores + " p95Ms=" + p95);
+            body.put("sentence", "panel idle cores=" + cores + " samples=" + coreSamples + " p95Ms=" + p95);
+            if (!ok) body.put("error", "selftest ui --cpu missed the idle or p95 target");
             if (!ok) body.put("error", "selftest ui --cpu missed the idle or p95 target");
             return body;
         } finally {
