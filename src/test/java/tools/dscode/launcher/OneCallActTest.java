@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -139,6 +140,49 @@ class OneCallActTest {
         } finally {
             driver.quit();
         }
+    }
+
+    @Test
+    @Timeout(value = 120, unit = TimeUnit.SECONDS)
+    void textQueryMatchesHiddenAndDisabledSave() throws Exception {
+        assumeTrue(BrowserSession.findChrome() != null, "skipped: chrome is not on PATH");
+        assumeTrue(!CompositeRuntime.primary(), "skipped: composite is on; snapshot text= is the off path");
+        Path page = temp.resolve("saves.html");
+        Files.writeString(page, """
+                <!DOCTYPE html><html><body>
+                <button id="hid" hidden>Save</button>
+                <button id="off" disabled style="width:80px;height:30px">Save</button>
+                </body></html>
+                """);
+        ChromeDriver driver = open(BrowserSession.findChrome());
+        try {
+            driver.get(page.toUri().toString());
+            List<ElementView> views = ElementOperations.describe(driver, EngineQuery.of("text=Save"));
+            ElementView hidden = byId(views, "hid");
+            ElementView disabled = byId(views, "off");
+            assertEquals("Save", hidden.text());
+            assertFalse(hidden.displayed(), String.valueOf(views));
+            assertTrue(hidden.enabled(), String.valueOf(views));
+            assertEquals("Save", disabled.text());
+            assertTrue(disabled.displayed(), String.valueOf(views));
+            assertFalse(disabled.enabled(), String.valueOf(views));
+            assertTrue(disabled.width() > 0, String.valueOf(views));
+        } finally {
+            driver.quit();
+        }
+    }
+
+    private static ElementView byId(List<ElementView> views, String id) {
+        ElementView found = null;
+        int count = 0;
+        for (ElementView view : views) {
+            if (id.equals(view.attribute("id"))) {
+                count++;
+                found = view;
+            }
+        }
+        assertEquals(1, count, String.valueOf(views));
+        return found;
     }
 
     private String eval(String expr, String runId) throws Exception {

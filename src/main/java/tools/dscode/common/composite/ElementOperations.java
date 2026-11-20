@@ -408,10 +408,65 @@ public final class ElementOperations {
     }
 
     /**
-     * text=, role=, and the visual relations, read from the live page source
-     * through the snapshot query engine. Composite stays off.
+     * text= and role= on a scriptable driver read the top document once.
+     * That read does not walk shadow roots or iframes.
+     * near=, below=, and above=, and a driver that cannot run a script, use the page source.
+     * Source matches take displayed and enabled from attributes. They do not invent a layout box.
      * Null when this query is not one of those selectors or the page cannot be read.
      */
+    private static final String LIVE_TEXT_ROLE = """
+            var kind = arguments[0];
+            var wanted = arguments[1];
+            function norm(value) {
+              return String(value == null ? '' : value).replace(/\\s+/g, ' ').trim();
+            }
+            function ownText(el) {
+              var direct = '';
+              var nodes = el.childNodes || [];
+              for (var i = 0; i < nodes.length; i++) {
+                if (nodes[i].nodeType === 3) direct += nodes[i].nodeValue || '';
+              }
+              direct = norm(direct);
+              if (direct) return direct;
+              return norm(el.textContent);
+            }
+            function shown(el) {
+              if (el.hidden) return false;
+              var style = window.getComputedStyle(el);
+              if (!style || style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+              var box = el.getBoundingClientRect();
+              return box.width >= 1 && box.height >= 1;
+            }
+            function on(el) {
+              if (el.disabled) return false;
+              return el.getAttribute('aria-disabled') !== 'true';
+            }
+            var out = [];
+            var all = document.querySelectorAll('body *');
+            for (var i = 0; i < all.length; i++) {
+              var el = all[i];
+              var text = ownText(el);
+              var label = norm(el.getAttribute('aria-label'));
+              var role = norm(el.getAttribute('role'));
+              if (!role) role = el.tagName.toLowerCase();
+              var hit = kind === 'role' ? role === wanted : (text === wanted || label === wanted);
+              if (!hit) continue;
+              var box = el.getBoundingClientRect();
+              out.push({
+                tag: el.tagName.toLowerCase(),
+                text: text || label,
+                displayed: shown(el),
+                enabled: on(el),
+                id: el.id || '',
+                x: Math.round(box.x),
+                y: Math.round(box.y),
+                width: Math.round(box.width),
+                height: Math.round(box.height)
+              });
+            }
+            return out;
+            """;
+
     private static List<ElementView> snapshotQuery(WebDriver driver, EngineQuery query) {
         if (driver == null || query == null || query.text() == null || query.text().isBlank()) return null;
         String pipeline = query.text().trim();
@@ -420,6 +475,74 @@ public final class ElementOperations {
                 && !pipeline.startsWith("above=")) {
             return null;
         }
+        String[] simple = simpleTextOrRole(pipeline);
+        if (simple != null && driver instanceof JavascriptExecutor) {
+            try {
+                List<ElementView> live = liveTextOrRole(driver, simple[0], simple[1]);
+                if (live != null) return live;
+            } catch (RuntimeException ignored) {
+                // The page source still answers when the script cannot run.
+            }
+        }
+        return sourceQuery(driver, pipeline);
+    }
+
+    /** A bare text= or role= value. Null when the pipeline has another stage. */
+    private static String[] simpleTextOrRole(String pipeline) {
+        int eq = pipeline.indexOf('=');
+        if (eq <= 0) return null;
+        String kind = pipeline.substring(0, eq).trim();
+        if (!"text".equals(kind) && !"role".equals(kind)) return null;
+        String rest = pipeline.substring(eq + 1).trim();
+        if (rest.contains(">>") || rest.contains(" AND ") || rest.contains(" OR ") || rest.contains(" NOT ")) return null;
+        if (rest.length() >= 2
+                && ((rest.startsWith("\"") && rest.endsWith("\"")) || (rest.startsWith("'") && rest.endsWith("'")))) {
+            rest = rest.substring(1, rest.length() - 1);
+        }
+        return new String[]{kind, rest.replaceAll("\\s+", " ").trim()};
+    }
+
+    private static List<ElementView> liveTextOrRole(WebDriver driver, String kind, String wanted) {
+        Object raw = script(driver, LIVE_TEXT_ROLE, kind, wanted);
+        if (!(raw instanceof List<?> rows)) return null;
+        java.util.ArrayList<ElementView> views = new java.util.ArrayList<>();
+        for (Object row : rows) {
+            if (!(row instanceof java.util.Map<?, ?> map)) continue;
+            String tag = map.get("tag") == null ? "" : String.valueOf(map.get("tag"));
+            String text = map.get("text") == null ? "" : String.valueOf(map.get("text"));
+            boolean displayed = flag(map.get("displayed"));
+            boolean enabled = flag(map.get("enabled"));
+            String id = map.get("id") == null ? "" : String.valueOf(map.get("id"));
+            views.add(new ElementView(
+                    tag,
+                    text,
+                    displayed,
+                    enabled,
+                    false,
+                    id.isBlank() ? java.util.Map.of() : java.util.Map.of("id", id),
+                    number(map.get("x")),
+                    number(map.get("y")),
+                    number(map.get("width")),
+                    number(map.get("height")),
+                    "",
+                    "",
+                    new ElementState(!enabled, text.isBlank(), false, false, false, false, false)
+            ));
+        }
+        return views;
+    }
+
+    private static boolean flag(Object value) {
+        if (value instanceof Boolean on) return on;
+        return "true".equalsIgnoreCase(String.valueOf(value));
+    }
+
+    private static int number(Object value) {
+        if (value instanceof Number n) return (int) Math.round(n.doubleValue());
+        return 0;
+    }
+
+    private static List<ElementView> sourceQuery(WebDriver driver, String pipeline) {
         try {
             dev.domengine.tree.DomNode root = dev.domengine.query.HtmlTree.parse(driver.getPageSource());
             com.fasterxml.jackson.databind.node.ObjectNode found =
@@ -430,20 +553,24 @@ public final class ElementOperations {
                 for (com.fasterxml.jackson.databind.JsonNode node : nodes) {
                     String text = node.path("text").asText("");
                     String tag = node.path("node_name").asText("").toLowerCase(java.util.Locale.ROOT);
+                    com.fasterxml.jackson.databind.JsonNode attrs = node.path("attributes");
+                    boolean displayed = sourceDisplayed(attrs);
+                    boolean enabled = sourceEnabled(attrs);
+                    String id = attrs.path("id").asText("");
                     views.add(new ElementView(
                             tag,
                             text,
-                            true,
-                            true,
+                            displayed,
+                            enabled,
                             false,
-                            java.util.Map.of(),
+                            id.isBlank() ? java.util.Map.of() : java.util.Map.of("id", id),
                             0,
                             0,
                             0,
                             0,
                             "",
                             "",
-                            new ElementState(false, text.isBlank(), false, false, false, false, false)
+                            new ElementState(!enabled, text.isBlank(), false, false, false, false, false)
                     ));
                 }
             }
@@ -451,6 +578,19 @@ public final class ElementOperations {
         } catch (RuntimeException failure) {
             return null;
         }
+    }
+
+    /** Page source has no layout. Hidden, aria-hidden, and a hiding style are not displayed. */
+    private static boolean sourceDisplayed(com.fasterxml.jackson.databind.JsonNode attrs) {
+        if (attrs.has("hidden")) return false;
+        if ("true".equalsIgnoreCase(attrs.path("aria-hidden").asText(""))) return false;
+        String style = attrs.path("style").asText("").toLowerCase(java.util.Locale.ROOT).replace(" ", "");
+        return !style.contains("display:none") && !style.contains("visibility:hidden");
+    }
+
+    private static boolean sourceEnabled(com.fasterxml.jackson.databind.JsonNode attrs) {
+        if (attrs.has("disabled")) return false;
+        return !"true".equalsIgnoreCase(attrs.path("aria-disabled").asText(""));
     }
 
     /** Click or type through the same query object. Composite only. */
