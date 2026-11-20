@@ -200,10 +200,51 @@ public final class WorkbenchAgentCommands {
 
     private static int exportGuidance(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
         try {
-            return PickleballLocalStore.exportGuidance(parsed.outputDirectory(), out, err);
+            int code = PickleballLocalStore.exportGuidance(parsed.outputDirectory(), out, err);
+            if (code != 0 || !hasFlag(parsed, "--warm")) return code;
+            return warm(parsed.project(), out, err);
         } catch (IOException failure) {
             throw new IllegalStateException(failure.getMessage(), failure);
         }
+    }
+
+    /** Writes the one-shot classpath, starts the controller, and times a second ping. */
+    private static int warm(Path project, PrintStream out, PrintStream err) {
+        Path root = project == null ? Path.of("").toAbsolutePath().normalize() : project.toAbsolutePath().normalize();
+        StringBuilder warnings = new StringBuilder();
+        WorkbenchOneShotLaunch.capture(root, warnings);
+        if (!warnings.isEmpty()) err.print(warnings);
+        PrintStream previousOut = System.out;
+        PrintStream previousErr = System.err;
+        ByteArrayOutputStream sinkOut = new ByteArrayOutputStream();
+        ByteArrayOutputStream sinkErr = new ByteArrayOutputStream();
+        int exit = 1;
+        long warmMs = -1L;
+        try {
+            System.setOut(new PrintStream(sinkOut, true, StandardCharsets.UTF_8));
+            System.setErr(new PrintStream(sinkErr, true, StandardCharsets.UTF_8));
+            exit = PkbMain.run(new String[]{"controller-start", root.toString()});
+            if (exit == 0) {
+                PkbMain.run(new String[]{"controller-ping", root.toString()});
+                long started = System.nanoTime();
+                exit = PkbMain.run(new String[]{"controller-ping", root.toString()});
+                warmMs = Math.max(0L, (System.nanoTime() - started) / 1_000_000L);
+            }
+        } catch (Exception failure) {
+            exit = 1;
+            String message = failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
+            sinkErr.writeBytes(("error: " + message + "\n").getBytes(StandardCharsets.UTF_8));
+        } finally {
+            System.setOut(previousOut);
+            System.setErr(previousErr);
+        }
+        String extra = sinkErr.toString(StandardCharsets.UTF_8);
+        if (!extra.isBlank()) err.print(extra.endsWith("\n") ? extra : extra + "\n");
+        out.println("warm=true");
+        out.println("classpath=" + WorkbenchOneShotLaunch.cacheFile(root));
+        out.println("pingMs=" + warmMs);
+        out.println("pingExit=" + exit);
+        return exit == 0 ? 0 : exit;
     }
 
     private static int hint(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
@@ -2007,6 +2048,9 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "kinds");
         copyFlag(args, parsed, "fixture");
         copyFlag(args, parsed, "fields");
+        copyFlag(args, parsed, "group");
+        copyFlag(args, parsed, "priority");
+        copyFlag(args, parsed, "echo");
         copyFlag(args, parsed, "items");
         copyFlag(args, parsed, "check");
         copyFlag(args, parsed, "pick");

@@ -220,6 +220,20 @@ public final class PickleballWorkbenchLauncher {
             PickleballLocalStore.ensureQuietly(project);
         }
 
+        if (AgentHop.shouldHop(parsed.command(), args)) {
+            try {
+                int exitCode = PkbMain.run(args);
+                if (exitCode != 0) exitProcess(exitCode);
+                return;
+            } catch (Exception failure) {
+                String message = failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
+                System.err.println("error: " + message);
+                System.err.println("fix: controller-start");
+                exitProcess(1);
+                return;
+            }
+        }
+
         if (WorkbenchCommandLine.isAgentCoreCommand(parsed.command()) && !controllerUiWithoutOps(parsed.command(), args)) {
             int exitCode = WorkbenchAgentCommands.run(args, System.out, System.err);
             if (exitCode != 0) exitProcess(exitCode);

@@ -51,6 +51,32 @@ class BindingEventTest {
         assertEquals("pkbSurface", event.get("binding"));
     }
 
+    @Test
+    void stringPayloadIsAnEvent() throws Exception {
+        ScriptedSocket socket = new ScriptedSocket().auto(request -> {
+            String method = ScriptedSocket.method(request);
+            return switch (method) {
+                case "Page.getFrameTree" -> ScriptedSocket.cdp(request, """
+                        {"frameTree":{"frame":{"id":"root","url":"https://example.test"}}}""");
+                case "Page.createIsolatedWorld" -> ScriptedSocket.cdp(request, "{\"executionContextId\":7}");
+                case "Runtime.evaluate" -> ScriptedSocket.cdp(request,
+                        "{\"result\":{\"type\":\"object\",\"value\":{\"ok\":true}}}");
+                default -> ScriptedSocket.cdp(request, "{}");
+            };
+        });
+        ProtocolSockets.useFactoryForTests(uri -> socket);
+        ProtocolSelector.useEndpointsForTests(driver -> java.net.URI.create("ws://127.0.0.1:9/devtools/browser"));
+        PageSurfaces.manage(driver(), "chrome-headed-quiet", true);
+        PageSurfaces.place(null, "append", null, null, "<b>n</b>", "html", null, null, null);
+        assertTrueBound();
+        socket.inbound("""
+                {"method":"Runtime.bindingCalled","params":{"name":"pkbSurface","payload":"{\\"type\\":\\"chat\\",\\"source\\":\\"human\\",\\"text\\":\\"hi\\"}"}}""");
+        Map<String, String> event = PageSurfaces.pushedForTests().get(0);
+        assertEquals("chat", event.get("type"));
+        assertEquals("human", event.get("source"));
+        assertEquals("hi", event.get("text"));
+    }
+
     private static void assertTrueBound() {
         assertFalse(PageSurfaces.pushedForTests().iterator().hasNext());
     }

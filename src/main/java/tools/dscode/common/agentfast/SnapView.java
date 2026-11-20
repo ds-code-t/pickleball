@@ -105,8 +105,9 @@ public final class SnapView {
             if (row.containsKey(field)) copy.put(field, row.get(field));
         }
         if (row.containsKey("ref")) copy.put("ref", row.get("ref"));
-        if (row.containsKey("role") && !copy.containsKey("role")) copy.put("role", row.get("role"));
-        if (row.containsKey("name") && !copy.containsKey("name")) copy.put("name", row.get("name"));
+        for (String identity : StandardView.elementFields()) {
+            if (row.containsKey(identity) && !copy.containsKey(identity)) copy.put(identity, row.get(identity));
+        }
         return copy;
     }
 

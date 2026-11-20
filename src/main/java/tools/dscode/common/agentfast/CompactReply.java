@@ -45,6 +45,9 @@ public final class CompactReply {
         if (source.get("phrases") instanceof List<?> phrases && !phrases.isEmpty()) {
             compact.put("phrases", new ArrayList<>(phrases));
         }
+        if (source.get("lines") instanceof List<?> lines && !lines.isEmpty()) {
+            compact.put("lines", new ArrayList<>(lines));
+        }
         if (source.get("kept") instanceof String kept && !kept.isBlank()) compact.put("kept", kept);
         Object sentence = source.get("sentence");
         if (sentence != null) compact.put("sentence", clip(String.valueOf(sentence)));
@@ -67,6 +70,8 @@ public final class CompactReply {
         }
         String kept = keptLines(raw);
         if (!kept.isBlank()) body.put("kept", kept);
+        List<String> lines = elementLines(raw);
+        if (!lines.isEmpty()) body.put("lines", lines);
         String label = kind == null || kind.isBlank() ? "reply" : kind;
         body.put("sentence", label + " has " + phrases.size() + " hits");
         try {
@@ -107,6 +112,34 @@ public final class CompactReply {
         return kept.toString();
     }
 
+    /** One compact element row per inspect hit, so a shrunk page still lists the rows. */
+    static List<String> elementLines(String raw) {
+        List<String> lines = new ArrayList<>();
+        String frame = "top";
+        String phrase = null;
+        String visible = null;
+        for (String line : raw.split("\n", -1)) {
+            if (line.startsWith("frame=")) frame = line.substring("frame=".length());
+            else if (line.startsWith("phrase=")) {
+                if (phrase != null) lines.add(elementLine(phrase, visible, frame));
+                phrase = line.substring("phrase=".length());
+                visible = null;
+            } else if (line.startsWith("visibleCount=")) {
+                visible = line.substring("visibleCount=".length());
+            }
+        }
+        if (phrase != null) lines.add(elementLine(phrase, visible, frame));
+        return lines;
+    }
+
+    private static String elementLine(String phrase, String visible, String frame) {
+        String shown = phrase == null ? "" : phrase.trim();
+        if (shown.length() > 80) shown = shown.substring(0, 77) + "...";
+        String count = visible == null || visible.isBlank() ? "0" : visible.trim();
+        String where = frame == null || frame.isBlank() ? "top" : frame.trim();
+        return "- element " + LineView.token(shown) + " visibleCount=" + LineView.token(count) + " frame=" + LineView.token(where);
+    }
+
     private static List<String> phrasesOf(String raw) {
         List<String> phrases = new ArrayList<>();
         for (String line : raw.split("\n", -1)) {
@@ -118,16 +151,26 @@ public final class CompactReply {
         return phrases;
     }
 
-    /** Drops trailing phrases, then shortens the sentence, until the object fits with room for elapsedMs. */
+    /** Drops extra element lines, then extra phrases, until the object fits. The first phrase stays. */
     private static void fit(Map<String, Object> compact) {
         int budget = LIMIT - 64;
         while (jsonSize(compact) > budget) {
-            Object phrases = compact.get("phrases");
-            if (phrases instanceof List<?> list && !list.isEmpty()) {
+            Object lines = compact.get("lines");
+            if (lines instanceof List<?> list && list.size() > 1) {
                 List<Object> copy = new ArrayList<>(list);
                 copy.remove(copy.size() - 1);
-                if (copy.isEmpty()) compact.remove("phrases");
-                else compact.put("phrases", copy);
+                compact.put("lines", copy);
+                continue;
+            }
+            Object phrases = compact.get("phrases");
+            if (phrases instanceof List<?> list && list.size() > 1) {
+                List<Object> copy = new ArrayList<>(list);
+                copy.remove(copy.size() - 1);
+                compact.put("phrases", copy);
+                continue;
+            }
+            if (lines instanceof List<?> list && list.size() == 1) {
+                compact.remove("lines");
                 continue;
             }
             Object sentence = compact.get("sentence");
@@ -137,9 +180,9 @@ public final class CompactReply {
                 continue;
             }
             Object kept = compact.get("kept");
-            String lines = kept == null ? "" : String.valueOf(kept);
-            if (lines.length() > 160) {
-                compact.put("kept", lines.substring(0, 157) + "...");
+            String keptText = kept == null ? "" : String.valueOf(kept);
+            if (keptText.length() > 160) {
+                compact.put("kept", keptText.substring(0, 157) + "...");
                 continue;
             }
             break;

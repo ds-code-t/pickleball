@@ -1461,7 +1461,15 @@ final class PageSurfaces {
 
     private static Map<String, String> bindingEvent(String name, Object payload) {
         Map<String, String> event = new LinkedHashMap<>();
-        if (payload instanceof Map<?, ?> map) {
+        Object parsed = payload;
+        if (payload instanceof String text && text.trim().startsWith("{")) {
+            try {
+                parsed = AgentStore.JSON.readValue(text, Map.class);
+            } catch (RuntimeException | java.io.IOException ignored) {
+                parsed = payload;
+            }
+        }
+        if (parsed instanceof Map<?, ?> map) {
             map.forEach((key, raw) -> {
                 if (key != null && raw != null) event.put(String.valueOf(key), String.valueOf(raw));
             });
@@ -1470,6 +1478,7 @@ final class PageSurfaces {
         }
         event.putIfAbsent("type", "binding");
         event.put("binding", name == null ? "pkbSurface" : name);
+        tools.dscode.common.agentfast.PushChannel.accept(event);
         return event;
     }
 

@@ -8,6 +8,14 @@ This is the canonical AI-agent contract for projects that consume Pickleball as 
 
 A consumer project may contain only a short `AGENTS.md` bridge. That bridge uses Pickleball Workbench (`tools.dscode.launcher.PickleballWorkbenchLauncher`) `export-guidance` to materialize the version-matched guidance embedded in the installed Pickleball dependency. When this file is materialized as `.pickleball/AGENT-GUIDE.md`, supporting documentation is under `.pickleball/docs/` and a curated reference snapshot of Pickleball's executable Maven consumer is under `.pickleball/maven-consumer-project/`. Full `docs/` and the snapshot stay exported for on-demand lookup. Do not dump them into first-read context.
 
+## Push channel and warm path
+
+`events --follow --until=text=hello --timeout=30` tails `.pickleball/agent-events.jsonl` and exits 0 on the first match. `--timeout=0` checks once. `--type` filters `type` or `event`. Own `source=agent` lines are hidden unless `--echo` or `--from=any`. The page calls `pkbSurface` for panel send, click, and answer (a sensitive answer stores `filled`, not the value). Mutations are opt-in (`window.__pkbPushMutations`) and debounced 50 ms. The stream keeps 20 lines a second and records the rest as one `dropped` line. The same file is the one cursor: `--cursor` is the line to start after, and the reply's `nextCursor` is the next line.
+
+`export-guidance --warm` writes `classpath.cache`, runs `controller-start`, discards one ping, and prints `warm=true`, `classpath=`, `pingMs=`, and `pingExit=`. `pingMs` is that second ping and is the warm-verb measurement (target at most 1 s). The launcher then sends agent verbs to that controller. Set `PKB_NO_AGENT_HOP=1` to stay in-process. `live-stop --all` stops the start host, project-scoped orphan Chrome, and the controller. It does not stop a Workbench worker.
+
+Reads (`snap`, `find`, `chat-poll`, `ui-poll`, `overlay-poll`, `inspect-page`, `events --follow`) take `--format=lines|json`, `--fields`, `--where`, `--limit`, `--budget`, `--group=type|role`, `--priority=on`, and `--echo=hide`. Priority order is human, answer, click, mutation, agent, system. Element rows keep ref, id, role, name, visible, enabled, interactive, and frame. Text is trimmed and zero-width characters are removed. A shrunk inspect keeps one `- element` line per phrase plus the first xpath.
+
 ## Tool chooser
 
 Pickleball Workbench is the one front door. It is a Java program launched from the consumer project, not a GUI requirement. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test. Do not click the JavaFX or WebView UI.

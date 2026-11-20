@@ -33,7 +33,8 @@ Usage: capture-scenario [--url=<substring>] [--since=<epoch-ms>] [--until=<epoch
 Usage: chat-history [--channel=<name>] [--limit=<n>] [--run-id=<id>]
 
 # help chat-poll
-Usage: chat-poll [--channel=<name>] [--id=<after>] [--wait=<seconds>] [--run-id=<id>]
+Usage: chat-poll [--channel=<name>] [--id=<after>] [--wait=<seconds>] [--run-id=<id>] [--format=lines|json] [--fields=<a,b>] [--where=<k=v>] [--limit=<n>] [--budget=<bytes>] [--group=type|role] [--priority=on] [--echo=hide]
+--echo=hide drops source=agent. --priority=on keeps human, answer, click, then mutation.
 
 # help chat-send
 Usage: chat-send --text=<message> [--source=agent|human|system] [--channel=<name>] [--agent=<id>] [--run-id=<id>]
@@ -78,7 +79,8 @@ Usage: doctor
 Reports chrome, session, health, headed, pid, bridge, worker, lease, leaseLeft, orphans, frame, and placed. No session still exits 0.
 
 # help events
-Usage: events [--hooks] [--json] [--cursor=<token>] [--run-id=<id>]
+Usage: events [--hooks] [--json] [--cursor=<token>] [--run-id=<id>] [--follow] [--until=<type|text=...>] [--timeout=<seconds>] [--type=<name>] [--echo] [--from=any] [--format=lines|json] [--fields=<a,b>] [--where=<k=v>] [--limit=<n>] [--budget=<bytes>] [--group=type|role] [--priority=on]
+--follow tails .pickleball/agent-events.jsonl and exits on the first match. No Workbench session is required. --timeout default 30, max 120. 0 checks once. Own source=agent lines are hidden unless --echo or --from=any.
 
 # help example
 Usage: example --example=<rows>
@@ -91,10 +93,12 @@ Usage: execute-steps --file=<steps.json> [--stop-on-fail]
 Runs a JSON array of {op,args} or one verb per line. One envelope lists each step. --stop-on-fail stops at the first failure.
 
 # help export-guidance
-Usage: export-guidance [output-directory]
+Usage: export-guidance [output-directory] [--warm]
+--warm writes classpath.cache, starts the controller, and prints warm=true, classpath=, pingMs=, and pingExit=. pingMs is the second ping.
 
 # help find
-Usage: find --target=<selector> [--query=<text>]
+Usage: find --target=<selector> [--query=<text>] [--format=lines|json] [--fields=<a,b>] [--where=<k=v>] [--limit=<n>] [--budget=<bytes>] [--group=type|role] [--priority=on]
+Element rows keep ref, id, role, name, visible, enabled, interactive, and frame.
 
 # help find-element
 Usage: find-element (--category=<Button> [--text=<label>] | --query=<selector>) [--exposure=human|lower] [--limit=<n>] [--explain] [--promote-visual] [--html=<file>]
@@ -166,8 +170,8 @@ Usage: inbox --write --to=<agent-id|any> --text=<one line> [--from=<agent-id>] [
 Usage: insert-step --text=<gherkin>
 
 # help inspect-page
-Usage: inspect-page [--query=<selector>] [--html=<file>] [--target=<selector>]
-Lists interactive elements and the phrase that would target each one. It takes no category. The reply names the current frame. --target uses the same page as snap.
+Usage: inspect-page [--query=<selector>] [--html=<file>] [--target=<selector>] [--format=lines|json] [--fields=<a,b>] [--where=<k=v>] [--limit=<n>] [--budget=<bytes>] [--group=type|role] [--priority=on]
+Lists interactive elements and the phrase that would target each one. It takes no category. The reply names the current frame. A compact reply keeps one element line per hit. --target uses the same page as snap.
 
 # help isolate
 Usage: isolate [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--runvar=key=value] [--run-id=<id>] [--agent=<id>] [--session-file=<path>]
@@ -198,7 +202,7 @@ Usage: open-window --run-id=<id>
 Usage: overlay --text=<html> [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--handle=<id>] [--at=auto|top|bottom|left|right|over] [--theme=auto|light|dark] [--block=true] [--geometry=<json>] [--html=<page>]
 
 # help overlay-poll
-Usage: overlay-poll [--after=<next>] [--run-id=<id>]
+Usage: overlay-poll [--after=<next>] [--run-id=<id>] [--format=lines|json] [--fields=<a,b>] [--where=<k=v>] [--limit=<n>] [--budget=<bytes>] [--group=type|role] [--priority=on] [--echo=hide]
 
 # help overlay-remove
 Usage: overlay-remove --id=<id> [--html=<page>]
@@ -288,7 +292,7 @@ Usage: ui [--ops=<json array>]
 Without --ops, ui opens the Workbench controller. With --ops, ui applies a catalog batch (same as ui-apply).
 
 # help ui-poll
-Usage: ui-poll [--after=<n>] [--chat-after=<id>] [--wait=<seconds, up to 25>] [--channel=<name>] [--run-id=<id>]
+Usage: ui-poll [--after=<n>] [--chat-after=<id>] [--wait=<seconds, up to 25>] [--channel=<name>] [--run-id=<id>] [--format=lines|json] [--fields=<a,b>] [--where=<k=v>] [--limit=<n>] [--budget=<bytes>] [--group=type|role] [--priority=on] [--echo=hide]
 
 # help ui-verify
 Usage: ui-verify [--run-id=<id>]
