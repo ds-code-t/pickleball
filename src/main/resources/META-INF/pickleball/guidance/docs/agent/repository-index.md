@@ -765,6 +765,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/composite/CompositeLocationTest.java`
 - `src/test/java/tools/dscode/common/composite/ContextAnchorReproTest.java`
 - `src/test/java/tools/dscode/common/composite/ContextNestGateTest.java`
+- `src/test/java/tools/dscode/common/composite/CurrentFramePathTest.java`
 - `src/test/java/tools/dscode/common/composite/DefaultPathTest.java`
 - `src/test/java/tools/dscode/common/composite/DictionaryLayerBoundaryTest.java`
 - `src/test/java/tools/dscode/common/composite/DomAccessGuardTest.java`
