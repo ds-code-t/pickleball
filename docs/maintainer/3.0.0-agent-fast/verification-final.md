@@ -43,7 +43,7 @@ Doc checks this session: `scripts/refresh_agent_index.py --check`, `scripts/veri
 | P7-11 Real paths | done | `NavigateDataFileTest` and `ConfirmTest` passed in the batch. Warm bound is item 8. |
 | P7-12 Prebuilt docs | done | "Prebuilt one-call functions" is in `docs/dynamic-control-api.md`. The three doc checks passed. |
 | F-1 `SQLITE_BUSY` | done | `EmbeddedMultiProcessTest` and `StoreConcurrencyTest.aDatabaseFileLockIsRetried` passed in the batch. Production retry was already on the branch (`6e31c90f`). Not re-mutated this session. |
-| CI | done in the workflow, not yet green on GitHub | `.github/workflows/agent-contract.yml` job `agent-fast` runs the Phase 1–7 classes on `ubuntu-latest`, `windows-latest`, and `macos-latest`, and fails if the named Chrome classes skip. The release gate requires that job. Existing jobs are unchanged. This host cannot run GitHub Actions. |
+| CI | running | `.github/workflows/agent-contract.yml` job `agent-fast` runs the Phase 1–7 classes on `ubuntu-latest`, `windows-latest`, and `macos-latest`, and fails if the named Chrome classes skip. The release gate requires that job. PR #26 is merged, so `pull_request` no longer fires for this branch. `3.0.0-agent-fast` is now a push branch, which is what starts the run. |
 
 ## Still open
 
