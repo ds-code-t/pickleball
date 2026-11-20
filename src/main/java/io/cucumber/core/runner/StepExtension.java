@@ -259,6 +259,12 @@ public class StepExtension extends StepData {
 
     public Object nativeReturned;
 
+    /** Frame-note depth when this step started. {@code -1} until the step is marked. */
+    public int frameDepth = -1;
+
+    /** Frames this step entered, joined. Empty when it entered none. */
+    public String nativeFrame = "";
+
     public boolean hasFinalizerAction() {
         return finalizerAction != null;
     }
@@ -286,12 +292,22 @@ public class StepExtension extends StepData {
             // AFTER_STEP runs as this method returns. A held control-bridge pause
             // executes later steps there. Cucumber emits the finish event before
             // that hook, so the native trace must record this step first.
+            // SharedStepRun restores the frame. Restoring here as well would pop twice.
             try {
                 return tools.dscode.engine.runtime.SharedStepRun.run(this);
             } finally {
                 recordNativeStep();
             }
         }
+        tools.dscode.engine.runtime.SharedStepRun.markFrame(this);
+        try {
+            return runPickleStep();
+        } finally {
+            tools.dscode.engine.runtime.SharedStepRun.restoreFrame(this);
+        }
+    }
+
+    private Result runPickleStep() {
         attachPendingInlineChild();
         result = null;
         ExecutionMode executionMode = ExecutionMode.RUN;

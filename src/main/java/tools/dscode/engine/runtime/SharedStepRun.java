@@ -5,7 +5,10 @@ import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
 import io.cucumber.plugin.event.Result;
 import io.cucumber.plugin.event.Status;
+import org.openqa.selenium.WebDriver;
 import tools.dscode.common.annotations.Phase;
+import tools.dscode.common.composite.ElementOperations;
+import tools.dscode.coredefinitions.BrowserSteps;
 import tools.dscode.common.dataoperations.NeutralRows;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.MappingProcessor;
@@ -183,8 +186,34 @@ public final class SharedStepRun {
         return "";
     }
 
+    /** Remember the frame depth before the step body. A second call keeps the first mark. */
+    public static void markFrame(StepExtension step) {
+        if (step != null && step.frameDepth < 0) step.frameDepth = ElementOperations.frameDepth();
+    }
+
+    /**
+     * Put the driver back to the frame depth the step started at, and keep the names of
+     * frames this step entered. Does not open a browser.
+     */
+    public static void restoreFrame(StepExtension step) {
+        if (step == null) return;
+        int depth = step.frameDepth < 0 ? ElementOperations.frameDepth() : step.frameDepth;
+        String used = ElementOperations.framesEnteredSince(depth);
+        WebDriver driver = step.webDriverUsed;
+        if (driver == null) {
+            try {
+                driver = BrowserSteps.getCurrentDriverIfPresent();
+            } catch (RuntimeException ignored) {
+                driver = null;
+            }
+        }
+        if (driver != null) ElementOperations.restoreFrames(driver, depth);
+        step.nativeFrame = used == null ? "" : used;
+    }
+
     public static Result run(StepExtension step) {
         Instant start = Instant.now();
+        markFrame(step);
         try {
             step.stepEntry = closestEntryToScenario()
                     .logWithType("STEP", keyword(step) + step.getStepText(), step.stepLogLevel)
@@ -218,12 +247,16 @@ public final class SharedStepRun {
             Throwable cause = unwrap(thrown);
             return finish(step, Status.FAILED, start, cause);
         } finally {
-            fireHooks("afterstep", contextOf());
-            if (step.waitForPageReady && step.webDriverUsed != null) {
-                safeWaitForPageReady(step.webDriverUsed, Duration.ofSeconds(5), 200);
+            try {
+                fireHooks("afterstep", contextOf());
+                if (step.waitForPageReady && step.webDriverUsed != null) {
+                    safeWaitForPageReady(step.webDriverUsed, Duration.ofSeconds(5), 200);
+                }
+                lifecycle.fire(Phase.AFTER_SCENARIO_STEP);
+                if (step.stepEntry != null) step.stepEntry.stop();
+            } finally {
+                restoreFrame(step);
             }
-            lifecycle.fire(Phase.AFTER_SCENARIO_STEP);
-            if (step.stepEntry != null) step.stepEntry.stop();
         }
     }
 

@@ -19,6 +19,7 @@ import tools.dscode.common.domoperations.KeyParser;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -31,7 +32,103 @@ public final class ElementOperations {
     private static final AtomicInteger FINDS = new AtomicInteger();
     private static final AtomicInteger STATE_FALLBACKS = new AtomicInteger();
 
+    /**
+     * Selenium cannot report the frame it is in. Notes record only frames entered
+     * through this class, so a step can restore the context it started in.
+     * {@code selenium} is false for a composite frame, which does not switch the driver.
+     */
+    private record FrameNote(String name, boolean selenium) {
+    }
+
+    private static final ThreadLocal<List<FrameNote>> FRAMES = ThreadLocal.withInitial(ArrayList::new);
+
     private ElementOperations() {
+    }
+
+    /** Depth of frames entered on this thread. A step marks this before it runs. */
+    public static int frameDepth() {
+        return FRAMES.get().size();
+    }
+
+    /** Names of frames entered after {@code depth}, in order. Blank names are omitted. */
+    public static String framesEnteredSince(int depth) {
+        List<FrameNote> stack = FRAMES.get();
+        if (depth < 0 || depth >= stack.size()) return "";
+        StringBuilder joined = new StringBuilder();
+        for (int index = depth; index < stack.size(); index++) {
+            String name = stack.get(index).name;
+            if (name == null || name.isBlank()) continue;
+            if (!joined.isEmpty()) joined.append(' ');
+            joined.append(name);
+        }
+        return joined.toString();
+    }
+
+    /**
+     * Snapshot of the notes. {@link tools.dscode.common.seleniumextensions.AllContextsScan}
+     * rewinds to this after it puts the driver back, so its own switches are not frames the step entered.
+     */
+    public static Object frameMark() {
+        return List.copyOf(FRAMES.get());
+    }
+
+    public static void rewindFrameMark(Object mark) {
+        ArrayList<FrameNote> copy = new ArrayList<>();
+        if (mark instanceof List<?> list) {
+            for (Object item : list) {
+                if (item instanceof FrameNote note) copy.add(note);
+            }
+        }
+        FRAMES.set(copy);
+    }
+
+    /** Pop frames this step pushed. A switch that throws at the top document goes back to default content. */
+    public static void restoreFrames(WebDriver driver, int depth) {
+        if (driver == null) return;
+        if (depth < 0) depth = 0;
+        int guard = 0;
+        while (FRAMES.get().size() > depth && guard++ < 32) {
+            FrameNote top = FRAMES.get().get(FRAMES.get().size() - 1);
+            if (!top.selenium) {
+                DomCompositeAdapter.get().popFrame();
+                popNote();
+                continue;
+            }
+            try {
+                parentFrame(driver);
+            } catch (RuntimeException thrown) {
+                if (depth == 0) {
+                    try {
+                        defaultContent(driver);
+                    } catch (RuntimeException ignored) {
+                        FRAMES.get().clear();
+                    }
+                }
+                return;
+            }
+        }
+    }
+
+    private static void note(String name, boolean selenium) {
+        FRAMES.get().add(new FrameNote(name == null ? "" : name, selenium));
+    }
+
+    private static void popNote() {
+        List<FrameNote> stack = FRAMES.get();
+        if (!stack.isEmpty()) stack.remove(stack.size() - 1);
+    }
+
+    private static String frameLabel(WebElement raw) {
+        if (raw == null) return "";
+        for (String key : new String[]{"id", "name", "title"}) {
+            try {
+                String value = attribute(raw, key);
+                if (value != null && !value.isBlank()) return value.trim();
+            } catch (RuntimeException ignored) {
+                return "";
+            }
+        }
+        return "";
     }
 
     public static boolean primary() {
@@ -88,11 +185,14 @@ public final class ElementOperations {
 
     public static void enterFrame(WebDriver driver, WebElement frame) {
         WebElement raw = unwrap(frame);
+        String name = frameLabel(raw);
         if (raw instanceof CompositeWebElement composite) {
             composite.enterFrame();
+            note(name, false);
             return;
         }
         driver.switchTo().frame(raw);
+        note(name, true);
     }
 
     public static SearchContext shadowRoot(WebElement host) {
@@ -431,16 +531,19 @@ public final class ElementOperations {
 
     public static void enterFrame(WebDriver driver, int index) {
         driver.switchTo().frame(index);
+        note(Integer.toString(index), true);
     }
 
     public static void defaultContent(WebDriver driver) {
         DomCompositeAdapter.get().clearFrames();
         if (driver != null) driver.switchTo().defaultContent();
+        FRAMES.get().clear();
     }
 
     public static void parentFrame(WebDriver driver) {
         DomCompositeAdapter.get().popFrame();
         if (driver != null) driver.switchTo().parentFrame();
+        popNote();
     }
 
     /** Full document HTML. There is no composite page-source verb, so this is the one Selenium call. */

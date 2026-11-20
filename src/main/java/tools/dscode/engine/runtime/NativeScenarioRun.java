@@ -535,7 +535,8 @@ public final class NativeScenarioRun {
         long millis = frame.result == null || frame.result.getDuration() == null
                 ? 0
                 : frame.result.getDuration().toMillis();
-        return new StepResult(status, keyword(frame, step), displayText(frame, step), noted, millis, returned);
+        String reportedFrame = frame.nativeFrame == null ? "" : frame.nativeFrame;
+        return new StepResult(status, keyword(frame, step), displayText(frame, step), noted, millis, returned, reportedFrame);
     }
 
     private static String keyword(StepExtension frame, EngineStep step) {

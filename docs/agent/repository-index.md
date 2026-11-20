@@ -936,6 +936,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/engine/convert/CucumberModelConverterTest.java`
 - `src/test/java/tools/dscode/engine/convert/NeutralDataTest.java`
 - `src/test/java/tools/dscode/engine/EngineConfigTest.java`
+- `src/test/java/tools/dscode/engine/framerestore/FramePageGlue.java`
 - `src/test/java/tools/dscode/engine/maskquiet/MaskPageGlue.java`
 - `src/test/java/tools/dscode/engine/match/StepRegistryTest.java`
 - `src/test/java/tools/dscode/engine/NativeDataExecutionTest.java`
@@ -974,6 +975,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/FormFillKindTest.java`
 - `src/test/java/tools/dscode/launcher/FrameActTest.java`
 - `src/test/java/tools/dscode/launcher/FrameInReplyTest.java`
+- `src/test/java/tools/dscode/launcher/FrameRestoreTest.java`
 - `src/test/java/tools/dscode/launcher/GuidanceCommandGoldenTest.java`
 - `src/test/java/tools/dscode/launcher/JsFallbackHonestyTest.java`
 - `src/test/java/tools/dscode/launcher/MaskQuietTest.java`

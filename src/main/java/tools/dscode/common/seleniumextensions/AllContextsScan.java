@@ -125,6 +125,7 @@ public final class AllContextsScan {
         }
 
         private List<ElementWrapper> run() {
+            Object framesAtStart = tools.dscode.common.composite.ElementOperations.frameMark();
             Duration originalWait = Duration.ZERO;
             String originalWindow = null;
             try {
@@ -159,6 +160,7 @@ public final class AllContextsScan {
                 // A closed window or a driver that cannot switch still returns whatever matched.
             } finally {
                 restoreBrowser(originalWindow, originalWait);
+                tools.dscode.common.composite.ElementOperations.rewindFrameMark(framesAtStart);
             }
             return finish();
         }
