@@ -64,6 +64,19 @@ public final class ElementOperations {
         return joined.toString();
     }
 
+    /** Path of frames this thread is in now. {@code top} when the stack is empty. */
+    public static String currentFramePath() {
+        List<FrameNote> stack = FRAMES.get();
+        if (stack.isEmpty()) return "top";
+        StringBuilder joined = new StringBuilder();
+        for (FrameNote note : stack) {
+            String name = note.name == null || note.name.isBlank() ? "?" : note.name;
+            if (!joined.isEmpty()) joined.append('/');
+            joined.append(name);
+        }
+        return joined.toString();
+    }
+
     /**
      * Snapshot of the notes. {@link tools.dscode.common.seleniumextensions.AllContextsScan}
      * rewinds to this after it puts the driver back, so its own switches are not frames the step entered.

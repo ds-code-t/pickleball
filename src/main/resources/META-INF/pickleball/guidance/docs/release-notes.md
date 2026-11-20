@@ -2,6 +2,8 @@
 
 ## 3.0.0
 
+Live session fixes. `validate --noop` lists empty consumer glue and exits 1. A step restores the frame it started in, and the execute-step value names that frame (`frame=top` on the top document). `frame --reset` returns the Selenium driver to the top document, and `frame --enter` enters a named iframe when the driver can see it. Inspect and act replies include `frame`.
+
 Agent-fast verification. A compact inspect or page reply keeps `source=`, `query=`, `note=`, and the first `xpath=` from the offline text; the full text stays under `.pickleball/agent-full/`. Bare `ui` without `--ops` opens the Workbench controller. `ui --ops` applies a catalog batch.
 
 `highlight --target` paints the selected page. `act` reports `applied` only after a read-back. A click is dispatched once, then waits up to 500 ms for a visible change. A dispatched click with no visible change is exit 0, `applied:false`, `dispatched:true`, `reason:"no visible change"`. A click that could not land (disabled, inert, or detached) is exit 1, `error:"could not land"`, `dispatched:false`. A select whose value does not stick is `applied:false`, including a JS-fallback select whose reset runs in a microtask or `setTimeout(0)`. `aria-label` wins over placeholder. `watch` returns at the first matching event. Its flags are `--kinds` and `--duration`. Fallback de-dupe is kept per run, for at most 64 runs, and the oldest run is dropped first. `ui-poll`, `ui-catalog`, and `chat-poll` return a host-level `browser_lost` once per cursor after Chrome dies, with or without `--run-id`. `session_ended` stays on its own session.

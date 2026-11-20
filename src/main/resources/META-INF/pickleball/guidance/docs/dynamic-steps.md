@@ -38,6 +38,8 @@ Built-in HTML categories include:
 
 `Window` and `Alert` are browser types, not HTML locators. They do not assemble an XPath.
 
+A step restores the frame it started in before the next step runs. The execute-step value ends with `frame=` and the path (`top` when the driver is on the top document). A click inside an iframe does not leave later steps in that iframe. `frame --reset` also returns the live Selenium document to the top, and `frame --enter` enters an iframe with that id, name, or title when the driver can see it.
+
 Projects can add names such as `Test Panel`, `Product Card`, or `Status Badge` in the runner. See [Custom element definitions](custom-element-definitions.md).
 
 The selector is assembled dynamically from the element category, text, state, ordinal, and context. Feature authors normally do not need to repeat XPath or CSS selectors. An unrecognized capitalized name still parses; unmatched names fall through generic name-attribute and descendant-text matching.

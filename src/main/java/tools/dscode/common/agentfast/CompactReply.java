@@ -78,7 +78,7 @@ public final class CompactReply {
 
     /**
      * Identity lines an agent still needs when the body is on disk:
-     * {@code source=}, {@code query=}, {@code note=}, and the first xpath and counts.
+     * {@code source=}, {@code frame=}, {@code query=}, {@code note=}, and the first xpath and counts.
      */
     static String keptLines(String raw) {
         StringBuilder kept = new StringBuilder();
@@ -87,7 +87,7 @@ public final class CompactReply {
         boolean visible = false;
         for (String line : raw.split("\n", -1)) {
             String stored = null;
-            if (line.startsWith("source=") || line.startsWith("query=") || line.startsWith("note=")) {
+            if (line.startsWith("source=") || line.startsWith("frame=") || line.startsWith("query=") || line.startsWith("note=")) {
                 stored = line;
             } else if (!xpath && line.startsWith("xpath=")) {
                 xpath = true;

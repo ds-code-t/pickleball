@@ -2915,6 +2915,7 @@ public final class TargetVerb {
             String key = runId == null ? "" : runId;
             if ("true".equals(args.get("reset"))) {
                 ENTERED.remove(key);
+                tools.dscode.common.agentcontrol.AgentControl.resetLiveDocument();
                 Map<String, Object> body = base("frame", "cdp", "browser", target);
                 body.put("entered", "");
                 stamp(body, cdp, null);
@@ -2925,6 +2926,7 @@ public final class TargetVerb {
             if (!enter.isBlank()) {
                 if (!frameExists(cdp, enter)) return fail("frame", "unknown frame");
                 ENTERED.put(key, enter);
+                tools.dscode.common.agentcontrol.AgentControl.enterNamedFrame(enter);
                 String id = resolveFrameId(cdp, enter);
                 Map<String, Object> body = base("frame", "cdp", "browser", target);
                 body.put("entered", enter);
@@ -3411,6 +3413,7 @@ public final class TargetVerb {
             }
         }
         if (!frame.isBlank()) body.put("frame", frame);
+        else body.put("frame", "top");
     }
 
     private static void stampDesktop(Map<String, Object> body, DesktopTree.Session session) {

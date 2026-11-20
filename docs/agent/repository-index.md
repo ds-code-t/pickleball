@@ -98,6 +98,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-engine-design.md`
 - `docs/maintainer/3.0.0-java-dom-design.md`
 - `docs/maintainer/3.0.0-linked-tracking-design.md`
+- `docs/maintainer/3.0.0-live-agent-fixes-scoreboard.md`
 - `docs/maintainer/3.0.0-locked-decisions-design.md`
 - `docs/maintainer/3.0.0-locked-decisions-prior-audit.md`
 - `docs/maintainer/3.0.0-locked-decisions-sweep.md`
@@ -856,6 +857,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/composite/CompositeLocationTest.java`
 - `src/test/java/tools/dscode/common/composite/ContextAnchorReproTest.java`
 - `src/test/java/tools/dscode/common/composite/ContextNestGateTest.java`
+- `src/test/java/tools/dscode/common/composite/CurrentFramePathTest.java`
 - `src/test/java/tools/dscode/common/composite/DefaultPathTest.java`
 - `src/test/java/tools/dscode/common/composite/DictionaryLayerBoundaryTest.java`
 - `src/test/java/tools/dscode/common/composite/DomAccessGuardTest.java`
