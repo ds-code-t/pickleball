@@ -141,7 +141,7 @@ public final class LiveBrowserHost {
                 try {
                     var params = Jsons.object();
                     params.put("url", pageUrl);
-                    JsonNode result = session.connection().call("Page.navigate", params, Duration.ofSeconds(3));
+                    JsonNode result = session.connection().call("Page.navigate", params, Duration.ofSeconds(15));
                     String errorText = result == null ? "" : result.path("errorText").asText("");
                     if (!errorText.isBlank()) {
                         navigated = false;
