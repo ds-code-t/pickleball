@@ -188,15 +188,20 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentcontrol/UiState.java`
 - `src/main/java/tools/dscode/common/agentcontrol/VisualKinds.java`
 - `src/main/java/tools/dscode/common/agentcontrol/WindowRegistry.java`
+- `src/main/java/tools/dscode/common/agentfast/AgentCursor.java`
+- `src/main/java/tools/dscode/common/agentfast/AgentEnvelope.java`
 - `src/main/java/tools/dscode/common/agentfast/AgentForward.java`
 - `src/main/java/tools/dscode/common/agentfast/CompactReply.java`
 - `src/main/java/tools/dscode/common/agentfast/FallbackLog.java`
+- `src/main/java/tools/dscode/common/agentfast/LineView.java`
 - `src/main/java/tools/dscode/common/agentfast/LiveBrowserHost.java`
 - `src/main/java/tools/dscode/common/agentfast/LiveChromeDriver.java`
 - `src/main/java/tools/dscode/common/agentfast/ReplyFields.java`
 - `src/main/java/tools/dscode/common/agentfast/RuntimeInstall.java`
 - `src/main/java/tools/dscode/common/agentfast/ScreenshotReply.java`
 - `src/main/java/tools/dscode/common/agentfast/SelftestUi.java`
+- `src/main/java/tools/dscode/common/agentfast/SessionIds.java`
+- `src/main/java/tools/dscode/common/agentfast/SnapView.java`
 - `src/main/java/tools/dscode/common/agentfast/StepTiming.java`
 - `src/main/java/tools/dscode/common/agentfast/TargetSelector.java`
 - `src/main/java/tools/dscode/common/agentfast/TargetVerb.java`
@@ -553,8 +558,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/engine/source/StepListScenarioSource.java`
 - `src/main/java/tools/dscode/engine/source/StoreScenarioSource.java`
 - `src/main/java/tools/dscode/internal/ValuesSupport.java`
+- `src/main/java/tools/dscode/launcher/AgentController.java`
 - `src/main/java/tools/dscode/launcher/ConsumerReadyCommands.java`
 - `src/main/java/tools/dscode/launcher/PickleballWorkbenchLauncher.java`
+- `src/main/java/tools/dscode/launcher/PkbMain.java`
 - `src/main/java/tools/dscode/launcher/QuietWarnings.java`
 - `src/main/java/tools/dscode/launcher/SessionHealthWait.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchAgentCommands.java`
@@ -714,6 +721,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/browser/ProtocolSelectorTest.java`
 - `src/test/java/tools/dscode/browser/ScriptedSocket.java`
 - `src/test/java/tools/dscode/browser/SurfaceAssetsTest.java`
+- `src/test/java/tools/dscode/common/agentcontrol/AgentDataFoundationTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/AgentLiveFixTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/BindingEventTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/ChatCursorTest.java`
@@ -868,6 +876,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureSteps.java`
 - `src/test/java/tools/dscode/GuidancePackagingTest.java`
 - `src/test/java/tools/dscode/launcher/ActConditionCoverTest.java`
+- `src/test/java/tools/dscode/launcher/AgentControllerTest.java`
 - `src/test/java/tools/dscode/launcher/AgentExpansionTest.java`
 - `src/test/java/tools/dscode/launcher/AgentFastCliTest.java`
 - `src/test/java/tools/dscode/launcher/AskIdTest.java`

@@ -21,13 +21,13 @@ class OverlayPollCursorTest {
         AgentControl.Result all = AgentControl.execute(project, "cur", "overlay-poll", Map.of("target", "page"), List.of(), "a");
         assertEquals(0, all.exit(), String.valueOf(all.body()));
         assertEquals(2, all.body().get("count"));
-        assertEquals(null, all.body().get("next"));
+        assertEquals(0, tools.dscode.common.agentfast.AgentCursor.overlay(String.valueOf(all.body().get("next"))));
         AgentControl.Result first = AgentControl.execute(project, "cur", "overlay-poll", Map.of("target", "page", "after", "0"), List.of(), "a");
-        assertEquals(2, first.body().get("next"));
+        assertEquals(2, tools.dscode.common.agentfast.AgentCursor.overlay(String.valueOf(first.body().get("next"))));
         PageSurfaces.recordInput(project, "cur", Map.of("type", "click", "id", "pkb-3"));
         AgentControl.Result newer = AgentControl.execute(project, "cur", "overlay-poll", Map.of("target", "page", "after", "2"), List.of(), "a");
         assertEquals(1, newer.body().get("count"), String.valueOf(newer.body()));
-        assertEquals(3, newer.body().get("next"));
+        assertEquals(3, tools.dscode.common.agentfast.AgentCursor.overlay(String.valueOf(newer.body().get("next"))));
         assertEquals("pkb-3", String.valueOf(((List<?>) newer.body().get("events")).get(0) instanceof Map<?, ?> m ? m.get("id") : ""));
         AgentControl.Result bad = AgentControl.execute(project, "cur", "overlay-poll", Map.of("target", "page", "after", "x"), List.of(), "a");
         assertEquals(2, bad.exit());

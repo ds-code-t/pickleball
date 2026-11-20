@@ -48,13 +48,9 @@ public final class TargetVerb {
     private static final Set<String> INTERACTIVE = Set.of(
             "a", "button", "input", "select", "textarea", "option"
     );
-    private static final int HIT_CAP = 256;
+    private static final int HIT_CAP = 512;
     /** How long a dispatched click waits for a visible change before it is reported quiet. */
     private static final long CLICK_SETTLE_MS = 500;
-    /** Default compact snap stops at this many lines. The rest is the full file. */
-    private static final int SNAP_LINE_BUDGET = 200;
-    /** Line text kept in the reply, leaving room for the JSON envelope under 16 KB. */
-    private static final int SNAP_BYTE_BUDGET = 12_000;
     /** Least-recently used refs drop once the cap is passed. */
     private static final Map<String, Hit> HITS = java.util.Collections.synchronizedMap(new LinkedHashMap<>(64, 0.75f, true) {
         @Override
@@ -77,13 +73,16 @@ public final class TargetVerb {
 
     private static final Set<String> ACT_KEYS = Set.of(
             "target", "kind", "query", "ref", "value", "snap", "run-id", "agent", "agent-id",
-            "fixture", "timeout", "condition", "frame", "group", "sequence"
+            "fixture", "timeout", "condition", "frame", "group", "sequence",
+            "format", "fields", "where", "limit", "budget"
     );
 
     /** CSS or text selector for a fresh {@code ref:}. Null when the ref is unknown or stale. */
     public static String anchorSelector(String raw) {
         String ref = raw == null ? "" : raw.trim();
-        if (!ref.startsWith("ref:")) ref = "ref:" + ref;
+        String expanded = SessionIds.expand(ref);
+        if (expanded != null) ref = expanded;
+        else if (!ref.startsWith("ref:")) ref = "ref:" + ref;
         Hit hit = HITS.get(ref);
         if (hit == null || hit.selector == null || hit.selector.isBlank()) return null;
         if (stale(hit)) return null;
@@ -179,7 +178,7 @@ public final class TargetVerb {
 
     public static Outcome run(Path project, String runId, String op, Map<String, String> args) {
         String verb = op == null ? "" : op;
-        Map<String, String> values = args == null ? Map.of() : args;
+        Map<String, String> values = SessionIds.rewrite(args == null ? Map.of() : args);
         RUN.set(runId);
         try {
             TargetSelector.Parsed target = TargetSelector.parse(values.get("target"));
@@ -333,6 +332,8 @@ public final class TargetVerb {
                 }
                 if (hits.size() > 1) {
                     Outcome missed = fail("act", "ambiguous");
+                    missed.body().put("candidates", publish(runId, "browser", page.session.id, docVersion(page.session.connection()), hits, query, page.session.connection()));
+                    missed.body().put("fix", "pass --ref or a tighter --query");
                     stamp(missed.body(), page.session.connection(), hits.get(0));
                     putEntered(missed.body(), runId, page.session.connection());
                     putShadow(missed.body(), hits.get(0));
@@ -744,7 +745,12 @@ public final class TargetVerb {
         String query = blank(args.get("query"));
         List<DomNode> hits = locate(session.root(), query, Map.of());
         if (hits.isEmpty()) return fail("act", "not found");
-        if (hits.size() > 1) return fail("act", "ambiguous");
+        if (hits.size() > 1) {
+            Outcome missed = fail("act", "ambiguous");
+            missed.body().put("candidates", publish(runId, "desktop", session.id(), "desktop:" + session.sequence(), hits, query));
+            missed.body().put("fix", "pass --ref or a tighter --query");
+            return missed;
+        }
         String beforeVersion = "desktop:" + session.sequence();
         List<SnapRow> rowsBefore = desktopRows(session);
         boolean wantAuto = "auto".equals(blank(args.get("snap")));
@@ -848,7 +854,7 @@ public final class TargetVerb {
             body.put("docVersion", version);
             body.put("doc_version", version);
             putEntered(body, runId, page.session.connection(), rows);
-            putBudgetedLines(body, rows, project, runId, "full".equals(mode));
+            putBudgetedLines(body, rows, project, runId, "full".equals(mode), args);
             if ("diff".equals(mode)) body.put("diff", diffAgainst(runId, picture, version));
             else BASELINE.put(baselineKey(runId), picture + "\n" + version);
             body.put("virtualized", virtualized(page.session.connection()));
@@ -870,7 +876,7 @@ public final class TargetVerb {
         body.put("mode", mode);
         body.put("docVersion", version);
         body.put("applied", session.live());
-        putBudgetedLines(body, rows, project, runId, "full".equals(mode));
+        putBudgetedLines(body, rows, project, runId, "full".equals(mode), args);
         String picture = desktopPicture(session);
         if ("diff".equals(mode)) body.put("diff", desktopDiff(runId, picture));
         else BASELINE.put(desktopBaselineKey(runId), picture);
@@ -1828,16 +1834,22 @@ public final class TargetVerb {
     }
 
     private static Hit requireHit(String ref) {
-        String key = ref.startsWith("ref:") ? ref : "ref:" + ref;
+        String expanded = SessionIds.expand(ref);
+        String key = expanded != null ? expanded : (ref != null && ref.startsWith("ref:") ? ref : "ref:" + (ref == null ? "" : ref));
         Hit hit = HITS.get(key);
+        if (hit == null && ref != null) hit = HITS.get(ref);
         if (hit == null) throw new Miss("unknown target");
         return hit;
     }
 
     private static boolean desktopHit(String ref) {
         if (ref == null || ref.isBlank()) return false;
-        Hit hit = HITS.get(ref.startsWith("ref:") ? ref : "ref:" + ref);
-        return hit != null && "desktop".equals(hit.kind);
+        try {
+            Hit hit = requireHit(ref);
+            return hit != null && "desktop".equals(hit.kind);
+        } catch (Miss missing) {
+            return false;
+        }
     }
 
     private static TargetSelector.Parsed resolved(TargetSelector.Parsed target, Map<String, String> args) {
@@ -2309,6 +2321,7 @@ public final class TargetVerb {
         List<Map<String, Object>> rows = new ArrayList<>();
         for (DomNode node : nodes) {
             String ref = "ref:" + version + ":" + node.backendNodeId;
+            String shortId = SessionIds.intern(runId, node.backendNodeId, ref);
             String selector = selector(node, query);
             String frameId = node.frameId == null ? "" : node.frameId;
             String[] identity = frames.get(frameId);
@@ -2322,13 +2335,24 @@ public final class TargetVerb {
             HITS.put(ref, new Hit(
                     kind, sessionId, node.backendNodeId, version, selector, query == null ? "" : query,
                     frameId, url, loader, role(node), name(node)));
+            HITS.put(shortId, HITS.get(ref));
+            boolean visible = node.displayed && !node.states.contains("hidden");
+            boolean enabled = !node.states.contains("disabled") && !node.attributes.containsKey("disabled");
+            String roleName = role(node);
+            String tag = node.tag();
+            boolean interactive = INTERACTIVE.contains(tag) || INTERACTIVE.contains(roleName) || "button".equals(roleName);
+            String frame = node.framePath != null && !node.framePath.isBlank() ? node.framePath
+                    : (frameId == null || frameId.isBlank() || "main".equals(frameId) ? "top" : frameId);
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("ref", ref);
-            row.put("role", role(node));
+            row.put("id", shortId);
+            row.put("role", roleName);
             row.put("name", name(node));
             row.put("handle", node.backendNodeId);
-            if (node.frameId != null && !node.frameId.isBlank() && !"main".equals(node.frameId)) row.put("frame", node.frameId);
-            else if (node.framePath != null && !node.framePath.isBlank()) row.put("frame", node.framePath);
+            row.put("visible", visible);
+            row.put("enabled", enabled);
+            row.put("interactive", interactive);
+            row.put("frame", frame);
             String via = graftViaOf(node);
             if (!via.isBlank()) row.put("via", via);
             String shadow = shadowModeOf(node);
@@ -2359,19 +2383,29 @@ public final class TargetVerb {
             List<Map<String, Object>> rows,
             Path project,
             String runId,
-            boolean alwaysFull
+            boolean alwaysFull,
+            Map<String, String> args
     ) {
-        List<String> all = sectioned(rows);
+        List<Map<String, Object>> shaped = SnapView.filter(rows, args);
+        List<String> all = sectioned(shaped);
+        int lineBudget = SnapView.lineBudget(args);
+        int byteBudget = SnapView.byteBudget(args);
         List<String> shown = new ArrayList<>();
         int bytes = 0;
         for (String line : all) {
             int next = bytes + line.length() + 1;
-            if (shown.size() >= SNAP_LINE_BUDGET || (shown.size() > 0 && next > SNAP_BYTE_BUDGET)) break;
+            if (shown.size() >= lineBudget || (shown.size() > 0 && next > byteBudget)) break;
             shown.add(line);
             bytes = next;
         }
         body.put("lines", shown);
-        if (rows != null && !rows.isEmpty()) body.put("ref", rows.get(0).get("ref"));
+        if (args != null && args.get("format") != null && !args.get("format").isBlank()) {
+            body.put("format", args.get("format"));
+        }
+        if (shaped != null && !shaped.isEmpty()) {
+            body.put("ref", shaped.get(0).get("ref"));
+            body.put("id", shaped.get(0).get("id"));
+        }
         boolean truncated = shown.size() < all.size();
         if (truncated) body.put("truncated", true);
         if (truncated || alwaysFull) body.put("full", writeLines(project, runId, all));
@@ -2398,8 +2432,13 @@ public final class TargetVerb {
         StringBuilder line = new StringBuilder();
         line.append("- ").append(row.get("role")).append(" \"").append(row.get("name")).append("\" [ref=")
                 .append(row.get("ref")).append("]");
+        Object id = row.get("id");
+        if (id != null) line.append(" id=").append(LineView.token(String.valueOf(id)));
+        if (row.get("visible") != null) line.append(" visible=").append(row.get("visible"));
+        if (row.get("enabled") != null) line.append(" enabled=").append(row.get("enabled"));
+        if (row.get("interactive") != null) line.append(" interactive=").append(row.get("interactive"));
         Object frame = row.get("frame");
-        if (frame instanceof String text && !text.isBlank()) line.append(" frame=").append(text);
+        line.append(" frame=").append(frame == null || String.valueOf(frame).isBlank() ? "top" : LineView.token(String.valueOf(frame)));
         return line.toString();
     }
 
@@ -2811,6 +2850,9 @@ public final class TargetVerb {
 
     private static void capSnap(Map<String, Object> diff, List<String> added, List<String> removed, List<String> updated) {
         int omitted = capSnapLines(added) + capSnapLines(removed) + capSnapLines(updated);
+        omitted += SnapView.limitLines(added, 20, 160, SnapView.REPLY_CAP);
+        omitted += SnapView.limitLines(removed, 20, 160, SnapView.REPLY_CAP);
+        omitted += SnapView.limitLines(updated, 20, 160, SnapView.REPLY_CAP);
         if (omitted > 0) {
             diff.put("truncated", true);
             diff.put("omitted", omitted);

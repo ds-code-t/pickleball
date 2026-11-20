@@ -1,0 +1,61 @@
+package tools.dscode.common.agentfast;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+
+/**
+ * Short ids for one controller JVM. {@code s1.h42} follows the DOM node
+ * (the backend id), not the document version. The long {@code ref:} stays
+ * the expansion.
+ */
+public final class SessionIds {
+    private static final ConcurrentHashMap<String, String> SCOPE = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, String> NODE = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, String> FULL = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, AtomicInteger> COUNTERS = new ConcurrentHashMap<>();
+    private static final AtomicInteger SESSIONS = new AtomicInteger();
+
+    private SessionIds() {
+    }
+
+    public static String scope(String runId) {
+        String key = runId == null || runId.isBlank() ? "session" : runId;
+        return SCOPE.computeIfAbsent(key, ignored -> "s" + SESSIONS.incrementAndGet());
+    }
+
+    /** Same backend id keeps the same short id. The stored expansion updates. */
+    public static String intern(String runId, long backend, String fullRef) {
+        String scope = scope(runId);
+        String nodeKey = scope + ":" + backend;
+        String id = NODE.computeIfAbsent(nodeKey, ignored -> {
+            int next = COUNTERS.computeIfAbsent(scope, key -> new AtomicInteger()).incrementAndGet();
+            return scope + ".h" + next;
+        });
+        if (fullRef != null && !fullRef.isBlank()) FULL.put(id, fullRef);
+        return id;
+    }
+
+    /** Full {@code ref:} for a short id. A value that is already a {@code ref:} is returned as-is. Null when unknown. */
+    public static String expand(String id) {
+        if (id == null || id.isBlank()) return null;
+        String token = id.trim();
+        if (token.startsWith("ref:")) return token;
+        return FULL.get(token);
+    }
+
+    /** Rewrites short ids in {@code target}, {@code ref}, and {@code within} to their full refs. */
+    public static Map<String, String> rewrite(Map<String, String> args) {
+        if (args == null || args.isEmpty()) return args == null ? Map.of() : args;
+        Map<String, String> copy = null;
+        for (String key : new String[]{"target", "ref", "within"}) {
+            String value = args.get(key);
+            String full = expand(value);
+            if (full == null || full.equals(value)) continue;
+            if (copy == null) copy = new LinkedHashMap<>(args);
+            copy.put(key, full);
+        }
+        return copy == null ? args : copy;
+    }
+}

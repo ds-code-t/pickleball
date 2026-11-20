@@ -46,6 +46,7 @@ final class WorkbenchCommandLine {
             "selftest",
             "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame",
             "ask-and-wait", "pin", "toast", "checklist", "ui",
+            "ref", "controller-start", "controller-stop", "controller-status", "controller-ping",
             "help"
     );
     static final Set<String> SESSION_CLIENT_COMMANDS = Set.of(

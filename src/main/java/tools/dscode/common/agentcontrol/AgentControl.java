@@ -145,31 +145,35 @@ public final class AgentControl {
             String agentId
     ) {
         long started = System.nanoTime();
-        Map<String, String> values = args == null ? Map.of() : args;
+        Map<String, String> values = args == null ? new java.util.LinkedHashMap<>() : new java.util.LinkedHashMap<>(args);
+        tools.dscode.common.agentfast.AgentCursor.absorb(op, values);
         try {
             Optional<Result> routed = AgentSurfaceRouter.route(project, runId, op, values, agentId);
-            if (routed.isPresent()) return timed(routed.get(), started);
+            if (routed.isPresent()) return timed(routed.get(), started, project, runId, op);
             if (values.get("scope") != null && !values.get("scope").isBlank()) UiState.scope(values.get("scope"));
             if (values.get("ttl") != null && !values.get("ttl").isBlank()) UiState.expires(values.get("ttl"), 0L);
             Result result = dispatch(project, runId, op, values, extraArgs, agentId);
             if (result.exit() == 0 && UiState.TRACKED.contains(op)) UiState.sync(project, runId, values);
             if (result.exit() == 0 && "html-cleanup".equals(op)) UiState.clear(project, runId);
-            return timed(result, started);
+            return timed(result, started, project, runId, op);
         } catch (IllegalArgumentException failure) {
-            return timed(fail(2, failure.getMessage() == null ? "usage" : failure.getMessage()), started);
+            return timed(fail(2, failure.getMessage() == null ? "usage" : failure.getMessage()), started, project, runId, op);
         } catch (Exception failure) {
-            return timed(fail(1, failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()), started);
+            return timed(fail(1, failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()), started, project, runId, op);
         }
     }
 
-    private static Result timed(Result result, long started) {
+    private static Result timed(Result result, long started, Path project, String runId, String op) {
         long elapsedMs = Math.max(0L, (System.nanoTime() - started) / 1_000_000L);
         Map<String, Object> body = result.body();
         if (body != null && !body.containsKey("frame")) {
             String frame = liveFrame();
             if (!frame.isBlank()) body.put("frame", frame);
         }
-        return new Result(result.exit(), ReplyFields.stamp(body, elapsedMs));
+        Map<String, Object> stamped = ReplyFields.stamp(body, elapsedMs);
+        if (stamped.get("op") == null && op != null) stamped.put("op", op);
+        return new Result(result.exit(), tools.dscode.common.agentfast.AgentEnvelope.apply(
+                stamped, result.exit(), op, project, runId));
     }
 
     /** Main frame id when this process has a live browser. Empty otherwise. */
@@ -217,6 +221,7 @@ public final class AgentControl {
                             tools.dscode.common.agentfast.TargetVerb.run(project, runId, op, values);
                     yield new Result(outcome.exit(), outcome.body());
                 }
+                case "ref" -> expandRef(values);
                 case "highlight" -> highlight(project, runId, values);
                 case "unhighlight" -> unhighlight(project, runId, values);
                 case "overlay" -> overlay(project, runId, values);
@@ -234,6 +239,24 @@ public final class AgentControl {
                 default -> fail(2, "unknown agent command: " + op);
             };
         }
+    }
+
+    private static Result expandRef(Map<String, String> args) {
+        String id = args.get("id");
+        if (id == null || id.isBlank()) id = args.get("ref");
+        if (id == null || id.isBlank()) id = args.get("target");
+        String full = tools.dscode.common.agentfast.SessionIds.expand(id);
+        if (full == null) {
+            Result failed = fail(1, "unknown ref");
+            failed.body().put("fix", "run snap (or find) again for a fresh ref");
+            return failed;
+        }
+        Map<String, Object> body = ok("Expanded ref.");
+        body.put("op", "ref");
+        body.put("id", id);
+        body.put("ref", full);
+        body.put("value", full);
+        return new Result(0, body);
     }
 
     private static Result observe(Path project, String runId, Map<String, String> args) throws Exception {
