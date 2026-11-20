@@ -207,8 +207,16 @@ public final class SelftestUi {
 
     static CpuSample cpuSample(long pid, boolean procStat) {
         if (procStat) return CpuSample.ticks(cpuTicks(pid));
-        Optional<Long> nanos = cpuNanos(pid);
-        return nanos.map(CpuSample::nanos).orElseGet(CpuSample::unsupported);
+        Optional<Long> handle = cpuNanosFromHandle(pid);
+        // JDK on macOS fills totalCpuDuration only for the current process.
+        List<String> rows = handle.isPresent() ? List.of() : psRows();
+        return cpuSample(pid, handle, rows);
+    }
+
+    /** Handle clock wins. An empty handle uses the ps rows, including child processes. */
+    static CpuSample cpuSample(long pid, Optional<Long> handleNanos, List<String> psRows) {
+        if (handleNanos != null && handleNanos.isPresent()) return CpuSample.nanos(handleNanos.get());
+        return sumTree(pid, psRows).map(CpuSample::nanos).orElseGet(CpuSample::unsupported);
     }
 
     private static CpuSample cpuSample(long pid) {
@@ -253,7 +261,7 @@ public final class SelftestUi {
         }
     }
 
-    private static Optional<Long> cpuNanos(long pid) {
+    private static Optional<Long> cpuNanosFromHandle(long pid) {
         ProcessHandle handle = ProcessHandle.of(pid).orElse(null);
         if (handle == null) return Optional.empty();
         long total = durationNanos(handle);
@@ -263,6 +271,128 @@ public final class SelftestUi {
             total += durationNanos(child);
         }
         return any ? Optional.of(total) : Optional.empty();
+    }
+
+    /**
+     * One {@code ps} snapshot. Missing {@code ps} yields an empty list, which the
+     * caller reports as an unsupported clock rather than a crash.
+     */
+    private static List<String> psRows() {
+        Process process;
+        try {
+            process = new ProcessBuilder("ps", "-ax", "-o", "pid=,ppid=,time=")
+                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .start();
+        } catch (IOException failure) {
+            return List.of();
+        }
+        try {
+            String text = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            if (!process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                return List.of();
+            }
+            if (process.exitValue() != 0) return List.of();
+            List<String> rows = new ArrayList<>();
+            for (String line : text.split("\\R")) {
+                if (!line.isBlank()) rows.add(line);
+            }
+            return rows;
+        } catch (IOException | InterruptedException failure) {
+            if (failure instanceof InterruptedException) Thread.currentThread().interrupt();
+            return List.of();
+        }
+    }
+
+    /** Sum {@code time} for {@code root} and every process whose parent chain reaches it. */
+    static Optional<Long> sumTree(long root, List<String> rows) {
+        if (rows == null || rows.isEmpty()) return Optional.empty();
+        Map<Long, Long> cpu = new java.util.HashMap<>();
+        Map<Long, List<Long>> children = new java.util.HashMap<>();
+        for (String line : rows) {
+            String[] cols = line.trim().split("\\s+", 3);
+            if (cols.length < 3) continue;
+            long pid;
+            long parent;
+            long nanos;
+            try {
+                pid = Long.parseLong(cols[0]);
+                parent = Long.parseLong(cols[1]);
+                nanos = parsePsCpu(cols[2]);
+            } catch (NumberFormatException failure) {
+                continue;
+            }
+            if (nanos < 0) continue;
+            cpu.put(pid, nanos);
+            children.computeIfAbsent(parent, key -> new ArrayList<>()).add(pid);
+        }
+        if (!cpu.containsKey(root)) return Optional.empty();
+        long total = 0L;
+        ArrayList<Long> pending = new ArrayList<>();
+        pending.add(root);
+        for (int index = 0; index < pending.size(); index++) {
+            long pid = pending.get(index);
+            total += cpu.getOrDefault(pid, 0L);
+            List<Long> kids = children.get(pid);
+            if (kids != null) pending.addAll(kids);
+        }
+        return Optional.of(total);
+    }
+
+    /**
+     * Linux {@code ps} prints {@code [dd-]hh:mm:ss}. macOS prints minutes and
+     * seconds with centiseconds, as {@code 0:00.01} or {@code 224:07.09}.
+     * Returns -1 when the text is not a CPU time.
+     */
+    static long parsePsCpu(String raw) {
+        if (raw == null) return -1L;
+        String text = raw.trim();
+        if (text.isEmpty() || "-".equals(text)) return -1L;
+        long days = 0L;
+        int dash = text.indexOf('-');
+        if (dash > 0 && text.indexOf(':') > dash) {
+            try {
+                days = Long.parseLong(text.substring(0, dash));
+            } catch (NumberFormatException failure) {
+                return -1L;
+            }
+            text = text.substring(dash + 1);
+        }
+        String[] parts = text.split(":");
+        if (parts.length < 2 || parts.length > 3) return -1L;
+        try {
+            long nanos = parts.length == 2
+                    ? clockNanos(0L, parts[0], parts[1])
+                    : clockNanos(Long.parseLong(parts[0]), parts[1], parts[2]);
+            return days * 86_400_000_000_000L + nanos;
+        } catch (NumberFormatException failure) {
+            return -1L;
+        }
+    }
+
+    private static long clockNanos(long hours, String minutesText, String secondsText) {
+        long minutes = Long.parseLong(minutesText);
+        int dot = secondsText.indexOf('.');
+        String whole = dot >= 0 ? secondsText.substring(0, dot) : secondsText;
+        String fraction = dot >= 0 ? secondsText.substring(dot + 1) : "";
+        if (whole.isEmpty()) whole = "0";
+        if (!digits(whole) || !digits(fraction)) throw new NumberFormatException(secondsText);
+        long nanos = Long.parseLong(whole) * 1_000_000_000L;
+        if (!fraction.isEmpty()) {
+            if (fraction.length() > 9) fraction = fraction.substring(0, 9);
+            long frac = Long.parseLong(fraction);
+            for (int pad = fraction.length(); pad < 9; pad++) frac *= 10L;
+            nanos += frac;
+        }
+        return hours * 3_600_000_000_000L + minutes * 60_000_000_000L + nanos;
+    }
+
+    private static boolean digits(String text) {
+        for (int index = 0; index < text.length(); index++) {
+            char ch = text.charAt(index);
+            if (ch < '0' || ch > '9') return false;
+        }
+        return true;
     }
 
     private static long durationNanos(ProcessHandle handle) {

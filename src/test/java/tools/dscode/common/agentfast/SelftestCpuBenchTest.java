@@ -14,6 +14,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -56,5 +58,33 @@ class SelftestCpuBenchTest {
         boolean hasNanos = ProcessHandle.current().info().totalCpuDuration().isPresent();
         assertEquals(hasNanos, sample.supported());
         if (hasNanos) assertFalse(sample.ticks());
+    }
+
+    @Test
+    void emptyHandleClockSumsThePsTree() {
+        List<String> rows = List.of(
+                "10 1 0:00.10",
+                "11 10 0:00.20",
+                "12 11 0:00.30",
+                "13 9 1:00.00"
+        );
+        SelftestUi.CpuSample sample = SelftestUi.cpuSample(10L, Optional.empty(), rows);
+        assertTrue(sample.supported());
+        assertFalse(sample.ticks());
+        assertEquals(600_000_000L, sample.nanos());
+        SelftestUi.CpuSample handle = SelftestUi.cpuSample(10L, Optional.of(5L), rows);
+        assertEquals(5L, handle.nanos());
+        assertFalse(SelftestUi.cpuSample(99L, Optional.empty(), rows).supported());
+    }
+
+    @Test
+    void psCpuTextParsesMacCentisecondsAndLinuxDays() {
+        assertEquals(10_000_000L, SelftestUi.parsePsCpu("0:00.01"));
+        assertEquals(224 * 60L * 1_000_000_000L + 7_090_000_000L, SelftestUi.parsePsCpu("224:07.09"));
+        assertEquals(1_000_000_000L, SelftestUi.parsePsCpu("00:00:01"));
+        assertEquals((86_400L + 3_600L + 120L + 3L) * 1_000_000_000L, SelftestUi.parsePsCpu("1-01:02:03"));
+        assertEquals(-1L, SelftestUi.parsePsCpu("-"));
+        assertEquals(-1L, SelftestUi.parsePsCpu(""));
+        assertEquals(-1L, SelftestUi.parsePsCpu("not-a-time"));
     }
 }

@@ -80,6 +80,7 @@ class TimingFieldsTest {
                     "127.0.0.1", port, "token-warm", ProcessHandle.current().pid(), "sess-warm"
             ));
             long[] samples = new long[2];
+            long[] verbs = new long[2];
             for (int sample = 0; sample < samples.length; sample++) {
                 long started = System.nanoTime();
                 Process process = new ProcessBuilder(
@@ -96,13 +97,17 @@ class TimingFieldsTest {
                 int code = process.waitFor();
                 samples[sample] = Math.max(0L, (System.nanoTime() - started) / 1_000_000L);
                 assertEquals(0, code, output);
-                assertTrue(output.contains("elapsedMs"), output);
+                verbs[sample] = elapsedOf(output);
             }
             long warmMs = Math.min(samples[0], samples[1]);
-            System.out.println("MEASURE warmMs=" + samples[0] + " " + samples[1] + " min=" + warmMs);
+            long verbMs = Math.min(verbs[0], verbs[1]);
+            System.out.println("MEASURE warmMs=" + samples[0] + " " + samples[1] + " min=" + warmMs
+                    + " elapsedMs=" + verbs[0] + " " + verbs[1] + " min=" + verbMs);
             assertTrue(posts.get() >= 2);
-            // Fresh JVM wall time. A 2-vCPU host measured 1025 ms. 1500 ms still fails a slow spawn.
-            assertTrue(warmMs <= 1500, "warmMs=" + samples[0] + "," + samples[1]);
+            // Process wall is a fresh JVM. GitHub macOS measured 2021 and 2058 ms on run 44683079221.
+            // 4000 ms only rejects a stuck spawn. The verb target is elapsedMs.
+            assertTrue(warmMs <= 4000, "warmMs=" + samples[0] + "," + samples[1]);
+            assertTrue(verbMs <= 1000, "elapsedMs=" + verbs[0] + "," + verbs[1]);
 
             ByteArrayOutputStream stdout = new ByteArrayOutputStream();
             ByteArrayOutputStream stderr = new ByteArrayOutputStream();
@@ -221,14 +226,26 @@ class TimingFieldsTest {
         long verbMs = Math.min(verbs[0], Math.min(verbs[1], verbs[2]));
         System.out.println("MEASURE realWarmMs=" + samples[0] + " " + samples[1] + " " + samples[2]
                 + " min=" + realWarmMs + " elapsedMs=" + verbs[0] + " " + verbs[1] + " " + verbs[2] + " min=" + verbMs);
-        // Process wall includes JVM startup. A 2-vCPU host measured 1062 ms, so the wall bound is 1500 ms.
-        // The verb itself is elapsedMs. That minimum stays at the 1 second target.
-        assertTrue(realWarmMs <= 1500, "realWarmMs=" + samples[0] + "," + samples[1] + "," + samples[2]);
+        // Process wall is JVM spawn plus the verb. GitHub macOS run 44683079221 measured
+        // 2028, 2205, and 1514 ms, so a 1500 ms wall fails a fast verb on a slow spawn.
+        // 4000 ms only rejects a stuck spawn. The 1 second target is elapsedMs.
+        assertTrue(realWarmMs <= 4000, "realWarmMs=" + samples[0] + "," + samples[1] + "," + samples[2]);
         assertTrue(verbMs <= 1000, "elapsedMs=" + verbs[0] + "," + verbs[1] + "," + verbs[2]);
         String paint = eval(
                 "document.getElementById('save').getAttribute('data-pkb-style')"
                         + "+'|'+getComputedStyle(document.getElementById('save')).backgroundColor");
         assertEquals("style_modified|rgb(255, 243, 160)", paint);
+    }
+
+    private static long elapsedOf(String output) {
+        int at = output.indexOf("\"elapsedMs\"");
+        assertTrue(at >= 0, output);
+        int end = output.indexOf(':', at) + 1;
+        while (end < output.length() && Character.isWhitespace(output.charAt(end))) end++;
+        int start = end;
+        while (end < output.length() && Character.isDigit(output.charAt(end))) end++;
+        assertTrue(end > start, output);
+        return Long.parseLong(output.substring(start, end));
     }
 
     private String eval(String expression) throws Exception {
