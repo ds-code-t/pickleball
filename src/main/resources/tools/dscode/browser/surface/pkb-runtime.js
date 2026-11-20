@@ -19,7 +19,7 @@
     try { wait.observe(document, {childList: true, subtree: true}); } catch (ignored) { /* not observable yet */ }
     return;
   }
-  var VERSION = '3.0.0-block';
+  var VERSION = '3.0.0-push';
   if (window.__pkbUi && window.__pkbUi.version === VERSION) return;
   if (window.__pkbUi && typeof window.__pkbUi.dispose === 'function') {
     try { window.__pkbUi.dispose(); } catch (ignored) { /* older runtime */ }
@@ -102,6 +102,46 @@
   function events() {
     window.__pkbEvents = window.__pkbEvents || [];
     return window.__pkbEvents;
+  }
+
+  var PUSH_CAP = 20;
+  var pushWindow = 0;
+  var pushCount = 0;
+  var pushDropped = 0;
+  var mutationTimer = 0;
+  function tryBind(ev) {
+    try {
+      var fn = window.pkbSurface;
+      if (typeof fn === 'function') fn(JSON.stringify(ev));
+    } catch (ignored) { /* this world has no binding */ }
+  }
+  function deliver(ev) {
+    events().push(ev);
+    var now = Date.now();
+    if (now - pushWindow > 1000) {
+      if (pushDropped) tryBind({type: 'dropped', text: String(pushDropped)});
+      pushWindow = now;
+      pushCount = 0;
+      pushDropped = 0;
+    }
+    if (pushCount >= PUSH_CAP) {
+      pushDropped++;
+      return;
+    }
+    pushCount++;
+    tryBind(ev);
+  }
+  function pushEvent(ev) {
+    if (!ev) return;
+    if (ev.type === 'mutation') {
+      if (mutationTimer) return;
+      mutationTimer = setTimeout(function () {
+        mutationTimer = 0;
+        deliver(ev);
+      }, 50);
+      return;
+    }
+    deliver(ev);
   }
 
   function installDocSheet() {
@@ -398,10 +438,10 @@
           item.scrollers = scrollersOf(next);
           observe(item);
           relocated = true;
-          if (item.lost) events().push({type: 'found', id: item.id});
+          if (item.lost) pushEvent({type: 'found', id: item.id});
           item.lost = false;
         } else {
-          if (!item.lost) events().push({type: 'lost', id: item.id});
+          if (!item.lost) pushEvent({type: 'lost', id: item.id});
           item.lost = true;
           plans.push({item: item, hidden: true});
           return;
@@ -484,6 +524,7 @@
       scrollersDirty = true;
       bumpDoc();
       schedule();
+      if (window.__pkbPushMutations) pushEvent({type: 'mutation', source: 'human'});
     }
   }
 
@@ -505,6 +546,17 @@
       if (event && event.target === layer) return;
       raiseLayer();
       schedule();
+    }, true);
+    on(document, 'click', function (event) {
+      if (!event || ours(event.target)) return;
+      var node = event.target && event.target.nodeType === 1 ? event.target : null;
+      var role = '';
+      var name = '';
+      if (node) {
+        role = node.getAttribute('role') || (node.nodeName || '');
+        name = String(node.getAttribute('aria-label') || node.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+      }
+      pushEvent({type: 'click', source: 'human', id: node && node.id ? node.id : '', role: role, name: name});
     }, true);
     on(document, 'visibilitychange', function () {
       paused = document.hidden;
@@ -773,12 +825,12 @@
     var ev = {type: 'step', g: g.id, s: step.n, done: true, how: how};
     if (how === 'input' || how === 'select' || how === 'check') ev.filled = true;
     if (value !== undefined) ev.value = value;
-    events().push(ev);
+    pushEvent(ev);
     var next = from + 1;
     while (next < g.steps.length && g.steps[next].done) next++;
     g.current = next;
     g.pulse = true;
-    if (g.current >= g.steps.length) events().push({type: 'guide', g: g.id, done: true});
+    if (g.current >= g.steps.length) pushEvent({type: 'guide', g: g.id, done: true});
     guideRender(g);
     if (g.scroll && g.steps[g.current] && g.steps[g.current].anchor) {
       try { g.steps[g.current].anchor.scrollIntoView({block: 'center', behavior: 'smooth'}); } catch (ignored) { /* old browser */ }
@@ -873,7 +925,7 @@
       g.current = Math.min(g.current, g.steps.length) - 1;
       g.steps[g.current].done = false;
       g.pulse = true;
-      events().push({type: 'step', g: id, s: g.steps[g.current].n, done: false, how: 'agent'});
+      pushEvent({type: 'step', g: id, s: g.steps[g.current].n, done: false, how: 'agent'});
       guideRender(g);
       schedule();
     }
@@ -896,7 +948,7 @@
   function guideDone(spec) {
     var id = String((spec && spec.id) || 'g1');
     if (!guides.has(id)) return null;
-    events().push({type: 'guide', g: id, done: true, how: 'agent'});
+    pushEvent({type: 'guide', g: id, done: true, how: 'agent'});
     guideClose(id);
     return {id: id, closed: true};
   }
@@ -921,7 +973,7 @@
     function answer(value) {
       var ev = {type: 'answer', id: id};
       if (spec.sensitive) ev.filled = true; else ev.value = String(value).slice(0, 2000);
-      events().push(ev);
+      pushEvent(ev);
       askClose(id);
     }
     if (choices.length) {
@@ -1112,6 +1164,7 @@
     window.__pkbChat = window.__pkbChat || [];
     window.__pkbChat.push({id: id, text: text, at: new Date().toISOString()});
     chat({id: id, from: 'human', text: text, state: 'pending', at: new Date().toISOString()});
+    pushEvent({type: 'chat', source: 'human', id: id, text: text});
     panel.input.value = '';
     panel.send.disabled = true;
     panel.input.focus();
@@ -1236,7 +1289,7 @@
     composer.addEventListener('submit', function (event) { event.preventDefault(); panelSend(); });
     minimize.addEventListener('click', function () { p.state.min = true; panelPlace(); });
     close.addEventListener('click', function () {
-      events().push({type: 'panel', action: 'close'});
+      pushEvent({type: 'panel', action: 'close'});
       panelClose();
     });
     pill.addEventListener('click', function () { p.state.min = false; p.unread = 0; pill.querySelector('.pkb-unread').textContent = ''; panelPlace(); });

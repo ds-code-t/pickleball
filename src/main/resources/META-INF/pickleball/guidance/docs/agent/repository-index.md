@@ -197,12 +197,14 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentfast/LineView.java`
 - `src/main/java/tools/dscode/common/agentfast/LiveBrowserHost.java`
 - `src/main/java/tools/dscode/common/agentfast/LiveChromeDriver.java`
+- `src/main/java/tools/dscode/common/agentfast/PushChannel.java`
 - `src/main/java/tools/dscode/common/agentfast/ReplyFields.java`
 - `src/main/java/tools/dscode/common/agentfast/RuntimeInstall.java`
 - `src/main/java/tools/dscode/common/agentfast/ScreenshotReply.java`
 - `src/main/java/tools/dscode/common/agentfast/SelftestUi.java`
 - `src/main/java/tools/dscode/common/agentfast/SessionIds.java`
 - `src/main/java/tools/dscode/common/agentfast/SnapView.java`
+- `src/main/java/tools/dscode/common/agentfast/StandardView.java`
 - `src/main/java/tools/dscode/common/agentfast/StepTiming.java`
 - `src/main/java/tools/dscode/common/agentfast/TargetSelector.java`
 - `src/main/java/tools/dscode/common/agentfast/TargetVerb.java`
@@ -560,6 +562,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/engine/source/StoreScenarioSource.java`
 - `src/main/java/tools/dscode/internal/ValuesSupport.java`
 - `src/main/java/tools/dscode/launcher/AgentController.java`
+- `src/main/java/tools/dscode/launcher/AgentHop.java`
 - `src/main/java/tools/dscode/launcher/CompositeCommands.java`
 - `src/main/java/tools/dscode/launcher/ConsumerReadyCommands.java`
 - `src/main/java/tools/dscode/launcher/LeaseHold.java`
@@ -747,6 +750,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentfast/CompactReplyTest.java`
 - `src/test/java/tools/dscode/common/agentfast/FallbackRunCapTest.java`
 - `src/test/java/tools/dscode/common/agentfast/LiveReplyRulesTest.java`
+- `src/test/java/tools/dscode/common/agentfast/PushAndViewTest.java`
 - `src/test/java/tools/dscode/common/agentfast/SelftestCpuBenchTest.java`
 - `src/test/java/tools/dscode/common/agentfast/TimingFieldsTest.java`
 - `src/test/java/tools/dscode/common/agentfast/UiCpuLoopTest.java`
@@ -914,6 +918,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/OverlapTest.java`
 - `src/test/java/tools/dscode/launcher/PickleballWorkbenchLauncherTest.java`
 - `src/test/java/tools/dscode/launcher/PlacementNowTest.java`
+- `src/test/java/tools/dscode/launcher/PolishRoadmapTest.java`
 - `src/test/java/tools/dscode/launcher/PopupVerbCoverageTest.java`
 - `src/test/java/tools/dscode/launcher/RedirectedFrameTest.java`
 - `src/test/java/tools/dscode/launcher/RefLifetimeTest.java`

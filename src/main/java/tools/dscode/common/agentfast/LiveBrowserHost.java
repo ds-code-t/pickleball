@@ -87,6 +87,7 @@ public final class LiveBrowserHost {
         }
         Path project = Path.of(args[0]);
         PROJECT = project;
+        PushChannel.bind(project);
         String id = args[1];
         SESSION_ID = id;
         String pageUrl = args[2];

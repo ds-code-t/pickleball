@@ -145,6 +145,7 @@ public final class AgentControl {
             String agentId
     ) {
         long started = System.nanoTime();
+        tools.dscode.common.agentfast.PushChannel.bind(project);
         Map<String, String> values = args == null ? new java.util.LinkedHashMap<>() : new java.util.LinkedHashMap<>(args);
         tools.dscode.common.agentfast.AgentCursor.absorb(op, values);
         try {
@@ -153,6 +154,9 @@ public final class AgentControl {
             if (values.get("scope") != null && !values.get("scope").isBlank()) UiState.scope(values.get("scope"));
             if (values.get("ttl") != null && !values.get("ttl").isBlank()) UiState.expires(values.get("ttl"), 0L);
             Result result = dispatch(project, runId, op, values, extraArgs, agentId);
+            if (tools.dscode.common.agentfast.StandardView.requested(values)) {
+                result = new Result(result.exit(), tools.dscode.common.agentfast.StandardView.applyBody(result.body(), values));
+            }
             if (result.exit() == 0 && UiState.TRACKED.contains(op)) UiState.sync(project, runId, values);
             if (result.exit() == 0 && "html-cleanup".equals(op)) UiState.clear(project, runId);
             return timed(result, started, project, runId, op);

@@ -127,7 +127,126 @@ public final class AgentEvents {
         return line.substring(start, end);
     }
 
+    /** One JSON object of string fields, appended to the same session stream. */
+    public static void appendObject(Path project, Map<String, String> fields) {
+        if (fields == null || fields.isEmpty()) return;
+        StringBuilder line = new StringBuilder("{");
+        boolean any = false;
+        for (Map.Entry<String, String> entry : fields.entrySet()) {
+            if (entry.getKey() == null || entry.getValue() == null) continue;
+            if (any) line.append(',');
+            any = true;
+            line.append('"').append(escape(entry.getKey())).append("\":\"");
+            line.append(escape(entry.getValue())).append('"');
+        }
+        if (!any) return;
+        line.append("}\n");
+        Path target = file(project);
+        try {
+            if (target.getParent() != null) Files.createDirectories(target.getParent());
+            Files.writeString(
+                    target,
+                    line.toString(),
+                    StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.APPEND
+            );
+        } catch (IOException ignored) {
+            // A later follow reports the miss as a timeout rather than throwing on the browser thread.
+        }
+    }
+
+    /** Every line that parses as a string-valued object, in file order. */
+    public static List<Map<String, String>> lines(Path project) {
+        List<Map<String, String>> rows = new ArrayList<>();
+        Path target = file(project);
+        if (!Files.isRegularFile(target)) return rows;
+        try {
+            for (String line : Files.readAllLines(target, StandardCharsets.UTF_8)) {
+                Map<String, String> row = parseObject(line);
+                if (!row.isEmpty()) rows.add(row);
+            }
+        } catch (IOException ignored) {
+            return rows;
+        }
+        return rows;
+    }
+
+    static Map<String, String> parseObject(String line) {
+        Map<String, String> row = new LinkedHashMap<>();
+        if (line == null) return row;
+        int index = line.indexOf('{');
+        if (index < 0) return row;
+        index++;
+        while (index < line.length()) {
+            char ch = line.charAt(index);
+            if (ch == '}' || ch == '\n' || ch == '\r') break;
+            if (ch == ' ' || ch == ',' || ch == '\t') {
+                index++;
+                continue;
+            }
+            if (ch != '"') break;
+            int[] end = new int[1];
+            String key = readString(line, index, end);
+            if (key == null) break;
+            index = end[0];
+            while (index < line.length() && (line.charAt(index) == ' ' || line.charAt(index) == ':')) index++;
+            if (index >= line.length() || line.charAt(index) != '"') break;
+            String value = readString(line, index, end);
+            if (value == null) break;
+            index = end[0];
+            row.put(key, value);
+        }
+        return row;
+    }
+
+    private static String readString(String line, int quote, int[] end) {
+        if (quote >= line.length() || line.charAt(quote) != '"') return null;
+        StringBuilder value = new StringBuilder();
+        for (int index = quote + 1; index < line.length(); index++) {
+            char ch = line.charAt(index);
+            if (ch == '"') {
+                end[0] = index + 1;
+                return value.toString();
+            }
+            if (ch != '\\' || index + 1 >= line.length()) {
+                value.append(ch);
+                continue;
+            }
+            char next = line.charAt(++index);
+            switch (next) {
+                case 'n' -> value.append('\n');
+                case 'r' -> value.append('\r');
+                case 't' -> value.append('\t');
+                case 'u' -> {
+                    if (index + 4 >= line.length()) return null;
+                    value.append((char) Integer.parseInt(line.substring(index + 1, index + 5), 16));
+                    index += 4;
+                }
+                default -> value.append(next);
+            }
+        }
+        return null;
+    }
+
     private static String escape(String value) {
-        return value.replace("\\", "\\\\").replace("\"", "\\\"");
+        String raw = value == null ? "" : value;
+        StringBuilder json = new StringBuilder();
+        for (int index = 0; index < raw.length(); index++) {
+            char ch = raw.charAt(index);
+            switch (ch) {
+                case '"' -> json.append("\\\"");
+                case '\\' -> json.append("\\\\");
+                case '\n' -> json.append("\\n");
+                case '\r' -> json.append("\\r");
+                case '\t' -> json.append("\\t");
+                default -> {
+                    if (ch < 0x20) json.append(String.format("\\u%04x", (int) ch));
+                    else json.append(ch);
+                }
+            }
+        }
+        return json.toString();
     }
 }
+

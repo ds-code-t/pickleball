@@ -51,6 +51,11 @@ final class ConsumerReadyCommands {
         Path project = parsed.project();
         if (hasToken(parsed, "--stop")) {
             StopOutcome outcome = stopOwned(project);
+            if (hasToken(parsed, "--all")) {
+                out.println("orphans=" + killOrphans(project));
+                stopController(project);
+                out.println("controller=stopped");
+            }
             if (outcome.stopped()) err.println("notice: live-stop stops the start host");
             else if (outcome.unrecorded()) {
                 err.println("notice: live-stop deleted a state file with no recorded start times");
@@ -260,6 +265,35 @@ final class ConsumerReadyCommands {
         LiveHostFile.delete(project);
         tools.dscode.common.agentfast.LiveBrowserHost.pruneProfiles(project, null);
         return new StopOutcome(stopped, false);
+    }
+
+    /** Project-scoped Chrome that is not the recorded host. A Workbench worker is not Chrome. */
+    private static String killOrphans(Path project) {
+        String listed = orphans(project, 0L);
+        if (listed == null || listed.isBlank() || "none".equals(listed)) return "none";
+        for (String piece : listed.split(",")) {
+            try {
+                ProcessTree.kill(Long.parseLong(piece.trim()));
+            } catch (NumberFormatException ignored) {
+                // orphans() only emits pids.
+            }
+        }
+        return listed;
+    }
+
+    private static void stopController(Path project) {
+        java.io.PrintStream previousOut = System.out;
+        java.io.PrintStream previousErr = System.err;
+        try {
+            System.setOut(new java.io.PrintStream(new java.io.ByteArrayOutputStream(), true, StandardCharsets.UTF_8));
+            System.setErr(new java.io.PrintStream(new java.io.ByteArrayOutputStream(), true, StandardCharsets.UTF_8));
+            PkbMain.run(new String[]{"controller-stop", project == null ? "" : project.toString()});
+        } catch (Exception ignored) {
+            // No controller is already stopped.
+        } finally {
+            System.setOut(previousOut);
+            System.setErr(previousErr);
+        }
     }
 
     static int doctor(WorkbenchCommandLine.Parsed parsed, java.io.PrintStream out, java.io.PrintStream err) {

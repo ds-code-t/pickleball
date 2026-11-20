@@ -34,6 +34,7 @@ public final class AgentController {
     }
 
     public static void serve(String[] args) throws Exception {
+        System.setProperty(AgentHop.INSIDE, "true");
         if (args == null || args.length < 2 || args[1] == null || args[1].isBlank()) {
             System.err.println("error: controller-serve needs a project directory");
             System.err.println("fix: controller-start");

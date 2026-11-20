@@ -908,6 +908,7 @@ public final class WorkbenchSessionCommands {
             PrintStream err,
             HttpClient http
     ) {
+        if (hasFlag(parsed, "--follow")) return followEvents(parsed, out, err);
         SessionState state = requireSession(parsed, http);
         try {
             JsonNode events = postJson(http, state, "/tools/workbench_events", Map.of());
@@ -952,6 +953,106 @@ public final class WorkbenchSessionCommands {
             err.println("Workbench events failed: " + failure.getMessage());
             return 1;
         }
+    }
+
+    /**
+     * Tails {@code .pickleball/agent-events.jsonl}. No Workbench session is required.
+     * Exits 0 on the first match and 1 on timeout. Own {@code source=agent} lines stay hidden
+     * unless {@code --echo} or {@code --from=any}.
+     */
+    private static int followEvents(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        Path project = parsed.project() == null ? Path.of("").toAbsolutePath().normalize() : parsed.project();
+        String until = flagValue(parsed, "--until");
+        String type = flagValue(parsed, "--type");
+        String timeoutRaw = flagValue(parsed, "--timeout");
+        long timeoutSec = 30;
+        if (timeoutRaw != null && !timeoutRaw.isBlank()) {
+            try {
+                timeoutSec = Long.parseLong(timeoutRaw.trim());
+            } catch (NumberFormatException failure) {
+                err.print(WorkbenchCliHelp.usageError("events --timeout is seconds from 0 to 120", "events"));
+                return 2;
+            }
+        }
+        if (timeoutSec < 0 || timeoutSec > 120) {
+            err.print(WorkbenchCliHelp.usageError("events --timeout is seconds from 0 to 120", "events"));
+            return 2;
+        }
+        boolean hideEcho = true;
+        String echo = flagValue(parsed, "--echo");
+        if (hasFlag(parsed, "--echo") && (echo == null || echo.isBlank() || "show".equalsIgnoreCase(echo) || "true".equalsIgnoreCase(echo))) {
+            hideEcho = false;
+        }
+        if ("any".equalsIgnoreCase(flagValue(parsed, "--from"))) hideEcho = false;
+        if (echo != null && ("hide".equalsIgnoreCase(echo) || "false".equalsIgnoreCase(echo))) hideEcho = true;
+        int after = 0;
+        String cursor = flagValue(parsed, "--cursor");
+        if (cursor != null && !cursor.isBlank()) {
+            try {
+                after = Integer.parseInt(cursor.trim());
+            } catch (NumberFormatException failure) {
+                err.print(WorkbenchCliHelp.usageError("events --cursor is a line number", "events"));
+                return 2;
+            }
+        }
+        long started = System.nanoTime();
+        tools.dscode.common.agentfast.PushChannel.Hit hit = tools.dscode.common.agentfast.PushChannel.follow(
+                project, until, type, timeoutSec * 1000L, hideEcho, after);
+        Map<String, Object> body = new LinkedHashMap<>();
+        if (hit.event() == null || hit.event().isEmpty()) body.put("events", List.of());
+        else body.put("events", List.of(new LinkedHashMap<String, Object>(hit.event())));
+        body.put("nextCursor", Integer.toString(hit.next()));
+        body.put("elapsedMs", Math.max(0L, (System.nanoTime() - started) / 1_000_000L));
+        if (hit.exit() != 0) body.put("error", "timeout");
+        Map<String, String> view = viewArgs(parsed);
+        Map<String, Object> stamped = tools.dscode.common.agentfast.AgentEnvelope.apply(
+                body, hit.exit(), "events", project, parsed.coordination().runId());
+        if (tools.dscode.common.agentfast.StandardView.requested(view)) {
+            stamped = tools.dscode.common.agentfast.StandardView.applyBody(stamped, view);
+        }
+        try {
+            String printed = JSON.writeValueAsString(stamped);
+            if ("lines".equals(view.get("format"))) {
+                printed = tools.dscode.common.agentfast.AgentEnvelope.renderLines(printed);
+            }
+            out.println(printed);
+        } catch (IOException failure) {
+            err.println("Workbench events failed: " + failure.getMessage());
+            return 1;
+        }
+        return hit.exit();
+    }
+
+    private static Map<String, String> viewArgs(WorkbenchCommandLine.Parsed parsed) {
+        Map<String, String> view = new LinkedHashMap<>();
+        for (String name : List.of("format", "fields", "where", "limit", "budget", "group", "priority", "echo")) {
+            String value = flagValue(parsed, "--" + name);
+            if (value != null && !value.isBlank()) view.put(name, value);
+        }
+        return view;
+    }
+
+    private static boolean hasFlag(WorkbenchCommandLine.Parsed parsed, String name) {
+        String[] args = parsed == null ? null : parsed.forwarded();
+        if (args == null || name == null) return false;
+        for (String token : args) {
+            if (name.equals(token) || (token != null && token.startsWith(name + "="))) return true;
+        }
+        return false;
+    }
+
+    private static String flagValue(WorkbenchCommandLine.Parsed parsed, String name) {
+        String[] args = parsed == null ? null : parsed.forwarded();
+        if (args == null || name == null) return null;
+        for (int index = 0; index < args.length; index++) {
+            String token = args[index];
+            if (token == null) continue;
+            if (token.startsWith(name + "=")) return token.substring(name.length() + 1);
+            if (name.equals(token) && index + 1 < args.length && args[index + 1] != null && !args[index + 1].startsWith("-")) {
+                return args[index + 1];
+            }
+        }
+        return null;
     }
 
     private static int stop(
