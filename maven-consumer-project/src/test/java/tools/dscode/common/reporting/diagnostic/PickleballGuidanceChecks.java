@@ -84,8 +84,8 @@ public class PickleballGuidanceChecks {
             assertFalse(chooser.contains("MUST use headless Chrome"));
             assertTrue(chooser.contains("one front door") || chooser.contains("Pickleball Workbench is the one front door"));
             String chooserList = guide.substring(
-                    guide.indexOf("## Tool chooser"),
-                    guide.indexOf("### Live isolation loop")
+                    guide.lastIndexOf("## Tool chooser"),
+                    guide.indexOf("### Live isolation loop", guide.lastIndexOf("## Tool chooser"))
             );
             assertTrue(chooserList.contains("discover"));
             assertTrue(chooserList.contains("confirm"));
@@ -342,17 +342,14 @@ public class PickleballGuidanceChecks {
             ));
 
             String guide = Files.readString(root.resolve("AGENT-GUIDE.md"));
-            assertTrue(guide.contains("use the shallowest evidence layer"));
+            assertTrue(guide.contains("start --url-key"));
+            assertTrue(guide.contains("chat-turn"));
+            assertTrue(guide.contains("act --query"));
+            assertTrue(guide.contains("ui-verify"));
+            assertTrue(guide.contains("doctor"));
             assertTrue(guide.contains("Exported from Pickleball `" + version + "`"));
             assertTrue(guide.contains("If export fails, treat any existing `.pickleball` contents as potentially stale"));
-            assertTrue(guide.contains("keep terminal logging minimal"));
-            assertTrue(guide.contains("older Pickleball release whose exporter predates the manifest lifecycle"));
-            assertTrue(guide.contains("read-only reference snapshot"));
             assertTrue(guide.contains("-Dexec.args=isolate"));
-            assertTrue(guide.contains("workbench_diagnostic_catalog"));
-            assertTrue(guide.contains("workbench_investigation_emit"));
-            assertTrue(guide.contains("pkb_reportretention=failed"));
-            assertTrue(guide.contains("Do not copy, modify, or execute files"));
             assertTrue(guide.contains("one front door"));
             assertTrue(guide.contains("PickleballWorkbenchLauncher"));
             assertFalse(guide.contains("Maintainer-only: pointer-eval harness"));
@@ -360,6 +357,14 @@ public class PickleballGuidanceChecks {
             assertTrue(guide.contains("-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher"));
             assertTrue(guide.contains("-Dexec.args=isolate"));
             String detail = Files.readString(root.resolve("docs/workbench-agent-detail.md"));
+            assertTrue(detail.contains("use the shallowest evidence layer"));
+            assertTrue(detail.contains("keep terminal logging minimal"));
+            assertTrue(detail.contains("older Pickleball release whose exporter predates the manifest lifecycle"));
+            assertTrue(detail.contains("read-only reference snapshot"));
+            assertTrue(detail.contains("workbench_diagnostic_catalog"));
+            assertTrue(detail.contains("workbench_investigation_emit"));
+            assertTrue(detail.contains("pkb_reportretention=failed"));
+            assertTrue(detail.contains("Do not copy, modify, or execute files"));
             assertFalse(detail.contains("Maintainer-only: pointer-eval harness"));
             assertFalse(detail.contains("## Maintainer-only"));
             assertTrue(detail.contains("## When the core Pickleball repository is also present"));
