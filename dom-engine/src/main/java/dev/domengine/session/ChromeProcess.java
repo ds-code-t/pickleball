@@ -87,11 +87,10 @@ public final class ChromeProcess {
     private static ChromeProcess spawn(String binary, Path dir, boolean headless, List<String> extraArgs, String initialUrl, long portWaitSeconds) {
         List<String> command = command(binary, dir, headless, extraArgs, initialUrl);
         Process handle;
-        Path log = dir.resolve("launch.log");
         try {
             ProcessBuilder builder = new ProcessBuilder(command)
                     .redirectErrorStream(true)
-                    .redirectOutput(ProcessBuilder.Redirect.to(log.toFile()));
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD);
             // The JVM bus stays as-is so AT-SPI can use it. Only this browser child changes.
             sanitizeSessionBus(builder.environment());
             handle = builder.start();
@@ -225,22 +224,53 @@ public final class ChromeProcess {
     public static void destroyTree(Process process) {
         if (process == null) return;
         ProcessHandle handle = process.toHandle();
+        List<Long> pids = new ArrayList<>();
+        pids.add(handle.pid());
+        try {
+            handle.descendants().forEach(child -> pids.add(child.pid()));
+        } catch (RuntimeException ignored) {
+            // A dead process has no descendants to add.
+        }
         handle.descendants().forEach(ProcessHandle::destroy);
         if (process.isAlive()) process.destroy();
+        taskkill(pids);
         try {
             if (!process.waitFor(10, TimeUnit.SECONDS)) {
                 handle.descendants().forEach(ProcessHandle::destroyForcibly);
                 process.destroyForcibly();
+                taskkill(pids);
                 process.waitFor(5, TimeUnit.SECONDS);
             } else {
                 handle.descendants().forEach(child -> {
                     if (child.isAlive()) child.destroyForcibly();
                 });
+                taskkill(pids);
             }
         } catch (InterruptedException failure) {
             Thread.currentThread().interrupt();
             handle.descendants().forEach(ProcessHandle::destroyForcibly);
             process.destroyForcibly();
+            taskkill(pids);
+        }
+    }
+
+    /** Windows reparents Chrome. {@code taskkill /T} still reaches that tree. No-op elsewhere. */
+    private static void taskkill(List<Long> pids) {
+        if (!isWindows() || pids == null) return;
+        for (long pid : pids) {
+            if (pid <= 0 || pid == ProcessHandle.current().pid()) continue;
+            try {
+                Process killer = new ProcessBuilder("taskkill", "/F", "/T", "/PID", Long.toString(pid))
+                        .redirectError(ProcessBuilder.Redirect.DISCARD)
+                        .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                        .start();
+                if (!killer.waitFor(5, TimeUnit.SECONDS)) killer.destroyForcibly();
+            } catch (IOException ignored) {
+                // taskkill is absent. destroyForcibly already ran.
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                return;
+            }
         }
     }
 
@@ -269,8 +299,8 @@ public final class ChromeProcess {
             destroyHandle(handle);
         }
         if (!signaled && isWindows()) signaled = signalWindows(markers);
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
-        while (System.nanoTime() < deadline) {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+        while (signaled && System.nanoTime() < deadline) {
             boolean alive = false;
             for (ProcessHandle handle : ProcessHandle.allProcesses().toList()) {
                 if (handle.pid() == ProcessHandle.current().pid()) continue;
@@ -324,8 +354,8 @@ public final class ChromeProcess {
     }
 
     /**
-     * Windows often leaves {@code ProcessHandle.Info.commandLine} empty.
-     * One CIM query finds the processes that still name the profile.
+     * One filtered CIM query. A full process list has hung Windows runners, so this
+     * asks only for chrome.exe and msedge.exe.
      */
     private static boolean signalWindows(List<String> markers) {
         boolean signaled = false;
@@ -333,6 +363,7 @@ public final class ChromeProcess {
             for (long pid : windowsPids(marker)) {
                 if (pid <= 0 || pid == ProcessHandle.current().pid()) continue;
                 ProcessHandle.of(pid).ifPresent(ChromeProcess::destroyHandle);
+                taskkill(List.of(pid));
                 signaled = true;
             }
         }
@@ -340,18 +371,19 @@ public final class ChromeProcess {
     }
 
     private static List<Long> windowsPids(String marker) {
+        String script = "$n=$env:PKB_PROFILE; "
+                + "if ($n) { Get-CimInstance Win32_Process -Filter \"Name = 'chrome.exe' OR Name = 'msedge.exe'\" | "
+                + "Where-Object { $_.CommandLine -and $_.CommandLine.ToLowerInvariant().Contains($n.ToLowerInvariant()) } | "
+                + "ForEach-Object { $_.ProcessId } }";
         ProcessBuilder builder = new ProcessBuilder(
-                "powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
-                "$n=$env:PKB_PROFILE; if ($n) { Get-CimInstance Win32_Process | "
-                        + "Where-Object { $_.CommandLine -and $_.CommandLine.ToLowerInvariant().Contains($n.ToLowerInvariant()) } | "
-                        + "ForEach-Object { $_.ProcessId } }"
+                "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script
         );
         builder.environment().put("PKB_PROFILE", marker);
         builder.redirectError(ProcessBuilder.Redirect.DISCARD);
         try {
             Process process = builder.start();
             String text = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-            if (!process.waitFor(15, TimeUnit.SECONDS)) {
+            if (!process.waitFor(8, TimeUnit.SECONDS)) {
                 process.destroyForcibly();
                 return List.of();
             }
