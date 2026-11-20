@@ -86,7 +86,7 @@ final class UiCatalog {
                 "{\"c\":\"remove\",\"id\":\"pkb-3\",\"of\":\"label\"}", "",
                 opt("id", new Option("string", null, "id", "placement id (required)")),
                 opt("of", new Option("string", "overlay", "of", "component it was: overlay, label, border, arrow, step-badge, magnifier or spotlight")));
-        add("clear", "html-cleanup", false, "removes every placement, guide, the saved state and its preload", "{\"c\":\"clear\"}", "");
+        add("clear", "html-cleanup", false, "removes every placement, guide, and the saved state. The panel stays open", "{\"c\":\"clear\"}", "");
     }
 
     private UiCatalog() {

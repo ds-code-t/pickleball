@@ -456,6 +456,16 @@ public final class ElementOperations {
               if (el.disabled) return false;
               return el.getAttribute('aria-disabled') !== 'true';
             }
+            function labelHit(name, query) {
+              var left = norm(name);
+              var right = norm(query);
+              if (!left || !right) return false;
+              if (left.toLowerCase() === right.toLowerCase()) return true;
+              if (left.length <= right.length) return false;
+              if (left.slice(left.length - right.length).toLowerCase() !== right.toLowerCase()) return false;
+              var before = left.charAt(left.length - right.length - 1);
+              return !(/[0-9A-Za-z]/).test(before);
+            }
             var out = [];
             var all = document.querySelectorAll('body *');
             for (var i = 0; i < all.length; i++) {
@@ -464,7 +474,7 @@ public final class ElementOperations {
               var label = norm(el.getAttribute('aria-label'));
               var role = norm(el.getAttribute('role'));
               if (!role) role = el.tagName.toLowerCase();
-              var hit = kind === 'role' ? role === wanted : (text === wanted || label === wanted);
+              var hit = kind === 'role' ? role === wanted : (labelHit(text, wanted) || labelHit(label, wanted) || labelHit(norm(el.innerText), wanted));
               if (!hit) continue;
               var box = el.getBoundingClientRect();
               out.push({

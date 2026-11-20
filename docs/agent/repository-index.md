@@ -811,6 +811,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentcontrol/ChatCursorTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/ChatLockChild.java`
 - `src/test/java/tools/dscode/common/agentcontrol/FallbackLogTest.java`
+- `src/test/java/tools/dscode/common/agentcontrol/ForgetLeavesPanelTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/IsolatedWorldTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/LiveChromeCdpTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/NoReinjectTest.java`

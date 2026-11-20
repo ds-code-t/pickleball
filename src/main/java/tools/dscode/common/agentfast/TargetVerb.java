@@ -2168,12 +2168,12 @@ public final class TargetVerb {
         List<DomNode> hits = new ArrayList<>();
         walk(root, node -> {
             String accessible = node.accessibleName == null ? "" : node.accessibleName;
-            if (query.equals(accessible) || (!accessible.isBlank() && query.equalsIgnoreCase(accessible))) {
+            if (labelMatches(accessible, query)) {
                 addHit(hits, node);
                 return;
             }
             String text = HtmlTree.textOf(node);
-            if (query.equals(text)) {
+            if (labelMatches(text, query)) {
                 if ("label".equals(node.tag()) && node.attributes.containsKey("for")) {
                     DomNode control = byId.get(node.attributes.get("for"));
                     if (control != null) addHit(hits, control);
@@ -2183,7 +2183,7 @@ public final class TargetVerb {
                 addHit(hits, node);
                 return;
             }
-            if (query.equals(attr(node, "aria-label")) || equalsIgnore(query, attr(node, "aria-label"))) addHit(hits, node);
+            if (labelMatches(attr(node, "aria-label"), query)) addHit(hits, node);
             else if (query.equals(attr(node, "id"))) addHit(hits, node);
             else if (query.equals(attr(node, "placeholder")) || equalsIgnore(query, attr(node, "placeholder"))) addHit(hits, node);
         });
@@ -2205,6 +2205,19 @@ public final class TargetVerb {
 
     private static boolean equalsIgnore(String query, String value) {
         return value != null && !value.isBlank() && query.equalsIgnoreCase(value);
+    }
+
+    /** Exact name, or the visible label after an icon prefix that is not a letter or digit. */
+    static boolean labelMatches(String name, String query) {
+        if (name == null || query == null) return false;
+        String left = name.replaceAll("\\s+", " ").trim();
+        String right = query.replaceAll("\\s+", " ").trim();
+        if (left.isEmpty() || right.isEmpty()) return false;
+        if (left.equalsIgnoreCase(right)) return true;
+        if (left.length() <= right.length()) return false;
+        if (!left.substring(left.length() - right.length()).equalsIgnoreCase(right)) return false;
+        char before = left.charAt(left.length() - right.length() - 1);
+        return !Character.isLetterOrDigit(before);
     }
 
     private static String attr(DomNode node, String name) {

@@ -62,6 +62,15 @@ class LiveReplyRulesTest {
         assertTrue(TargetVerb.selectedNode(option));
     }
 
+    @Test
+    void iconPrefixStillMatchesTheVisibleLabel() {
+        assertTrue(TargetVerb.labelMatches("account_circle Dan", "Dan"));
+        assertTrue(TargetVerb.labelMatches("Dan", "dan"));
+        assertFalse(TargetVerb.labelMatches("Danville", "Dan"));
+        assertFalse(TargetVerb.labelMatches("Jordan", "Dan"));
+        assertFalse(TargetVerb.labelMatches("", "Dan"));
+    }
+
     private static Map<String, Object> quiet(boolean changed) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("applied", false);
