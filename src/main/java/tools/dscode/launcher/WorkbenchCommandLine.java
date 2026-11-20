@@ -130,7 +130,8 @@ final class WorkbenchCommandLine {
             Long runTimeoutSeconds,
             boolean quiet,
             Integer maxSteps,
-            boolean allSteps
+            boolean allSteps,
+            boolean noopGlue
     ) {
         public Parsed {
             selects = selects == null ? List.of() : List.copyOf(selects);
@@ -172,14 +173,14 @@ final class WorkbenchCommandLine {
         args = sessionQueryArgs(normalizeFlags(rewriteLiveStart(args)));
         Path cwd = Path.of("").toAbsolutePath().normalize();
         if (args == null || args.length == 0) {
-            return new Parsed("ui", cwd, null, null, null, null, null, new String[]{"ui", cwd.toString()}, Coordination.empty(), null, false, false, false, List.of(), List.of(), null, null, false, null, false);
+            return new Parsed("ui", cwd, null, null, null, null, null, new String[]{"ui", cwd.toString()}, Coordination.empty(), null, false, false, false, List.of(), List.of(), null, null, false, null, false, false);
         }
         String command = args[0];
         if ("export-guidance".equals(command) || "help".equals(command)) {
             Path output = "export-guidance".equals(command) && args.length >= 2 && !isFlag(args[1])
                     ? Path.of(args[1])
                     : Path.of(".pickleball");
-            return new Parsed(command, cwd, output, null, null, null, null, args.clone(), Coordination.empty(), null, false, false, false, List.of(), List.of(), null, null, false, null, false);
+            return new Parsed(command, cwd, output, null, null, null, null, args.clone(), Coordination.empty(), null, false, false, false, List.of(), List.of(), null, null, false, null, false, false);
         }
 
         String tags = null;
@@ -218,6 +219,7 @@ final class WorkbenchCommandLine {
         boolean quiet = false;
         Integer maxSteps = null;
         boolean allSteps = false;
+        boolean noopGlue = false;
         java.util.LinkedHashSet<String> seenFlags = new java.util.LinkedHashSet<>();
         String absorb = null;
         boolean tagsSplitOpen = false;
@@ -298,6 +300,11 @@ final class WorkbenchCommandLine {
             }
             if ("--all".equals(token)) {
                 allSteps = true;
+                absorb = null;
+                continue;
+            }
+            if ("--noop".equals(token)) {
+                noopGlue = true;
                 absorb = null;
                 continue;
             }
@@ -627,12 +634,12 @@ final class WorkbenchCommandLine {
             forwarded.addAll(rest);
             return new Parsed(
                     command, project, null, tags, name, example, retention, forwarded.toArray(String[]::new),
-                    coordination, version, planOnly, refreshIndex, fullScan, runVars, selects, stepTimeoutSeconds, runTimeoutSeconds, quiet, maxSteps, allSteps
+                    coordination, version, planOnly, refreshIndex, fullScan, runVars, selects, stepTimeoutSeconds, runTimeoutSeconds, quiet, maxSteps, allSteps, noopGlue
             );
         }
         return new Parsed(
                 command, project, null, tags, name, example, retention, args.clone(),
-                coordination, version, planOnly, refreshIndex, fullScan, runVars, selects, stepTimeoutSeconds, runTimeoutSeconds, quiet, maxSteps, allSteps
+                coordination, version, planOnly, refreshIndex, fullScan, runVars, selects, stepTimeoutSeconds, runTimeoutSeconds, quiet, maxSteps, allSteps, noopGlue
         );
     }
 

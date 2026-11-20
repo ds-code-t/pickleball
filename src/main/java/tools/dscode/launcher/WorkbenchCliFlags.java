@@ -40,7 +40,7 @@ final class WorkbenchCliFlags {
     static final Map<String, List<String>> USED_BY = Map.of(
             "validate", List.of(
                     "--tags", "--tags-file", "--tags-b64", "--name", "--run-id",
-                    "--max-steps", "--all"
+                    "--max-steps", "--all", "--noop"
             ),
             "act", List.of(
                     "--target", "--kind", "--query", "--ref", "--value", "--snap",

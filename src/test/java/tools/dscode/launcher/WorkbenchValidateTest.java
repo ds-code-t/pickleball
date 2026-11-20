@@ -424,6 +424,42 @@ class WorkbenchValidateTest {
         assertFalse(out.contains("undefined:"), out);
     }
 
+    @Test
+    void noopListsEmptyConsumerGlueAndLeavesRealGlue() throws Exception {
+        Path feature = project.resolve("src/test/resources/features/click.feature");
+        Files.createDirectories(feature.getParent());
+        Files.writeString(feature, """
+                Feature: Clicks
+                  Scenario: a link
+                    Then I click the "Save" Link
+                """);
+        Path glue = project.resolve("src/test/java/com/example/ClickGlue.java");
+        Files.createDirectories(glue.getParent());
+        Files.writeString(glue, """
+                package com.example;
+                import io.cucumber.java.en.Then;
+                public class ClickGlue {
+                  @Then("I click the {string} Link")
+                  public void clickLink(String name) {}
+                  @Then("I click the {string} Button")
+                  public void clickButton(String name) { name.length(); }
+                }
+                """);
+        compileGlue(project);
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        int code = WorkbenchValidate.run(project, null, null, null, null, false, true,
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream()));
+        String out = stdout.toString(StandardCharsets.UTF_8);
+        assertEquals(1, code, out);
+        assertTrue(out.contains("noop:"), out);
+        assertTrue(out.contains("clickLink"), out);
+        assertTrue(out.contains("I click the {string} Link"), out);
+        assertTrue(out.contains("noop:true"), out);
+        assertFalse(out.contains("clickButton"), out);
+        assertTrue(out.contains("noop=1"), out);
+    }
+
     private static void compileGlue(Path project) throws Exception {
         Path sourceRoot = project.resolve("src/test/java");
         List<Path> sources = new ArrayList<>();

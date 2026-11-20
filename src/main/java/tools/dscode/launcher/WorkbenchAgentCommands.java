@@ -118,6 +118,7 @@ public final class WorkbenchAgentCommands {
                         parsed.coordination().runId(),
                         parsed.maxSteps(),
                         parsed.allSteps(),
+                        parsed.noopGlue(),
                         safeOut,
                         safeErr
                 );

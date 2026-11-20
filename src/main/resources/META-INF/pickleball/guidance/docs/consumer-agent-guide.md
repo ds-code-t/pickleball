@@ -62,7 +62,7 @@ Headless Workbench is not a headless browser. `isolate` and `execute-step` skip 
 
 Disposable FTS5 `reports/diagnostic-runs/diagnostics.db` (table `record_fts`). JSON stays authoritative. DiagnosticCli rebuild on `reports/diagnostic-runs` rewrites `run-index.json` and `run-catalog.json`. Delete `diagnostics.db`, `-wal`, `-shm` to drop it. Missing file: `query search` reads the JSON. Present file rebuilds only when a source is newer.
 
-Performance: warm verb <=1s, UI p95 <=150ms, idle after panel-open <=0.1 core in 500ms, compact <=2 KiB. selftest ui --cpu. screenshot --out writes PNG. Replies carry elapsedMs, timing. Over 2 KiB, inspect, page, and step print a compact object; text in .pickleball/agent-full/. Steps log .pickleball/logs/step-timing.jsonl (on; pkb_step_timing=off disables). Recipe: start --url= --browser=chrome, panel-open --target=page, chat-send, chat_wait, live-stop, ui-catalog once, ui-apply, ui-poll.
+Performance: warm verb <=1s, UI p95 <=150ms, idle<=0.1 core, compact <=2 KiB. screenshot --out writes PNG. Replies carry elapsedMs. Over 2 KiB, inspect, page, and step print a compact object. Steps log .pickleball/logs/step-timing.jsonl. `validate --noop` lists empty glue. Recipe: start --url= --browser=chrome, panel-open --target=page, chat-send, chat_wait, live-stop, ui-catalog once, ui-apply, ui-poll.
 
 ## Generated guidance lifecycle
 

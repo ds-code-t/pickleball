@@ -7,6 +7,7 @@ import tools.dscode.control.protocol.WorkbenchFeatureIndex;
 import tools.dscode.control.protocol.Workspace;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintStream;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
@@ -66,7 +67,7 @@ public final class WorkbenchValidate {
     }
 
     public static int run(Path project, String tags, String name, PrintStream out, PrintStream err) {
-        return run(project, tags, name, null, null, false, out, err);
+        return run(project, tags, name, null, null, false, false, out, err);
     }
 
     /**
@@ -74,6 +75,7 @@ public final class WorkbenchValidate {
      *              (blank means no consumer patterns; core steps still match)
      * @param maxSteps step budget; null keeps {@link #STEP_CAP}
      * @param allSteps when true, there is no step cap ({@code --all} wins over {@code maxSteps})
+     * @param noop when true, empty consumer step definitions are listed as {@code noop}
      */
     public static int run(
             Path project,
@@ -82,6 +84,20 @@ public final class WorkbenchValidate {
             String runId,
             Integer maxSteps,
             boolean allSteps,
+            PrintStream out,
+            PrintStream err
+    ) {
+        return run(project, tags, name, runId, maxSteps, allSteps, false, out, err);
+    }
+
+    public static int run(
+            Path project,
+            String tags,
+            String name,
+            String runId,
+            Integer maxSteps,
+            boolean allSteps,
+            boolean noop,
             PrintStream out,
             PrintStream err
     ) {
@@ -122,6 +138,8 @@ public final class WorkbenchValidate {
         int ambiguous = count(findings, "ambiguous");
         int unresolved = count(findings, "unresolved");
         int skipped = Math.max(0, selection.hits().size() - budget.scenarios);
+        List<Finding> noops = noop ? emptyGlue(project, runId, out) : List.of();
+        findings.addAll(noops);
         if (out != null) {
             if (budget.capped) {
                 out.println("fix: narrow validate with --tags or --name, or pass --max-steps / --all");
@@ -132,11 +150,261 @@ public final class WorkbenchValidate {
             out.println("validate undefined=" + undefined
                     + " ambiguous=" + ambiguous
                     + " unresolved=" + unresolved
+                    + " noop=" + noops.size()
                     + " elapsedMs=" + elapsed
                     + " capped=" + budget.capped
                     + " skipped=" + skipped);
         }
-        return undefined + ambiguous + unresolved == 0 ? 0 : 1;
+        return undefined + ambiguous + unresolved + noops.size() == 0 ? 0 : 1;
+    }
+
+    /**
+     * Empty consumer step bodies. Framework classes are skipped. A method whose
+     * class file cannot be read is not listed. {@code pkb_noop_glue=fail} is
+     * the execute-step failure switch; this list is the same detection.
+     */
+    static List<Finding> emptyGlue(Path project, String runId, PrintStream out) {
+        List<Finding> found = new ArrayList<>();
+        if (project == null) return found;
+        List<Path> roots = classRoots(project);
+        List<URL> urls = new ArrayList<>();
+        Set<String> urlSeen = new LinkedHashSet<>();
+        for (Path root : roots) addUrl(urls, urlSeen, root);
+        for (Path entry : testClasspathEntries(project)) addUrl(urls, urlSeen, entry);
+        if (urls.isEmpty()) return found;
+        List<String> prefixes = gluePrefixes(project, runId);
+        if (prefixes != null && prefixes.isEmpty()) return found;
+        ClassLoader parent = WorkbenchValidate.class.getClassLoader();
+        try (URLClassLoader loader = new GlueClassLoader(urls.toArray(URL[]::new), parent)) {
+            for (Path root : roots) {
+                if (root == null || !Files.isDirectory(root)) continue;
+                try (Stream<Path> walk = Files.walk(root)) {
+                    for (Path path : walk.filter(file -> file.getFileName().toString().endsWith(".class")).toList()) {
+                        String relative = root.relativize(path).toString().replace('\\', '/');
+                        if (!relative.endsWith(".class") || relative.indexOf('$') >= 0) continue;
+                        String className = relative.substring(0, relative.length() - ".class".length()).replace('/', '.');
+                        if (className.startsWith("tools.dscode.") || !packageAllowed(className, prefixes)) continue;
+                        Class<?> type;
+                        try {
+                            type = Class.forName(className, false, loader);
+                        } catch (Throwable ignored) {
+                            continue;
+                        }
+                        Method[] methods;
+                        try {
+                            methods = type.getDeclaredMethods();
+                        } catch (Throwable ignored) {
+                            continue;
+                        }
+                        for (Method method : methods) {
+                            if (!consumerEmpty(method)) continue;
+                            String pattern = stepPattern(method);
+                            if (pattern == null) continue;
+                            String where = className + "#" + method.getName();
+                            found.add(new Finding(
+                                    "noop",
+                                    where,
+                                    pattern + " noop:true empty consumer glue. Set pkb_noop_glue=fail to fail the step."
+                            ));
+                        }
+                    }
+                } catch (IOException ignored) {
+                    // A class tree that cannot be read is not a match.
+                }
+            }
+        } catch (IOException ignored) {
+            return found;
+        }
+        return found;
+    }
+
+    private static List<String> gluePrefixes(Path project, String runId) {
+        if (runId == null || runId.isBlank()) return null;
+        Path workspace = Workspace.directory(project, runId.trim()).toAbsolutePath().normalize();
+        String packages = "";
+        if (Workspace.exists(workspace)) {
+            String stored = Workspace.readRunVars(workspace).get("pkb_glue");
+            packages = stored == null ? "" : stored;
+        }
+        if (packages.isBlank()) return List.of();
+        List<String> prefixes = new ArrayList<>();
+        for (String raw : packages.split(",")) {
+            String pkg = raw.trim();
+            if (!pkg.isEmpty()) prefixes.add(pkg);
+        }
+        return prefixes;
+    }
+
+    private static String stepPattern(Method method) {
+        StringBuilder joined = new StringBuilder();
+        try {
+            for (Annotation annotation : method.getDeclaredAnnotations()) {
+                collectPattern(joined, annotation);
+            }
+        } catch (Throwable ignored) {
+            return null;
+        }
+        return joined.isEmpty() ? null : joined.toString();
+    }
+
+    private static void collectPattern(StringBuilder joined, Annotation annotation) {
+        String name = annotation.annotationType().getName();
+        if (!isLanguageStepAnnotation(name)) return;
+        try {
+            Object value = annotation.annotationType().getMethod("value").invoke(annotation);
+            if (value instanceof String pattern && !pattern.isBlank()) {
+                if (!joined.isEmpty()) joined.append(" | ");
+                joined.append(pattern);
+            } else if (value instanceof Object[] nested) {
+                for (Object item : nested) {
+                    if (item instanceof Annotation inner) collectPattern(joined, inner);
+                }
+            }
+        } catch (ReflectiveOperationException ignored) {
+            // An annotation without a string value is not a step pattern.
+        }
+    }
+
+    /** Same rule as the worker's {@code NoopGlue}. Reflection keeps the launcher off that module. */
+    static boolean consumerEmpty(Method method) {
+        if (method == null) return false;
+        String className = method.getDeclaringClass().getName();
+        if (className.startsWith("tools.dscode.") || "tools.dscode".equals(className)) return false;
+        try {
+            Class<?> type = Class.forName("tools.dscode.control.bridge.NoopGlue");
+            Method check = type.getMethod("consumerEmpty", Method.class);
+            return Boolean.TRUE.equals(check.invoke(null, method));
+        } catch (ReflectiveOperationException failure) {
+            return bytecodeEmpty(method);
+        }
+    }
+
+    private static boolean bytecodeEmpty(Method method) {
+        String resource = method.getDeclaringClass().getName().replace('.', '/') + ".class";
+        ClassLoader loader = method.getDeclaringClass().getClassLoader();
+        InputStream in = loader == null
+                ? ClassLoader.getSystemResourceAsStream(resource)
+                : loader.getResourceAsStream(resource);
+        if (in == null) return false;
+        try (in) {
+            return Boolean.TRUE.equals(codeReturnsOnly(in.readAllBytes(), method.getName()));
+        } catch (IOException | RuntimeException failure) {
+            return false;
+        }
+    }
+
+    /** True when the named method's code is only a return. False when real code or the method is missing. */
+    static Boolean codeReturnsOnly(byte[] bytes, String methodName) {
+        try {
+            Cursor cursor = new Cursor(bytes);
+            if (cursor.u4() != 0xCAFEBABE) return Boolean.FALSE;
+            cursor.u2();
+            cursor.u2();
+            int count = cursor.u2();
+            String[] utf8 = new String[count];
+            for (int i = 1; i < count; i++) {
+                int tag = cursor.u1();
+                switch (tag) {
+                    case 1 -> {
+                        int length = cursor.u2();
+                        utf8[i] = new String(cursor.bytes(length), StandardCharsets.UTF_8);
+                    }
+                    case 7, 8, 16, 19, 20 -> cursor.skip(2);
+                    case 15 -> cursor.skip(3);
+                    case 3, 4, 9, 10, 11, 12, 17, 18 -> cursor.skip(4);
+                    case 5, 6 -> {
+                        cursor.skip(8);
+                        i++;
+                    }
+                    default -> {
+                        return Boolean.FALSE;
+                    }
+                }
+            }
+            cursor.u2();
+            cursor.u2();
+            cursor.u2();
+            int interfaces = cursor.u2();
+            cursor.skip(interfaces * 2);
+            int fields = cursor.u2();
+            for (int i = 0; i < fields; i++) skipMember(cursor);
+            int methods = cursor.u2();
+            Boolean empty = null;
+            for (int i = 0; i < methods; i++) {
+                cursor.u2();
+                int nameIndex = cursor.u2();
+                cursor.u2();
+                int attributes = cursor.u2();
+                String name = nameIndex > 0 && nameIndex < utf8.length ? utf8[nameIndex] : null;
+                boolean match = methodName.equals(name);
+                for (int a = 0; a < attributes; a++) {
+                    int attrName = cursor.u2();
+                    int length = cursor.u4();
+                    byte[] body = cursor.bytes(length);
+                    if (!match) continue;
+                    String attr = attrName > 0 && attrName < utf8.length ? utf8[attrName] : "";
+                    if (!"Code".equals(attr) || body.length < 8) continue;
+                    Cursor code = new Cursor(body);
+                    code.u2();
+                    code.u2();
+                    int codeLength = code.u4();
+                    if (codeLength < 0 || codeLength > body.length - 8) continue;
+                    byte[] opcodes = code.bytes(codeLength);
+                    boolean returns = opcodes.length == 1 && (opcodes[0] & 0xFF) == 0xB1;
+                    empty = returns;
+                }
+            }
+            return Boolean.TRUE.equals(empty);
+        } catch (RuntimeException failure) {
+            return Boolean.FALSE;
+        }
+    }
+
+    private static void skipMember(Cursor cursor) {
+        cursor.u2();
+        cursor.u2();
+        cursor.u2();
+        int attributes = cursor.u2();
+        for (int i = 0; i < attributes; i++) {
+            cursor.u2();
+            int length = cursor.u4();
+            cursor.skip(length);
+        }
+    }
+
+    private static final class Cursor {
+        private final byte[] data;
+        private int at;
+
+        private Cursor(byte[] data) {
+            this.data = data;
+        }
+
+        private int u1() {
+            if (at >= data.length) throw new IllegalArgumentException("class file truncated");
+            return data[at++] & 0xFF;
+        }
+
+        private int u2() {
+            return (u1() << 8) | u1();
+        }
+
+        private int u4() {
+            return (u1() << 24) | (u1() << 16) | (u1() << 8) | u1();
+        }
+
+        private void skip(int n) {
+            if (n < 0 || at + n > data.length) throw new IllegalArgumentException("class file truncated");
+            at += n;
+        }
+
+        private byte[] bytes(int n) {
+            if (n < 0 || at + n > data.length) throw new IllegalArgumentException("class file truncated");
+            byte[] slice = new byte[n];
+            System.arraycopy(data, at, slice, 0, n);
+            at += n;
+            return slice;
+        }
     }
 
     private static List<StepDef> glueFor(Path project, String runId, PrintStream out) {
