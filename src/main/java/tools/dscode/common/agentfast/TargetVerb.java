@@ -353,17 +353,70 @@ public final class TargetVerb {
             List<SnapRow> rowsAfter = wantDiff
                     ? elementRows(page.session.connection(), page.session.id, docVersion(page.session.connection())) : List.of();
             if (effect.refused()) {
-                Outcome failed = fail("act", "could not land");
+                // A cover is its own error. Disabled, inert, and detached stay "could not land".
+                boolean covered = "covered".equals(effect.reason());
+                Outcome failed = fail("act", covered ? "covered" : "could not land");
                 failed.body().put("used", effect.used());
                 failed.body().put("dispatched", false);
                 failed.body().put("visible", false);
                 failed.body().put("reason", effect.reason());
+                if (covered) failed.body().put("coveredBy", effect.detail());
                 stamp(failed.body(), page.session.connection(), node);
                 putEntered(failed.body(), runId, page.session.connection());
                 putShadow(failed.body(), node);
                 putSnapDiff(failed.body(), args, titleBefore, title(page.session.connection()), before, docVersion(page.session.connection()), rowsBefore, rowsAfter);
                 putAutoSnap(failed.body(), args, project, runId, autoBefore, () -> compactBrowser(page.session, runId, target));
                 return failed;
+            }
+            String condition = blank(args.get("condition"));
+            // The condition is the success test. A quiet click still waits, and it is not sent again.
+            // A refused click already returned. A click that was not dispatched does not wait.
+            if (!condition.isBlank() && (effect.applied() || effect.quiet())) {
+                boolean met = waitPoll(
+                        page.session.connection(),
+                        condition,
+                        query,
+                        timeoutMs(args),
+                        scopedFrame(runId, target),
+                        enteredSession(page.session.connection(), runId));
+                String titleAfter = title(page.session.connection());
+                String after = docVersion(page.session.connection());
+                if (wantDiff) {
+                    rowsAfter = elementRows(page.session.connection(), page.session.id, after);
+                }
+                if (!met) {
+                    Outcome failed = fail("act", "timeout");
+                    // The click landed when the effect was read back. A quiet click that never meets the condition did not.
+                    failed.body().put("applied", effect.applied());
+                    failed.body().put("condition", condition);
+                    failed.body().put("title", titleAfter);
+                    if (kind.isBlank() || "click".equals(kind)) {
+                        failed.body().put("dispatched", true);
+                        failed.body().put("visible", effect.applied());
+                    }
+                    putSnapDiff(failed.body(), args, titleBefore, titleAfter, before, after, rowsBefore, rowsAfter);
+                    putAutoSnap(failed.body(), args, project, runId, autoBefore, () -> compactBrowser(page.session, runId, target));
+                    stamp(failed.body(), page.session.connection(), node);
+                    putEntered(failed.body(), runId, page.session.connection());
+                    putShadow(failed.body(), node);
+                    return failed;
+                }
+                Map<String, Object> body = base("act", effect.used(), "browser", target);
+                body.put("applied", true);
+                body.put("docVersion", after);
+                body.put("kind", kind.isBlank() ? "click" : kind);
+                body.put("condition", condition);
+                body.put("title", titleAfter);
+                if (kind.isBlank() || "click".equals(kind)) {
+                    body.put("dispatched", true);
+                    body.put("visible", true);
+                }
+                putSnapDiff(body, args, titleBefore, titleAfter, before, after, rowsBefore, rowsAfter);
+                putAutoSnap(body, args, project, runId, autoBefore, () -> compactBrowser(page.session, runId, target));
+                stamp(body, page.session.connection(), node);
+                putEntered(body, runId, page.session.connection());
+                putShadow(body, node);
+                return ok(body);
             }
             if (effect.quiet()) {
                 String titleAfter = title(page.session.connection());
@@ -393,43 +446,12 @@ public final class TargetVerb {
                 putAutoSnap(failed.body(), args, project, runId, autoBefore, () -> compactBrowser(page.session, runId, target));
                 return failed;
             }
-            String condition = blank(args.get("condition"));
-            if (!condition.isBlank()) {
-                boolean met = waitPoll(
-                        page.session.connection(),
-                        condition,
-                        query,
-                        timeoutMs(args),
-                        scopedFrame(runId, target),
-                        enteredSession(page.session.connection(), runId));
-                if (!met) {
-                    Outcome failed = fail("act", "timeout");
-                    failed.body().put("applied", true);
-                    failed.body().put("condition", condition);
-                    String timedOut = docVersion(page.session.connection());
-                    List<SnapRow> timedRows = wantDiff
-                            ? elementRows(page.session.connection(), page.session.id, timedOut) : List.of();
-                    putSnapDiff(failed.body(), args, titleBefore, title(page.session.connection()), before, timedOut, rowsBefore, timedRows);
-                    putAutoSnap(failed.body(), args, project, runId, autoBefore, () -> compactBrowser(page.session, runId, target));
-                    stamp(failed.body(), page.session.connection(), node);
-                    putEntered(failed.body(), runId, page.session.connection());
-                    putShadow(failed.body(), node);
-                    return failed;
-                }
-                if (wantDiff) {
-                    rowsAfter = elementRows(page.session.connection(), page.session.id, docVersion(page.session.connection()));
-                }
-            }
             String after = docVersion(page.session.connection());
             String titleAfter = title(page.session.connection());
             Map<String, Object> body = base("act", effect.used(), "browser", target);
             body.put("applied", true);
             body.put("docVersion", after);
-            body.put("kind", blank(args.get("kind")).isBlank() ? "click" : blank(args.get("kind")));
-            if (!condition.isBlank()) {
-                body.put("condition", condition);
-                body.put("title", titleAfter);
-            }
+            body.put("kind", kind.isBlank() ? "click" : kind);
             if (kind.isBlank() || "click".equals(kind)) {
                 body.put("dispatched", true);
                 body.put("visible", true);
@@ -1156,6 +1178,10 @@ public final class TargetVerb {
             return Effect.refused(inputOff ? "js" : "cdp", inert(control) ? "inert" : "disabled");
         }
         String framed = cdpSessionOf(node);
+        if ("click".equals(kind)) {
+            String coveredBy = coverOf(session.connection(), framed, acted);
+            if (!coveredBy.isBlank()) return Effect.covered(inputOff ? "js" : "cdp", coveredBy);
+        }
         if (!framed.isBlank()) return actInFrame(session.connection(), framed, kind, value, node);
         if ("click".equals(kind) && insideFrame(node) && !closedShadow(acted)) {
             return clickInPlace(session.connection(), node);
@@ -1257,6 +1283,37 @@ public final class TargetVerb {
             if (cursor.iframe) return true;
         }
         return false;
+    }
+
+    /**
+     * Role and name of an element painted over the target's centre, or blank when the click would reach it.
+     * Closed-shadow hosts are not covers: {@code elementFromPoint} returns the host, and the walk crosses it.
+     */
+    private static String coverOf(CdpConnection cdp, String sessionId, DomNode node) {
+        String raw = callOnNode(cdp, sessionId, node, ""
+                + "function(){"
+                + "function chain(outer,node){var cursor=node,hops=0;"
+                + "while(cursor&&hops++<30){if(cursor===outer)return true;"
+                + "var root=cursor.getRootNode?cursor.getRootNode():null;"
+                + "if(root&&root.host)cursor=root.host;else cursor=cursor.parentElement;}"
+                + "return false;}"
+                + "try{var el=this;if(!el||!el.getBoundingClientRect)return '';"
+                + "var r=el.getBoundingClientRect();if(r.width<1||r.height<1)return '';"
+                + "var x=r.left+r.width/2,y=r.top+r.height/2;"
+                + "var doc=el.ownerDocument||document;var top=null;"
+                + "if(doc.elementsFromPoint){var stack=doc.elementsFromPoint(x,y);top=stack&&stack.length?stack[0]:null;}"
+                + "else if(doc.elementFromPoint)top=doc.elementFromPoint(x,y);"
+                + "var guard=0;while(top&&top.shadowRoot&&guard++<8){"
+                + "var inner=top.shadowRoot.elementFromPoint(x,y);if(!inner||inner===top)break;top=inner;}"
+                + "if(!top||chain(el,top)||chain(top,el))return '';"
+                + "var role=(top.getAttribute&&top.getAttribute('role'))||(top.tagName?top.tagName.toLowerCase():'element');"
+                + "var name=top.getAttribute? (top.getAttribute('aria-label')||''):'';"
+                + "name=String(name).replace(/\\s+/g,' ').trim();"
+                + "if(name.length>80)name=name.slice(0,80);"
+                + "if(name)return role+' \"'+name+'\"';"
+                + "if(top.id)return (top.tagName?top.tagName.toLowerCase():'element')+'#'+top.id;"
+                + "return role;}catch(e){return '';}}");
+        return raw == null ? "" : raw.trim();
     }
 
     /** A click was sent once. Wait for a visible change, and do not send it again. */
@@ -3425,9 +3482,14 @@ public final class TargetVerb {
         for (DomNode shadow : node.shadowRoots) walk(shadow, visit);
     }
 
-    private record Effect(String used, boolean applied, String disposition, String reason) {
+    private record Effect(String used, boolean applied, String disposition, String reason, String detail) {
         Effect(String used, boolean applied) {
-            this(used, applied, applied ? "applied" : "failed", "");
+            this(used, applied, applied ? "applied" : "failed", "", "");
+        }
+
+        /** Existing four-argument calls keep an empty detail. */
+        Effect(String used, boolean applied, String disposition, String reason) {
+            this(used, applied, disposition, reason == null ? "" : reason, "");
         }
 
         static Effect changed(String used) {
@@ -3440,6 +3502,10 @@ public final class TargetVerb {
 
         static Effect refused(String used, String reason) {
             return new Effect(used, false, "refused", reason == null || reason.isBlank() ? "detached" : reason);
+        }
+
+        static Effect covered(String used, String by) {
+            return new Effect(used, false, "refused", "covered", by == null ? "" : by);
         }
 
         boolean refused() {

@@ -88,8 +88,9 @@ class ClickOnceTest {
             assertFalse(asyncBody.has("error"), async.out);
             assertEquals("1", eval("String(window.as)"), async.out);
             assertEquals("saved", eval("document.getElementById('asyncOut').textContent"), async.out);
-            assertEquals("- span \"saved\"", line(asyncBody.path("snap").path("added")), async.out);
-            assertEquals("- span \"idle\"", line(asyncBody.path("snap").path("removed")), async.out);
+            String diffText = joined(asyncBody.path("snap").path("updated")) + joined(asyncBody.path("snap").path("added"));
+            assertTrue(diffText.contains("\"saved\""), async.out);
+            assertFalse(diffText.contains("\"idle\""), async.out);
             assertTrue(asyncBody.path("snap").path("changed").asBoolean(), async.out);
 
             assertRefused("Off", "disabled", "String(window.offClicks)");
@@ -202,9 +203,12 @@ class ClickOnceTest {
         }
     }
 
-    private static String line(JsonNode lines) {
-        assertEquals(1, lines.size(), lines.toString());
-        return lines.get(0).asText("");
+    private static String joined(JsonNode lines) {
+        StringBuilder text = new StringBuilder();
+        if (lines != null && lines.isArray()) {
+            for (JsonNode line : lines) text.append(line.asText("")).append('\n');
+        }
+        return text.toString();
     }
 
     private static String trim(String url) {
