@@ -43,7 +43,7 @@ Doc checks this session: `scripts/refresh_agent_index.py --check`, `scripts/veri
 | P7-11 Real paths | done | `NavigateDataFileTest` and `ConfirmTest` passed in the batch. Warm bound is item 8. |
 | P7-12 Prebuilt docs | done | "Prebuilt one-call functions" is in `docs/dynamic-control-api.md`. The three doc checks passed. |
 | F-1 `SQLITE_BUSY` | done | `EmbeddedMultiProcessTest` and `StoreConcurrencyTest.aDatabaseFileLockIsRetried` passed in the batch. Production retry was already on the branch (`6e31c90f`). Not re-mutated this session. |
-| CI | not green | Job `agent-fast` is in `.github/workflows/agent-contract.yml` and the release gate requires it. Run [44699195747](https://github.com/ds-code-t/pickleball/actions/runs/44699195747) on `0d026222`: ubuntu agent-fast, the Windows contract job, macOS targeted Store, and Java DOM live Chrome succeeded. macOS agent-fast failed `SelftestCpuBenchTest` at `cores=0.24` on one 500 ms headed slice (`p95Ms=33`); the idle figure is now the quietest of three slices, and the 0.1 core and 150 ms bounds are unchanged. Windows agent-fast failed only `OopifAutoAttachTest` because `Page.navigate` timed out at 3 s (`navigated=false`). The host navigate timeout is now 15 s, the same as `BrowserSession`. Not green until a run of both fixes is. |
+| CI | green | Job `agent-fast` is in `.github/workflows/agent-contract.yml` and the release gate requires it. Run [44701707034](https://github.com/ds-code-t/pickleball/actions/runs/44701707034) on `ab593f0e` succeeded: ubuntu, windows, and macOS agent-fast, the Windows contract job, macOS targeted Store, Java DOM live Chrome, and the gate. Named Chrome tests ran. The Windows consumer-sim 8-restart-paths budget was not changed. |
 
 ## Still open
 
