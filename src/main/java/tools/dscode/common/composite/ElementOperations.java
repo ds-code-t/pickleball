@@ -217,6 +217,7 @@ public final class ElementOperations {
         tools.dscode.common.domoperations.MaskQuiet.await(driver, raw == null ? element : raw, 3_000L);
         if (raw instanceof CompositeWebElement composite) {
             composite.click();
+            tools.dscode.common.domoperations.MaskQuiet.requireClear(driver, raw, 3_000L);
             return;
         }
         if (primary()) {
@@ -225,6 +226,7 @@ public final class ElementOperations {
             library(driver);
         }
         raw.click();
+        tools.dscode.common.domoperations.MaskQuiet.requireClear(driver, raw == null ? element : raw, 3_000L);
     }
 
     /**

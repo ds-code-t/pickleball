@@ -2,7 +2,7 @@
 
 ## 3.0.0
 
-Live session fixes. `validate --noop` lists empty consumer glue and exits 1. A step restores the frame it started in, and the execute-step value names that frame (`frame=top` on the top document). `frame --reset` returns the Selenium driver to the top document, and `frame --enter` enters a named iframe when the driver can see it. Inspect and act replies include `frame`.
+Live session fixes. `validate --noop` lists empty consumer glue and exits 1. A step restores the frame it started in, and the execute-step value names that frame (`frame=top` on the top document). `frame --reset` returns the Selenium driver to the top document, and `frame --enter` enters a named iframe when the driver can see it. Inspect and act replies include `frame`. A click that is still covered by a loading mask fails instead of reporting success. `act --snap=diff` does not say `applied:false` in the same reply as `snap.changed:true`, and the diff lists stay short. `--condition` accepts `title=`, `text=`, `url=`, and `ref=<id>:selected`.
 
 Agent-fast verification. A compact inspect or page reply keeps `source=`, `query=`, `note=`, and the first `xpath=` from the offline text; the full text stays under `.pickleball/agent-full/`. Bare `ui` without `--ops` opens the Workbench controller. `ui --ops` applies a catalog batch.
 

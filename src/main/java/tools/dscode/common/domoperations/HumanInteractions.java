@@ -138,13 +138,21 @@ public final class HumanInteractions {
                     .pause(SHORT)
                     .build().perform();
         } catch (RuntimeException e) {
+            if (stuckMask(e)) throw e;
             try {
                 centerScroll(driver, el);
                 tools.dscode.common.composite.ElementOperations.click(driver, el);
             } catch (RuntimeException e2) {
+                if (stuckMask(e2)) throw e2;
                 jsClick(driver, el);
             }
         }
+        MaskQuiet.requireClear(driver, el, 3_000L);
+    }
+
+    private static boolean stuckMask(RuntimeException failure) {
+        String message = failure == null ? null : failure.getMessage();
+        return message != null && message.contains("loading mask still covers");
     }
 
     public static void doubleClick(WebDriver driver, WebElement el) {

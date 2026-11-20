@@ -1607,6 +1607,15 @@ public final class TargetVerb {
         if (condition.startsWith("title=")) {
             return condition.substring("title=".length()).equals(title(cdp, sessionId));
         }
+        if (condition.startsWith("url=")) {
+            String want = condition.substring("url=".length());
+            String href = href(cdp, sessionId);
+            return !want.isBlank() && (href.equals(want) || href.startsWith(want) || href.contains(want));
+        }
+        if (condition.startsWith("ref=") && condition.endsWith(":selected")) {
+            String ref = condition.substring("ref=".length(), condition.length() - ":selected".length());
+            return refSelected(cdp, ref, flags);
+        }
         String text = condition.startsWith("text=") ? condition.substring("text=".length()) : query;
         if (text == null || text.isBlank()) text = condition;
         if (text.isBlank() || EVENT_CONDITIONS.contains(text)) return !title(cdp, sessionId).isBlank();
@@ -1619,6 +1628,45 @@ public final class TargetVerb {
         } catch (RuntimeException failure) {
             return false;
         }
+    }
+
+    /** A remembered ref, or a name, is selected when aria-selected, selected, or aria-current says so. */
+    private static boolean refSelected(CdpConnection cdp, String ref, Map<String, String> flags) {
+        if (ref == null || ref.isBlank()) return false;
+        String key = ref.startsWith("ref:") ? ref : "ref:" + ref;
+        Hit hit = HITS.get(key);
+        try {
+            DomNode root = tree(cdp);
+            if (flags != null && flags.get("frame") != null && !flags.get("frame").isBlank()) {
+                root = Frames.scope(root, flags);
+            }
+            List<DomNode> hits = new ArrayList<>();
+            if (hit != null) {
+                long backend = hit.backend();
+                walk(root, node -> {
+                    if (node.backendNodeId == backend) addHit(hits, node);
+                });
+                if (hits.isEmpty() && hit.query() != null && !hit.query().isBlank()) hits.addAll(locate(root, hit.query(), Map.of()));
+                if (hits.isEmpty() && hit.name() != null && !hit.name().isBlank()) hits.addAll(named(root, hit.name()));
+            } else {
+                hits.addAll(named(root, ref));
+            }
+            for (DomNode node : hits) {
+                if (selectedNode(node)) return true;
+            }
+            return false;
+        } catch (RuntimeException failure) {
+            return false;
+        }
+    }
+
+    static boolean selectedNode(DomNode node) {
+        if (node == null) return false;
+        if ("true".equalsIgnoreCase(attr(node, "aria-selected"))) return true;
+        if (node.attributes.containsKey("selected")) return true;
+        String current = attr(node, "aria-current");
+        if ("page".equalsIgnoreCase(current) || "true".equalsIgnoreCase(current) || "step".equalsIgnoreCase(current)) return true;
+        return node.liveState != null && node.liveState.path("selected").asBoolean(false);
     }
 
     private static boolean waitEvent(Path project, String runId, CdpConnection cdp, String condition, long timeout, String sessionId) {
@@ -2580,10 +2628,16 @@ public final class TargetVerb {
     }
 
     private static String href(CdpConnection cdp) {
+        return href(cdp, "");
+    }
+
+    private static String href(CdpConnection cdp, String sessionId) {
         ObjectNode params = Jsons.object();
         params.put("returnByValue", true);
         params.put("expression", "location.href");
-        JsonNode value = cdp.call("Runtime.evaluate", params, Duration.ofSeconds(5));
+        JsonNode value = sessionId == null || sessionId.isBlank()
+                ? cdp.call("Runtime.evaluate", params, Duration.ofSeconds(5))
+                : cdp.call("Runtime.evaluate", params, sessionId, Duration.ofSeconds(5));
         return value.path("result").path("value").asText("");
     }
 
@@ -2723,8 +2777,46 @@ public final class TargetVerb {
             boolean titleChanged = titleBefore != null && titleAfter != null && !titleBefore.equals(titleAfter);
             boolean urlChanged = !urlOfVersion(before).equals(urlOfVersion(after));
             diff.put("changed", titleChanged || urlChanged || !added.isEmpty() || !removed.isEmpty() || !updated.isEmpty());
+            capSnap(diff, added, removed, updated);
         }
         body.put("snap", diff);
+        reconcileApplied(body);
+    }
+
+    /** A changed snap is not the same reply as {@code applied:false} / no visible change. */
+    static void reconcileApplied(Map<String, Object> body) {
+        if (body == null) return;
+        Object snap = body.get("snap");
+        if (!(snap instanceof Map<?, ?> diff)) return;
+        if (!body.containsKey("applied")) return;
+        if (!Boolean.TRUE.equals(diff.get("changed"))) return;
+        if (Boolean.FALSE.equals(body.get("dispatched"))) return;
+        body.put("applied", true);
+        if (body.containsKey("visible")) body.put("visible", true);
+        if ("no visible change".equals(body.get("reason"))) body.remove("reason");
+    }
+
+    private static void capSnap(Map<String, Object> diff, List<String> added, List<String> removed, List<String> updated) {
+        int omitted = capSnapLines(added) + capSnapLines(removed) + capSnapLines(updated);
+        if (omitted > 0) {
+            diff.put("truncated", true);
+            diff.put("omitted", omitted);
+        }
+    }
+
+    /** Keeps 20 lines and 160 characters. Returns how many lines were dropped. */
+    static int capSnapLines(List<String> lines) {
+        if (lines == null) return 0;
+        int omitted = 0;
+        if (lines.size() > 20) {
+            omitted = lines.size() - 20;
+            lines.subList(20, lines.size()).clear();
+        }
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
+            if (line != null && line.length() > 160) lines.set(i, line.substring(0, 157) + "...");
+        }
+        return omitted;
     }
 
     /** The document URL stored in front of the mutation count. */
