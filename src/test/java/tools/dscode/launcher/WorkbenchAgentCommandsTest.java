@@ -819,6 +819,74 @@ class WorkbenchAgentCommandsTest {
     }
 
     @Test
+    void confirmDoesNotPassWhenWrappedSurefireFailed() throws Exception {
+        writeProjectWrapper();
+        Path features = tempDir.resolve("src/test/resources/features");
+        Files.createDirectories(features);
+        Files.writeString(features.resolve("boom.feature"), """
+                @boom
+                Feature: Boom
+                  Scenario: It fails
+                    Given no
+                """);
+        Path catalogDir = tempDir.resolve("reports/diagnostic-runs");
+        Files.createDirectories(catalogDir);
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        int exit = WorkbenchAgentCommands.run(
+                new String[]{"discover", tempDir.toString(), "--tags=@boom", "--run-id=run-wrapped"},
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                (project, command, out, err) -> {
+                    try {
+                        Path index = AgentCoordination.runDirectory(project, "run-wrapped")
+                                .resolve("diagnostic").resolve("run-index.json");
+                        Files.createDirectories(index.getParent());
+                        Files.writeString(index, """
+                                {
+                                  "schemaVersion": 1,
+                                  "runId": "run-wrapped",
+                                  "outcome": "PASSED",
+                                  "counts": { "total": 1, "passed": 1, "failed": 0, "errors": 0 }
+                                }
+                                """);
+                        Path report = project.resolve("target/surefire-reports/TEST-boom.xml");
+                        Files.createDirectories(report.getParent());
+                        Files.writeString(report, """
+                                <testsuites failures="1"><testsuite name="boom" tests="1" failures="1" errors="0"></testsuite></testsuites>
+                                """);
+                        Files.writeString(catalogDir.resolve("run-catalog.json"), """
+                                {
+                                  "schemaVersion": 1,
+                                  "runs": [
+                                    {
+                                      "runId": "run-wrapped",
+                                      "outcome": "PASSED",
+                                      "runProfile": "pkb_tags=@boom",
+                                      "lineage": { "runPurpose": "workbench-discover" }
+                                    }
+                                  ]
+                                }
+                                """);
+                    } catch (Exception failure) {
+                        throw new RuntimeException(failure);
+                    }
+                    return 0;
+                }
+        );
+        assertEquals(1, exit);
+        String text = stdout.toString(StandardCharsets.UTF_8);
+        assertTrue(text.contains("summary status=FAILED"), text);
+        assertFalse(text.contains("summary status=PASSED"), text);
+        String record = Files.readString(
+                AgentCoordination.runDirectory(tempDir, "run-wrapped").resolve(AgentCoordination.RECORD_FILE)
+        );
+        assertTrue(record.contains("\"status\" : \"FAILED\""), record);
+        assertTrue(record.contains("\"failureCount\" : 1"), record);
+        assertFalse(record.contains("\"failureCount\" : 2"), record);
+        assertFalse(record.contains("\"status\" : \"PASSED\""), record);
+    }
+
+    @Test
     void discoverUpgradesAWorkerPassedRecordWhenTheFlatIndexHasAnError() throws Exception {
         writeProjectWrapper();
         Path features = tempDir.resolve("src/test/resources/features");

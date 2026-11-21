@@ -7,6 +7,9 @@ import tools.dscode.common.agentcontrol.AgentControl;
 import tools.dscode.common.agentcontrol.LaunchTemplates;
 import tools.dscode.common.agentcontrol.ObserveEvents;
 import tools.dscode.common.agentcontrol.ScenarioCapture;
+import tools.dscode.common.agentfast.LiveBrowserHost;
+import dev.domengine.session.SessionEvents;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -69,6 +72,7 @@ class AgentExpansionTest {
             assertFalse(Files.exists(temp.resolve(".pickleball/runs/obs2/agent/captured-service-calls.feature")));
             assertFalse(captured.out.contains("No Network.requestWillBeSent"), captured.out);
         } finally {
+            LiveBrowserHost.useEventsForTests(null);
             CompositeRuntime.resetForTests();
         }
     }
@@ -518,6 +522,7 @@ class AgentExpansionTest {
         assertTrue(html.contains("detail"), html);
         assertTrue(html.contains("border-radius:50%"), html);
         assertTrue(html.contains("scale(2"), html);
+        assertTrue(html.contains("data-pkb-copy=\"fallback\""), html);
         Capture bad = agent("magnifier", temp.toString(), "--html=" + page, "--zoom=12", "--x=1", "--y=1");
         assertEquals(2, bad.code);
         assertTrue(bad.err.contains("--zoom"), bad.err);
@@ -641,6 +646,64 @@ class AgentExpansionTest {
         assertTrue(feature.contains("EXECUTE SERVICE CALL"), feature);
         assertFalse(feature.contains("consoleAPICalled"), feature);
         assertTrue(ScenarioCapture.feature(ObserveEvents.parse(Files.readString(events))).contains("EXECUTE SERVICE CALL"));
+    }
+
+    @Test
+    void observe_and_capture_scenario_read_the_start_host_buffer() throws Exception {
+        LiveBrowserHost.useEventsForTests(null);
+        SessionEvents buffer = new SessionEvents();
+        buffer.accept(new ObjectMapper().readTree("""
+                {"method":"Network.requestWillBeSent","params":{"requestId":"r1","wallTime":1.7,"request":{"url":"https://api.example.test/health?ready=1","method":"GET"}}}
+                """));
+        LiveBrowserHost.useEventsForTests(buffer);
+        try {
+            tools.dscode.common.agentcontrol.AgentControl.Result observed =
+                    tools.dscode.common.agentcontrol.AgentControl.execute(temp, "host-obs", "observe", Map.of(), List.of(), "a");
+            String observedText = String.valueOf(observed.body());
+            assertEquals(0, observed.exit(), observedText);
+            assertTrue(observedText.contains("api.example.test"), observedText);
+            assertTrue(observedText.contains("\"count\":1") || observedText.contains("count=1"), observedText);
+            Path feature = temp.resolve("host-captured.feature");
+            tools.dscode.common.agentcontrol.AgentControl.Result captured =
+                    tools.dscode.common.agentcontrol.AgentControl.execute(
+                            temp, "host-cap", "capture-scenario", Map.of("out", feature.toString()), List.of(), "a");
+            String capturedText = String.valueOf(captured.body());
+            assertEquals(0, captured.exit(), capturedText);
+            String written = Files.readString(feature);
+            assertTrue(written.contains("EXECUTE SERVICE CALL"), written);
+            assertTrue(written.contains("health"), written);
+            assertFalse(written.contains("No Network.requestWillBeSent"), written);
+        } finally {
+            LiveBrowserHost.useEventsForTests(null);
+        }
+    }
+
+    @Test
+    void covers_command_capture_steps() throws Exception {
+        Path events = temp.resolve("clicks.jsonl");
+        Files.writeString(events, """
+                {"type":"click","ref":"s1.h1","query":"Save"}
+                {"type":"answer","ref":"s1.h2","value":"Ada"}
+                {"type":"answer","sensitive":"true","value":"secret","ref":"s1.h3"}
+                {"op":"snap","args":{"budget":"4"}}
+                """);
+        Path out = temp.resolve("steps.json");
+        Capture capture = agent("capture-steps", temp.toString(), "--events=" + events, "--out=" + out, "--run-id=cap");
+        assertEquals(0, capture.code, capture.out + capture.err);
+        assertTrue(capture.out.contains("\"count\":3"), capture.out);
+        String body = Files.readString(out);
+        assertTrue(body.contains("\"op\":\"act\""), body);
+        assertTrue(body.contains("\"kind\":\"click\""), body);
+        assertTrue(body.contains("\"kind\":\"type\""), body);
+        assertTrue(body.contains("\"op\":\"snap\""), body);
+        assertFalse(body.contains("secret"), body);
+        Path bare = Files.createDirectories(temp.resolve("bare"));
+        Path emptyOut = bare.resolve("captured-steps.json");
+        Capture empty = agent("capture-steps", bare.toString(), "--run-id=none", "--out=" + emptyOut);
+        assertEquals(0, empty.code, empty.out + empty.err);
+        assertTrue(empty.out.contains("no steps captured"), empty.out);
+        assertTrue(empty.out.contains("\"count\":0"), empty.out);
+        assertEquals("[]", Files.readString(emptyOut).trim());
     }
 
     @Test

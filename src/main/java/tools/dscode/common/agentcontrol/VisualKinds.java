@@ -113,7 +113,8 @@ public final class VisualKinds {
     public static String magnifierMarkup(String text, String zoomRaw) {
         String zoom = zoom(zoomRaw);
         String body = text == null || text.isBlank() ? "magnifier" : escape(text);
-        return "<div data-pkb-zoom=\"" + zoom + "\" style=\"transform:scale(" + zoom + ");transform-origin:0 0;\">"
+        return "<div data-pkb-zoom=\"" + zoom + "\" data-pkb-copy=\"fallback\" style=\"transform:scale(" + zoom
+                + ");transform-origin:0 0;color:#111;font:12px sans-serif;\">"
                 + body + "</div>";
     }
 

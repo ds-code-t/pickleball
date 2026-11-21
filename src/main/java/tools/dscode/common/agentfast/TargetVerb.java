@@ -1360,6 +1360,10 @@ public final class TargetVerb {
         if ("click".equals(kind) && insideFrame(node) && !closedShadow(acted)) {
             return clickInPlace(session.connection(), node);
         }
+        if ("hover".equals(kind) && hoverInPlaceFrame(node)) {
+            if (!hoverReachable(visibilityProbe(session.connection(), "", node), node)) return new Effect("cdp", false);
+            return hoverInPlace(session.connection(), node);
+        }
         if (inputOff) PageActions.useCdpInput(false);
         try {
             if (inputOff) {
@@ -1367,7 +1371,9 @@ public final class TargetVerb {
                 return jsAct(session.connection(), kind, query, selector, value, node);
             }
             if ("click".equals(kind) && closedShadow(acted)) return clickClosed(session.connection(), acted);
-            if ("hover".equals(kind) && !nodeVisible(session.connection(), "", node)) return new Effect("cdp", false);
+            if ("hover".equals(kind) && !hoverReachable(visibilityProbe(session.connection(), "", node), node)) {
+                return new Effect("cdp", false);
+            }
             String before = pageMark(session.connection());
             String signature = "click".equals(kind) ? nodeSignature(session.connection(), "", node) : "";
             LiveXPath.use(session.connection());
@@ -1404,9 +1410,20 @@ public final class TargetVerb {
         return clickReadBack(signature, nodeSignature(cdp, "", node), clickSettled(cdp, "", before, "cdp"));
     }
 
+    /** One hover on a same-origin frame node. Parent-viewport coordinates miss that document. */
+    private static Effect hoverInPlace(CdpConnection cdp, DomNode node) {
+        String script = "function(){ this.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));"
+                + " this.dispatchEvent(new MouseEvent('mouseenter',{bubbles:true}));"
+                + " this.dispatchEvent(new MouseEvent('mousemove',{bubbles:true})); return true; }";
+        if (callOnNode(cdp, "", node, script) == null) return new Effect("cdp", false);
+        return Effect.changed("cdp");
+    }
+
     /** Click, type, or select on the frame session that owns the node. One call, then a read-back. */
     private static Effect actInFrame(CdpConnection cdp, String sessionId, String kind, String value, DomNode node) {
-        if ("hover".equals(kind) && !nodeVisible(cdp, sessionId, node)) return new Effect("cdp", false);
+        if ("hover".equals(kind) && !hoverReachable(visibilityProbe(cdp, sessionId, node), node)) {
+            return new Effect("cdp", false);
+        }
         String before = pageMark(cdp, sessionId);
         String signature = "click".equals(kind) ? nodeSignature(cdp, sessionId, node) : "";
         String script = switch (kind) {
@@ -1795,16 +1812,31 @@ public final class TargetVerb {
         return raw == null ? "" : raw;
     }
 
-    private static boolean nodeVisible(CdpConnection cdp, String sessionId, DomNode node) {
-        if (cdp == null || node == null) return false;
-        String raw = callOnNode(cdp, sessionId, node, ""
+    /**
+     * A probe of {@code 1} is visible. A blank or {@code 0} probe is not proof the node is hidden
+     * when the tree already says it is displayed.
+     */
+    static boolean hoverReachable(String probe, DomNode node) {
+        if ("1".equals(probe)) return true;
+        if (node == null || !node.displayed || node.states.contains("hidden")) return false;
+        return true;
+    }
+
+    /** Same-origin iframe hover. A child CDP session uses {@code actInFrame} instead. */
+    static boolean hoverInPlaceFrame(DomNode node) {
+        if (node == null || !insideFrame(node) || closedShadow(node)) return false;
+        return cdpSessionOf(node).isBlank();
+    }
+
+    private static String visibilityProbe(CdpConnection cdp, String sessionId, DomNode node) {
+        if (cdp == null || node == null) return null;
+        return callOnNode(cdp, sessionId, node, ""
                 + "function(){"
                 + " var style=getComputedStyle(this);"
                 + " if(!style||style.display==='none'||style.visibility==='hidden') return '0';"
                 + " var box=this.getBoundingClientRect();"
                 + " return (box.width>=1 && box.height>=1)?'1':'0';"
                 + "}");
-        return "1".equals(raw);
     }
 
     /** Polls one ref until that node matches {@code condition}, or the timeout ends. */

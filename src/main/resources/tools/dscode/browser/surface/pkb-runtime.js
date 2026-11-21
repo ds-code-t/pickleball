@@ -352,6 +352,26 @@
     return {x: item.baseL + (r.left - item.origin.l), y: item.baseT + (r.top - item.origin.t)};
   }
 
+  function paintCopy(source, clone) {
+    if (!source || !clone || !window.getComputedStyle) return;
+    var keys = ['color', 'backgroundColor', 'backgroundImage', 'font', 'fontSize', 'fontWeight', 'fontFamily', 'border', 'borderRadius', 'padding', 'display', 'alignItems', 'justifyContent', 'textAlign', 'lineHeight', 'boxSizing', 'whiteSpace'];
+    function apply(from, to) {
+      var style;
+      try { style = window.getComputedStyle(from); } catch (e) { return; }
+      keys.forEach(function (key) {
+        try { if (style[key]) to.style[key] = style[key]; } catch (ignored) {}
+      });
+    }
+    apply(source, clone);
+    var box = source.getBoundingClientRect ? source.getBoundingClientRect() : null;
+    if (box && box.width > 0) clone.style.width = Math.round(box.width) + 'px';
+    if (box && box.height > 0) clone.style.height = Math.round(box.height) + 'px';
+    var fromKids = source.querySelectorAll ? source.querySelectorAll('*') : [];
+    var toKids = clone.querySelectorAll('*');
+    for (var i = 0; i < fromKids.length && i < toKids.length; i++) apply(fromKids[i], toKids[i]);
+    clone.setAttribute('data-pkb-copy', 'live');
+  }
+
   function sanitizeClone(anchor, zoom) {
     var clone = anchor.cloneNode(true);
     clone.querySelectorAll('script').forEach(function (s) { s.remove(); });
@@ -363,9 +383,12 @@
     });
     clone.setAttribute('inert', '');
     clone.setAttribute('aria-hidden', 'true');
+    paintCopy(anchor, clone);
     clone.style.transform = 'scale(' + zoom + ')';
     clone.style.transformOrigin = '0 0';
     clone.style.pointerEvents = 'none';
+    if (anchor) clone.setAttribute('data-pkb-copy', 'live');
+    else clone.setAttribute('data-pkb-copy', 'fallback');
     return clone;
   }
 
@@ -383,6 +406,19 @@
       el.setAttribute('data-pkb-id', item.id);
     });
     old.replaceWith(clone);
+    var blank = !((clone.textContent || '').replace(/\s/g, '')) && !clone.querySelector('img,svg,canvas,video,input');
+    var note = item.host.querySelector('[data-pkb-copy="fallback"]');
+    if (blank) {
+      if (!note) {
+        note = document.createElement('div');
+        note.setAttribute('data-pkb-copy', 'fallback');
+        note.textContent = 'target not captured';
+        note.style.cssText = 'color:#111;font:12px sans-serif;padding:8px;';
+        item.host.appendChild(note);
+      }
+    } else if (note) {
+      note.remove();
+    }
   }
 
   function makeRing(id) {
@@ -602,7 +638,7 @@
       baseL: num(host.style.left), baseT: num(host.style.top),
       sizeW: num(host.style.width), sizeH: num(host.style.height),
       origin: spec.origin && isFinite(spec.origin.l) ? {l: +spec.origin.l, t: +spec.origin.t} : {l: r.left, t: r.top}, locator: locatorOf(anchor), scrollers: scrollersOf(anchor),
-      cache: {}, ringCache: {}, lost: false, cloneDirty: false, block: isBlocked(spec)
+      cache: {}, ringCache: {}, lost: false, cloneDirty: spec.kind === 'magnifier', block: isBlocked(spec)
     };
     if ((item.kind === 'overlay' && at !== 'over') || (item.block && !onTarget(item.kind, at))) item.ring = makeRing(id);
     applyBlock(item);

@@ -47,7 +47,12 @@ public final class ObserveEvents {
             if (!path.isAbsolute() && project != null) path = project.resolve(file);
             events.addAll(parse(Files.readString(path, StandardCharsets.UTF_8)));
         } else {
-            events.addAll(fromEngine(args));
+            dev.domengine.session.SessionEvents buffer = tools.dscode.common.agentfast.LiveBrowserHost.events();
+            if (buffer != null) {
+                events.addAll(fromBuffer(buffer.read(dev.domengine.session.SessionEvents.Filter.of(args), waitMs(args))));
+            } else {
+                events.addAll(fromEngine(args));
+            }
         }
         List<Event> filtered = filter(events, args);
         if (filtered.isEmpty()) {
@@ -63,6 +68,26 @@ public final class ObserveEvents {
         AgentStore.ensure(out.getParent());
         AgentStore.JSON.writeValue(out.toFile(), filtered.stream().map(ObserveEvents::toMap).toList());
         return filtered;
+    }
+
+    /**
+     * Rows already on the start host's {@code BrowserSession} buffer. An empty
+     * list is empty traffic, not a missing session.
+     */
+    static List<Event> fromBuffer(List<? extends JsonNode> rows) throws IOException {
+        if (rows == null || rows.isEmpty()) return List.of();
+        return parse(AgentStore.JSON.writeValueAsString(rows));
+    }
+
+    private static long waitMs(Map<String, String> args) {
+        String wait = args.get("wait-ms");
+        if (wait == null || wait.isBlank()) wait = args.get("waitMs");
+        if (wait == null || wait.isBlank()) return 0L;
+        try {
+            return Long.parseLong(wait.trim());
+        } catch (NumberFormatException failure) {
+            return 0L;
+        }
     }
 
     static List<Event> fromEngine(Map<String, String> args) throws IOException {

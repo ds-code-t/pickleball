@@ -43,6 +43,7 @@ public final class LiveBrowserHost {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final AtomicBoolean WAS_OK = new AtomicBoolean(false);
     private static final AtomicReference<BrowserSession> CHROME = new AtomicReference<>();
+    private static final AtomicReference<dev.domengine.session.SessionEvents> EVENTS = new AtomicReference<>();
     private static final AtomicReference<WebDriver> PAGE = new AtomicReference<>();
     private static volatile Path PROJECT = Path.of("");
     private static volatile String SESSION_ID = "";
@@ -52,6 +53,21 @@ public final class LiveBrowserHost {
         BrowserSession session = CHROME.get();
         if (session == null || session.isClosed()) return null;
         return session;
+    }
+
+    /**
+     * CDP event buffer for observe and capture-scenario. The start host uses the
+     * live session. Tests may install a buffer when this process is not the host.
+     */
+    public static dev.domengine.session.SessionEvents events() {
+        BrowserSession session = chrome();
+        if (session != null) return session.events();
+        return EVENTS.get();
+    }
+
+    /** Installs or clears the test event buffer. Production code does not call this. */
+    public static void useEventsForTests(dev.domengine.session.SessionEvents events) {
+        EVENTS.set(events);
     }
 
     /** Page driver registered for the host. Null outside the host process. */

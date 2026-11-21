@@ -157,6 +157,7 @@ public final class WorkbenchAgentCommands {
                      "guide", "guide-next", "guide-back", "guide-done", "ask",
                      "panel-open", "panel-close",
                      "capture-scenario",
+                     "capture-steps",
                      "screenshot", "selftest",
                      "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame",
                      "ask-and-wait", "pin", "toast", "checklist", "ui", "ref",
@@ -1979,6 +1980,7 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "since");
         copyFlag(args, parsed, "until");
         copyFlag(args, parsed, "events");
+        copyFlag(args, parsed, "file");
         copyFlag(args, parsed, "cdp");
         copyFlag(args, parsed, "session");
         copyFlag(args, parsed, "wait-ms");
@@ -2537,9 +2539,14 @@ public final class WorkbenchAgentCommands {
             return new Observed("LAUNCH_ERROR", exit, 0, null, true);
         }
         if (signal != null && (signal.failed() || "PASSED".equalsIgnoreCase(signal.outcome()))) {
-            if (signal.failed()) {
+            if (signal.failed() || signal.failureCount() > 0) {
                 int exit = mavenExit == 0 ? Math.max(signal.failureCount(), 1) : mavenExit;
                 return new Observed("FAILED", exit, Math.max(signal.failureCount(), 1), signal.failureSummary());
+            }
+            if (verdict != null && verdict.failed()) {
+                int count = Math.max(verdict.failures(), 1);
+                int exit = mavenExit == 0 ? count : mavenExit;
+                return new Observed("FAILED", exit, count, null);
             }
             return new Observed("PASSED", 0);
         }
@@ -2632,8 +2639,12 @@ public final class WorkbenchAgentCommands {
     }
 
     private static int attributeSum(Pattern pattern, String text) {
+        String body = text == null ? "" : text;
+        if (body.contains("<testsuites")) {
+            body = body.replaceAll("(?s)<testsuites\\b[^>]*>", "").replace("</testsuites>", "");
+        }
         int sum = 0;
-        Matcher matcher = pattern.matcher(text);
+        Matcher matcher = pattern.matcher(body);
         while (matcher.find()) {
             sum += Integer.parseInt(matcher.group(1));
         }

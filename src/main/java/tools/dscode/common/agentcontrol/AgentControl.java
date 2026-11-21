@@ -242,6 +242,7 @@ public final class AgentControl {
                 case "html-remove" -> remove(project, runId, values, "html");
                 case "html-cleanup" -> cleanup(project, runId, values);
                 case "capture-scenario" -> capture(project, runId, values);
+                case "capture-steps" -> captureSteps(project, runId, values);
                 default -> fail(2, "unknown agent command: " + op);
             };
         }
@@ -1492,6 +1493,12 @@ public final class AgentControl {
         Map<String, Object> written = ScenarioCapture.write(project, runId, events, args.get("out"));
         written.put("ok", true);
         CompositeLog.info("capture", "filter url=" + text(args.get("url")) + " out=" + written.get("path"));
+        return new Result(0, written);
+    }
+
+    private static Result captureSteps(Path project, String runId, Map<String, String> args) throws Exception {
+        Map<String, Object> written = StepCapture.write(project, runId, args);
+        written.put("ok", true);
         return new Result(0, written);
     }
 

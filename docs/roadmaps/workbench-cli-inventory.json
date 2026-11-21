@@ -23,6 +23,7 @@
       "call",
       "capture",
       "capture-scenario",
+      "capture-steps",
       "chat-history",
       "chat-poll",
       "chat-send",

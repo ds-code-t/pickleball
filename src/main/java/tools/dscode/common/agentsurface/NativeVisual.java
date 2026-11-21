@@ -45,6 +45,7 @@ public final class NativeVisual {
                 ? NativeHighlightBox.show(id, box.x(), box.y(), box.width(), box.height())
                 : new NativeHighlightBox.Drawn(false, "no-size", id);
         String raw = args.get("text") == null ? "" : args.get("text");
+        if ("magnifier".equals(kind) && raw.isBlank()) raw = "target not captured";
         if (!raw.isBlank()) {
             String labeled = PopupSurfaceBridge.label(PopupSurfaceBridge.neutralize(raw), kind);
             PopupLedger.append(project, runId, "append", "instructions", id, "", labeled, "", PopupSurfaceBridge.sentence(kind));

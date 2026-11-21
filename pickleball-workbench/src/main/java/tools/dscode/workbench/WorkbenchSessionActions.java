@@ -102,7 +102,8 @@ public final class WorkbenchSessionActions {
             "ask",
             "panel-open",
             "panel-close",
-            "capture-scenario"
+            "capture-scenario",
+            "capture-steps"
     );
 
     private static final Set<String> DRIVING = Set.of(
@@ -423,7 +424,7 @@ public final class WorkbenchSessionActions {
                  "ui-apply", "ui-poll", "ui-catalog",
                  "guide", "guide-next", "guide-back", "guide-done", "ask",
                  "panel-open", "panel-close",
-                 "capture-scenario" -> forwardAgent(op, args);
+                 "capture-scenario", "capture-steps" -> forwardAgent(op, args);
             default -> throw new IllegalArgumentException("Unknown session command: " + op);
         };
     }

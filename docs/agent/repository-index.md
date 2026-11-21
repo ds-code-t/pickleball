@@ -281,6 +281,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentcontrol/PageSurfaces.java`
 - `src/main/java/tools/dscode/common/agentcontrol/PopupSurfaceBridge.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ScenarioCapture.java`
+- `src/main/java/tools/dscode/common/agentcontrol/StepCapture.java`
 - `src/main/java/tools/dscode/common/agentcontrol/SurfaceBox.java`
 - `src/main/java/tools/dscode/common/agentcontrol/UiBatch.java`
 - `src/main/java/tools/dscode/common/agentcontrol/UiCatalog.java`
@@ -855,6 +856,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentfast/LiveReplyRulesTest.java`
 - `src/test/java/tools/dscode/common/agentfast/PushAndViewTest.java`
 - `src/test/java/tools/dscode/common/agentfast/SelftestCpuBenchTest.java`
+- `src/test/java/tools/dscode/common/agentfast/SnapScopeTest.java`
 - `src/test/java/tools/dscode/common/agentfast/TimingFieldsTest.java`
 - `src/test/java/tools/dscode/common/agentfast/UiCpuLoopTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/AgentSurfaceRouterTest.java`

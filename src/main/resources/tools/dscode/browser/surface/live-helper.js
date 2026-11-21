@@ -147,6 +147,25 @@ if (spec.kind === 'overlay') {
     host.style.maxWidth = '280px';
   }
 } else if (spec.css) host.setAttribute('style', spec.css);
+function paintCopy(source, clone) {
+  if (!source || !clone || !window.getComputedStyle) return;
+  var keys = ['color','backgroundColor','backgroundImage','font','fontSize','fontWeight','fontFamily','border','borderRadius','padding','display','alignItems','justifyContent','textAlign','lineHeight','boxSizing','whiteSpace'];
+  function apply(from, to) {
+    var style;
+    try { style = window.getComputedStyle(from); } catch (e) { return; }
+    keys.forEach(function(key) {
+      try { if (style[key]) to.style[key] = style[key]; } catch (ignored) {}
+    });
+  }
+  apply(source, clone);
+  var box = source.getBoundingClientRect ? source.getBoundingClientRect() : null;
+  if (box && box.width > 0) clone.style.width = Math.round(box.width) + 'px';
+  if (box && box.height > 0) clone.style.height = Math.round(box.height) + 'px';
+  var fromKids = source.querySelectorAll ? source.querySelectorAll('*') : [];
+  var toKids = clone.querySelectorAll('*');
+  for (var i = 0; i < fromKids.length && i < toKids.length; i++) apply(fromKids[i], toKids[i]);
+  clone.setAttribute('data-pkb-copy', 'live');
+}
 if (spec.kind === 'magnifier' && anchor) {
   var zoom = spec.zoom == null || spec.zoom === '' ? 2 : spec.zoom;
   var clone = anchor.cloneNode(true);
@@ -161,12 +180,24 @@ if (spec.kind === 'magnifier' && anchor) {
   });
   clone.setAttribute('inert', '');
   clone.setAttribute('aria-hidden', 'true');
+  paintCopy(anchor, clone);
   clone.style.transform = 'scale(' + zoom + ')';
   clone.style.transformOrigin = '0 0';
   clone.style.pointerEvents = 'none';
   host.textContent = '';
   host.appendChild(clone);
+  var blank = !((clone.textContent || '').replace(/\s/g, '')) && !clone.querySelector('img,svg,canvas,video,input');
+  if (blank) {
+    var note = document.createElement('div');
+    note.setAttribute('data-pkb-copy', 'fallback');
+    note.textContent = 'target not captured';
+    note.style.cssText = 'color:#111;font:12px sans-serif;padding:8px;';
+    host.appendChild(note);
+  }
   markTree(clone, spec.kind, spec.sentence);
+} else if (spec.kind === 'magnifier') {
+  host.setAttribute('data-pkb-copy', 'fallback');
+  if (!((host.textContent || '').trim())) host.textContent = 'target not captured';
 }
 if (op === 'replace' && anchor) {
   window.__pkbUndo = window.__pkbUndo || {};

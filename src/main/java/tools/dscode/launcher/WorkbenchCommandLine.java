@@ -43,6 +43,7 @@ final class WorkbenchCommandLine {
             "guide", "guide-next", "guide-back", "guide-done", "ask",
             "panel-open", "panel-close",
             "capture-scenario",
+            "capture-steps",
             "screenshot",
             "selftest",
             "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame",
