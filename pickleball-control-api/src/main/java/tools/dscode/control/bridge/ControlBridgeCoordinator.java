@@ -900,8 +900,9 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         if (result == null) return null;
         String path = "top";
         try {
-            String current = tools.dscode.common.composite.ElementOperations.currentFramePath();
-            if (current != null && !current.isBlank()) path = current;
+            org.openqa.selenium.WebDriver driver = tools.dscode.coredefinitions.BrowserSteps.getCurrentDriverIfPresent();
+            String observed = tools.dscode.common.composite.ElementOperations.observedFrame(driver);
+            if (observed != null && !observed.isBlank()) path = observed;
         } catch (Throwable ignored) {
             path = "top";
         }

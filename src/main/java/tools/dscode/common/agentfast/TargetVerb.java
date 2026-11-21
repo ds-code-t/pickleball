@@ -374,6 +374,17 @@ public final class TargetVerb {
             tools.dscode.common.domoperations.MaskQuiet.Wait mask = null;
             if (kind.isBlank() || "click".equals(kind)) {
                 mask = awaitMaskQuiet(page.session.connection(), node, timeoutMs(args));
+                if (maskStillCovering(mask)) {
+                    Outcome failed = fail("act", "covered");
+                    failed.body().put("applied", false);
+                    failed.body().put("dispatched", false);
+                    failed.body().put("reason", "loading mask still covers the click");
+                    stamp(failed.body(), page.session.connection(), node);
+                    putEntered(failed.body(), runId, page.session.connection());
+                    putShadow(failed.body(), node);
+                    putMask(failed.body(), mask);
+                    return failed;
+                }
             }
             boolean wantDiff = "diff".equals(blank(args.get("snap")));
             boolean wantAuto = "auto".equals(blank(args.get("snap")));
@@ -422,7 +433,7 @@ public final class TargetVerb {
                     failed.body().put("applied", effect.applied());
                     failed.body().put("condition", condition);
                     failed.body().put("title", titleAfter);
-                    if (kind.isBlank() || "click".equals(kind)) {
+                    if (kind.isBlank() || "click".equals(kind) || "hover".equals(kind)) {
                         failed.body().put("dispatched", true);
                         failed.body().put("visible", effect.applied());
                     }
@@ -440,7 +451,7 @@ public final class TargetVerb {
                 body.put("kind", kind.isBlank() ? "click" : kind);
                 body.put("condition", condition);
                 body.put("title", titleAfter);
-                if (kind.isBlank() || "click".equals(kind)) {
+                if (kind.isBlank() || "click".equals(kind) || "hover".equals(kind)) {
                     body.put("dispatched", true);
                     body.put("visible", true);
                 }
@@ -490,7 +501,7 @@ public final class TargetVerb {
             body.put("applied", true);
             body.put("docVersion", after);
             body.put("kind", kind.isBlank() ? "click" : kind);
-            if (kind.isBlank() || "click".equals(kind)) {
+            if (kind.isBlank() || "click".equals(kind) || "hover".equals(kind)) {
                 body.put("dispatched", true);
                 body.put("visible", true);
             }
@@ -1356,7 +1367,9 @@ public final class TargetVerb {
                 return jsAct(session.connection(), kind, query, selector, value, node);
             }
             if ("click".equals(kind) && closedShadow(acted)) return clickClosed(session.connection(), acted);
+            if ("hover".equals(kind) && !nodeVisible(session.connection(), "", node)) return new Effect("cdp", false);
             String before = pageMark(session.connection());
+            String signature = "click".equals(kind) ? nodeSignature(session.connection(), "", node) : "";
             LiveXPath.use(session.connection());
             try {
                 PageActions.act(session, verb, flags);
@@ -1365,7 +1378,10 @@ public final class TargetVerb {
             }
             if ("select".equals(kind)) return new Effect("cdp", valueMatches(value, controlValue(session.connection(), selectOf(acted))));
             if ("type".equals(kind)) return new Effect("cdp", valueMatches(value, controlValue(session.connection(), node)));
-            if ("click".equals(kind)) return clickSettled(session.connection(), "", before, "cdp");
+            if ("click".equals(kind)) {
+                return clickReadBack(signature, nodeSignature(session.connection(), "", node), clickSettled(session.connection(), "", before, "cdp"));
+            }
+            if ("hover".equals(kind)) return Effect.changed("cdp");
             if (!before.equals(pageMark(session.connection()))) return Effect.changed("cdp");
             return new Effect("cdp", false);
         } catch (CdpException failure) {
@@ -1381,15 +1397,18 @@ public final class TargetVerb {
     /** One click on a same-origin frame node. Coordinates from that document miss the parent viewport. */
     private static Effect clickInPlace(CdpConnection cdp, DomNode node) {
         String before = pageMark(cdp);
+        String signature = nodeSignature(cdp, "", node);
         if (callOnNode(cdp, "", node, "function(){ this.click(); return true; }") == null) {
             return Effect.refused("cdp", "detached");
         }
-        return clickSettled(cdp, "", before, "cdp");
+        return clickReadBack(signature, nodeSignature(cdp, "", node), clickSettled(cdp, "", before, "cdp"));
     }
 
     /** Click, type, or select on the frame session that owns the node. One call, then a read-back. */
     private static Effect actInFrame(CdpConnection cdp, String sessionId, String kind, String value, DomNode node) {
+        if ("hover".equals(kind) && !nodeVisible(cdp, sessionId, node)) return new Effect("cdp", false);
         String before = pageMark(cdp, sessionId);
+        String signature = "click".equals(kind) ? nodeSignature(cdp, sessionId, node) : "";
         String script = switch (kind) {
             case "type" -> "function(){ this.focus(); this.value=" + jsString(value)
                     + "; this.dispatchEvent(new Event('input',{bubbles:true})); this.dispatchEvent(new Event('change',{bubbles:true})); return String(this.value); }";
@@ -1398,14 +1417,20 @@ public final class TargetVerb {
                     + " var label=(o.label||o.text||'').replace(/\\s+/g,' ').trim(); if(o.value===value||label===value){ o.selected=true; matched=true; break; } }"
                     + " if(!matched) return ''; box.dispatchEvent(new Event('input',{bubbles:true})); box.dispatchEvent(new Event('change',{bubbles:true}));"
                     + " var chosen=box.options[box.selectedIndex]; return chosen?String(chosen.value||chosen.text||'').trim():''; }";
-            case "click", "hover", "press" -> "function(){ this.click(); return true; }";
+            case "hover" -> "function(){ this.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));"
+                    + " this.dispatchEvent(new MouseEvent('mouseenter',{bubbles:true}));"
+                    + " this.dispatchEvent(new MouseEvent('mousemove',{bubbles:true})); return true; }";
+            case "click", "press" -> "function(){ this.click(); return true; }";
             default -> "";
         };
         if (script.isBlank()) return new Effect("cdp", false);
         String read = callOnNode(cdp, sessionId, node, script);
         if (read == null) return "click".equals(kind) ? Effect.refused("cdp", "detached") : new Effect("cdp", false);
         if ("type".equals(kind) || "select".equals(kind)) return new Effect("cdp", valueMatches(value, read));
-        if ("click".equals(kind)) return clickSettled(cdp, sessionId, before, "cdp");
+        if ("hover".equals(kind)) return Effect.changed("cdp");
+        if ("click".equals(kind)) {
+            return clickReadBack(signature, nodeSignature(cdp, sessionId, node), clickSettled(cdp, sessionId, before, "cdp"));
+        }
         return !before.equals(pageMark(cdp, sessionId)) ? Effect.changed("cdp") : new Effect("cdp", false);
     }
 
@@ -1571,6 +1596,7 @@ public final class TargetVerb {
     /** JS runs on the session that was targeted, including a {@code browser:cdp=} page. */
     private static Effect jsAct(CdpConnection cdp, String kind, String query, String selector, String value, DomNode node) {
         String before = pageMark(cdp);
+        String signature = "click".equals(kind) ? nodeSignature(cdp, "", node) : "";
         String script = ""
                 + "(async function(){"
                 + "var kind=" + jsString(kind) + ",q=" + jsString(query) + ",sel=" + jsString(selector) + ",value=" + jsString(value) + ";"
@@ -1589,6 +1615,11 @@ public final class TargetVerb {
                 + "await settle();"
                 + "var chosen=box.options[box.selectedIndex]; var shown=chosen?((chosen.value||chosen.text||'')+'').replace(/\\s+/g,' ').trim():'';"
                 + "return {ok:true,value:shown};}"
+                + "if(kind==='hover'){ var style=getComputedStyle(el); var box=el.getBoundingClientRect();"
+                + " if(style.display==='none'||style.visibility==='hidden'||box.width<1||box.height<1) return {ok:false};"
+                + " el.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));"
+                + " el.dispatchEvent(new MouseEvent('mouseenter',{bubbles:true}));"
+                + " el.dispatchEvent(new MouseEvent('mousemove',{bubbles:true})); return {ok:true}; }"
                 + "el.click(); return {ok:true};"
                 + "})()";
         ObjectNode params = Jsons.object();
@@ -1603,7 +1634,8 @@ public final class TargetVerb {
             if (!valueMatches(value, read) && node != null) read = controlValue(cdp, "select".equals(kind) ? selectOf(node) : node);
             return new Effect("js", valueMatches(value, read));
         }
-        if ("click".equals(kind)) return clickSettled(cdp, "", before, "js");
+        if ("click".equals(kind)) return clickReadBack(signature, nodeSignature(cdp, "", node), clickSettled(cdp, "", before, "js"));
+        if ("hover".equals(kind)) return Effect.changed("js");
         return new Effect("js", !before.equals(pageMark(cdp)));
     }
 
@@ -1693,6 +1725,56 @@ public final class TargetVerb {
         if (body == null || mask == null) return;
         body.put("waitedMs", mask.waitedMs());
         body.put("maskCleared", mask.maskCleared());
+    }
+
+    /** A covering mask that did not clear. A miss ({@code waitedMs == 0}) is not a cover. */
+    static boolean maskStillCovering(tools.dscode.common.domoperations.MaskQuiet.Wait mask) {
+        return mask != null && mask.waitedMs() > 0 && !mask.maskCleared();
+    }
+
+    /**
+     * A quiet click is applied when the node's own text or state moved.
+     * A blank read stays quiet, so a handler that only bumps a counter is not a visible change.
+     */
+    static boolean signatureApplied(String before, String after) {
+        if (before == null || before.isBlank() || after == null || after.isBlank()) return false;
+        return !before.equals(after);
+    }
+
+    private static Effect clickReadBack(String before, String after, Effect settled) {
+        if (settled == null || !settled.quiet()) return settled;
+        if (!signatureApplied(before, after)) return settled;
+        return Effect.changed(settled.used());
+    }
+
+    /** Text, selection, class, checked, and value. A counter that is not on the node is absent. */
+    private static String nodeSignature(CdpConnection cdp, String sessionId, DomNode node) {
+        if (cdp == null || node == null) return "";
+        String raw = callOnNode(cdp, sessionId, node, ""
+                + "function(){"
+                + " function clip(v){ v=String(v==null?'':v).replace(/\\s+/g,' ').trim(); return v.length>120?v.slice(0,120):v; }"
+                + " var text=clip(this.innerText||this.textContent||'');"
+                + " var selected=this.getAttribute?(this.getAttribute('aria-selected')||''):'';"
+                + " var checked=this.getAttribute?(this.getAttribute('aria-checked')||''):'';"
+                + " var current=this.getAttribute?(this.getAttribute('aria-current')||''):'';"
+                + " var cls=this.getAttribute?(this.getAttribute('class')||''):'';"
+                + " var box=this.checked===true?'1':(this.checked===false?'0':'');"
+                + " var value=('value' in this)?clip(this.value):'';"
+                + " return [text, selected, checked, current, clip(cls), box, value].join('\\n');"
+                + "}");
+        return raw == null ? "" : raw;
+    }
+
+    private static boolean nodeVisible(CdpConnection cdp, String sessionId, DomNode node) {
+        if (cdp == null || node == null) return false;
+        String raw = callOnNode(cdp, sessionId, node, ""
+                + "function(){"
+                + " var style=getComputedStyle(this);"
+                + " if(!style||style.display==='none'||style.visibility==='hidden') return '0';"
+                + " var box=this.getBoundingClientRect();"
+                + " return (box.width>=1 && box.height>=1)?'1':'0';"
+                + "}");
+        return "1".equals(raw);
     }
 
     /** Polls one ref until that node matches {@code condition}, or the timeout ends. */

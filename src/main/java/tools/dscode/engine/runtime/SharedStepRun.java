@@ -210,7 +210,26 @@ public final class SharedStepRun {
             }
         }
         if (driver != null) ElementOperations.restoreFrames(driver, depth);
-        step.nativeFrame = used == null ? "" : used;
+        String drifted = "";
+        if (driver != null && depth == 0) {
+            try {
+                String live = ElementOperations.observedFrame(driver);
+                if (live != null && !live.isBlank() && !"top".equals(live)) {
+                    drifted = live;
+                    driver.switchTo().defaultContent();
+                    ElementOperations.rewindFrameMark(List.of());
+                }
+            } catch (RuntimeException ignored) {
+                // A frame the step entered is still named below. The driver stays where the switch left it.
+            }
+        }
+        if (used != null && !used.isBlank()) {
+            step.nativeFrame = used;
+        } else if (!drifted.isBlank()) {
+            step.nativeFrame = drifted;
+        } else {
+            step.nativeFrame = used == null ? "" : used;
+        }
     }
 
     public static Result run(StepExtension step) {
