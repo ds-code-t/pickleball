@@ -209,7 +209,7 @@ One command opens a ready browser. `start --url-key=URL.app --browser=chrome --h
 
 `chat_wait` returns human messages only. `--from=any` or `--from=all` disables that filter. `--channel` selects the session channel (default run, under `.pickleball/runs/<session>/agent/chat/`). The cursor still advances past the agent's own lines, so the next wait does not return them.
 
-`doctor` prints leaseLeft, orphans, frame, and placed, plus chrome, session, and health. `--hold=30s` arms the lease. Orphans are Chrome processes for this project that are not the current host. `selftest ui --cpu` looks up Chrome on PATH, then Windows Program Files and LOCALAPPDATA, macOS applications, and the usual Linux paths. The idle sample is 2 seconds. `DOMENGINE_CHROME` is used only when that file exists.
+`doctor` prints leaseLeft, orphans, frame, and placed, plus chrome, session, and health. `chrome=present` only while the recorded Chrome pid is alive. `state.browser` is `up` only when the worker is alive or both the start host and that Chrome pid are alive, so a dead Chrome process is `down` even if the host JVM is still up. `lease` is held only for a live worker or an unexpired hold; `leaseLeft=0` is `lease=open` and envelope `lease=none`. `live-stop` deletes `.pickleball/consumer-session.json`. `ui-poll` emits `browser_lost` once. `--hold=30s` arms the lease. Orphans are Chrome processes for this project that are not the current host. `selftest ui --cpu` looks up Chrome on PATH, then Windows Program Files and LOCALAPPDATA, macOS applications, and the usual Linux paths. The idle sample is 2 seconds. `DOMENGINE_CHROME` is used only when that file exists.
 
 ## First-read
 

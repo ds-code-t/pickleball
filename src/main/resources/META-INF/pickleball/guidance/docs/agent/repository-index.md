@@ -895,6 +895,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/AskIdTest.java`
 - `src/test/java/tools/dscode/launcher/AutoSnapshotTest.java`
 - `src/test/java/tools/dscode/launcher/BrowserLostRunIdTest.java`
+- `src/test/java/tools/dscode/launcher/BrowserStateTest.java`
 - `src/test/java/tools/dscode/launcher/ClickOnceTest.java`
 - `src/test/java/tools/dscode/launcher/CliForwardToWorkerTest.java`
 - `src/test/java/tools/dscode/launcher/ClosedShadowResolveTest.java`
@@ -1200,6 +1201,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/AgentFastLog.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/AgentLog.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/AgentSurfaceEnd.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/BrowserPresence.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ClientHeartbeat.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeBoundedJsonEvidence.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeBreakpoint.java`
@@ -1240,6 +1242,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/InvestigationHandoff.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/JavaEngineLauncher.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/JsonLite.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/LeaseClock.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/LiveBridgeFile.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/LiveHostFile.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/NoopNotice.java`

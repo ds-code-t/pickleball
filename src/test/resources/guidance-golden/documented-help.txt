@@ -76,7 +76,7 @@ Usage: discover-hint [--json]
 
 # help doctor
 Usage: doctor
-Reports chrome, session, health, headed, pid, bridge, worker, lease, leaseLeft, orphans, frame, and placed. No session still exits 0.
+Reports chrome, session, health, headed, pid, bridge, worker, lease, leaseLeft, orphans, frame, and placed. chrome=present only while the recorded Chrome pid is alive. lease is open when leaseLeft is 0. live-stop clears the session. No session still exits 0.
 
 # help events
 Usage: events [--hooks] [--json] [--cursor=<token>] [--run-id=<id>] [--follow] [--until=<type|text=...>] [--timeout=<seconds>] [--type=<name>] [--echo] [--from=any] [--format=lines|json] [--fields=<a,b>] [--where=<k=v>] [--limit=<n>] [--budget=<bytes>] [--group=type|role] [--priority=on]

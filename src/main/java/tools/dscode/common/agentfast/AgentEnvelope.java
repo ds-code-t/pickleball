@@ -3,8 +3,6 @@ package tools.dscode.common.agentfast;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import tools.dscode.control.protocol.LiveBridgeFile;
-import tools.dscode.control.protocol.LiveHostFile;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -145,21 +143,13 @@ public final class AgentEnvelope {
         Object session = body.get("session");
         state.put("session", session == null || String.valueOf(session).isBlank()
                 ? (runId == null ? "" : runId) : String.valueOf(session));
-        boolean up = false;
-        try {
-            var bridge = LiveBridgeFile.read(project);
-            up = bridge.isPresent() && bridge.get().pid() > 0;
-            if (!up) {
-                var host = LiveHostFile.read(project);
-                up = host.isPresent() && host.get().pid() > 0;
-            }
-        } catch (RuntimeException ignored) {
-            up = false;
-        }
+        boolean worker = tools.dscode.control.protocol.BrowserPresence.workerUp(project);
+        boolean up = tools.dscode.control.protocol.BrowserPresence.browserUp(project);
+        boolean held = worker || tools.dscode.control.protocol.LeaseClock.fresh(project);
         state.put("browser", up ? "up" : "down");
         Object frame = body.get("frame");
         state.put("frame", frame == null || String.valueOf(frame).isBlank() ? "top" : String.valueOf(frame));
-        state.put("lease", up ? "held" : "none");
+        state.put("lease", held ? "held" : "none");
         return state;
     }
 

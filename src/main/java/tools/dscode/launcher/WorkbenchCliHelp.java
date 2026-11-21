@@ -20,7 +20,7 @@ final class WorkbenchCliHelp {
             Map.entry("validate", "Usage: validate [--tags=<expr>] [--name=<regex>] [--run-id=<id>] [--max-steps=<n>] [--all] [--noop]\nReports undefined steps, ambiguous glue, and unresolved RUN SCENARIO targets. Outline rows are expanded. Core steps count as defined. A long suite prints progress and stops at a step cap unless --max-steps or --all is set, and reports how many scenarios were skipped. Plain validate lists empty consumer step definitions (noop:true) and exits 1 when any are found. --noop is accepted. --noop with --tags still filters the feature scan and lists those noops. A non-empty body is not listed. Runs nothing. A flag this command does not use, including --quiet, is rejected with error: and fix:."),
             Map.entry("hint", "Usage: hint [--json]"),
             Map.entry("discover-hint", "Usage: discover-hint [--json]"),
-            Map.entry("doctor", "Usage: doctor\nReports chrome, session, health, headed, pid, bridge, worker, lease, leaseLeft, orphans, frame, and placed. No session still exits 0."),
+            Map.entry("doctor", "Usage: doctor\nReports chrome, session, health, headed, pid, bridge, worker, lease, leaseLeft, orphans, frame, and placed. chrome=present only while the recorded Chrome pid is alive. lease is open when leaseLeft is 0. live-stop clears the session. No session still exits 0."),
             Map.entry("resolve-runvars", "Usage: resolve-runvars [--json]"),
             Map.entry("workspace-show", "Usage: workspace-show --run-id=<id> [--json]"),
             Map.entry("workspace-edit", "Usage: workspace-edit --run-id=<id> (--runvar=key=value | --config=<relative> --text=<body>) [--expect=<fingerprint>]"),
