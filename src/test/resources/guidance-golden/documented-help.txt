@@ -90,7 +90,7 @@ Usage: execute-step <gherkin> | execute-step --text=<gherkin> | --text-file=<pat
 
 # help execute-steps
 Usage: execute-steps --file=<steps.json> [--stop-on-fail]
-Runs a JSON array of {op,args} or one verb per line. One envelope lists each step. --stop-on-fail stops at the first failure.
+Runs a JSON array of {op,args} or one verb per line. Page verbs post to the live worker when it is up. doctor runs in this process. stopped is true only with --stop-on-fail. A failure without that flag says steps failed.
 
 # help export-guidance
 Usage: export-guidance [output-directory] [--warm]

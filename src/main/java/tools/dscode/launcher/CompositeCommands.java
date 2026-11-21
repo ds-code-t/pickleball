@@ -2,9 +2,9 @@ package tools.dscode.launcher;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import tools.dscode.common.agentcontrol.AgentControl;
 import tools.dscode.common.agentfast.AgentEnvelope;
 
+import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -112,31 +112,36 @@ final class CompositeCommands {
         List<Map<String, Object>> items = new ArrayList<>();
         int exit = 0;
         int ran = 0;
+        String frame = "";
         for (Step step : steps) {
             ran++;
-            AgentControl.Result result = AgentControl.execute(
-                    parsed.project(), runId, step.op, step.args, List.of(), parsed.coordination().agentId()
-            );
+            StepReply reply = runStep(parsed, runId, step);
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("op", step.op);
-            row.put("ok", result.exit() == 0);
-            row.put("exit", result.exit());
-            Object error = result.body() == null ? null : result.body().get("error");
-            if (error != null) row.put("error", String.valueOf(error));
+            row.put("ok", reply.exit == 0);
+            row.put("exit", reply.exit);
+            if (reply.error != null && !reply.error.isBlank()) row.put("error", reply.error);
+            if (reply.frame != null && !reply.frame.isBlank()) {
+                row.put("frame", reply.frame);
+                frame = reply.frame;
+            }
+            if (reply.text != null && !reply.text.isBlank()) row.put("text", reply.text);
             items.add(row);
-            if (result.exit() != 0) {
-                exit = result.exit();
+            if (reply.exit != 0) {
+                exit = reply.exit;
                 if (stop) break;
             }
         }
+        boolean stopped = stop && exit != 0;
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("ok", exit == 0);
         body.put("op", "execute-steps");
         body.put("ran", ran);
         body.put("count", steps.size());
-        body.put("stopped", stop && exit != 0);
+        body.put("stopped", stopped);
         body.put("lines", items);
-        body.put("sentence", exit == 0 ? "steps ok" : "steps stopped");
+        if (!frame.isBlank()) body.put("frame", frame);
+        body.put("sentence", exit == 0 ? "steps ok" : (stopped ? "steps stopped" : "steps failed"));
         if (exit != 0) {
             body.put("error", "step failed");
             body.put("fix", "fix the failed step and run execute-steps again");
@@ -150,6 +155,69 @@ final class CompositeCommands {
     }
 
     private record Step(String op, Map<String, String> args) {
+    }
+
+    private record StepReply(int exit, String error, String frame, String text) {
+    }
+
+    /**
+     * One step uses the same launcher path as typing the verb: page verbs post
+     * to the live worker, and {@code doctor} stays in this process.
+     */
+    private static StepReply runStep(WorkbenchCommandLine.Parsed parsed, String runId, Step step) {
+        Map<String, String> args = new LinkedHashMap<>();
+        if (step.args != null) args.putAll(step.args);
+        String verb = verbOf(step.op == null ? "" : step.op, args);
+        List<String> argv = new ArrayList<>();
+        argv.add(verb);
+        for (Map.Entry<String, String> entry : args.entrySet()) {
+            if (entry.getKey() == null || entry.getKey().isBlank() || entry.getValue() == null) continue;
+            if ("positional".equals(entry.getKey())) {
+                argv.add(entry.getValue());
+                continue;
+            }
+            argv.add("--" + entry.getKey() + "=" + entry.getValue());
+        }
+        if (runId != null && !runId.isBlank()) argv.add("--run-id=" + runId);
+        argv.add(parsed.project().toString());
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        int code = WorkbenchAgentCommands.run(
+                argv.toArray(String[]::new),
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(stderr, true, StandardCharsets.UTF_8)
+        );
+        String printed = stdout.toString(StandardCharsets.UTF_8).trim();
+        String error = "";
+        String frame = "";
+        String text = "";
+        if (printed.startsWith("{")) {
+            try {
+                JsonNode node = JSON.readTree(printed);
+                if (node.has("error") && !node.get("error").isNull() && node.get("error").isValueNode()) {
+                    error = node.get("error").asText("");
+                } else if (node.path("err").isObject()) {
+                    error = node.path("err").path("code").asText("");
+                }
+                frame = node.path("state").path("frame").asText("");
+                if (frame.isBlank()) frame = node.path("frame").asText("");
+            } catch (java.io.IOException ignored) {
+                text = printed;
+            }
+        } else if (!printed.isEmpty()) {
+            text = printed;
+            for (String line : printed.split("\\R")) {
+                if (line.startsWith("frame=")) frame = line.substring("frame=".length()).trim();
+            }
+        }
+        if (error.isBlank() && code != 0) {
+            String errText = stderr.toString(StandardCharsets.UTF_8).trim();
+            int newline = errText.indexOf('\n');
+            String first = newline < 0 ? errText : errText.substring(0, newline).trim();
+            if (first.startsWith("error:")) first = first.substring("error:".length()).trim();
+            error = first;
+        }
+        return new StepReply(code, error, frame, text);
     }
 
     private static List<Step> steps(String text) throws java.io.IOException {

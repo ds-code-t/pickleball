@@ -111,6 +111,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-polish-full-standard-scoreboard.md`
 - `docs/maintainer/3.0.0-query-visual-design.md`
 - `docs/maintainer/3.0.0-regression-scoreboard.md`
+- `docs/maintainer/3.0.0-roadmap-2-scoreboard.md`
 - `docs/maintainer/3.0.0-snapshot-coverage-audit.md`
 - `docs/maintainer/3.0.0-workbench-edit-design.md`
 - `docs/maintainer/consumer-sim-harness.md`

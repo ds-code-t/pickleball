@@ -203,7 +203,7 @@ One command opens a ready browser. `start --url-key=URL.app --browser=chrome --h
 
 `ui-verify` lists every placement: visible, rect, and overlaps. No live browser is exit 1, with fix `run start --url= --browser=`.
 
-`execute-steps --file=steps.json --stop-on-fail` runs a JSON array of op and args, or lines of `verb text`. One envelope lists each row. `--stop-on-fail` stops at the first non-zero exit.
+`execute-steps --file=steps.json --stop-on-fail` runs a JSON array of op and args, or lines of `verb text`. Each step uses the same path as typing that verb. Page verbs (`snap`, `frame`, `act`, and `click`) post to the live worker when `.pickleball/workbench/live-bridge.json` or the start host is up, so `state.browser` stays `up` and the step does not answer `no live browser` from the short-lived CLI. `doctor` runs in this process and its `chrome=`, `frame=`, and `leaseLeft=` lines are on that step. The outer envelope `state.frame` is the last step frame. `--stop-on-fail` stops at the first non-zero exit and sets `stopped` true with sentence `steps stopped`. Without that flag a failure still finishes the file, `stopped` stays false, and the sentence is `steps failed`.
 
 `watch --ref=s1.h1 --until=visible` polls until mutation, change, visible, hidden, `text=`, or click. A miss is timeout. With no `--until`, watch still returns the first matching event.
 

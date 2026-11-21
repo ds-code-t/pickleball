@@ -60,8 +60,26 @@ class CompositeVerbsCliTest {
         assertEquals(2, stopped.code, stopped.out + stopped.err);
         assertTrue(stopped.out.contains("execute-steps"), stopped.out);
         assertTrue(stopped.out.contains("step-one") || stopped.out.contains("chat-send"), stopped.out);
-        assertTrue(stopped.out.contains("\"stopped\":true") || stopped.out.contains("stopped"), stopped.out);
+        assertTrue(stopped.out.contains("\"stopped\":true"), stopped.out);
+        assertTrue(stopped.out.contains("steps stopped"), stopped.out);
+        assertFalse(stopped.out.contains("steps failed"), stopped.out);
         assertTrue(Files.readString(temp.resolve(".pickleball/runs/steps/agent/chat/run.jsonl")).contains("step-one"));
+    }
+
+    @Test
+    void covers_command_execute_steps_failure_is_not_stopped() throws Exception {
+        Path file = temp.resolve("steps-continue.json");
+        Files.writeString(file, """
+                [{"op":"chat-send","args":{"text":"kept-going","source":"human"}},{"op":"no-such-verb","args":{}}]
+                """);
+        Capture continued = run("execute-steps", "--file=" + file, "--run-id=continue", temp.toString());
+        assertEquals(2, continued.code, continued.out + continued.err);
+        assertTrue(continued.out.contains("\"stopped\":false"), continued.out);
+        assertTrue(continued.out.contains("steps failed"), continued.out);
+        assertFalse(continued.out.contains("steps stopped"), continued.out);
+        assertTrue(continued.out.contains("\"ran\":2"), continued.out);
+        assertTrue(Files.readString(temp.resolve(".pickleball/runs/continue/agent/chat/run.jsonl")).contains("kept-going"));
+        assertFalse(continued.out.contains("unknown agent command"), continued.out);
     }
 
     @Test
