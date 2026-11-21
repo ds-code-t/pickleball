@@ -46,7 +46,8 @@ public final class TargetVerb {
             "mutation", "network", "load", "navigation", "mask"
     );
     private static final Set<String> INTERACTIVE = Set.of(
-            "a", "button", "input", "select", "textarea", "option"
+            "a", "button", "input", "select", "textarea", "option",
+            "tab", "link", "menuitem", "checkbox", "radio", "switch", "textbox", "combobox", "searchbox"
     );
     private static final int HIT_CAP = 512;
     /** How long a dispatched click waits for a visible change before it is reported quiet. */
@@ -890,8 +891,7 @@ public final class TargetVerb {
             }
             String within = blank(args.get("within"));
             if (!within.isBlank()) {
-                Hit scope = requireHit(within);
-                DomNode scoped = findNode(shownRoot, "", scope.backend);
+                DomNode scoped = resolveWithin(shownRoot, within);
                 if (scoped == null) return fail("snap", "not found");
                 shownRoot = scoped;
             }
@@ -1537,17 +1537,47 @@ public final class TargetVerb {
     }
 
     private static String docVersion(CdpConnection cdp, String sessionId) {
-        String expression = "(function(){var root=document.documentElement;if(!root)return '0:0';"
+        String text = evalText(cdp, sessionId, docVersionExpression(), pkbWorld(cdp, sessionId));
+        return text.isBlank() ? "0:0" : text;
+    }
+
+    /** Top document plus same-origin iframe documents. Child sessions are folded in by {@link #docVersion(CdpConnection)}. */
+    static String docVersionExpression() {
+        return "(function(){var root=document.documentElement;if(!root)return '0:0';"
                 + "var g=globalThis;"
+                + "function arm(doc){if(!doc||!doc.documentElement)return 0;if(doc.__pkbFrameWatch)return doc.__pkbFrameCount||0;"
+                + "doc.__pkbFrameCount=0;doc.__pkbFrameWatch=new MutationObserver(function(records){"
+                + "for(var i=0;i<records.length;i++){var r=records[i];var t=r.target;"
+                + "if(r.type==='attributes'&&r.attributeName&&r.attributeName.indexOf('data-pkb-')===0)continue;"
+                + "if(t&&t.nodeType===1&&t.closest&&t.closest('[data-pkb-agent],[data-pkb-layer]'))continue;"
+                + "doc.__pkbFrameCount++;return;}});"
+                + "try{doc.__pkbFrameWatch.observe(doc.documentElement,{subtree:true,childList:true,attributes:true,characterData:true});}catch(e){}"
+                + "return 0;}"
+                + "function sum(doc){if(!doc||!doc.documentElement)return 0;var n=arm(doc);"
+                + "var frames=doc.querySelectorAll?doc.querySelectorAll('iframe,frame'):[];"
+                + "for(var i=0;i<frames.length;i++){try{var child=frames[i].contentDocument;if(child&&child!==doc)n+=sum(child);}catch(e){}}"
+                + "return n;}"
                 + "if(!g.__pkbDocWatch){g.__pkbDocCount=0;g.__pkbDocWatch=new MutationObserver(function(records){"
                 + "for(var i=0;i<records.length;i++){var r=records[i];var t=r.target;"
-                + "if(r.type==='attributes'&&r.attributeName&&r.attributeName.indexOf('data-pkb-')===0) continue;"
-                + "if(t&&t.nodeType===1&&t.closest&&t.closest('[data-pkb-agent],[data-pkb-layer]')) continue;"
+                + "if(r.type==='attributes'&&r.attributeName&&r.attributeName.indexOf('data-pkb-')===0)continue;"
+                + "if(t&&t.nodeType===1&&t.closest&&t.closest('[data-pkb-agent],[data-pkb-layer]'))continue;"
                 + "g.__pkbDocCount++;return;}});"
                 + "g.__pkbDocWatch.observe(root,{subtree:true,childList:true,attributes:true,characterData:true});}"
-                + "return location.href+':'+g.__pkbDocCount;})()";
-        String text = evalText(cdp, sessionId, expression, pkbWorld(cdp, sessionId));
-        return text.isBlank() ? "0:0" : text;
+                + "return location.href+':'+g.__pkbDocCount+':'+sum(document);})()";
+    }
+
+    private static String docVersion(CdpConnection cdp) {
+        StringBuilder text = new StringBuilder(docVersion(cdp, ""));
+        try {
+            for (String frameId : FrameCoverage.frameIds(cdp)) {
+                String session = FrameCoverage.sessionId(cdp, frameId);
+                if (session == null || session.isBlank()) continue;
+                text.append('|').append(docVersion(cdp, session));
+            }
+        } catch (RuntimeException ignored) {
+            // A missing child session leaves the main document version.
+        }
+        return text.toString();
     }
 
     /** Isolated world for this session's document. The page's main world is not written. */
@@ -2527,6 +2557,63 @@ public final class TargetVerb {
         return false;
     }
 
+    /** {@code --within} is a stored ref, a short id, a backend id, or an element id. */
+    static DomNode resolveWithin(DomNode root, String within) {
+        if (root == null || within == null || within.isBlank()) return null;
+        String token = within.trim();
+        try {
+            Hit scope = requireHit(token);
+            DomNode stored = findNode(root, "", scope.backend);
+            if (stored != null) return stored;
+        } catch (Miss ignored) {
+            // A fresh id is still an element id or a backend id.
+        }
+        String expanded = SessionIds.expand(token);
+        DomNode fromRef = nodeByRef(root, expanded != null ? expanded : token);
+        if (fromRef != null) return fromRef;
+        if (token.matches("\\d+")) {
+            try {
+                DomNode byBackend = findNode(root, "", Long.parseLong(token));
+                if (byBackend != null) return byBackend;
+            } catch (NumberFormatException ignored) {
+                // Fall through to the element id.
+            }
+        }
+        String id = token.startsWith("#") ? token.substring(1) : token;
+        return findByElementId(root, id);
+    }
+
+    static List<DomNode> scopedInteractive(DomNode root, String within, int depth) {
+        DomNode shown = within == null || within.isBlank() ? root : resolveWithin(root, within);
+        if (shown == null) return List.of();
+        return interactive(shown, depth);
+    }
+
+    private static DomNode nodeByRef(DomNode root, String ref) {
+        if (ref == null || !ref.startsWith("ref:")) return null;
+        int mark = ref.lastIndexOf(':');
+        if (mark < 0 || mark == ref.length() - 1) return null;
+        try {
+            return findNode(root, "", Long.parseLong(ref.substring(mark + 1)));
+        } catch (NumberFormatException failure) {
+            return null;
+        }
+    }
+
+    private static DomNode findByElementId(DomNode node, String id) {
+        if (node == null || id == null || id.isBlank()) return null;
+        if (id.equals(node.attributes.get("id"))) return node;
+        for (DomNode child : node.children) {
+            DomNode found = findByElementId(child, id);
+            if (found != null) return found;
+        }
+        for (DomNode shadow : node.shadowRoots) {
+            DomNode found = findByElementId(shadow, id);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
     private static DomNode findNode(DomNode node, String handle, long backend) {
         if (node == null) return null;
         if (!handle.isBlank() && handle.equals(node.id())) return node;
@@ -2577,6 +2664,7 @@ public final class TargetVerb {
             row.put("ref", ref);
             row.put("id", shortId);
             row.put("role", roleName);
+            row.put("type", tag.isBlank() ? roleName : tag);
             row.put("name", name(node));
             row.put("handle", node.backendNodeId);
             row.put("visible", visible);
@@ -2617,7 +2705,7 @@ public final class TargetVerb {
             Map<String, String> args
     ) {
         List<Map<String, Object>> shaped = SnapView.filter(rows, args);
-        List<String> all = sectioned(shaped);
+        List<String> all = sectioned(shaped, args);
         int lineBudget = SnapView.lineBudget(args);
         int byteBudget = SnapView.byteBudget(args);
         List<String> shown = new ArrayList<>();
@@ -2641,24 +2729,46 @@ public final class TargetVerb {
         if (truncated || alwaysFull) body.put("full", writeLines(project, runId, all));
     }
 
-    /** Interactable roles, in first-seen order, each under a {@code # role} header. */
-    private static List<String> sectioned(List<Map<String, Object>> rows) {
+    /** Interactable rows under {@code # role} or {@code # type}. {@code --priority=on} reorders and marks each line. */
+    private static List<String> sectioned(List<Map<String, Object>> rows, Map<String, String> args) {
+        String group = args == null ? "" : blank(args.get("group"));
+        boolean byType = "type".equalsIgnoreCase(group);
+        boolean priority = args != null && "on".equalsIgnoreCase(blank(args.get("priority")));
+        List<Map<String, Object>> ordered = rows == null ? List.of() : new ArrayList<>(rows);
+        if (priority) {
+            ordered.sort(java.util.Comparator.comparingInt(TargetVerb::priorityRank));
+        }
         Map<String, List<String>> groups = new LinkedHashMap<>();
-        if (rows != null) {
-            for (Map<String, Object> row : rows) {
-                String roleName = String.valueOf(row.get("role"));
-                groups.computeIfAbsent(roleName, key -> new ArrayList<>()).add(snapLine(row));
-            }
+        for (Map<String, Object> row : ordered) {
+            String key = byType
+                    ? String.valueOf(row.getOrDefault("type", row.get("role")))
+                    : String.valueOf(row.get("role"));
+            groups.computeIfAbsent(key, ignored -> new ArrayList<>()).add(snapLine(row, priority));
         }
         List<String> lines = new ArrayList<>();
-        for (Map.Entry<String, List<String>> group : groups.entrySet()) {
-            lines.add("# " + group.getKey());
-            lines.addAll(group.getValue());
+        for (Map.Entry<String, List<String>> groupRow : groups.entrySet()) {
+            lines.add("# " + groupRow.getKey());
+            lines.addAll(groupRow.getValue());
         }
         return lines;
     }
 
-    private static String snapLine(Map<String, Object> row) {
+    private static final List<String> SNAP_PRIORITY = List.of(
+            "button", "link", "tab", "textbox", "searchbox", "checkbox", "radio", "switch",
+            "combobox", "menuitem", "option", "a", "input", "select", "textarea"
+    );
+
+    private static int priorityRank(Map<String, Object> row) {
+        String roleName = String.valueOf(row.get("role")).toLowerCase(Locale.ROOT);
+        int index = SNAP_PRIORITY.indexOf(roleName);
+        return index < 0 ? SNAP_PRIORITY.size() : index;
+    }
+
+    static List<String> snapLines(List<Map<String, Object>> rows, Map<String, String> args) {
+        return sectioned(rows, args);
+    }
+
+    private static String snapLine(Map<String, Object> row, boolean priority) {
         StringBuilder line = new StringBuilder();
         line.append("- ").append(row.get("role")).append(" \"").append(row.get("name")).append("\" [ref=")
                 .append(row.get("ref")).append("]");
@@ -2669,6 +2779,7 @@ public final class TargetVerb {
         if (row.get("interactive") != null) line.append(" interactive=").append(row.get("interactive"));
         Object frame = row.get("frame");
         line.append(" frame=").append(frame == null || String.valueOf(frame).isBlank() ? "top" : LineView.token(String.valueOf(frame)));
+        if (priority) line.append(" priority=").append(priorityRank(row));
         return line.toString();
     }
 
@@ -2702,7 +2813,7 @@ public final class TargetVerb {
         String version = docVersion(session.connection());
         List<Map<String, Object>> rows = publish(
                 runId, "browser", session.id, version, interactive(shown), "", session.connection());
-        return sectioned(rows);
+        return sectioned(rows, Map.of());
     }
 
     private static List<String> compactDesktop(DesktopTree.Session session, String runId) {
@@ -2710,7 +2821,7 @@ public final class TargetVerb {
         String version = "desktop:" + session.sequence();
         List<Map<String, Object>> rows = publish(
                 runId, "desktop", session.id(), version, interactive(session.root()), "");
-        return sectioned(rows);
+        return sectioned(rows, Map.of());
     }
 
     /**
@@ -2889,10 +3000,6 @@ public final class TargetVerb {
         }
         for (DomNode child : node.children) collectSelectOptions(child, into);
         for (DomNode shadow : node.shadowRoots) collectSelectOptions(shadow, into);
-    }
-
-    private static String docVersion(CdpConnection cdp) {
-        return docVersion(cdp, "");
     }
 
     private static String title(CdpConnection cdp) {

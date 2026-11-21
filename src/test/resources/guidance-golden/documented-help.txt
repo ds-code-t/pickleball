@@ -270,7 +270,8 @@ Usage: short-log [--limit=<n>]
 Usage: show-run --run-id=<id>
 
 # help snap
-Usage: snap [--target=browser:auto|browser:<id>|browser:cdp=<url>|desktop:<pid>|desktop:app~<name>|ref:<doc>:<handle>] [--format=lines|json] [--fields=<a,b>] [--where=<role=button>] [--limit=<n>] [--budget=<bytes>]
+Usage: snap [--target=browser:auto|browser:<id>|browser:cdp=<url>|desktop:<pid>|desktop:app~<name>|ref:<doc>:<handle>] [--within=<id>] [--depth=<n>] [--group=role|type] [--priority=on] [--format=lines|json] [--fields=<a,b>] [--where=<role=button>] [--limit=<n>] [--budget=<bytes>]
+--within is a ref, short id, backend id, or element id. --depth is the levels under that node. --group=type headers use the tag. --priority=on reorders and marks priority.
 
 # help start
 Usage: start --url=<page> | --url-key=<URL.key> --browser=<chrome|edge|chrome-headless> [--headed] [--hold=<seconds|forever>] [--panel] [--size=1600x1000] [--env=KEY=VALUE]
@@ -314,6 +315,7 @@ Reports undefined steps, ambiguous glue, and unresolved RUN SCENARIO targets. Ou
 
 # help watch
 Usage: watch --target=<selector> [--ref=<ref>] [--until=mutation|change|visible|hidden|text=<text>|click] [--kinds=<kinds>] [--duration=<ms>]
+mutation and change include same-origin iframe documents and attached child frames.
 
 # help windows
 Usage: windows [--switch=<handle>] [--close=<handle>] [--run-id=<id>]
