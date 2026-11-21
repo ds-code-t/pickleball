@@ -16,7 +16,7 @@ After installing this bundle, use a write-capable coding agent and ask primarily
 
 > Change component service-call scenarios so mapped values preserve JSON number and boolean types.
 
-> Drive a live browser and talk to a person: `start --url-key=URL.app --browser=chrome --headed --panel`, then `chat-turn --until=human`, `act --query=Save --pick=1`, `ui-verify`, and `doctor`. `execute-steps --file=steps.json` runs those verbs on the live worker (`doctor` stays in this process; `stopped` is true only with `--stop-on-fail`). Use `call` when there is no IDE MCP client.
+> Drive a live browser and talk to a person: `start --url-key=URL.app --browser=chrome --headed --panel`, then `chat-turn --until=human`, `act --query=Save --pick=1`, `ui-verify`, and `doctor`. `execute-steps --file=steps.json` runs those verbs on the live worker (`doctor` stays in this process; `stopped` is true only with `--stop-on-fail`). `capture-steps` writes `{op,args}` for that file; an empty capture is count 0. `capture-scenario` reads the same network buffer as `observe`. A live `magnifier` copies the target or says target not captured. `discover` and `confirm` do not say PASSED when failures are greater than 0. Use `call` when there is no IDE MCP client.
 
 The agent should retrieve project setup, affected documentation, tests, consumer examples, and validation requirements from the repository.
 
