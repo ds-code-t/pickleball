@@ -61,7 +61,11 @@ Headless Workbench is not a headless browser. `isolate` and `execute-step` skip 
 
 Disposable FTS5 `reports/diagnostic-runs/diagnostics.db` (table `record_fts`). JSON stays authoritative. DiagnosticCli rebuild on `reports/diagnostic-runs` rewrites `run-index.json` and `run-catalog.json`. Delete `diagnostics.db`, `-wal`, `-shm` to drop it. Missing file: `query search` reads the JSON. Present file rebuilds only when a source is newer.
 
-Performance: `controller-start` keeps one JVM. `export-guidance --warm` then a ping is under 1 s. Replies are one envelope (v, ok, op, ms, state, sum, items, next, trunc, err). Short id s1.h42; `ref` expands it. format=lines is the compact view (200 lines, 16 KB). `validate --noop` lists empty glue.
+## Controller health
+
+A down controller runs in-process (no 30s wait, Windows too). `controller-start` is one JVM. `export-guidance --warm` pings under 1 s.
+
+Replies are one envelope (v, ok, op, ms, state, sum, items, next, trunc, err). Short id s1.h42; `ref` expands it. format=lines is the compact view (200 lines, 16 KB). `validate --noop` lists empty glue.
 
 ## Generated guidance lifecycle
 

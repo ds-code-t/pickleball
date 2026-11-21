@@ -55,7 +55,7 @@ One warm round trip. The reply is the agent envelope.
 
 # help controller-start
 Usage: controller-start [project]
-Starts the long-lived agent controller for this project. Later verbs are clients of that process.
+Starts the long-lived agent controller for this project. Later verbs are clients of that process. The classpath is classpath.cache or this program's own classes, not a wrapper classpath that lacks PkbMain. A down controller runs the verb in-process and does not wait. PKB_NO_AGENT_HOP=1 stays in-process.
 
 # help controller-status
 Usage: controller-status [project]

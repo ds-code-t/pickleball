@@ -95,6 +95,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-consumer-report-2026-11-17/agreed-plan.md`
 - `docs/maintainer/3.0.0-consumer-report-2026-11-17/bug-p2-24-tracking-store-tabs-empty.md`
 - `docs/maintainer/3.0.0-consumer-report-2026-11-17/bug-workbench-window-freeze.md`
+- `docs/maintainer/3.0.0-core-reliability-scoreboard.md`
 - `docs/maintainer/3.0.0-embedded-store-design.md`
 - `docs/maintainer/3.0.0-engine-defects-design.md`
 - `docs/maintainer/3.0.0-engine-design.md`
@@ -994,6 +995,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/CompositeVerbsCliTest.java`
 - `src/test/java/tools/dscode/launcher/ConfirmTest.java`
 - `src/test/java/tools/dscode/launcher/ConsumerReadyCliTest.java`
+- `src/test/java/tools/dscode/launcher/ControllerReliabilityTest.java`
 - `src/test/java/tools/dscode/launcher/DesktopSameVerbTest.java`
 - `src/test/java/tools/dscode/launcher/DoctorTest.java`
 - `src/test/java/tools/dscode/launcher/DomEngineCliLaunchTest.java`

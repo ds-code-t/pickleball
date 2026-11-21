@@ -124,7 +124,7 @@ final class WorkbenchCliHelp {
             Map.entry("ui", "Usage: ui [--ops=<json array>]\nWithout --ops, ui opens the Workbench controller. With --ops, ui applies a catalog batch (same as ui-apply)."),
             Map.entry("frame", "Usage: frame --target=<selector> [--list] [--reset] [--enter=<id|name>]\nLists frames, returns later steps to the top document, or enters a frame. --reset clears the entered frame and the Selenium driver. --enter scopes later find, act, snap, and inspect to that frame, and enters an iframe with that id, name, or title when the driver can see it. Replies include frame."),
             Map.entry("ref", "Usage: ref --id=<short-id>\nExpands a short id such as s1.h42 to its full ref. The id follows the DOM node until that node is removed."),
-            Map.entry("controller-start", "Usage: controller-start [project]\nStarts the long-lived agent controller for this project. Later verbs are clients of that process."),
+            Map.entry("controller-start", "Usage: controller-start [project]\nStarts the long-lived agent controller for this project. Later verbs are clients of that process. The classpath is classpath.cache or this program's own classes, not a wrapper classpath that lacks PkbMain. A down controller runs the verb in-process and does not wait. PKB_NO_AGENT_HOP=1 stays in-process."),
             Map.entry("controller-stop", "Usage: controller-stop [project]\nStops the agent controller and deletes its handle file."),
             Map.entry("controller-status", "Usage: controller-status [project]\nPrints running=true and the pid when the controller is up."),
             Map.entry("controller-ping", "Usage: controller-ping [project]\nOne warm round trip. The reply is the agent envelope."),

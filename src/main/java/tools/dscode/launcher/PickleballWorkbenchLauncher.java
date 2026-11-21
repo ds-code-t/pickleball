@@ -222,9 +222,11 @@ public final class PickleballWorkbenchLauncher {
 
         if (AgentHop.shouldHop(parsed.command(), args)) {
             try {
-                int exitCode = PkbMain.run(args);
-                if (exitCode != 0) exitProcess(exitCode);
-                return;
+                java.util.OptionalInt hopped = controllerHop(args);
+                if (hopped.isPresent()) {
+                    if (hopped.getAsInt() != 0) exitProcess(hopped.getAsInt());
+                    return;
+                }
             } catch (Exception failure) {
                 String message = failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
                 System.err.println("error: " + message);
@@ -266,6 +268,17 @@ public final class PickleballWorkbenchLauncher {
             System.err.println("Could not launch Pickleball Workbench: " + failure.getMessage());
             exitProcess(1);
         }
+    }
+
+    /**
+     * Ask the persistent controller to run {@code args}. Empty means the
+     * controller is down or unreachable, so the caller runs the verb here.
+     * There is no start wait.
+     */
+    static java.util.OptionalInt controllerHop(String[] args) throws Exception {
+        int exitCode = PkbMain.run(args);
+        if (exitCode == PkbMain.HOP_MISS) return java.util.OptionalInt.empty();
+        return java.util.OptionalInt.of(exitCode);
     }
 
     /**
