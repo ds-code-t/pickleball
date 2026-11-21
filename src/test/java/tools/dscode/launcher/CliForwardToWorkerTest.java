@@ -3,6 +3,7 @@ package tools.dscode.launcher;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.common.agentfast.AgentForward;
 import tools.dscode.control.protocol.ClientHeartbeat;
 import tools.dscode.control.protocol.LiveBridgeFile;
 
@@ -12,8 +13,12 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -154,6 +159,52 @@ class CliForwardToWorkerTest {
         } finally {
             server.stop(0);
             LiveBridgeFile.delete(project);
+        }
+    }
+
+    @Test
+    void chatTurnHttpBudgetOutlivesTheVerbAndALivePidIsTimeout() throws Exception {
+        assertEquals(Duration.ofSeconds(135), AgentForward.httpTimeout("chat-turn", Map.of("timeout", "120")));
+        assertEquals(Duration.ofSeconds(60), AgentForward.httpTimeout("snap", Map.of()));
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.setExecutor(executor);
+        server.createContext("/v1/agent/command", exchange -> {
+            try {
+                Thread.sleep(1500);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            }
+            byte[] response = "{\"exit\":0,\"body\":{\"ok\":true}}".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.start();
+        try {
+            LiveBridgeFile.Bridge live = new LiveBridgeFile.Bridge(
+                    "127.0.0.1", server.getAddress().getPort(), "token-turn", ProcessHandle.current().pid(), "sess-turn"
+            );
+            AgentForward.Posted slow = AgentForward.post(
+                    live, "chat-turn", Map.of("text", "hi", "timeout", "120"), List.of(),
+                    project, "turn", "agent", Duration.ofMillis(300)
+            );
+            assertEquals(1, slow.exit());
+            assertTrue(slow.error() == null || slow.error().isBlank(), slow.error());
+            assertTrue(slow.bodyJson().contains("\"error\":\"timeout\""), slow.bodyJson());
+            assertFalse(slow.bodyJson().contains("unreachable"), slow.bodyJson());
+
+            AgentForward.Posted gone = AgentForward.post(
+                    new LiveBridgeFile.Bridge("127.0.0.1", 9, "token-turn", 999_999L, "sess-gone"),
+                    "chat-turn", Map.of("timeout", "30"), List.of(),
+                    project, "turn", "agent", Duration.ofMillis(500)
+            );
+            assertTrue(gone.error().contains("live worker unreachable"), gone.error());
+            assertFalse(gone.error().contains("\"error\":\"timeout\""), gone.error());
+        } finally {
+            server.stop(0);
+            executor.shutdownNow();
         }
     }
 

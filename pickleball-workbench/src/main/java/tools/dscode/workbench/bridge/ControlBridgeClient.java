@@ -363,12 +363,62 @@ public final class ControlBridgeClient {
     }
 
     public AgentCommandResult agentCommand(AgentCommandRequest request) {
-        return request(
-                "POST", "/v1/agent/command",
-                request,
-                AgentCommandResult.class,
-                Duration.ofSeconds(60)
-        );
+        try {
+            return request(
+                    "POST", "/v1/agent/command",
+                    request,
+                    AgentCommandResult.class,
+                    agentHttpTimeout(request)
+            );
+        } catch (IllegalStateException failure) {
+            AgentCommandResult timed = timeoutIfAlive(descriptor, request == null ? "" : request.op(), failure);
+            if (timed != null) return timed;
+            throw failure;
+        }
+    }
+
+    /** Same budget as {@code AgentForward.httpTimeout}: the client outlives the verb. */
+    static Duration agentHttpTimeout(AgentCommandRequest request) {
+        String op = request == null ? "" : request.op();
+        java.util.Map<String, String> args = request == null || request.args() == null ? java.util.Map.of() : request.args();
+        long declared = 45;
+        if (waits(op)) {
+            declared = 30;
+            String raw = args.get("timeout");
+            if (raw != null && !raw.isBlank()) {
+                try {
+                    declared = Long.parseLong(raw.trim());
+                } catch (NumberFormatException ignored) {
+                    declared = 30;
+                }
+            }
+            if (declared < 0) declared = 0;
+            if (declared > 120) declared = 120;
+        }
+        return Duration.ofSeconds(Math.min(180L, Math.max(60L, declared + 15L)));
+    }
+
+    /**
+     * HTTP gave up but the worker pid is still alive. That is the verb timeout,
+     * not a dead bridge. A dead pid stays the caller's communication error.
+     */
+    static AgentCommandResult timeoutIfAlive(ControlBridgeDescriptor worker, String op, RuntimeException failure) {
+        if (worker == null || !waits(op) || failure == null || !(failure.getCause() instanceof java.io.IOException)) {
+            return null;
+        }
+        boolean alive = worker.pid() > 0 && ProcessHandle.of(worker.pid()).map(ProcessHandle::isAlive).orElse(false);
+        if (!alive) return null;
+        java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("ok", false);
+        body.put("op", op);
+        body.put("error", "timeout");
+        body.put("fix", "chat-send --source=human, then chat-turn again");
+        return new AgentCommandResult(1, body);
+    }
+
+    private static boolean waits(String op) {
+        return "chat-turn".equals(op) || "chat_wait".equals(op) || "ask-and-wait".equals(op)
+                || "watch".equals(op) || "wait".equals(op) || "wait-for".equals(op);
     }
 
     /** Repeated launch {@code --arg} values travel as {@code extraArgs}, not only inside the string map. */

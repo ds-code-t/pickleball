@@ -845,7 +845,6 @@ public final class AgentControl {
                     body.put("op", "chat-turn");
                     body.put("until", until);
                     body.put("messages", list);
-                    body.put("lines", list);
                     body.put("count", list.size());
                     return new Result(0, body);
                 }
@@ -869,7 +868,6 @@ public final class AgentControl {
                     body.put("op", "chat-turn");
                     body.put("until", until);
                     body.put("events", List.of(event));
-                    body.put("lines", List.of(event));
                     body.put("count", 1);
                     return new Result(0, body);
                 }

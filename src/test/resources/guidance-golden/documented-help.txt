@@ -41,7 +41,7 @@ Usage: chat-send --text=<message> [--source=agent|human|system] [--channel=<name
 
 # help chat-turn
 Usage: chat-turn --text=<message> [--until=human|answer|click] [--timeout=<seconds>] [--channel=<name>] [--run-id=<id>]
-Sends the text as the agent, then waits for a human, an answer, or a click. --timeout default 30, max 120.
+Sends the text as the agent, then waits for a human, an answer, or a click. The person's message is listed once. A live worker that is still up reports timeout, not unreachable. --timeout default 30, max 120.
 
 # help close-window
 Usage: close-window

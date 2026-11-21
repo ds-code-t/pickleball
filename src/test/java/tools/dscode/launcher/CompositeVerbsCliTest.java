@@ -1,5 +1,7 @@
 package tools.dscode.launcher;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.domengine.session.BrowserSession;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -47,6 +49,39 @@ class CompositeVerbsCliTest {
         assertEquals(1, timed.code, timed.out + timed.err);
         assertTrue(timed.out.contains("timeout") || timed.err.contains("timeout"), timed.out + timed.err);
         assertTrue(timed.out.contains("\"op\":\"chat-turn\""), timed.out);
+    }
+
+    @Test
+    void covers_command_chat_turn_lists_the_human_once() throws Exception {
+        Thread human = new Thread(() -> {
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            run("chat-send", "--text=only-once-human", "--source=human", "--run-id=once", temp.toString());
+        });
+        human.start();
+        Capture turn = run(
+                "chat-turn", "--text=agent-asks", "--until=human", "--timeout=5", "--run-id=once", temp.toString()
+        );
+        human.join(6000);
+        assertEquals(0, turn.code, turn.out + turn.err);
+        JsonNode node = new ObjectMapper().readTree(turn.out);
+        assertEquals(1, node.path("v").asInt());
+        assertTrue(node.path("state").isObject(), turn.out);
+        assertEquals(1, node.path("messages").size(), turn.out);
+        assertTrue(node.path("messages").toString().contains("only-once-human"), turn.out);
+        assertFalse(node.has("lines"), turn.out);
+        assertTrue(node.path("items").toString().contains("only-once-human"), turn.out);
+        int copies = 0;
+        int from = 0;
+        while ((from = turn.out.indexOf("only-once-human", from)) >= 0) {
+            copies++;
+            from += "only-once-human".length();
+        }
+        assertEquals(2, copies, turn.out);
     }
 
     @Test

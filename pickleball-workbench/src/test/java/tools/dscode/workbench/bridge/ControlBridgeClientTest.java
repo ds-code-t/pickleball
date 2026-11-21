@@ -20,6 +20,7 @@ import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -184,6 +185,56 @@ class ControlBridgeClientTest {
                 "tools.dscode.testengine.WorkbenchWorkerMain",
                 ControlProtocol.WORKER_MAIN_CLASS
         );
+    }
+
+    @Test
+    void chatTurnBudgetOutlivesTheVerbAndALiveWorkerIsTimeout() {
+        tools.dscode.control.protocol.ControlBridgeRequests.AgentCommandRequest slow =
+                new tools.dscode.control.protocol.ControlBridgeRequests.AgentCommandRequest(
+                "chat-turn", java.util.Map.of("timeout", "120"), "p", "r", "a", List.of()
+        );
+        assertEquals(135, ControlBridgeClient.agentHttpTimeout(slow).getSeconds());
+        tools.dscode.control.protocol.ControlBridgeRequests.AgentCommandRequest snap =
+                new tools.dscode.control.protocol.ControlBridgeRequests.AgentCommandRequest(
+                        "snap", java.util.Map.of(), "p", "r", "a", List.of()
+                );
+        assertEquals(60, ControlBridgeClient.agentHttpTimeout(snap).getSeconds());
+        ControlBridgeDescriptor live = new ControlBridgeDescriptor(
+                ControlProtocol.CURRENT_VERSION,
+                ControlProtocol.MINIMUM_COMPATIBLE_VERSION,
+                "session",
+                "runtime",
+                ProcessHandle.current().pid(),
+                "127.0.0.1",
+                1,
+                "2026-08-20T00:00:00Z",
+                "3.0.0",
+                "jar",
+                ControlProtocol.WORKER_CAPABILITIES
+        );
+        IllegalStateException timedOut = new IllegalStateException(
+                "Could not communicate",
+                new java.net.http.HttpTimeoutException("request timed out")
+        );
+        tools.dscode.control.protocol.ControlBridgeResponses.AgentCommandResult result =
+                ControlBridgeClient.timeoutIfAlive(live, "chat-turn", timedOut);
+        assertEquals(1, result.exit());
+        assertEquals("timeout", result.body().get("error"));
+        assertNull(ControlBridgeClient.timeoutIfAlive(live, "snap", timedOut));
+        ControlBridgeDescriptor dead = new ControlBridgeDescriptor(
+                ControlProtocol.CURRENT_VERSION,
+                ControlProtocol.MINIMUM_COMPATIBLE_VERSION,
+                "session",
+                "runtime",
+                999_999L,
+                "127.0.0.1",
+                1,
+                "2026-08-20T00:00:00Z",
+                "3.0.0",
+                "jar",
+                ControlProtocol.WORKER_CAPABILITIES
+        );
+        assertNull(ControlBridgeClient.timeoutIfAlive(dead, "chat-turn", timedOut));
     }
 
     private ControlBridgeDescriptor startProtocolServer(String token) throws IOException {
