@@ -155,7 +155,7 @@ The workspace configs copy is a plain copy of the project configs (real values, 
 
 `pkb_browser` is a name in the `configs` mapping, not a browser binary. Workbench keeps the project browser. `CHROME_HEADLESS` is used only when the project names none. A normal `mvn test` uses the project value. A workspace edit of `pkb_browser` is what the next Workbench launch uses.
 
-`gc-runs` deletes expired run payloads. It is not part of `finish`, and `--retention` does not invoke it. `--retention=all|failed|none` only changes what that Workbench discover or confirm keeps. Discover’s default is `failed`.
+`gc-runs` deletes expired run payloads and stopped browser profiles that nothing holds. It is not part of `finish`, and `--retention` does not invoke it. `--dry-run` prints `would-remove` paths and deletes nothing. Any other flag is rejected and deletes nothing. `--retention=all|failed|none` only changes what that Workbench discover or confirm keeps. Discover’s default is `failed`.
 
 ### Live isolation loop
 

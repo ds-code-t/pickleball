@@ -956,6 +956,14 @@ public final class AgentCoordination {
      * stay. The run directory stays. Two sweepers deleting the same file are safe.
      */
     public static RunSweep sweepRuns(Path project, Instant when) {
+        return sweepRuns(project, when, false, null);
+    }
+
+    /**
+     * Same selection as {@link #sweepRuns(Path, Instant)}. {@code dryRun} prints
+     * {@code would-remove} paths and deletes nothing.
+     */
+    public static RunSweep sweepRuns(Path project, Instant when, boolean dryRun, PrintStream out) {
         Instant clock = when == null ? Instant.now() : when;
         Path runs = PickleballLocalLayout.root(project).resolve(RUNS_DIRECTORY);
         if (!Files.isDirectory(runs)) return new RunSweep(0, 0);
@@ -971,10 +979,10 @@ public final class AgentCoordination {
         for (Path directory : directories) {
             RunRecord record = readRecordQuiet(directory.resolve(RECORD_FILE));
             if (record == null || held(project, directory, record, clock)) continue;
-            if (deleteTreeContents(directory.resolve("browser-profile"))) profiles++;
+            if (deleteTreeContents(directory.resolve("browser-profile"), dryRun, out)) profiles++;
             if (record.runId() != null && record.runId().equals(lastFailed)) continue;
             if (!payloadExpired(record, clock)) continue;
-            if (deleteDensePayload(directory)) payloads++;
+            if (deleteDensePayload(directory, dryRun, out)) payloads++;
         }
         return new RunSweep(profiles, payloads);
     }
@@ -2022,22 +2030,31 @@ public final class AgentCoordination {
         }
     }
 
-    private static boolean deleteTreeContents(Path root) {
+    private static boolean deleteTreeContents(Path root, boolean dryRun, PrintStream out) {
         if (!Files.exists(root)) return false;
-        boolean removed = false;
         List<Path> paths;
         try (var walk = Files.walk(root)) {
             paths = walk.sorted(Comparator.reverseOrder()).toList();
         } catch (IOException ignored) {
             return false;
         }
+        boolean removed = false;
         for (Path path : paths) {
             if (path.equals(root)) continue;
+            if (dryRun) {
+                noteWouldRemove(out, path);
+                removed = true;
+                continue;
+            }
             try {
                 if (Files.deleteIfExists(path)) removed = true;
             } catch (IOException ignored) {
                 // Another sweeper removed it, or it is still open.
             }
+        }
+        if (dryRun) {
+            noteWouldRemove(out, root);
+            return removed;
         }
         try {
             Files.deleteIfExists(root);
@@ -2047,7 +2064,7 @@ public final class AgentCoordination {
         return removed;
     }
 
-    private static boolean deleteDensePayload(Path runDirectory) {
+    private static boolean deleteDensePayload(Path runDirectory, boolean dryRun, PrintStream out) {
         boolean removed = false;
         List<Path> paths;
         try (var walk = Files.walk(runDirectory)) {
@@ -2058,6 +2075,11 @@ public final class AgentCoordination {
         for (Path path : paths) {
             if (path.equals(runDirectory)) continue;
             if (keepPayload(runDirectory, path)) continue;
+            if (dryRun) {
+                noteWouldRemove(out, path);
+                removed = true;
+                continue;
+            }
             try {
                 if (Files.deleteIfExists(path)) removed = true;
             } catch (IOException ignored) {
@@ -2065,6 +2087,11 @@ public final class AgentCoordination {
             }
         }
         return removed;
+    }
+
+    private static void noteWouldRemove(PrintStream out, Path path) {
+        if (out == null || path == null) return;
+        out.println("would-remove " + path);
     }
 
     private static boolean keepPayload(Path runDirectory, Path path) {

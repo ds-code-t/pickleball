@@ -1518,9 +1518,12 @@ public final class WorkbenchAgentCommands {
     }
 
     private static int gcRuns(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
-        AgentCoordination.RunSweep sweep = AgentCoordination.sweepRuns(parsed.project(), java.time.Instant.now());
+        boolean dryRun = hasFlag(parsed, "--dry-run");
+        AgentCoordination.RunSweep sweep = AgentCoordination.sweepRuns(
+                parsed.project(), java.time.Instant.now(), dryRun, out);
         out.println("profiles-removed=" + sweep.profilesRemoved());
         out.println("payloads-removed=" + sweep.payloadsRemoved());
+        if (dryRun) out.println("deleted=false");
         return 0;
     }
 

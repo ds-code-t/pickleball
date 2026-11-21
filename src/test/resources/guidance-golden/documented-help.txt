@@ -114,7 +114,8 @@ Lists frames, returns later steps to the top document, or enters a frame. --rese
 Usage: from-here
 
 # help gc-runs
-Usage: gc-runs
+Usage: gc-runs [--dry-run]
+Deletes expired run payloads and stopped browser profiles that nothing holds. It is not part of finish. --dry-run prints would-remove paths and deletes nothing. Any other flag is rejected and deletes nothing.
 
 # help gc-versions
 Usage: gc-versions

@@ -35,6 +35,7 @@ final class WorkbenchCliHelp {
             Map.entry("open-scenario", "Usage: open-scenario --feature=<path-or-name> --name=<scenario> [--example=<rows>]"),
             Map.entry("example", "Usage: example --example=<rows>"),
             Map.entry("finish", "Usage: finish --run-id=<id> [--learned=<one line>] [--status=PASSED|FAILED|EMPTY|TIMEOUT|STOPPED]"),
+            Map.entry("gc-runs", "Usage: gc-runs [--dry-run]\nDeletes expired run payloads and stopped browser profiles that nothing holds. It is not part of finish. --dry-run prints would-remove paths and deletes nothing. Any other flag is rejected and deletes nothing."),
             Map.entry("note", "Usage: note --text=<one line> [--agent=<id>] [--run-id=<id>]"),
             Map.entry("short-log", "Usage: short-log [--limit=<n>]"),
             Map.entry("export-guidance", "Usage: export-guidance [output-directory] [--warm]\n--warm writes classpath.cache, starts the controller, and prints warm=true, classpath=, pingMs=, and pingExit=. pingMs is the second ping."),

@@ -12,7 +12,7 @@ Use this checklist for changes to Pickleball behavior. Coding agents should comp
 
 ## Implement
 
-- [ ] Register a new Workbench verb in the command line, help, CLI inventory, and guidance golden. Keep `docs/consumer-agent-guide.md` at most 5120 UTF-8 LF bytes. Do not add `--follow` or `--warm` to the major flag lists. `events --follow` and `export-guidance --warm` are documented on their help pages.
+- [ ] Register a new Workbench verb in the command line, help, CLI inventory, and guidance golden. Keep `docs/consumer-agent-guide.md` at most 5120 UTF-8 LF bytes. Do not add `--follow` or `--warm` to the major flag lists. `events --follow` and `export-guidance --warm` are documented on their help pages. `gc-runs` accepts only `--dry-run`; any other flag is rejected and deletes nothing.
 - [ ] Preserve Java 21 compatibility.
 - [ ] Preserve established public behavior unless a breaking change was requested.
 - [ ] Avoid unrelated refactoring.
