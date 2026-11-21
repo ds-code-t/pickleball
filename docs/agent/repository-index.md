@@ -652,6 +652,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/engine/runtime/NativeScenarioCatalog.java`
 - `src/main/java/tools/dscode/engine/runtime/NativeScenarioRun.java`
 - `src/main/java/tools/dscode/engine/runtime/NativeStepTrace.java`
+- `src/main/java/tools/dscode/engine/runtime/NoopGlueMode.java`
 - `src/main/java/tools/dscode/engine/runtime/SharedStepRun.java`
 - `src/main/java/tools/dscode/engine/source/FileScenarioSource.java`
 - `src/main/java/tools/dscode/engine/source/MemoryScenarioSource.java`
@@ -667,6 +668,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/launcher/PickleballWorkbenchLauncher.java`
 - `src/main/java/tools/dscode/launcher/PkbMain.java`
 - `src/main/java/tools/dscode/launcher/QuietWarnings.java`
+- `src/main/java/tools/dscode/launcher/RunVarOverrides.java`
 - `src/main/java/tools/dscode/launcher/SessionHealthWait.java`
 - `src/main/java/tools/dscode/launcher/UrlKeys.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchAgentCommands.java`
@@ -810,6 +812,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 
 ## Framework tests
 
+- `src/test/java/com/example/noop/EmptySteps.java`
 - `src/test/java/io/cucumber/core/gherkin/messages/ConditionalArgumentPickleTest.java`
 - `src/test/java/io/cucumber/core/gherkin/messages/MultilineArgumentPickleTest.java`
 - `src/test/java/io/cucumber/core/runner/StepRepetitionLimitTest.java`
@@ -1011,6 +1014,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/JsFallbackHonestyTest.java`
 - `src/test/java/tools/dscode/launcher/MaskQuietTest.java`
 - `src/test/java/tools/dscode/launcher/NavigateDataFileTest.java`
+- `src/test/java/tools/dscode/launcher/NoopGlueModeTest.java`
 - `src/test/java/tools/dscode/launcher/OffsetFrameClickTest.java`
 - `src/test/java/tools/dscode/launcher/OneCallActTest.java`
 - `src/test/java/tools/dscode/launcher/OopifAutoAttachTest.java`

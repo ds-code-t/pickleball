@@ -239,13 +239,16 @@ public class StepExtension extends StepData {
         Object target = java.lang.reflect.Modifier.isStatic(method.getModifiers())
                 ? null
                 : instanceOrNull;
+        Object value;
         try {
-            return method.invoke(target, arguments.stream().map(Argument::getValue).toArray());
+            value = method.invoke(target, arguments.stream().map(Argument::getValue).toArray());
         } catch (Throwable t) {
             Throwable cause = t instanceof InvocationTargetException ? t.getCause() : t;
             cause.printStackTrace();
             throw new RuntimeException(cause);
         }
+        tools.dscode.engine.runtime.SharedStepRun.noteConsumerNoop(method);
+        return value;
     }
 
     public void addArg(Argument arg) {

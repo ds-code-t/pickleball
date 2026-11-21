@@ -132,6 +132,7 @@ public final class WorkbenchSessionCommands {
         }
         SecretRedactor.noteAssignments(parsed.runVars());
         noteWorkspaceSecrets(parsed);
+        RunVarOverrides.publish(parsed.project(), parsed.runVars());
         PrintStream safeOut = OutputFormatter.wrap(out);
         PrintStream safeErr = OutputFormatter.wrap(err);
         try {

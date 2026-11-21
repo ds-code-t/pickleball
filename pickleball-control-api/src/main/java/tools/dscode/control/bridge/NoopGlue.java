@@ -11,7 +11,8 @@ import java.nio.file.Path;
  * Detects consumer glue whose body does nothing. Framework classes
  * ({@code tools.dscode.*}) are never flagged. A class file that cannot be
  * parsed is not flagged unless the source body is visibly empty.
- * {@code pkb_noop_glue=fail} (or {@code PKB_NOOP_GLUE=fail}) turns the flag
+ * {@code pkb_noop_glue=fail} (system property, {@code PKB_NOOP_GLUE},
+ * {@code pkb_runvars}, the workspace, or the CLI override file) turns the flag
  * into a failure. The default stamps {@code noop:true} and the CLI warns.
  */
 public final class NoopGlue {
@@ -22,9 +23,7 @@ public final class NoopGlue {
     }
 
     public static boolean failMode() {
-        String raw = System.getProperty("pkb_noop_glue");
-        if (raw == null || raw.isBlank()) raw = System.getenv("PKB_NOOP_GLUE");
-        return raw != null && "fail".equalsIgnoreCase(raw.trim());
+        return tools.dscode.engine.runtime.NoopGlueMode.fail();
     }
 
     public static String stamp(String valueText) {

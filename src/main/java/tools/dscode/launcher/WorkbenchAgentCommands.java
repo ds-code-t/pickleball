@@ -82,6 +82,7 @@ public final class WorkbenchAgentCommands {
         }
         SecretRedactor.noteAssignments(parsed.runVars());
         noteWorkspaceSecrets(parsed);
+        RunVarOverrides.publish(parsed.project(), parsed.runVars());
         PrintStream safeOut = OutputFormatter.wrap(out);
         PrintStream safeErr = OutputFormatter.wrap(err);
         try {
@@ -120,7 +121,7 @@ public final class WorkbenchAgentCommands {
                         parsed.coordination().runId(),
                         parsed.maxSteps(),
                         parsed.allSteps(),
-                        parsed.noopGlue(),
+                        true,
                         safeOut,
                         safeErr
                 );

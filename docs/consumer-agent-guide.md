@@ -65,7 +65,7 @@ Disposable FTS5 `reports/diagnostic-runs/diagnostics.db` (table `record_fts`). J
 
 A down controller runs in-process (no 30s wait, Windows too). `controller-start` is one JVM. `export-guidance --warm` pings under 1 s.
 
-Replies are one envelope (v, ok, op, ms, state, sum, items, next, trunc, err). Short id s1.h42; `ref` expands it. format=lines is the compact view (200 lines, 16 KB). `validate --noop` lists empty glue.
+Replies are one envelope (v, ok, op, ms, state, sum, items, next, trunc, err). Short id s1.h42; `ref` expands it. format=lines is the compact view (200 lines, 16 KB). `validate` lists empty glue.
 
 ## Generated guidance lifecycle
 
