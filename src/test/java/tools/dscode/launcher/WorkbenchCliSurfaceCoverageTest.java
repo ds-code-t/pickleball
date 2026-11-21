@@ -1018,7 +1018,9 @@ class WorkbenchCliSurfaceCoverageTest {
 
     @Test
     void covers_flag_sweep() throws Exception {
-        assertTrue(parse("gc-runs", "--sweep").coordination().sweep());
+        IllegalArgumentException rejected = assertThrows(
+                IllegalArgumentException.class, () -> parse("gc-runs", "--sweep"));
+        assertTrue(rejected.getMessage().contains("gc-runs does not use --sweep"), rejected.getMessage());
         assertTrue(parse("presence", "--sweep").coordination().sweep());
         agent("presence", temp.toString(), "--touch", "--agent=ada");
         Capture capture = agent("presence", temp.toString(), "--sweep");

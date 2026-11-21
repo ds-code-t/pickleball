@@ -25,11 +25,13 @@ import tools.dscode.engine.model.EngineStep;
 import tools.dscode.engine.model.StepArgument;
 import tools.dscode.engine.model.Table;
 import tools.dscode.engine.convert.CucumberModelConverter;
+import tools.dscode.control.protocol.NoopNotice;
 import tools.dscode.coredefinitions.GeneralSteps;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -208,7 +210,26 @@ public final class SharedStepRun {
             }
         }
         if (driver != null) ElementOperations.restoreFrames(driver, depth);
-        step.nativeFrame = used == null ? "" : used;
+        String drifted = "";
+        if (driver != null && depth == 0) {
+            try {
+                String live = ElementOperations.observedFrame(driver);
+                if (live != null && !live.isBlank() && !"top".equals(live)) {
+                    drifted = live;
+                    driver.switchTo().defaultContent();
+                    ElementOperations.rewindFrameMark(List.of());
+                }
+            } catch (RuntimeException ignored) {
+                // A frame the step entered is still named below. The driver stays where the switch left it.
+            }
+        }
+        if (used != null && !used.isBlank()) {
+            step.nativeFrame = used;
+        } else if (!drifted.isBlank()) {
+            step.nativeFrame = drifted;
+        } else {
+            step.nativeFrame = used == null ? "" : used;
+        }
     }
 
     public static Result run(StepExtension step) {
@@ -368,6 +389,26 @@ public final class SharedStepRun {
         }
     }
 
+    /**
+     * Empty consumer glue is not a silent pass. The default warns and stamps
+     * {@code noop:true}. {@code pkb_noop_glue=fail} fails the step.
+     */
+    public static void noteConsumerNoop(Method method) {
+        if (!tools.dscode.launcher.WorkbenchValidate.consumerEmpty(method)) return;
+        NoopNotice.warnIfPresent(NoopNotice.MARK, System.err);
+        String runId = System.getProperty("pkb_run_id");
+        if (runId != null && !runId.isBlank()) {
+            String project = System.getProperty("pkb_project");
+            Path root = project == null || project.isBlank() ? Path.of("") : Path.of(project);
+            NoopNotice.noteReport(root, runId, NoopNotice.MARK);
+        }
+        if (NoopGlueMode.fail()) {
+            throw new IllegalStateException(
+                    "noop consumer glue (noop:true). The step reported SUCCESS without acting."
+            );
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private static Object call(StepExtension step, StepMatch match, ExecutionContext context) throws ReflectiveOperationException {
         Method method = step.method;
@@ -386,7 +427,9 @@ public final class SharedStepRun {
         EngineStep engineStep = BOUND.get().get(step);
         Object[] args = arguments(method, match, engineStep, step);
         try {
-            return method.invoke(target, args);
+            Object value = method.invoke(target, args);
+            noteConsumerNoop(method);
+            return value;
         } catch (InvocationTargetException failure) {
             Throwable cause = failure.getCause() == null ? failure : failure.getCause();
             if (cause instanceof RuntimeException runtime) throw runtime;

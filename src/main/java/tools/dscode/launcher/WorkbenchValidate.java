@@ -266,7 +266,7 @@ public final class WorkbenchValidate {
     }
 
     /** Same rule as the worker's {@code NoopGlue}. Reflection keeps the launcher off that module. */
-    static boolean consumerEmpty(Method method) {
+    public static boolean consumerEmpty(Method method) {
         if (method == null) return false;
         String className = method.getDeclaringClass().getName();
         if (className.startsWith("tools.dscode.") || "tools.dscode".equals(className)) return false;

@@ -851,6 +851,19 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
     }
 
     private ControlBridgeCallResult noteNoop(String text, ControlBridgeCallResult result) {
+        if (result != null && "FAILED".equals(result.status()) && noopFailure(result)) {
+            return new ControlBridgeCallResult(
+                    "FAILED",
+                    null,
+                    NoopGlue.MARK,
+                    new tools.dscode.control.protocol.ControlBridgeError(
+                            "NOOP_GLUE",
+                            "noop consumer glue (noop:true). The step reported SUCCESS without acting.",
+                            result.error() == null ? "" : result.error().stackTrace()
+                    ),
+                    result.runtime()
+            );
+        }
         if (result == null || !"SUCCESS".equals(result.status())) return result;
         try {
             var glue = CucumberStepInvoker.findGlueDefinition(text == null ? "" : text);
@@ -876,13 +889,20 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         }
     }
 
+    private static boolean noopFailure(ControlBridgeCallResult result) {
+        String message = result.error() == null || result.error().message() == null ? "" : result.error().message();
+        String text = result.valueText() == null ? "" : result.valueText();
+        return message.contains("noop consumer glue") || message.contains("noop:true") || text.contains("noop:true");
+    }
+
     /** The driver frame after the step, appended so a reply always names it. */
     private ControlBridgeCallResult noteFrame(ControlBridgeCallResult result) {
         if (result == null) return null;
         String path = "top";
         try {
-            String current = tools.dscode.common.composite.ElementOperations.currentFramePath();
-            if (current != null && !current.isBlank()) path = current;
+            org.openqa.selenium.WebDriver driver = tools.dscode.coredefinitions.BrowserSteps.getCurrentDriverIfPresent();
+            String observed = tools.dscode.common.composite.ElementOperations.observedFrame(driver);
+            if (observed != null && !observed.isBlank()) path = observed;
         } catch (Throwable ignored) {
             path = "top";
         }

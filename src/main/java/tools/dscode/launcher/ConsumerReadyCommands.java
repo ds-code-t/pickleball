@@ -233,6 +233,7 @@ final class ConsumerReadyCommands {
 
     private static StopOutcome stopOwned(Path project) {
         if (project == null) return new StopOutcome(false, false);
+        deleteSession(project);
         Optional<LiveHostFile.Host> host = LiveHostFile.read(project);
         if (host.isEmpty()) return new StopOutcome(false, false);
         LiveHostFile.Host found = host.get();
@@ -298,7 +299,7 @@ final class ConsumerReadyCommands {
 
     static int doctor(WorkbenchCommandLine.Parsed parsed, java.io.PrintStream out, java.io.PrintStream err) {
         Path project = parsed.project();
-        String chrome = BrowserSession.findChrome() == null ? "absent" : "present";
+        String chrome = tools.dscode.control.protocol.BrowserPresence.chromeUp(project) ? "present" : "absent";
         String session = sessionId(project);
         if (session == null || session.isBlank()) session = "absent";
         CliHealth health = readCliHealth(project);
@@ -307,7 +308,7 @@ final class ConsumerReadyCommands {
         if (!bridge) bridge = legacyHostAlive(project);
         Optional<LiveBridgeFile.Bridge> workerBridge = LiveBridgeFile.read(project);
         boolean worker = workerBridge.isPresent() && alive(workerBridge.get().pid());
-        boolean lease = worker || Files.isRegularFile(project.resolve(".pickleball/workbench/pause-hold"));
+        boolean lease = worker || tools.dscode.control.protocol.LeaseClock.fresh(project);
         boolean page = "attached".equals(health.page());
         out.println("chrome=" + chrome);
         out.println("session=" + session);
@@ -623,6 +624,14 @@ final class ConsumerReadyCommands {
             return text.substring(start);
         } catch (IOException failure) {
             return "";
+        }
+    }
+
+    private static void deleteSession(Path project) {
+        try {
+            Files.deleteIfExists(sessionFile(project));
+        } catch (IOException ignored) {
+            // A missing session is the clean doctor state.
         }
     }
 

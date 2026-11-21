@@ -1,0 +1,27 @@
+package tools.dscode.common.agentfast;
+
+import org.junit.jupiter.api.Test;
+import tools.dscode.common.domoperations.MaskQuiet;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/** Click honesty that does not need Chrome: a stuck mask fails, a signature change is applied. */
+class ActHonestyTest {
+    @Test
+    void aStuckCoveringMaskIsNotAMiss() {
+        assertTrue(TargetVerb.maskStillCovering(new MaskQuiet.Wait(800, false)));
+        assertFalse(TargetVerb.maskStillCovering(new MaskQuiet.Wait(800, true)));
+        assertFalse(TargetVerb.maskStillCovering(new MaskQuiet.Wait(0, false)));
+        assertFalse(TargetVerb.maskStillCovering(null));
+    }
+
+    @Test
+    void elementStateChangeIsAppliedAndABlankReadIsNot() {
+        assertTrue(TargetVerb.signatureApplied("Count\n\n\n\n\n\n", "Count\ntrue\n\n\n\n\n"));
+        assertFalse(TargetVerb.signatureApplied("Count\n\n\n\n\n\n", "Count\n\n\n\n\n\n"));
+        assertFalse(TargetVerb.signatureApplied("", "Count\ntrue"));
+        assertFalse(TargetVerb.signatureApplied("Count", ""));
+        assertFalse(TargetVerb.signatureApplied(null, "Count"));
+    }
+}

@@ -460,6 +460,44 @@ class WorkbenchValidateTest {
         assertTrue(out.contains("noop=1"), out);
     }
 
+    @Test
+    void plainValidateListsEmptyConsumerGlue() throws Exception {
+        Path feature = project.resolve("src/test/resources/features/plain-click.feature");
+        Files.createDirectories(feature.getParent());
+        Files.writeString(feature, """
+                Feature: Clicks
+                  Scenario: a link
+                    Then I click the "Save" Link
+                """);
+        Path glue = project.resolve("src/test/java/com/example/PlainClickGlue.java");
+        Files.createDirectories(glue.getParent());
+        Files.writeString(glue, """
+                package com.example;
+                import io.cucumber.java.en.Then;
+                public class PlainClickGlue {
+                  @Then("I click the {string} Link")
+                  public void clickLink(String name) {}
+                  @Then("I click the {string} Button")
+                  public void clickButton(String name) { name.length(); }
+                }
+                """);
+        compileGlue(project);
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        int code = WorkbenchAgentCommands.run(
+                new String[]{"validate", project.toString()},
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(stderr, true, StandardCharsets.UTF_8)
+        );
+        String out = stdout.toString(StandardCharsets.UTF_8);
+        assertEquals(1, code, out + stderr.toString(StandardCharsets.UTF_8));
+        assertTrue(out.contains("noop:"), out);
+        assertTrue(out.contains("clickLink"), out);
+        assertTrue(out.contains("noop:true"), out);
+        assertFalse(out.contains("clickButton"), out);
+        assertTrue(out.contains("noop=1"), out);
+    }
+
     private static void compileGlue(Path project) throws Exception {
         Path sourceRoot = project.resolve("src/test/java");
         List<Path> sources = new ArrayList<>();

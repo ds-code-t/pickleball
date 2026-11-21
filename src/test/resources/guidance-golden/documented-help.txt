@@ -20,7 +20,7 @@ all: act arrow ask ask-and-wait attach border bridge-health call capture capture
 
 # help act
 Usage: act --target=<selector> [--kind=click|type|hover|press|select] [--query=<text>] [--ref=<ref>] [--pick=<n|name>] [--value=<text>] [--condition=title=<text>|text=<text>|url=<text>|ref=<id>:selected] [--snap=diff|auto] [--timeout=<ms>]
---pick chooses one hit in the same snapshot, so the ref cannot go stale. A success includes checked and settleMs.
+--pick chooses one hit in the same snapshot, so the ref cannot go stale. A success includes checked and settleMs. Hover on a visible element is applied and dispatched. A click is applied when the page or that element's text or state changes. A covering mask that does not clear fails the click. Replies include frame.
 
 # help call
 Usage: call <tool> [--args-file=<json>] [--args-b64=<base64>] [--args=<json>|-] [--text=<message>]
@@ -55,7 +55,7 @@ One warm round trip. The reply is the agent envelope.
 
 # help controller-start
 Usage: controller-start [project]
-Starts the long-lived agent controller for this project. Later verbs are clients of that process.
+Starts the long-lived agent controller for this project. Later verbs are clients of that process. The classpath is classpath.cache or this program's own classes, not a wrapper classpath that lacks PkbMain. A down controller runs the verb in-process and does not wait. PKB_NO_AGENT_HOP=1 stays in-process.
 
 # help controller-status
 Usage: controller-status [project]
@@ -76,7 +76,7 @@ Usage: discover-hint [--json]
 
 # help doctor
 Usage: doctor
-Reports chrome, session, health, headed, pid, bridge, worker, lease, leaseLeft, orphans, frame, and placed. No session still exits 0.
+Reports chrome, session, health, headed, pid, bridge, worker, lease, leaseLeft, orphans, frame, and placed. chrome=present only while the recorded Chrome pid is alive. lease is open when leaseLeft is 0. live-stop clears the session. No session still exits 0.
 
 # help events
 Usage: events [--hooks] [--json] [--cursor=<token>] [--run-id=<id>] [--follow] [--until=<type|text=...>] [--timeout=<seconds>] [--type=<name>] [--echo] [--from=any] [--format=lines|json] [--fields=<a,b>] [--where=<k=v>] [--limit=<n>] [--budget=<bytes>] [--group=type|role] [--priority=on]
@@ -114,7 +114,8 @@ Lists frames, returns later steps to the top document, or enters a frame. --rese
 Usage: from-here
 
 # help gc-runs
-Usage: gc-runs
+Usage: gc-runs [--dry-run]
+Deletes expired run payloads and stopped browser profiles that nothing holds. It is not part of finish. --dry-run prints would-remove paths and deletes nothing. Any other flag is rejected and deletes nothing.
 
 # help gc-versions
 Usage: gc-versions
@@ -309,7 +310,7 @@ Usage: use-version --version=<safe-version>
 
 # help validate
 Usage: validate [--tags=<expr>] [--name=<regex>] [--run-id=<id>] [--max-steps=<n>] [--all] [--noop]
-Reports undefined steps, ambiguous glue, and unresolved RUN SCENARIO targets. Outline rows are expanded. Core steps count as defined. A long suite prints progress and stops at a step cap unless --max-steps or --all is set, and reports how many scenarios were skipped. --noop lists empty consumer step definitions (noop:true) and exits 1 when any are found. A non-empty body is not listed. Runs nothing. A flag this command does not use, including --quiet, is rejected with error: and fix:.
+Reports undefined steps, ambiguous glue, and unresolved RUN SCENARIO targets. Outline rows are expanded. Core steps count as defined. A long suite prints progress and stops at a step cap unless --max-steps or --all is set, and reports how many scenarios were skipped. Plain validate lists empty consumer step definitions (noop:true) and exits 1 when any are found. --noop is accepted. --noop with --tags still filters the feature scan and lists those noops. A non-empty body is not listed. Runs nothing. A flag this command does not use, including --quiet, is rejected with error: and fix:.
 
 # help watch
 Usage: watch --target=<selector> [--ref=<ref>] [--until=mutation|change|visible|hidden|text=<text>|click] [--kinds=<kinds>] [--duration=<ms>]

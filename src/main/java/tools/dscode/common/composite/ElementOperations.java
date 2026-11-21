@@ -78,6 +78,40 @@ public final class ElementOperations {
     }
 
     /**
+     * The frame the driver is actually in. A raw {@code switchTo} that never
+     * touched the thread-local stack is not reported as {@code top}.
+     */
+    public static String observedFrame(WebDriver driver) {
+        String tracked = currentFramePath();
+        if (!(driver instanceof org.openqa.selenium.JavascriptExecutor js)) return tracked;
+        String live = "";
+        try {
+            Object raw = js.executeScript(
+                    "try {"
+                            + " if (window === window.top) return 'top';"
+                            + " var el = window.frameElement;"
+                            + " if (!el) return 'iframe';"
+                            + " var name = el.id || el.getAttribute('name') || el.getAttribute('title') || '';"
+                            + " return name ? String(name) : 'iframe';"
+                            + "} catch (e) { return 'iframe'; }"
+            );
+            live = raw == null ? "" : String.valueOf(raw).trim();
+        } catch (RuntimeException failure) {
+            return tracked;
+        }
+        return combineFrame(live, tracked);
+    }
+
+    /** Prefer the live document when the thread-local stack still says top. */
+    static String combineFrame(String live, String tracked) {
+        String seen = tracked == null || tracked.isBlank() ? "top" : tracked;
+        if (live == null || live.isBlank()) return seen;
+        if ("top".equals(live)) return "top".equals(seen) ? "top" : seen;
+        if ("top".equals(seen)) return live;
+        return seen;
+    }
+
+    /**
      * Snapshot of the notes. {@link tools.dscode.common.seleniumextensions.AllContextsScan}
      * rewinds to this after it puts the driver back, so its own switches are not frames the step entered.
      */
@@ -214,10 +248,11 @@ public final class ElementOperations {
 
     public static void click(WebDriver driver, WebElement element) {
         WebElement raw = unwrap(element);
-        tools.dscode.common.domoperations.MaskQuiet.await(driver, raw == null ? element : raw, 3_000L);
+        WebElement target = raw == null ? element : raw;
+        tools.dscode.common.domoperations.MaskQuiet.requireClear(driver, target, 3_000L);
         if (raw instanceof CompositeWebElement composite) {
             composite.click();
-            tools.dscode.common.domoperations.MaskQuiet.requireClear(driver, raw, 3_000L);
+            tools.dscode.common.domoperations.MaskQuiet.requireClear(driver, target, 3_000L);
             return;
         }
         if (primary()) {

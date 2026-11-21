@@ -39,22 +39,7 @@ final class LeaseHold {
 
     /** Seconds still on the hold, {@code forever}, or {@code none}. */
     static String left(Path project) {
-        if (project == null) return "none";
-        Path file = project.resolve(".pickleball").resolve("live-browser").resolve("hold.json");
-        if (!Files.isRegularFile(file)) {
-            Path marker = project.resolve(".pickleball").resolve("workbench").resolve("pause-hold");
-            return Files.isRegularFile(marker) ? "3600" : "none";
-        }
-        try {
-            var node = JSON.readTree(file.toFile());
-            if (node.path("forever").asBoolean(false)) return "forever";
-            long expires = node.path("expires").asLong(0L);
-            if (expires <= 0) return "none";
-            long left = (expires - System.currentTimeMillis()) / 1000L;
-            return left < 0 ? "0" : Long.toString(left);
-        } catch (java.io.IOException failure) {
-            return "none";
-        }
+        return tools.dscode.control.protocol.LeaseClock.left(project);
     }
 
     /** Whole seconds. Negative means forever. */
