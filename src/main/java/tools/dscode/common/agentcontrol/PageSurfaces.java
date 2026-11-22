@@ -1470,14 +1470,18 @@ final class PageSurfaces {
         }
         if (raw == null || raw.isBlank() || "null".equals(raw)) return 0;
         int stored = 0;
+        java.util.List<String> pageIds = new java.util.ArrayList<>();
         for (Object item : AgentStore.JSON.readValue(raw, List.class)) {
             if (!(item instanceof Map<?, ?> map) || map.get("text") == null) continue;
             String text = String.valueOf(map.get("text"));
             if (text.isBlank()) continue;
+            Object pageId = map.get("id");
+            if (pageId != null && !String.valueOf(pageId).isBlank()) pageIds.add(String.valueOf(pageId));
             ChatLog.send(project, runId, null, "human", "", text);
             CompositeLog.info("chat", "panel human message chars=" + text.length());
             stored++;
         }
+        if (!pageIds.isEmpty()) markRead(pageIds);
         return stored;
     }
 

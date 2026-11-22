@@ -43,6 +43,8 @@ public final class AgentEnvelope {
             return copy;
         }
         String verb = op == null || op.isBlank() ? String.valueOf(copy.getOrDefault("op", "")) : op;
+        // `wait-for` is the `wait` alias. The reply names the canonical verb.
+        if ("wait-for".equals(verb)) verb = "wait";
         boolean ok = exit == 0 && !Boolean.FALSE.equals(copy.get("ok"));
         long ms = longValue(copy.get("elapsedMs"), longValue(copy.get("ms"), 0));
         copy.put("v", VERSION);

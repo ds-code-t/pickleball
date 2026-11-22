@@ -227,6 +227,7 @@ final class UiBatch {
             }
             Map<String, String> chatArgs = new LinkedHashMap<>();
             chatArgs.put("peek", "true");
+            chatArgs.put("consume-events", "true");
             if (chatAfter != null && !chatAfter.isBlank()) chatArgs.put("after", chatAfter);
             else {
                 String stored = ChatCursor.after(project, runId, args.getOrDefault("channel", "run"));
@@ -282,18 +283,26 @@ final class UiBatch {
         for (Object item : list) {
             Map<String, Object> row = new LinkedHashMap<>();
             if (item instanceof Map<?, ?> map) {
-                map.forEach((key, value) -> {
-                    if (key != null && value != null && !NOISE.contains(String.valueOf(key))) row.put(String.valueOf(key), value);
-                });
+                copyCompact(row, map);
             } else if (item != null) {
                 Map<?, ?> converted = AgentStore.JSON.convertValue(item, Map.class);
-                converted.forEach((key, value) -> {
-                    if (key != null && value != null && !NOISE.contains(String.valueOf(key))) row.put(String.valueOf(key), value);
-                });
+                copyCompact(row, converted);
             }
             rows.add(row);
         }
         return rows;
+    }
+
+    /** Typed field text stays in the recording file. A compact poll does not repeat it. */
+    private static void copyCompact(Map<String, Object> row, Map<?, ?> map) {
+        boolean interaction = "interaction".equals(String.valueOf(map.get("event")));
+        map.forEach((key, value) -> {
+            if (key == null || value == null) return;
+            String name = String.valueOf(key);
+            if (NOISE.contains(name)) return;
+            if (interaction && ("value".equals(name) || "oldValue".equals(name))) return;
+            row.put(name, value);
+        });
     }
 
     private static List<Map<String, String>> eventRows(Object raw) {

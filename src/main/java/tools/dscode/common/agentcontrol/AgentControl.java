@@ -863,6 +863,8 @@ public final class AgentControl {
         }
         boolean explicit = present(args.get("after")) || present(args.get("id"));
         boolean peek = "true".equalsIgnoreCase(args.get("peek"));
+        // peek skips the chat cursor. ui-poll still consumes host events once.
+        boolean consumeEvents = !peek || "true".equalsIgnoreCase(args.get("consume-events"));
         if (!explicit && !peek) {
             String advanceTo = null;
             if (!messages.isEmpty()) {
@@ -872,7 +874,7 @@ public final class AgentControl {
             if (filter && lastRawId != null) advanceTo = lastRawId;
             if (advanceTo != null) ChatCursor.advance(project, runId, args.get("channel"), advanceTo);
         }
-        if (!peek) EventCursor.advance(project, runId, agentId, eventNext);
+        if (consumeEvents) EventCursor.advance(project, runId, agentId, eventNext);
         java.util.List<String> read = new java.util.ArrayList<>();
         for (Map<String, Object> message : messages) {
             Object id = message.get("id");

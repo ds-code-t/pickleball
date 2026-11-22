@@ -146,7 +146,12 @@
     if (!note && node.classList && node.classList.contains('pkb-msg')) {
       note = document.createElement('span');
       note.className = 'pkb-feedback';
-      node.appendChild(note);
+      var text = null;
+      for (var i = 0; i < node.childNodes.length; i++) {
+        if (node.childNodes[i].nodeType === 3) { text = node.childNodes[i]; break; }
+      }
+      if (text) node.insertBefore(note, text);
+      else node.appendChild(note);
     }
     if (note) {
       note.textContent = state === 'sending' || state === 'pending' ? 'Sending'
@@ -1612,7 +1617,7 @@
     }
     walk(document);
     var vp = viewport();
-    var y = 72;
+    var y = 24;
     hosts.forEach(function (host) {
       if (host.getAttribute('data-pkb-parked') === 'user') return;
       var w = host.offsetWidth || 220;
