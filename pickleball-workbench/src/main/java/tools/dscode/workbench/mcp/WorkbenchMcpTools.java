@@ -1,5 +1,6 @@
 package tools.dscode.workbench.mcp;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.modelcontextprotocol.server.McpServerFeatures;
 import io.modelcontextprotocol.spec.McpSchema;
@@ -169,8 +170,24 @@ final class WorkbenchMcpTools {
                         "limit", integerProperty("Maximum events to return.")
                 )),
                 args -> services.events(longValue(args, "afterSequence"), integer(args, "limit")));
-        add("workbench_browser_page", "Read current browser page evidence.", schema(Map.of()),
-                args -> services.browserPage());
+        add("workbench_browser_page",
+                "Compact snap of the current page. Same rows as snap. fields and budget keep the reply small.",
+                schema(Map.of(
+                        "target", stringProperty("browser:auto, a ref, or a short id. Default browser:auto."),
+                        "fields", stringProperty("Comma-separated reply fields."),
+                        "budget", stringProperty("Maximum reply bytes. Default 2048."),
+                        "format", stringProperty("lines or json. Default json."),
+                        "where", stringProperty("Row filter such as role=button."),
+                        "limit", stringProperty("Maximum rows.")
+                )),
+                args -> {
+                    Map<String, Object> call = new LinkedHashMap<>();
+                    if (args != null) call.putAll(args);
+                    if (optionalText(call, "target") == null) call.put("target", "browser:auto");
+                    if (optionalText(call, "format") == null) call.put("format", "json");
+                    if (optionalText(call, "budget") == null) call.put("budget", "2048");
+                    return viewCommand("snap", call);
+                });
         add("workbench_browser_screenshot", "Capture the current browser screenshot. Prefer workbench_browser_page unless the image is required.", schema(Map.of()),
                 args -> services.browserScreenshot());
         add("workbench_element_inspect", "Inspect with a Pickleball category or one engine query (css=, xpath=, text=, image=, near=, below=, above=, left-of=, right-of=, >> stages, AND/OR/NOT).",
@@ -522,7 +539,13 @@ final class WorkbenchMcpTools {
                     verb.add("--file=" + text(args, "file"));
                     String runId = optionalText(args, "runId");
                     if (runId != null && !runId.isBlank()) verb.add("--run-id=" + runId);
-                    return forwardReady(verb);
+                    Object forwarded = forwardReady(verb);
+                    if (!(forwarded instanceof Map<?, ?> raw)) return forwarded;
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> body = (Map<String, Object>) raw;
+                    int cap = budgetOf(optionalText(args, "budget"));
+                    if (cap > 0 && fitJson(body, cap)) body.put("truncated", true);
+                    return body;
                 });
         add("workbench_ui_verify",
                 "Check placed overlay widgets. The reply lists each placement once, under items.",
@@ -644,10 +667,33 @@ final class WorkbenchMcpTools {
     private Object forwardReady(List<String> verbArgs) {
         ConsumerReadyForwarder.Result result = ConsumerReadyForwarder.forward(services.projectRoot(), verbArgs);
         Map<String, Object> body = new LinkedHashMap<>();
+        String out = result.out() == null ? "" : result.out().strip();
+        boolean parsed = false;
+        if (out.startsWith("{") && out.endsWith("}")) {
+            try {
+                JsonNode node = json.readTree(out);
+                if (node.isObject()) {
+                    node.fields().forEachRemaining(entry ->
+                            body.put(entry.getKey(), json.convertValue(entry.getValue(), Object.class)));
+                    parsed = true;
+                }
+            } catch (Exception ignored) {
+                parsed = false;
+            }
+        }
+        if (!parsed && !out.isBlank()) body.put("text", out);
         body.put("exit", result.exit());
-        body.put("out", result.out());
-        body.put("err", result.err());
+        if (!body.containsKey("ok")) body.put("ok", result.exit() == 0);
+        if (result.err() != null && !result.err().isBlank()) body.put("err", result.err());
         body.put("command", result.command());
+        String budget = null;
+        if (verbArgs != null) {
+            for (String arg : verbArgs) {
+                if (arg != null && arg.startsWith("--budget=")) budget = arg.substring("--budget=".length());
+            }
+        }
+        int cap = budgetOf(budget);
+        if (cap > 0 && fitJson(body, cap)) body.put("truncated", true);
         return body;
     }
 
@@ -757,7 +803,16 @@ final class WorkbenchMcpTools {
         int guard = 0;
         while (jsonBytes(body) > maxBytes && guard++ < 10_000) {
             Object items = body.get("items");
-            if (!(items instanceof List<?> list) || list.isEmpty()) break;
+            if (!(items instanceof List<?> list) || list.isEmpty()) {
+                Object text = body.get("text");
+                if (text instanceof String raw && raw.length() > 80 && raw.length() > maxBytes) {
+                    int room = Math.max(24, Math.min(raw.length() - 1, Math.max(24, maxBytes / 2)));
+                    body.put("text", raw.substring(0, room) + "...");
+                    trimmed = true;
+                    continue;
+                }
+                break;
+            }
             if (list.size() == 1 && list.get(0) instanceof String text && text.length() > 24) {
                 int room = Math.max(8, Math.min(text.length() - 1, Math.max(8, maxBytes / 4)));
                 String clip = text.substring(0, Math.min(text.length(), room));

@@ -11,6 +11,7 @@ import tools.dscode.control.protocol.ControlBridgeStatus;
 import tools.dscode.control.protocol.ControlBridgeStepResolution;
 import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.workbench.WorkbenchServices;
+import tools.dscode.workbench.launch.ConsumerReadyForwarder;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -638,6 +639,54 @@ class WorkbenchMcpServerTest {
             throw new AssertionError(failure);
         }
         assertTrue(json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length <= 600, json);
+    }
+
+    @Test
+    void browserPageIsALeanSnapAndForwardedRepliesAreStructured() {
+        java.util.concurrent.atomic.AtomicReference<Map<String, String>> seen = new java.util.concurrent.atomic.AtomicReference<>();
+        WorkbenchMcpTools tools = new WorkbenchMcpTools(fakeServices((method, args) -> {
+            if ("projectRoot".equals(method)) return project;
+            if (!"agentCommand".equals(method)) return null;
+            @SuppressWarnings("unchecked")
+            Map<String, String> flags = (Map<String, String>) args[1];
+            seen.set(flags);
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", "s1.h1");
+            row.put("role", "link");
+            row.put("name", "Docs");
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("ok", true);
+            body.put("op", "snap");
+            body.put("items", List.of(row));
+            return body;
+        }), JSON);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> page = (Map<String, Object>) tools.call("workbench_browser_page", Map.of());
+        assertEquals("json", seen.get().get("format"));
+        assertEquals("2048", seen.get().get("budget"));
+        assertEquals("browser:auto", seen.get().get("target"));
+        assertFalse(page.containsKey("out"), page.toString());
+        assertEquals("Docs", ((Map<?, ?>) ((List<?>) page.get("items")).get(0)).get("name"));
+
+        ConsumerReadyForwarder.runner = command -> {
+            return new ConsumerReadyForwarder.Result(
+                    0,
+                    "{\"ok\":true,\"op\":\"start\",\"items\":[{\"name\":\"Save\"}]}",
+                    "",
+                    command);
+        };
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> started = (Map<String, Object>) tools.call("workbench_start", Map.of(
+                    "url", "http://127.0.0.1/page",
+                    "browser", "chrome"));
+            assertTrue(String.valueOf(started.get("command")).contains("start"), started.toString());
+            assertEquals(0, started.get("exit"));
+            assertFalse(started.containsKey("out"), started.toString());
+            assertEquals("Save", ((Map<?, ?>) ((List<?>) started.get("items")).get(0)).get("name"));
+        } finally {
+            ConsumerReadyForwarder.runner = null;
+        }
     }
 
     @Test

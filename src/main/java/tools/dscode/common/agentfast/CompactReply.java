@@ -151,28 +151,15 @@ public final class CompactReply {
         return phrases;
     }
 
-    /** Drops extra element lines, then extra phrases, until the object fits. The first phrase stays. */
+    /**
+     * Drops extra phrases, then extra element lines, until the object fits.
+     * The first phrase and one element line stay.
+     */
     private static void fit(Map<String, Object> compact) {
         int budget = LIMIT - 64;
         while (jsonSize(compact) > budget) {
-            Object lines = compact.get("lines");
-            if (lines instanceof List<?> list && list.size() > 1) {
-                List<Object> copy = new ArrayList<>(list);
-                copy.remove(copy.size() - 1);
-                compact.put("lines", copy);
-                continue;
-            }
-            Object phrases = compact.get("phrases");
-            if (phrases instanceof List<?> list && list.size() > 1) {
-                List<Object> copy = new ArrayList<>(list);
-                copy.remove(copy.size() - 1);
-                compact.put("phrases", copy);
-                continue;
-            }
-            if (lines instanceof List<?> list && list.size() == 1) {
-                compact.remove("lines");
-                continue;
-            }
+            if (dropLast(compact, "phrases", 1)) continue;
+            if (dropLast(compact, "lines", 1)) continue;
             Object sentence = compact.get("sentence");
             String text = sentence == null ? "" : String.valueOf(sentence);
             if (text.length() > 24) {
@@ -185,8 +172,30 @@ public final class CompactReply {
                 compact.put("kept", keptText.substring(0, 157) + "...");
                 continue;
             }
+            if (clipElementLine(compact)) continue;
             break;
         }
+    }
+
+    private static boolean dropLast(Map<String, Object> compact, String key, int keep) {
+        Object value = compact.get(key);
+        if (!(value instanceof List<?> list) || list.size() <= keep) return false;
+        List<Object> copy = new ArrayList<>(list);
+        copy.remove(copy.size() - 1);
+        compact.put(key, copy);
+        return true;
+    }
+
+    /** Shortens the remaining element line instead of deleting the only row. */
+    private static boolean clipElementLine(Map<String, Object> compact) {
+        Object value = compact.get("lines");
+        if (!(value instanceof List<?> list) || list.isEmpty()) return false;
+        String text = String.valueOf(list.get(list.size() - 1));
+        if (text.length() <= 48) return false;
+        List<Object> copy = new ArrayList<>(list);
+        copy.set(copy.size() - 1, text.substring(0, 45) + "...");
+        compact.put("lines", copy);
+        return true;
     }
 
     private static int jsonSize(Map<String, Object> compact) {

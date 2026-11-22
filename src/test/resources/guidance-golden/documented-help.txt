@@ -187,7 +187,7 @@ Usage: insert-step --text=<gherkin>
 
 # help inspect-page
 Usage: inspect-page [--query=<selector>] [--html=<file>] [--target=<selector>] [--format=lines|json] [--fields=<a,b>] [--where=<k=v>] [--limit=<n>] [--budget=<bytes>] [--group=type|role] [--priority=on]
-Lists interactive elements and the phrase that would target each one. It takes no category. The reply names the current frame. A compact reply keeps one element line per hit. --target uses the same page as snap.
+Lists interactive elements and the phrase that would target each one. It takes no category. The reply names the current frame. A compact reply keeps the first phrase and at least one element line. --target uses the same page as snap.
 
 # help isolate
 Usage: isolate [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--runvar=key=value] [--run-id=<id>] [--agent=<id>] [--session-file=<path>]
