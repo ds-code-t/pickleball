@@ -19,7 +19,7 @@
     try { wait.observe(document, {childList: true, subtree: true}); } catch (ignored) { /* not observable yet */ }
     return;
   }
-  var VERSION = '3.0.0-lean';
+  var VERSION = '3.0.0-feedback';
   if (window.__pkbUi && window.__pkbUi.version === VERSION) return;
   if (window.__pkbUi && typeof window.__pkbUi.dispose === 'function') {
     try { window.__pkbUi.dispose(); } catch (ignored) { /* older runtime */ }
@@ -44,6 +44,14 @@
     + '[data-pkb-ui][data-pkb-kind=overlay] button{font:inherit;border:0;background:var(--pkb-accent);color:#fff;border-radius:6px;padding:3px 10px;margin:4px 4px 0 0;cursor:pointer;}'
     + '[data-pkb-ui][data-pkb-kind=label]{background:#111827!important;color:#fff!important;border-radius:6px!important;'
     + 'font:600 12px/1.3 ' + FONT + '!important;padding:3px 8px!important;box-shadow:0 2px 8px rgba(0,0,0,.25);pointer-events:none;white-space:nowrap;}'
+    + '[data-pkb-ui][data-pkb-kind=label]:has([data-pkb-card]){background:var(--pkb-bg)!important;color:var(--pkb-fg)!important;'
+    + 'pointer-events:auto!important;white-space:normal!important;border:1px solid var(--pkb-line)!important;border-radius:10px!important;'
+    + 'padding:10px 12px!important;box-shadow:var(--pkb-shadow)!important;font:14px/1.45 ' + FONT + '!important;max-width:280px!important;}'
+    + '[data-pkb-card] [data-pkb-check]{display:flex;gap:8px;align-items:flex-start;margin:4px 0;cursor:pointer;}'
+    + '[data-pkb-card] input[type=checkbox]{margin:2px 0 0;cursor:pointer;}'
+    + '[data-pkb-feedback="sending"]{opacity:.65!important;}'
+    + '[data-pkb-feedback="delivered"]{opacity:1!important;box-shadow:inset 3px 0 0 #22a06b!important;}'
+    + '[data-pkb-feedback="read"]{opacity:.92!important;box-shadow:inset 3px 0 0 var(--pkb-accent)!important;}'
     + '[data-pkb-ui][data-pkb-kind=border]{border-radius:6px;}'
     + '[data-pkb-ui][data-pkb-kind=magnifier]{box-shadow:var(--pkb-shadow);pointer-events:none;}'
     + '[data-pkb-ui][data-pkb-kind=step],[data-pkb-ui][data-pkb-kind=arrow],[data-pkb-ui][data-pkb-kind=spotlight]{pointer-events:none;}'
@@ -73,6 +81,11 @@
     + '.ask .row{display:flex;gap:6px;flex-wrap:wrap;}'
     + '.ask button{font:inherit;border:0;border-radius:6px;padding:4px 12px;background:var(--pkb-accent);color:#fff;cursor:pointer;}'
     + '.ask button.secondary{background:rgba(17,24,39,.08);color:inherit;}'
+    + '.ask .pkb-confirm{font-size:12px;color:#22a06b;}'
+    + '.badge.missing,.tip.missing{outline:2px dashed #d93025;}'
+    + '[data-pkb-feedback="sending"]{opacity:.65;}'
+    + '[data-pkb-feedback="delivered"]{box-shadow:inset 3px 0 0 #22a06b;}'
+    + '[data-pkb-feedback="read"]{box-shadow:inset 3px 0 0 var(--pkb-accent);}'
     + '@media (prefers-color-scheme: dark){.tip,.ask{background:#1f2937;color:#f3f4f6;border-color:rgba(255,255,255,.16);}.badge{background:#1f2937;}.ask input{background:#111827;color:#f3f4f6;border-color:rgba(255,255,255,.2);}}'
     + '@media (prefers-reduced-motion: reduce){.ring,.badge{transition:none;animation:none;}}';
 
@@ -109,6 +122,12 @@
   var pushCount = 0;
   var pushDropped = 0;
   var mutationTimer = 0;
+  var eventSeq = 0;
+  var installId = Math.random().toString(36).slice(2, 8);
+  var lastPressed = null;
+  function nextEid(prefix) {
+    return installId + (prefix || 'e') + (++eventSeq);
+  }
   function tryBind(ev) {
     try {
       var fn = window.pkbSurface;
@@ -119,11 +138,36 @@
     } catch (ignored) { /* this world has no binding */ }
     return false;
   }
+  function setFeedback(node, state) {
+    if (!node || !node.setAttribute) return;
+    node.setAttribute('data-state', state);
+    node.setAttribute('data-pkb-feedback', state);
+    var note = node.querySelector ? node.querySelector(':scope > .pkb-feedback') : null;
+    if (!note && node.classList && node.classList.contains('pkb-msg')) {
+      note = document.createElement('span');
+      note.className = 'pkb-feedback';
+      node.appendChild(note);
+    }
+    if (note) {
+      note.textContent = state === 'sending' || state === 'pending' ? 'Sending'
+        : (state === 'delivered' || state === 'sent' ? 'Delivered' : (state === 'read' ? 'Read' : ''));
+    }
+  }
+  function noteDelivered(ev) {
+    var node = lastPressed;
+    if (panel && ev && ev.id) {
+      var bubble = panel.chatPane.querySelector('.pkb-msg[data-id="' + CSS.escape(String(ev.id)) + '"]');
+      if (bubble) node = bubble;
+    }
+    if (!node) return;
+    if (node.getAttribute('data-pkb-feedback') === 'read' || node.getAttribute('data-state') === 'read') return;
+    setFeedback(node, 'delivered');
+  }
   function deliver(ev) {
     var now = Date.now();
     if (now - pushWindow > 1000) {
       if (pushDropped) {
-        var dropped = {type: 'dropped', text: String(pushDropped)};
+        var dropped = {type: 'dropped', text: String(pushDropped), eid: nextEid('d')};
         if (!tryBind(dropped)) events().push(dropped);
       }
       pushWindow = now;
@@ -132,25 +176,31 @@
     }
     if (pushCount >= PUSH_CAP) {
       pushDropped++;
-      return;
+      return false;
     }
     pushCount++;
-    // The binding and the in-page queue are the same event. Queue only when nothing is bound,
-    // so a later drain does not record a second copy without the binding name.
-    if (!tryBind(ev)) events().push(ev);
+    if (!ev.eid) ev.eid = nextEid('e');
+    // Queue as well as bind. A binding that does not reach the host is still drained.
+    // The host drops the second copy when the eid matches.
+    var bound = tryBind(ev);
+    events().push(ev);
+    if (bound) noteDelivered(ev);
+    return bound;
   }
   function pushEvent(ev) {
-    if (!ev) return;
+    if (!ev) return false;
+    if (!ev.eid) ev.eid = nextEid('e');
     if (ev.type === 'mutation') {
-      if (mutationTimer) return;
+      if (mutationTimer) return false;
       mutationTimer = setTimeout(function () {
         mutationTimer = 0;
         deliver(ev);
       }, 50);
-      return;
+      return false;
     }
-    deliver(ev);
+    return deliver(ev);
   }
+  window.__pkbPush = pushEvent;
 
   function installDocSheet() {
     if (docSheet) return;
@@ -209,6 +259,14 @@
   function ours(node) {
     var el = node && node.nodeType === 1 ? node : (node && node.parentElement);
     return !!(el && el.closest && el.closest('[data-pkb-agent],[data-pkb-layer]'));
+  }
+
+  function eventLeaf(event) {
+    if (!event) return null;
+    var path = event.composedPath ? event.composedPath() : [];
+    var leaf = path.length ? path[0] : event.target;
+    if (leaf && leaf.nodeType !== 1) leaf = leaf.parentElement;
+    return leaf && leaf.nodeType === 1 ? leaf : null;
   }
 
   function scrollable(el) {
@@ -591,16 +649,52 @@
       raiseLayer();
       schedule();
     }, true);
+    on(document, 'pointerdown', function (event) {
+      var leaf = eventLeaf(event);
+      if (!leaf || !leaf.closest) return;
+      var hit = leaf.closest('button,[role="button"],[data-pkb-check],.pkb-step,.ask button');
+      if (!hit) return;
+      if (!ours(hit) && !(hit.closest && hit.closest('[data-pkb-agent]'))) return;
+      lastPressed = hit;
+      setFeedback(hit, 'sending');
+    }, true);
     on(document, 'click', function (event) {
-      if (!event || ours(event.target)) return;
-      var node = event.target && event.target.nodeType === 1 ? event.target : null;
-      var role = '';
+      if (!event) return;
+      var node = eventLeaf(event);
+      if (!node) return;
+      if (ours(node) && !(node.closest && node.closest('[data-pkb-agent],[data-choice]'))) return;
+      if (node.closest && node.closest('[data-pkb-agent]') && !node.closest('[data-choice]')) return;
+      var control = (node.closest && node.closest('button,a,label,input,summary,[data-choice],[data-pkb-action]')) || node;
+      var role = control.getAttribute ? (control.getAttribute('role') || (control.nodeName || '')) : '';
       var name = '';
-      if (node) {
-        role = node.getAttribute('role') || (node.nodeName || '');
-        name = String(node.getAttribute('aria-label') || node.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+      if (control.getAttribute) {
+        name = String(control.getAttribute('data-choice') || control.getAttribute('aria-label') || control.innerText || control.value || '')
+          .replace(/\s+/g, ' ').trim().slice(0, 80);
       }
-      pushEvent({type: 'click', source: 'human', id: node && node.id ? node.id : '', role: role, name: name});
+      var placed = control.closest && control.closest('[data-pkb-agent]');
+      pushEvent({
+        type: 'click', source: 'human',
+        id: (placed && placed.getAttribute('data-pkb-id')) || (node.id || ''),
+        role: role, name: name
+      });
+    }, true);
+    on(document, 'change', function (event) {
+      var input = eventLeaf(event);
+      if (!input || !input.closest) return;
+      var row = input.closest('[data-pkb-check]');
+      if (!row) return;
+      var host = input.closest('[data-pkb-id]');
+      var on = input.checked === true || row.getAttribute('data-pkb-checked') === 'true';
+      if (input.type === 'checkbox') on = !!input.checked;
+      row.setAttribute('data-pkb-checked', on ? 'true' : 'false');
+      lastPressed = row;
+      setFeedback(row, 'sending');
+      pushEvent({
+        type: 'check', source: 'human',
+        id: host ? host.getAttribute('data-pkb-id') || '' : '',
+        check: row.getAttribute('data-pkb-check') || '',
+        checked: on ? 'true' : 'false'
+      });
     }, true);
     on(document, 'visibilitychange', function () {
       paused = document.hidden;
@@ -729,14 +823,39 @@
         return document.evaluate(text.slice(2), document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
       }
       if (text.indexOf('h:') === 0) text = text.slice(2);
-      var byId = /^[A-Za-z][\w-]*$/.test(text) ? document.getElementById(text) : null;
-      if (byId) return byId;
+      var idHit = byDomId(idToken(text));
+      if (idHit && !ours(idHit)) return idHit;
       var marked = document.querySelector('[data-pkb-handle="' + CSS.escape(text) + '"]');
       if (marked) return marked;
       return document.querySelector(text);
     } catch (bad) {
       return null;
     }
+  }
+
+  function idToken(text) {
+    if (!text) return null;
+    var attr = /^\[id=(["'])([^"']+)\1\]$/.exec(text);
+    if (attr) return attr[2];
+    if (text.charAt(0) === '#') return text.slice(1);
+    if (/^[A-Za-z0-9][\w:.-]*$/.test(text)) return text;
+    return null;
+  }
+
+  function byDomId(id) {
+    if (!id) return null;
+    var hit = document.getElementById(id);
+    if (hit) return hit;
+    var quoted = id.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    try {
+      hit = document.querySelector('[id="' + quoted + '"]');
+      if (hit) return hit;
+    } catch (ignored) { /* bad id */ }
+    try {
+      hit = document.querySelector('#' + CSS.escape(id));
+      if (hit) return hit;
+    } catch (ignored) { /* selector rejected */ }
+    return null;
   }
 
   function sensitive(el, step) {
@@ -766,10 +885,10 @@
         root.appendChild(step.ring);
         root.appendChild(step.badge);
       }
-      var state = step.done ? 'done' : (i === g.current ? 'current' : 'todo');
+      var state = step.done ? 'done' : (!step.anchor && step.missing ? 'missing' : (i === g.current ? 'current' : 'todo'));
       step.badge.className = 'badge ' + state;
       step.badge.textContent = step.done ? '\u2713' : String(step.n);
-      step.ring.className = 'ring ' + state + (i === g.current && g.pulse ? ' pulse' : '');
+      step.ring.className = 'ring ' + state + (i === g.current && g.pulse && step.anchor ? ' pulse' : '');
       step.state = state;
     });
     g.pulse = false;
@@ -779,8 +898,9 @@
       root.appendChild(g.tip);
     }
     var cur = g.steps[g.current];
-    if (cur) tipText(g.tip, cur.n, cur.say);
-    g.tip.hidden = !cur;
+    if (cur && cur.anchor) tipText(g.tip, cur.n, cur.say);
+    g.tip.hidden = !(cur && cur.anchor);
+    g.tip.classList.toggle('missing', !!(cur && !cur.anchor));
     stepsList();
     window.__pkbGuideState = guideState();
   }
@@ -837,11 +957,16 @@
           if (step.anchor && resizeObserver) { try { resizeObserver.observe(step.anchor); } catch (ignored) { /* detached */ } }
         }
         if (!step.anchor) {
+          step.missing = true;
           step.badge.style.visibility = 'hidden';
           step.ring.style.visibility = 'hidden';
-          if (i === g.current) g.tip.style.visibility = 'hidden';
+          if (i === g.current) {
+            g.tip.hidden = true;
+            g.tip.style.visibility = 'hidden';
+          }
           return;
         }
+        step.missing = false;
         var r = step.anchor.getBoundingClientRect();
         var v = visibleRect({scrollers: step.scrollers || []}, r, vp);
         var vis = v.empty ? 'hidden' : '';
@@ -891,7 +1016,10 @@
     if (want === 'click') return kind === 'click';
     if (want === 'check') return kind === 'change' && !!a.checked;
     if (want === 'select') return kind === 'change' && tag === 'select';
-    if (want === 'input') return (kind === 'input' || kind === 'change') && !!String(a.value || '').length;
+    if (want === 'input') {
+      if (kind === 'keydown' || kind === 'keyup' || kind === 'blur') return true;
+      return (kind === 'input' || kind === 'change') && !!String(a.value || '').length;
+    }
     if (kind === 'click') return !(tag === 'input' && type !== 'checkbox' && type !== 'radio' && type !== 'button' && type !== 'submit') && tag !== 'textarea' && tag !== 'select';
     return (kind === 'input' || kind === 'change') && (a.type === 'checkbox' ? !!a.checked : !!String(a.value || '').length);
   }
@@ -907,17 +1035,26 @@
       if (!matches(step, ev.target, ev.type)) return;
       var how = ev.type === 'click' ? 'click' : ((step.anchor.nodeName || '').toLowerCase() === 'select' ? 'select' : (step.anchor.type === 'checkbox' ? 'check' : 'input'));
       var at = g.current;
+      if (step.timer) clearTimeout(step.timer);
       var finish = function () {
         step.timer = 0;
         if (g.current !== at || step.done || !guides.has(g.id)) return;
         // A value is only reported when the agent asked for it and the field is not sensitive.
+        // Read the field now, after typing has paused, so the value is the whole entry.
         var value = step.capture && how !== 'click' && !sensitive(step.anchor, step) ? String(step.anchor.value || '').slice(0, 500) : undefined;
+        setFeedback(step.badge, 'sending');
         guideAdvance(g, at, how, value);
+        setFeedback(step.badge, 'delivered');
       };
-      if (step.timer) clearTimeout(step.timer);
-      // Typing settles before the step completes, so one keystroke does not skip ahead; change and click complete at once.
-      if (ev.type === 'input' && how === 'input') step.timer = setTimeout(finish, TYPE_SETTLE_MS);
-      else finish();
+      var typing = how === 'input' && (ev.type === 'input' || ev.type === 'change' || ev.type === 'keyup' || ev.type === 'keydown' || ev.type === 'blur');
+      if (typing) {
+        var explicit = ev.type === 'blur' || (ev.type === 'keydown' && ev.key === 'Enter');
+        if (!String(step.anchor.value || '').length) return;
+        if (explicit) finish();
+        else step.timer = setTimeout(finish, TYPE_SETTLE_MS);
+        return;
+      }
+      finish();
     });
   }
 
@@ -927,6 +1064,8 @@
     on(document, 'click', onGuideEvent, true);
     on(document, 'input', onGuideEvent, true);
     on(document, 'change', onGuideEvent, true);
+    on(document, 'keydown', onGuideEvent, true);
+    on(document, 'blur', onGuideEvent, true);
   }
 
   function guide(spec) {
@@ -945,17 +1084,21 @@
     g.steps.forEach(function (step) {
       step.anchor = findTarget(step.t);
       step.scrollers = step.anchor ? scrollersOf(step.anchor) : [];
+      step.missing = !step.anchor;
       if (!step.anchor) miss.push(step.n);
     });
     if (typeof spec.at === 'number' && spec.at > 1) {
       for (var k = 0; k < g.steps.length && g.steps[k].n < spec.at; k++) g.steps[k].done = true;
       g.current = Math.min(k, g.steps.length);
     }
+    var current = g.steps[g.current];
+    var unresolved = !!(current && !current.anchor);
     guides.set(id, g);
     guideRender(g);
     if (panel && spec.tab !== false) panelTab('steps');
     update();
-    return {id: id, steps: g.steps.length, current: g.steps[g.current] ? g.steps[g.current].n : null, miss: miss};
+    return {id: id, steps: g.steps.length, current: current ? current.n : null, miss: miss, unresolved: unresolved,
+      flag: unresolved ? 'step ' + current.n + ' target was not found' : ''};
   }
 
   function guideMove(spec) {
@@ -1011,20 +1154,30 @@
     b.textContent = String(spec.say || '');
     q.appendChild(b);
     node.appendChild(q);
-    var choices = Array.isArray(spec.choices) ? spec.choices.filter(function (c) { return String(c).trim(); }) : [];
+    var choices = Array.isArray(spec.choices) ? spec.choices.filter(function (c) { return String(c).trim(); }).map(function (c) { return String(c).trim(); }) : [];
     var row = el('div', 'row');
     var field = null;
-    function answer(value) {
-      var ev = {type: 'answer', id: id};
-      if (spec.sensitive) ev.filled = true; else ev.value = String(value).slice(0, 2000);
-      pushEvent(ev);
-      askClose(id);
+    function answer(value, btn) {
+      var picked = String(value == null ? '' : value);
+      var note = el('div', 'pkb-confirm', 'You chose ' + picked);
+      node.appendChild(note);
+      if (btn) setFeedback(btn, 'sending');
+      var ev = {type: 'answer', id: id, choice: picked, value: picked};
+      if (spec.sensitive) { delete ev.value; delete ev.choice; ev.filled = true; }
+      var bound = pushEvent(ev);
+      if (btn) setFeedback(btn, bound ? 'delivered' : 'sending');
+      setTimeout(function () { askClose(id); }, 320);
     }
     if (choices.length) {
       choices.forEach(function (choice, i) {
-        var btn = el('button', i === 0 ? '' : 'secondary', String(choice));
+        var btn = el('button', i === 0 ? '' : 'secondary', choice);
         btn.type = 'button';
-        btn.addEventListener('click', function () { answer(choice); });
+        btn.setAttribute('data-choice', choice);
+        btn.addEventListener('click', function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          answer(btn.getAttribute('data-choice'), btn);
+        });
         row.appendChild(btn);
       });
     } else {
@@ -1039,6 +1192,8 @@
       node.addEventListener('submit', function (e) { e.preventDefault(); if (field.value.trim()) answer(field.value); });
     }
     node.appendChild(row);
+    node.setAttribute('data-pkb-id', 'ask-' + id);
+    node.setAttribute('data-pkb-card', 'ask');
     isolateKeys(node);
     root.appendChild(node);
     asks.set(id, {id: id, node: node, t: spec.t, anchor: spec.t ? findTarget(spec.t) : null, scrollers: []});
@@ -1056,6 +1211,44 @@
     return true;
   }
 
+  function rectsOf(skip) {
+    var boxes = [{left: 0, top: 0, right: 160, bottom: 56, width: 160, height: 56}];
+    items.forEach(function (item) {
+      if (!item.host || item.host === skip) return;
+      var r = item.host.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) boxes.push(r);
+    });
+    asks.forEach(function (a) {
+      if (!a.node || a.node === skip) return;
+      var r = a.node.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) boxes.push(r);
+    });
+    return boxes;
+  }
+
+  function hits(x, y, w, h, boxes) {
+    var r1 = x + w;
+    var b1 = y + h;
+    for (var i = 0; i < boxes.length; i++) {
+      var b = boxes[i];
+      if (r1 <= b.left || b.right <= x || b1 <= b.top || b.bottom <= y) continue;
+      return true;
+    }
+    return false;
+  }
+
+  function shiftClear(x, y, w, h, vp, skip) {
+    var boxes = rectsOf(skip);
+    var nx = x;
+    var ny = Math.max(y, 64);
+    for (var n = 0; n < 12; n++) {
+      if (!hits(nx, ny, w, h, boxes)) return {x: Math.max(8, nx), y: Math.max(64, ny)};
+      ny += Math.max(24, Math.round(h * 0.6));
+      if (ny + h > vp.h - 8) { ny = 72; nx = Math.max(8, nx - 48); }
+    }
+    return {x: Math.max(8, nx), y: Math.max(72, ny)};
+  }
+
   function asksUpdate(vp) {
     asks.forEach(function (a) {
       if (a.t && (!a.anchor || !a.anchor.isConnected)) a.anchor = findTarget(a.t);
@@ -1064,9 +1257,11 @@
       if (a.anchor) {
         var r = a.anchor.getBoundingClientRect();
         var spot = beside(r, w, h, 'right', vp);
-        placeAt(a.node, spot.x, spot.y);
+        var clear = shiftClear(spot.x, spot.y, w, h, vp, a.node);
+        placeAt(a.node, clear.x, clear.y);
       } else {
-        placeAt(a.node, Math.max(8, (vp.w - w) / 2), 16);
+        var clearTop = shiftClear(Math.max(8, (vp.w - w) / 2), 72, w, h, vp, a.node);
+        placeAt(a.node, clearTop.x, clearTop.y);
       }
     });
   }
@@ -1150,11 +1345,16 @@
   }
 
   function panelUnread() {
-    var count = 0;
     if (!panel) return;
-    if (panel.state.min || panel.state.tab !== 'chat') count = ++panel.unread; else panel.unread = 0;
-    var badge = panel.tabs[0].querySelector('.pkb-badge');
-    badge.textContent = panel.state.tab !== 'chat' && count ? String(count) : '';
+    if (panel.state.min || panel.state.tab !== 'chat') panel.unread++; else panel.unread = 0;
+    var count = panel.unread || 0;
+    var chatTab = panel.tabs[0];
+    var badge = chatTab.querySelector('.pkb-badge');
+    var show = panel.state.tab !== 'chat' && count;
+    badge.textContent = show ? String(count) : '';
+    if (show) chatTab.setAttribute('data-unread', String(count));
+    else chatTab.removeAttribute('data-unread');
+    chatTab.setAttribute('aria-label', show ? 'Chat, ' + count + ' unread' : 'Chat');
     panel.pill.querySelector('.pkb-unread').textContent = panel.state.min && count ? String(count) : '';
   }
 
@@ -1163,11 +1363,15 @@
     var node = el('div', 'pkb-msg');
     node.setAttribute('data-from', from);
     if (row.id) node.setAttribute('data-id', row.id);
-    if (row.state) node.setAttribute('data-state', row.state);
     var who = from === 'human' ? 'You' : (from === 'system' ? 'System' : ('Agent' + (row.agent ? ' ' + row.agent : '')));
     var meta = el('span', 'pkb-meta', who + ' \u00b7 ' + clock(row.at));
     node.appendChild(meta);
     node.appendChild(document.createTextNode(String(row.text == null ? '' : row.text)));
+    if (row.state === 'sending' || row.state === 'pending' || row.state === 'delivered' || row.state === 'read' || row.state === 'sent') {
+      setFeedback(node, row.state === 'pending' ? 'sending' : (row.state === 'sent' ? 'delivered' : row.state));
+    } else if (row.state) {
+      node.setAttribute('data-state', row.state);
+    }
     return node;
   }
 
@@ -1196,9 +1400,77 @@
     var n = 0;
     ids.forEach(function (id) {
       var node = panel.chatPane.querySelector('.pkb-msg[data-id="' + CSS.escape(String(id)) + '"]');
-      if (node) { node.setAttribute('data-state', 'sent'); n++; }
+      if (!node) return;
+      if (node.getAttribute('data-state') === 'read') return;
+      setFeedback(node, 'delivered');
+      n++;
     });
     return n;
+  }
+
+  function markRead(ids) {
+    var list = Array.isArray(ids) ? ids : (ids ? [ids] : []);
+    var n = 0;
+    list.forEach(function (id) {
+      if (id == null || id === '') return;
+      var key = CSS.escape(String(id));
+      var nodes = [];
+      if (panel) {
+        var bubble = panel.chatPane.querySelector('.pkb-msg[data-id="' + key + '"]');
+        if (bubble) nodes.push(bubble);
+      }
+      document.querySelectorAll('[data-pkb-id="' + key + '"],[data-feedback-id="' + key + '"]').forEach(function (node) { nodes.push(node); });
+      if (layer && layer.shadowRoot) {
+        layer.shadowRoot.querySelectorAll('[data-pkb-id="' + key + '"],[data-id="' + key + '"]').forEach(function (node) { nodes.push(node); });
+      }
+      nodes.forEach(function (node) { setFeedback(node, 'read'); n++; });
+    });
+    return n;
+  }
+
+  function parkCards() {
+    var hosts = [];
+    var seen = new Set();
+    function walk(root) {
+      if (!root || !root.querySelectorAll || seen.has(root)) return;
+      seen.add(root);
+      Array.prototype.forEach.call(root.querySelectorAll('[data-pkb-id]'), function (el) {
+        if (el.querySelector('[data-pkb-card]') || el.hasAttribute('data-pkb-card')) hosts.push(el);
+      });
+      Array.prototype.forEach.call(root.querySelectorAll('*'), function (n) { if (n.shadowRoot) walk(n.shadowRoot); });
+    }
+    walk(document);
+    var vp = viewport();
+    var y = 72;
+    hosts.forEach(function (host) {
+      if (host.getAttribute('data-pkb-parked') === 'user') return;
+      var w = host.offsetWidth || 220;
+      var h = host.offsetHeight || 48;
+      var x = Math.max(16, vp.w - w - 16);
+      if (x < 168) x = 168;
+      host.style.left = Math.round(x) + 'px';
+      host.style.top = Math.round(y) + 'px';
+      y += h + 8;
+      if (y > vp.h - 48) y = 72;
+      if (!host.__pkbDrag) {
+        host.__pkbDrag = true;
+        var drag = null;
+        host.addEventListener('pointerdown', function (event) {
+          if (event.button !== 0) return;
+          if (event.target && event.target.closest && event.target.closest('input,button,a,textarea,select')) return;
+          drag = {id: event.pointerId, x: event.clientX, y: event.clientY, l: parseFloat(host.style.left) || 0, t: parseFloat(host.style.top) || 0};
+          try { host.setPointerCapture(event.pointerId); } catch (ignored) { /* synthetic */ }
+        });
+        host.addEventListener('pointermove', function (event) {
+          if (!drag || event.pointerId !== drag.id) return;
+          host.style.left = Math.round(drag.l + event.clientX - drag.x) + 'px';
+          host.style.top = Math.round(drag.t + event.clientY - drag.y) + 'px';
+          host.setAttribute('data-pkb-parked', 'user');
+        });
+        host.addEventListener('pointerup', function () { drag = null; });
+      }
+    });
+    return {parked: hosts.length};
   }
 
   function panelSend() {
@@ -1207,8 +1479,9 @@
     var id = 'h' + (++chatSeq) + '-' + Date.now().toString(36);
     window.__pkbChat = window.__pkbChat || [];
     window.__pkbChat.push({id: id, text: text, at: new Date().toISOString()});
-    chat({id: id, from: 'human', text: text, state: 'pending', at: new Date().toISOString()});
-    pushEvent({type: 'chat', source: 'human', id: id, text: text});
+    chat({id: id, from: 'human', text: text, state: 'sending', at: new Date().toISOString()});
+    var bound = pushEvent({type: 'chat', source: 'human', id: id, text: text});
+    if (bound) noteDelivered({id: id});
     panel.input.value = '';
     panel.send.disabled = true;
     panel.input.focus();
@@ -1602,6 +1875,8 @@
     panelTab: panelTab,
     chat: chat,
     chatSent: chatSent,
+    markRead: markRead,
+    parkCards: parkCards,
     drainChat: drainChat,
     guide: guide,
     guideMove: guideMove,

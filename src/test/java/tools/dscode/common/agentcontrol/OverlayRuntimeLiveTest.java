@@ -480,7 +480,7 @@ class OverlayRuntimeLiveTest {
         String messages = String.valueOf(polled.body().get("items"));
         assertTrue(messages.contains("from the page") && messages.contains("source=human"), messages);
         Object state = browser.executeScript(RING.replace(".ring", ".pkb-msg[data-from=human]") + " return n ? n.getAttribute('data-state') : null;");
-        assertEquals("sent", state);
+        assertEquals("read", state);
     }
 
     /** An agent chat-send reaches the open page panel as well as the run chat. */

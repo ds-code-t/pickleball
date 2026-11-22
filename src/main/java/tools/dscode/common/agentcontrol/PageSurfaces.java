@@ -676,7 +676,22 @@ final class PageSurfaces {
     }
 
     /** A binding delivery and a queue drain are one event. The second copy is dropped. */
+    private static final java.util.concurrent.ConcurrentHashMap<String, java.util.ArrayDeque<String>> RECENT_EIDS =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
     private static boolean duplicateEvent(Path file, Map<String, Object> row) {
+        Object eid = row == null ? null : row.get("eid");
+        if (eid != null && !String.valueOf(eid).isBlank() && !"null".equals(String.valueOf(eid))) {
+            String key = file.toAbsolutePath().normalize().toString();
+            java.util.ArrayDeque<String> seen = RECENT_EIDS.computeIfAbsent(key, ignored -> new java.util.ArrayDeque<>());
+            String token = String.valueOf(eid);
+            synchronized (seen) {
+                if (seen.contains(token)) return true;
+                seen.addLast(token);
+                while (seen.size() > 300) seen.removeFirst();
+            }
+            return false;
+        }
         String fingerprint = eventFingerprint(row);
         if (!Files.isRegularFile(file)) return false;
         try {
@@ -1464,6 +1479,19 @@ final class PageSurfaces {
             stored++;
         }
         return stored;
+    }
+
+    /** Marks page controls the agent has now read. A missing page is a no-op. */
+    static void markRead(java.util.Collection<String> ids) {
+        if (ids == null || ids.isEmpty() || !hasLivePage()) return;
+        java.util.List<String> list = new java.util.ArrayList<>();
+        for (String id : ids) if (id != null && !id.isBlank()) list.add(id);
+        if (list.isEmpty()) return;
+        try {
+            runtimeCall("markRead", list, false);
+        } catch (RuntimeException failure) {
+            CompositeLog.info("ui", "mark read skipped " + failure.getMessage());
+        }
     }
 
     /** Shows an agent chat message in the in-page panel when one is open. Never installs the runtime. */

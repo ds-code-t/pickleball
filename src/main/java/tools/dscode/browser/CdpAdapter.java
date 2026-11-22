@@ -9,6 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Chromium protocol over our own WebSocket. This is not Selenium
@@ -17,6 +18,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class CdpAdapter implements BrowserFacade {
     private final JsonRpc rpc;
     private final Map<String, BindingListener> bindings = new ConcurrentHashMap<>();
+    private final Map<String, String> bindingWorlds = new ConcurrentHashMap<>();
+    private final AtomicBoolean rebindQueued = new AtomicBoolean();
     private final Map<String, Integer> worlds = new ConcurrentHashMap<>();
     private volatile String rootFrame;
     private volatile String pageTarget;
@@ -40,10 +43,16 @@ public final class CdpAdapter implements BrowserFacade {
             }
         });
         rpc.onEvent((method, params) -> {
-            if (!"Runtime.bindingCalled".equals(method)) return;
-            String name = params.path("name").asText("");
-            BindingListener listener = bindings.get(name);
-            if (listener != null) listener.onEvent(name, JsonRpc.value(params.get("payload")));
+            if ("Runtime.bindingCalled".equals(method)) {
+                String name = params.path("name").asText("");
+                BindingListener listener = bindings.get(name);
+                if (listener != null) listener.onEvent(name, JsonRpc.value(params.get("payload")));
+                return;
+            }
+            if ("Page.frameNavigated".equals(method) || "Page.loadEventFired".equals(method)
+                    || "Runtime.executionContextCreated".equals(method)) {
+                scheduleRebind();
+            }
         });
     }
 
@@ -205,12 +214,48 @@ public final class CdpAdapter implements BrowserFacade {
             throw new IllegalArgumentException("error: binding name is blank.\nfix: Pass the binding name.");
         }
         bindings.put(name, listener);
+        bindingWorlds.put(name, executionContextName == null ? "" : executionContextName);
+        installBinding(name, executionContextName);
+    }
+
+    /**
+     * A reload (including {@code location.href}) drops the isolated world. The binding is added
+     * again on the next frame or context, off the socket thread so the reply can be read.
+     */
+    private void scheduleRebind() {
+        if (bindingWorlds.isEmpty()) return;
+        if (!rebindQueued.compareAndSet(false, true)) return;
+        Thread worker = new Thread(() -> {
+            try {
+                Thread.sleep(40);
+                bindingWorlds.forEach(this::installBinding);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            } finally {
+                rebindQueued.set(false);
+            }
+        }, "pkb-rebind");
+        worker.setDaemon(true);
+        worker.start();
+    }
+
+    private void installBinding(String name, String executionContextName) {
+        try {
+            rpc.call("Runtime.enable", Map.of());
+        } catch (RuntimeException ignored) {
+            // Already enabled, or this socket has no Runtime domain yet.
+        }
         Map<String, Object> params = new LinkedHashMap<>();
         params.put("name", name);
         if (executionContextName != null && !executionContextName.isBlank()) {
             params.put("executionContextName", executionContextName);
         }
-        rpc.call("Runtime.addBinding", params);
+        try {
+            rpc.call("Runtime.addBinding", params);
+        } catch (RuntimeException failure) {
+            String message = failure.getMessage() == null ? "" : failure.getMessage();
+            if (!message.contains("already") && !message.contains("exists")) throw failure;
+        }
     }
 
     @Override

@@ -172,7 +172,7 @@ public final class AgentEvents {
         return rows;
     }
 
-    static Map<String, String> parseObject(String line) {
+    public static Map<String, String> parseObject(String line) {
         Map<String, String> row = new LinkedHashMap<>();
         if (line == null) return row;
         int index = line.indexOf('{');

@@ -558,9 +558,22 @@ public final class AgentControl {
         String reply = PageSurfaces.runtimeCall("guide", spec, true);
         if (reply == null || "null".equals(reply)) return fail(1, "guide did not start on the page");
         CompositeLog.info("guide", "start " + reply);
+        Map<String, Object> parsed = AgentStore.JSON.readValue(reply, Map.class);
+        if (truth(parsed.get("unresolved"))) {
+            try {
+                PageSurfaces.runtimeCall("guideClose", spec.get("id"), false);
+            } catch (RuntimeException ignored) {
+                // The empty card is already hidden. The refusal still stands.
+            }
+            String flag = String.valueOf(parsed.getOrDefault("flag", "step target was not found"));
+            Result failed = fail(1, flag);
+            failed.body().put("op", "guide");
+            failed.body().putAll(parsed);
+            return failed;
+        }
         Map<String, Object> body = ok("Guide shown on the page; steps advance as the person acts.");
         body.put("op", "guide");
-        body.putAll(AgentStore.JSON.readValue(reply, Map.class));
+        body.putAll(parsed);
         return new Result(0, body);
     }
 
@@ -616,9 +629,11 @@ public final class AgentControl {
 
     private static Result askAndWait(Path project, String runId, Map<String, String> args) throws Exception {
         int before = inputCount(project, runId);
+        long started = System.currentTimeMillis();
         Result shown = ask(project, runId, args);
         if (shown.exit() != 0) return shown;
         String id = String.valueOf(shown.body().getOrDefault("id", ""));
+        List<String> choices = splitChoices(args.get("choices"));
         long timeout = 3000L;
         if (present(args.get("timeout"))) {
             try {
@@ -630,14 +645,33 @@ public final class AgentControl {
         }
         long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(Math.max(0, timeout));
         Map<String, Object> answer = null;
+        String value = "";
         while (true) {
-            for (Map<String, Object> event : PageSurfaces.pollInput(project, runId, before)) {
-                if (!"answer".equals(String.valueOf(event.get("type")))) continue;
-                if (!id.equals(String.valueOf(event.get("id")))) continue;
-                answer = event;
+            try {
+                for (Map<String, Object> event : PageSurfaces.pollInput(project, runId, before)) {
+                    String picked = acceptedChoice(event, id, choices);
+                    if (picked == null) continue;
+                    answer = event;
+                    value = picked;
+                }
+            } catch (RuntimeException | java.io.IOException failure) {
+                CompositeLog.info("ui", "ask poll skipped " + failure.getMessage());
+            }
+            if (answer == null) {
+                Map<String, String> stored = AnswerRecovery.find(project, runId, started, id, choices);
+                if (stored != null) {
+                    answer = new LinkedHashMap<>(stored);
+                    value = stored.getOrDefault("value", "");
+                }
             }
             if (answer != null) break;
             if (System.nanoTime() >= deadline) {
+                Map<String, String> stored = AnswerRecovery.find(project, runId, started, id, choices);
+                if (stored != null) {
+                    answer = new LinkedHashMap<>(stored);
+                    value = stored.getOrDefault("value", "");
+                    break;
+                }
                 PageSurfaces.runtimeCall("askClose", id, false);
                 Result failed = fail(1, "timeout");
                 failed.body().put("op", "ask-and-wait");
@@ -649,10 +683,30 @@ public final class AgentControl {
         Map<String, Object> body = ok("Answer received.");
         body.put("op", "ask-and-wait");
         body.put("id", id);
-        Object value = answer.get("value");
-        body.put("value", value == null ? "" : value);
-        body.put("applied", value != null && !String.valueOf(value).isBlank());
+        body.put("value", value);
+        body.put("choice", value);
+        body.put("applied", !value.isBlank());
         return new Result(0, body);
+    }
+
+    /** The one clicked label, or null when this event is not that answer. A joined label list is not a choice. */
+    static String acceptedChoice(Map<String, Object> event, String id, List<String> choices) {
+        if (event == null || !"answer".equals(String.valueOf(event.get("type")))) return null;
+        if (id != null && !id.isBlank() && !id.equals(String.valueOf(event.get("id")))) return null;
+        Object raw = event.get("choice");
+        if (raw == null || String.valueOf(raw).isBlank()) raw = event.get("value");
+        String value = raw == null ? "" : String.valueOf(raw).replaceAll("\\s+", " ").trim();
+        if (choices == null || choices.size() < 2) return value;
+        for (String choice : choices) if (choice.equals(value)) return choice;
+        if (value.equals(String.join(" ", choices))) return null;
+        return null;
+    }
+
+    private static List<String> splitChoices(String raw) {
+        List<String> choices = new ArrayList<>();
+        if (!present(raw)) return choices;
+        for (String choice : raw.split(",")) if (!choice.isBlank()) choices.add(choice.trim());
+        return choices;
     }
 
     /** Events already stored before this ask. A later answer is the only one this call accepts. */
@@ -691,6 +745,19 @@ public final class AgentControl {
         placed.put("ok", true);
         placed.put("op", op);
         placed.put("kind", op);
+        try {
+            PageSurfaces.runtimeCall("parkCards", null, false);
+        } catch (RuntimeException ignored) {
+            // A page without the runtime keeps the inline position.
+        }
+        String placedId = String.valueOf(placed.getOrDefault("id", ""));
+        for (Map<String, Object> box : liveBoxes()) {
+            if (!placedId.equals(String.valueOf(box.get("id")))) continue;
+            placed.put("x", box.get("x"));
+            placed.put("y", box.get("y"));
+            placed.put("width", box.get("w"));
+            placed.put("height", box.get("h"));
+        }
         stampOverlaps(placed);
         if ("toast".equals(op)) {
             placed.put("transient", true);
@@ -798,6 +865,12 @@ public final class AgentControl {
             if (advanceTo != null) ChatCursor.advance(project, runId, args.get("channel"), advanceTo);
         }
         if (!peek) EventCursor.advance(project, runId, agentId, eventNext);
+        java.util.List<String> read = new java.util.ArrayList<>();
+        for (Map<String, Object> message : messages) {
+            Object id = message.get("id");
+            if (id != null) read.add(String.valueOf(id));
+        }
+        PageSurfaces.markRead(read);
         Map<String, Object> body = ok("Chat messages after the given id.");
         body.put("count", messages.size());
         body.put("messages", messages);
@@ -1236,13 +1309,14 @@ public final class AgentControl {
     private static String checklistHtml(String items) {
         if (!present(items)) return null;
         StringBuilder html = new StringBuilder();
-        html.append("<div data-pkb-card=\"checklist\">");
+        html.append("<div data-pkb-card=\"checklist\" data-pkb-checklist=\"\">");
         int count = 0;
         for (String item : items.split("\\|")) {
             if (item.isBlank()) continue;
             count++;
-            html.append("<div data-pkb-check=\"").append(count).append("\" data-pkb-checked=\"false\">")
-                    .append(escapeCard(item.trim())).append("</div>");
+            html.append("<label data-pkb-check=\"").append(count).append("\" data-pkb-checked=\"false\">")
+                    .append("<input type=\"checkbox\" data-pkb-check-input=\"").append(count).append("\">")
+                    .append("<span>").append(escapeCard(item.trim())).append("</span></label>");
         }
         html.append("</div>");
         return count == 0 ? null : html.toString();
@@ -1318,6 +1392,8 @@ public final class AgentControl {
               var row = rows[n];
               if (row.getAttribute('data-pkb-check') === want) {
                 row.setAttribute('data-pkb-checked', 'true');
+                var box = row.querySelector('input[type=checkbox]');
+                if (box) box.checked = true;
                 matched = true;
               }
               out.push({
@@ -1432,6 +1508,7 @@ public final class AgentControl {
     private static Result overlayPoll(Path project, String runId, Map<String, String> args) throws Exception {
         if (!present(args.get("after"))) {
             List<Map<String, Object>> events = PageSurfaces.pollInput(project, runId);
+            markConsumed(events);
             Map<String, Object> body = ok("Forwarded overlay clicks and form inputs.");
             body.put("count", events.size());
             body.put("events", events);
@@ -1446,11 +1523,25 @@ public final class AgentControl {
         List<Map<String, Object>> all = PageSurfaces.pollInput(project, runId);
         List<Map<String, Object>> events = after <= 0 ? all
                 : after >= all.size() ? List.of() : List.copyOf(all.subList(after, all.size()));
+        markConsumed(events);
         Map<String, Object> body = ok("Overlay events after the cursor.");
         body.put("count", events.size());
         body.put("events", events);
         body.put("next", all.size());
         return new Result(0, body);
+    }
+
+    private static void markConsumed(List<Map<String, Object>> events) {
+        List<String> read = new ArrayList<>();
+        if (events != null) {
+            for (Map<String, Object> event : events) {
+                Object id = event.get("id");
+                if (id != null) read.add(String.valueOf(id));
+                Object eid = event.get("eid");
+                if (eid != null) read.add(String.valueOf(eid));
+            }
+        }
+        PageSurfaces.markRead(read);
     }
 
     private static Result html(Path project, String runId, Map<String, String> args, String op) throws Exception {

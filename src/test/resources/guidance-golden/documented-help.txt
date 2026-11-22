@@ -22,6 +22,13 @@ all: act arrow ask ask-and-wait attach border bridge-health call capture capture
 Usage: act --target=<selector> [--kind=click|type|hover|press|select] [--query=<text>] [--ref=<ref>] [--pick=<n|name>] [--value=<text>] [--condition=title=<text>|text=<text>|url=<text>|ref=<id>:selected] [--snap=diff|auto] [--timeout=<ms>]
 --pick chooses one hit in the same snapshot, so the ref cannot go stale. A success includes checked and settleMs. Hover on a visible element is applied and dispatched. A click is applied when the page or that element's text or state changes. A covering mask that does not clear fails the click. Replies include frame.
 
+# help ask-and-wait
+Usage: ask-and-wait --say=<question> [--choices=a,b] [--id=<id>] [--timeout=<ms>]
+Returns only the clicked choice. An answer already stored is returned even if the worker call is tight.
+
+# help border
+Usage: border [--text=<html>] [--handle=<id>] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--color=<color>] [--style=<css>] [--target=auto|page|popup|native] [--block=true] [--html=<page>]
+
 # help call
 Usage: call <tool> [--args-file=<json>] [--args-b64=<base64>] [--args=<json>|-] [--text=<message>]
 Forwards one MCP tool to the shell. The controller is .pickleball/agent-controller.json. The reply is the agent envelope. An unmapped tool is error unavailable.
@@ -37,8 +44,8 @@ Writes {op,args} steps for execute-steps --file. Click and answer rows in --even
 Usage: chat-history [--channel=<name>] [--limit=<n>] [--run-id=<id>]
 
 # help chat-poll
-Usage: chat-poll [--channel=<name>] [--id=<after>] [--wait=<seconds>] [--run-id=<id>] [--format=lines|json] [--fields=<a,b>] [--where=<k=v>] [--limit=<n>] [--budget=<bytes>] [--group=type|role] [--priority=on] [--echo=hide]
---echo=hide drops source=agent. --priority=on keeps human, answer, click, then mutation.
+Usage: chat-poll [--channel=<name>] [--id=<after>] [--cursor=<token>] [--wait=<seconds>] [--run-id=<id>] [--format=lines|json] [--fields=<a,b>] [--where=<k=v>] [--limit=<n>] [--budget=<bytes>] [--group=type|role] [--priority=on] [--echo=hide]
+--echo=hide drops source=agent. --priority=on keeps human, answer, click, then mutation. --cursor is per channel and repeatable.
 
 # help chat-send
 Usage: chat-send --text=<message> [--source=agent|human|system] [--channel=<name>] [--agent=<id>] [--run-id=<id>]
@@ -102,13 +109,17 @@ Usage: export-guidance [output-directory] [--warm]
 
 # help find
 Usage: find --target=<selector> [--query=<text>] [--format=lines|json] [--fields=<a,b>] [--where=<k=v>] [--limit=<n>] [--budget=<bytes>] [--group=type|role] [--priority=on]
-Element rows keep ref, id, role, name, visible, enabled, interactive, and frame.
+Hits are returned once, as items. A long page ref is not embedded. --fields keeps only the named keys.
 
 # help find-element
 Usage: find-element (--category=<Button> [--text=<label>] | --query=<selector>) [--exposure=human|lower] [--limit=<n>] [--explain] [--promote-visual] [--html=<file>]
 
 # help finish
 Usage: finish --run-id=<id> [--learned=<one line>] [--status=PASSED|FAILED|EMPTY|TIMEOUT|STOPPED]
+
+# help form-fill
+Usage: form-fill --target=<selector> --fields=id=value|id=value
+A field is an id, a name, a short id, or the visible label (case and a trailing colon are ignored).
 
 # help frame
 Usage: frame --target=<selector> [--list] [--reset] [--enter=<id|name>]
@@ -278,7 +289,10 @@ Usage: show-run --run-id=<id>
 
 # help snap
 Usage: snap [--target=browser:auto|browser:<id>|browser:cdp=<url>|desktop:<pid>|desktop:app~<name>|ref:<doc>:<handle>] [--within=<id>] [--depth=<n>] [--group=role|type] [--priority=on] [--format=lines|json] [--fields=<a,b>] [--where=<role=button>] [--limit=<n>] [--budget=<bytes>]
---within is a ref, short id, backend id, or element id. --depth is the levels under that node. --group=type headers use the tag. --priority=on reorders and marks priority.
+--within is a ref, short id, backend id, or element id. --fields prints only those keys. --budget is the whole reply in bytes (at most 16 KB). Default lines use a short id and omit a long ref.
+
+# help spotlight
+Usage: spotlight [--dim=<0-1>] [--handle=<id>] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--target=auto|page|popup|native] [--block=true] [--html=<page>]
 
 # help start
 Usage: start --url=<page> | --url-key=<URL.key> --browser=<chrome|edge|chrome-headless> [--headed] [--hold=<seconds|forever>] [--panel] [--size=1600x1000] [--env=KEY=VALUE]
@@ -301,7 +315,8 @@ Usage: ui [--ops=<json array>]
 Without --ops, ui opens the Workbench controller. With --ops, ui applies a catalog batch (same as ui-apply).
 
 # help ui-poll
-Usage: ui-poll [--after=<n>] [--chat-after=<id>] [--wait=<seconds, up to 25>] [--channel=<name>] [--run-id=<id>] [--format=lines|json] [--fields=<a,b>] [--where=<k=v>] [--limit=<n>] [--budget=<bytes>] [--group=type|role] [--priority=on] [--echo=hide]
+Usage: ui-poll [--after=<n>] [--chat-after=<id>] [--cursor=<token>] [--wait=<seconds, up to 25>] [--channel=<name>] [--run-id=<id>] [--format=lines|json] [--fields=<a,b>] [--where=<k=v>] [--limit=<n>] [--budget=<bytes>] [--group=type|role] [--priority=on] [--echo=hide]
+The cursor channel is ui. The same token returns the same events and does not move the chat cursor.
 
 # help ui-verify
 Usage: ui-verify [--run-id=<id>]

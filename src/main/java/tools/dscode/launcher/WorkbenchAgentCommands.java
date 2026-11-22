@@ -2105,6 +2105,7 @@ public final class WorkbenchAgentCommands {
         }
         if (liveBridge.isPresent()) {
             long forwardStarted = System.nanoTime();
+            long askedAt = System.currentTimeMillis();
             tools.dscode.common.agentfast.AgentForward.Posted posted = tools.dscode.common.agentfast.AgentForward.post(
                     liveBridge.get(),
                     command,
@@ -2115,6 +2116,33 @@ public final class WorkbenchAgentCommands {
                     parsed.coordination().agentId()
             );
             if (posted.error() != null && !posted.error().isBlank()) {
+                Map<String, String> recovered = "ask-and-wait".equals(command)
+                        ? tools.dscode.common.agentcontrol.AnswerRecovery.find(
+                        parsed.project(),
+                        boundRunId(parsed),
+                        askedAt,
+                        args.get("id"),
+                        splitChoiceList(args.get("choices")))
+                        : null;
+                if (recovered != null) {
+                    Map<String, Object> body = new java.util.LinkedHashMap<>();
+                    body.put("ok", true);
+                    body.put("op", "ask-and-wait");
+                    body.put("value", recovered.get("value"));
+                    body.put("choice", recovered.get("value"));
+                    body.put("id", recovered.getOrDefault("id", args.getOrDefault("id", "")));
+                    body.put("applied", true);
+                    body.put("recovered", true);
+                    long totalMs = Math.max(0L, (System.nanoTime() - forwardStarted) / 1_000_000L);
+                    try {
+                        out.println(tools.dscode.common.agentfast.AgentEnvelope.ensure(
+                                JSON.writeValueAsString(body), command, totalMs, parsed.project(), boundRunId(parsed)));
+                    } catch (java.io.IOException failure) {
+                        err.println(failure.getMessage());
+                        return 1;
+                    }
+                    return 0;
+                }
                 err.println(posted.error());
                 return posted.exit() == 0 ? 1 : posted.exit();
             }
@@ -2178,6 +2206,13 @@ public final class WorkbenchAgentCommands {
             err.print(failureLine(error == null ? "agent command failed" : String.valueOf(error), command));
         }
         return result.exit();
+    }
+
+    private static List<String> splitChoiceList(String raw) {
+        List<String> choices = new ArrayList<>();
+        if (raw == null || raw.isBlank()) return choices;
+        for (String choice : raw.split(",")) if (!choice.isBlank()) choices.add(choice.trim());
+        return choices;
     }
 
     /** A target-selector string, not panel `page` or `popup`. */

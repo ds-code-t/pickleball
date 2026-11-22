@@ -61,6 +61,24 @@ class CdpAdapterTest {
     }
 
     @Test
+    void navigationRebindsTheSurfaceBindingOffTheSocketThread() throws Exception {
+        ScriptedSocket socket = new ScriptedSocket().auto(request -> ScriptedSocket.cdp(request, "{}"));
+        CdpAdapter adapter = new CdpAdapter(socket);
+        adapter.addBinding("pkbSurface", (name, value) -> { }, "pkb-surface");
+        long before = socket.methods().stream().filter("Runtime.addBinding"::equals).count();
+        socket.inbound("{\"method\":\"Page.frameNavigated\",\"params\":{\"frame\":{\"id\":\"root\"}}}");
+        long after = before;
+        for (int i = 0; i < 40 && after <= before; i++) {
+            Thread.sleep(25);
+            after = socket.methods().stream().filter("Runtime.addBinding"::equals).count();
+        }
+        assertTrue(after > before, socket.methods().toString());
+        assertTrue(socket.methods().contains("Runtime.enable"), socket.methods().toString());
+        String rebound = socket.sent().stream().filter(line -> line.contains("Runtime.addBinding")).reduce((a, b) -> b).orElseThrow();
+        assertTrue(rebound.contains("pkb-surface"), rebound);
+    }
+
+    @Test
     void attachPageCarriesTheFlattenedSession() {
         ScriptedSocket socket = new ScriptedSocket().auto(request -> {
             String method = ScriptedSocket.method(request);
