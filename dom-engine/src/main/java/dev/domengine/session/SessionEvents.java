@@ -146,6 +146,48 @@ public final class SessionEvents {
         return kept;
     }
 
+    /**
+     * {@code --request} keeps requestWillBeSent. {@code --response} keeps
+     * responseReceived and loadingFinished/Failed. Both flags keep either match.
+     * {@code *}, {@code true}, {@code 1}, or a blank value keeps every row of that kind.
+     */
+    public static List<ObjectNode> applyTraffic(List<ObjectNode> rows, String request, String response, int limit) {
+        boolean wantRequest = request != null && !request.isBlank();
+        boolean wantResponse = response != null && !response.isBlank();
+        if (!wantRequest && !wantResponse) return rows == null ? List.of() : rows;
+        List<ObjectNode> kept = new ArrayList<>();
+        if (rows != null) {
+            for (ObjectNode event : rows) {
+                if (trafficRow(event, request, wantRequest, response, wantResponse)) kept.add(event);
+            }
+        }
+        if (limit > 0 && kept.size() > limit) {
+            return new ArrayList<>(kept.subList(kept.size() - limit, kept.size()));
+        }
+        return kept;
+    }
+
+    private static boolean trafficRow(ObjectNode event, String request, boolean wantRequest, String response, boolean wantResponse) {
+        String method = event.path("method").asText("");
+        boolean requestRow = method.contains("requestWillBeSent") || "request".equalsIgnoreCase(event.path("kind").asText(""));
+        boolean responseRow = method.contains("responseReceived")
+                || method.contains("loadingFinished")
+                || method.contains("loadingFailed")
+                || "response".equalsIgnoreCase(event.path("kind").asText(""));
+        if (wantRequest && requestRow && trafficNeedle(event, request)) return true;
+        return wantResponse && responseRow && trafficNeedle(event, response);
+    }
+
+    private static boolean trafficNeedle(ObjectNode event, String needle) {
+        if (needle == null || needle.isBlank() || "*".equals(needle) || "true".equalsIgnoreCase(needle) || "1".equals(needle)) {
+            return true;
+        }
+        String hay = (event.path("url").asText("") + " " + event.path("text").asText("") + " "
+                + event.path("httpMethod").asText("") + " " + event.path("method").asText("") + " "
+                + event.path("status").asText("")).toLowerCase(Locale.ROOT);
+        return hay.contains(needle.toLowerCase(Locale.ROOT));
+    }
+
     private static boolean matchesKind(JsonNode event, String kind) {
         if (kind == null || kind.isBlank()) return true;
         String needle = kind.trim().toLowerCase(Locale.ROOT);

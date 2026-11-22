@@ -198,7 +198,7 @@ public final class McpRegistry {
         argv.put("type", "array");
         argv.putObject("items").put("type", "string");
         argv.put("description", "CLI arguments. For domengine this is the whole argv. For other commands it follows the command name.");
-        for (String name : List.of("session", "selector", "text", "file", "cdp", "url", "kind", "platform", "html")) {
+        for (String name : List.of("session", "selector", "text", "file", "cdp", "url", "kind", "platform", "html", "type", "request", "response")) {
             properties.putObject(name).put("type", "string");
         }
         return schema;
@@ -236,6 +236,9 @@ public final class McpRegistry {
         flag(argv, arguments, "file", "--file");
         flag(argv, arguments, "cdp", "--cdp");
         flag(argv, arguments, "url", "--url");
+        flag(argv, arguments, "type", "--type");
+        flag(argv, arguments, "request", "--request");
+        flag(argv, arguments, "response", "--response");
         return argv;
     }
 

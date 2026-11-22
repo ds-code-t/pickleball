@@ -63,6 +63,12 @@ final class ConsumerReadyCommands {
             out.println(outcome.stopped() ? "stopped=true" : "stopped=false");
             return 0;
         }
+        String engine = flag(parsed, "--engine");
+        if (engine != null && !engine.isBlank()) {
+            err.println("error: --engine=" + engine.trim() + " is not a browser engine");
+            err.println("fix: the page engine is Chrome DevTools; use --browser=chrome|edge|chrome-headless");
+            return 2;
+        }
         String url = flag(parsed, "--url");
         String urlKey = flag(parsed, "--url-key");
         if ((url == null || url.isBlank()) && urlKey != null && !urlKey.isBlank()) {
@@ -77,6 +83,11 @@ final class ConsumerReadyCommands {
             url = tools.dscode.common.agentfast.FixturePages.resolve(url);
         }
         String browser = flag(parsed, "--browser");
+        if (browser != null && browser.toLowerCase(Locale.ROOT).contains("selenium")) {
+            err.println("error: --browser=selenium is not supported");
+            err.println("fix: the page engine is Chrome DevTools; use --browser=chrome|edge|chrome-headless");
+            return 2;
+        }
         if (url == null || url.isBlank() || browser == null || browser.isBlank()) {
             err.print(WorkbenchCliHelp.usageError("start requires --url and --browser", "start"));
             return 2;
@@ -190,7 +201,7 @@ final class ConsumerReadyCommands {
         try {
             Map<String, Object> stamped = tools.dscode.common.agentfast.AgentEnvelope.apply(
                     envelope, navigated && (!panel || panelOpen) ? 0 : 1, "start", project, id);
-            out.println(JSON.writeValueAsString(stamped));
+            out.println(QuietWarnings.dropNoise(JSON.writeValueAsString(stamped)));
         } catch (IOException ignored) {
             // The line fields above are already the session id.
         }
@@ -212,6 +223,7 @@ final class ConsumerReadyCommands {
     /** Chrome, Chromium, or Edge. Null means the name is unsupported or the binary is missing. */
     static String resolveBrowser(String name) {
         String lower = name == null ? "" : name.toLowerCase(Locale.ROOT);
+        if (lower.contains("selenium")) return null;
         if (lower.contains("edge")) return BrowserSession.findEdge();
         if (lower.contains("firefox")) return null;
         if (lower.contains("chrome") || lower.contains("chromium")) return BrowserSession.findChrome();
@@ -283,6 +295,15 @@ final class ConsumerReadyCommands {
     }
 
     private static void stopController(Path project) {
+        if (Boolean.getBoolean(AgentHop.INSIDE)) {
+            try {
+                Files.deleteIfExists(PkbMain.handleFile(project));
+            } catch (IOException ignored) {
+                // The controller removes the handle again when it exits.
+            }
+            AgentController.requestStopAfterReply();
+            return;
+        }
         java.io.PrintStream previousOut = System.out;
         java.io.PrintStream previousErr = System.err;
         try {

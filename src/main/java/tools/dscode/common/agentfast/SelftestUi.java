@@ -27,6 +27,34 @@ public final class SelftestUi {
     private SelftestUi() {
     }
 
+    /**
+     * Checks sending, delivered, and read in the page runtime and panel CSS.
+     * No Chrome. A missing state is a failed selftest, not a skip.
+     */
+    public static Map<String, Object> feedback(Path project) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("op", "selftest");
+        body.put("component", "feedback");
+        String runtime = tools.dscode.browser.SurfaceAssets.script("pkb-runtime");
+        String css = tools.dscode.browser.SurfaceAssets.panelCss();
+        String joined = (runtime == null ? "" : runtime) + "\n" + (css == null ? "" : css);
+        boolean sending = joined.contains("data-pkb-feedback=\"sending\"");
+        boolean delivered = joined.contains("data-pkb-feedback=\"delivered\"");
+        boolean read = joined.contains("data-pkb-feedback=\"read\"");
+        boolean ok = sending && delivered && read;
+        body.put("ok", ok);
+        body.put("sending", sending);
+        body.put("delivered", delivered);
+        body.put("read", read);
+        body.put("chrome", false);
+        if (project != null) body.put("project", project.toString());
+        body.put("sentence", ok
+                ? "feedback states sending, delivered, and read are in the page runtime"
+                : "feedback states missing");
+        if (!ok) body.put("error", "selftest ui --component=feedback did not find sending, delivered, and read");
+        return body;
+    }
+
     public static Map<String, Object> cpu(Path project, String component) throws Exception {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("op", "selftest");

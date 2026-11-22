@@ -153,6 +153,24 @@ class WorkbenchMcpServerTest {
     }
 
     @Test
+    void observeSchemaAcceptsTrafficFlagsAndStartRejectsSelenium() {
+        Map<String, Object> schema = McpRegistry.observeSchema();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> properties = (Map<String, Object>) schema.get("properties");
+        assertTrue(properties.containsKey("request"), properties.keySet().toString());
+        assertTrue(properties.containsKey("response"), properties.keySet().toString());
+        assertEquals(Boolean.FALSE, schema.get("additionalProperties"));
+        assertEquals(
+                List.of("observe", "--request", "/api", "--response", "*"),
+                McpRegistry.argv("observe", Map.of("request", "/api", "response", "*"))
+        );
+        WorkbenchMcpTools tools = new WorkbenchMcpTools(fakeServices((method, args) -> null), JSON);
+        Object rejected = tools.call("workbench_start", Map.of("url", "http://127.0.0.1/page", "browser", "selenium"));
+        assertTrue(String.valueOf(rejected).contains("not supported"), String.valueOf(rejected));
+        assertTrue(tools.names().contains("observe"));
+    }
+
+    @Test
     void snapshotCommandReturnsTheCompositeSnapshotShape() {
         WorkbenchMcpTools tools = new WorkbenchMcpTools(fakeServices((method, args) -> null), JSON);
         Object value = tools.call("snapshot", Map.of("kind", "offline"));

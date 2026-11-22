@@ -49,7 +49,12 @@ public final class ObserveEvents {
         } else {
             dev.domengine.session.SessionEvents buffer = tools.dscode.common.agentfast.LiveBrowserHost.events();
             if (buffer != null) {
-                events.addAll(fromBuffer(buffer.read(dev.domengine.session.SessionEvents.Filter.of(args), waitMs(args))));
+                Map<String, String> bufferFlags = args;
+                if (present(args.get("request")) || present(args.get("response"))) {
+                    bufferFlags = new java.util.LinkedHashMap<>(args);
+                    bufferFlags.put("limit", "0");
+                }
+                events.addAll(fromBuffer(buffer.read(dev.domengine.session.SessionEvents.Filter.of(bufferFlags), waitMs(args))));
             } else {
                 events.addAll(fromEngine(args));
             }
@@ -115,9 +120,15 @@ public final class ObserveEvents {
         }
         put(argv, "--type", args.get("type"));
         put(argv, "--url", args.get("url"));
+        put(argv, "--request", args.get("request"));
+        put(argv, "--response", args.get("response"));
         put(argv, "--since", args.get("since"));
         put(argv, "--until", args.get("until"));
-        put(argv, "--limit", args.get("limit"));
+        if ((present(args.get("request")) || present(args.get("response"))) && !present(args.get("limit"))) {
+            put(argv, "--limit", "0");
+        } else {
+            put(argv, "--limit", args.get("limit"));
+        }
         String wait = args.get("wait-ms");
         if (wait == null || wait.isBlank()) wait = args.get("waitMs");
         put(argv, "--wait-ms", wait);
@@ -176,12 +187,15 @@ public final class ObserveEvents {
         Long until = longOrNull(args.get("until"));
         int limit = intOr(args.get("limit"), 100);
         List<Event> kept = new ArrayList<>();
+        String request = blank(args.get("request"));
+        String response = blank(args.get("response"));
         for (Event event : events) {
             if (type != null && !matchesType(event, type)) continue;
             if (url != null) {
                 String hay = (event.url() + " " + event.text()).toLowerCase(Locale.ROOT);
                 if (!hay.contains(url.toLowerCase(Locale.ROOT))) continue;
             }
+            if (!matchesTraffic(event, request, response)) continue;
             if (event.at() != null && since != null && event.at() < since) continue;
             if (event.at() != null && until != null && event.at() > until) continue;
             kept.add(event);
@@ -197,6 +211,50 @@ public final class ObserveEvents {
         String method = event.method() == null ? "" : event.method().toLowerCase(Locale.ROOT);
         String kind = event.kind() == null ? "" : event.kind().toLowerCase(Locale.ROOT);
         return method.contains(needle) || kind.equals(needle);
+    }
+
+    /**
+     * {@code --request} keeps {@code Network.requestWillBeSent}. {@code --response}
+     * keeps response and loading rows. A blank value, {@code *}, {@code true}, or
+     * {@code 1} keeps every row of that kind. Anything else is a substring of
+     * the url, text, HTTP method, CDP method, or status. Both flags together
+     * keep a row that matches either one.
+     */
+    static boolean matchesTraffic(Event event, String request, String response) {
+        boolean wantRequest = request != null;
+        boolean wantResponse = response != null;
+        if (!wantRequest && !wantResponse) return true;
+        boolean requestRow = isRequest(event);
+        boolean responseRow = isResponse(event);
+        if (wantRequest && requestRow && trafficNeedle(event, request)) return true;
+        if (wantResponse && responseRow && trafficNeedle(event, response)) return true;
+        return false;
+    }
+
+    private static boolean isRequest(Event event) {
+        String method = event.method() == null ? "" : event.method();
+        return method.contains("requestWillBeSent") || "request".equalsIgnoreCase(event.kind());
+    }
+
+    private static boolean isResponse(Event event) {
+        String method = event.method() == null ? "" : event.method();
+        return method.contains("responseReceived")
+                || method.contains("loadingFinished")
+                || method.contains("loadingFailed")
+                || "response".equalsIgnoreCase(event.kind());
+    }
+
+    private static boolean trafficNeedle(Event event, String needle) {
+        if (needle == null || needle.isBlank() || "*".equals(needle) || "true".equalsIgnoreCase(needle) || "1".equals(needle)) {
+            return true;
+        }
+        String hay = (event.url() + " " + event.text() + " " + event.httpMethod() + " " + event.method()
+                + " " + (event.status() == null ? "" : event.status())).toLowerCase(Locale.ROOT);
+        return hay.contains(needle.toLowerCase(Locale.ROOT));
+    }
+
+    private static boolean present(String value) {
+        return value != null && !value.isBlank();
     }
 
     public static List<Event> parse(String json) throws IOException {

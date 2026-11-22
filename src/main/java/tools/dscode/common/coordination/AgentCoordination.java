@@ -510,8 +510,9 @@ public final class AgentCoordination {
     /**
      * Stops the run. When {@code run-index.json} is present it supplies the status
      * and the failure fields, including after a worker already wrote PASSED.
-     * {@code TIMEOUT}, {@code EMPTY}, and {@code LAUNCH_ERROR} are left alone. {@code observedFailures}
-     * is the Surefire or Gradle failure+error count used only when no index exists.
+     * {@code TIMEOUT}, {@code EMPTY}, and {@code LAUNCH_ERROR} are left alone.
+     * {@code observedFailures} is the Surefire or Gradle failure+error count.
+     * A failed index keeps the larger of its own count and that Surefire count.
      * {@code environment} and {@code browser} come from the resolved run vars.
      */
     public static void finish(
@@ -544,6 +545,9 @@ public final class AgentCoordination {
             String failureSummary = existing.failureSummary();
             if (signal != null && signal.failed()) {
                 failureCount = signal.failureCount();
+                if (observedFailures != null && (failureCount == null || observedFailures > failureCount)) {
+                    failureCount = observedFailures;
+                }
                 failedScenario = signal.failedScenario();
                 if (signal.failureSummary() != null) failureSummary = signal.failureSummary();
             } else if ("FAILED".equalsIgnoreCase(statusValue)

@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class AgentController {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final AtomicBoolean STOP = new AtomicBoolean();
+    private static final AtomicBoolean STOP_AFTER = new AtomicBoolean();
 
     private AgentController() {
     }
@@ -44,6 +45,7 @@ public final class AgentController {
         Path project = Path.of(args[1]).toAbsolutePath().normalize();
         Files.createDirectories(project.resolve(".pickleball"));
         STOP.set(false);
+        STOP_AFTER.set(false);
         try (ServerSocket server = new ServerSocket(0, 50, InetAddress.getLoopbackAddress())) {
             write(project, server.getLocalPort());
             while (!STOP.get()) {
@@ -70,12 +72,14 @@ public final class AgentController {
         String line = reader.readLine();
         if (line == null || line.isBlank()) {
             writer.println(reply(2, "", "error: empty request\n"));
+            afterReply(writer);
             return;
         }
         JsonNode node = JSON.readTree(line);
         String token = node.path("token").asText("");
         if (!token.equals(readToken(project))) {
             writer.println(reply(2, "", "error: controller token rejected\nfix: controller-start\n"));
+            afterReply(writer);
             return;
         }
         String op = node.path("op").asText("");
@@ -93,12 +97,14 @@ public final class AgentController {
             long started = System.nanoTime();
             String body = tools.dscode.common.agentfast.AgentEnvelope.ping(project, "ping", started);
             writer.println(reply(0, body.endsWith("\n") ? body : body + "\n", ""));
+            afterReply(writer);
             return;
         }
         List<String> argv = new ArrayList<>();
         for (JsonNode arg : node.path("argv")) argv.add(arg.asText(""));
         if (argv.isEmpty()) {
             writer.println(reply(2, "", "error: missing argv\nfix: pass a verb\n"));
+            afterReply(writer);
             return;
         }
         ByteArrayOutputStream outBytes = new ByteArrayOutputStream();
@@ -113,9 +119,34 @@ public final class AgentController {
         } catch (RuntimeException failure) {
             String message = failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
             writer.println(reply(1, "", "error: " + message + "\n"));
+            afterReply(writer);
             return;
         }
         writer.println(reply(exit, outBytes.toString(StandardCharsets.UTF_8), errBytes.toString(StandardCharsets.UTF_8)));
+        afterReply(writer);
+    }
+
+    /** {@code live-stop} inside the controller exits only after this reply is flushed. */
+    public static void requestStopAfterReply() {
+        STOP_AFTER.set(true);
+    }
+
+    /** Tests clear the flag so a later controller in this JVM is not stopped. */
+    public static void clearStopAfterReplyForTests() {
+        STOP_AFTER.set(false);
+    }
+
+    static boolean stopAfterReply() {
+        return STOP_AFTER.get();
+    }
+
+    private static void afterReply(PrintWriter writer) {
+        writer.flush();
+        if (!STOP_AFTER.getAndSet(false)) return;
+        STOP.set(true);
+        Thread stopper = new Thread(() -> System.exit(0), "pickleball-agent-controller-stop");
+        stopper.setDaemon(true);
+        stopper.start();
     }
 
     private static String reply(int exit, String out, String err) throws Exception {

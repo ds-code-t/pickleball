@@ -430,15 +430,22 @@ final class WorkbenchMcpTools {
             if (!tools.containsKey(name)) add(name, description, schema, handler);
         });
         add("workbench_start",
-                "Forward start --url --browser --env. Later page commands target that live session.",
+                "Forward start --url --browser --env. The page engine is Chrome DevTools. --engine=selenium is not supported.",
                 schema(Map.of(
                         "url", stringProperty("Page URL."),
-                        "browser", stringProperty("chrome, edge, or chrome-headless. Defaults to chrome."),
+                        "browser", stringProperty("chrome, edge, or chrome-headless. Defaults to chrome. selenium is rejected."),
                         "env", stringProperty("Optional KEY=VALUE pairs, comma-separated.")
                 ), "url"),
                 args -> {
                     String browser = optionalText(args, "browser");
                     if (browser == null || browser.isBlank()) browser = "chrome";
+                    if (browser.toLowerCase(java.util.Locale.ROOT).contains("selenium")) {
+                        return Map.of(
+                                "ok", false,
+                                "error", "--browser=selenium is not supported",
+                                "fix", "use chrome, edge, or chrome-headless. The page engine is Chrome DevTools."
+                        );
+                    }
                     return forwardReady(List.of(
                             "start",
                             "--url=" + text(args, "url"),

@@ -2035,6 +2035,8 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "kind");
         copyFlag(args, parsed, "condition");
         copyFlag(args, parsed, "timeout");
+        copyFlag(args, parsed, "request");
+        copyFlag(args, parsed, "response");
         copyFlag(args, parsed, "ref");
         copyFlag(args, parsed, "value");
         copyFlag(args, parsed, "snap");
@@ -2091,6 +2093,9 @@ public final class WorkbenchAgentCommands {
         if (parsed.coordination().limit() != null) args.put("limit", parsed.coordination().limit().toString());
         if (parsed.coordination().id() != null) args.put("id", parsed.coordination().id());
         if (hasFlag(parsed, "--start")) args.put("start", "true");
+        if ("observe".equals(command) && hasFlag(parsed, "--follow") && !args.containsKey("wait-ms")) {
+            args.put("wait-ms", Long.toString(followWaitMs(args.get("timeout"))));
+        }
         if ("record".equals(command)) {
             for (String flag : List.of(
                     "stop", "status", "pause", "resume", "script", "save", "load", "list",
@@ -2162,8 +2167,8 @@ public final class WorkbenchAgentCommands {
                     body.put("recovered", true);
                     long totalMs = Math.max(0L, (System.nanoTime() - forwardStarted) / 1_000_000L);
                     try {
-                        out.println(tools.dscode.common.agentfast.AgentEnvelope.ensure(
-                                JSON.writeValueAsString(body), command, totalMs, parsed.project(), boundRunId(parsed)));
+                        out.println(QuietWarnings.dropNoise(tools.dscode.common.agentfast.AgentEnvelope.ensure(
+                                JSON.writeValueAsString(body), command, totalMs, parsed.project(), boundRunId(parsed))));
                     } catch (java.io.IOException failure) {
                         err.println(failure.getMessage());
                         return 1;
@@ -2182,7 +2187,7 @@ public final class WorkbenchAgentCommands {
                     boundRunId(parsed)
             );
             if ("lines".equals(args.get("format"))) printed = tools.dscode.common.agentfast.AgentEnvelope.renderLines(printed);
-            out.println(printed);
+            out.println(QuietWarnings.dropNoise(printed));
             if (posted.exit() != 0) {
                 String error = "agent command failed";
                 try {
@@ -2197,13 +2202,13 @@ public final class WorkbenchAgentCommands {
         }
         if (failFastWithoutBrowser(command, args)) {
             err.print(WorkbenchCliHelp.structured("no live browser", "run start --url= --browser="));
-            out.println(tools.dscode.common.agentfast.AgentEnvelope.ensure(
+            out.println(QuietWarnings.dropNoise(tools.dscode.common.agentfast.AgentEnvelope.ensure(
                     "{\"ok\":false,\"error\":\"no live browser\",\"op\":\"" + command + "\"}",
                     command,
                     0,
                     parsed.project(),
                     boundRunId(parsed)
-            ));
+            )));
             return 1;
         }
         AgentControl.Result result = AgentControl.execute(
@@ -2223,7 +2228,7 @@ public final class WorkbenchAgentCommands {
                     boundRunId(parsed)
             );
             if ("lines".equals(args.get("format"))) printed = tools.dscode.common.agentfast.AgentEnvelope.renderLines(printed);
-            out.println(printed);
+            out.println(QuietWarnings.dropNoise(printed));
         } catch (java.io.IOException failure) {
             err.println(failure.getMessage());
             return 1;
@@ -2318,6 +2323,21 @@ public final class WorkbenchAgentCommands {
     private static void copyFlag(Map<String, String> args, WorkbenchCommandLine.Parsed parsed, String name) {
         String value = flag(parsed, "--" + name);
         if (value != null && !value.isBlank()) args.put(name, value);
+    }
+
+    /** {@code observe --follow} waits this many milliseconds, then returns in this process. */
+    private static long followWaitMs(String timeout) {
+        long seconds = 0;
+        if (timeout != null && !timeout.isBlank()) {
+            try {
+                seconds = Long.parseLong(timeout.trim());
+            } catch (NumberFormatException ignored) {
+                seconds = 0;
+            }
+        }
+        if (seconds < 0) seconds = 0;
+        if (seconds > 120) seconds = 120;
+        return seconds * 1000L;
     }
 
     private static String flag(WorkbenchCommandLine.Parsed parsed, String name) {
@@ -2582,9 +2602,9 @@ public final class WorkbenchAgentCommands {
 
     /**
      * Maven {@code testFailureIgnore} can exit 0 when scenarios failed.
-     * The current run's {@code run-index.json} is authoritative, including a
-     * Surefire Error recorded as {@code counts.errors} or outcome {@code ERROR}.
-     * Surefire XML is used only when that index was not written.
+     * The current run's {@code run-index.json} is authoritative for status,
+     * including a Surefire Error recorded as {@code counts.errors} or outcome
+     * {@code ERROR}. The failure count is the larger of the index and Surefire XML.
      */
     private static Observed observe(Path project, String runId, int mavenExit, boolean empty, String console) {
         if (empty) {
@@ -2602,8 +2622,10 @@ public final class WorkbenchAgentCommands {
         }
         if (signal != null && (signal.failed() || "PASSED".equalsIgnoreCase(signal.outcome()))) {
             if (signal.failed() || signal.failureCount() > 0) {
-                int exit = mavenExit == 0 ? Math.max(signal.failureCount(), 1) : mavenExit;
-                return new Observed("FAILED", exit, Math.max(signal.failureCount(), 1), signal.failureSummary());
+                int count = Math.max(signal.failureCount(), 1);
+                if (verdict != null && verdict.failures() > count) count = verdict.failures();
+                int exit = mavenExit == 0 ? count : mavenExit;
+                return new Observed("FAILED", exit, count, signal.failureSummary());
             }
             if (verdict != null && verdict.failed()) {
                 int count = Math.max(verdict.failures(), 1);

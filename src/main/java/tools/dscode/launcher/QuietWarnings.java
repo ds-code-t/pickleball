@@ -52,8 +52,30 @@ final class QuietWarnings extends OutputStream {
     private void flushLine() throws IOException {
         String line = pending.toString(StandardCharsets.UTF_8).replace("\r", "");
         pending.reset();
-        if (line.startsWith("WARN:") || line.startsWith("WARNING:")) return;
+        if (line.startsWith("WARN:") || line.startsWith("WARNING:") || line.stripLeading().startsWith("PKB-AGENT")) return;
         delegate.write(line.getBytes(StandardCharsets.UTF_8));
         delegate.write('\n');
+    }
+
+    /**
+     * Drops {@code PKB-AGENT}, {@code WARN:}, and {@code WARNING:} lines from an agent reply.
+     * A JSON line is kept even when its text mentions those prefixes.
+     */
+    static String dropNoise(String text) {
+        if (text == null || text.isEmpty()) return text == null ? "" : text;
+        String[] lines = text.split("\n", -1);
+        StringBuilder kept = new StringBuilder();
+        boolean first = true;
+        for (String line : lines) {
+            String stripped = line.stripLeading();
+            boolean json = stripped.startsWith("{") || stripped.startsWith("[");
+            if (!json && (stripped.startsWith("PKB-AGENT") || stripped.startsWith("WARN:") || stripped.startsWith("WARNING:"))) {
+                continue;
+            }
+            if (!first) kept.append('\n');
+            first = false;
+            kept.append(line);
+        }
+        return kept.toString();
     }
 }

@@ -58,7 +58,7 @@ public final class AgentEnvelope {
                 copy.put("chatNext", String.valueOf(last.get("id")));
             }
         }
-        copy.put("items", takeItems(copy));
+        copy.put("items", leanItems(takeItems(copy)));
         Object priorNext = copy.get("next");
         if (priorNext instanceof Number number) copy.put("seq", number.intValue());
         copy.put("next", AgentCursor.stamp(runId, agentId, copy));
@@ -212,6 +212,38 @@ public final class AgentEnvelope {
             }
         }
         return items;
+    }
+
+    /** Short ids win over a long ref or a long string handle. Quotes lose one escape level. */
+    private static List<Object> leanItems(List<Object> items) {
+        if (items == null || items.isEmpty()) return items == null ? List.of() : items;
+        List<Object> leaned = new ArrayList<>(items.size());
+        for (Object item : items) {
+            if (item instanceof Map<?, ?> map) leaned.add(leanRow(map));
+            else if (item instanceof String text) leaned.add(StandardView.unescapeQuoted(text));
+            else leaned.add(item);
+        }
+        return leaned;
+    }
+
+    private static Map<String, Object> leanRow(Map<?, ?> map) {
+        Map<String, Object> copy = new LinkedHashMap<>();
+        map.forEach((key, value) -> {
+            if (key == null) return;
+            copy.put(String.valueOf(key), value instanceof String text ? StandardView.unescapeQuoted(text) : value);
+        });
+        Object id = copy.get("id");
+        Object ref = copy.get("ref");
+        if (id instanceof String idText && idText.matches("s\\d+\\.h\\d+")
+                && ref instanceof String refText && refText.length() > 72) {
+            copy.remove("ref");
+        }
+        Object handle = copy.get("handle");
+        if (handle instanceof String handleText && handleText.length() > 48
+                && id instanceof String idText && !idText.isBlank()) {
+            copy.put("handle", idText);
+        }
+        return copy;
     }
 
     /** Reply doc versions stay short. Desktop versions and an already-short URL are unchanged. */

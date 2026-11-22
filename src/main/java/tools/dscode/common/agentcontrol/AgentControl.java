@@ -524,6 +524,10 @@ public final class AgentControl {
     }
 
     private static Result selftest(Path project, Map<String, String> args) throws Exception {
+        if ("feedback".equals(args.get("component"))) {
+            Map<String, Object> report = SelftestUi.feedback(project);
+            return new Result(Boolean.TRUE.equals(report.get("ok")) ? 0 : 1, report);
+        }
         if ("pages".equals(args.get("component"))) {
             Map<String, Object> report = tools.dscode.common.agentfast.SelftestUi.pages(project);
             if (Boolean.TRUE.equals(report.get("skipped"))) return new Result(1, report);

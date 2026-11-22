@@ -48,6 +48,20 @@ class LeanReplyTest {
     }
 
     @Test
+    void snapLineUnescapesAQuotedNameAndKeepsAShortRef() {
+        List<String> lines = TargetVerb.snapLines(List.of(Map.of(
+                "role", "button",
+                "name", "Say \\\"Save\\\"",
+                "ref", "ref:1:1",
+                "id", "s1.h4"
+        )), Map.of());
+        String line = lines.get(1);
+        assertTrue(line.contains("Say \"Save\""), line);
+        assertTrue(line.contains("[ref=ref:1:1]"), line);
+        assertTrue(line.contains("id=s1.h4"), line);
+    }
+
+    @Test
     void fieldsAndBudgetAreHonored() {
         List<Map<String, Object>> rows = new ArrayList<>();
         for (int index = 0; index < 40; index++) {

@@ -217,7 +217,7 @@ public final class DomEngineMain {
         observe.put("source", "cdp-session");
         observe.put("buffer", dev.domengine.session.SessionEvents.CAPACITY);
         array(observe, "kinds", List.of("network", "navigation", "console", "log"));
-        array(observe, "flags", List.of("session", "cdp", "type", "url", "since", "until", "limit", "wait-ms"));
+        array(observe, "flags", List.of("session", "cdp", "type", "url", "request", "response", "since", "until", "limit", "wait-ms", "follow", "timeout"));
         array(node, "engines", dev.domengine.query.Query.ENGINES);
         node.put("display_name", "Control Engine");
         syntax(node);
@@ -572,6 +572,20 @@ public final class DomEngineMain {
                 return error(2, "usage", "invalid --wait-ms: " + rawWait);
             }
         }
+        if ("true".equals(flags.get("follow")) && (rawWait == null || rawWait.isBlank())) {
+            String timeout = flags.get("timeout");
+            if (timeout != null && !timeout.isBlank()) {
+                try {
+                    long seconds = Long.parseLong(timeout.trim());
+                    if (seconds < 0 || seconds > 120) {
+                        return error(2, "usage", "observe --timeout is seconds from 0 to 120");
+                    }
+                    waitMs = seconds * 1000L;
+                } catch (NumberFormatException failure) {
+                    return error(2, "usage", "invalid --timeout: " + timeout);
+                }
+            }
+        }
         BrowserSession session;
         String cdp = flags.get("cdp");
         if ((flags.get("session") == null || flags.get("session").isBlank()) && cdp != null && !cdp.isBlank()) {
@@ -590,8 +604,17 @@ public final class DomEngineMain {
         if (session == null) {
             return error(2, "usage", "observe needs --session, --cdp, a joined session, or a query selector with --file");
         }
-        dev.domengine.session.SessionEvents.Filter filter = dev.domengine.session.SessionEvents.Filter.of(flags);
+        dev.domengine.session.SessionEvents.Filter raw = dev.domengine.session.SessionEvents.Filter.of(flags);
+        String request = flags.get("request");
+        String response = flags.get("response");
+        boolean traffic = (request != null && !request.isBlank()) || (response != null && !response.isBlank());
+        dev.domengine.session.SessionEvents.Filter filter = traffic
+                ? new dev.domengine.session.SessionEvents.Filter(raw.kind(), raw.url(), raw.since(), raw.until(), 0)
+                : raw;
         List<ObjectNode> rows = session.events().read(filter, waitMs);
+        if (traffic) {
+            rows = dev.domengine.session.SessionEvents.applyTraffic(rows, request, response, raw.limit());
+        }
         EngineLog.info("observe", "session=" + session.id + " wait_ms=" + waitMs + " count=" + rows.size()
                 + " buffered=" + session.events().size());
         ObjectNode result = Jsons.object();
@@ -712,8 +735,18 @@ public final class DomEngineMain {
                 return flags;
             }
             String name = token.substring(2);
+            int equals = name.indexOf('=');
+            String inline = null;
+            if (equals >= 0) {
+                inline = name.substring(equals + 1);
+                name = name.substring(0, equals);
+            }
             if (isBoolean(name)) {
-                flags.put(name, "true");
+                flags.put(name, inline == null || inline.isBlank() ? "true" : inline);
+                continue;
+            }
+            if (inline != null) {
+                flags.put(name, inline);
                 continue;
             }
             if (i + 1 >= args.size() || args.get(i + 1).startsWith("--")) {
@@ -792,8 +825,10 @@ public final class DomEngineMain {
                 click|type|scroll|submit|key|dblclick|contextclick|drag|eval --session ID
                 screenshot --session ID [--out file.png]
                 observe|wait --file page.html|--session ID --css SELECTOR [--timeout-ms N]
-                observe --session ID|--cdp URL [--type KIND] [--url TEXT] [--since MS] [--until MS] [--limit N] [--wait-ms N]
+                observe --session ID|--cdp URL [--type KIND] [--url TEXT] [--request TEXT] [--response TEXT] [--since MS] [--until MS] [--limit N] [--wait-ms N] [--follow] [--timeout SECONDS]
                   no selector: CDP events the session buffered since attach (network, navigation, console, log)
+                  --request keeps Network.requestWillBeSent. --response keeps response and loading rows. * keeps that kind.
+                  --follow reads the buffer and returns. It does not leave a process. Default timeout is one read.
                 desktop list|attach|walk|query|resolve|close|click|type|snapshot
                   attach --fixture FILE   replays a recorded tree
                   attach --live [--name WINDOW]   Windows UIA, macOS AX, or Linux AT-SPI

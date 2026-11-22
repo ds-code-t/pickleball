@@ -55,6 +55,16 @@ public final class StandardView {
         return text.toString();
     }
 
+    /**
+     * One level of JSON-style escaping ({@code \\} then {@code \"}).
+     * Matching stays on {@link #normalize}; this is only for reply text.
+     */
+    public static String unescapeQuoted(String value) {
+        if (value == null || value.indexOf('\\') < 0) return value;
+        if (!value.contains("\\\"") && !value.contains("\\\\")) return value;
+        return value.replace("\\\\", "\\").replace("\\\"", "\"");
+    }
+
     /** Lower numbers are kept first when a reply is over budget. */
     public static int priority(Map<String, ?> row) {
         String source = text(row, "source");

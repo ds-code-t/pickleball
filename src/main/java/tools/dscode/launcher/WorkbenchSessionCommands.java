@@ -1016,7 +1016,7 @@ public final class WorkbenchSessionCommands {
             if ("lines".equals(view.get("format"))) {
                 printed = tools.dscode.common.agentfast.AgentEnvelope.renderLines(printed);
             }
-            out.println(printed);
+            out.println(QuietWarnings.dropNoise(printed));
         } catch (IOException failure) {
             err.println("Workbench events failed: " + failure.getMessage());
             return 1;

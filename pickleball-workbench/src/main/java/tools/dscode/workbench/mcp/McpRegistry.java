@@ -74,7 +74,8 @@ public final class McpRegistry {
     }
 
     private static Command engineCommand(String name, String description, Function<List<String>, Object> engine) {
-        return new Command(name, description, argumentSchema(name), arguments -> engine.apply(argv(name, arguments)));
+        Map<String, Object> schema = "observe".equals(name) ? observeSchema() : argumentSchema(name);
+        return new Command(name, description, schema, arguments -> engine.apply(argv(name, arguments)));
     }
 
     private static Command agent(String name, String description, WorkbenchServices services, String op) {
@@ -157,6 +158,10 @@ public final class McpRegistry {
         flag(argv, arguments, "text", "--text");
         flag(argv, arguments, "file", "--file");
         flag(argv, arguments, "cdp", "--cdp");
+        flag(argv, arguments, "url", "--url");
+        flag(argv, arguments, "type", "--type");
+        flag(argv, arguments, "request", "--request");
+        flag(argv, arguments, "response", "--response");
         return argv;
     }
 
@@ -186,6 +191,19 @@ public final class McpRegistry {
                 "text", stringProperty("Text for type or observe."),
                 "file", stringProperty("HTML file for an offline command.")
         ));
+    }
+
+    static Map<String, Object> observeSchema() {
+        Map<String, Object> properties = new LinkedHashMap<>();
+        properties.put("argv", Map.of("type", "array", "description", "Flags after observe.", "items", Map.of("type", "string")));
+        properties.put("session", stringProperty("Session id."));
+        properties.put("type", stringProperty("Event kind: Network, console, or log."));
+        properties.put("url", stringProperty("Substring of the event url or text."));
+        properties.put("request", stringProperty("Keep requestWillBeSent rows. * keeps every request."));
+        properties.put("response", stringProperty("Keep response and loading rows. * keeps every response."));
+        properties.put("file", stringProperty("Recorded events file."));
+        properties.put("cdp", stringProperty("CDP endpoint."));
+        return schema(properties);
     }
 
     private static Map<String, Object> schema(Map<String, Object> properties) {

@@ -91,7 +91,7 @@ Reports chrome, session, health, headed, pid, bridge, worker, lease, leaseLeft, 
 
 # help events
 Usage: events [--hooks] [--json] [--cursor=<token>] [--run-id=<id>] [--follow] [--until=<type|text=...>] [--timeout=<seconds>] [--type=<name>] [--echo] [--from=any] [--format=lines|json] [--fields=<a,b>] [--where=<k=v>] [--limit=<n>] [--budget=<bytes>] [--group=type|role] [--priority=on]
---follow tails .pickleball/agent-events.jsonl and exits on the first match. No Workbench session is required. --timeout default 30, max 120. 0 checks once. Own source=agent lines are hidden unless --echo or --from=any.
+--follow tails .pickleball/agent-events.jsonl from the start of the file unless --cursor is set, so early lines are included. It exits on the first match in this process. It does not hop and it does not leave a child process. No Workbench session is required. --timeout default 30, max 120. 0 checks once. Own source=agent lines are hidden unless --echo or --from=any.
 
 # help example
 Usage: example --example=<rows>
@@ -123,7 +123,7 @@ A field is an id, a name, a short id, or the visible label (case and a trailing 
 
 # help frame
 Usage: frame --target=<selector> [--list] [--reset] [--enter=<id|name>]
-Lists frames, returns later steps to the top document, or enters a frame. --reset clears the entered frame and the Selenium driver. --enter scopes later find, act, snap, and inspect to that frame, and enters an iframe with that id, name, or title when the driver can see it. Replies include frame.
+Lists frames, returns later steps to the top document, or enters a frame. --reset clears the entered frame and the page driver. The page engine is Chrome DevTools. --engine=selenium is not supported. --enter scopes later find, act, snap, and inspect to that frame, and enters an iframe with that id, name, or title when the driver can see it. Replies include frame.
 
 # help from-here
 Usage: from-here
@@ -200,7 +200,7 @@ Usage: label --text=<label> [--handle=<id>] [--x=<px>] [--y=<px>] [--width=<px>]
 
 # help launch
 Usage: launch --template=<name> [--arg=<chrome-arg>] [--start] [--run-id=<id>]
-Templates: chrome-headed-verbose, chrome-headed-quiet, chrome-headless-verbose, chrome-headless-quiet, edge-headed-quiet, edge-headless-quiet, chrome-headed-logs, chromium-headed-quiet. Args are added to the existing pkb_browser / Selenium Manager launch. Chromium uses that Chrome launcher. --start calls DriverConstruction.
+Templates: chrome-headed-verbose, chrome-headed-quiet, chrome-headless-verbose, chrome-headless-quiet, edge-headed-quiet, edge-headless-quiet, chrome-headed-logs, chromium-headed-quiet. Args are added to the existing pkb_browser / Selenium Manager launch. Chromium uses that Chrome launcher. --start calls DriverConstruction. The page engine is Chrome DevTools. --engine=selenium is not a browser engine and is rejected.
 
 # help magnifier
 Usage: magnifier [--text=<caption>] [--zoom=<1-8>] [--handle=<id>] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--target=auto|page|popup|native] [--block=true] [--html=<page>]
@@ -209,7 +209,8 @@ Usage: magnifier [--text=<caption>] [--zoom=<1-8>] [--handle=<id>] [--x=<px>] [-
 Usage: note --text=<one line> [--agent=<id>] [--run-id=<id>]
 
 # help observe
-Usage: observe [--type=<Network|console|log>] [--url=<substring>] [--since=<epoch-ms>] [--until=<epoch-ms>] [--limit=<n>] [--wait-ms=<n>] [--events=<file>] [--cdp=<url>] [--session=<id>] [--run-id=<id>]
+Usage: observe [--type=<Network|console|log>] [--url=<substring>] [--request=<substring>] [--response=<substring>] [--since=<epoch-ms>] [--until=<epoch-ms>] [--limit=<n>] [--wait-ms=<n>] [--follow] [--timeout=<seconds>] [--events=<file>] [--cdp=<url>] [--session=<id>] [--run-id=<id>]
+--request keeps Network.requestWillBeSent rows. --response keeps response and loading rows. * keeps every row of that kind. Both flags keep a row that matches either one. --follow reads the current buffer and returns. It does not leave a process. With --follow, --timeout is seconds (default 0, one read, max 120).
 
 # help open-scenario
 Usage: open-scenario --feature=<path-or-name> --name=<scenario> [--example=<rows>]
@@ -273,7 +274,8 @@ Usage: save
 # help selftest
 Usage: selftest ui --cpu [--component=panel]
 selftest ui --component=pages
-Chrome is found on PATH, then Windows LOCALAPPDATA and Program Files, macOS applications, and the usual Linux paths. The idle window is 2000 ms.
+selftest ui --component=feedback
+Chrome is found on PATH, then Windows LOCALAPPDATA and Program Files, macOS applications, and the usual Linux paths. The idle window is 2000 ms. --component=feedback checks sending, delivered, and read in the page runtime. It does not need Chrome.
 
 # help session
 Usage: session list [--json] | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>
@@ -300,7 +302,7 @@ Usage: spotlight [--dim=<0-1>] [--handle=<id>] [--x=<px>] [--y=<px>] [--width=<p
 
 # help start
 Usage: start --url=<page> | --url-key=<URL.key> --browser=<chrome|edge|chrome-headless> [--headed] [--hold=<seconds|forever>] [--panel] [--size=1600x1000] [--env=KEY=VALUE]
-Opens the browser, navigates, and waits until GET /health is ok. fixture: names a built-in page. --panel opens the page panel. live-start is start. The reply includes the agent envelope.
+Opens the browser, navigates, and waits until GET /health is ok. fixture: names a built-in page. --panel opens the page panel. live-start is start. The reply includes the agent envelope. The page engine is Chrome DevTools. --engine=selenium is rejected.
 
 # help status
 Usage: status [command-id] [--json] [--run-id=<id>]

@@ -2866,14 +2866,15 @@ public final class TargetVerb {
             return picked.toString();
         }
         StringBuilder line = new StringBuilder();
-        line.append("- ").append(row.get("role")).append(" \"").append(row.get("name")).append("\"");
+        Object name = row.get("name");
+        Object shown = name instanceof String text ? StandardView.unescapeQuoted(text) : name;
+        line.append("- ").append(row.get("role")).append(" \"").append(shown).append("\"");
         Object ref = row.get("ref");
         Object id = row.get("id");
         boolean hasId = id != null && !String.valueOf(id).isBlank();
-        boolean longRef = ref != null && String.valueOf(ref).length() > 72;
-        if (!hasId || !longRef) {
-            if (ref != null) line.append(" [ref=").append(ref).append("]");
-        }
+        String refText = ref == null ? "" : String.valueOf(ref);
+        boolean omitRef = hasId && (refText.length() > 40 || refText.contains("data:"));
+        if (ref != null && !omitRef) line.append(" [ref=").append(ref).append("]");
         if (hasId) line.append(" id=").append(LineView.token(String.valueOf(id)));
         if (row.get("visible") != null) line.append(" visible=").append(row.get("visible"));
         if (row.get("enabled") != null) line.append(" enabled=").append(row.get("enabled"));
