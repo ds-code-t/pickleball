@@ -23,7 +23,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -113,7 +115,16 @@ class WorkbenchMcpServerTest {
             "workbench_history_query",
             "workbench_entity_lookup",
             "workbench_open_run",
-            "workbench_bridge_health"
+            "workbench_bridge_health",
+            "workbench_snap",
+            "workbench_find",
+            "workbench_act",
+            "workbench_form_fill",
+            "workbench_watch",
+            "workbench_chat_turn",
+            "workbench_execute_steps",
+            "workbench_ui_verify",
+            "workbench_capture_steps"
     );
 
     @TempDir
@@ -554,6 +565,56 @@ class WorkbenchMcpServerTest {
         } finally {
             tools.dscode.workbench.launch.ConsumerReadyForwarder.runner = null;
         }
+    }
+
+    @Test
+    void compactSnapReplyHonorsFieldsAndBudget() {
+        WorkbenchMcpTools tools = new WorkbenchMcpTools(fakeServices((method, args) -> {
+            if (!"agentCommand".equals(method)) return null;
+            List<Map<String, Object>> items = new ArrayList<>();
+            for (int index = 0; index < 40; index++) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("id", "s1.h" + index);
+                row.put("role", "button");
+                row.put("ref", "ref:data:" + "x".repeat(180) + ":" + index);
+                row.put("name", "Row " + index + " " + "y".repeat(80));
+                items.add(row);
+            }
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("v", 1);
+            body.put("ok", true);
+            body.put("op", "snap");
+            body.put("items", items);
+            return body;
+        }), JSON);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> reply = (Map<String, Object>) tools.call("workbench_snap", Map.of(
+                "target", "browser:auto",
+                "fields", "id,role",
+                "budget", "600"
+        ));
+        assertTrue(reply.get("items") instanceof List<?>);
+        List<?> items = (List<?>) reply.get("items");
+        assertFalse(items.isEmpty());
+        assertTrue(items.size() < 40, items.size() + " rows");
+        assertEquals(Boolean.TRUE, reply.get("truncated"));
+        Map<?, ?> first = (Map<?, ?>) items.get(0);
+        assertEquals(List.of("id", "role"), new ArrayList<>(first.keySet()));
+        String json;
+        try {
+            json = JSON.writeValueAsString(reply);
+        } catch (Exception failure) {
+            throw new AssertionError(failure);
+        }
+        assertTrue(json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length <= 600, json);
+    }
+
+    @Test
+    void chatWaitAcceptsANumericTimeout() {
+        assertEquals("12", WorkbenchMcpTools.timeoutText(12));
+        assertEquals("0", WorkbenchMcpTools.timeoutText(0));
+        assertEquals("30", WorkbenchMcpTools.timeoutText("30"));
+        assertThrows(IllegalArgumentException.class, () -> WorkbenchMcpTools.timeoutText(121));
     }
 
     private static WorkbenchServices fakeServices(FakeInvocation invocation) {

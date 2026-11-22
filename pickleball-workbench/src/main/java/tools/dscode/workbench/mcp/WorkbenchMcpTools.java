@@ -94,8 +94,11 @@ final class WorkbenchMcpTools {
 
         add("workbench_request_control",
                 "Request the Workbench live-control lease so this agent can test the live scenario while the human watches.",
-                schema(Map.of("agentName", stringProperty("Display name shown in the Workbench banner.")), "agentName"),
-                args -> services.requestControl(text(args, "agentName")));
+                schema(Map.of("agentName", stringProperty("Display name shown in the Workbench banner. Defaults to agent."))),
+                args -> {
+                    String name = optionalText(args, "agentName");
+                    return services.requestControl(name == null || name.isBlank() ? "agent" : name);
+                });
         add("workbench_release_control",
                 "Release the Workbench live-control lease back to the human.",
                 schema(Map.of()),
@@ -430,18 +433,22 @@ final class WorkbenchMcpTools {
                 "Forward start --url --browser --env. Later page commands target that live session.",
                 schema(Map.of(
                         "url", stringProperty("Page URL."),
-                        "browser", stringProperty("chrome, edge, or chrome-headless."),
+                        "browser", stringProperty("chrome, edge, or chrome-headless. Defaults to chrome."),
                         "env", stringProperty("Optional KEY=VALUE pairs, comma-separated.")
-                ), "url", "browser"),
-                args -> forwardReady(List.of(
-                        "start",
-                        "--url=" + text(args, "url"),
-                        "--browser=" + text(args, "browser"),
-                        "--env=" + blank(optionalText(args, "env"))
-                )));
+                ), "url"),
+                args -> {
+                    String browser = optionalText(args, "browser");
+                    if (browser == null || browser.isBlank()) browser = "chrome";
+                    return forwardReady(List.of(
+                            "start",
+                            "--url=" + text(args, "url"),
+                            "--browser=" + browser,
+                            "--env=" + blank(optionalText(args, "env"))
+                    ));
+                });
         add("workbench_chat_wait",
                 "Forward blocking chat_wait. Returns when a chat message is stored or the timeout elapses.",
-                schema(Map.of("timeout", stringProperty("Seconds to wait, 0 to 120. Default 30."))),
+                schema(Map.of("timeout", timeoutProperty())),
                 args -> forwardReady(waitArgs(args)));
         add("workbench_history_summary",
                 "Forward history-summary. Counts runs, passed, failed, and skipped.",
@@ -450,10 +457,10 @@ final class WorkbenchMcpTools {
         add("workbench_history_query",
                 "Forward history-query. Same read as query. The store is the source of truth.",
                 schema(Map.of(
-                        "op", stringProperty("runs, get, query, search, props, errors, or tail."),
+                        "op", stringProperty("runs, get, query, search, props, errors, or tail. Defaults to query."),
                         "text", stringProperty("Optional words."),
                         "runId", stringProperty("Optional run id.")
-                ), "op"),
+                )),
                 args -> forwardReady(historyQueryArgs(args)));
         add("workbench_entity_lookup",
                 "Forward entity-lookup --ref. Prints the field value.",
@@ -470,6 +477,54 @@ final class WorkbenchMcpTools {
                 "Forward bridge-health. GET /v1/health on the bridge URL.",
                 schema(Map.of("url", stringProperty("Bridge base URL.")), "url"),
                 args -> forwardReady(List.of("bridge-health", "--url=" + text(args, "url"))));
+        Map<String, Object> view = viewProperties();
+        add("workbench_snap",
+                "Compact page snap. items is the only element list. Short ids are the default. fields and budget limit the reply.",
+                schema(view),
+                args -> viewCommand("snap", args));
+        add("workbench_find",
+                "Find elements. items is the hit list. A short id from this reply works as a target.",
+                schema(view),
+                args -> viewCommand("find", args));
+        add("workbench_act",
+                "Act on a target. Accepts a short id, ref, or query. fields and budget limit the reply.",
+                schema(view),
+                args -> viewCommand("act", args));
+        add("workbench_form_fill",
+                "Fill controls by id, short id, or visible label. fields is id=value pairs separated by |.",
+                schema(view),
+                args -> viewCommand("form-fill", args));
+        add("workbench_watch",
+                "Watch page events. fields and budget limit the reply.",
+                schema(view),
+                args -> viewCommand("watch", args));
+        add("workbench_chat_turn",
+                "Send one agent line, then wait for a human message, an answer, or a click.",
+                schema(view),
+                args -> viewCommand("chat-turn", args));
+        add("workbench_execute_steps",
+                "Run a JSON steps file on the shared controller path. Each step is one verb.",
+                schema(Map.of(
+                        "file", stringProperty("Path to the steps JSON."),
+                        "runId", stringProperty("Optional run id."),
+                        "budget", stringProperty("Optional reply byte budget.")
+                ), "file"),
+                args -> {
+                    List<String> verb = new ArrayList<>();
+                    verb.add("execute-steps");
+                    verb.add("--file=" + text(args, "file"));
+                    String runId = optionalText(args, "runId");
+                    if (runId != null && !runId.isBlank()) verb.add("--run-id=" + runId);
+                    return forwardReady(verb);
+                });
+        add("workbench_ui_verify",
+                "Check placed overlay widgets. The reply lists each placement once, under items.",
+                schema(view),
+                args -> viewCommand("ui-verify", args));
+        add("workbench_capture_steps",
+                "Write the steps captured for this run.",
+                schema(view),
+                args -> viewCommand("capture-steps", args));
     }
 
     private Object forwardReady(List<String> verbArgs) {
@@ -485,15 +540,161 @@ final class WorkbenchMcpTools {
     private static List<String> waitArgs(Map<String, Object> args) {
         List<String> verb = new ArrayList<>();
         verb.add("chat_wait");
-        String timeout = optionalText(args, "timeout");
+        String timeout = timeoutText(args.get("timeout"));
         if (timeout != null && !timeout.isBlank()) verb.add("--timeout=" + timeout);
         return verb;
+    }
+
+    /** Seconds from a string or a number. Null when the argument was omitted. */
+    static String timeoutText(Object value) {
+        if (value == null) return null;
+        if (value instanceof Number number) {
+            double raw = number.doubleValue();
+            if (raw < 0 || raw > 120) {
+                throw new IllegalArgumentException("error: workbench_chat_wait timeout is seconds from 0 to 120.");
+            }
+            if (Math.rint(raw) == raw) return Integer.toString(number.intValue());
+            return Double.toString(raw);
+        }
+        if (value instanceof String text && !text.isBlank()) return text.trim();
+        return null;
+    }
+
+    private static Map<String, Object> timeoutProperty() {
+        Map<String, Object> property = new LinkedHashMap<>();
+        property.put("description", "Seconds to wait, 0 to 120. Default 30. A number or a string.");
+        property.put("anyOf", List.of(
+                Map.of("type", "integer"),
+                Map.of("type", "number"),
+                Map.of("type", "string")
+        ));
+        return property;
+    }
+
+    private static Map<String, Object> viewProperties() {
+        Map<String, Object> view = new LinkedHashMap<>();
+        view.put("target", stringProperty("browser:auto, a ref, or a short id."));
+        view.put("query", stringProperty("Visible text or selector."));
+        view.put("ref", stringProperty("Full ref or short id."));
+        view.put("fields", stringProperty("Comma-separated reply fields, or form-fill id=value pairs."));
+        view.put("budget", stringProperty("Maximum reply bytes. The reply is truncated under this cap."));
+        view.put("format", stringProperty("lines or json."));
+        view.put("limit", stringProperty("Maximum rows."));
+        view.put("where", stringProperty("Row filter such as role=button."));
+        view.put("within", stringProperty("Snap scope: ref, short id, or element id."));
+        view.put("kind", stringProperty("act kind: click, type, hover, press, or select."));
+        view.put("value", stringProperty("Value for type or select."));
+        view.put("text", stringProperty("chat-turn text."));
+        view.put("timeout", stringProperty("Seconds to wait."));
+        view.put("until", stringProperty("Watch or chat-turn condition."));
+        view.put("pick", stringProperty("Index, name, or role such as role=button."));
+        view.put("runId", stringProperty("Optional run id."));
+        view.put("mode", stringProperty("snap mode: compact, diff, or full."));
+        view.put("out", stringProperty("Optional capture path."));
+        return view;
+    }
+
+    private Object viewCommand(String op, Map<String, Object> args) {
+        Map<String, String> forwarded = viewFlags(args);
+        Object value = services.agentCommand(op, forwarded);
+        if (!(value instanceof Map<?, ?> raw)) return Map.of("status", "UNAVAILABLE", "op", op);
+        Map<String, Object> body = new LinkedHashMap<>();
+        raw.forEach((key, item) -> {
+            if (key != null) body.put(String.valueOf(key), item);
+        });
+        String fields = forwarded.get("fields");
+        if (fields != null && !fields.isBlank() && !"form-fill".equals(op) && body.get("items") instanceof List<?> list
+                && !list.isEmpty() && list.get(0) instanceof Map<?, ?>) {
+            List<String> names = new ArrayList<>();
+            for (String part : fields.split(",")) {
+                if (!part.isBlank()) names.add(part.trim());
+            }
+            List<Map<String, Object>> rows = new ArrayList<>();
+            for (Object item : list) {
+                if (!(item instanceof Map<?, ?> map)) continue;
+                Map<String, Object> row = new LinkedHashMap<>();
+                for (String name : names) {
+                    if (map.containsKey(name)) row.put(name, map.get(name));
+                }
+                rows.add(row);
+            }
+            body.put("items", rows);
+        }
+        int budget = budgetOf(forwarded.get("budget"));
+        if (budget > 0 && fitJson(body, budget)) body.put("truncated", true);
+        return body;
+    }
+
+    private static int budgetOf(String raw) {
+        if (raw == null || raw.isBlank()) return 0;
+        try {
+            int bytes = Integer.parseInt(raw.trim());
+            if (bytes < 1) return 0;
+            return Math.min(16 * 1024, bytes);
+        } catch (NumberFormatException failure) {
+            return 0;
+        }
+    }
+
+    /** Drops trailing items until the JSON object fits, including the last row. */
+    static boolean fitJson(Map<String, Object> body, int maxBytes) {
+        if (body == null || maxBytes < 1) return false;
+        boolean trimmed = false;
+        int guard = 0;
+        while (jsonBytes(body) > maxBytes && guard++ < 10_000) {
+            Object items = body.get("items");
+            if (!(items instanceof List<?> list) || list.isEmpty()) break;
+            if (list.size() == 1 && list.get(0) instanceof String text && text.length() > 24) {
+                int room = Math.max(8, Math.min(text.length() - 1, Math.max(8, maxBytes / 4)));
+                String clip = text.substring(0, Math.min(text.length(), room));
+                if (clip.length() > 3 && clip.length() < text.length()) {
+                    body.put("items", List.of(clip.substring(0, clip.length() - 3) + "..."));
+                    trimmed = true;
+                    continue;
+                }
+            }
+            body.put("items", new ArrayList<>(list.subList(0, list.size() - 1)));
+            trimmed = true;
+        }
+        return trimmed;
+    }
+
+    private static int jsonBytes(Map<String, Object> body) {
+        try {
+            return new ObjectMapper().writeValueAsString(body).getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+        } catch (java.io.IOException failure) {
+            return Integer.MAX_VALUE;
+        }
+    }
+
+    private static Map<String, String> viewFlags(Map<String, Object> args) {
+        Map<String, String> forwarded = new LinkedHashMap<>();
+        if (args == null) return forwarded;
+        for (String key : List.of(
+                "target", "query", "ref", "fields", "budget", "format", "limit", "where", "within",
+                "kind", "value", "text", "timeout", "until", "pick", "mode", "out", "channel"
+        )) {
+            String value = optionalAny(args, key);
+            if (value != null && !value.isBlank()) forwarded.put(key, value);
+        }
+        String runId = optionalAny(args, "runId");
+        if (runId != null && !runId.isBlank()) forwarded.put("run-id", runId);
+        return forwarded;
+    }
+
+    private static String optionalAny(Map<String, Object> args, String name) {
+        Object value = args.get(name);
+        if (value == null) return null;
+        if (value instanceof String text) return text.isBlank() ? null : text;
+        if (value instanceof Number || value instanceof Boolean) return String.valueOf(value);
+        return null;
     }
 
     private static List<String> historyQueryArgs(Map<String, Object> args) {
         List<String> verb = new ArrayList<>();
         verb.add("history-query");
-        verb.add(text(args, "op"));
+        String op = optionalText(args, "op");
+        verb.add(op == null || op.isBlank() ? "query" : op);
         String words = optionalText(args, "text");
         if (words != null && !words.isBlank()) verb.add("--text=" + words);
         String runId = optionalText(args, "runId");
