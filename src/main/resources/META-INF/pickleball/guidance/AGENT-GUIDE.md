@@ -65,7 +65,7 @@ Disposable FTS5 `reports/diagnostic-runs/diagnostics.db` (table `record_fts`). J
 
 A down controller runs in-process (no 30s wait, Windows too). `controller-start` is one JVM. `export-guidance --warm` pings under 1 s.
 
-Replies are one envelope (v, ok, op, ms, state, sum, items, next, trunc, err). `items` is the one list. Short id s1.h42 is the default target; `ref` expands it. `--fields` keeps those keys. `--budget` caps the JSON and sets trunc.on. `next` is per channel (`--cursor`). Push rows have sessionId. `validate` lists empty glue.
+Replies are one envelope (v, ok, op, ms, state, sum, items, next, trunc, err). `items` is the one list. Short id s1.h42 is the target; `ref` expands it. MCP session shares that host. `--fields` keeps those keys. `--budget` caps the JSON and sets trunc.on. `next` is per channel (`--cursor`). Push rows have sessionId. `validate` lists empty glue.
 
 ## Generated guidance lifecycle
 

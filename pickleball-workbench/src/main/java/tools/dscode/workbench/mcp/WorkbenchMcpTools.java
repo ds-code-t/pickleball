@@ -171,14 +171,15 @@ final class WorkbenchMcpTools {
                 )),
                 args -> services.events(longValue(args, "afterSequence"), integer(args, "limit")));
         add("workbench_browser_page",
-                "Compact snap of the current page. Same rows as snap. fields and budget keep the reply small.",
+                "Compact snap of the live start host or isolate worker. Same rows as snap. Pass session to choose that id. A live session does not need a separate paused worker.",
                 schema(Map.of(
                         "target", stringProperty("browser:auto, a ref, or a short id. Default browser:auto."),
+                        "session", stringProperty("Session id from start or isolate. Omit to use the current live session."),
                         "fields", stringProperty("Comma-separated reply fields."),
-                        "budget", stringProperty("Maximum reply bytes. Default 2048."),
+                        "budget", cliNumber("Maximum reply bytes. Default 2048. A number or a string."),
                         "format", stringProperty("lines or json. Default json."),
                         "where", stringProperty("Row filter such as role=button."),
-                        "limit", stringProperty("Maximum rows.")
+                        "limit", cliNumber("Maximum rows. A number or a string.")
                 )),
                 args -> {
                     Map<String, Object> call = new LinkedHashMap<>();
@@ -503,7 +504,7 @@ final class WorkbenchMcpTools {
                 args -> forwardReady(List.of("bridge-health", "--url=" + text(args, "url"))));
         Map<String, Object> view = viewProperties();
         add("workbench_snap",
-                "Compact page snap. items is the only element list. Short ids are the default. fields and budget limit the reply.",
+                "Compact page snap on the live start host or isolate worker. Pass session to use that id. items is the only element list. Short ids are the default.",
                 schema(view),
                 args -> viewCommand("snap", args));
         add("workbench_find",
@@ -734,27 +735,34 @@ final class WorkbenchMcpTools {
     private static Map<String, Object> viewProperties() {
         Map<String, Object> view = new LinkedHashMap<>();
         view.put("target", stringProperty("browser:auto, a ref, or a short id."));
+        view.put("session", stringProperty("Session id from start or isolate. Omit to use the current live session."));
         view.put("query", stringProperty("Visible text or selector."));
         view.put("ref", stringProperty("Full ref or short id."));
         view.put("fields", stringProperty("Comma-separated reply fields, or form-fill id=value pairs."));
-        view.put("budget", stringProperty("Maximum reply bytes. The reply is truncated under this cap."));
+        view.put("budget", cliNumber("Maximum reply bytes. The reply is truncated under this cap. A number or a string."));
         view.put("format", stringProperty("lines or json."));
-        view.put("limit", stringProperty("Maximum rows."));
+        view.put("limit", cliNumber("Maximum rows. A number or a string."));
         view.put("where", stringProperty("Row filter such as role=button."));
         view.put("within", stringProperty("Snap scope: ref, short id, or element id."));
+        view.put("depth", cliNumber("Levels under --within. A number or a string."));
+        view.put("group", stringProperty("role or type."));
+        view.put("priority", stringProperty("on to order controls."));
         view.put("kind", stringProperty("act kind: click, type, hover, press, or select."));
         view.put("value", stringProperty("Value for type or select."));
         view.put("text", stringProperty("chat-turn text."));
-        view.put("timeout", stringProperty("Seconds to wait."));
+        view.put("timeout", cliNumber("Seconds to wait. A number or a string."));
         view.put("until", stringProperty("Watch or chat-turn condition."));
         view.put("pick", stringProperty("Index, name, or role such as role=button."));
         view.put("runId", stringProperty("Optional run id."));
         view.put("mode", stringProperty("snap mode: compact, diff, or full."));
         view.put("out", stringProperty("Optional capture path."));
+        view.put("frame", stringProperty("Frame id."));
+        view.put("condition", stringProperty("Wait or act condition."));
         return view;
     }
 
     private Object viewCommand(String op, Map<String, Object> args) {
+        checkView(args);
         Map<String, String> forwarded = viewFlags(args);
         Object value = services.agentCommand(op, forwarded);
         if (!(value instanceof Map<?, ?> raw)) return Map.of("status", "UNAVAILABLE", "op", op);
@@ -840,22 +848,98 @@ final class WorkbenchMcpTools {
         Map<String, String> forwarded = new LinkedHashMap<>();
         if (args == null) return forwarded;
         for (String key : List.of(
-                "target", "query", "ref", "fields", "budget", "format", "limit", "where", "within",
-                "kind", "value", "text", "timeout", "until", "pick", "mode", "out", "channel"
+                "target", "session", "query", "ref", "fields", "budget", "format", "limit", "where", "within",
+                "depth", "group", "priority", "kind", "value", "text", "timeout", "until", "pick", "mode", "out",
+                "channel", "frame", "condition"
         )) {
             String value = optionalAny(args, key);
             if (value != null && !value.isBlank()) forwarded.put(key, value);
         }
         String runId = optionalAny(args, "runId");
         if (runId != null && !runId.isBlank()) forwarded.put("run-id", runId);
+        if (forwarded.get("session") == null) {
+            String alias = optionalAny(args, "sessionId");
+            if (alias != null && !alias.isBlank()) forwarded.put("session", alias);
+        }
         return forwarded;
+    }
+
+    private static final java.util.Set<String> VIEW_KEYS = java.util.Set.of(
+            "target", "session", "sessionId", "query", "ref", "fields", "budget", "format", "limit", "where",
+            "within", "depth", "group", "priority", "kind", "value", "text", "timeout", "until", "pick",
+            "runId", "mode", "out", "channel", "frame", "condition"
+    );
+
+    /** Rejects a value the CLI would not accept. Numbers and strings are both valid. */
+    private static void checkView(Map<String, Object> args) {
+        if (args == null || args.isEmpty()) return;
+        String tool = CURRENT_TOOL.get();
+        if (tool == null || tool.isBlank()) tool = "workbench tool";
+        for (Map.Entry<String, Object> entry : args.entrySet()) {
+            String key = entry.getKey();
+            if (key == null || !VIEW_KEYS.contains(key)) {
+                throw new IllegalArgumentException(
+                        "error: " + tool + " does not accept " + key + ".\n"
+                                + "fix: Use the same flags as the CLI verb. session is the start or isolate id."
+                );
+            }
+            Object value = entry.getValue();
+            if (value == null) continue;
+            if (!(value instanceof String) && !(value instanceof Number) && !(value instanceof Boolean)) {
+                throw new IllegalArgumentException(
+                        "error: " + key + " must be a string, number, or boolean.\n"
+                                + "fix: Pass the same value the CLI flag accepts."
+                );
+            }
+        }
+        whole(args.get("budget"), "budget");
+        whole(args.get("limit"), "limit");
+        whole(args.get("timeout"), "timeout");
+        whole(args.get("depth"), "depth");
+        Object format = args.get("format");
+        if (format instanceof String text && !text.isBlank()
+                && !"lines".equals(text.trim()) && !"json".equals(text.trim())) {
+            throw new IllegalArgumentException(
+                    "error: format must be lines or json.\nfix: Pass format as \"lines\" or \"json\"."
+            );
+        }
+    }
+
+    private static void whole(Object value, String name) {
+        if (value == null) return;
+        if (value instanceof Boolean) {
+            throw new IllegalArgumentException(
+                    "error: " + name + " must be a whole number.\nfix: Pass " + name + " as 600 or \"600\"."
+            );
+        }
+        if (value instanceof Number number) {
+            double raw = number.doubleValue();
+            if (!Double.isFinite(raw) || raw != Math.rint(raw)) {
+                throw new IllegalArgumentException(
+                        "error: " + name + " must be a whole number.\nfix: Pass " + name + " as 600 or \"600\"."
+                );
+            }
+            return;
+        }
+        if (value instanceof String text) {
+            String trimmed = text.trim();
+            if (trimmed.isEmpty() || trimmed.matches("-?\\d+")) return;
+        }
+        throw new IllegalArgumentException(
+                "error: " + name + " must be a whole number.\nfix: Pass " + name + " as 600 or \"600\"."
+        );
     }
 
     private static String optionalAny(Map<String, Object> args, String name) {
         Object value = args.get(name);
         if (value == null) return null;
         if (value instanceof String text) return text.isBlank() ? null : text;
-        if (value instanceof Number || value instanceof Boolean) return String.valueOf(value);
+        if (value instanceof Number number) {
+            double raw = number.doubleValue();
+            if (Double.isFinite(raw) && raw == Math.rint(raw)) return Long.toString(number.longValue());
+            return String.valueOf(raw);
+        }
+        if (value instanceof Boolean) return String.valueOf(value);
         return null;
     }
 
@@ -1016,6 +1100,8 @@ final class WorkbenchMcpTools {
             return result(value, false);
         } catch (ToolFailure failure) {
             return result(failure.body, true);
+        } catch (IllegalArgumentException failure) {
+            return result(usageBody(failure.getMessage()), true);
         } catch (RuntimeException failure) {
             return result(Map.of(
                     "error", failure.getClass().getSimpleName(),
@@ -1044,6 +1130,37 @@ final class WorkbenchMcpTools {
         if (required.length > 0) schema.put("required", List.of(required));
         schema.put("additionalProperties", false);
         return schema;
+    }
+
+    private static Map<String, Object> usageBody(String message) {
+        String text = message == null ? "invalid arguments" : message.strip();
+        String error = text;
+        String fix = "";
+        if (text.startsWith("error:")) {
+            int fixAt = text.indexOf("\nfix:");
+            if (fixAt >= 0) {
+                error = text.substring("error:".length(), fixAt).trim();
+                fix = text.substring(fixAt + "\nfix:".length()).trim();
+            } else {
+                error = text.substring("error:".length()).trim();
+            }
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("ok", false);
+        body.put("error", error);
+        if (!fix.isBlank()) body.put("fix", fix);
+        return body;
+    }
+
+    private static Map<String, Object> cliNumber(String description) {
+        Map<String, Object> property = new LinkedHashMap<>();
+        property.put("description", description);
+        property.put("anyOf", List.of(
+                Map.of("type", "integer"),
+                Map.of("type", "number"),
+                Map.of("type", "string")
+        ));
+        return property;
     }
 
     private static Map<String, Object> stringProperty(String description) {

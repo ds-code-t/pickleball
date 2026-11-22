@@ -6,6 +6,7 @@ import tools.dscode.workbench.terminal.WorkerLogFiles;
 
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -193,12 +194,41 @@ public final class WorkbenchLiveSession implements AutoCloseable {
     }
 
     public Map<String, Object> agentCommand(Path project, String op, Map<String, String> args) {
-        Map<String, String> values = args == null ? Map.of() : args;
+        Map<String, String> values = args == null ? new LinkedHashMap<>() : new LinkedHashMap<>(args);
+        Path root = project == null ? projectRoot : project;
+        String session = first(values, "session", "sessionId", "session-id");
+        boolean named = session != null && !session.isBlank();
+        Optional<LiveSessionAttach.Attached> attached = LiveSessionAttach.resolve(root, session, named);
+        if (attached.isPresent()) {
+            values.remove("session");
+            values.remove("sessionId");
+            values.remove("session-id");
+            String runId = first(values, "runId", "run", "run-id");
+            if (runId == null || runId.isBlank()) runId = attached.get().bridge().sessionId();
+            LiveSessionAttach.Posted posted = LiveSessionAttach.post(
+                    attached.get().bridge(),
+                    op,
+                    values,
+                    List.of(),
+                    root,
+                    runId,
+                    first(values, "agent", "agentId")
+            );
+            return postedBody(op, posted);
+        }
+        if (named) {
+            Map<String, Object> missing = new LinkedHashMap<>();
+            missing.put("ok", false);
+            missing.put("op", op == null ? "" : op);
+            missing.put("error", "unknown session: " + session);
+            missing.put("fix", "use the session id printed by start or isolate");
+            return missing;
+        }
         return call(binding -> {
             var result = binding.client().agentCommand(
                     op,
                     values,
-                    project == null ? projectRoot.toString() : project.toString(),
+                    root.toString(),
                     first(values, "runId", "run"),
                     first(values, "agent", "agentId")
             );
@@ -207,6 +237,40 @@ public final class WorkbenchLiveSession implements AutoCloseable {
             }
             return result.body();
         });
+    }
+
+    private static Map<String, Object> postedBody(String op, LiveSessionAttach.Posted posted) {
+        if (posted.error() != null && !posted.error().isBlank()) {
+            Map<String, Object> failed = new LinkedHashMap<>();
+            failed.put("ok", false);
+            failed.put("op", op == null ? "" : op);
+            failed.put("error", posted.error());
+            failed.put("fix", "run start or isolate, then pass that session id");
+            return failed;
+        }
+        try {
+            Object parsed = JsonLite.parse(
+                    posted.bodyJson() == null || posted.bodyJson().isBlank() ? "{}" : posted.bodyJson()
+            );
+            Map<String, Object> body = JsonLite.object(parsed);
+            if (body == null) {
+                Map<String, Object> raw = new LinkedHashMap<>();
+                raw.put("op", op == null ? "" : op);
+                raw.put("status", "UNAVAILABLE");
+                raw.put("text", posted.bodyJson() == null ? "" : posted.bodyJson());
+                return raw;
+            }
+            if (!body.containsKey("ok")) body.put("ok", posted.exit() == 0);
+            body.put("exit", posted.exit());
+            return body;
+        } catch (RuntimeException failure) {
+            Map<String, Object> failed = new LinkedHashMap<>();
+            failed.put("ok", false);
+            failed.put("op", op == null ? "" : op);
+            failed.put("error", "live session returned unreadable JSON");
+            failed.put("fix", "run start or isolate again");
+            return failed;
+        }
     }
 
     private static String first(Map<String, String> values, String... keys) {

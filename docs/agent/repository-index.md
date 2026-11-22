@@ -121,6 +121,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-roadmap-2-scoreboard.md`
 - `docs/maintainer/3.0.0-roadmap-3-readability-scoreboard.md`
 - `docs/maintainer/3.0.0-roadmap-3-scoreboard.md`
+- `docs/maintainer/3.0.0-roadmap-4-mcp-session-scoreboard.md`
 - `docs/maintainer/3.0.0-roadmap-4-scoreboard.md`
 - `docs/maintainer/3.0.0-roadmap-5-scoreboard.md`
 - `docs/maintainer/3.0.0-roadmap-6-scoreboard.md`
@@ -1072,6 +1073,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/Release218RecommendationsTest.java`
 - `src/test/java/tools/dscode/launcher/SecretRedactionTest.java`
 - `src/test/java/tools/dscode/launcher/SessionHealthWaitTest.java`
+- `src/test/java/tools/dscode/launcher/SharedSessionCliTest.java`
 - `src/test/java/tools/dscode/launcher/SnapBudgetTest.java`
 - `src/test/java/tools/dscode/launcher/SnapshotDiffOnActTest.java`
 - `src/test/java/tools/dscode/launcher/StartDrivesPageTest.java`
@@ -1383,6 +1385,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/LeaseClock.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/LiveBridgeFile.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/LiveHostFile.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/LiveSessionAttach.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/NoopNotice.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/OutputFormatter.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/PickleballArtifactLocator.java`
@@ -1419,6 +1422,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/EngineKeyRemovedTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/ExampleRowSelectorTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/FailureRecordTest.java`
+- `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/LiveSessionAttachTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/OpenerQuoteTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/PickleballPathsTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/RunConfigsTest.java`
@@ -1556,6 +1560,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/log/LogCliForwarderTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mapping/MappingValueCodecTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/popup/PopupMcpCommandsTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/SharedSessionMcpTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/ui/WorkbenchUiToolsTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchAttachServerProgressTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchAttachServerTest.java`

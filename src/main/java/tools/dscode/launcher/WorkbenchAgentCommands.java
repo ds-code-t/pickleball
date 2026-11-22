@@ -2126,7 +2126,7 @@ public final class WorkbenchAgentCommands {
         List<String> extra = new ArrayList<>();
         // extra is filled below; the live-worker post uses the same maps.
         java.util.Optional<tools.dscode.control.protocol.LiveBridgeFile.Bridge> liveBridge =
-                livePageTarget(parsed.project());
+                livePageTarget(parsed.project(), args.get("session"));
         String[] forwarded = parsed.forwarded();
         if (forwarded != null) {
             for (int index = 0; index < forwarded.length; index++) {
@@ -2265,24 +2265,12 @@ public final class WorkbenchAgentCommands {
         return WorkbenchCliHelp.usageError(text, command);
     }
 
-    private static java.util.Optional<tools.dscode.control.protocol.LiveBridgeFile.Bridge> livePageTarget(java.nio.file.Path project) {
-        java.util.Optional<tools.dscode.control.protocol.LiveBridgeFile.Bridge> worker =
-                tools.dscode.control.protocol.LiveBridgeFile.read(project);
-        if (worker.isPresent() && alivePid(worker.get().pid())) return worker;
-        java.util.Optional<tools.dscode.control.protocol.LiveHostFile.Host> host =
-                tools.dscode.control.protocol.LiveHostFile.read(project);
-        if (host.isEmpty() || !alivePid(host.get().pid())) return java.util.Optional.empty();
-        tools.dscode.control.protocol.LiveHostFile.Host found = host.get();
-        String hostName = "127.0.0.1";
-        try {
-            java.net.URI uri = java.net.URI.create(found.url());
-            if (uri.getHost() != null && !uri.getHost().isBlank()) hostName = uri.getHost();
-        } catch (RuntimeException ignored) {
-            // The stored url is still the health base the parent wrote.
-        }
-        return java.util.Optional.of(new tools.dscode.control.protocol.LiveBridgeFile.Bridge(
-                hostName, found.port(), found.token(), found.pid(), found.sessionId()
-        ));
+    private static java.util.Optional<tools.dscode.control.protocol.LiveBridgeFile.Bridge> livePageTarget(
+            java.nio.file.Path project,
+            String sessionId
+    ) {
+        return tools.dscode.control.protocol.LiveSessionAttach.resolve(project, sessionId, false)
+                .map(tools.dscode.control.protocol.LiveSessionAttach.Attached::bridge);
     }
 
     private static boolean alivePid(long pid) {

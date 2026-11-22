@@ -2,6 +2,8 @@
 
 ## 3.0.0
 
+Shared session. MCP view tools (`workbench_snap`, `workbench_find`, `workbench_act`, `workbench_form_fill`, `workbench_watch`, `workbench_chat_turn`, `workbench_ui_verify`, `workbench_capture_steps`, `workbench_browser_page`) attach to the same live `start` host or isolate worker the CLI uses. Pass `session` or `sessionId`. A live session does not need a separate paused interactive worker. MCP does not fall through when that id is unknown (`error: unknown session`). CLI `--session` does fall back to the current live session, so an engine id on `observe` still reaches the worker. With no id, the worker wins when it is alive, otherwise the start host. `budget`, `limit`, `timeout`, and `depth` accept a whole number or the same digits as a string. `execute-step` still needs the paused worker.
+
 Snap names. A snap row and a find hit share one name: the accessible name when the browser has one, otherwise the visible text, `aria-label`, `aria-labelledby`, `alt`, `title`, the `<label for>` text, the placeholder, or a button value. The name is clipped at 80 characters. An anchor with no explicit role is `link`.
 
 Format views. `--format=lines` prints each item as a readable line, not a raw JSON object, for snap, find, and ui-poll. `--format=json` returns object items, including a snap row with `name` and `role`. The default snap print stays JSON of the line strings. `--fields`, `--where`, `--limit`, and `--budget` still apply.
