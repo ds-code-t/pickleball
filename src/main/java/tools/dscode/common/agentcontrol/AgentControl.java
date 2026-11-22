@@ -632,7 +632,7 @@ public final class AgentControl {
             if (!choices.isEmpty()) spec.put("choices", choices);
         }
         if (!PageSurfaces.hasLivePage()) return fail(1, "ask needs a live browser page; run launch first");
-        if (present(args.get("handle"))) spec.put("t", args.get("handle").trim());
+        if (present(args.get("handle"))) spec.put("t", expandHandle(args.get("handle")));
         if ("true".equalsIgnoreCase(String.valueOf(args.get("sensitive")))) spec.put("sensitive", true);
         String reply = PageSurfaces.runtimeCall("ask", spec, true);
         if (reply == null || "null".equals(reply)) return fail(1, "ask did not show on the page");
@@ -1109,7 +1109,7 @@ public final class AgentControl {
     }
 
     private static Result unhighlight(Path project, String runId, Map<String, String> args) throws Exception {
-        Map<String, Object> cleared = PageSurfaces.unhighlight(explicitPage(project, args), args.get("handle"));
+        Map<String, Object> cleared = PageSurfaces.unhighlight(explicitPage(project, args), expandHandle(args.get("handle")));
         cleared.put("ok", true);
         return new Result(0, cleared);
     }
@@ -1135,7 +1135,7 @@ public final class AgentControl {
         Map<String, Object> placed = PageSurfaces.place(
                 explicitPage(project, args),
                 "append",
-                args.get("handle"),
+                expandHandle(args.get("handle")),
                 args.get("where"),
                 args.get("text"),
                 "overlay",
@@ -1187,7 +1187,7 @@ public final class AgentControl {
             width = arrow.width();
             height = arrow.height();
             args = new LinkedHashMap<>(args);
-            String anchor = present(args.get("handle")) ? args.get("handle") : args.get("from");
+            String anchor = present(args.get("handle")) ? expandHandle(args.get("handle")) : expandHandle(args.get("from"));
             if (present(anchor)) args.put("anchor", anchor.trim());
             handle = null;
             geometry = arrow.resolved()
@@ -1611,7 +1611,7 @@ public final class AgentControl {
         Map<String, Object> placed = PageSurfaces.place(
                 explicitPage(project, args),
                 op,
-                args.get("handle"),
+                expandHandle(args.get("handle")),
                 args.get("where"),
                 args.get("text"),
                 "html",
@@ -1693,9 +1693,11 @@ public final class AgentControl {
         return new Result(exit, body);
     }
 
-    /** A short id or ref becomes the page handle ui-apply would resolve. Other handles stay as given. */
+    /** A short id or ref becomes the element id or {@code frame:backend}, never the accessible name. */
     private static String expandHandle(String handle) {
         if (!present(handle)) return handle;
+        String placed = tools.dscode.common.agentfast.TargetVerb.placementHandle(handle);
+        if (placed != null && !placed.isBlank()) return placed;
         String selector = tools.dscode.common.agentfast.TargetHandles.selector(handle);
         String lookup = selector;
         if (lookup == null || lookup.isBlank()) {

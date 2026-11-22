@@ -462,18 +462,26 @@ final class PageSurfaces {
             throw new IllegalStateException("no live browser; " + kind + " was not applied");
         }
         if (visual && liveOnly && handle != null && !handle.isBlank() && !resolved(handle)) {
-            String selector = tools.dscode.common.agentfast.TargetHandles.selector(handle);
-            if (selector != null && !selector.isBlank()) {
-                try {
-                    String found = UiBatch.resolve(selector);
-                    if (found != null && !found.isBlank()) handle = found;
-                } catch (Exception ignored) {
-                    // The live lookup below still reports unknown handle.
+            String placed = tools.dscode.common.agentfast.TargetVerb.placementHandle(handle);
+            if (placed != null && !placed.isBlank()) handle = placed;
+            else {
+                String selector = tools.dscode.common.agentfast.TargetHandles.selector(handle);
+                if (selector != null && !selector.isBlank()) {
+                    try {
+                        String found = UiBatch.resolve(selector);
+                        if (found != null && !found.isBlank()) handle = found;
+                    } catch (Exception ignored) {
+                        // The live lookup below still reports unknown handle.
+                    }
                 }
+            }
+            HandleRef ranked = parseHandle(handle);
+            if (ranked.backend != null && !resolved(handle) && !locateLiveHandle(handle)) {
+                rememberRankedBox(handle, ranked.backend);
             }
         }
         if (visual && liveOnly && handle != null && !handle.isBlank() && !resolved(handle) && !locateLiveHandle(handle)) {
-            throw new IllegalArgumentException("unknown handle: " + handle);
+            if (parseHandle(handle).backend == null) throw new IllegalArgumentException("unknown handle: " + handle);
         }
         SurfaceBox.View box = visual ? chooseBox(handle, geometryJson, x, y, width, height) : null;
         int[] point = visual
@@ -1265,6 +1273,78 @@ final class PageSurfaces {
             current = current.getCause();
         }
         return false;
+    }
+
+    static boolean rankedHandle(String handle) {
+        HandleRef parsed = parseHandle(handle);
+        return parsed.backend != null;
+    }
+
+    private static boolean canBridge(WebDriver web) {
+        return cdpCapable(web) || direct(web) != null;
+    }
+
+    /** Viewport box for {@code frame:backend}, so a placement is not rejected before the bridge runs. */
+    private static boolean rememberRankedBox(String handle, int backend) {
+        WebDriver web = driver;
+        if (web == null && !managed().isEmpty()) web = managed().get(managed().size() - 1).driver();
+        if (web == null || !canBridge(web)) return false;
+        try {
+            String bridge = bridgeBackend(web, backend);
+            if (bridge != null && web instanceof JavascriptExecutor executor) {
+                Object value = executor.executeScript(
+                        "var h=arguments[0];"
+                                + "var el=document.querySelector('[data-pkb-bridge=\"'+CSS.escape(h)+'\"]');"
+                                + "if(!el||!el.getBoundingClientRect) return null;"
+                                + "el.removeAttribute('data-pkb-bridge');"
+                                + "var r=el.getBoundingClientRect();"
+                                + "return {x:r.x,y:r.y,w:r.width,h:r.height};",
+                        bridge
+                );
+                if (value instanceof Map<?, ?> map) {
+                    rememberBounds(
+                            handle,
+                            coordinate(map.get("x")),
+                            coordinate(map.get("y")),
+                            coordinate(map.get("w")),
+                            coordinate(map.get("h")),
+                            web,
+                            currentHandle(web)
+                    );
+                    return true;
+                }
+            }
+            Object model = cdp(web, "DOM.getBoxModel", Map.of("backendNodeId", backend));
+            double[] box = boxOf(model);
+            if (box == null) return false;
+            rememberBounds(handle, box[0], box[1], box[2], box[3], web, currentHandle(web));
+            return true;
+        } catch (RuntimeException failure) {
+            return false;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static double[] boxOf(Object model) {
+        if (!(model instanceof Map<?, ?> root)) return null;
+        Object body = root.get("model") instanceof Map<?, ?> nested ? root.get("model") : root;
+        if (!(body instanceof Map<?, ?> map)) return null;
+        Object content = map.get("content");
+        if (!(content instanceof List<?> quad) || quad.size() < 8) return null;
+        double minX = Double.POSITIVE_INFINITY;
+        double minY = Double.POSITIVE_INFINITY;
+        double maxX = Double.NEGATIVE_INFINITY;
+        double maxY = Double.NEGATIVE_INFINITY;
+        for (int i = 0; i + 1 < quad.size(); i += 2) {
+            double x = coordinate(quad.get(i));
+            double y = coordinate(quad.get(i + 1));
+            minX = Math.min(minX, x);
+            minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x);
+            maxY = Math.max(maxY, y);
+        }
+        if (minX == Double.POSITIVE_INFINITY) return null;
+        return new double[]{minX, minY, Math.max(0, maxX - minX), Math.max(0, maxY - minY)};
     }
 
     private static boolean cdpCapable(WebDriver web) {
@@ -2250,7 +2330,7 @@ final class PageSurfaces {
         spec.put("id", id == null ? "" : id);
         spec.put("measure", measure);
         if (ref.backend != null) spec.put("backend", ref.backend);
-        if (ref.backend != null && cdpCapable(current)) {
+        if (ref.backend != null && canBridge(current)) {
             String bridge = bridgeBackend(current, ref.backend);
             if (bridge != null) spec.put("bridge", bridge);
         }

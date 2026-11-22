@@ -117,13 +117,17 @@ final class UiBatch {
         if (target == null || target.isBlank()) return null;
         String t = target.trim();
         if (t.startsWith("h:")) t = t.substring(2);
-        if (t.startsWith("ref:")) {
+        String placed = tools.dscode.common.agentfast.TargetVerb.placementHandle(t);
+        if (placed != null && !placed.isBlank()) {
+            if (PageSurfaces.rememberedPoint(placed) != null || PageSurfaces.rankedHandle(placed)) return placed;
+            t = placed;
+        } else if (t.startsWith("ref:")) {
             String selector = tools.dscode.common.agentfast.TargetVerb.anchorSelector(t);
             if (selector == null || selector.isBlank()) return null;
             t = selector;
         }
         if (PageSurfaces.rememberedPoint(t) != null) return t;
-        String raw = PageSurfaces.runtimeCall("resolve", Map.of("t", target.trim()), true);
+        String raw = PageSurfaces.runtimeCall("resolve", Map.of("t", t), true);
         if (raw == null || "null".equals(raw)) return null;
         Map<?, ?> box = AgentStore.JSON.readValue(raw, Map.class);
         String handle = String.valueOf(box.get("h"));

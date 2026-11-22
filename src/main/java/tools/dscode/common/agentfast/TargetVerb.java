@@ -90,6 +90,37 @@ public final class TargetVerb {
         return hit.selector;
     }
 
+    /**
+     * Handle a placement can use for a short id or {@code ref:}.
+     * The element id when that is what snap or find stored, otherwise {@code frame:backend}.
+     * Never the accessible name. Null when this process did not publish the token.
+     */
+    public static String placementHandle(String raw) {
+        Hit hit = published(raw);
+        if (hit == null) return null;
+        String selector = hit.selector == null ? "" : hit.selector.trim();
+        String query = hit.query == null ? "" : hit.query.trim();
+        if (selector.startsWith("#") && selector.length() > 1 && !selector.equals(query)) {
+            return selector.substring(1);
+        }
+        String frame = hit.frameId == null || hit.frameId.isBlank() || "main".equals(hit.frameId) ? "top" : hit.frameId;
+        return frame + ":" + hit.backend;
+    }
+
+    private static Hit published(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        String token = raw.trim();
+        Hit direct = HITS.get(token);
+        if (direct != null) return direct;
+        String expanded = SessionIds.expand(token);
+        if (expanded != null) {
+            Hit hit = HITS.get(expanded);
+            if (hit != null) return hit;
+        }
+        if (!token.startsWith("ref:")) token = "ref:" + token;
+        return HITS.get(token);
+    }
+
     /** Null when {@code target} is a browser or ref this process can open. Otherwise the error text. */
     public static String unavailable(String raw) {
         TargetSelector.Parsed target = TargetSelector.parse(raw);
@@ -111,9 +142,13 @@ public final class TargetVerb {
      * {@code applied} is true only when that page reads back {@code data-pkb-style=style_modified}.
      */
     public static Outcome highlight(String targetRaw, String handle, String css, String runId) {
-        String lookup = handle;
-        String selector = TargetHandles.selector(handle);
-        if (selector != null && !selector.isBlank()) lookup = selector;
+        String lookup = handle == null ? "" : handle;
+        String placed = placementHandle(handle);
+        if (placed != null && !placed.isBlank()) lookup = placed;
+        else {
+            String selector = TargetHandles.selector(handle);
+            if (selector != null && !selector.isBlank()) lookup = selector;
+        }
         TargetSelector.Parsed target = TargetSelector.parse(targetRaw);
         if (target == null || "desktop".equals(target.kind()) || "none".equals(target.kind())) {
             Outcome failed = fail("highlight", "unknown target");
@@ -124,6 +159,7 @@ public final class TargetVerb {
         CdpConnection cdp = page.session.connection();
         try {
             String sentence = tools.dscode.browser.SurfaceAssets.sentence("highlight");
+            if (ranked(lookup)) return paintRanked(cdp, runId, target, handle, lookup, css, sentence);
             String script = "(function(){"
                     + "var handle=" + jsString(lookup) + ",css=" + jsString(css) + ",sentence=" + jsString(sentence) + ";"
                     + "var el=document.getElementById(handle);"
@@ -180,6 +216,65 @@ public final class TargetVerb {
         } finally {
             page.release();
         }
+    }
+
+    private static boolean ranked(String handle) {
+        if (handle == null) return false;
+        int colon = handle.lastIndexOf(':');
+        if (colon <= 0 || colon >= handle.length() - 1) return false;
+        try {
+            Long.parseLong(handle.substring(colon + 1));
+            return true;
+        } catch (NumberFormatException failure) {
+            return false;
+        }
+    }
+
+    /** Paints a {@code frame:backend} handle. The accessible name is not a selector. */
+    private static Outcome paintRanked(
+            CdpConnection cdp,
+            String runId,
+            TargetSelector.Parsed target,
+            String handle,
+            String lookup,
+            String css,
+            String sentence
+    ) {
+        int colon = lookup.lastIndexOf(':');
+        DomNode node = new DomNode();
+        node.backendNodeId = Long.parseLong(lookup.substring(colon + 1));
+        String frame = lookup.substring(0, colon);
+        String session = frame.isBlank() || "top".equals(frame)
+                ? enteredSession(cdp, runId)
+                : FrameCoverage.sessionId(cdp, frame);
+        if (session == null || session.isBlank()) session = enteredSession(cdp, runId);
+        String function = "function(){var css=" + jsString(css) + ",sentence=" + jsString(sentence) + ";"
+                + "if(!this||this.nodeType!==1) return '';"
+                + "if(!this.hasAttribute('data-pkb-original-style')) this.setAttribute('data-pkb-original-style', this.getAttribute('style')||'');"
+                + "var original=this.getAttribute('data-pkb-original-style')||'';"
+                + "var joined=original; if(joined&&css&&joined.trim().slice(-1)!==';') joined+=';';"
+                + "this.setAttribute('style', joined+css);"
+                + "this.setAttribute('data-pkb-style','style_modified');"
+                + "this.setAttribute('data-pkb-sentence', sentence);"
+                + "this.setAttribute('data-pkb-css', css);"
+                + "return this.getAttribute('data-pkb-style');}";
+        String read = callOnNode(cdp, session, node, function);
+        if (!"style_modified".equals(read)) {
+            Outcome failed = fail("highlight", "unknown handle");
+            failed.body().put("applied", false);
+            failed.body().put("handle", handle == null ? "" : handle);
+            stamp(failed.body(), cdp, null);
+            putEntered(failed.body(), runId, cdp);
+            return failed;
+        }
+        Map<String, Object> body = base("highlight", "cdp", "browser", target);
+        body.put("applied", true);
+        body.put("handle", handle == null ? "" : handle);
+        body.put("cdp", "style");
+        body.put("labels", List.of("style_modified"));
+        stamp(body, cdp, null);
+        putEntered(body, runId, cdp);
+        return ok(body);
     }
 
     public static Outcome run(Path project, String runId, String op, Map<String, String> args) {
@@ -333,6 +428,7 @@ public final class TargetVerb {
         }
         String ref = blank(args.get("ref"));
         if (ref.isBlank() && "ref".equals(target.kind())) ref = target.raw();
+        if (ref.isBlank() && SessionIds.expand(blank(args.get("query"))) != null) ref = blank(args.get("query"));
         Hit hit = ref.isBlank() ? null : requireHit(ref);
         if (hit != null && "desktop".equals(hit.kind)) return actDesktop(project, runId, hit, args);
         if ("desktop".equals(target.kind())) return actDesktop(project, runId, target, args);
