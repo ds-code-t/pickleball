@@ -40,6 +40,14 @@ public final class InteractionLog {
         return row;
     }
 
+    /** Writes a person interaction onto the recording stream without a second agent-events line. */
+    public static void mirrorStream(Path project, Map<String, String> event) {
+        if (project == null || event == null || event.isEmpty()) return;
+        if (!RecordingSession.recording(project)) return;
+        if (!"interaction".equalsIgnoreCase(event.get("event"))) return;
+        appendStream(project, normalize(project, event));
+    }
+
     public static Map<String, String> normalize(Path project, Map<String, String> raw) {
         Map<String, String> row = new LinkedHashMap<>();
         if (raw != null) {

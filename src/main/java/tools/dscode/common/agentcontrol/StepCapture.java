@@ -107,7 +107,7 @@ public final class StepCapture {
         return steps;
     }
 
-    static Map<String, Object> stepOf(Map<String, String> row) {
+    public static Map<String, Object> stepOf(Map<String, String> row) {
         if (row == null || row.isEmpty()) return null;
         if (row.get("op") != null && !row.get("op").isBlank()) {
             Map<String, Object> step = new LinkedHashMap<>();
@@ -116,10 +116,13 @@ public final class StepCapture {
             return step;
         }
         String type = first(row.get("type"), row.get("event"));
+        if ("click".equalsIgnoreCase(type) || "answer".equalsIgnoreCase(type)) {
+            if (question(row)) return null;
+        }
         if ("click".equalsIgnoreCase(type)) {
             Map<String, String> args = new LinkedHashMap<>();
             args.put("kind", "click");
-            String ref = first(row.get("ref"), row.get("id"));
+            String ref = actionRef(first(row.get("ref"), row.get("id")));
             String query = first(row.get("query"), row.get("text"), row.get("name"));
             if (ref != null) args.put("ref", ref);
             if (query != null) args.put("query", query);
@@ -130,7 +133,7 @@ public final class StepCapture {
             if ("true".equalsIgnoreCase(row.get("sensitive"))) return null;
             String value = first(row.get("value"), row.get("text"));
             if (value == null) return null;
-            String ref = first(row.get("ref"), row.get("id"));
+            String ref = actionRef(first(row.get("ref"), row.get("id")));
             if (ref != null) {
                 Map<String, String> args = new LinkedHashMap<>();
                 args.put("kind", "type");
@@ -144,6 +147,18 @@ public final class StepCapture {
             return step("chat-send", args);
         }
         return null;
+    }
+
+    private static boolean question(Map<String, String> row) {
+        String choice = row.get("choice");
+        return choice != null && !choice.isBlank();
+    }
+
+    /** Placement ids are not act refs. A short id such as {@code s1.h2} is kept. */
+    private static String actionRef(String ref) {
+        if (ref == null || ref.isBlank()) return null;
+        if (ref.startsWith("pkb-") || ref.startsWith("ask-") || ref.startsWith("data-pkb")) return null;
+        return ref;
     }
 
     private static boolean looksLikeSteps(JsonNode array) {

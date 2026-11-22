@@ -183,6 +183,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentcontrol/ObserveEvents.java`
 - `src/main/java/tools/dscode/common/agentcontrol/PageSurfaces.java`
 - `src/main/java/tools/dscode/common/agentcontrol/PopupSurfaceBridge.java`
+- `src/main/java/tools/dscode/common/agentcontrol/RecordSelftest.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ScenarioCapture.java`
 - `src/main/java/tools/dscode/common/agentcontrol/StepCapture.java`
 - `src/main/java/tools/dscode/common/agentcontrol/SurfaceBox.java`
@@ -842,6 +843,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/mappings/queries/TopLevelCollectionTest.java`
 - `src/test/java/tools/dscode/common/mappings/UndefinedDollarStepTest.java`
 - `src/test/java/tools/dscode/common/recording/CollaborativeRecordingTest.java`
+- `src/test/java/tools/dscode/common/recording/RefinementTest.java`
 - `src/test/java/tools/dscode/common/recording/StepEditorTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/AgentDiscoverPlannerTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/ConsumerMavenTestRunnerTest.java`

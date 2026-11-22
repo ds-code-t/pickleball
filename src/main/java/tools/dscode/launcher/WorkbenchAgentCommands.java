@@ -2069,6 +2069,7 @@ public final class WorkbenchAgentCommands {
         if (parsed.forwarded() != null) {
             for (String token : parsed.forwarded()) {
                 if ("ui".equals(token)) args.put("ui", "true");
+                if ("record".equals(token)) args.put("record", "true");
             }
         }
         String command = verb == null || verb.isBlank() ? parsed.command() : verb;

@@ -1626,6 +1626,8 @@ final class PageSurfaces {
         event.putIfAbsent("type", "binding");
         event.put("binding", name == null ? "pkbSurface" : name);
         tools.dscode.common.agentfast.PushChannel.accept(event);
+        tools.dscode.common.recording.InteractionLog.mirrorStream(
+                tools.dscode.common.agentfast.PushChannel.project(), event);
         return event;
     }
 

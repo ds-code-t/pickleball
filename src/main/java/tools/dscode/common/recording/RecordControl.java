@@ -16,6 +16,8 @@ import java.util.Map;
 
 /** CLI and MCP entry for collaborative recording. */
 public final class RecordControl {
+    private static final ThreadLocal<Boolean> REPLAYING = new ThreadLocal<>();
+
     private RecordControl() {
     }
 
@@ -57,8 +59,9 @@ public final class RecordControl {
         }
     }
 
-    /** Records one agent act or form-fill when record mode is on. */
+    /** Records one agent act or form-fill when record mode is on. A replay does not record itself. */
     public static void noteAgent(Path project, String runId, String op, Map<String, String> args, Map<String, Object> body) {
+        if (Boolean.TRUE.equals(REPLAYING.get())) return;
         if (project == null || !RecordingSession.recording(project)) return;
         Map<String, String> flags = args == null ? Map.of() : args;
         if ("form-fill".equals(op)) {
@@ -292,6 +295,15 @@ public final class RecordControl {
     }
 
     private static Outcome literal(Path project, String name) {
+        if (!present(name)) return fail(2, "record --literal needs a parameter name");
+        StepGenerator.Script script = current(project);
+        boolean known = false;
+        if (script.parameters() != null) {
+            for (Map<String, Object> parameter : script.parameters()) {
+                if (name.equals(String.valueOf(parameter.get("name")))) known = true;
+            }
+        }
+        if (!known) return fail(2, "unknown parameter " + name);
         Map<String, Object> state = RecordingSession.read(project);
         List<String> literals = RecordingSession.literals(state);
         if (!literals.contains(name)) literals.add(name);
@@ -431,16 +443,104 @@ public final class RecordControl {
         String json = new com.fasterxml.jackson.databind.ObjectMapper()
                 .writeValueAsString(RoutineStore.replaySteps(lines));
         Files.writeString(stepsFile, json, StandardCharsets.UTF_8);
-        Map<String, Object> body = ok("parameters applied");
+        int ran = 0;
+        String failure = "";
+        boolean live = AgentControl.livePage();
+        if (live) {
+            REPLAYING.set(true);
+            try {
+                for (String line : lines) {
+                    Map<String, String> act = actOf(line);
+                    if (act == null) {
+                        failure = "could not replay: " + line;
+                        break;
+                    }
+                    tools.dscode.common.agentfast.TargetVerb.Outcome outcome =
+                            tools.dscode.common.agentfast.TargetVerb.run(project, RecordingSession.sessionId(project), "act", act);
+                    if (outcome.exit() != 0) {
+                        Object error = outcome.body() == null ? null : outcome.body().get("error");
+                        failure = error == null ? "replay failed" : String.valueOf(error);
+                        break;
+                    }
+                    ran++;
+                }
+            } finally {
+                REPLAYING.remove();
+            }
+        }
+        boolean applied = live && failure.isBlank() && ran == lines.size() && !lines.isEmpty();
+        if (!failure.isBlank()) {
+            Map<String, Object> body = fail(1, failure).body();
+            body.put("op", "record");
+            body.put("name", routine.get("name"));
+            body.put("steps", lines);
+            body.put("count", lines.size());
+            body.put("ran", ran);
+            body.put("feature", feature.toAbsolutePath().normalize().toString());
+            body.put("file", stepsFile.toAbsolutePath().normalize().toString());
+            body.put("applied", false);
+            body.put("fix", "execute-steps --file=" + stepsFile.toAbsolutePath().normalize());
+            return new Outcome(1, body);
+        }
+        Map<String, Object> body = ok(applied ? "script ran" : "parameters applied");
         body.put("op", "record");
         body.put("name", routine.get("name"));
         body.put("steps", lines);
         body.put("count", lines.size());
+        body.put("ran", ran);
         body.put("feature", feature.toAbsolutePath().normalize().toString());
         body.put("file", stepsFile.toAbsolutePath().normalize().toString());
-        body.put("applied", false);
-        body.put("sentence", "parameters applied");
+        body.put("applied", applied);
+        if (!live) body.put("fix", "execute-steps --file=" + stepsFile.toAbsolutePath().normalize());
+        body.put("sentence", applied ? "script ran" : "parameters applied");
         return new Outcome(0, body);
+    }
+
+    /** One concrete dynamic step as an {@code act}, or null when the line is not a click, type, select, or key. */
+    static Map<String, String> actOf(String line) {
+        if (line == null) return null;
+        String text = line.trim();
+        if (text.startsWith("Then ") || text.startsWith("And ")) text = text.substring(5).trim();
+        if (text.startsWith(",")) text = text.substring(1).trim();
+        Map<String, String> args = new LinkedHashMap<>();
+        args.put("target", "browser:auto");
+        java.util.regex.Matcher frame = java.util.regex.Pattern
+                .compile("in the \"([^\"]+)\" IFrame,\\s*")
+                .matcher(text);
+        if (frame.lookingAt()) {
+            args.put("frame", frame.group(1));
+            text = text.substring(frame.end()).trim();
+        }
+        java.util.List<String> quotes = new java.util.ArrayList<>();
+        java.util.regex.Matcher quoted = java.util.regex.Pattern.compile("\"([^\"]*)\"").matcher(text);
+        while (quoted.find()) quotes.add(quoted.group(1));
+        if (text.startsWith("click ")) {
+            if (quotes.isEmpty()) return null;
+            args.put("kind", "click");
+            args.put("query", quotes.get(0));
+            return args;
+        }
+        if (text.startsWith("enter ")) {
+            if (quotes.size() < 2) return null;
+            args.put("kind", "type");
+            args.put("value", quotes.get(0));
+            args.put("query", quotes.get(1));
+            return args;
+        }
+        if (text.startsWith("select ")) {
+            if (quotes.size() < 2) return null;
+            args.put("kind", "select");
+            args.put("value", quotes.get(0));
+            args.put("query", quotes.get(1));
+            return args;
+        }
+        if (text.startsWith("press ")) {
+            if (quotes.isEmpty()) return null;
+            args.put("kind", "press");
+            args.put("value", quotes.get(0));
+            return args;
+        }
+        return null;
     }
 
     static StepGenerator.Script current(Path project) {
@@ -454,10 +554,19 @@ public final class RecordControl {
         Map<String, Object> state = RecordingSession.read(project);
         StepGenerator.Script generated = generated(project, state);
         List<EditorDraft.Row> rows = EditorDraft.rows(generated, state);
+        String edited = EditorDraft.gherkin(rows);
+        String comment = contextComment(state);
+        if (!comment.isBlank() && (edited == null || !edited.startsWith("# "))) edited = comment + (edited == null ? "" : edited);
         StepGenerator.Script script = EditorDraft.edited(state)
-                ? StepGenerator.presented(generated, EditorDraft.phrases(rows), EditorDraft.gherkin(rows))
+                ? StepGenerator.presented(generated, EditorDraft.phrases(rows), edited)
                 : generated;
         return new Presented(script, rows, state);
+    }
+
+    private static String contextComment(Map<String, Object> state) {
+        String context = state == null ? "" : String.valueOf(state.getOrDefault("context", ""));
+        if (context.isBlank() || "null".equals(context)) return "";
+        return "# " + context.trim() + "\n";
     }
 
     private static StepGenerator.Script generated(Path project, Map<String, Object> state) {

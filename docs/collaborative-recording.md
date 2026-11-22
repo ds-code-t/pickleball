@@ -64,7 +64,7 @@ record --run --name=checkout --param=acct=42 --param=accountType=Basic
 Then , enter "<accountNumber>" in the "Account Number" Textbox
 ```
 
-A multi-select `Premium|Plus` becomes two `select` phrases. An empty value stays a parameter with an empty example. A value that contains a quote stays in the parameter example; the step text keeps `<name>`. `--literal` puts the example in the step instead of a placeholder. `--rename` changes the parameter name. `--context` leads the first phrase.
+A multi-select `Premium|Plus` becomes two `select` phrases. An empty value stays a parameter with an empty example. A value that contains a quote stays in the parameter example; the step text keeps `<name>`. `--literal` puts that example in the step and exits 2 when the parameter name is unknown. `--rename` changes that exact parameter name, not a later `name2`. `--context` is a `#` comment above the steps, not text inside a step. `record --run` replays the concrete steps with `act` when a browser page is already open. With no page it still writes the replay files, says `parameters applied`, and the `fix` is `execute-steps --file=` that steps file. A person interaction is also appended to `.pickleball/recordings/stream.jsonl`.
 
 Repeated input on the same control keeps the last value. Focus is not a step. A drag needs a drop target (`dragAndDrop the "From" Button the "To" Button`).
 

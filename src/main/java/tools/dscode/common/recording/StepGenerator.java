@@ -46,15 +46,11 @@ public final class StepGenerator {
                 continue;
             }
             String text = withFrame(row, phrase.text);
-            if (context != null && !context.isBlank() && steps.isEmpty()) {
-                text = context.trim() + (context.trim().endsWith(",") ? " " : ", ") + stripComma(text);
-                if (!text.startsWith(",")) text = ", " + text;
-            }
             steps.add(text.startsWith(",") ? text : ", " + text);
             kept.add(row);
             index++;
         }
-        return new Script(steps, gherkin(steps), chain(steps), parameters, kept);
+        return new Script(steps, gherkin(steps, context), chain(steps), parameters, kept);
     }
 
     /** Same parameters and kept rows, with editor phrases and gherkin in front. */
@@ -314,9 +310,9 @@ public final class StepGenerator {
             return quote("<" + name + ">");
         }
         String base = paramBase(label.isBlank() ? type : label);
-        String renamed = renames.getOrDefault(base, base);
-        String name = unique(renamed, used);
-        boolean literal = literals.contains(base) || literals.contains(name) || literals.contains(renamed);
+        String uniqued = unique(base, used);
+        String name = renames.getOrDefault(uniqued, uniqued);
+        boolean literal = literals.contains(base) || literals.contains(uniqued) || literals.contains(name);
         remember(parameters, name, type, value, label);
         if (literal) return quote(value);
         return quote("<" + name + ">");
@@ -434,9 +430,17 @@ public final class StepGenerator {
     }
 
     static String gherkin(List<String> steps) {
+        return gherkin(steps, "");
+    }
+
+    static String gherkin(List<String> steps, String context) {
         StringBuilder text = new StringBuilder();
+        if (context != null && !context.isBlank() && !"null".equals(context)) {
+            text.append("# ").append(context.trim()).append('\n');
+        }
+        if (steps == null) return text.toString().stripTrailing();
         for (int index = 0; index < steps.size(); index++) {
-            if (index > 0) text.append('\n');
+            if (text.length() > 0 && text.charAt(text.length() - 1) != '\n') text.append('\n');
             text.append(index == 0 ? "Then " : "And ").append(steps.get(index));
         }
         return text.toString();

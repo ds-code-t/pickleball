@@ -511,6 +511,10 @@ public final class AgentControl {
         return steps;
     }
 
+    public static boolean livePage() {
+        return PageSurfaces.hasLivePage();
+    }
+
     private static Result screenshot(Path project, Map<String, String> args) throws Exception {
         String out = args.get("out");
         if (!present(out)) return fail(2, "screenshot requires --out");
@@ -530,6 +534,11 @@ public final class AgentControl {
         }
         if ("pages".equals(args.get("component"))) {
             Map<String, Object> report = tools.dscode.common.agentfast.SelftestUi.pages(project);
+            if (Boolean.TRUE.equals(report.get("skipped"))) return new Result(1, report);
+            return new Result(Boolean.TRUE.equals(report.get("ok")) ? 0 : 1, report);
+        }
+        if ("true".equals(args.get("record"))) {
+            Map<String, Object> report = RecordSelftest.run(project);
             if (Boolean.TRUE.equals(report.get("skipped"))) return new Result(1, report);
             return new Result(Boolean.TRUE.equals(report.get("ok")) ? 0 : 1, report);
         }
