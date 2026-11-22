@@ -32,9 +32,15 @@ class WorkbenchUiToolsTest {
                 assertEquals("r1", args.get("run-id"));
             }
             if (name.equals("ui_poll")) {
-                Map<String, Object> body = (Map<String, Object>) handler.apply(Map.of("chatAfter", "m3", "wait", 5));
+                Map<String, Object> properties = (Map<String, Object>) schema.get("properties");
+                assertTrue(properties.containsKey("chatAfter"), properties.keySet().toString());
+                assertTrue(properties.containsKey("after"));
+                Map<String, Object> body = (Map<String, Object>) handler.apply(Map.of("chatAfter", "m3", "wait", 5, "after", 2.0d));
                 assertEquals("ui-poll", body.get("op"));
-                assertEquals("m3", ((Map<String, String>) body.get("args")).get("chat-after"));
+                Map<String, String> args = (Map<String, String>) body.get("args");
+                assertEquals("m3", args.get("chat-after"));
+                assertEquals("5", args.get("wait"));
+                assertEquals("2", args.get("after"));
             }
         });
         assertEquals(List.of("ui", "ui_poll", "ui_catalog"), names);

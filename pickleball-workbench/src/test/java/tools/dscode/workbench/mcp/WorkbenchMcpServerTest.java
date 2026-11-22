@@ -210,7 +210,7 @@ class WorkbenchMcpServerTest {
     @Test
     void surfacesSchemaDescribesEveryForwardedVisualArgument() {
         Map<String, Object> properties = McpRegistry.surfaceProperties();
-        for (String key : List.of("op", "text", "handle", "id", "html", "x", "y", "width", "height", "geometry",
+        for (String key : List.of("op", "text", "handle", "id", "html", "session", "x", "y", "width", "height", "geometry",
                 "where", "number", "zoom", "dim", "direction", "from", "to", "color", "style", "preset", "target", "pane")) {
             assertTrue(properties.containsKey(key), key + " missing from the surfaces schema " + properties.keySet());
             Map<?, ?> property = (Map<?, ?>) properties.get(key);
@@ -219,7 +219,59 @@ class WorkbenchMcpServerTest {
             assertTrue(description.length() <= 300, key + " " + description.length());
         }
         assertEquals(List.of("number", "string"), ((Map<?, ?>) properties.get("zoom")).get("type"));
+        assertTrue(properties.containsKey("session"), properties.keySet().toString());
         assertTrue(String.valueOf(((Map<?, ?>) properties.get("html")).get("description")).contains("page file"));
+    }
+
+    @Test
+    void wholeNumbersForwardWithoutADecimalAndBadLimitsAreRejected() {
+        java.util.concurrent.atomic.AtomicReference<Object[]> seen = new java.util.concurrent.atomic.AtomicReference<>();
+        WorkbenchMcpTools tools = new WorkbenchMcpTools(fakeServices((method, args) -> {
+            if ("events".equals(method) || "agentCommand".equals(method)) seen.set(args);
+            return null;
+        }), JSON);
+        assertEquals(null, tools.call("workbench_events", Map.of("afterSequence", "4", "limit", "5")));
+        assertEquals(4L, seen.get()[0]);
+        assertEquals(5, seen.get()[1]);
+        IllegalArgumentException bad = assertThrows(
+                IllegalArgumentException.class,
+                () -> tools.call("workbench_events", Map.of("limit", "nope"))
+        );
+        assertTrue(bad.getMessage().contains("whole number"), bad.getMessage());
+
+        tools.call("workbench_record_save", Map.of("name", "morning", "index", 2.0d));
+        assertEquals("record", seen.get()[0]);
+        @SuppressWarnings("unchecked")
+        Map<String, String> forwarded = (Map<String, String>) seen.get()[1];
+        assertEquals("true", forwarded.get("save"));
+        assertEquals("morning", forwarded.get("name"));
+        assertEquals("2", forwarded.get("index"));
+        assertFalse(forwarded.containsKey("session"), forwarded.toString());
+        assertFalse(forwarded.containsKey("text"), forwarded.toString());
+
+        Object placed = tools.call("surfaces", Map.of("op", "magnifier", "handle", "s1.h18", "zoom", 2.0d, "session", "live-1"));
+        assertEquals("magnifier", ((Map<?, ?>) placed).get("op"));
+        assertEquals("magnifier", seen.get()[0]);
+        @SuppressWarnings("unchecked")
+        Map<String, String> visual = (Map<String, String>) seen.get()[1];
+        assertEquals("2", visual.get("zoom"));
+        assertEquals("s1.h18", visual.get("handle"));
+        assertEquals("live-1", visual.get("session"));
+
+        tools.call("workbench_record_refine", Map.of("from", "account", "to", "id"));
+        assertEquals("record", seen.get()[0]);
+        @SuppressWarnings("unchecked")
+        Map<String, String> refined = (Map<String, String>) seen.get()[1];
+        assertEquals("true", refined.get("rename"));
+        assertEquals("account", refined.get("from"));
+        assertEquals("id", refined.get("to"));
+        assertFalse(refined.containsKey("action"), refined.toString());
+
+        tools.call("workbench_record_pop", Map.of("panel", "editor"));
+        @SuppressWarnings("unchecked")
+        Map<String, String> popped = (Map<String, String>) seen.get()[1];
+        assertEquals("true", popped.get("popout"));
+        assertEquals("editor", popped.get("panel"));
     }
 
     @Test

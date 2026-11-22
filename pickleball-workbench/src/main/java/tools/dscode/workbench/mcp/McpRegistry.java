@@ -116,7 +116,8 @@ public final class McpRegistry {
         Map<String, Object> properties = new LinkedHashMap<>();
         properties.put("op", stringProperty("html-write, html-replace, html-insert, html-remove, html-cleanup, overlay, overlay-poll, overlay-remove, highlight, unhighlight, label, unlabel, border, unborder, arrow, unarrow, step-badge, unstep-badge, magnifier, unmagnifier, spotlight, or unspotlight."));
         properties.put("text", stringProperty("Content: HTML for html-* and overlay, caption for label, step-badge, and magnifier."));
-        properties.put("handle", stringProperty("Optional target handle from a query. A resolved box wins over x, y, width, and height."));
+        properties.put("handle", stringProperty("Target: a short id (s1.h18), an element id, or frame:backend."));
+        properties.put("session", stringProperty("Session id from start or isolate."));
         properties.put("id", stringProperty("Placement id to remove. An un* verb refuses an id of another kind."));
         properties.put("html", stringProperty("Optional path to a local HTML page file to edit instead of the live browser."));
         properties.put("x", numberProperty("Left edge in visual-viewport pixels when no handle is given."));
@@ -167,7 +168,7 @@ public final class McpRegistry {
 
     private static void flag(List<String> argv, Map<String, Object> arguments, String field, String flag) {
         if (arguments == null || arguments.get(field) == null) return;
-        String value = String.valueOf(arguments.get(field));
+        String value = plain(arguments.get(field));
         if (!value.isBlank()) {
             argv.add(flag);
             argv.add(value);
@@ -178,7 +179,7 @@ public final class McpRegistry {
         Map<String, String> forwarded = new LinkedHashMap<>();
         if (arguments == null) return forwarded;
         arguments.forEach((key, value) -> {
-            if (key != null && value != null) forwarded.put(key, String.valueOf(value));
+            if (key != null && value != null) forwarded.put(key, plain(value));
         });
         return forwarded;
     }
@@ -212,6 +213,17 @@ public final class McpRegistry {
         schema.put("properties", properties);
         schema.put("additionalProperties", false);
         return schema;
+    }
+
+    /** A whole number is digits only, so a CLI flag is {@code 2} and not {@code 2.0}. */
+    public static String plain(Object value) {
+        if (value instanceof Number number) {
+            double raw = number.doubleValue();
+            if (Double.isFinite(raw) && raw == Math.rint(raw) && raw >= Long.MIN_VALUE && raw <= Long.MAX_VALUE) {
+                return Long.toString(number.longValue());
+            }
+        }
+        return value == null ? "" : String.valueOf(value);
     }
 
     private static Map<String, Object> stringProperty(String description) {

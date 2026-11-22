@@ -612,11 +612,11 @@ final class WorkbenchMcpTools {
                         "action", stringProperty("rename, literal, context, accept, or reject.")
                 )),
                 args -> {
-                    String action = text(args, "action");
+                    String action = optionalScalar(args, "action");
                     if (action.isBlank()) {
-                        if (!text(args, "from").isBlank()) action = "rename";
-                        else if (!text(args, "literal").isBlank()) action = "literal";
-                        else if (!text(args, "text").isBlank()) action = "context";
+                        if (!optionalScalar(args, "from").isBlank()) action = "rename";
+                        else if (!optionalScalar(args, "literal").isBlank()) action = "literal";
+                        else if (!optionalScalar(args, "text").isBlank()) action = "context";
                         else action = "reject";
                     }
                     return recordCommand(args, action);
@@ -647,7 +647,7 @@ final class WorkbenchMcpTools {
                         "panel", stringProperty("editor or chat.")
                 ), "panel"),
                 args -> {
-                    String action = text(args, "action");
+                    String action = optionalScalar(args, "action");
                     if (action.isBlank()) action = "popout";
                     return recordCommand(args, action);
                 });
@@ -658,7 +658,7 @@ final class WorkbenchMcpTools {
         if (flag != null && !flag.isBlank()) forwarded.put(flag, "true");
         for (String name : List.of("name", "session", "format", "out", "kind", "query", "value", "role",
                 "from", "to", "literal", "text", "index", "param", "depth", "panel")) {
-            String value = text(args, name);
+            String value = optionalScalar(args, name);
             if (!value.isBlank()) forwarded.put(name, value);
         }
         Object value = services.agentCommand("record", forwarded);
@@ -1168,7 +1168,14 @@ final class WorkbenchMcpTools {
     }
 
     private static Map<String, Object> integerProperty(String description) {
-        return Map.of("type", "integer", "description", description);
+        Map<String, Object> property = new LinkedHashMap<>();
+        property.put("description", description + " A number or a string.");
+        property.put("anyOf", List.of(
+                Map.of("type", "integer"),
+                Map.of("type", "number"),
+                Map.of("type", "string")
+        ));
+        return property;
     }
 
     private static Map<String, Object> booleanProperty(String description) {
@@ -1228,14 +1235,55 @@ final class WorkbenchMcpTools {
         return value instanceof String text && !text.isBlank() ? text : null;
     }
 
-    private static Integer integer(Map<String, Object> args, String name) {
+    private static String optionalScalar(Map<String, Object> args, String name) {
+        if (args == null || args.get(name) == null) return "";
         Object value = args.get(name);
-        return value instanceof Number number ? number.intValue() : null;
+        if (value instanceof Number || value instanceof String) return McpRegistry.plain(value);
+        throw new IllegalArgumentException(
+                "error: " + name + " must be a string or a whole number.\nfix: Pass " + name + " as text or digits."
+        );
+    }
+
+    private static Integer integer(Map<String, Object> args, String name) {
+        Long whole = whole(args, name);
+        if (whole == null) return null;
+        if (whole > Integer.MAX_VALUE || whole < Integer.MIN_VALUE) {
+            throw new IllegalArgumentException(
+                    "error: " + name + " must be a whole number.\nfix: Pass " + name + " as a number or a string of digits."
+            );
+        }
+        return whole.intValue();
     }
 
     private static Long longValue(Map<String, Object> args, String name) {
+        return whole(args, name);
+    }
+
+    private static Long whole(Map<String, Object> args, String name) {
+        if (args == null || args.get(name) == null) return null;
         Object value = args.get(name);
-        return value instanceof Number number ? number.longValue() : null;
+        if (value instanceof Number number) {
+            double raw = number.doubleValue();
+            if (!Double.isFinite(raw) || raw != Math.rint(raw)) {
+                throw new IllegalArgumentException(
+                        "error: " + name + " must be a whole number.\nfix: Pass " + name + " as 20 or \"20\"."
+                );
+            }
+            return number.longValue();
+        }
+        if (value instanceof String text) {
+            if (text.isBlank()) return null;
+            try {
+                return Long.parseLong(text.trim());
+            } catch (NumberFormatException failure) {
+                throw new IllegalArgumentException(
+                        "error: " + name + " must be a whole number.\nfix: Pass " + name + " as 20 or \"20\"."
+                );
+            }
+        }
+        throw new IllegalArgumentException(
+                "error: " + name + " must be a whole number.\nfix: Pass " + name + " as 20 or \"20\"."
+        );
     }
 
     private static boolean bool(Map<String, Object> args, String name, boolean defaultValue) {

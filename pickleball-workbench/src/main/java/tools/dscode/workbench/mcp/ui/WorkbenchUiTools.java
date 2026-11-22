@@ -43,7 +43,9 @@ public final class WorkbenchUiTools implements McpCommandContributor {
                     case "chatAfter" -> "chat-after";
                     default -> key;
                 };
-                args.put(flag, value instanceof Map<?, ?> || value instanceof List<?> ? json(value) : String.valueOf(value));
+                args.put(flag, value instanceof Map<?, ?> || value instanceof List<?>
+                        ? json(value)
+                        : tools.dscode.workbench.mcp.McpRegistry.plain(value));
             });
         }
         WorkbenchServices services = PopupMcpCommands.currentServices();
@@ -81,16 +83,25 @@ public final class WorkbenchUiTools implements McpCommandContributor {
                 "description", "Ops in order, e.g. [{\"c\":\"guide\",\"steps\":[{\"t\":\"#email\",\"say\":\"Type your email\",\"do\":\"input\"}]}]."));
         properties.put("verbose", Map.of("type", "boolean", "description", "Full replies instead of the compact one."));
         properties.put("scope", Map.of("type", "string", "enum", List.of("page", "origin", "run"), "description", "Where it comes back after reloads."));
-        properties.put("ttl", Map.of("type", "integer", "description", "Seconds before the saved page state expires."));
+        properties.put("ttl", Map.of(
+                "description", "Seconds before the saved page state expires. A number or a string.",
+                "anyOf", List.of(Map.of("type", "integer"), Map.of("type", "number"), Map.of("type", "string"))
+        ));
         properties.put("runId", Map.of("type", "string", "description", "Run id."));
         return object(properties, List.of("ops"));
     }
 
     static Map<String, Object> pollSchema() {
         Map<String, Object> properties = new LinkedHashMap<>();
-        properties.put("after", Map.of("type", "integer", "description", "Event cursor: next from the last ui_poll."));
+        properties.put("after", Map.of(
+                "description", "Event cursor: next from the last ui_poll. A number or a string.",
+                "anyOf", List.of(Map.of("type", "integer"), Map.of("type", "number"), Map.of("type", "string"))
+        ));
+        properties.put("wait", Map.of(
+                "description", "Seconds to wait for something, up to 25. A number or a string.",
+                "anyOf", List.of(Map.of("type", "integer"), Map.of("type", "number"), Map.of("type", "string"))
+        ));
         properties.put("chatAfter", Map.of("type", "string", "description", "Chat cursor: chatNext from the last ui_poll."));
-        properties.put("wait", Map.of("type", "number", "description", "Seconds to wait for something, up to 25."));
         properties.put("runId", Map.of("type", "string", "description", "Run id."));
         return object(properties, List.of());
     }
