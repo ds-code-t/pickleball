@@ -97,6 +97,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-consumer-report-2026-11-17/bug-p2-24-tracking-store-tabs-empty.md`
 - `docs/maintainer/3.0.0-consumer-report-2026-11-17/bug-workbench-window-freeze.md`
 - `docs/maintainer/3.0.0-core-reliability-scoreboard.md`
+- `docs/maintainer/3.0.0-desktop-atspi-verification.md`
 - `docs/maintainer/3.0.0-embedded-store-design.md`
 - `docs/maintainer/3.0.0-engine-defects-design.md`
 - `docs/maintainer/3.0.0-engine-design.md`
