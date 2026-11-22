@@ -3004,13 +3004,27 @@ public final class TargetVerb {
         return false;
     }
 
-    private static String role(DomNode node) {
+    static String role(DomNode node) {
+        if (node == null) return "element";
         if (node.role != null && !node.role.isBlank()) return node.role;
+        String mapped = Query.roleOf(node);
+        if (mapped != null && !mapped.isBlank()) return mapped;
         String tag = node.tag();
         return tag.isBlank() ? "element" : tag;
     }
 
-    private static String name(DomNode node) {
+    /**
+     * Name shared by snap and find. Accessible name, then visible or label text.
+     * Clipped at 80 characters so a row stays one line.
+     */
+    static String name(DomNode node) {
+        if (node == null) return "";
+        String raw = rawName(node);
+        String normalized = StandardView.normalize(raw);
+        return normalized.length() > 80 ? normalized.substring(0, 80) : normalized;
+    }
+
+    private static String rawName(DomNode node) {
         if ("select".equals(node.tag())) {
             String label = labelOf(node);
             String selected = selectedText(node);
@@ -3021,10 +3035,55 @@ public final class TargetVerb {
         String aria = attr(node, "aria-label");
         if (!aria.isBlank()) return aria;
         if (node.accessibleName != null && !node.accessibleName.isBlank()) return node.accessibleName;
+        String labelled = labelledBy(node);
+        if (!labelled.isBlank()) return labelled;
+        String alt = attr(node, "alt");
+        if (!alt.isBlank()) return alt;
+        String title = attr(node, "title");
+        if (!title.isBlank()) return title;
+        String label = labelOf(node);
+        if (!label.isBlank()) return label;
+        String placeholder = attr(node, "placeholder");
+        if (!placeholder.isBlank()) return placeholder;
+        String buttonValue = buttonValue(node);
+        if (!buttonValue.isBlank()) return buttonValue;
         String text = HtmlTree.textOf(node);
-        if (!text.isBlank()) return text.length() > 80 ? text.substring(0, 80) : text;
+        if (!text.isBlank()) return text;
+        if (node.nodeValue != null && !node.nodeValue.isBlank()) return node.nodeValue;
         String id = node.attributes.get("id");
         return id == null ? "" : id;
+    }
+
+    /** {@code aria-labelledby} ids, in order, joined with a space. */
+    private static String labelledBy(DomNode node) {
+        String ids = attr(node, "aria-labelledby");
+        if (ids.isBlank()) return "";
+        DomNode root = node;
+        while (root.parent != null) root = root.parent;
+        Map<String, DomNode> byId = new LinkedHashMap<>();
+        walk(root, candidate -> {
+            String id = candidate.attributes.get("id");
+            if (id != null && !id.isBlank() && !byId.containsKey(id)) byId.put(id, candidate);
+        });
+        StringBuilder text = new StringBuilder();
+        for (String id : ids.split("\\s+")) {
+            DomNode target = byId.get(id);
+            if (target == null) continue;
+            String piece = HtmlTree.textOf(target).trim();
+            if (piece.isBlank()) continue;
+            if (!text.isEmpty()) text.append(' ');
+            text.append(piece);
+        }
+        return text.toString();
+    }
+
+    /** The value of a button, submit, or reset. A typed field's value is not its name. */
+    private static String buttonValue(DomNode node) {
+        String tag = node.tag();
+        String type = attr(node, "type").toLowerCase(Locale.ROOT);
+        boolean button = "button".equals(tag)
+                || ("input".equals(tag) && ("button".equals(type) || "submit".equals(type) || "reset".equals(type)));
+        return button ? attr(node, "value") : "";
     }
 
     private static String labelOf(DomNode node) {
@@ -3084,6 +3143,7 @@ public final class TargetVerb {
             DomNode root = dev.domengine.tree.LiveTree.read(cdp).root;
             if (root != null) {
                 root.linkParents();
+                stampRoles(cdp, root);
                 List<DomNode> options = new ArrayList<>();
                 collectSelectOptions(root, options);
                 if (!options.isEmpty()) RowStates.fill(cdp, options);
@@ -3325,7 +3385,6 @@ public final class TargetVerb {
     /** Interactive nodes and nodes with their own text. Pickleball's layer is left out. */
     private static List<SnapRow> elementRows(CdpConnection cdp, String sessionId, String version) {
         DomNode root = tree(cdp);
-        stampRoles(cdp, root);
         List<DomNode> nodes = new ArrayList<>();
         collectSnap(root, false, nodes);
         Map<String, String[]> frames = frameIndex(cdp);

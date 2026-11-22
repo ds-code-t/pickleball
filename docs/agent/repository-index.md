@@ -117,7 +117,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-regression-scoreboard.md`
 - `docs/maintainer/3.0.0-remaining-live-issues.md`
 - `docs/maintainer/3.0.0-roadmap-1-scoreboard.md`
+- `docs/maintainer/3.0.0-roadmap-2-question-cards-scoreboard.md`
 - `docs/maintainer/3.0.0-roadmap-2-scoreboard.md`
+- `docs/maintainer/3.0.0-roadmap-3-readability-scoreboard.md`
 - `docs/maintainer/3.0.0-roadmap-3-scoreboard.md`
 - `docs/maintainer/3.0.0-roadmap-4-scoreboard.md`
 - `docs/maintainer/3.0.0-roadmap-5-scoreboard.md`
@@ -292,6 +294,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentcontrol/ObserveEvents.java`
 - `src/main/java/tools/dscode/common/agentcontrol/PageSurfaces.java`
 - `src/main/java/tools/dscode/common/agentcontrol/PopupSurfaceBridge.java`
+- `src/main/java/tools/dscode/common/agentcontrol/ReadMarks.java`
 - `src/main/java/tools/dscode/common/agentcontrol/RecordSelftest.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ScenarioCapture.java`
 - `src/main/java/tools/dscode/common/agentcontrol/StepCapture.java`
@@ -881,6 +884,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentfast/LiveReplyRulesTest.java`
 - `src/test/java/tools/dscode/common/agentfast/PushAndViewTest.java`
 - `src/test/java/tools/dscode/common/agentfast/SelftestCpuBenchTest.java`
+- `src/test/java/tools/dscode/common/agentfast/SnapNameTest.java`
 - `src/test/java/tools/dscode/common/agentfast/SnapScopeTest.java`
 - `src/test/java/tools/dscode/common/agentfast/TimingFieldsTest.java`
 - `src/test/java/tools/dscode/common/agentfast/UiCpuLoopTest.java`
