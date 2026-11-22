@@ -207,6 +207,8 @@ One command opens a ready browser. `start --url-key=URL.app --browser=chrome --h
 
 `capture-steps --events=<file> --out=<json>` writes `{op,args}` for `execute-steps --file`. Click rows become `act` with `kind=click`. An answer with a ref becomes `act` with `kind=type`. An answer with no ref becomes `chat-send`. A sensitive answer is dropped. The same rows are read from `.pickleball/agent-events.jsonl`. An empty capture still writes `[]`, count 0, and sentence `no steps captured`.
 
+`record --start` arms collaborative recording. The page pushes click, input, select, check, and Enter/Tab/Escape, and while recording also hover, focus, and drag. Each row has `event=interaction` plus target, value, frame, source, and `sessionId`. `events --follow --type=interaction` reads them. Agent `act` and `form-fill`, including desktop, are recorded beside the person. `record --script` prints dynamic steps and turns typed values into `<name>` parameters. `record --save --name=`, `record --load`, `record --list`, and `record --export --format=feature` keep a routine under `.pickleball/recordings`. `record --run --param=name=value` substitutes parameters. Pause, resume, accept, and reject are on the in-page record bar. See [collaborative-recording.md](collaborative-recording.md).
+
 A live `magnifier` copies the target into the oval, including computed color, font, and size. The copy is inert and has no id, name, or inline handler. When that copy cannot be taken the oval says `target not captured`. A native magnifier stores that same fallback caption.
 
 `act --kind=hover` is applied when the node is displayed, including a same-origin iframe and a visibility probe that did not return. A hidden node, or one the tree marks not displayed, stays `applied:false`.

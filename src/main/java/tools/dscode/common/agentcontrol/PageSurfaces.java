@@ -1481,6 +1481,15 @@ final class PageSurfaces {
         return stored;
     }
 
+    /** Tells the page runtime that record mode is on or off, and shows the live script. */
+    public static void armRecording(Map<String, Object> spec) {
+        try {
+            runtimeCall("record", spec == null ? Map.of() : spec, false);
+        } catch (RuntimeException ignored) {
+            // No managed page. Record mode still lives in the state file.
+        }
+    }
+
     /** Marks page controls the agent has now read. A missing page is a no-op. */
     static void markRead(java.util.Collection<String> ids) {
         if (ids == null || ids.isEmpty() || !hasLivePage()) return;

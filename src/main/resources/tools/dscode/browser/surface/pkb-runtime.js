@@ -19,7 +19,7 @@
     try { wait.observe(document, {childList: true, subtree: true}); } catch (ignored) { /* not observable yet */ }
     return;
   }
-  var VERSION = '3.0.0-feedback';
+  var VERSION = '3.0.0-record';
   if (window.__pkbUi && window.__pkbUi.version === VERSION) return;
   if (window.__pkbUi && typeof window.__pkbUi.dispose === 'function') {
     try { window.__pkbUi.dispose(); } catch (ignored) { /* older runtime */ }
@@ -267,6 +267,88 @@
     var leaf = path.length ? path[0] : event.target;
     if (leaf && leaf.nodeType !== 1) leaf = leaf.parentElement;
     return leaf && leaf.nodeType === 1 ? leaf : null;
+  }
+
+  function clipText(text, max) {
+    return String(text || '').replace(/\s+/g, ' ').trim().slice(0, max || 80);
+  }
+  function labelOf(el) {
+    if (!el || !el.getAttribute) return '';
+    var labelled = '';
+    try { labelled = el.labels && el.labels[0] ? el.labels[0].innerText : ''; } catch (ignored) { labelled = ''; }
+    return clipText(el.getAttribute('data-choice') || el.getAttribute('aria-label') || labelled
+      || el.getAttribute('placeholder') || el.getAttribute('name') || el.innerText || '');
+  }
+  function roleOf(el) {
+    if (!el || !el.getAttribute) return '';
+    var role = el.getAttribute('role');
+    if (role) return role;
+    var tag = (el.nodeName || '').toLowerCase();
+    if (tag === 'a') return 'link';
+    if (tag === 'select') return 'combobox';
+    if (tag === 'textarea') return 'textbox';
+    if (tag === 'button') return 'button';
+    if (tag === 'input') {
+      var type = (el.type || 'text').toLowerCase();
+      if (type === 'checkbox') return 'checkbox';
+      if (type === 'radio') return 'radio';
+      if (type === 'button' || type === 'submit' || type === 'reset') return 'button';
+      return 'textbox';
+    }
+    return tag;
+  }
+  function boundsOf(el) {
+    try {
+      var r = el.getBoundingClientRect();
+      return Math.round(r.left) + ',' + Math.round(r.top) + ',' + Math.round(r.width) + ',' + Math.round(r.height);
+    } catch (ignored) { return ''; }
+  }
+  function frameName() {
+    try { return window.frameElement ? (window.frameElement.id || window.frameElement.name || 'frame') : 'top'; }
+    catch (ignored) { return 'top'; }
+  }
+  function controlOf(node) {
+    if (!node || !node.closest) return node;
+    return node.closest('button,a,input,select,textarea,summary,label,[role],[data-choice],[data-pkb-action]') || node;
+  }
+  function sense(kind, node, extra) {
+    var el = controlOf(node);
+    if (!el || el.nodeType !== 1) return false;
+    if (ours(el) && !(el.closest && el.closest('[data-pkb-agent],[data-choice]'))) return false;
+    var name = labelOf(el);
+    var value = extra && extra.value != null ? String(extra.value) : (el.value != null ? String(el.value) : '');
+    if (kind === 'select' && el.multiple && el.selectedOptions && !(extra && extra.value != null)) {
+      var picked = [];
+      for (var s = 0; s < el.selectedOptions.length; s++) {
+        picked.push(el.selectedOptions[s].label || el.selectedOptions[s].value || '');
+      }
+      value = picked.join('|');
+    }
+    var row = {
+      event: 'interaction',
+      type: kind,
+      kind: kind,
+      source: (extra && extra.source) || 'human',
+      id: (extra && extra.id) || el.id || '',
+      role: roleOf(el),
+      name: extra && extra.name != null ? String(extra.name) : name,
+      text: extra && extra.name != null ? String(extra.name) : name,
+      value: value,
+      oldValue: extra && extra.oldValue != null ? String(extra.oldValue) : '',
+      frame: frameName(),
+      bounds: boundsOf(el),
+      target: name || el.id || roleOf(el)
+    };
+    if (extra && extra.drop) row.drop = String(extra.drop);
+    if (extra && extra.checked != null) row.checked = String(extra.checked);
+    var sensitive = (el.getAttribute && el.getAttribute('data-sensitive') === 'true')
+      || (el.type && String(el.type).toLowerCase() === 'password');
+    if (sensitive) {
+      row.sensitive = 'true';
+      row.value = 'filled';
+      row.oldValue = '';
+    }
+    return pushEvent(row);
   }
 
   function scrollable(el) {
@@ -672,10 +754,9 @@
           .replace(/\s+/g, ' ').trim().slice(0, 80);
       }
       var placed = control.closest && control.closest('[data-pkb-agent]');
-      pushEvent({
-        type: 'click', source: 'human',
-        id: (placed && placed.getAttribute('data-pkb-id')) || (node.id || ''),
-        role: role, name: name
+      sense('click', control, {
+        id: (placed && placed.getAttribute('data-pkb-id')) || (control.id || node.id || ''),
+        name: name
       });
     }, true);
     on(document, 'change', function (event) {
@@ -690,11 +771,76 @@
       lastPressed = row;
       setFeedback(row, 'sending');
       pushEvent({
-        type: 'check', source: 'human',
+        type: 'check', source: 'human', event: 'interaction', kind: 'check',
         id: host ? host.getAttribute('data-pkb-id') || '' : '',
         check: row.getAttribute('data-pkb-check') || '',
-        checked: on ? 'true' : 'false'
+        checked: on ? 'true' : 'false',
+        name: row.getAttribute('data-pkb-check') || '',
+        role: 'checkbox',
+        frame: frameName()
       });
+    }, true);
+    var inputTimer = 0;
+    var inputEl = null;
+    on(document, 'input', function (event) {
+      var input = eventLeaf(event);
+      if (!input || ours(input)) return;
+      inputEl = input;
+      if (inputTimer) clearTimeout(inputTimer);
+      inputTimer = setTimeout(function () {
+        inputTimer = 0;
+        if (!inputEl) return;
+        var tag = (inputEl.nodeName || '').toLowerCase();
+        sense(tag === 'select' ? 'select' : 'input', inputEl, {value: inputEl.value == null ? '' : String(inputEl.value)});
+      }, 400);
+    }, true);
+    on(document, 'change', function (event) {
+      var input = eventLeaf(event);
+      if (!input || ours(input) || input.closest && input.closest('[data-pkb-check]')) return;
+      var tag = (input.nodeName || '').toLowerCase();
+      if (tag === 'select') sense('select', input, {value: input.value == null ? '' : String(input.value)});
+      else if (input.type === 'checkbox' || input.type === 'radio') {
+        sense('check', input, {checked: input.checked ? 'true' : 'false', value: input.checked ? 'true' : 'false'});
+      } else sense('change', input, {value: input.value == null ? '' : String(input.value)});
+    }, true);
+    on(document, 'keydown', function (event) {
+      if (!event) return;
+      var key = event.key || '';
+      if (key !== 'Enter' && key !== 'Tab' && key !== 'Escape') return;
+      var target = eventLeaf(event);
+      if (!target || ours(target)) return;
+      sense('key', target, {value: key, name: labelOf(target) || key});
+    }, true);
+    var hoverTimer = 0;
+    var hoverEl = null;
+    on(document, 'pointerover', function (event) {
+      if (window.__pkbRecord !== true) return;
+      var node = eventLeaf(event);
+      if (!node || ours(node)) return;
+      hoverEl = node;
+      if (hoverTimer) clearTimeout(hoverTimer);
+      hoverTimer = setTimeout(function () {
+        hoverTimer = 0;
+        if (hoverEl) sense('hover', hoverEl, {});
+      }, 350);
+    }, true);
+    on(document, 'focusin', function (event) {
+      if (window.__pkbRecord !== true) return;
+      var node = eventLeaf(event);
+      if (!node || ours(node)) return;
+      sense('focus', node, {});
+    }, true);
+    var dragFrom = '';
+    on(document, 'dragstart', function (event) {
+      if (window.__pkbRecord !== true) return;
+      var node = eventLeaf(event);
+      dragFrom = labelOf(controlOf(node));
+    }, true);
+    on(document, 'drop', function (event) {
+      if (window.__pkbRecord !== true) return;
+      var node = eventLeaf(event);
+      if (!node) return;
+      sense('drag', node, {name: dragFrom || labelOf(controlOf(node)), drop: labelOf(controlOf(node))});
     }, true);
     on(document, 'visibilitychange', function () {
       paused = document.hidden;
@@ -1858,6 +2004,64 @@
     return {h: h, x: r.left, y: r.top, w: r.width, hh: r.height};
   }
 
+  var recordBar = null;
+  function record(spec) {
+    spec = spec || {};
+    if (spec.on === true || spec.on === 'true') window.__pkbRecord = true;
+    if (spec.on === false || spec.on === 'false') window.__pkbRecord = false;
+    var status = spec.status || (window.__pkbRecord ? 'recording' : 'stopped');
+    if (status === 'stopped' && !spec.script) {
+      if (recordBar && recordBar.parentNode) recordBar.parentNode.removeChild(recordBar);
+      recordBar = null;
+      return {on: !!window.__pkbRecord, status: status};
+    }
+    if (!recordBar || !recordBar.isConnected) {
+      recordBar = document.createElement('div');
+      recordBar.setAttribute('data-pkb-layer', '');
+      recordBar.setAttribute('data-pkb-record', '');
+      recordBar.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:2147483646;max-width:420px;'
+        + 'background:#111827;color:#f9fafb;border-radius:10px;padding:8px 10px;'
+        + 'box-shadow:0 8px 24px rgba(0,0,0,.28);font:12px/1.4 ' + FONT + ';';
+      (document.documentElement || document.body).appendChild(recordBar);
+    }
+    recordBar.textContent = '';
+    var title = document.createElement('div');
+    title.textContent = status === 'paused' ? 'Recording paused' : 'Recording';
+    recordBar.appendChild(title);
+    var pre = document.createElement('pre');
+    pre.setAttribute('data-pkb-script', '');
+    pre.textContent = spec.script || '';
+    pre.style.cssText = 'white-space:pre-wrap;margin:6px 0;max-height:140px;overflow:auto;';
+    recordBar.appendChild(pre);
+    function button(label, action) {
+      var node = document.createElement('button');
+      node.type = 'button';
+      node.textContent = label;
+      node.setAttribute('data-pkb-action', action);
+      node.style.cursor = 'pointer';
+      node.style.marginRight = '6px';
+      node.addEventListener('click', function () {
+        lastPressed = node;
+        setFeedback(node, 'sending');
+        var ev = {type: 'record', event: 'record', action: action, source: 'human'};
+        if (action === 'accept' || action === 'reject') {
+          var lines = (pre.textContent || '').split('\n').filter(function (line) { return line.trim(); });
+          ev.index = String(Math.max(0, lines.length - 1));
+        }
+        pushEvent(ev);
+        setFeedback(node, 'delivered');
+        if (action === 'pause') window.__pkbRecord = false;
+        if (action === 'resume') window.__pkbRecord = true;
+      });
+      return node;
+    }
+    recordBar.appendChild(button(status === 'paused' || !window.__pkbRecord ? 'Resume' : 'Pause',
+      status === 'paused' || !window.__pkbRecord ? 'resume' : 'pause'));
+    recordBar.appendChild(button('Accept', 'accept'));
+    recordBar.appendChild(button('Reject', 'reject'));
+    return {on: !!window.__pkbRecord, status: status, script: spec.script || ''};
+  }
+
   window.__pkbUi = {
     version: VERSION,
     track: track,
@@ -1889,7 +2093,8 @@
     forget: forget,
     resolve: resolve,
     watchUntil: watchUntil,
-    docVersion: function () { return docVersion; }
+    docVersion: function () { return docVersion; },
+    record: record
   };
 
   var docVersion = 0;

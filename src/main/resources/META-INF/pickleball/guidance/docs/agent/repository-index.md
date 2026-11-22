@@ -29,6 +29,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/agent/repository-index.md`
 - `docs/ai-run-configuration.md`
 - `docs/block-conditionals.md`
+- `docs/collaborative-recording.md`
 - `docs/component-scenarios.md`
 - `docs/config-files-and-resource-mapping.md`
 - `docs/configuration.md`
@@ -372,6 +373,11 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/mappings/ScenarioMapping.java`
 - `src/main/java/tools/dscode/common/mappings/StepMapping.java`
 - `src/main/java/tools/dscode/common/mappings/ValueFormatting.java`
+- `src/main/java/tools/dscode/common/recording/InteractionLog.java`
+- `src/main/java/tools/dscode/common/recording/RecordControl.java`
+- `src/main/java/tools/dscode/common/recording/RecordingSession.java`
+- `src/main/java/tools/dscode/common/recording/RoutineStore.java`
+- `src/main/java/tools/dscode/common/recording/StepGenerator.java`
 - `src/main/java/tools/dscode/common/reporting/diagnostic/AgentDiscoverPlanner.java`
 - `src/main/java/tools/dscode/common/reporting/diagnostic/ConfigurationProvenance.java`
 - `src/main/java/tools/dscode/common/reporting/diagnostic/ConsumerMavenTestRunner.java`
@@ -831,6 +837,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/mappings/queries/DocumentAndReservedFieldReadTest.java`
 - `src/test/java/tools/dscode/common/mappings/queries/TopLevelCollectionTest.java`
 - `src/test/java/tools/dscode/common/mappings/UndefinedDollarStepTest.java`
+- `src/test/java/tools/dscode/common/recording/CollaborativeRecordingTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/AgentDiscoverPlannerTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/ConsumerMavenTestRunnerTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/DiagnosticCliGuidanceTest.java`
@@ -2024,6 +2031,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/features/nested-and-block-conditionals.feature`
 - `maven-consumer-project/src/test/resources/features/phrase-plain-forms.feature`
 - `maven-consumer-project/src/test/resources/features/pickleball-2.1.2-syntax-demo.feature`
+- `maven-consumer-project/src/test/resources/features/recorded-collaboration.feature`
 - `maven-consumer-project/src/test/resources/features/release-2-1-16.feature`
 - `maven-consumer-project/src/test/resources/features/reusable-scenario-selection.feature`
 - `maven-consumer-project/src/test/resources/features/run-row-gates.feature`

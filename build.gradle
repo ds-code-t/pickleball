@@ -1115,6 +1115,9 @@ allprojects {
                 '-Dpkb.test.console.forward.bytes=262144',
                 '-Dpkb.test.console.file.bytes=4194304'
         )
+        if (System.getProperty('pkb.update.golden') == 'true') {
+            task.systemProperty('pkb.update.golden', 'true')
+        }
         def consoleDir = task.project.layout.buildDirectory.dir("test-console/${task.name}")
         task.systemProperty('pkb.test.console.dir', consoleDir.get().asFile.absolutePath)
         task.doFirst {

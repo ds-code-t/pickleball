@@ -158,6 +158,7 @@ public final class WorkbenchAgentCommands {
                      "panel-open", "panel-close",
                      "capture-scenario",
                      "capture-steps",
+                     "record",
                      "screenshot", "selftest",
                      "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame",
                      "ask-and-wait", "pin", "toast", "checklist", "ui", "ref",
@@ -2090,6 +2091,30 @@ public final class WorkbenchAgentCommands {
         if (parsed.coordination().limit() != null) args.put("limit", parsed.coordination().limit().toString());
         if (parsed.coordination().id() != null) args.put("id", parsed.coordination().id());
         if (hasFlag(parsed, "--start")) args.put("start", "true");
+        if ("record".equals(command)) {
+            for (String flag : List.of(
+                    "stop", "status", "pause", "resume", "script", "save", "load", "list",
+                    "export", "run", "inject", "rename", "reject", "accept", "context"
+            )) {
+                if (hasFlag(parsed, "--" + flag)) args.put(flag, "true");
+            }
+            for (String flag : List.of(
+                    "name", "format", "out", "from", "to", "index", "literal", "session",
+                    "kind", "value", "query", "role", "id", "ref", "frame", "window", "source", "text"
+            )) {
+                copyFlag(args, parsed, flag);
+            }
+            StringBuilder params = new StringBuilder();
+            if (parsed.forwarded() != null) {
+                for (String token : parsed.forwarded()) {
+                    if (token != null && token.startsWith("--param=")) {
+                        if (!params.isEmpty()) params.append('|');
+                        params.append(token.substring("--param=".length()));
+                    }
+                }
+            }
+            if (!params.isEmpty()) args.put("param", params.toString());
+        }
         List<String> extra = new ArrayList<>();
         // extra is filled below; the live-worker post uses the same maps.
         java.util.Optional<tools.dscode.control.protocol.LiveBridgeFile.Bridge> liveBridge =

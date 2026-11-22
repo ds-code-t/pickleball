@@ -227,6 +227,9 @@ public final class AgentControl {
                 case "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame" -> {
                     tools.dscode.common.agentfast.TargetVerb.Outcome outcome =
                             tools.dscode.common.agentfast.TargetVerb.run(project, runId, op, values);
+                    if (outcome.exit() == 0) {
+                        tools.dscode.common.recording.RecordControl.noteAgent(project, runId, op, values, outcome.body());
+                    }
                     yield new Result(outcome.exit(), outcome.body());
                 }
                 case "ref" -> expandRef(values);
@@ -245,6 +248,7 @@ public final class AgentControl {
                 case "html-cleanup" -> cleanup(project, runId, values);
                 case "capture-scenario" -> capture(project, runId, values);
                 case "capture-steps" -> captureSteps(project, runId, values);
+                case "record" -> record(project, runId, values);
                 default -> fail(2, "unknown agent command: " + op);
             };
         }
@@ -1595,6 +1599,17 @@ public final class AgentControl {
         Map<String, Object> written = StepCapture.write(project, runId, args);
         written.put("ok", true);
         return new Result(0, written);
+    }
+
+    private static Result record(Path project, String runId, Map<String, String> args) {
+        tools.dscode.common.recording.RecordControl.Outcome outcome =
+                tools.dscode.common.recording.RecordControl.handle(project, runId, args);
+        return new Result(outcome.exit(), outcome.body());
+    }
+
+    /** Shows or hides the in-page record bar. A missing page is ignored. */
+    public static void armRecording(Map<String, Object> spec) {
+        PageSurfaces.armRecording(spec);
     }
 
     private static Path explicitPage(Path project, Map<String, String> args) {

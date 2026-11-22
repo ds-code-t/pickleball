@@ -44,6 +44,7 @@ final class WorkbenchCommandLine {
             "panel-open", "panel-close",
             "capture-scenario",
             "capture-steps",
+            "record",
             "screenshot",
             "selftest",
             "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame",

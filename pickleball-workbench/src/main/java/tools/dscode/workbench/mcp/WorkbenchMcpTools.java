@@ -525,6 +525,83 @@ final class WorkbenchMcpTools {
                 "Write the steps captured for this run.",
                 schema(view),
                 args -> viewCommand("capture-steps", args));
+        add("workbench_record_start",
+                "Start collaborative recording. Later human and agent interactions become dynamic steps.",
+                schema(Map.of("session", stringProperty("Optional session id."))),
+                args -> recordCommand(args, "start"));
+        add("workbench_record_stop",
+                "Stop collaborative recording and return the script.",
+                schema(Map.of()),
+                args -> recordCommand(args, "stop"));
+        add("workbench_record_status",
+                "Read record mode, session id, and step count.",
+                schema(Map.of()),
+                args -> recordCommand(args, "status"));
+        add("workbench_record_script",
+                "Return the live parameterized dynamic-step script.",
+                schema(Map.of()),
+                args -> recordCommand(args, "script"));
+        add("workbench_record_save",
+                "Save the live script as a named routine.",
+                schema(Map.of("name", stringProperty("Routine name.")), "name"),
+                args -> recordCommand(args, "save"));
+        add("workbench_record_load",
+                "Load a saved routine.",
+                schema(Map.of("name", stringProperty("Routine name.")), "name"),
+                args -> recordCommand(args, "load"));
+        add("workbench_record_list",
+                "List saved routines.",
+                schema(Map.of()),
+                args -> recordCommand(args, "list"));
+        add("workbench_record_export",
+                "Export a routine as a Gherkin feature that uses dynamic steps.",
+                schema(Map.of(
+                        "name", stringProperty("Routine name. Omit to export the live script."),
+                        "format", stringProperty("feature."),
+                        "out", stringProperty("Optional feature path.")
+                )),
+                args -> recordCommand(args, "export"));
+        add("workbench_record_inject",
+                "Record an agent action while recording is on.",
+                schema(Map.of(
+                        "kind", stringProperty("click, input, select, key, hover, drag, or check."),
+                        "query", stringProperty("Visible label."),
+                        "value", stringProperty("Typed or selected value."),
+                        "role", stringProperty("button, textbox, combobox, checkbox, or link.")
+                ), "kind"),
+                args -> recordCommand(args, "inject"));
+        add("workbench_record_refine",
+                "Rename a parameter, mark it literal, add context, or accept or reject a step.",
+                schema(Map.of(
+                        "from", stringProperty("Parameter to rename."),
+                        "to", stringProperty("New parameter name."),
+                        "literal", stringProperty("Parameter to keep as a literal value."),
+                        "text", stringProperty("Context phrase prepended to the script."),
+                        "index", stringProperty("Step index to accept or reject."),
+                        "action", stringProperty("rename, literal, context, accept, or reject.")
+                )),
+                args -> {
+                    String action = text(args, "action");
+                    if (action.isBlank()) {
+                        if (!text(args, "from").isBlank()) action = "rename";
+                        else if (!text(args, "literal").isBlank()) action = "literal";
+                        else if (!text(args, "text").isBlank()) action = "context";
+                        else action = "reject";
+                    }
+                    return recordCommand(args, action);
+                });
+    }
+
+    private Object recordCommand(Map<String, Object> args, String flag) {
+        Map<String, String> forwarded = new LinkedHashMap<>();
+        if (flag != null && !flag.isBlank()) forwarded.put(flag, "true");
+        for (String name : List.of("name", "session", "format", "out", "kind", "query", "value", "role",
+                "from", "to", "literal", "text", "index", "param")) {
+            String value = text(args, name);
+            if (!value.isBlank()) forwarded.put(name, value);
+        }
+        Object value = services.agentCommand("record", forwarded);
+        return value == null ? Map.of("status", "UNAVAILABLE", "op", "record") : value;
     }
 
     private Object forwardReady(List<String> verbArgs) {

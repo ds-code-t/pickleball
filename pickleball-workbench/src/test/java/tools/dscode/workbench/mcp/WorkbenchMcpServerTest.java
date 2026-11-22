@@ -124,7 +124,17 @@ class WorkbenchMcpServerTest {
             "workbench_chat_turn",
             "workbench_execute_steps",
             "workbench_ui_verify",
-            "workbench_capture_steps"
+            "workbench_capture_steps",
+            "workbench_record_start",
+            "workbench_record_stop",
+            "workbench_record_status",
+            "workbench_record_script",
+            "workbench_record_save",
+            "workbench_record_load",
+            "workbench_record_list",
+            "workbench_record_export",
+            "workbench_record_inject",
+            "workbench_record_refine"
     );
 
     @TempDir
