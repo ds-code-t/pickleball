@@ -16,6 +16,10 @@ A consumer project may contain only a short `AGENTS.md` bridge. That bridge uses
 
 Reads (`snap`, `find`, `chat-poll`, `ui-poll`, `overlay-poll`, `inspect-page`, `events --follow`) take `--format=lines|json`, `--fields`, `--where`, `--limit`, `--budget`, `--group=type|role`, `--priority=on`, and `--echo=hide`. Priority order is human, answer, click, mutation, agent, system. Element rows keep ref, id, role, name, visible, enabled, interactive, and frame. Text is trimmed and zero-width characters are removed. A shrunk inspect keeps the first phrase and one `- element` line, plus the first xpath.
 
+## Human-value distinction
+
+When instructional text includes a concrete value, quote that value. Write `Enter "abc" in this textbox`, not `Enter abc in this textbox`. Overlays, callouts, guides, question cards, the step editor, chat, the recording script, and HTML report titles paint each quoted span as a `.pkb-value` chip (monospace, bold, a light background). The quote characters stay in the text, so a copy of the sentence still contains `"abc"`. A guide `expect` is quoted inside the step sentence when the sentence does not already quote it. The stored answer from `ask-and-wait` stays the clicked label. The card confirms with `Answer sent: "Alpha"`.
+
 ## Tool chooser
 
 Pickleball Workbench is the one front door. It is a Java program launched from the consumer project, not a GUI requirement. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test. Do not click the JavaFX or WebView UI.

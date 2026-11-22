@@ -1,6 +1,7 @@
 // file: tools/dscode/common/reporting/logging/simplehtml/SimpleHtmlReportConverter.java
 package tools.dscode.common.reporting.logging.simplehtml;
 
+import tools.dscode.common.agentcontrol.HumanValue;
 import tools.dscode.internal.ValuesSupport;
 import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.common.reporting.logging.Attachment;
@@ -1601,7 +1602,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
                 if (!tdClass.isBlank()) out.append("            <td class=\"").append(tdClass).append("\">");
                 else out.append("            <td>");
 
-                out.append(escapeHtml(cellText)).append("</td>\n");
+                out.append(HumanValue.chip(escapeHtml(cellText))).append("</td>\n");
             }
 
             out.append("          </tr>\n");
@@ -1678,7 +1679,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         out.append("<div class=\"hdrLeft\">");
 
         out.append("<div class=\"hdrTitle\">")
-                .append(node.title)
+                .append(HumanValue.chip(node.title))
                 .append("</div>");
 
         out.append("<div class=\"hdrMeta\">")
@@ -2152,7 +2153,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
                     out.append("          <td>");
                 }
 
-                out.append(escapeHtml(cellText));
+                out.append(HumanValue.chip(escapeHtml(cellText)));
                 out.append("</td>\n");
             }
             out.append("        </tr>\n");
@@ -2474,6 +2475,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
             .nodeHeader.level-error { outline: 1px solid rgba(127, 29, 29, 0.28); outline-offset: -2px; }
             
             .hdrLeft { min-width: 0; }
+            .pkb-value { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight: 700; background: rgba(59, 130, 246, .14); border-radius: 4px; padding: 0 3px; }
             .hdrTitle {
               font-weight: var(--title-weight, 700);
               font-size: var(--header-font-size, 13px);

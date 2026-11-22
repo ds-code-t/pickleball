@@ -105,14 +105,14 @@ public final class VisualKinds {
                 + parsed + "</span>";
         if (text != null && !text.isBlank()) {
             badge += "<span style=\"margin-left:4px;font:12px sans-serif;color:#111;background:#fff;padding:1px 4px;\">"
-                    + escape(text) + "</span>";
+                    + HumanValue.html(text) + "</span>";
         }
         return badge;
     }
 
     public static String magnifierMarkup(String text, String zoomRaw) {
         String zoom = zoom(zoomRaw);
-        String body = text == null || text.isBlank() ? "magnifier" : escape(text);
+        String body = text == null || text.isBlank() ? "magnifier" : HumanValue.html(text);
         return "<div data-pkb-zoom=\"" + zoom + "\" data-pkb-copy=\"fallback\" style=\"transform:scale(" + zoom
                 + ");transform-origin:0 0;color:#111;font:12px sans-serif;\">"
                 + body + "</div>";

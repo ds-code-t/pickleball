@@ -88,12 +88,15 @@ class PersonFeedbackTest {
         assertTrue(js.contains("function byDomId"));
         assertTrue(js.contains("getElementById"));
         assertTrue(js.contains("function panelUnread()"));
+        assertTrue(js.contains("function appendDistinguished"));
+        assertTrue(js.contains("function quoteValue"));
         assertTrue(js.contains("Chat, "));
         assertTrue(js.contains("installId"));
         assertTrue(css.contains("[data-state=\"sending\"]"));
         assertTrue(css.contains("[data-state=\"delivered\"]"));
         assertTrue(css.contains("[data-state=\"read\"]"));
         assertTrue(css.contains(".pkb-badge:not(:empty)"));
+        assertTrue(css.contains(".pkb-value"));
         assertFalse(events.contains("n.innerText"));
         assertTrue(events.contains("data-choice"));
         assertTrue(events.contains("__pkbPush"));

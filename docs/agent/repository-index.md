@@ -291,6 +291,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentcontrol/ChatCursor.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ChatLog.java`
 - `src/main/java/tools/dscode/common/agentcontrol/EventCursor.java`
+- `src/main/java/tools/dscode/common/agentcontrol/HumanValue.java`
 - `src/main/java/tools/dscode/common/agentcontrol/LaunchTemplates.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ObserveEvents.java`
 - `src/main/java/tools/dscode/common/agentcontrol/PageSurfaces.java`
@@ -862,6 +863,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentcontrol/ChatLockChild.java`
 - `src/test/java/tools/dscode/common/agentcontrol/FallbackLogTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/ForgetLeavesPanelTest.java`
+- `src/test/java/tools/dscode/common/agentcontrol/HumanValueTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/IframeRecordingTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/IsolatedWorldTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/LiveChromeCdpTest.java`

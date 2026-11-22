@@ -113,3 +113,4 @@
 .pkb-handle { flex: none; border: 0; background: transparent; color: var(--pkb-muted); cursor: grab; font: inherit; padding: 2px 4px; touch-action: none; }
 .pkb-editor-tools { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--pkb-border); background: var(--pkb-surface); }
 .pkb-editor-tools button { border: 0; border-radius: 8px; padding: 4px 10px; background: var(--pkb-accent); color: var(--pkb-accent-text); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.pkb-value { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight: 700; background: rgba(59, 130, 246, .14); border-radius: 4px; padding: 0 3px; }

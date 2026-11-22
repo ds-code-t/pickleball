@@ -61,6 +61,26 @@
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
 
+  function appendDistinguished(node, text) {
+    var src = String(text == null ? "" : text);
+    var re = /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g;
+    var last = 0;
+    var match;
+    var any = false;
+    while ((match = re.exec(src))) {
+      any = true;
+      if (match.index > last) node.appendChild(document.createTextNode(src.slice(last, match.index)));
+      var chip = document.createElement("span");
+      chip.className = "pkb-value";
+      chip.textContent = match[0];
+      node.appendChild(chip);
+      last = match.index + match[0].length;
+    }
+    if (!any) node.appendChild(document.createTextNode(src));
+    else if (last < src.length) node.appendChild(document.createTextNode(src.slice(last)));
+    return node;
+  }
+
   function bubble(text, from, at, state) {
     var stick = nearBottom();
     var line = document.createElement("div");
@@ -72,7 +92,7 @@
     meta.textContent = (from === "human" ? "You" : from === "system" ? "System" : "Agent") + " \u00b7 " + time(at);
     var body = document.createElement("span");
     body.className = "pkb-body";
-    body.textContent = text;
+    appendDistinguished(body, text);
     line.appendChild(meta);
     line.appendChild(body);
     chat.appendChild(line);

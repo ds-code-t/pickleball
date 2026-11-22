@@ -72,7 +72,7 @@ Repeated input on the same control keeps the last value. Focus is not a step. A 
 
 Routines are JSON files under `.pickleball/recordings/routines/<name>.json`. They survive a new process. `--export --format=feature` writes a Scenario Outline whose steps are dynamic steps and whose Examples row is the recorded values. `--run --param=name=value` substitutes those placeholders, writes `.pickleball/recordings/replay/<name>.feature`, and writes `execute-step` rows in `<name>.steps.json`. Replay uses the same dynamic-step path as any other feature. `<name>` is an Examples or mapping placeholder, not a new syntax.
 
-The in-page bar (`window.__pkbUi.record`) shows the script while recording. Pause, Resume, Accept, and Reject use the same `sending` then `delivered` feedback as the panel. Those buttons push `type:record` onto the event stream.
+The in-page bar (`window.__pkbUi.record`) shows the script while recording. A quoted value in that script, and in each editor row, is a `.pkb-value` chip. The row text still contains the quotes. Pause, Resume, Accept, and Reject use the same `sending` then `delivered` feedback as the panel. Those buttons push `type:record` onto the event stream.
 
 ## Step editor
 

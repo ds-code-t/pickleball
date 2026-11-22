@@ -98,6 +98,39 @@ class OverlayRuntimeLiveTest {
         assertTrue(events.contains("click") && events.contains(id), "overlay click was not drained: " + events);
     }
 
+    /** A guide tip, the guide list, and a status card chip the quoted value. */
+    @Test
+    void guideAndStatusCardDistinguishTheQuotedValue() {
+        load("basic.html");
+        assertNotNull(PageSurfaces.runtimeCall("panelOpen", Map.of("tab", "steps", "focus", false), true));
+        String guide = PageSurfaces.runtimeCall("guide", Map.of(
+                "id", "g-value",
+                "tab", true,
+                "steps", List.of(Map.of(
+                        "t", "#email",
+                        "say", "Enter \"abc\" in this textbox",
+                        "n", 1,
+                        "do", "input",
+                        "expect", "abc"))), true);
+        assertNotNull(guide, "guide runtime call");
+        assertTrue(guide.contains("g-value"), guide);
+        Object tip = browser.executeScript(
+                "var l=document.querySelector('pkb-layer');"
+                        + "var chip=l&&l.shadowRoot&&l.shadowRoot.querySelector('.tip .pkb-value');"
+                        + "return chip?chip.textContent:'';");
+        assertEquals("\"abc\"", String.valueOf(tip), "guide tip");
+        Object listed = browser.executeScript(
+                "var l=document.querySelector('pkb-layer');"
+                        + "var chip=l&&l.shadowRoot&&l.shadowRoot.querySelector('.pkb-step .pkb-value');"
+                        + "return chip?chip.textContent:'';");
+        assertEquals("\"abc\"", String.valueOf(listed), "guide list");
+        AgentControl.Result card = run("status", Map.of("text", "Enter \"abc\" in this textbox", "target", "page"));
+        assertEquals(0, card.exit(), String.valueOf(card.body()));
+        Object cardChip = browser.executeScript(
+                "var chip=document.querySelector('[data-pkb-card] .pkb-value'); return chip?chip.textContent:'';");
+        assertEquals("\"abc\"", String.valueOf(cardChip), "status card");
+    }
+
     /** Audit item 6: the cached isolated-world context dies on a same-tab navigation. */
     @Test
     void placementAfterSameTabNavigationSucceeds() throws Exception {

@@ -29,7 +29,9 @@
   var LIGHT = '--pkb-bg:#ffffff;--pkb-fg:#111827;--pkb-muted:#6b7280;--pkb-line:rgba(17,24,39,.12);'
     + '--pkb-accent:#3b82f6;--pkb-shadow:0 8px 24px rgba(15,23,42,.16),0 1px 3px rgba(15,23,42,.12);';
   var DARK = '--pkb-bg:#1f2937;--pkb-fg:#f3f4f6;--pkb-muted:#9ca3af;--pkb-line:rgba(255,255,255,.16);'
-    + '--pkb-accent:#60a5fa;--pkb-shadow:0 8px 24px rgba(0,0,0,.55),0 1px 3px rgba(0,0,0,.4);';
+    + '--pkb-accent:#60a5fa;--pkb-shadow:0 8px 24px rgba(0,0,0,.55),0 1px 3px rgba(0,0,0,.4);'
+  var VALUE_CSS = '.pkb-value{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:700;'
+    + 'background:rgba(59,130,246,.14);border-radius:4px;padding:0 3px;}';;
   var DOC_CSS = ''
     + '[data-pkb-agent][data-pkb-ui]{' + LIGHT + '}'
     + '@media (prefers-color-scheme: dark){[data-pkb-agent][data-pkb-ui]:not([data-pkb-theme=light]){' + DARK + '}}'
@@ -55,7 +57,8 @@
     + '[data-pkb-ui][data-pkb-kind=border]{border-radius:6px;}'
     + '[data-pkb-ui][data-pkb-kind=magnifier]{box-shadow:var(--pkb-shadow);pointer-events:none;}'
     + '[data-pkb-ui][data-pkb-kind=step],[data-pkb-ui][data-pkb-kind=arrow],[data-pkb-ui][data-pkb-kind=spotlight]{pointer-events:none;}'
-    + '@media (prefers-reduced-motion: reduce){[data-pkb-ui]{transition:none!important;}}';
+    + '@media (prefers-reduced-motion: reduce){[data-pkb-ui]{transition:none!important;}}'
+    + VALUE_CSS;
   var LAYER_CSS = ''
     + ':host{all:initial;--pkb-accent:#3b82f6;}'
     + '@media (prefers-color-scheme: dark){:host{--pkb-accent:#60a5fa;}}'
@@ -87,7 +90,8 @@
     + '[data-pkb-feedback="delivered"]{box-shadow:inset 3px 0 0 #22a06b;}'
     + '[data-pkb-feedback="read"]{box-shadow:inset 3px 0 0 var(--pkb-accent);}'
     + '@media (prefers-color-scheme: dark){.tip,.ask{background:#1f2937;color:#f3f4f6;border-color:rgba(255,255,255,.16);}.badge{background:#1f2937;}.ask input{background:#111827;color:#f3f4f6;border-color:rgba(255,255,255,.2);}}'
-    + '@media (prefers-reduced-motion: reduce){.ring,.badge{transition:none;animation:none;}}';
+    + '@media (prefers-reduced-motion: reduce){.ring,.badge{transition:none;animation:none;}}'
+    + VALUE_CSS;
 
   var items = new Map();
   var layer = null;
@@ -146,11 +150,14 @@
     if (!note && node.classList && node.classList.contains('pkb-msg')) {
       note = document.createElement('span');
       note.className = 'pkb-feedback';
-      var text = null;
+      var anchor = null;
       for (var i = 0; i < node.childNodes.length; i++) {
-        if (node.childNodes[i].nodeType === 3) { text = node.childNodes[i]; break; }
+        var child = node.childNodes[i];
+        if (child.nodeType === 1 && child.classList && child.classList.contains('pkb-meta')) continue;
+        anchor = child;
+        break;
       }
-      if (text) node.insertBefore(note, text);
+      if (anchor) node.insertBefore(note, anchor);
       else node.appendChild(note);
     }
     if (note) {
@@ -1094,12 +1101,12 @@
     return type === 'password' || auto.indexOf('password') >= 0 || auto.indexOf('cc-') >= 0 || auto.indexOf('one-time-code') >= 0;
   }
 
-  function tipText(node, n, say) {
+  function tipText(node, n, say, value) {
     node.textContent = '';
     var b = document.createElement('b');
     b.textContent = n + '. ';
     node.appendChild(b);
-    node.appendChild(document.createTextNode(String(say || '')));
+    appendDistinguished(node, instruction(say, value));
   }
 
   function guideRender(g) {
@@ -1126,7 +1133,7 @@
       root.appendChild(g.tip);
     }
     var cur = g.steps[g.current];
-    if (cur && cur.anchor) tipText(g.tip, cur.n, cur.say);
+    if (cur && cur.anchor) tipText(g.tip, cur.n, cur.say, cur.expect);
     g.tip.hidden = !(cur && cur.anchor);
     g.tip.classList.toggle('missing', !!(cur && !cur.anchor));
     stepsList();
@@ -1153,7 +1160,9 @@
         row.setAttribute('data-state', step.state || 'todo');
         row.setAttribute('data-step', String(step.n));
         row.appendChild(el('span', 'pkb-num', step.done ? '\u2713' : String(step.n)));
-        row.appendChild(el('span', '', String(step.say || '')));
+        var say = el('span', 'pkb-say');
+        appendDistinguished(say, instruction(step.say, step.expect));
+        row.appendChild(say);
         list.appendChild(row);
       });
       pane.appendChild(list);
@@ -1433,7 +1442,7 @@
     node.setAttribute('aria-label', 'Question from the agent');
     var q = el('div');
     var b = document.createElement('b');
-    b.textContent = String(spec.say || '');
+    appendDistinguished(b, String(spec.say || ''));
     q.appendChild(b);
     node.appendChild(q);
     var choices = choiceList(spec.choices);
@@ -1441,7 +1450,9 @@
     var field = null;
     function answer(value, btn) {
       var picked = String(value == null ? '' : value);
-      var note = el('div', 'pkb-confirm', 'Answer sent: ' + picked);
+      var note = el('div', 'pkb-confirm');
+      note.appendChild(document.createTextNode('Answer sent: '));
+      appendDistinguished(note, quoteValue(picked));
       node.appendChild(note);
       if (btn) setFeedback(btn, 'sending');
       var ev = {type: 'answer', id: id, choice: picked, value: picked};
@@ -1566,6 +1577,50 @@
     return node;
   }
 
+  /** Quotes a concrete value. The quote characters stay in the text. */
+  function quoteValue(value) {
+    var text = String(value == null ? '' : value);
+    return '"' + text.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+  }
+
+  /** Quotes a known value inside instructional text when it is not already quoted. */
+  function instruction(text, value) {
+    var words = String(text == null ? '' : text);
+    if (value == null || value === '') return words;
+    var quoted = quoteValue(value);
+    if (words.indexOf(quoted) >= 0) return words;
+    var raw = String(value);
+    var at = words.indexOf(raw);
+    if (at >= 0) {
+      var open = at > 0 && words.charAt(at - 1) === '"';
+      var after = at + raw.length;
+      var close = after < words.length && words.charAt(after) === '"';
+      if (!(open && close)) return words.slice(0, at) + quoted + words.slice(at + raw.length);
+    }
+    return words ? words + ' ' + quoted : quoted;
+  }
+
+  /** Paints each quoted span as a chip. textContent of the node stays the original sentence. */
+  function appendDistinguished(node, text) {
+    var src = String(text == null ? '' : text);
+    var re = /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g;
+    var last = 0;
+    var match;
+    var any = false;
+    while ((match = re.exec(src))) {
+      any = true;
+      if (match.index > last) node.appendChild(document.createTextNode(src.slice(last, match.index)));
+      var chip = document.createElement('span');
+      chip.className = 'pkb-value';
+      chip.textContent = match[0];
+      node.appendChild(chip);
+      last = match.index + match[0].length;
+    }
+    if (!any) node.appendChild(document.createTextNode(src));
+    else if (last < src.length) node.appendChild(document.createTextNode(src.slice(last)));
+    return node;
+  }
+
   function clock(at) {
     var d = at ? new Date(at) : new Date();
     if (isNaN(d.getTime())) d = new Date();
@@ -1659,7 +1714,7 @@
     var who = from === 'human' ? 'You' : (from === 'system' ? 'System' : ('Agent' + (row.agent ? ' ' + row.agent : '')));
     var meta = el('span', 'pkb-meta', who + ' \u00b7 ' + clock(row.at));
     node.appendChild(meta);
-    node.appendChild(document.createTextNode(String(row.text == null ? '' : row.text)));
+    appendDistinguished(node, String(row.text == null ? '' : row.text));
     if (row.state === 'sending' || row.state === 'pending' || row.state === 'delivered' || row.state === 'read' || row.state === 'sent') {
       setFeedback(node, row.state === 'pending' ? 'sending' : (row.state === 'sent' ? 'delivered' : row.state));
     } else if (row.state) {
@@ -2217,7 +2272,7 @@
     recordBar.appendChild(title);
     var pre = document.createElement('pre');
     pre.setAttribute('data-pkb-script', '');
-    pre.textContent = spec.script || '';
+    appendDistinguished(pre, spec.script || '');
     pre.style.cssText = 'white-space:pre-wrap;margin:6px 0;max-height:140px;overflow:auto;';
     recordBar.appendChild(pre);
     function button(label, action) {
@@ -2396,7 +2451,7 @@
       text.setAttribute('role', 'textbox');
       text.setAttribute('aria-label', 'Step ' + (step.id || index + 1));
       text.setAttribute('spellcheck', 'false');
-      text.textContent = step.text || '';
+      appendDistinguished(text, step.text || '');
       var outdent = el('button', 'pkb-icon', '\u2190');
       outdent.type = 'button';
       outdent.setAttribute('aria-label', 'Outdent');
@@ -2583,6 +2638,12 @@
           event.preventDefault();
           editorCommand('delete', {index: index});
         }
+      });
+      list.addEventListener('focusin', function (event) {
+        var field = event.target;
+        if (!field.classList || !field.classList.contains('pkb-editor-text')) return;
+        if (!field.querySelector || !field.querySelector('.pkb-value')) return;
+        field.textContent = field.textContent;
       });
       list.addEventListener('focusout', function (event) {
         if (editorRendering) return;
@@ -2831,6 +2892,7 @@
       + '#list{padding:12px;display:flex;flex-direction:column;gap:6px;}'
       + '.row{display:flex;gap:6px;align-items:flex-start;}'
       + '.text{flex:1;min-height:22px;white-space:pre-wrap;overflow-wrap:anywhere;}'
+      + '.pkb-value{font-family:ui-monospace,monospace;font-weight:700;background:rgba(59,130,246,.18);border-radius:4px;padding:0 3px;}'
       + '.msg{padding:6px 10px;border-radius:10px;background:#1d2127;border:1px solid #2c323b;}'
       + '.msg[data-from="human"]{align-self:flex-end;background:#1f3354;}'
       + '[data-state="sending"],[data-pkb-feedback="sending"]{opacity:.65;}'
@@ -2851,11 +2913,13 @@
     return ''
       + 'var PANEL="' + kind + '";'
       + 'var list=document.getElementById("list");'
+      + 'function chip(node,text){var src=String(text==null?"":text);node.textContent="";var re=/"([^"\\\\]|\\\\.)*"|\'([^\'\\\\]|\\\\.)*\'/g;var last=0,m,any=false;while((m=re.exec(src))){any=true;if(m.index>last)node.appendChild(document.createTextNode(src.slice(last,m.index)));var s=document.createElement("span");s.className="pkb-value";s.textContent=m[0];node.appendChild(s);last=m.index+m[0].length;}if(!any)node.textContent=src;else if(last<src.length)node.appendChild(document.createTextNode(src.slice(last)));}'
       + 'function send(op,extra){extra=extra||{};extra.pkb="pop";extra.panel=PANEL;extra.op=op;if(window.opener)window.opener.postMessage(extra,"*");}'
       + 'function phrase(text){var value=String(text==null?"":text).trim();if(!value)return", ";if(value.charAt(0)===","||value.charAt(0)===":"||value.indexOf("Then ")===0||value.indexOf("And ")===0)return value;return", "+value;}'
       + 'function renderSteps(steps){list.textContent="";(steps||[]).forEach(function(step,index){'
       + 'var row=document.createElement("div");row.className="row";row.setAttribute("data-index",String(index));row.style.marginLeft=((step.depth||0)*16)+"px";'
-      + 'var text=document.createElement("div");text.className="text";text.contentEditable="true";text.setAttribute("role","textbox");text.textContent=step.text||"";'
+      + 'var text=document.createElement("div");text.className="text";text.contentEditable="true";text.setAttribute("role","textbox");chip(text,step.text||"");'
+      + 'text.addEventListener("focusin",function(){if(text.querySelector(".pkb-value"))text.textContent=text.textContent;});'
       + 'text.addEventListener("keydown",function(event){if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();send("edit",{index:index,text:text.textContent});}'
       + 'if(event.key==="Tab"){event.preventDefault();send(event.shiftKey?"outdent":"nest",{index:index});}'
       + 'if(event.altKey&&(event.key==="ArrowUp"||event.key==="ArrowDown")){event.preventDefault();send("move",{from:index,to:event.key==="ArrowUp"?Math.max(0,index-1):index+1});}'
@@ -2868,7 +2932,7 @@
       + 'row.appendChild(text);row.appendChild(out);row.appendChild(nest);row.appendChild(del);list.appendChild(row);});}'
       + 'function renderChat(messages){list.textContent="";(messages||[]).forEach(function(row){'
       + 'var node=document.createElement("div");node.className="msg";node.setAttribute("data-from",row.from||"agent");'
-      + 'if(row.state){node.setAttribute("data-state",row.state);node.setAttribute("data-pkb-feedback",row.state);}node.textContent=row.text||"";list.appendChild(node);});'
+      + 'if(row.state){node.setAttribute("data-state",row.state);node.setAttribute("data-pkb-feedback",row.state);}chip(node,row.text||"");list.appendChild(node);});'
       + 'list.scrollTop=list.scrollHeight;}'
       + 'window.addEventListener("message",function(event){var data=event.data;if(!data||data.pkb!=="pop-state"||data.panel!==PANEL)return;'
       + 'if(PANEL==="editor")renderSteps(data.steps||[]);else renderChat(data.messages||[]);});'

@@ -764,7 +764,7 @@ public final class AgentControl {
             if (text == null) return fail(2, "checklist requires --items");
         } else {
             if (!present(args.get("text"))) return fail(2, op + " requires --text");
-            text = "<div data-pkb-card=\"" + op + "\">" + escapeCard(args.get("text").trim()) + "</div>";
+            text = "<div data-pkb-card=\"" + op + "\">" + HumanValue.html(args.get("text").trim()) + "</div>";
         }
         int top = nextCardTop();
         Map<String, Object> placed = PageSurfaces.place(
@@ -1378,14 +1378,10 @@ public final class AgentControl {
             count++;
             html.append("<label data-pkb-check=\"").append(count).append("\" data-pkb-checked=\"false\">")
                     .append("<input type=\"checkbox\" data-pkb-check-input=\"").append(count).append("\">")
-                    .append("<span>").append(escapeCard(item.trim())).append("</span></label>");
+                    .append("<span>").append(HumanValue.html(item.trim())).append("</span></label>");
         }
         html.append("</div>");
         return count == 0 ? null : html.toString();
-    }
-
-    private static String escapeCard(String value) {
-        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
     }
 
     private static double boxNumber(Object value) {
