@@ -2091,6 +2091,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/tools/dscode/common/util/datetime/BusinessTimePostModifierChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/coredefinitions/DataTableConversionChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/coredefinitions/ModularScenariosChecks.java`
+- `maven-consumer-project/src/test/java/tools/dscode/launcher/ConsumerReadinessSmoke.java`
 - `maven-consumer-project/src/test/java/tools/dscode/launcher/WorkbenchAgentCommandChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/parallelutilities/ParallelCountEstimatorChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/Release217Phase1Checks.java`
