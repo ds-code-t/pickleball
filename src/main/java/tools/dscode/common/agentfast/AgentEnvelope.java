@@ -159,8 +159,7 @@ public final class AgentEnvelope {
             JsonNode items = node.path("items");
             if (items.isArray()) {
                 for (JsonNode item : items) {
-                    if (item.isTextual()) text.append(item.asText()).append('\n');
-                    else text.append(item.toString()).append('\n');
+                    text.append(renderItem(item)).append('\n');
                 }
             }
             text.append("next=").append(LineView.token(node.path("next").asText(""))).append('\n');
@@ -172,6 +171,60 @@ public final class AgentEnvelope {
         } catch (Exception failure) {
             return json == null ? "" : json;
         }
+    }
+
+    /** A readable line. Text stays text. An object is not printed as raw JSON. */
+    private static String renderItem(JsonNode item) {
+        if (item == null || item.isNull()) return "";
+        if (item.isTextual()) return item.asText();
+        if (!item.isObject()) return item.asText();
+        if (item.hasNonNull("role") || item.hasNonNull("name")) return renderSnapItem(item);
+        StringBuilder line = new StringBuilder("-");
+        java.util.Iterator<java.util.Map.Entry<String, JsonNode>> fields = item.fields();
+        while (fields.hasNext()) {
+            java.util.Map.Entry<String, JsonNode> entry = fields.next();
+            JsonNode value = entry.getValue();
+            if (value == null || value.isNull() || value.isContainerNode()) continue;
+            line.append(' ').append(entry.getKey()).append('=').append(LineView.token(scalar(value)));
+        }
+        if (line.length() == 1) line.append(" item");
+        return line.toString();
+    }
+
+    /** Same shape as a snap line: {@code - role "name" id= visible= ...}. */
+    private static String renderSnapItem(JsonNode item) {
+        String role = item.path("role").asText("item");
+        if (role.isBlank()) role = "item";
+        String name = item.path("name").asText("").replace("\"", "'");
+        StringBuilder line = new StringBuilder();
+        line.append("- ").append(role).append(" \"").append(name).append("\"");
+        String id = item.path("id").asText("");
+        String ref = item.path("ref").asText("");
+        if (!ref.isBlank() && (id.isBlank() || ref.length() <= 40)) {
+            line.append(" [ref=").append(ref).append("]");
+        }
+        appendField(line, item, "id");
+        appendField(line, item, "visible");
+        appendField(line, item, "enabled");
+        appendField(line, item, "interactive");
+        if (item.has("frame")) {
+            String frame = item.path("frame").asText("");
+            line.append(" frame=").append(LineView.token(frame.isBlank() ? "top" : frame));
+        }
+        return line.toString();
+    }
+
+    private static void appendField(StringBuilder line, JsonNode item, String key) {
+        if (!item.has(key) || item.get(key).isNull() || item.get(key).isContainerNode()) return;
+        String value = scalar(item.get(key));
+        if (value.isBlank()) return;
+        line.append(' ').append(key).append('=').append(LineView.token(value));
+    }
+
+    private static String scalar(JsonNode value) {
+        if (value == null || value.isNull()) return "";
+        if (value.isTextual()) return value.asText("");
+        return value.asText("");
     }
 
     private static Map<String, Object> state(Map<String, Object> body, Path project, String runId) {

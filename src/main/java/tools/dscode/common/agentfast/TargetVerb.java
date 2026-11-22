@@ -2783,6 +2783,7 @@ public final class TargetVerb {
     /**
      * Section headers, then the compact lines. Over the line or byte budget, the reply keeps a prefix
      * and the whole list is written under {@code .pickleball/agent-full/}. Hits are not copied beside the lines.
+     * {@code --format=json} stores the row objects. Every other format, including the default, stores line strings.
      */
     private static void putBudgetedLines(
             Map<String, Object> body,
@@ -2792,6 +2793,10 @@ public final class TargetVerb {
             boolean alwaysFull,
             Map<String, String> args
     ) {
+        if (jsonFormat(args)) {
+            putJsonRows(body, rows, project, runId, alwaysFull, args);
+            return;
+        }
         List<Map<String, Object>> shaped = SnapView.matching(rows, args);
         List<String> all = sectioned(shaped, args);
         int lineBudget = SnapView.lineBudget(args);
@@ -2816,6 +2821,47 @@ public final class TargetVerb {
         boolean truncated = shown.size() < all.size();
         if (truncated) body.put("truncated", true);
         if (truncated || alwaysFull) body.put("full", writeLines(project, runId, all));
+    }
+
+    /** Object rows for {@code --format=json}. The default snap print stays line strings. */
+    private static void putJsonRows(
+            Map<String, Object> body,
+            List<Map<String, Object>> rows,
+            Path project,
+            String runId,
+            boolean alwaysFull,
+            Map<String, String> args
+    ) {
+        List<Map<String, Object>> objects = new ArrayList<>(SnapView.filter(rows, args));
+        int lineBudget = SnapView.lineBudget(args);
+        boolean truncated = false;
+        if (objects.size() > lineBudget) {
+            objects = new ArrayList<>(objects.subList(0, lineBudget));
+            truncated = true;
+        }
+        body.put("lines", objects);
+        int byteBudget = SnapView.byteBudget(args);
+        body.put("replyBudget", byteBudget);
+        body.put("format", "json");
+        if (!objects.isEmpty()) {
+            body.put("ref", objects.get(0).get("ref"));
+            body.put("id", objects.get(0).get("id"));
+        }
+        List<String> all = sectioned(SnapView.matching(rows, args), args);
+        if (truncated) body.put("truncated", true);
+        if (truncated || alwaysFull) body.put("full", writeLines(project, runId, all));
+    }
+
+    private static boolean jsonFormat(Map<String, String> args) {
+        if (args == null) return false;
+        return "json".equalsIgnoreCase(blank(args.get("format")));
+    }
+
+    /** The list {@code snap} would put on {@code lines} for these args. Package tests use it. */
+    static Object viewLines(List<Map<String, Object>> rows, Map<String, String> args) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        putBudgetedLines(body, rows, null, "view", false, args);
+        return body.get("lines");
     }
 
     /** Interactable rows under {@code # role} or {@code # type}. {@code --priority=on} reorders and marks each line. */
