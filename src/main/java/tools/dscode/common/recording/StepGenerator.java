@@ -112,7 +112,8 @@ public final class StepGenerator {
         Map<String, String> pending = null;
         for (Map<String, String> row : open) {
             String kind = kind(row);
-            if ("focus".equals(kind)) {
+            if (ownRow(row)) continue;
+            if (("focus".equals(kind) || "hover".equals(kind)) && !noise(state)) {
                 continue;
             }
             if (("input".equals(kind) || "change".equals(kind)) && pending != null && sameTarget(pending, row)
@@ -325,9 +326,26 @@ public final class StepGenerator {
         return InteractionLog.first(row.get("kind"), row.get("type"), "click").toLowerCase(Locale.ROOT);
     }
 
+    private static boolean noise(Map<String, Object> state) {
+        if (state == null) return false;
+        Object value = state.get("noise");
+        return Boolean.TRUE.equals(value) || "true".equalsIgnoreCase(String.valueOf(value));
+    }
+
+    private static boolean ownRow(Map<String, String> row) {
+        if (row == null) return false;
+        if ("true".equalsIgnoreCase(row.get("own"))) return true;
+        String id = InteractionLog.first(row.get("id"), "");
+        return id.startsWith("pkb-") || id.startsWith("ask-");
+    }
+
     private static boolean sameTarget(Map<String, String> left, Map<String, String> right) {
-        String a = InteractionLog.first(left.get("id"), left.get("name"), left.get("target"));
-        String b = InteractionLog.first(right.get("id"), right.get("name"), right.get("target"));
+        String leftId = InteractionLog.first(left.get("id"), "");
+        String rightId = InteractionLog.first(right.get("id"), "");
+        if (!leftId.isBlank() && leftId.equals(rightId)) return true;
+        if (!leftId.isBlank() || !rightId.isBlank()) return false;
+        String a = InteractionLog.first(left.get("name"), left.get("target"));
+        String b = InteractionLog.first(right.get("name"), right.get("target"));
         return !a.isBlank() && a.equals(b);
     }
 

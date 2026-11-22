@@ -263,7 +263,14 @@
 
   function ours(node) {
     var el = node && node.nodeType === 1 ? node : (node && node.parentElement);
-    return !!(el && el.closest && el.closest('[data-pkb-agent],[data-pkb-layer]'));
+    var guard = 0;
+    while (el && guard++ < 24) {
+      if (el.nodeType === 1 && el.closest && el.closest('[data-pkb-agent],[data-pkb-layer],[data-pkb-record]')) return true;
+      var root = el.getRootNode ? el.getRootNode() : null;
+      if (root && root.host && root.host !== el) el = root.host;
+      else break;
+    }
+    return false;
   }
 
   function eventLeaf(event) {
@@ -328,7 +335,7 @@
   function sense(kind, node, extra) {
     var el = controlOf(node);
     if (!el || el.nodeType !== 1) return false;
-    if (ours(el) && !(el.closest && el.closest('[data-pkb-agent],[data-choice]'))) return false;
+    if (ours(el)) return false;
     var tagName = (el.nodeName || '').toLowerCase();
     if (tagName === 'iframe' || tagName === 'frame') return false;
     var name = labelOf(el);
@@ -744,8 +751,7 @@
       if (!event) return;
       var node = eventLeaf(event);
       if (!node) return;
-      if (ours(node) && !(node.closest && node.closest('[data-pkb-agent],[data-choice]'))) return;
-      if (node.closest && node.closest('[data-pkb-agent]') && !node.closest('[data-choice]')) return;
+      if (ours(node)) return;
       var control = (node.closest && node.closest('button,a,label,input,summary,[data-choice],[data-pkb-action],[role]')) || node;
       var tag = (control.nodeName || '').toLowerCase();
       if (tag === 'iframe' || tag === 'frame') return;
@@ -772,13 +778,11 @@
       lastPressed = row;
       setFeedback(row, 'sending');
       pushEvent({
-        type: 'check', source: 'human', event: 'interaction', kind: 'check',
+        type: 'check', source: 'human',
         id: host ? host.getAttribute('data-pkb-id') || '' : '',
         check: row.getAttribute('data-pkb-check') || '',
         checked: on ? 'true' : 'false',
-        name: row.getAttribute('data-pkb-check') || '',
-        role: 'checkbox',
-        frame: frameName(input)
+        name: row.getAttribute('data-pkb-check') || ''
       });
     }, true);
     var inputTimer = 0;
@@ -815,7 +819,7 @@
     var hoverTimer = 0;
     var hoverEl = null;
     on(doc, 'pointerover', function (event) {
-      if (window.__pkbRecord !== true) return;
+      if (window.__pkbRecord !== true || window.__pkbRecordNoise !== true) return;
       var node = eventLeaf(event);
       if (!node || ours(node)) return;
       var tag = (node.nodeName || '').toLowerCase();
@@ -828,7 +832,7 @@
       }, 350);
     }, true);
     on(doc, 'focusin', function (event) {
-      if (window.__pkbRecord !== true) return;
+      if (window.__pkbRecord !== true || window.__pkbRecordNoise !== true) return;
       var node = eventLeaf(event);
       if (!node || ours(node)) return;
       sense('focus', node, {});

@@ -751,6 +751,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentcontrol/IframeRecordingTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/IsolatedWorldTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/LiveChromeCdpTest.java`
+- `src/test/java/tools/dscode/common/agentcontrol/NoiseRecordingTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/NoReinjectTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/OverlayFixtures.java`
 - `src/test/java/tools/dscode/common/agentcontrol/OverlayPollCursorTest.java`
