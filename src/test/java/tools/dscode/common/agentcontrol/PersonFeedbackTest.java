@@ -30,6 +30,17 @@ class PersonFeedbackTest {
     }
 
     @Test
+    void choiceListSplitsCommasAndJsonButNotSpaces() {
+        assertEquals(List.of("Alpha", "Beta"), AgentControl.choiceList("Alpha,Beta"));
+        assertEquals(List.of("Alpha", "Beta"), AgentControl.choiceList("[\"Alpha\",\"Beta\"]"));
+        assertEquals(List.of("Alpha,Beta"), AgentControl.choiceList("[\"Alpha,Beta\"]"));
+        assertEquals(List.of("Yes, I agree", "No"), AgentControl.choiceList("[\"Yes, I agree\",\"No\"]"));
+        assertEquals(List.of("New York"), AgentControl.choiceList("New York"));
+        assertEquals(List.of("Alpha"), AgentControl.choiceList("Alpha, Alpha"));
+        assertEquals(List.of(), AgentControl.choiceList("  "));
+    }
+
+    @Test
     void aStoredAnswerIsNotMissedAndAJoinedLabelIsIgnored() throws Exception {
         Path project = Files.createTempDirectory("pkb-answer");
         String early = Instant.now().minusSeconds(5).toString();
@@ -68,7 +79,10 @@ class PersonFeedbackTest {
         assertTrue(js.contains("unresolved"));
         assertTrue(js.contains("function parkCards()"));
         assertTrue(js.contains("data-choice"));
-        assertTrue(js.contains("You chose "));
+        assertTrue(js.contains("function choiceList"));
+        assertTrue(js.contains("ANSWER_CONFIRM_MS = 1500"));
+        assertTrue(js.contains("Answer sent: "));
+        assertFalse(js.contains("You chose "));
         assertTrue(js.contains("function byDomId"));
         assertTrue(js.contains("getElementById"));
         assertTrue(js.contains("function panelUnread()"));

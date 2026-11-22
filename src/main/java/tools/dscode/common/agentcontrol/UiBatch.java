@@ -101,8 +101,9 @@ final class UiBatch {
             Object value = op.get(entry.getKey());
             if (value == null) continue;
             String flag = entry.getValue().flag();
-            if ("steps".equals(entry.getKey())) flags.put(flag, AgentStore.JSON.writeValueAsString(value));
-            else if (value instanceof List<?> list) flags.put(flag, String.join(",", list.stream().map(String::valueOf).toList()));
+            if ("steps".equals(entry.getKey()) || ("choices".equals(entry.getKey()) && value instanceof List<?>)) {
+                flags.put(flag, AgentStore.JSON.writeValueAsString(value));
+            } else if (value instanceof List<?> list) flags.put(flag, String.join(",", list.stream().map(String::valueOf).toList()));
             else flags.put(flag, String.valueOf(value));
         }
         if (handle != null) flags.put("handle", handle);

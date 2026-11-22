@@ -22,7 +22,8 @@ class UiBatchTest {
         assertEquals("Email", label.get("text"));
         assertEquals("h1", label.get("handle"));
         assertEquals("page", label.get("target"));
-        assertEquals("Yes,No", UiBatch.flags(ops.get(1), null).get("choices"));
+        assertEquals("[\"Yes\",\"No\"]", UiBatch.flags(ops.get(1), null).get("choices"));
+        assertEquals(List.of("Yes", "No"), AgentControl.choiceList(UiBatch.flags(ops.get(1), null).get("choices")));
         Map<String, String> panel = UiBatch.flags(ops.get(2), null);
         assertEquals("400", panel.get("width"));
         assertEquals("true", panel.get("minimized"));

@@ -2242,10 +2242,7 @@ public final class WorkbenchAgentCommands {
     }
 
     private static List<String> splitChoiceList(String raw) {
-        List<String> choices = new ArrayList<>();
-        if (raw == null || raw.isBlank()) return choices;
-        for (String choice : raw.split(",")) if (!choice.isBlank()) choices.add(choice.trim());
-        return choices;
+        return AgentControl.choiceList(raw);
     }
 
     /** A target-selector string, not panel `page` or `popup`. */

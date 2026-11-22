@@ -627,10 +627,9 @@ public final class AgentControl {
         spec.put("id", present(args.get("id")) ? args.get("id").trim() : "q" + ASK_SEQ.incrementAndGet());
         spec.put("say", args.get("say").trim());
         if (present(args.get("choices"))) {
-            List<String> choices = new ArrayList<>();
-            for (String choice : args.get("choices").split(",")) if (!choice.isBlank()) choices.add(choice.trim());
+            List<String> choices = choiceList(args.get("choices"));
             if (choices.size() > 6) return fail(2, "ask --choices holds at most 6 answers");
-            spec.put("choices", choices);
+            if (!choices.isEmpty()) spec.put("choices", choices);
         }
         if (!PageSurfaces.hasLivePage()) return fail(1, "ask needs a live browser page; run launch first");
         if (present(args.get("handle"))) spec.put("t", args.get("handle").trim());
@@ -650,7 +649,7 @@ public final class AgentControl {
         Result shown = ask(project, runId, args);
         if (shown.exit() != 0) return shown;
         String id = String.valueOf(shown.body().getOrDefault("id", ""));
-        List<String> choices = splitChoices(args.get("choices"));
+        List<String> choices = choiceList(args.get("choices"));
         long timeout = 3000L;
         if (present(args.get("timeout"))) {
             try {
@@ -719,11 +718,32 @@ public final class AgentControl {
         return null;
     }
 
-    private static List<String> splitChoices(String raw) {
+    /**
+     * Comma list or a JSON array. Spaces stay inside one label. A JSON label may contain a comma.
+     * Blank and duplicate labels are dropped. More than six is the caller's error.
+     */
+    public static List<String> choiceList(String raw) {
         List<String> choices = new ArrayList<>();
-        if (!present(raw)) return choices;
-        for (String choice : raw.split(",")) if (!choice.isBlank()) choices.add(choice.trim());
+        if (raw == null || raw.isBlank()) return choices;
+        String text = raw.trim();
+        if (text.startsWith("[")) {
+            try {
+                List<?> parsed = AgentStore.JSON.readValue(text, List.class);
+                for (Object item : parsed) pushChoice(choices, item == null ? "" : String.valueOf(item));
+                return choices;
+            } catch (RuntimeException | java.io.IOException ignored) {
+                // Not a JSON array. Fall through to the comma list.
+            }
+        }
+        for (String part : text.split(",", -1)) pushChoice(choices, part);
         return choices;
+    }
+
+    private static void pushChoice(List<String> choices, String raw) {
+        if (raw == null) return;
+        String value = raw.trim();
+        if (value.isEmpty() || choices.contains(value)) return;
+        choices.add(value);
     }
 
     /** Events already stored before this ask. A later answer is the only one this call accepts. */

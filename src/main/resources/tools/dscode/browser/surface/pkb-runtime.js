@@ -1365,6 +1365,41 @@
     return {id: id, closed: true};
   }
 
+  var ANSWER_CONFIRM_MS = 1500;
+
+  /** Comma list or a JSON array. A label keeps its spaces. A JSON label may contain a comma. */
+  function choiceList(raw) {
+    var out = [];
+    function push(value) {
+      value = String(value == null ? '' : value).trim();
+      if (!value || out.indexOf(value) >= 0) return;
+      out.push(value);
+    }
+    function fromString(value) {
+      value = String(value == null ? '' : value).trim();
+      if (!value) return;
+      if (value.charAt(0) === '[') {
+        try {
+          var parsed = JSON.parse(value);
+          if (Array.isArray(parsed)) {
+            parsed.forEach(push);
+            return;
+          }
+        } catch (ignored) { /* not JSON; split on commas below */ }
+      }
+      if (value.indexOf(',') >= 0) {
+        value.split(',').forEach(push);
+        return;
+      }
+      push(value);
+    }
+    if (Array.isArray(raw)) {
+      if (raw.length === 1) fromString(raw[0]);
+      else raw.forEach(push);
+    } else fromString(raw);
+    return out;
+  }
+
   function ask(spec) {
     spec = spec || {};
     var id = String(spec.id || 'q1');
@@ -1379,19 +1414,19 @@
     b.textContent = String(spec.say || '');
     q.appendChild(b);
     node.appendChild(q);
-    var choices = Array.isArray(spec.choices) ? spec.choices.filter(function (c) { return String(c).trim(); }).map(function (c) { return String(c).trim(); }) : [];
+    var choices = choiceList(spec.choices);
     var row = el('div', 'row');
     var field = null;
     function answer(value, btn) {
       var picked = String(value == null ? '' : value);
-      var note = el('div', 'pkb-confirm', 'You chose ' + picked);
+      var note = el('div', 'pkb-confirm', 'Answer sent: ' + picked);
       node.appendChild(note);
       if (btn) setFeedback(btn, 'sending');
       var ev = {type: 'answer', id: id, choice: picked, value: picked};
       if (spec.sensitive) { delete ev.value; delete ev.choice; ev.filled = true; }
       var bound = pushEvent(ev);
       if (btn) setFeedback(btn, bound ? 'delivered' : 'sending');
-      setTimeout(function () { askClose(id); }, 320);
+      setTimeout(function () { askClose(id); }, ANSWER_CONFIRM_MS);
     }
     if (choices.length) {
       choices.forEach(function (choice, i) {

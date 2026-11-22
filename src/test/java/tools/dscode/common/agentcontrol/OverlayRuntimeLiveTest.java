@@ -611,6 +611,8 @@ class OverlayRuntimeLiveTest {
         frames(2);
         OverlayFixtures.shot(browser, "p4-ask-confirm");
         layerRoot().findElement(By.cssSelector(".ask button.secondary")).click();
+        String confirm = layerRoot().findElement(By.cssSelector(".ask .pkb-confirm")).getText();
+        assertTrue(confirm.contains("Answer sent: No"), confirm);
         String events = String.valueOf(run("overlay-poll", Map.of()).body().get("items"));
         assertTrue(events.contains("type=answer") && events.contains("value=No"), events);
     }

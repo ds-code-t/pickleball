@@ -91,6 +91,27 @@ class WorkbenchCommandLineTest {
     }
 
     @Test
+    void choiceFragmentsRejoinOnCommasAndASpaceStaysOneChoice() {
+        WorkbenchCommandLine.Parsed split = WorkbenchCommandLine.parse(new String[]{
+                "ask-and-wait", "--say=Which?", "--choices=Alpha", "Beta"
+        });
+        assertTrue(List.of(split.forwarded()).contains("--choices=Alpha,Beta"), List.of(split.forwarded()).toString());
+        assertFalse(List.of(split.forwarded()).contains("Beta"));
+        WorkbenchCommandLine.Parsed spaced = WorkbenchCommandLine.parse(new String[]{
+                "ask", "--say=Which?", "--choices", "Alpha", "Beta"
+        });
+        assertTrue(List.of(spaced.forwarded()).contains("--choices=Alpha,Beta"), List.of(spaced.forwarded()).toString());
+        WorkbenchCommandLine.Parsed city = WorkbenchCommandLine.parse(new String[]{
+                "ask", "--say=City?", "--choices=New York"
+        });
+        assertTrue(List.of(city.forwarded()).contains("--choices=New York"), List.of(city.forwarded()).toString());
+        WorkbenchCommandLine.Parsed json = WorkbenchCommandLine.parse(new String[]{
+                "ask-and-wait", "--say=Which?", "--choices=[\"Alpha\",", "\"Beta\"]"
+        });
+        assertTrue(List.of(json.forwarded()).contains("--choices=[\"Alpha\",\"Beta\"]"), List.of(json.forwarded()).toString());
+    }
+
+    @Test
     void nameDoesNotAbsorbTokensAfterExample() {
         WorkbenchCommandLine.Parsed parsed = WorkbenchCommandLine.parse(
                 new String[]{"confirm", "--example=1", "2", "--name=The", "failing", "scenario"}

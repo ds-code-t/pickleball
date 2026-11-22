@@ -24,7 +24,7 @@ Usage: act --target=<selector> [--kind=click|type|hover|press|select] [--query=<
 
 # help ask-and-wait
 Usage: ask-and-wait --say=<question> [--choices=a,b] [--id=<id>] [--timeout=<ms>]
-Returns only the clicked choice. An answer already stored is returned even if the worker call is tight.
+Returns only the clicked choice. --choices is a comma list or a JSON array, one button each. The card shows Answer sent: <choice> for about 1.5 seconds. An answer already stored is returned even if the worker call is tight.
 
 # help border
 Usage: border [--text=<html>] [--handle=<id>] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--color=<color>] [--style=<css>] [--target=auto|page|popup|native] [--block=true] [--html=<page>]
@@ -275,7 +275,8 @@ Usage: save
 Usage: selftest ui --cpu [--component=panel]
 selftest ui --component=pages
 selftest ui --component=feedback
-Chrome is found on PATH, then Windows LOCALAPPDATA and Program Files, macOS applications, and the usual Linux paths. The idle window is 2000 ms. --component=feedback checks sending, delivered, and read in the page runtime. It does not need Chrome.
+selftest record
+Chrome is found on PATH, then Windows LOCALAPPDATA and Program Files, macOS applications, and the usual Linux paths. The idle window is 2000 ms. --component=feedback checks sending, delivered, and read in the page runtime. It does not need Chrome. selftest record clicks and types inside a fixture iframe and checks that the script names that frame and element, with no own-UI noise. It needs Chrome.
 
 # help session
 Usage: session list [--json] | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>

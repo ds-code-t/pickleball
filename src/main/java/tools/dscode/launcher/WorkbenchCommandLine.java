@@ -176,6 +176,9 @@ final class WorkbenchCommandLine {
         }
         ALIAS_NOTICES.get().clear();
         args = sessionQueryArgs(normalizeFlags(rewriteLiveStart(args)));
+        if (args != null && args.length > 0 && ("ask".equals(args[0]) || "ask-and-wait".equals(args[0]))) {
+            args = rejoinChoiceFragments(args);
+        }
         Path cwd = Path.of("").toAbsolutePath().normalize();
         if (args == null || args.length == 0) {
             return new Parsed("ui", cwd, null, null, null, null, null, new String[]{"ui", cwd.toString()}, Coordination.empty(), null, false, false, false, List.of(), List.of(), null, null, false, null, false, false);
@@ -939,6 +942,61 @@ final class WorkbenchCommandLine {
             }
         }
         return true;
+    }
+
+    /**
+     * PowerShell's comma operator and a whitespace split turn {@code --choices=Alpha,Beta}
+     * into {@code --choices=Alpha} plus a bare {@code Beta}. Join those fragments with commas
+     * so each name is its own button. A JSON array split on spaces keeps the commas it already has.
+     * A single token such as {@code --choices=New York} is not split on the space.
+     */
+    static String[] rejoinChoiceFragments(String[] args) {
+        if (args == null || args.length == 0) return args;
+        List<String> out = new ArrayList<>();
+        for (int index = 0; index < args.length; index++) {
+            String token = args[index];
+            if (token == null) continue;
+            boolean equalsForm = token.startsWith("--choices=");
+            if (!equalsForm && !"--choices".equals(token)) {
+                out.add(token);
+                continue;
+            }
+            String value = null;
+            if (equalsForm) {
+                value = token.substring("--choices=".length());
+            } else if (index + 1 < args.length && choiceFragment(args[index + 1])) {
+                value = args[++index];
+            }
+            if (value == null) {
+                out.add(token);
+                continue;
+            }
+            StringBuilder joined = new StringBuilder(value);
+            while (index + 1 < args.length && choiceFragment(args[index + 1])) {
+                appendChoiceFragment(joined, args[++index]);
+            }
+            out.add("--choices=" + joined);
+        }
+        return out.toArray(String[]::new);
+    }
+
+    private static void appendChoiceFragment(StringBuilder joined, String next) {
+        boolean json = joined.length() > 0 && joined.charAt(0) == '[';
+        if (!json) {
+            if (!joined.isEmpty()) joined.append(',');
+            joined.append(next);
+            return;
+        }
+        char last = joined.charAt(joined.length() - 1);
+        if (last == ',' || last == '[' || next.startsWith(",") || next.startsWith("]")) joined.append(next);
+        else joined.append(',').append(next);
+    }
+
+    /** A leftover choice word, not a flag and not a project path. */
+    private static boolean choiceFragment(String token) {
+        if (token == null || token.isBlank()) return false;
+        if (isFlag(token)) return false;
+        return !looksLikeProject(token);
     }
 
     private static boolean isFlag(String token) {
