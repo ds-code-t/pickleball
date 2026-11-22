@@ -21,6 +21,8 @@ Each gesture is one JSON object on `.pickleball/agent-events.jsonl` and on `.pic
 
 The page runtime (`pkb-runtime.js`, version `3.0.0-editor`) pushes these through `pkbSurface`. Click, input (debounced), select, check, and Enter/Tab/Escape are always sensed. Hover, focus, and drag are sensed while record mode is on. Agent `act` and `form-fill` are recorded too, including `used:desktop`.
 
+A person click, type, or other gesture inside a content iframe is recorded as that inner element. The `frame` field is the iframe id, name, or title (`top` on the main document, `desktop` for a desktop verb). The generated step names that frame, for example `in the "billing" IFrame, click the "Pay" Button`, instead of a hover on the iframe host. Same-origin frames are wired from the top document. An out-of-process frame is armed through the existing CDP frame list when that session can create a `pkb-surface` world there. Agent `act` inside a frame is unchanged.
+
 `events --follow --type=interaction` tails the same file and exits on the first match. It does not need a Workbench session.
 
 ## Verbs

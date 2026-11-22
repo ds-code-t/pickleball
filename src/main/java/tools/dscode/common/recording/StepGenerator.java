@@ -45,7 +45,7 @@ public final class StepGenerator {
                 index++;
                 continue;
             }
-            String text = phrase.text;
+            String text = withFrame(row, phrase.text);
             if (context != null && !context.isBlank() && steps.isEmpty()) {
                 text = context.trim() + (context.trim().endsWith(",") ? " " : ", ") + stripComma(text);
                 if (!text.startsWith(",")) text = ", " + text;
@@ -276,6 +276,17 @@ public final class StepGenerator {
         String text = name.isEmpty() ? "value" : name.toString();
         if (!Character.isLetter(text.charAt(0))) text = "p" + text;
         return text;
+    }
+
+    private static String withFrame(Map<String, String> row, String text) {
+        String frame = InteractionLog.first(row.get("frame"), "");
+        if (frame.isBlank() || "top".equalsIgnoreCase(frame) || "main".equalsIgnoreCase(frame)
+                || "desktop".equalsIgnoreCase(frame) || "null".equals(frame)) {
+            return text;
+        }
+        String body = text == null ? "" : text.trim();
+        if (body.startsWith(",")) body = body.substring(1).trim();
+        return ", in the " + quote(frame) + " IFrame, " + body;
     }
 
     private static String category(Map<String, String> row, String kind) {

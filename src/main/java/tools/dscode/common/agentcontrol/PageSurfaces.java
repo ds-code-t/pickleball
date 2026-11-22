@@ -1487,10 +1487,77 @@ final class PageSurfaces {
 
     /** Tells the page runtime that record mode is on or off, and shows the live script. */
     public static void armRecording(Map<String, Object> spec) {
+        Map<String, Object> body = spec == null ? Map.of() : spec;
         try {
-            runtimeCall("record", spec == null ? Map.of() : spec, false);
+            runtimeCall("record", body, false);
         } catch (RuntimeException ignored) {
             // No managed page. Record mode still lives in the state file.
+        }
+        try {
+            armRecordingFrames(body);
+        } catch (RuntimeException ignored) {
+            // A child frame that cannot take the runtime still records in the top document.
+        }
+    }
+
+    /** Installs sensing in child frames, including an out-of-process frame the top document cannot read. */
+    private static void armRecordingFrames(Map<String, Object> spec) {
+        WebDriver web = liveDriver();
+        if (web == null || !cdpCapable(web)) return;
+        boolean on = Boolean.TRUE.equals(spec.get("on")) || "true".equalsIgnoreCase(String.valueOf(spec.get("on")));
+        java.util.Set<String> ids;
+        try {
+            ids = liveFrameIds(web);
+        } catch (RuntimeException failure) {
+            CompositeLog.info("record", "frame arm skipped " + failure.getMessage());
+            return;
+        }
+        boolean root = true;
+        for (String id : ids) {
+            if (root) {
+                root = false;
+                continue;
+            }
+            try {
+                String probe = evalFrame(web, id, "window.__pkbUi&&window.__pkbUi.armSense?'yes':'no'");
+                if (!"yes".equals(probe)) {
+                    evalFrame(web, id, RUNTIME + "\n;'installed'");
+                }
+                String flag = on ? "true" : "false";
+                evalFrame(web, id, "window.__pkbRecord=" + flag + ";if(window.__pkbRecord&&window.__pkbUi&&window.__pkbUi.armSense)window.__pkbUi.armSense();'ok'");
+            } catch (RuntimeException failure) {
+                CompositeLog.info("record", "frame " + id + " " + failure.getMessage());
+            }
+        }
+    }
+
+    private static String evalFrame(WebDriver web, String frameId, String expression) {
+        Map<String, Object> world = new LinkedHashMap<>();
+        world.put("frameId", frameId);
+        world.put("worldName", "pkb-surface");
+        world.put("grantUniveralAccess", true);
+        int context = contextId(cdp(web, "Page.createIsolatedWorld", world));
+        if (context <= 0) throw new IllegalStateException("frame world failed");
+        Map<String, Object> eval = new LinkedHashMap<>();
+        eval.put("expression", expression);
+        eval.put("contextId", context);
+        eval.put("returnByValue", true);
+        Object result = cdp(web, "Runtime.evaluate", eval);
+        if (!(result instanceof Map<?, ?> map)) return "";
+        Object inner = map.get("result");
+        if (inner instanceof Map<?, ?> value && value.get("value") != null) return String.valueOf(value.get("value"));
+        return "";
+    }
+
+    private static int contextId(Object created) {
+        if (!(created instanceof Map<?, ?> map)) return 0;
+        Object id = map.get("executionContextId");
+        if (id instanceof Number number) return number.intValue();
+        if (id == null) return 0;
+        try {
+            return Integer.parseInt(String.valueOf(id));
+        } catch (NumberFormatException failure) {
+            return 0;
         }
     }
 

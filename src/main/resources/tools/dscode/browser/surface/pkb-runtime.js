@@ -308,9 +308,18 @@
       return Math.round(r.left) + ',' + Math.round(r.top) + ',' + Math.round(r.width) + ',' + Math.round(r.height);
     } catch (ignored) { return ''; }
   }
-  function frameName() {
-    try { return window.frameElement ? (window.frameElement.id || window.frameElement.name || 'frame') : 'top'; }
-    catch (ignored) { return 'top'; }
+  function frameName(node) {
+    try {
+      var doc = node && node.ownerDocument ? node.ownerDocument : document;
+      var view = doc.defaultView || window;
+      if (view.__pkbFrameLabel) return String(view.__pkbFrameLabel);
+      var host = null;
+      try { host = view.frameElement; } catch (ignored) { host = null; }
+      if (host) return host.id || host.getAttribute('name') || host.getAttribute('title') || 'frame';
+      try { if (view === view.top) return 'top'; } catch (ignored) { /* cross-origin top */ }
+      if (view.name) return String(view.name);
+    } catch (ignored) { /* detached */ }
+    return 'frame';
   }
   function controlOf(node) {
     if (!node || !node.closest) return node;
@@ -320,6 +329,8 @@
     var el = controlOf(node);
     if (!el || el.nodeType !== 1) return false;
     if (ours(el) && !(el.closest && el.closest('[data-pkb-agent],[data-choice]'))) return false;
+    var tagName = (el.nodeName || '').toLowerCase();
+    if (tagName === 'iframe' || tagName === 'frame') return false;
     var name = labelOf(el);
     var value = extra && extra.value != null ? String(extra.value) : (el.value != null ? String(el.value) : '');
     if (kind === 'select' && el.multiple && el.selectedOptions && !(extra && extra.value != null)) {
@@ -335,12 +346,12 @@
       kind: kind,
       source: (extra && extra.source) || 'human',
       id: (extra && extra.id) || el.id || '',
-      role: roleOf(el),
+      role: (extra && extra.role) || roleOf(el),
       name: extra && extra.name != null ? String(extra.name) : name,
       text: extra && extra.name != null ? String(extra.name) : name,
       value: value,
       oldValue: extra && extra.oldValue != null ? String(extra.oldValue) : '',
-      frame: frameName(),
+      frame: (extra && extra.frame) || frameName(el),
       bounds: boundsOf(el),
       target: name || el.id || roleOf(el)
     };
@@ -713,8 +724,169 @@
       scrollersDirty = true;
       bumpDoc();
       schedule();
+      adoptFrames(document);
       if (window.__pkbPushMutations) pushEvent({type: 'mutation', source: 'human'});
     }
+  }
+
+  function markSensed(doc) {
+    try {
+      if (!doc || !doc.documentElement) return false;
+      if (doc.documentElement.getAttribute('data-pkb-sense') === '1') return false;
+      doc.documentElement.setAttribute('data-pkb-sense', '1');
+      return true;
+    } catch (ignored) { return false; }
+  }
+
+  function wireSense(doc) {
+    if (!markSensed(doc)) return false;
+    on(doc, 'click', function (event) {
+      if (!event) return;
+      var node = eventLeaf(event);
+      if (!node) return;
+      if (ours(node) && !(node.closest && node.closest('[data-pkb-agent],[data-choice]'))) return;
+      if (node.closest && node.closest('[data-pkb-agent]') && !node.closest('[data-choice]')) return;
+      var control = (node.closest && node.closest('button,a,label,input,summary,[data-choice],[data-pkb-action],[role]')) || node;
+      var tag = (control.nodeName || '').toLowerCase();
+      if (tag === 'iframe' || tag === 'frame') return;
+      var name = '';
+      if (control.getAttribute) {
+        name = String(control.getAttribute('data-choice') || control.getAttribute('aria-label') || control.innerText || control.value || '')
+          .replace(/\s+/g, ' ').trim().slice(0, 80);
+      }
+      var placed = control.closest && control.closest('[data-pkb-agent]');
+      sense('click', control, {
+        id: (placed && placed.getAttribute('data-pkb-id')) || (control.id || node.id || ''),
+        name: name
+      });
+    }, true);
+    on(doc, 'change', function (event) {
+      var input = eventLeaf(event);
+      if (!input || !input.closest) return;
+      var row = input.closest('[data-pkb-check]');
+      if (!row) return;
+      var host = input.closest('[data-pkb-id]');
+      var on = input.checked === true || row.getAttribute('data-pkb-checked') === 'true';
+      if (input.type === 'checkbox') on = !!input.checked;
+      row.setAttribute('data-pkb-checked', on ? 'true' : 'false');
+      lastPressed = row;
+      setFeedback(row, 'sending');
+      pushEvent({
+        type: 'check', source: 'human', event: 'interaction', kind: 'check',
+        id: host ? host.getAttribute('data-pkb-id') || '' : '',
+        check: row.getAttribute('data-pkb-check') || '',
+        checked: on ? 'true' : 'false',
+        name: row.getAttribute('data-pkb-check') || '',
+        role: 'checkbox',
+        frame: frameName(input)
+      });
+    }, true);
+    var inputTimer = 0;
+    var inputEl = null;
+    on(doc, 'input', function (event) {
+      var input = eventLeaf(event);
+      if (!input || ours(input)) return;
+      inputEl = input;
+      if (inputTimer) clearTimeout(inputTimer);
+      inputTimer = setTimeout(function () {
+        inputTimer = 0;
+        if (!inputEl) return;
+        var tag = (inputEl.nodeName || '').toLowerCase();
+        sense(tag === 'select' ? 'select' : 'input', inputEl, {value: inputEl.value == null ? '' : String(inputEl.value)});
+      }, 400);
+    }, true);
+    on(doc, 'change', function (event) {
+      var input = eventLeaf(event);
+      if (!input || ours(input) || input.closest && input.closest('[data-pkb-check]')) return;
+      var tag = (input.nodeName || '').toLowerCase();
+      if (tag === 'select') sense('select', input, {value: input.value == null ? '' : String(input.value)});
+      else if (input.type === 'checkbox' || input.type === 'radio') {
+        sense('check', input, {checked: input.checked ? 'true' : 'false', value: input.checked ? 'true' : 'false'});
+      } else sense('change', input, {value: input.value == null ? '' : String(input.value)});
+    }, true);
+    on(doc, 'keydown', function (event) {
+      if (!event) return;
+      var key = event.key || '';
+      if (key !== 'Enter' && key !== 'Tab' && key !== 'Escape') return;
+      var target = eventLeaf(event);
+      if (!target || ours(target)) return;
+      sense('key', target, {value: key, name: labelOf(target) || key});
+    }, true);
+    var hoverTimer = 0;
+    var hoverEl = null;
+    on(doc, 'pointerover', function (event) {
+      if (window.__pkbRecord !== true) return;
+      var node = eventLeaf(event);
+      if (!node || ours(node)) return;
+      var tag = (node.nodeName || '').toLowerCase();
+      if (tag === 'iframe' || tag === 'frame') return;
+      hoverEl = node;
+      if (hoverTimer) clearTimeout(hoverTimer);
+      hoverTimer = setTimeout(function () {
+        hoverTimer = 0;
+        if (hoverEl) sense('hover', hoverEl, {});
+      }, 350);
+    }, true);
+    on(doc, 'focusin', function (event) {
+      if (window.__pkbRecord !== true) return;
+      var node = eventLeaf(event);
+      if (!node || ours(node)) return;
+      sense('focus', node, {});
+    }, true);
+    var dragFrom = '';
+    on(doc, 'dragstart', function (event) {
+      if (window.__pkbRecord !== true) return;
+      var node = eventLeaf(event);
+      dragFrom = labelOf(controlOf(node));
+    }, true);
+    on(doc, 'drop', function (event) {
+      if (window.__pkbRecord !== true) return;
+      var node = eventLeaf(event);
+      if (!node) return;
+      sense('drag', node, {name: dragFrom || labelOf(controlOf(node)), drop: labelOf(controlOf(node))});
+    }, true);
+    return true;
+  }
+
+  function adoptFrames(doc) {
+    if (!doc || !doc.querySelectorAll) return;
+    var frames;
+    try { frames = doc.querySelectorAll('iframe,frame'); } catch (ignored) { return; }
+    for (var i = 0; i < frames.length; i++) {
+      var frame = frames[i];
+      if (frame && !frame.__pkbFrameHook) {
+        frame.__pkbFrameHook = true;
+        on(frame, 'load', function () { adoptFrames(document); });
+      }
+      var child = null;
+      try { child = frame.contentDocument; } catch (ignored) { child = null; }
+      if (!child || child === doc || !child.documentElement) continue;
+      wireSense(child);
+      adoptFrames(child);
+    }
+  }
+
+  function armSense() {
+    wireSense(document);
+    adoptFrames(document);
+    if (!window.__pkbFrameWatch && window.MutationObserver && document.documentElement) {
+      window.__pkbFrameWatch = new MutationObserver(function () { adoptFrames(document); });
+      try { window.__pkbFrameWatch.observe(document.documentElement, {childList: true, subtree: true}); } catch (ignored) { /* not observable */ }
+    }
+    return true;
+  }
+
+  function publishRecord(on) {
+    var msg = {pkb: 'record', on: on === true};
+    function walk(win) {
+      var list;
+      try { list = win.frames; } catch (ignored) { return; }
+      for (var i = 0; i < list.length; i++) {
+        try { list[i].postMessage(msg, '*'); } catch (ignored) { /* cross-origin */ }
+        walk(list[i]);
+      }
+    }
+    walk(window);
   }
 
   function listen() {
@@ -745,108 +917,7 @@
       lastPressed = hit;
       setFeedback(hit, 'sending');
     }, true);
-    on(document, 'click', function (event) {
-      if (!event) return;
-      var node = eventLeaf(event);
-      if (!node) return;
-      if (ours(node) && !(node.closest && node.closest('[data-pkb-agent],[data-choice]'))) return;
-      if (node.closest && node.closest('[data-pkb-agent]') && !node.closest('[data-choice]')) return;
-      var control = (node.closest && node.closest('button,a,label,input,summary,[data-choice],[data-pkb-action]')) || node;
-      var role = control.getAttribute ? (control.getAttribute('role') || (control.nodeName || '')) : '';
-      var name = '';
-      if (control.getAttribute) {
-        name = String(control.getAttribute('data-choice') || control.getAttribute('aria-label') || control.innerText || control.value || '')
-          .replace(/\s+/g, ' ').trim().slice(0, 80);
-      }
-      var placed = control.closest && control.closest('[data-pkb-agent]');
-      sense('click', control, {
-        id: (placed && placed.getAttribute('data-pkb-id')) || (control.id || node.id || ''),
-        name: name
-      });
-    }, true);
-    on(document, 'change', function (event) {
-      var input = eventLeaf(event);
-      if (!input || !input.closest) return;
-      var row = input.closest('[data-pkb-check]');
-      if (!row) return;
-      var host = input.closest('[data-pkb-id]');
-      var on = input.checked === true || row.getAttribute('data-pkb-checked') === 'true';
-      if (input.type === 'checkbox') on = !!input.checked;
-      row.setAttribute('data-pkb-checked', on ? 'true' : 'false');
-      lastPressed = row;
-      setFeedback(row, 'sending');
-      pushEvent({
-        type: 'check', source: 'human', event: 'interaction', kind: 'check',
-        id: host ? host.getAttribute('data-pkb-id') || '' : '',
-        check: row.getAttribute('data-pkb-check') || '',
-        checked: on ? 'true' : 'false',
-        name: row.getAttribute('data-pkb-check') || '',
-        role: 'checkbox',
-        frame: frameName()
-      });
-    }, true);
-    var inputTimer = 0;
-    var inputEl = null;
-    on(document, 'input', function (event) {
-      var input = eventLeaf(event);
-      if (!input || ours(input)) return;
-      inputEl = input;
-      if (inputTimer) clearTimeout(inputTimer);
-      inputTimer = setTimeout(function () {
-        inputTimer = 0;
-        if (!inputEl) return;
-        var tag = (inputEl.nodeName || '').toLowerCase();
-        sense(tag === 'select' ? 'select' : 'input', inputEl, {value: inputEl.value == null ? '' : String(inputEl.value)});
-      }, 400);
-    }, true);
-    on(document, 'change', function (event) {
-      var input = eventLeaf(event);
-      if (!input || ours(input) || input.closest && input.closest('[data-pkb-check]')) return;
-      var tag = (input.nodeName || '').toLowerCase();
-      if (tag === 'select') sense('select', input, {value: input.value == null ? '' : String(input.value)});
-      else if (input.type === 'checkbox' || input.type === 'radio') {
-        sense('check', input, {checked: input.checked ? 'true' : 'false', value: input.checked ? 'true' : 'false'});
-      } else sense('change', input, {value: input.value == null ? '' : String(input.value)});
-    }, true);
-    on(document, 'keydown', function (event) {
-      if (!event) return;
-      var key = event.key || '';
-      if (key !== 'Enter' && key !== 'Tab' && key !== 'Escape') return;
-      var target = eventLeaf(event);
-      if (!target || ours(target)) return;
-      sense('key', target, {value: key, name: labelOf(target) || key});
-    }, true);
-    var hoverTimer = 0;
-    var hoverEl = null;
-    on(document, 'pointerover', function (event) {
-      if (window.__pkbRecord !== true) return;
-      var node = eventLeaf(event);
-      if (!node || ours(node)) return;
-      hoverEl = node;
-      if (hoverTimer) clearTimeout(hoverTimer);
-      hoverTimer = setTimeout(function () {
-        hoverTimer = 0;
-        if (hoverEl) sense('hover', hoverEl, {});
-      }, 350);
-    }, true);
-    on(document, 'focusin', function (event) {
-      if (window.__pkbRecord !== true) return;
-      var node = eventLeaf(event);
-      if (!node || ours(node)) return;
-      sense('focus', node, {});
-    }, true);
-    var dragFrom = '';
-    on(document, 'dragstart', function (event) {
-      if (window.__pkbRecord !== true) return;
-      var node = eventLeaf(event);
-      dragFrom = labelOf(controlOf(node));
-    }, true);
-    on(document, 'drop', function (event) {
-      if (window.__pkbRecord !== true) return;
-      var node = eventLeaf(event);
-      if (!node) return;
-      sense('drag', node, {name: dragFrom || labelOf(controlOf(node)), drop: labelOf(controlOf(node))});
-    }, true);
+    armSense();
     on(document, 'visibilitychange', function () {
       paused = document.hidden;
       if (!paused) schedule();
@@ -2057,6 +2128,8 @@
     spec = spec || {};
     if (spec.on === true || spec.on === 'true') window.__pkbRecord = true;
     if (spec.on === false || spec.on === 'false') window.__pkbRecord = false;
+    if (window.__pkbRecord === true) armSense();
+    publishRecord(window.__pkbRecord === true);
     var status = spec.status || (window.__pkbRecord ? 'recording' : 'stopped');
     if (status === 'stopped' && !spec.script && !(Array.isArray(spec.steps) && spec.steps.length)) {
       if (recordBar && recordBar.parentNode) recordBar.parentNode.removeChild(recordBar);
@@ -2732,7 +2805,14 @@
   }
 
   window.addEventListener('message', onPopMessage);
+  window.addEventListener('message', function (event) {
+    var data = event.data;
+    if (!data || data.pkb !== 'record') return;
+    window.__pkbRecord = data.on === true;
+    if (data.on === true) armSense();
+  });
   reattachPops();
+  if (window.__pkbRecord === true) armSense();
 
   window.__pkbUi = {
     version: VERSION,
@@ -2767,6 +2847,10 @@
     watchUntil: watchUntil,
     docVersion: function () { return docVersion; },
     record: record,
+    armSense: armSense,
+    sensed: function () {
+      return events().filter(function (row) { return row && row.event === 'interaction'; });
+    },
     editor: editorOpen,
     editorClose: editorClose,
     editorState: function () { return window.__pkbEditorState || null; },
