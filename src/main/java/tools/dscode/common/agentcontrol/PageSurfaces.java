@@ -1476,12 +1476,16 @@ final class PageSurfaces {
             String text = String.valueOf(map.get("text"));
             if (text.isBlank()) continue;
             Object pageId = map.get("id");
-            if (pageId != null && !String.valueOf(pageId).isBlank()) pageIds.add(String.valueOf(pageId));
-            ChatLog.send(project, runId, null, "human", "", text);
+            String page = pageId == null ? "" : String.valueOf(pageId);
+            if (!page.isBlank() && !"null".equals(page)) pageIds.add(page);
+            ChatLog.send(project, runId, null, "human", "", text, page);
             CompositeLog.info("chat", "panel human message chars=" + text.length());
             stored++;
         }
-        if (!pageIds.isEmpty()) markRead(pageIds);
+        if (!pageIds.isEmpty()) {
+            ReadMarks.note(project, runId, pageIds);
+            markRead(pageIds);
+        }
         return stored;
     }
 
@@ -1558,6 +1562,22 @@ final class PageSurfaces {
             return Integer.parseInt(String.valueOf(id));
         } catch (NumberFormatException failure) {
             return 0;
+        }
+    }
+
+    /** Page bubble ids the panel already shows as Read. Empty when no page is open. */
+    static java.util.List<String> readIds() {
+        if (!hasLivePage()) return java.util.List.of();
+        try {
+            String raw = runtimeCall("readIds", null, false);
+            if (raw == null || raw.isBlank() || "null".equals(raw)) return java.util.List.of();
+            java.util.List<String> ids = new java.util.ArrayList<>();
+            for (Object item : AgentStore.JSON.readValue(raw, java.util.List.class)) {
+                if (item != null && !String.valueOf(item).isBlank()) ids.add(String.valueOf(item));
+            }
+            return ids;
+        } catch (RuntimeException | java.io.IOException failure) {
+            return java.util.List.of();
         }
     }
 

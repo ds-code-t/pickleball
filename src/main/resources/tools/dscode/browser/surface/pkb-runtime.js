@@ -1689,7 +1689,7 @@
         state: row.state || '',
         at: row.at || ''
       });
-      if ((row.from || row.source) !== 'human') panelUnread();
+      if ((row.from || row.source) !== 'human' && row.state !== 'read') panelUnread();
     });
     if (stick) pane.scrollTop = pane.scrollHeight;
     syncPop('chat');
@@ -1735,6 +1735,14 @@
     });
     syncPop('chat');
     return n;
+  }
+
+  function readIds() {
+    var ids = [];
+    chatMirror.forEach(function (row) {
+      if (row && row.state === 'read' && row.id) ids.push(String(row.id));
+    });
+    return ids;
   }
 
   function parkCards() {
@@ -2736,9 +2744,49 @@
     pops[kind] = null;
     try { sessionStorage.removeItem('pkb-pop-' + kind); } catch (ignored) { /* storage blocked */ }
     if (kind === 'editor' && editor) { editor.state.pop = false; editorPlace(); }
-    if (kind === 'chat' && panel) { panel.state.pop = false; panelPlace(); }
+    if (kind === 'chat' && panel) {
+      panel.state.pop = false;
+      reapplyChat();
+      panelPlace();
+    }
     if (!silent) pushEvent({type: 'record', event: 'record', action: 'popin', panel: kind, source: 'human'});
     return {ok: true, panel: kind, where: 'page'};
+  }
+
+  function reapplyChat() {
+    if (!panel) return;
+    var rows = chatMirror.slice();
+    panel.chatPane.textContent = '';
+    panel.seen = {};
+    panel.unread = 0;
+    if (panel.empty) { panel.empty.remove(); panel.empty = null; }
+    chatMirror = [];
+    rows.forEach(function (row) {
+      if (!row || row.text == null) return;
+      chat({id: row.id, from: row.from, source: row.from, text: row.text, state: row.state || '', at: row.at || ''});
+    });
+    recountUnread();
+  }
+
+  function recountUnread() {
+    if (!panel) return;
+    var n = 0;
+    if (panel.state.min || panel.state.tab !== 'chat' || panel.state.pop) {
+      chatMirror.forEach(function (row) {
+        var from = row.from || 'agent';
+        if (from !== 'human' && row.state !== 'read') n++;
+      });
+    }
+    panel.unread = n;
+    var count = panel.unread || 0;
+    var chatTab = panel.tabs[0];
+    var badge = chatTab.querySelector('.pkb-badge');
+    var show = panel.state.tab !== 'chat' && count;
+    badge.textContent = show ? String(count) : '';
+    if (show) chatTab.setAttribute('data-unread', String(count));
+    else chatTab.removeAttribute('data-unread');
+    chatTab.setAttribute('aria-label', show ? 'Chat, ' + count + ' unread' : 'Chat');
+    panel.pill.querySelector('.pkb-unread').textContent = panel.state.min && count ? String(count) : '';
   }
 
   function syncPop(kind) {
@@ -2889,6 +2937,7 @@
     chat: chat,
     chatSent: chatSent,
     markRead: markRead,
+    readIds: readIds,
     parkCards: parkCards,
     drainChat: drainChat,
     guide: guide,

@@ -908,7 +908,10 @@ public final class AgentControl {
         for (Map<String, Object> message : messages) {
             Object id = message.get("id");
             if (id != null) read.add(String.valueOf(id));
+            Object pageId = message.get("pageId");
+            if (pageId != null && !String.valueOf(pageId).isBlank()) read.add(String.valueOf(pageId));
         }
+        ReadMarks.note(project, runId, read);
         PageSurfaces.markRead(read);
         Map<String, Object> body = ok("Chat messages after the given id.");
         body.put("count", messages.size());
@@ -954,14 +957,16 @@ public final class AgentControl {
         long deadline = System.nanoTime() + timeoutSec * 1_000_000_000L;
         while (true) {
             if ("human".equals(until) || "answer".equals(until)) {
+                java.util.Set<String> already = new java.util.LinkedHashSet<>(ReadMarks.ids(project, runId));
+                already.addAll(PageSurfaces.readIds());
                 Result polled = chatPoll(project, runId, poll, agentId);
-                Object messages = polled.body().get("messages");
-                if (messages instanceof List<?> list && !list.isEmpty()) {
+                List<Map<String, Object>> fresh = unreadChat(polled.body().get("messages"), already);
+                if (!fresh.isEmpty()) {
                     Map<String, Object> body = ok("human".equals(until) ? "human replied" : "answer received");
                     body.put("op", "chat-turn");
                     body.put("until", until);
-                    body.put("messages", list);
-                    body.put("count", list.size());
+                    body.put("messages", fresh);
+                    body.put("count", fresh.size());
                     return new Result(0, body);
                 }
             }
@@ -997,6 +1002,24 @@ public final class AgentControl {
             }
             Thread.sleep(50L);
         }
+    }
+
+    /** Drops chat rows whose id or page id was already Read before this poll. */
+    private static List<Map<String, Object>> unreadChat(Object messages, java.util.Set<String> already) {
+        List<Map<String, Object>> kept = new ArrayList<>();
+        if (!(messages instanceof List<?> list) || already == null) return kept;
+        for (Object item : list) {
+            if (!(item instanceof Map<?, ?> raw)) continue;
+            String id = raw.get("id") == null ? "" : String.valueOf(raw.get("id"));
+            String pageId = raw.get("pageId") == null ? "" : String.valueOf(raw.get("pageId"));
+            if ((!id.isBlank() && already.contains(id)) || (!pageId.isBlank() && already.contains(pageId))) continue;
+            Map<String, Object> row = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> entry : raw.entrySet()) {
+                if (entry.getKey() != null) row.put(String.valueOf(entry.getKey()), entry.getValue());
+            }
+            kept.add(row);
+        }
+        return kept;
     }
 
     /** Visible, rect, and overlaps for every placement on the live page. */

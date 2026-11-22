@@ -137,6 +137,38 @@ class AgentDataFoundationTest {
     }
 
     @Test
+    void chatTurnSkipsAReadMessageAndReturnsAnUnreadOne() throws Exception {
+        ChatCursor.arm(project, "turn", "run");
+        ChatLog.Message seen = ChatLog.send(project, "turn", "run", "human", "", "seen-reply", "h-seen");
+        ReadMarks.note(project, "turn", java.util.List.of("h-seen"));
+        ChatLog.send(project, "turn", "run", "human", "", "fresh-reply", "h-fresh");
+        Map<String, String> args = new LinkedHashMap<>();
+        args.put("text", "ping");
+        args.put("until", "human");
+        args.put("timeout", "0");
+        args.put("channel", "run");
+        AgentControl.Result hit = AgentControl.execute(project, "turn", "chat-turn", args, List.of(), "a");
+        assertEquals(0, hit.exit(), String.valueOf(hit.body()));
+        assertTrue(String.valueOf(hit.body()).contains("fresh-reply"), String.valueOf(hit.body()));
+        assertFalse(String.valueOf(hit.body()).contains("seen-reply"), String.valueOf(hit.body()));
+        assertEquals(1, hit.body().get("count"), String.valueOf(hit.body()));
+        AgentControl.Result again = AgentControl.execute(project, "turn", "chat-turn", args, List.of(), "a");
+        assertEquals(1, again.exit(), String.valueOf(again.body()));
+        assertFalse(String.valueOf(again.body()).contains("fresh-reply"), String.valueOf(again.body()));
+        assertEquals("h-seen", seen.pageId());
+
+        ChatCursor.arm(project, "poll", "run");
+        ChatLog.send(project, "poll", "run", "human", "", "still-polled", "h-polled");
+        ReadMarks.note(project, "poll", java.util.List.of("h-polled"));
+        Map<String, String> peek = new LinkedHashMap<>();
+        peek.put("channel", "run");
+        peek.put("from", "human");
+        AgentControl.Result polled = AgentControl.execute(project, "poll", "chat-poll", peek, List.of(), "a");
+        assertEquals(0, polled.exit(), String.valueOf(polled.body()));
+        assertTrue(String.valueOf(polled.body()).contains("still-polled"), String.valueOf(polled.body()));
+    }
+
+    @Test
     void linesAreSmallerAndEscapeAndStayUnderTheCap() {
         assertEquals("Save", LineView.token("Save"));
         assertEquals("\"a\\nb\"", LineView.token("a\nb"));

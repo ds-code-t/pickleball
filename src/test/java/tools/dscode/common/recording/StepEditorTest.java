@@ -198,6 +198,12 @@ class StepEditorTest {
         assertTrue(js.contains("Pop out step editor"));
         assertTrue(js.contains("data-pkb-feedback"));
         assertTrue(js.contains("chatMirror"));
+        assertTrue(js.contains("function readIds"));
+        assertTrue(js.contains("function reapplyChat"));
+        assertTrue(js.contains("function recountUnread"));
+        int pop = js.indexOf("function popIn");
+        assertTrue(pop > 0 && js.substring(pop, pop + 700).contains("reapplyChat"));
+        assertTrue(js.contains("row.state !== 'read'"));
     }
 
     private static Map<String, String> row(String kind, String name, String role, String value, String source) {
