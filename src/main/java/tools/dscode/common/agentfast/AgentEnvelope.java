@@ -67,6 +67,7 @@ public final class AgentEnvelope {
         compactVersions(copy);
         copy.put("err", ok ? null : error(copy, verb));
         copy.put("trunc", trunc(copy));
+        if ("ui-apply".equals(verb) || "ui-poll".equals(verb)) leanBatch(copy);
         int cap = replyCap(copy, verb);
         if (cap > 0 && SnapView.fitJson(copy, cap)) {
             for (int spin = 0; spin < 8; spin++) {
@@ -76,6 +77,17 @@ public final class AgentEnvelope {
             markTruncated(copy);
         }
         return copy;
+    }
+
+    /**
+     * Guided batch replies stay small. {@code ms} is the elapsed time, {@code next} is the cursor,
+     * and {@code state} stays. Timing, the duplicate elapsed field, and the cursor object do not.
+     */
+    private static void leanBatch(Map<String, Object> copy) {
+        copy.remove("timing");
+        copy.remove("elapsedMs");
+        copy.remove("cursors");
+        copy.remove("seq");
     }
 
     /** Records that the reply was cut. Line count is refreshed after the rows are dropped. */

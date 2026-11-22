@@ -196,6 +196,8 @@ Frame ids. A hit's `frame`, and the `frame` on `find` and `act`, is the same id 
 
 Consumer playground. `URL.dynamicSteps` in the consumer `configs/URL.yaml` is `http://127.0.0.1:8765/dynamic-steps.html`. That page is the dynamic-steps playground and the page `recorded-collaboration.feature` fills in (First Name, Favorite Color, Submit, and the live Name and Favorite Color lines). The consumer `CHROME_HEADLESS` config passes `--no-sandbox` so Chrome can start when the test process is root.
 
+Guided-flow replies. A direct placement still includes `visible`, `hidden`, `hiddenReason`, `overlaps`, and `lost` without `--verbose`. A `ui-apply` row omits those flags unless `--verbose=true`. `ui-apply` and `ui-poll` keep `ms`, `state`, and `next`, and omit `elapsedMs`, `timing`, `cursors`, and `seq`. `ui-poll` keeps name, role, and guide fields (`type`, `s`, `g`, `done`, `how`) and drops bounds, typed values, the system `overlay input` echo, and per-event `binding`, `sessionId`, and `frame`. Empty `chat` and `agentEvents` lists are omitted. The recording file still has the typed value.
+
 ## 2.2.0
 
 _No changes yet._

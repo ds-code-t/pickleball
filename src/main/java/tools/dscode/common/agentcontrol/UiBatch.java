@@ -15,7 +15,10 @@ import java.util.Set;
  */
 final class UiBatch {
     static final int MAX_OPS = 50;
-    private static final Set<String> NOISE = Set.of("at", "codes", "sentence", "runId", "channel");
+    /** Compact poll drops these. Typed values stay in the recording file, not the reply. */
+    private static final Set<String> NOISE = Set.of(
+            "at", "codes", "sentence", "runId", "channel",
+            "bounds", "target", "value", "oldValue", "eid", "sensitive", "drop");
 
     private UiBatch() {
     }
@@ -131,9 +134,9 @@ final class UiBatch {
         return value instanceof Number number ? number.doubleValue() : 0;
     }
 
-    /** Visibility and overlap stay on the row even when --verbose is off. */
-    private static void copyPlacement(Map<String, Object> row, Map<String, Object> body) {
-        if (row == null || body == null) return;
+    /** Visibility and overlap stay on a direct placement verb. A batch row carries them only with --verbose. */
+    private static void copyPlacement(Map<String, Object> row, Map<String, Object> body, boolean verbose) {
+        if (!verbose || row == null || body == null) return;
         for (String key : List.of("visible", "hidden", "hiddenReason", "overlaps", "lost")) {
             if (body.containsKey(key)) row.put(key, body.get(key));
         }
@@ -187,7 +190,7 @@ final class UiBatch {
                 row.put("ok", false);
                 row.put("error", String.valueOf(result.body().getOrDefault("error", "failed")));
             }
-            copyPlacement(row, result.body());
+            copyPlacement(row, result.body(), verbose);
             if (verbose) row.put("body", result.body());
             rows.add(row);
         }
@@ -238,14 +241,15 @@ final class UiBatch {
             List<Map<String, Object>> eventRows = compact(events.body().get("events"));
             List<Map<String, Object>> chatRows = compact(chat.exit() == 0 ? chat.body().get("messages") : null);
             chatRows.removeIf(row -> "agent".equals(row.get("source")));
+            chatRows.removeIf(UiBatch::overlayEcho);
             List<Map<String, String>> agentEvents = eventRows(chat.exit() == 0 ? chat.body().get("agentEvents") : null);
             if (!eventRows.isEmpty() || !chatRows.isEmpty() || !agentEvents.isEmpty() || System.nanoTime() >= deadline) {
                 UiState.sync(project, runId, args);
                 Map<String, Object> body = new LinkedHashMap<>();
                 body.put("ok", true);
                 body.put("events", eventRows);
-                body.put("chat", chatRows);
-                body.put("agentEvents", agentEvents);
+                if (!chatRows.isEmpty()) body.put("chat", chatRows);
+                if (!agentEvents.isEmpty()) body.put("agentEvents", agentEvents);
                 body.put("next", events.body().get("next"));
                 List<?> raw = chat.exit() == 0 && chat.body().get("messages") instanceof List<?> list ? list : List.of();
                 if (!raw.isEmpty() && raw.get(raw.size() - 1) instanceof Map<?, ?> last && last.get("id") != null) {
@@ -293,16 +297,37 @@ final class UiBatch {
         return rows;
     }
 
-    /** Typed field text stays in the recording file. A compact poll does not repeat it. */
+    /** The system line ChatLog writes for each overlay event. The event itself is already in the poll. */
+    private static boolean overlayEcho(Map<String, Object> row) {
+        if (row == null || !"system".equals(row.get("source"))) return false;
+        Object text = row.get("text");
+        return text != null && String.valueOf(text).startsWith("overlay input");
+    }
+
+    /** Typed field text stays in the recording file. A compact poll keeps the identity an agent acts on. */
     private static void copyCompact(Map<String, Object> row, Map<?, ?> map) {
-        boolean interaction = "interaction".equals(String.valueOf(map.get("event")));
+        boolean overlay = overlayRow(map);
         map.forEach((key, value) -> {
             if (key == null || value == null) return;
             String name = String.valueOf(key);
             if (NOISE.contains(name)) return;
-            if (interaction && ("value".equals(name) || "oldValue".equals(name))) return;
+            if (overlay && POLL_BULK.contains(name)) return;
+            if (overlay && "text".equals(name)) return;
             row.put(name, value);
         });
+    }
+
+    private static final Set<String> POLL_BULK = Set.of(
+            "binding", "sessionId", "frame", "source", "kind", "event", "filled");
+
+    private static boolean overlayRow(Map<?, ?> map) {
+        if (map.containsKey("event") || map.containsKey("kind") || map.containsKey("g") || map.containsKey("how")) return true;
+        Object type = map.get("type");
+        if (type == null) return false;
+        return switch (String.valueOf(type)) {
+            case "step", "guide", "input", "change", "click", "check", "select", "key" -> true;
+            default -> false;
+        };
     }
 
     private static List<Map<String, String>> eventRows(Object raw) {
@@ -312,7 +337,10 @@ final class UiBatch {
             if (!(item instanceof Map<?, ?> map)) continue;
             Map<String, String> row = new LinkedHashMap<>();
             map.forEach((key, value) -> {
-                if (key != null && value != null) row.put(String.valueOf(key), String.valueOf(value));
+                if (key == null || value == null) return;
+                String name = String.valueOf(key);
+                if (NOISE.contains(name) || "text".equals(name)) return;
+                row.put(name, String.valueOf(value));
             });
             rows.add(row);
         }
