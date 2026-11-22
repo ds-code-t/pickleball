@@ -53,7 +53,7 @@ confirm --run-id=row-1
 summary status=PASSED
 ```
 
-`record.json` `environment` is resolved, or `unset`. Never supply `pkb_run_profile` as input. Do not treat resolve-runvars as the environment Discover will use. `pkb_overriderunvars` does not launch confirm. The Workbench GUI is only a lightweight head over state and controls that already exist under the hood. Finished run id is not reused. `ui` chat writes a popup-ledger row. `inspect-page` uses a published live run session. `presence --touch`, `post --write`, `history --append`. `.pickleball/investigations/`, `.pickleball/presence/`, `.pickleball/posts/`, `.pickleball/history.log`. `gc-runs --dry-run`. `session-start` timeout is `error:`/`fix:`. `query` reads the store. A skipped step stays `SKIPPED`. `<entity:Type#id>` resolves from `store-entities` (Store on), including a dotted id.
+`record.json` `environment` is resolved, or `unset`. Never supply `pkb_run_profile` as input. `pkb_overriderunvars` does not launch confirm. The GUI is a thin head over existing controls. Finished run id is not reused. `ui` chat writes a popup-ledger row. `inspect-page` uses a published live run session. `presence --touch`, `post --write`, `history --append`. `.pickleball/investigations/`, `.pickleball/presence/`, `.pickleball/posts/`, `.pickleball/history.log`. `gc-runs --dry-run`. `session-start` timeout is `error:`/`fix:`. `query` reads the store. A skipped step stays `SKIPPED`. `<entity:Type#id>` resolves from `store-entities` (Store on), including a dotted id.
 
 Headless Workbench is not a headless browser. `isolate` and `execute-step` skip the GUI. The project browser is kept. `CHROME_HEADLESS` falls back only when the project names no browser.
 
@@ -65,7 +65,7 @@ Disposable FTS5 `reports/diagnostic-runs/diagnostics.db` (table `record_fts`). J
 
 A down controller runs in-process (no 30s wait, Windows too). `controller-start` is one JVM. `export-guidance --warm` pings under 1 s.
 
-Replies are one envelope (v, ok, op, ms, state, sum, items, next, trunc, err). Short id s1.h42; `ref` expands it. format=lines is the compact view (200 lines, 16 KB). `validate` lists empty glue.
+Replies are one envelope (v, ok, op, ms, state, sum, items, next, trunc, err). `items` is the one list. Short id s1.h42 is the default target; `ref` expands it. `--fields` keeps those keys. `--budget` caps the JSON and sets trunc.on. `next` is per channel (`--cursor`). Push rows have sessionId. `validate` lists empty glue.
 
 ## Generated guidance lifecycle
 
