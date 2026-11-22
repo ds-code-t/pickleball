@@ -75,7 +75,9 @@ class PersonFeedbackTest {
         String java = Files.readString(Path.of("src/main/java/tools/dscode/common/agentcontrol/AgentControl.java"));
         String adapter = Files.readString(Path.of("src/main/java/tools/dscode/browser/CdpAdapter.java"));
         assertTrue(js.contains("VERSION = '3.0.0-editor'"));
-        assertTrue(js.contains("TYPE_SETTLE_MS = 700"));
+        assertFalse(js.contains("TYPE_SETTLE_MS"));
+        assertTrue(js.contains("function clearFieldChrome"));
+        assertTrue(js.contains("step.expect"));
         assertTrue(js.contains("unresolved"));
         assertTrue(js.contains("function parkCards()"));
         assertTrue(js.contains("data-choice"));

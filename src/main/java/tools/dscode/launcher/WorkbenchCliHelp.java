@@ -77,7 +77,7 @@ final class WorkbenchCliHelp {
             Map.entry("overlay", "Usage: overlay --text=<html> [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--handle=<id>] [--at=auto|top|bottom|left|right|over] [--theme=auto|light|dark] [--block=true] [--geometry=<json>] [--html=<page>]"),
             Map.entry("panel-open", "Usage: panel-open [--target=auto|page|popup] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--tab=chat|steps] [--title=<text>] [--theme=auto|light|dark] [--minimized=true|false] [--run-id=<id>]"),
             Map.entry("panel-close", "Usage: panel-close [--target=auto|page|popup] [--run-id=<id>]"),
-            Map.entry("guide", "Usage: guide --steps=<json array>|@file.json [--id=<guide>] [--scroll=true] [--run-id=<id>]  (step: {\"t\":\"#email\",\"say\":\"Type your email\",\"do\":\"input\"}; do is click, input, select, check, or any; t may be a digit-leading id, #id, or [id=\"...\"]; a missing current target is refused)"),
+            Map.entry("guide", "Usage: guide --steps=<json array>|@file.json [--id=<guide>] [--scroll=true] [--run-id=<id>]  (step: {\"t\":\"#email\",\"say\":\"Type your email\",\"do\":\"input\"}; do is click, input, select, check, or any; t may be a digit-leading id, #id, or [id=\"...\"]; an input step ends on Enter, blur, or expect, not a typing pause; a missing current target is refused and is not listed in Steps; field badges are removed when the guide ends)"),
             Map.entry("guide-next", "Usage: guide-next [--id=<guide>] [--run-id=<id>]"),
             Map.entry("guide-back", "Usage: guide-back [--id=<guide>] [--run-id=<id>]"),
             Map.entry("guide-done", "Usage: guide-done [--id=<guide>] [--run-id=<id>]"),

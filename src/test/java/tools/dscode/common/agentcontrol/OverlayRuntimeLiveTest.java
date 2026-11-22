@@ -538,8 +538,12 @@ class OverlayRuntimeLiveTest {
         assertEquals("[]", String.valueOf(started.body().get("miss")));
         assertEquals("current", badge(1));
         assertEquals("todo", badge(2));
-        browser.findElement(By.id("email")).sendKeys("me@example.test");
-        assertEquals("current", badge(1), "one keystroke must not complete the step");
+        browser.findElement(By.id("email")).sendKeys("a");
+        Thread.sleep(900);
+        assertEquals("current", badge(1), "a pause must not complete the step");
+        browser.findElement(By.id("email")).sendKeys("me@example.test".substring(1));
+        assertEquals("current", badge(1), "more typing must not complete the step");
+        browser.executeScript("document.getElementById('email').blur()");
         awaitBadge(1, "done");
         assertEquals("current", badge(2));
         OverlayFixtures.shot(browser, "p4-guide-step2");
@@ -554,7 +558,7 @@ class OverlayRuntimeLiveTest {
         startGuide("[{\"t\":\"#save\",\"say\":\"Click Save\",\"do\":\"click\"}]");
         browser.findElement(By.id("save")).click();
         frames(2);
-        assertEquals("done", badge(1));
+        assertTrue(stateFromBadges().isEmpty(), "step-done badge stayed on the field");
         String events = String.valueOf(run("overlay-poll", Map.of()).body().get("items"));
         assertTrue(events.contains("how=click") && events.contains("type=guide"), events);
         AgentControl.Result done = run("guide-done", Map.of());
@@ -568,8 +572,10 @@ class OverlayRuntimeLiveTest {
         load("basic.html");
         startGuide(THREE_STEPS);
         browser.findElement(By.id("email")).sendKeys("me@example.test");
+        browser.executeScript("document.getElementById('email').blur()");
         awaitBadge(2, "current");
         browser.findElement(By.id("password")).sendKeys("Hunter2-Secret!");
+        browser.executeScript("document.getElementById('password').blur()");
         awaitBadge(3, "current");
         AgentControl.Result polled = run("overlay-poll", Map.of());
         String events = String.valueOf(polled.body().get("items"));
@@ -727,7 +733,9 @@ class OverlayRuntimeLiveTest {
         assertTrue((Boolean) browser.executeScript("return document.querySelectorAll('[data-pkb-kind=label]').length === 1"
                 + " && document.querySelectorAll('[data-pkb-kind=border]').length === 1"), reply);
         browser.findElement(By.id("email")).sendKeys("me@example.test");
+        browser.executeScript("document.getElementById('email').blur()");
         browser.findElement(By.id("password")).sendKeys("Hunter2-Secret!");
+        browser.executeScript("document.getElementById('password').blur()");
         awaitBadge(3, "current");
         browser.findElement(By.id("save")).click();
         AgentControl.Result polled = run("ui-poll", Map.of("wait", "5"));

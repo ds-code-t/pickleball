@@ -1224,7 +1224,13 @@
     while (next < g.steps.length && g.steps[next].done) next++;
     g.current = next;
     g.pulse = true;
-    if (g.current >= g.steps.length) pushEvent({type: 'guide', g: g.id, done: true});
+    if (g.current >= g.steps.length) {
+      pushEvent({type: 'guide', g: g.id, done: true});
+      clearFieldChrome(g);
+      stepsList();
+      window.__pkbGuideState = guideState();
+      return;
+    }
     guideRender(g);
     if (g.scroll && g.steps[g.current] && g.steps[g.current].anchor) {
       try { g.steps[g.current].anchor.scrollIntoView({block: 'center', behavior: 'smooth'}); } catch (ignored) { /* old browser */ }
@@ -1249,8 +1255,6 @@
     return (kind === 'input' || kind === 'change') && (a.type === 'checkbox' ? !!a.checked : !!String(a.value || '').length);
   }
 
-  var TYPE_SETTLE_MS = 700;
-
   function onGuideEvent(ev) {
     if (!guides.size || ours(ev.target)) return;
     guides.forEach(function (g) {
@@ -1260,12 +1264,11 @@
       if (!matches(step, ev.target, ev.type)) return;
       var how = ev.type === 'click' ? 'click' : ((step.anchor.nodeName || '').toLowerCase() === 'select' ? 'select' : (step.anchor.type === 'checkbox' ? 'check' : 'input'));
       var at = g.current;
-      if (step.timer) clearTimeout(step.timer);
+      if (step.timer) { clearTimeout(step.timer); step.timer = 0; }
       var finish = function () {
         step.timer = 0;
         if (g.current !== at || step.done || !guides.has(g.id)) return;
-        // A value is only reported when the agent asked for it and the field is not sensitive.
-        // Read the field now, after typing has paused, so the value is the whole entry.
+        // Read the field when the person finishes, so the value is the whole entry.
         var value = step.capture && how !== 'click' && !sensitive(step.anchor, step) ? String(step.anchor.value || '').slice(0, 500) : undefined;
         setFeedback(step.badge, 'sending');
         guideAdvance(g, at, how, value);
@@ -1273,10 +1276,13 @@
       };
       var typing = how === 'input' && (ev.type === 'input' || ev.type === 'change' || ev.type === 'keyup' || ev.type === 'keydown' || ev.type === 'blur');
       if (typing) {
-        var explicit = ev.type === 'blur' || (ev.type === 'keydown' && ev.key === 'Enter');
-        if (!String(step.anchor.value || '').length) return;
-        if (explicit) finish();
-        else step.timer = setTimeout(finish, TYPE_SETTLE_MS);
+        var valueNow = String(step.anchor.value || '');
+        var expected = step.expect == null ? '' : String(step.expect);
+        var explicit = ev.type === 'blur' || (ev.type === 'keydown' && (ev.key === 'Enter' || ev.keyCode === 13));
+        var matched = expected !== '' && valueNow === expected;
+        // A pause or a single keystroke does not finish the step.
+        if (!valueNow.length) return;
+        if (explicit || matched) finish();
         return;
       }
       finish();
@@ -1301,9 +1307,9 @@
     listen();
     guideListen();
     var g = {id: id, current: 0, scroll: !!spec.scroll, pulse: true, spec: {id: id, scroll: !!spec.scroll, steps: steps.map(function (st) {
-      return {t: st.t, say: st.say, do: st.do, n: st.n, sensitive: st.sensitive, capture: st.capture};
+      return {t: st.t, say: st.say, do: st.do, n: st.n, sensitive: st.sensitive, capture: st.capture, expect: st.expect};
     })}, steps: steps.map(function (st, i) {
-      return {t: st.t, say: st.say, do: st.do || 'any', n: st.n || i + 1, sensitive: !!st.sensitive, capture: !!st.capture, done: false};
+      return {t: st.t, say: st.say, do: st.do || 'any', n: st.n || i + 1, sensitive: !!st.sensitive, capture: !!st.capture, expect: st.expect == null ? '' : String(st.expect), done: false};
     })};
     var miss = [];
     g.steps.forEach(function (step) {
@@ -1318,6 +1324,10 @@
     }
     var current = g.steps[g.current];
     var unresolved = !!(current && !current.anchor);
+    if (unresolved) {
+      return {id: id, steps: g.steps.length, current: current ? current.n : null, miss: miss, unresolved: true,
+        flag: 'step ' + current.n + ' target was not found'};
+    }
     guides.set(id, g);
     guideRender(g);
     if (panel && spec.tab !== false) panelTab('steps');
@@ -1344,12 +1354,21 @@
     return {id: id, current: g.steps[g.current] ? g.steps[g.current].n : null, total: g.steps.length};
   }
 
+  function clearFieldChrome(g) {
+    if (!g) return;
+    g.steps.forEach(function (step) {
+      if (step.timer) { clearTimeout(step.timer); step.timer = 0; }
+      if (step.badge) { step.badge.remove(); step.badge = null; }
+      if (step.ring) { step.ring.remove(); step.ring = null; }
+    });
+    if (g.tip) { g.tip.remove(); g.tip = null; }
+  }
+
   function guideClose(id) {
     var key = String(id || 'g1');
     var g = guides.get(key);
     if (!g) return false;
-    g.steps.forEach(function (step) { if (step.badge) step.badge.remove(); if (step.ring) step.ring.remove(); });
-    if (g.tip) g.tip.remove();
+    clearFieldChrome(g);
     guides.delete(key);
     stepsList();
     window.__pkbGuideState = guideState();

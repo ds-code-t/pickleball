@@ -126,9 +126,12 @@ class FieldReportRegressionTest {
         assertEquals("Yes", hit.get("choice"));
         assertTrue(page("ask-and-wait").contains("clicked choice"));
         assertTrue(page("guide").contains("digit-leading"));
+        assertTrue(page("guide").contains("Enter"));
         String runtime = Files.readString(Path.of(
                 "src/main/resources/tools/dscode/browser/surface/pkb-runtime.js"));
-        assertTrue(runtime.contains("TYPE_SETTLE_MS = 700"));
+        assertFalse(runtime.contains("TYPE_SETTLE_MS"));
+        assertTrue(runtime.contains("ev.key === 'Enter'"));
+        assertTrue(runtime.contains("function clearFieldChrome"));
         assertTrue(runtime.contains("function byDomId"));
     }
 
