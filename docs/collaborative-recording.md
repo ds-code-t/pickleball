@@ -115,3 +115,7 @@ MCP: `workbench_record_editor`, `workbench_record_edit` (`action` is `edit`, `mo
 ## Desktop
 
 A desktop `act` while recording stores `source:agent`, `surface:desktop`, and `window`. The generated phrase is the same dynamic step (`click the "Save" Button`). The window stays on the interaction row. There is no OS-wide hook; the agent records the desktop verb it just ran, and a fixture or live tree is the target.
+
+## Consumer example
+
+`maven-consumer-project/src/test/resources/features/recorded-collaboration.feature` is the shape `record --export --format=feature` writes. It navigates to `URL.dynamicSteps`, enters a name, selects a color, clicks Submit, and checks the displayed text. The Examples rows are the recorded values (`Ava`/`Green`, `Mia`/`Blue`). The feature comment is the editor contract: `record --editor`, `--edit`, `--move`, `--nest`, `--add`, `--delete`, `--popout --panel=editor|chat`, and `--popin`. Use that file. Do not add a second feature for the same path. Replay still goes through `record --run --param=name=value`, which writes `.pickleball/recordings/replay/<name>.feature`.
