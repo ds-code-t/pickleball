@@ -2094,13 +2094,15 @@ public final class WorkbenchAgentCommands {
         if ("record".equals(command)) {
             for (String flag : List.of(
                     "stop", "status", "pause", "resume", "script", "save", "load", "list",
-                    "export", "run", "inject", "rename", "reject", "accept", "context"
+                    "export", "run", "inject", "rename", "reject", "accept", "context",
+                    "editor", "edit", "move", "nest", "outdent", "add", "delete", "popout", "popin"
             )) {
                 if (hasFlag(parsed, "--" + flag)) args.put(flag, "true");
             }
             for (String flag : List.of(
                     "name", "format", "out", "from", "to", "index", "literal", "session",
-                    "kind", "value", "query", "role", "id", "ref", "frame", "window", "source", "text"
+                    "kind", "value", "query", "role", "id", "ref", "frame", "window", "source", "text",
+                    "depth", "panel"
             )) {
                 copyFlag(args, parsed, flag);
             }

@@ -53,13 +53,13 @@ confirm --run-id=row-1
 summary status=PASSED
 ```
 
-`record.json` `environment` is resolved, or `unset`. Never supply `pkb_run_profile` as input. `pkb_overriderunvars` does not launch confirm. The GUI is a thin head over existing controls. Finished run id is not reused. `ui` chat writes a popup-ledger row. `inspect-page` uses a published live run session. `presence --touch`, `post --write`, `history --append`. `.pickleball/investigations/`, `.pickleball/presence/`, `.pickleball/posts/`, `.pickleball/history.log`. `gc-runs --dry-run`. `session-start` timeout is `error:`/`fix:`. `query` reads the store. A skipped step stays `SKIPPED`. `<entity:Type#id>` resolves from `store-entities` (Store on), including a dotted id.
+`record.json` `environment` is resolved, or `unset`. Never supply `pkb_run_profile` as input. `pkb_overriderunvars` does not launch confirm. The GUI is a thin head over existing controls. Finished run id is not reused. `record --editor` edits steps; `--popout --panel=editor|chat` pops a panel out. `ui` chat writes a popup-ledger row. `inspect-page` uses a published live run session. `presence --touch`, `post --write`, `history --append`. `.pickleball/investigations/`, `.pickleball/presence/`, `.pickleball/posts/`, `.pickleball/history.log`. `gc-runs --dry-run`. `session-start` timeout is `error:`/`fix:`. `query` reads the store. A skipped step stays `SKIPPED`. `<entity:Type#id>` resolves from `store-entities` (Store on), including a dotted id.
 
 Headless Workbench is not a headless browser. `isolate` and `execute-step` skip the GUI. The project browser is kept. `CHROME_HEADLESS` falls back only when the project names no browser.
 
 `store entity use` records a read, write, or mention. Omit `--step` for the active tracked step. Step id: `runId|featurePath|scenarioLine|examplesRow|stepOrd|sha256` (UTF-8).
 
-Disposable FTS5 `reports/diagnostic-runs/diagnostics.db` (table `record_fts`). JSON stays authoritative. DiagnosticCli rebuild on `reports/diagnostic-runs` rewrites `run-index.json` and `run-catalog.json`. Delete `diagnostics.db`, `-wal`, `-shm` to drop it. Missing file: `query search` reads the JSON. Present file rebuilds only when a source is newer.
+Disposable FTS5 `reports/diagnostic-runs/diagnostics.db` (table `record_fts`). JSON stays authoritative. DiagnosticCli rebuild on `reports/diagnostic-runs` rewrites `run-index.json` and `run-catalog.json`. Missing file: `query search` reads the JSON.
 
 ## Controller health
 

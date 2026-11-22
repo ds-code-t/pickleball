@@ -590,13 +590,43 @@ final class WorkbenchMcpTools {
                     }
                     return recordCommand(args, action);
                 });
+        add("workbench_record_editor",
+                "Return the in-page step editor rows (id, index, text, depth) and panel placement.",
+                schema(Map.of()),
+                args -> recordCommand(args, "editor"));
+        add("workbench_record_edit",
+                "Edit the step editor: edit text, move, nest, outdent, add, or delete. New interactions still append.",
+                schema(Map.of(
+                        "action", stringProperty("edit, move, nest, outdent, add, or delete."),
+                        "index", stringProperty("0-based row. For add, the insert point."),
+                        "text", stringProperty("Step phrase. A missing comma is added."),
+                        "from", stringProperty("Move source index."),
+                        "to", stringProperty("Move destination index."),
+                        "depth", stringProperty("Nesting depth after a move or add.")
+                ), "action"),
+                args -> {
+                    String action = text(args, "action");
+                    if (action.isBlank()) action = "edit";
+                    return recordCommand(args, action);
+                });
+        add("workbench_record_pop",
+                "Pop the step editor or the chat panel out to its own window, or pop it back in.",
+                schema(Map.of(
+                        "action", stringProperty("popout or popin."),
+                        "panel", stringProperty("editor or chat.")
+                ), "panel"),
+                args -> {
+                    String action = text(args, "action");
+                    if (action.isBlank()) action = "popout";
+                    return recordCommand(args, action);
+                });
     }
 
     private Object recordCommand(Map<String, Object> args, String flag) {
         Map<String, String> forwarded = new LinkedHashMap<>();
         if (flag != null && !flag.isBlank()) forwarded.put(flag, "true");
         for (String name : List.of("name", "session", "format", "out", "kind", "query", "value", "role",
-                "from", "to", "literal", "text", "index", "param")) {
+                "from", "to", "literal", "text", "index", "param", "depth", "panel")) {
             String value = text(args, name);
             if (!value.isBlank()) forwarded.put(name, value);
         }

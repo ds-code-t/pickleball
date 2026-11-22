@@ -57,6 +57,16 @@ public final class StepGenerator {
         return new Script(steps, gherkin(steps), chain(steps), parameters, kept);
     }
 
+    /** Same parameters and kept rows, with editor phrases and gherkin in front. */
+    public static Script presented(Script generated, List<String> phrases, String gherkin) {
+        List<String> steps = phrases == null ? List.of() : List.copyOf(phrases);
+        List<Map<String, Object>> parameters = generated == null || generated.parameters() == null
+                ? List.of() : generated.parameters();
+        List<Map<String, String>> kept = generated == null || generated.kept() == null
+                ? List.of() : generated.kept();
+        return new Script(steps, gherkin == null ? "" : gherkin, chain(steps), parameters, kept);
+    }
+
     /** Substitutes {@code <name>} using the supplied values, then the recorded example. */
     public static List<String> apply(List<String> steps, List<Map<String, Object>> parameters, Map<String, String> values) {
         List<String> concrete = new ArrayList<>();

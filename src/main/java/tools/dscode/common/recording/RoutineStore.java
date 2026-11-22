@@ -35,6 +35,10 @@ public final class RoutineStore {
     }
 
     public static Map<String, Object> save(Path project, String name, StepGenerator.Script script) throws IOException {
+        return save(project, name, script, List.of());
+    }
+
+    public static Map<String, Object> save(Path project, String name, StepGenerator.Script script, List<Integer> depths) throws IOException {
         String title = name == null || name.isBlank() ? "recorded" : name.trim();
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("name", title);
@@ -42,6 +46,7 @@ public final class RoutineStore {
         body.put("script", script.gherkin());
         body.put("phrase", script.phrase());
         body.put("steps", script.steps());
+        body.put("depths", depths == null ? List.of() : depths);
         body.put("parameters", script.parameters());
         Path target = file(project, title);
         if (target.getParent() != null) Files.createDirectories(target.getParent());
@@ -98,11 +103,11 @@ public final class RoutineStore {
         text.append("  # Recorded collaborative routine. Replay with the Examples row or record --run --param.\n");
         if (parameters.isEmpty()) {
             text.append("  Scenario: ").append(name).append("\n");
-            writeSteps(text, steps);
+            writeSteps(text, steps, depthList(routine));
             return text.toString();
         }
         text.append("  Scenario Outline: ").append(name).append("\n");
-        writeSteps(text, steps);
+        writeSteps(text, steps, depthList(routine));
         text.append("\n    Examples:\n      |");
         for (Map<String, Object> parameter : parameters) {
             text.append(' ').append(parameter.get("name")).append(" |");
@@ -130,9 +135,16 @@ public final class RoutineStore {
         return steps;
     }
 
-    private static void writeSteps(StringBuilder text, List<String> steps) {
+    public static List<Integer> depthList(Map<String, Object> routine) {
+        List<Integer> depths = new ArrayList<>();
+        if (routine == null || !(routine.get("depths") instanceof List<?> list)) return depths;
+        for (Object item : list) depths.add(RecordingSession.number(item));
+        return depths;
+    }
+
+    private static void writeSteps(StringBuilder text, List<String> steps, List<Integer> depths) {
         for (int index = 0; index < steps.size(); index++) {
-            text.append(index == 0 ? "    Then " : "    And ").append(steps.get(index)).append('\n');
+            text.append(EditorDraft.featureLine(steps, depths, index)).append('\n');
         }
     }
 

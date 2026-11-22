@@ -47,6 +47,10 @@ public final class RecordingSession {
             state.putIfAbsent("literals", new ArrayList<String>());
             state.putIfAbsent("renames", new LinkedHashMap<String, String>());
             state.putIfAbsent("context", "");
+            state.remove("edited");
+            state.remove("draft");
+            state.remove("removed");
+            state.remove("manualSeq");
             write(project, state);
             tools.dscode.common.agentfast.PushChannel.bind(project, session);
             return copy(state);

@@ -36,6 +36,15 @@ public final class RecordControl {
             if (truth(flags, "reject")) return reject(project, flags, true);
             if (truth(flags, "accept")) return reject(project, flags, false);
             if (truth(flags, "context")) return context(project, flags);
+            if (truth(flags, "editor")) return editor(project);
+            if (truth(flags, "edit")) return mutate(project, "edit", flags);
+            if (truth(flags, "move")) return mutate(project, "move", flags);
+            if (truth(flags, "nest")) return mutate(project, "nest", flags);
+            if (truth(flags, "outdent")) return mutate(project, "outdent", flags);
+            if (truth(flags, "add")) return mutate(project, "add", flags);
+            if (truth(flags, "delete")) return mutate(project, "delete", flags);
+            if (truth(flags, "popout")) return pop(project, flags, "window");
+            if (truth(flags, "popin")) return pop(project, flags, "page");
             if (truth(flags, "save")) return save(project, flags);
             if (truth(flags, "load")) return load(project, flags);
             if (truth(flags, "list")) return list(project);
@@ -106,7 +115,7 @@ public final class RecordControl {
     private static Outcome start(Path project, Map<String, String> flags, String runId) {
         String session = InteractionLog.first(flags.get("session"), runId, "");
         Map<String, Object> state = RecordingSession.start(project, session);
-        arm(true, "");
+        arm(project);
         Map<String, Object> body = ok("recording");
         body.put("op", "record");
         body.put("status", state.get("status"));
@@ -118,7 +127,7 @@ public final class RecordControl {
 
     private static Outcome stop(Path project) {
         Map<String, Object> state = RecordingSession.stop(project);
-        arm(false, "");
+        arm(project);
         StepGenerator.Script script = current(project);
         Map<String, Object> body = ok("recording stopped");
         body.put("op", "record");
@@ -132,14 +141,14 @@ public final class RecordControl {
     private static Outcome pause(Path project) {
         marker(project, "pause", null);
         Map<String, Object> state = RecordingSession.pause(project);
-        arm(false, "");
+        arm(project);
         return stateBody(state, "paused");
     }
 
     private static Outcome resume(Path project) {
         marker(project, "resume", null);
         Map<String, Object> state = RecordingSession.resume(project);
-        arm(true, "");
+        arm(project);
         return stateBody(state, "recording");
     }
 
@@ -169,17 +178,59 @@ public final class RecordControl {
     }
 
     private static Outcome script(Path project, boolean push) {
-        StepGenerator.Script script = current(project);
-        if (push) arm(RecordingSession.recording(project), script.gherkin());
+        Presented presented = presented(project);
+        if (push) arm(project);
+        StepGenerator.Script script = presented.script();
         Map<String, Object> body = ok(script.steps().isEmpty() ? "no steps recorded" : "script ready");
         body.put("op", "record");
-        body.put("status", RecordingSession.read(project).get("status"));
+        body.put("status", presented.state().get("status"));
         body.put("count", script.steps().size());
         body.put("steps", script.steps());
+        body.put("editor", EditorDraft.maps(presented.rows()));
+        body.put("panels", EditorDraft.panels(presented.state()));
         body.put("script", script.gherkin());
         body.put("phrase", script.phrase());
         body.put("parameters", script.parameters());
         body.put("sentence", script.steps().isEmpty() ? "no steps recorded" : "script ready");
+        return new Outcome(0, body);
+    }
+
+    private static Outcome editor(Path project) {
+        Outcome outcome = script(project, true);
+        int count = outcome.body().get("count") instanceof Number number ? number.intValue() : 0;
+        outcome.body().put("sentence", count == 0 ? "no steps recorded" : "editor ready");
+        return outcome;
+    }
+
+    private static Outcome mutate(Path project, String action, Map<String, String> flags) {
+        Map<String, Object> state = RecordingSession.read(project);
+        try {
+            EditorDraft.apply(state, generated(project, state), action, flags);
+        } catch (IllegalArgumentException failure) {
+            return fail(2, failure.getMessage() == null ? "editor update failed" : failure.getMessage());
+        }
+        RecordingSession.update(project, state);
+        Outcome outcome = script(project, true);
+        outcome.body().put("sentence", "editor updated");
+        return outcome;
+    }
+
+    private static Outcome pop(Path project, Map<String, String> flags, String where) {
+        Map<String, Object> state = RecordingSession.read(project);
+        try {
+            EditorDraft.place(state, flags.get("panel"), where);
+        } catch (IllegalArgumentException failure) {
+            return fail(2, failure.getMessage() == null ? "pop failed" : failure.getMessage());
+        }
+        RecordingSession.update(project, state);
+        arm(project);
+        String sentence = "window".equals(where) ? "popped out" : "popped in";
+        Map<String, Object> body = ok(sentence);
+        body.put("op", "record");
+        body.put("panel", flags.get("panel"));
+        body.put("where", "window".equals(where) ? "window" : "page");
+        body.put("panels", EditorDraft.panels(state));
+        body.put("sentence", sentence);
         return new Outcome(0, body);
     }
 
@@ -255,14 +306,15 @@ public final class RecordControl {
 
     private static Outcome save(Path project, Map<String, String> flags) throws IOException {
         String name = InteractionLog.first(flags.get("name"), "recorded");
-        StepGenerator.Script script = current(project);
-        Map<String, Object> saved = RoutineStore.save(project, name, script);
+        Presented presented = presented(project);
+        Map<String, Object> saved = RoutineStore.save(
+                project, name, presented.script(), EditorDraft.depths(presented.rows()));
         Map<String, Object> body = ok("routine saved");
         body.put("op", "record");
         body.put("name", saved.get("name"));
         body.put("path", saved.get("path"));
-        body.put("count", script.steps().size());
-        body.put("parameters", script.parameters());
+        body.put("count", presented.script().steps().size());
+        body.put("parameters", presented.script().parameters());
         body.put("sentence", "routine saved");
         return new Outcome(0, body);
     }
@@ -270,12 +322,26 @@ public final class RecordControl {
     private static Outcome load(Path project, Map<String, String> flags) throws IOException {
         if (!present(flags.get("name"))) return fail(2, "record --load needs --name");
         Map<String, Object> routine = RoutineStore.load(project, flags.get("name"));
+        List<String> loadedSteps = stringList(routine.get("steps"));
+        List<Integer> loadedDepths = RoutineStore.depthList(routine);
+        Map<String, Object> state = RecordingSession.read(project);
+        List<String> hidden = new ArrayList<>();
+        for (EditorDraft.Row row : EditorDraft.rows(generated(project, state), Map.of())) {
+            if (row.key() != null) hidden.add(row.key());
+        }
+        EditorDraft.install(state, loadedSteps, loadedDepths);
+        state.put("removed", hidden);
+        RecordingSession.update(project, state);
+        Presented presented = presented(project);
+        arm(project);
         Map<String, Object> body = ok("routine loaded");
         body.put("op", "record");
         body.put("name", routine.get("name"));
         body.put("path", routine.get("path"));
-        body.put("script", routine.get("script"));
-        body.put("steps", routine.get("steps"));
+        body.put("script", presented.script().gherkin());
+        body.put("steps", loadedSteps);
+        body.put("depths", loadedDepths);
+        body.put("editor", EditorDraft.maps(presented.rows()));
         body.put("parameters", routine.get("parameters"));
         body.put("sentence", "routine loaded");
         return new Outcome(0, body);
@@ -293,7 +359,7 @@ public final class RecordControl {
 
     private static Outcome export(Path project, Map<String, String> flags) throws IOException {
         String name = flags.get("name");
-        Map<String, Object> routine = present(name) ? RoutineStore.load(project, name) : routineFrom(current(project), "recorded");
+        Map<String, Object> routine = present(name) ? RoutineStore.load(project, name) : liveRoutine(project, "recorded");
         String format = InteractionLog.first(flags.get("format"), "feature");
         if (!"feature".equalsIgnoreCase(format)) return fail(2, "record --export format is feature");
         String feature = RoutineStore.feature(routine);
@@ -311,7 +377,7 @@ public final class RecordControl {
 
     private static Outcome run(Path project, Map<String, String> flags) throws IOException {
         String name = flags.get("name");
-        Map<String, Object> routine = present(name) ? RoutineStore.load(project, name) : routineFrom(current(project), "recorded");
+        Map<String, Object> routine = present(name) ? RoutineStore.load(project, name) : liveRoutine(project, "recorded");
         @SuppressWarnings("unchecked")
         List<String> steps = routine.get("steps") instanceof List<?> list
                 ? list.stream().map(String::valueOf).toList()
@@ -330,11 +396,11 @@ public final class RecordControl {
             }
         }
         Map<String, String> values = params(flags.get("param"));
+        List<Integer> depths = RoutineStore.depthList(routine);
         List<String> concrete = StepGenerator.apply(steps, parameters, values);
         List<String> lines = new ArrayList<>();
         for (int index = 0; index < concrete.size(); index++) {
-            String step = concrete.get(index);
-            lines.add(index == 0 ? "Then " + step : "And " + step);
+            lines.add(EditorDraft.featureLine(concrete, depths, index).strip());
         }
         Path dir = project.resolve(".pickleball/recordings/replay");
         Files.createDirectories(dir);
@@ -358,9 +424,27 @@ public final class RecordControl {
     }
 
     static StepGenerator.Script current(Path project) {
+        return presented(project).script();
+    }
+
+    private record Presented(StepGenerator.Script script, List<EditorDraft.Row> rows, Map<String, Object> state) {
+    }
+
+    private static Presented presented(Path project) {
         Map<String, Object> state = RecordingSession.read(project);
-        int from = RecordingSession.cursor(project);
-        int end = RecordingSession.endCursor(project);
+        StepGenerator.Script generated = generated(project, state);
+        List<EditorDraft.Row> rows = EditorDraft.rows(generated, state);
+        StepGenerator.Script script = EditorDraft.edited(state)
+                ? StepGenerator.presented(generated, EditorDraft.phrases(rows), EditorDraft.gherkin(rows))
+                : generated;
+        return new Presented(script, rows, state);
+    }
+
+    private static StepGenerator.Script generated(Path project, Map<String, Object> state) {
+        int from = RecordingSession.number(state == null ? null : state.get("cursor"));
+        Object endValue = state == null ? null : state.get("endCursor");
+        int end = endValue == null ? -1 : RecordingSession.number(endValue);
+        if (endValue != null && end < 0) end = -1;
         List<Map<String, String>> rows = new ArrayList<>();
         List<Map<String, String>> all = AgentEvents.lines(project);
         for (int index = Math.max(0, from); index < all.size(); index++) {
@@ -368,6 +452,13 @@ public final class RecordControl {
             rows.add(all.get(index));
         }
         return StepGenerator.generate(rows, state);
+    }
+
+    private static Map<String, Object> liveRoutine(Path project, String name) {
+        Presented presented = presented(project);
+        Map<String, Object> routine = routineFrom(presented.script(), name);
+        routine.put("depths", EditorDraft.depths(presented.rows()));
+        return routine;
     }
 
     /** Applies page control rows (pause, resume, accept, reject) onto the session. */
@@ -402,6 +493,20 @@ public final class RecordControl {
                 if (dropped.removeIf(item -> item == step)) {
                     state.put("dropped", dropped);
                     changed = true;
+                }
+            } else if (editorAction(action)) {
+                try {
+                    EditorDraft.apply(state, generated(project, state), action, row);
+                    changed = true;
+                } catch (IllegalArgumentException ignored) {
+                    // A stray page index does not stop the rest of the stream.
+                }
+            } else if ("popout".equalsIgnoreCase(action) || "popin".equalsIgnoreCase(action)) {
+                try {
+                    EditorDraft.place(state, row.get("panel"), "popout".equalsIgnoreCase(action) ? "window" : "page");
+                    changed = true;
+                } catch (IllegalArgumentException ignored) {
+                    // The page asked for a panel this session does not pop.
                 }
             }
         }
@@ -466,12 +571,30 @@ public final class RecordControl {
         return path;
     }
 
-    private static void arm(boolean on, String script) {
+    private static boolean editorAction(String action) {
+        return "edit".equalsIgnoreCase(action) || "move".equalsIgnoreCase(action)
+                || "nest".equalsIgnoreCase(action) || "outdent".equalsIgnoreCase(action)
+                || "add".equalsIgnoreCase(action) || "delete".equalsIgnoreCase(action);
+    }
+
+    private static List<String> stringList(Object value) {
+        List<String> steps = new ArrayList<>();
+        if (value instanceof List<?> list) {
+            for (Object item : list) if (item != null) steps.add(String.valueOf(item));
+        }
+        return steps;
+    }
+
+    private static void arm(Path project) {
         try {
+            Presented presented = presented(project);
+            String status = String.valueOf(presented.state().getOrDefault("status", "stopped"));
             Map<String, Object> spec = new LinkedHashMap<>();
-            spec.put("on", on);
-            spec.put("status", on ? "recording" : "stopped");
-            spec.put("script", script == null ? "" : script);
+            spec.put("on", "recording".equals(status));
+            spec.put("status", status);
+            spec.put("script", presented.script().gherkin() == null ? "" : presented.script().gherkin());
+            spec.put("steps", EditorDraft.maps(presented.rows()));
+            spec.put("panels", EditorDraft.panels(presented.state()));
             AgentControl.armRecording(spec);
         } catch (RuntimeException ignored) {
             // No live page. The state file is still the record mode.

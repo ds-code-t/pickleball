@@ -134,7 +134,10 @@ class WorkbenchMcpServerTest {
             "workbench_record_list",
             "workbench_record_export",
             "workbench_record_inject",
-            "workbench_record_refine"
+            "workbench_record_refine",
+            "workbench_record_editor",
+            "workbench_record_edit",
+            "workbench_record_pop"
     );
 
     @TempDir

@@ -373,6 +373,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/mappings/ScenarioMapping.java`
 - `src/main/java/tools/dscode/common/mappings/StepMapping.java`
 - `src/main/java/tools/dscode/common/mappings/ValueFormatting.java`
+- `src/main/java/tools/dscode/common/recording/EditorDraft.java`
 - `src/main/java/tools/dscode/common/recording/InteractionLog.java`
 - `src/main/java/tools/dscode/common/recording/RecordControl.java`
 - `src/main/java/tools/dscode/common/recording/RecordingSession.java`
@@ -838,6 +839,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/mappings/queries/TopLevelCollectionTest.java`
 - `src/test/java/tools/dscode/common/mappings/UndefinedDollarStepTest.java`
 - `src/test/java/tools/dscode/common/recording/CollaborativeRecordingTest.java`
+- `src/test/java/tools/dscode/common/recording/StepEditorTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/AgentDiscoverPlannerTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/ConsumerMavenTestRunnerTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/DiagnosticCliGuidanceTest.java`

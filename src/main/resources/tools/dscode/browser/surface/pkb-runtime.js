@@ -19,7 +19,7 @@
     try { wait.observe(document, {childList: true, subtree: true}); } catch (ignored) { /* not observable yet */ }
     return;
   }
-  var VERSION = '3.0.0-record';
+  var VERSION = '3.0.0-editor';
   if (window.__pkbUi && window.__pkbUi.version === VERSION) return;
   if (window.__pkbUi && typeof window.__pkbUi.dispose === 'function') {
     try { window.__pkbUi.dispose(); } catch (ignored) { /* older runtime */ }
@@ -918,6 +918,9 @@
   }
 
   function dispose() {
+    try { popIn('editor', true); } catch (ignored) { /* pop not open */ }
+    try { popIn('chat', true); } catch (ignored) { /* pop not open */ }
+    try { editorClose(); } catch (ignored) { /* editor not open */ }
     clear();
     handlers.forEach(function (h) { h[0].removeEventListener(h[1], h[2], h[3]); });
     handlers = [];
@@ -934,7 +937,7 @@
   var guideListening = false;
 
   function idle() {
-    return items.size === 0 && !panel && guides.size === 0 && asks.size === 0;
+    return items.size === 0 && !panel && !editor && guides.size === 0 && asks.size === 0;
   }
 
   function findTarget(t) {
@@ -1418,7 +1421,10 @@
   var PANEL_MIN_H = 200;
   var SNAP = 16;
   var panel = null;
+  var editor = null;
   var chatSeq = 0;
+  var chatMirror = [];
+  var pops = {editor: null, chat: null};
 
   function el(tag, cls, text) {
     var node = document.createElement(tag);
@@ -1437,7 +1443,7 @@
     var vp = viewport();
     var w = Math.min(360, Math.floor(vp.w * 0.9));
     var h = Math.min(420, Math.floor(vp.h * 0.9));
-    return {x: vp.w - w - 16, y: vp.h - h - 16, w: w, h: h, min: false, tab: 'chat'};
+    return {x: vp.w - w - 16, y: vp.h - h - 16, w: w, h: h, min: false, tab: 'chat', pop: false};
   }
 
   function panelClamp(st) {
@@ -1465,14 +1471,17 @@
     card.style.transform = 'translate3d(' + Math.round(st.x) + 'px,' + Math.round(st.y) + 'px,0)';
     card.style.width = Math.round(st.w) + 'px';
     card.style.height = Math.round(st.h) + 'px';
-    card.hidden = !!st.min;
-    panel.pill.hidden = !st.min;
-    if (st.min) {
+    card.hidden = !!st.min || !!st.pop;
+    panel.pill.hidden = !st.min && !st.pop;
+    if (st.min || st.pop) {
       var pw = panel.pill.offsetWidth || 120;
       var ph = panel.pill.offsetHeight || 32;
       panel.pill.style.transform = 'translate3d(' + Math.round(st.x + st.w - pw) + 'px,' + Math.round(st.y + st.h - ph) + 'px,0)';
     }
-    window.__pkbPanelState = {x: Math.round(st.x), y: Math.round(st.y), w: Math.round(st.w), h: Math.round(st.h), min: !!st.min, tab: st.tab};
+    var label = panel.pill.querySelector('.pkb-pill-label');
+    if (label) label.textContent = st.pop ? 'Chat window' : 'Agent';
+    panel.pill.setAttribute('aria-label', st.pop ? 'Pop chat back in' : 'Open agent panel');
+    window.__pkbPanelState = {x: Math.round(st.x), y: Math.round(st.y), w: Math.round(st.w), h: Math.round(st.h), min: !!st.min, tab: st.tab, pop: !!st.pop};
   }
 
   function panelTab(name) {
@@ -1535,9 +1544,17 @@
       if (panel.empty) { panel.empty.remove(); panel.empty = null; }
       pane.appendChild(bubble(row));
       added++;
+      chatMirror.push({
+        id: key,
+        from: row.from || row.source || 'agent',
+        text: String(row.text),
+        state: row.state || '',
+        at: row.at || ''
+      });
       if ((row.from || row.source) !== 'human') panelUnread();
     });
     if (stick) pane.scrollTop = pane.scrollHeight;
+    syncPop('chat');
     return added;
   }
 
@@ -1549,8 +1566,12 @@
       if (!node) return;
       if (node.getAttribute('data-state') === 'read') return;
       setFeedback(node, 'delivered');
+      chatMirror.forEach(function (row) {
+        if (String(row.id) === String(id) && row.state !== 'read') row.state = 'delivered';
+      });
       n++;
     });
+    syncPop('chat');
     return n;
   }
 
@@ -1570,7 +1591,11 @@
         layer.shadowRoot.querySelectorAll('[data-pkb-id="' + key + '"],[data-id="' + key + '"]').forEach(function (node) { nodes.push(node); });
       }
       nodes.forEach(function (node) { setFeedback(node, 'read'); n++; });
+      chatMirror.forEach(function (row) {
+        if (String(row.id) === String(id)) row.state = 'read';
+      });
     });
+    syncPop('chat');
     return n;
   }
 
@@ -1686,6 +1711,10 @@
       tabs.appendChild(b);
       return b;
     });
+    var pop = el('button', 'pkb-icon', '\u2197');
+    pop.type = 'button';
+    pop.setAttribute('aria-label', 'Pop out chat');
+    pop.setAttribute('data-action', 'popout');
     var minimize = el('button', 'pkb-icon', '\u2013');
     minimize.type = 'button';
     minimize.setAttribute('aria-label', 'Minimize');
@@ -1697,6 +1726,7 @@
     head.appendChild(dot);
     head.appendChild(title);
     head.appendChild(tabs);
+    head.appendChild(pop);
     head.appendChild(minimize);
     head.appendChild(close);
     var chatPane = el('div', 'pkb-pane pkb-chat');
@@ -1734,7 +1764,8 @@
     var pillDot = el('span', 'pkb-dot');
     pillDot.setAttribute('data-state', 'live');
     pill.appendChild(pillDot);
-    pill.appendChild(document.createTextNode('Agent'));
+    var pillLabel = el('span', 'pkb-pill-label', 'Agent');
+    pill.appendChild(pillLabel);
     pill.appendChild(el('span', 'pkb-unread'));
     root.appendChild(card);
     root.appendChild(pill);
@@ -1750,12 +1781,19 @@
       }
     });
     composer.addEventListener('submit', function (event) { event.preventDefault(); panelSend(); });
-    minimize.addEventListener('click', function () { p.state.min = true; panelPlace(); });
+    minimize.addEventListener('click', function () { p.state.min = true; p.state.pop = false; panelPlace(); });
+    pop.addEventListener('click', function () { popOut('chat'); });
     close.addEventListener('click', function () {
       pushEvent({type: 'panel', action: 'close'});
       panelClose();
     });
-    pill.addEventListener('click', function () { p.state.min = false; p.unread = 0; pill.querySelector('.pkb-unread').textContent = ''; panelPlace(); });
+    pill.addEventListener('click', function () {
+      if (p.state.pop) { popIn('chat'); return; }
+      p.state.min = false;
+      p.unread = 0;
+      pill.querySelector('.pkb-unread').textContent = '';
+      panelPlace();
+    });
     var start = null;
     dragger(head, function () {
       start = {x: p.state.x, y: p.state.y};
@@ -2010,10 +2048,11 @@
     if (spec.on === true || spec.on === 'true') window.__pkbRecord = true;
     if (spec.on === false || spec.on === 'false') window.__pkbRecord = false;
     var status = spec.status || (window.__pkbRecord ? 'recording' : 'stopped');
-    if (status === 'stopped' && !spec.script) {
+    if (status === 'stopped' && !spec.script && !(Array.isArray(spec.steps) && spec.steps.length)) {
       if (recordBar && recordBar.parentNode) recordBar.parentNode.removeChild(recordBar);
       recordBar = null;
-      return {on: !!window.__pkbRecord, status: status};
+      editorSync(spec);
+      return {on: !!window.__pkbRecord, status: status, editor: window.__pkbEditorState || null};
     }
     if (!recordBar || !recordBar.isConnected) {
       recordBar = document.createElement('div');
@@ -2059,8 +2098,631 @@
       status === 'paused' || !window.__pkbRecord ? 'resume' : 'pause'));
     recordBar.appendChild(button('Accept', 'accept'));
     recordBar.appendChild(button('Reject', 'reject'));
-    return {on: !!window.__pkbRecord, status: status, script: spec.script || ''};
+    editorSync(spec);
+    return {on: !!window.__pkbRecord, status: status, script: spec.script || '', editor: window.__pkbEditorState || null};
   }
+
+  // ---- In-page step editor and pop-out windows (chat + editor) ----
+  var editorDismissed = false;
+  var editorWasRecording = false;
+  var editorRendering = false;
+
+  function editorPhrase(text) {
+    var value = String(text == null ? '' : text).trim();
+    if (!value) return ', ';
+    if (value.charAt(0) === ',' || value.charAt(0) === ':' || value.indexOf('Then ') === 0 || value.indexOf('And ') === 0) return value;
+    return ', ' + value;
+  }
+
+  function editorNormalize(steps) {
+    var prev = 0;
+    steps.forEach(function (row, index) {
+      var depth = Math.max(0, +row.depth || 0);
+      if (index === 0) depth = 0;
+      else depth = Math.min(depth, prev + 1);
+      row.depth = depth;
+      row.index = index;
+      prev = depth;
+    });
+  }
+
+  function editorRows(spec) {
+    spec = spec || {};
+    if (Array.isArray(spec.steps) && spec.steps.length && typeof spec.steps[0] === 'object') {
+      return spec.steps.map(function (row, index) {
+        return {
+          id: String(row.id || ('s' + (index + 1))),
+          text: String(row.text == null ? '' : row.text),
+          depth: +row.depth || 0,
+          index: index
+        };
+      });
+    }
+    var lines = String(spec.script || '').split('\n').filter(function (line) { return line.trim(); });
+    return lines.map(function (line, index) {
+      var text = line.trim();
+      var depth = 0;
+      var marks = text.match(/^:+/);
+      if (marks) {
+        depth = marks[0].length;
+        text = text.slice(depth).trim();
+      }
+      text = text.replace(/^(Then |And )/, '').replace(/:$/, '');
+      return {id: 's' + (index + 1), text: text, depth: depth, index: index};
+    });
+  }
+
+  function editorWanted(spec, steps) {
+    if (!spec) return false;
+    if (spec.editor === false || spec.editor === 'false') return false;
+    var status = spec.status || '';
+    if (status === 'recording' || status === 'paused') return true;
+    if (spec.script) return true;
+    return !!(steps && steps.length);
+  }
+
+  function editorDefaults() {
+    var vp = viewport();
+    var w = Math.min(380, Math.floor(vp.w * 0.9));
+    var h = Math.min(480, Math.floor(vp.h * 0.9));
+    return {x: 16, y: 16, w: w, h: h, min: false, pop: false};
+  }
+
+  function editorClamp(st) {
+    var vp = viewport();
+    st.w = clamp(st.w, PANEL_MIN_W, Math.max(PANEL_MIN_W, Math.floor(vp.w * 0.9)));
+    st.h = clamp(st.h, PANEL_MIN_H, Math.max(PANEL_MIN_H, Math.floor(vp.h * 0.9)));
+    st.x = clamp(st.x, 0, vp.w - st.w);
+    st.y = clamp(st.y, 0, vp.h - st.h);
+    return st;
+  }
+
+  function editorPlace() {
+    if (!editor) return;
+    var st = editorClamp(editor.state);
+    editor.card.hidden = !!st.min || !!st.pop;
+    editor.pill.hidden = !st.min && !st.pop;
+    editor.card.style.transform = 'translate3d(' + Math.round(st.x) + 'px,' + Math.round(st.y) + 'px,0)';
+    editor.card.style.width = Math.round(st.w) + 'px';
+    editor.card.style.height = Math.round(st.h) + 'px';
+    if (st.min || st.pop) {
+      var pw = editor.pill.offsetWidth || 120;
+      var ph = editor.pill.offsetHeight || 32;
+      editor.pill.style.transform = 'translate3d(' + Math.round(st.x + st.w - pw) + 'px,' + Math.round(st.y) + 'px,0)';
+    }
+    var label = editor.pill.querySelector('.pkb-pill-label');
+    if (label) label.textContent = st.pop ? 'Steps window' : 'Steps';
+    editor.pill.setAttribute('aria-label', st.pop ? 'Pop steps back in' : 'Open step editor');
+    window.__pkbEditorState = {
+      x: Math.round(st.x), y: Math.round(st.y), w: Math.round(st.w), h: Math.round(st.h),
+      min: !!st.min, pop: !!st.pop, count: (editor.steps || []).length
+    };
+  }
+
+  function editorApplyIncoming(steps) {
+    if (!editor) return;
+    var active = editor.list.querySelector('.pkb-editor-text:focus');
+    var activeId = active ? active.closest('.pkb-editor-row').getAttribute('data-id') : '';
+    var typing = active ? active.textContent : null;
+    editor.steps = steps.map(function (row) {
+      if (activeId && row.id === activeId && typing != null) row.text = typing;
+      return row;
+    });
+    editorRender();
+    if (activeId) {
+      var field = editor.list.querySelector('[data-id="' + CSS.escape(activeId) + '"] .pkb-editor-text');
+      if (field) {
+        field.focus();
+        if (typing != null) field.textContent = typing;
+      }
+    }
+  }
+
+  function editorRender() {
+    if (!editor || editorRendering) return;
+    editorRendering = true;
+    try {
+    var list = editor.list;
+    var stick = list.scrollHeight - list.scrollTop - list.clientHeight < 40;
+    list.textContent = '';
+    var steps = editor.steps || [];
+    if (!steps.length) {
+      list.appendChild(el('div', 'pkb-empty', 'No steps yet. Interactions appear here.'));
+      editorPlace();
+      return;
+    }
+    steps.forEach(function (step, index) {
+      var row = el('div', 'pkb-editor-row');
+      row.setAttribute('data-index', String(index));
+      row.setAttribute('data-id', step.id || ('s' + (index + 1)));
+      row.setAttribute('data-depth', String(step.depth || 0));
+      row.style.marginLeft = ((step.depth || 0) * 16) + 'px';
+      var handle = el('button', 'pkb-handle', '\u2630');
+      handle.type = 'button';
+      handle.draggable = true;
+      handle.setAttribute('aria-label', 'Drag to reorder');
+      handle.setAttribute('data-action', 'drag');
+      var num = el('span', 'pkb-num', step.id || ('s' + (index + 1)));
+      var text = el('div', 'pkb-editor-text');
+      text.setAttribute('contenteditable', 'true');
+      text.setAttribute('role', 'textbox');
+      text.setAttribute('aria-label', 'Step ' + (step.id || index + 1));
+      text.setAttribute('spellcheck', 'false');
+      text.textContent = step.text || '';
+      var outdent = el('button', 'pkb-icon', '\u2190');
+      outdent.type = 'button';
+      outdent.setAttribute('aria-label', 'Outdent');
+      outdent.setAttribute('data-action', 'outdent');
+      var nest = el('button', 'pkb-icon', '\u2192');
+      nest.type = 'button';
+      nest.setAttribute('aria-label', 'Nest');
+      nest.setAttribute('data-action', 'nest');
+      var remove = el('button', 'pkb-icon', '\u00d7');
+      remove.type = 'button';
+      remove.setAttribute('aria-label', 'Delete step');
+      remove.setAttribute('data-action', 'delete');
+      row.appendChild(handle);
+      row.appendChild(num);
+      row.appendChild(text);
+      row.appendChild(outdent);
+      row.appendChild(nest);
+      row.appendChild(remove);
+      list.appendChild(row);
+    });
+    if (stick) list.scrollTop = list.scrollHeight;
+    editorPlace();
+    } finally {
+      editorRendering = false;
+    }
+  }
+
+  function editorApplyLocal(action, extra) {
+    var steps = editor.steps || [];
+    var index = extra.index == null || extra.index === '' ? -1 : +extra.index;
+    if (action === 'edit' && steps[index]) steps[index].text = editorPhrase(extra.text);
+    else if (action === 'move' && steps[+extra.from]) {
+      var moved = steps.splice(+extra.from, 1)[0];
+      if (extra.depth != null && extra.depth !== '') moved.depth = +extra.depth;
+      var at = extra.to == null ? steps.length : Math.max(0, Math.min(+extra.to, steps.length));
+      steps.splice(at, 0, moved);
+    } else if (action === 'nest' && steps[index]) steps[index].depth = (+steps[index].depth || 0) + 1;
+    else if (action === 'outdent' && steps[index]) steps[index].depth = (+steps[index].depth || 0) - 1;
+    else if (action === 'add') {
+      var insert = extra.index == null || extra.index === '' ? steps.length : Math.max(0, Math.min(+extra.index, steps.length));
+      steps.splice(insert, 0, {
+        id: 'm' + Date.now().toString(36),
+        text: editorPhrase(extra.text || ', '),
+        depth: +(extra.depth || 0)
+      });
+    } else if (action === 'delete' && index >= 0 && index < steps.length) steps.splice(index, 1);
+    editorNormalize(steps);
+    editor.steps = steps;
+  }
+
+  function editorCommand(action, extra) {
+    if (!editor) editorOpen({steps: []});
+    extra = extra || {};
+    var ev = {type: 'record', event: 'record', action: action, source: 'human'};
+    ['index', 'text', 'from', 'to', 'depth'].forEach(function (key) {
+      if (extra[key] != null && extra[key] !== '') ev[key] = String(extra[key]);
+    });
+    var node = editor.list && extra.index != null
+      ? editor.list.querySelector('.pkb-editor-row[data-index="' + String(extra.index) + '"]')
+      : editor.card;
+    if (node) {
+      lastPressed = node;
+      setFeedback(node, 'sending');
+    }
+    var bound = pushEvent(ev);
+    if (node) setFeedback(node, bound ? 'delivered' : 'sending');
+    editorApplyLocal(action, extra);
+    editorRender();
+    syncPop('editor');
+    return bound;
+  }
+
+  function editorOpen(opts) {
+    opts = opts || {};
+    editorDismissed = false;
+    listen();
+    var root = ensureLayer();
+    panelSheet(root);
+    if (!editor) editor = buildEditor(root);
+    if (!editor.card.isConnected) {
+      root.appendChild(editor.card);
+      root.appendChild(editor.pill);
+    }
+    if (Array.isArray(opts.steps)) editorApplyIncoming(opts.steps);
+    else editorRender();
+    raiseLayer();
+    return window.__pkbEditorState;
+  }
+
+  function editorClose() {
+    editorDismissed = true;
+    if (!editor) return false;
+    editor.card.remove();
+    editor.pill.remove();
+    editor = null;
+    window.__pkbEditorState = null;
+    if (idle() && layer && layer.isConnected) layer.remove();
+    return true;
+  }
+
+  function buildEditor(root) {
+    var card = el('section', 'pkb-card pkb-panel');
+    card.setAttribute('role', 'dialog');
+    card.setAttribute('aria-label', 'Step editor');
+    card.setAttribute('data-pkb-editor', '');
+    var head = el('header', 'pkb-head');
+    var dot = el('span', 'pkb-dot');
+    dot.setAttribute('data-state', 'live');
+    var title = el('strong', 'pkb-title', 'Steps');
+    var pop = el('button', 'pkb-icon', '\u2197');
+    pop.type = 'button';
+    pop.setAttribute('aria-label', 'Pop out step editor');
+    pop.setAttribute('data-action', 'popout');
+    var minimize = el('button', 'pkb-icon', '\u2013');
+    minimize.type = 'button';
+    minimize.setAttribute('aria-label', 'Collapse step editor');
+    minimize.setAttribute('data-action', 'minimize');
+    var close = el('button', 'pkb-icon', '\u00d7');
+    close.type = 'button';
+    close.setAttribute('aria-label', 'Close step editor');
+    close.setAttribute('data-action', 'close');
+    head.appendChild(dot);
+    head.appendChild(title);
+    head.appendChild(pop);
+    head.appendChild(minimize);
+    head.appendChild(close);
+    var list = el('div', 'pkb-pane pkb-editor-list');
+    list.setAttribute('role', 'list');
+    list.setAttribute('aria-label', 'Recorded steps');
+    var tools = el('div', 'pkb-editor-tools');
+    var add = el('button', '', 'Add step');
+    add.type = 'button';
+    add.setAttribute('data-action', 'add');
+    tools.appendChild(add);
+    card.appendChild(head);
+    card.appendChild(list);
+    card.appendChild(tools);
+    ['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw'].forEach(function (dir) {
+      var grip = el('div', 'pkb-grip');
+      grip.setAttribute('data-dir', dir);
+      card.appendChild(grip);
+    });
+    var pill = el('button', 'pkb-card pkb-pill');
+    pill.type = 'button';
+    pill.hidden = true;
+    pill.setAttribute('aria-label', 'Open step editor');
+    pill.appendChild(el('span', 'pkb-dot'));
+    pill.querySelector('.pkb-dot').setAttribute('data-state', 'live');
+    pill.appendChild(el('span', 'pkb-pill-label', 'Steps'));
+    root.appendChild(card);
+    root.appendChild(pill);
+    isolateKeys(card);
+    isolateKeys(pill);
+    var state = editorDefaults();
+    var built = {card: card, pill: pill, list: list, head: head, state: state, steps: []};
+    function bindList() {
+      list.addEventListener('keydown', function (event) {
+        var row = event.target.closest && event.target.closest('.pkb-editor-row');
+        if (!row) return;
+        var index = +row.getAttribute('data-index');
+        var field = row.querySelector('.pkb-editor-text');
+        if (event.key === 'Enter' && !event.shiftKey && field && event.target === field) {
+          event.preventDefault();
+          editorCommand('edit', {index: index, text: field.textContent});
+          return;
+        }
+        if (event.key === 'Tab') {
+          event.preventDefault();
+          editorCommand(event.shiftKey ? 'outdent' : 'nest', {index: index});
+          return;
+        }
+        if (event.altKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+          event.preventDefault();
+          var to = event.key === 'ArrowUp' ? Math.max(0, index - 1) : index + 1;
+          editorCommand('move', {from: index, to: to});
+          return;
+        }
+        if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+          event.preventDefault();
+          editorCommand('add', {index: index + 1, text: ', '});
+          return;
+        }
+        if ((event.metaKey || event.ctrlKey) && event.key === 'Backspace') {
+          event.preventDefault();
+          editorCommand('delete', {index: index});
+        }
+      });
+      list.addEventListener('focusout', function (event) {
+        if (editorRendering) return;
+        var field = event.target;
+        if (!field.classList || !field.classList.contains('pkb-editor-text')) return;
+        var row = field.closest('.pkb-editor-row');
+        if (!row) return;
+        var index = +row.getAttribute('data-index');
+        var current = (built.steps[index] && built.steps[index].text) || '';
+        if (field.textContent !== current) editorCommand('edit', {index: index, text: field.textContent});
+      });
+      list.addEventListener('click', function (event) {
+        var button = event.target.closest && event.target.closest('button[data-action]');
+        if (!button) return;
+        var row = button.closest('.pkb-editor-row');
+        if (!row) return;
+        var index = +row.getAttribute('data-index');
+        var action = button.getAttribute('data-action');
+        if (action === 'nest' || action === 'outdent' || action === 'delete') editorCommand(action, {index: index});
+      });
+      var dragFrom = -1;
+      list.addEventListener('dragstart', function (event) {
+        var handle = event.target.closest && event.target.closest('.pkb-handle');
+        if (!handle) return;
+        var row = handle.closest('.pkb-editor-row');
+        dragFrom = row ? +row.getAttribute('data-index') : -1;
+        if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+      });
+      list.addEventListener('dragover', function (event) {
+        var row = event.target.closest && event.target.closest('.pkb-editor-row');
+        if (!row || dragFrom < 0) return;
+        event.preventDefault();
+        list.querySelectorAll('[data-drop]').forEach(function (node) { node.removeAttribute('data-drop'); });
+        row.setAttribute('data-drop', 'on');
+      });
+      list.addEventListener('drop', function (event) {
+        var row = event.target.closest && event.target.closest('.pkb-editor-row');
+        if (!row || dragFrom < 0) return;
+        event.preventDefault();
+        row.removeAttribute('data-drop');
+        var to = +row.getAttribute('data-index');
+        var rect = row.getBoundingClientRect();
+        var nest = event.clientX > rect.left + Math.min(48, rect.width / 2);
+        var extra = {from: dragFrom, to: to};
+        if (nest) extra.depth = (+row.getAttribute('data-depth') || 0) + 1;
+        dragFrom = -1;
+        editorCommand('move', extra);
+      });
+      list.addEventListener('dragend', function () {
+        dragFrom = -1;
+        list.querySelectorAll('[data-drop]').forEach(function (node) { node.removeAttribute('data-drop'); });
+      });
+    }
+    bindList();
+    add.addEventListener('click', function () { editorCommand('add', {text: ', '}); });
+    pop.addEventListener('click', function () { popOut('editor'); });
+    minimize.addEventListener('click', function () { built.state.min = true; built.state.pop = false; editorPlace(); });
+    close.addEventListener('click', function () { editorClose(); });
+    pill.addEventListener('click', function () {
+      if (built.state.pop) { popIn('editor'); return; }
+      built.state.min = false;
+      editorPlace();
+    });
+    var start = null;
+    dragger(head, function () {
+      start = {x: built.state.x, y: built.state.y};
+      card.classList.add('pkb-dragging');
+    }, function (dx, dy) {
+      built.state.x = start.x + dx;
+      built.state.y = start.y + dy;
+      editorPlace();
+    }, function () {
+      card.classList.remove('pkb-dragging');
+      var st = built.state;
+      var vp = viewport();
+      if (st.x <= SNAP) st.x = 0;
+      if (st.y <= SNAP) st.y = 0;
+      if (vp.w - (st.x + st.w) <= SNAP) st.x = vp.w - st.w;
+      if (vp.h - (st.y + st.h) <= SNAP) st.y = vp.h - st.h;
+      editorPlace();
+    });
+    Array.prototype.forEach.call(card.querySelectorAll('.pkb-grip'), function (grip) {
+      var dir = grip.getAttribute('data-dir');
+      var from = null;
+      dragger(grip, function () {
+        from = {x: built.state.x, y: built.state.y, w: built.state.w, h: built.state.h};
+        card.classList.add('pkb-resizing');
+      }, function (dx, dy) {
+        var vp = viewport();
+        var maxW = Math.max(PANEL_MIN_W, Math.floor(vp.w * 0.9));
+        var maxH = Math.max(PANEL_MIN_H, Math.floor(vp.h * 0.9));
+        var st = built.state;
+        if (dir.indexOf('e') >= 0) st.w = clamp(from.w + dx, PANEL_MIN_W, maxW);
+        if (dir.indexOf('s') >= 0) st.h = clamp(from.h + dy, PANEL_MIN_H, maxH);
+        if (dir.indexOf('w') >= 0) {
+          st.w = clamp(from.w - dx, PANEL_MIN_W, maxW);
+          st.x = from.x + (from.w - st.w);
+        }
+        if (dir.indexOf('n') >= 0) {
+          st.h = clamp(from.h - dy, PANEL_MIN_H, maxH);
+          st.y = from.y + (from.h - st.h);
+        }
+        editorPlace();
+      }, function () {
+        card.classList.remove('pkb-resizing');
+        editorPlace();
+      });
+    });
+    return built;
+  }
+
+  function editorSync(spec) {
+    spec = spec || {};
+    var steps = editorRows(spec);
+    if (spec.status === 'recording' && !editorWasRecording) editorDismissed = false;
+    editorWasRecording = spec.status === 'recording';
+    if (editorWanted(spec, steps) && !editorDismissed) editorOpen({steps: steps});
+    else if (editor) editorApplyIncoming(steps);
+    placeFromSpec(spec);
+  }
+
+  function placeFromSpec(spec) {
+    var panels = spec && spec.panels ? spec.panels : {};
+    if (panels.editor === 'window' && (!editor || !editor.state.pop)) popOut('editor', true);
+    if (panels.editor === 'page' && editor && editor.state.pop) popIn('editor', true);
+    if (panels.chat === 'window' && (!panel || !panel.state.pop)) popOut('chat', true);
+    if (panels.chat === 'page' && panel && panel.state.pop) popIn('chat', true);
+  }
+
+  function popName(kind) {
+    return kind === 'chat' ? 'pkb-chat-panel' : 'pkb-step-editor';
+  }
+
+  function popOut(kind, silent) {
+    kind = kind === 'chat' ? 'chat' : 'editor';
+    if (kind === 'chat' && !panel) panelOpen({focus: false});
+    if (kind === 'editor' && !editor) editorOpen({steps: []});
+    var win = pops[kind] && !pops[kind].closed ? pops[kind] : window.open('', popName(kind), 'popup=yes,width=440,height=720');
+    if (!win) {
+      if (!silent) pushEvent({type: 'record', event: 'record', action: 'popout', panel: kind, source: 'human', error: 'blocked'});
+      return {ok: false, panel: kind, reason: 'popup blocked'};
+    }
+    pops[kind] = win;
+    var ready = false;
+    try { ready = win.document.documentElement.getAttribute('data-pkb-pop') === kind; } catch (ignored) { ready = false; }
+    if (!ready) writePop(win, kind);
+    try { sessionStorage.setItem('pkb-pop-' + kind, 'window'); } catch (ignored) { /* storage blocked */ }
+    if (kind === 'editor' && editor) { editor.state.pop = true; editor.state.min = false; editorPlace(); }
+    if (kind === 'chat' && panel) { panel.state.pop = true; panel.state.min = false; panelPlace(); }
+    if (!silent) pushEvent({type: 'record', event: 'record', action: 'popout', panel: kind, source: 'human'});
+    syncPop(kind);
+    return {ok: true, panel: kind, where: 'window'};
+  }
+
+  function popIn(kind, silent) {
+    kind = kind === 'chat' ? 'chat' : 'editor';
+    var win = pops[kind];
+    if (win && !win.closed) { try { win.close(); } catch (ignored) { /* already closed */ } }
+    pops[kind] = null;
+    try { sessionStorage.removeItem('pkb-pop-' + kind); } catch (ignored) { /* storage blocked */ }
+    if (kind === 'editor' && editor) { editor.state.pop = false; editorPlace(); }
+    if (kind === 'chat' && panel) { panel.state.pop = false; panelPlace(); }
+    if (!silent) pushEvent({type: 'record', event: 'record', action: 'popin', panel: kind, source: 'human'});
+    return {ok: true, panel: kind, where: 'page'};
+  }
+
+  function syncPop(kind) {
+    if (!pops || !pops[kind] || pops[kind].closed) return;
+    var payload = {pkb: 'pop-state', panel: kind};
+    if (kind === 'editor') payload.steps = (editor && editor.steps) ? editor.steps : [];
+    if (kind === 'chat') payload.messages = chatMirror.slice(-200);
+    try { pops[kind].postMessage(payload, '*'); } catch (ignored) { /* window gone */ }
+  }
+
+  function chatFromPop(text) {
+    if (!text || !String(text).trim()) return;
+    if (!panel) panelOpen({focus: false});
+    panel.input.value = text;
+    panelSend();
+  }
+
+  function onPopMessage(event) {
+    var data = event.data;
+    if (!data || data.pkb !== 'pop') return;
+    var kind = data.panel === 'chat' ? 'chat' : 'editor';
+    if (data.op === 'hello' || data.op === 'ready') { syncPop(kind); return; }
+    if (data.op === 'popin') { popIn(kind); return; }
+    if (kind === 'chat' && data.op === 'send') { chatFromPop(data.text); return; }
+    if (kind === 'editor' && data.op) editorCommand(data.op, data);
+  }
+
+  function writePop(win, kind) {
+    var doc = win.document;
+    doc.open();
+    doc.write(popHtml(kind));
+    doc.close();
+  }
+
+  function popHtml(kind) {
+    var title = kind === 'chat' ? 'Chat' : 'Steps';
+    return '<!DOCTYPE html><html data-pkb-pop="' + kind + '"><head><meta charset="utf-8"><title>' + title
+      + '</title><style>'
+      + 'body{margin:0;background:#15181d;color:#e6e9ee;font:14px/1.45 system-ui,sans-serif;}'
+      + 'header{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#1d2127;}'
+      + 'button{cursor:pointer;}'
+      + '#list{padding:12px;display:flex;flex-direction:column;gap:6px;}'
+      + '.row{display:flex;gap:6px;align-items:flex-start;}'
+      + '.text{flex:1;min-height:22px;white-space:pre-wrap;overflow-wrap:anywhere;}'
+      + '.msg{padding:6px 10px;border-radius:10px;background:#1d2127;border:1px solid #2c323b;}'
+      + '.msg[data-from="human"]{align-self:flex-end;background:#1f3354;}'
+      + '[data-state="sending"],[data-pkb-feedback="sending"]{opacity:.65;}'
+      + '[data-state="delivered"],[data-pkb-feedback="delivered"]{box-shadow:inset 3px 0 0 #22a06b;}'
+      + '[data-state="read"],[data-pkb-feedback="read"]{box-shadow:inset 3px 0 0 #3b82f6;}'
+      + 'form{display:flex;gap:8px;padding:8px;border-top:1px solid #2c323b;}'
+      + 'textarea{flex:1;min-height:38px;}'
+      + '@media (prefers-color-scheme: light){body{background:#fff;color:#1b1f24;}header{background:#f6f7f9;}.msg{background:#f6f7f9;border-color:#dfe3e8;}}'
+      + '@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important;}}'
+      + '</style></head><body><header><strong>' + title + '</strong>'
+      + '<button type="button" id="popin" data-action="popin">Pop in</button></header>'
+      + '<div id="list"></div>'
+      + (kind === 'chat' ? '<form id="composer"><textarea aria-label="Message"></textarea><button type="submit">Send</button></form>' : '<div><button type="button" id="add" data-action="add">Add step</button></div>')
+      + '<script>' + popScript(kind) + '<\/script></body></html>';
+  }
+
+  function popScript(kind) {
+    return ''
+      + 'var PANEL="' + kind + '";'
+      + 'var list=document.getElementById("list");'
+      + 'function send(op,extra){extra=extra||{};extra.pkb="pop";extra.panel=PANEL;extra.op=op;if(window.opener)window.opener.postMessage(extra,"*");}'
+      + 'function phrase(text){var value=String(text==null?"":text).trim();if(!value)return", ";if(value.charAt(0)===","||value.charAt(0)===":"||value.indexOf("Then ")===0||value.indexOf("And ")===0)return value;return", "+value;}'
+      + 'function renderSteps(steps){list.textContent="";(steps||[]).forEach(function(step,index){'
+      + 'var row=document.createElement("div");row.className="row";row.setAttribute("data-index",String(index));row.style.marginLeft=((step.depth||0)*16)+"px";'
+      + 'var text=document.createElement("div");text.className="text";text.contentEditable="true";text.setAttribute("role","textbox");text.textContent=step.text||"";'
+      + 'text.addEventListener("keydown",function(event){if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();send("edit",{index:index,text:text.textContent});}'
+      + 'if(event.key==="Tab"){event.preventDefault();send(event.shiftKey?"outdent":"nest",{index:index});}'
+      + 'if(event.altKey&&(event.key==="ArrowUp"||event.key==="ArrowDown")){event.preventDefault();send("move",{from:index,to:event.key==="ArrowUp"?Math.max(0,index-1):index+1});}'
+      + 'if((event.metaKey||event.ctrlKey)&&event.key==="Enter"){event.preventDefault();send("add",{index:index+1,text:", "});}'
+      + 'if((event.metaKey||event.ctrlKey)&&event.key==="Backspace"){event.preventDefault();send("delete",{index:index});}});'
+      + 'text.addEventListener("focusout",function(){send("edit",{index:index,text:text.textContent});});'
+      + 'var nest=document.createElement("button");nest.type="button";nest.textContent="Nest";nest.addEventListener("click",function(){send("nest",{index:index});});'
+      + 'var out=document.createElement("button");out.type="button";out.textContent="Outdent";out.addEventListener("click",function(){send("outdent",{index:index});});'
+      + 'var del=document.createElement("button");del.type="button";del.textContent="Delete";del.addEventListener("click",function(){send("delete",{index:index});});'
+      + 'row.appendChild(text);row.appendChild(out);row.appendChild(nest);row.appendChild(del);list.appendChild(row);});}'
+      + 'function renderChat(messages){list.textContent="";(messages||[]).forEach(function(row){'
+      + 'var node=document.createElement("div");node.className="msg";node.setAttribute("data-from",row.from||"agent");'
+      + 'if(row.state){node.setAttribute("data-state",row.state);node.setAttribute("data-pkb-feedback",row.state);}node.textContent=row.text||"";list.appendChild(node);});'
+      + 'list.scrollTop=list.scrollHeight;}'
+      + 'window.addEventListener("message",function(event){var data=event.data;if(!data||data.pkb!=="pop-state"||data.panel!==PANEL)return;'
+      + 'if(PANEL==="editor")renderSteps(data.steps||[]);else renderChat(data.messages||[]);});'
+      + 'document.getElementById("popin").addEventListener("click",function(){send("popin");});'
+      + (kind === 'chat'
+        ? 'var form=document.getElementById("composer");form.addEventListener("submit",function(event){event.preventDefault();var field=form.querySelector("textarea");send("send",{text:field.value});field.value="";});'
+          + 'form.querySelector("textarea").addEventListener("keydown",function(event){if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();form.requestSubmit?form.requestSubmit():form.dispatchEvent(new Event("submit"));}});'
+        : 'document.getElementById("add").addEventListener("click",function(){send("add",{text:", "});});')
+      + 'if(window.opener)send("hello");';
+  }
+
+  function reattachPops() {
+    ['editor', 'chat'].forEach(function (kind) {
+      var where = '';
+      try { where = sessionStorage.getItem('pkb-pop-' + kind) || ''; } catch (ignored) { where = ''; }
+      if (where !== 'window') return;
+      var win;
+      try { win = window.open('', popName(kind)); } catch (ignored) { win = null; }
+      if (!win) return;
+      var ready = false;
+      try { ready = win.document.documentElement.getAttribute('data-pkb-pop') === kind; } catch (ignored) { ready = false; }
+      if (!ready) {
+        try { win.close(); } catch (ignored) { /* blank window from a missing pop */ }
+        try { sessionStorage.removeItem('pkb-pop-' + kind); } catch (ignored) { /* storage blocked */ }
+        return;
+      }
+      pops[kind] = win;
+      if (kind === 'editor') {
+        if (!editor) editorOpen({steps: []});
+        editor.state.pop = true;
+        editorPlace();
+      } else {
+        if (!panel) panelOpen({focus: false});
+        panel.state.pop = true;
+        panelPlace();
+      }
+      syncPop(kind);
+    });
+  }
+
+  window.addEventListener('message', onPopMessage);
+  reattachPops();
 
   window.__pkbUi = {
     version: VERSION,
@@ -2094,7 +2756,12 @@
     resolve: resolve,
     watchUntil: watchUntil,
     docVersion: function () { return docVersion; },
-    record: record
+    record: record,
+    editor: editorOpen,
+    editorClose: editorClose,
+    editorState: function () { return window.__pkbEditorState || null; },
+    popOut: function (kind) { return popOut(kind || 'editor'); },
+    popIn: function (kind) { return popIn(kind || 'editor'); }
   };
 
   var docVersion = 0;

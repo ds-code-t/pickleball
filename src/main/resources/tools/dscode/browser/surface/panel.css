@@ -103,3 +103,13 @@
 @media (prefers-reduced-motion: reduce) {
   .pkb-card, .pkb-card *, .pkb-pill { animation: none !important; transition: none !important; }
 }
+
+.pkb-editor-list { display: flex; flex-direction: column; gap: 4px; }
+.pkb-editor-row { display: flex; gap: 6px; align-items: flex-start; padding: 4px; border-radius: 8px; border: 1px solid transparent; }
+.pkb-editor-row[data-drop="on"] { border-color: var(--pkb-accent); background: var(--pkb-human); }
+.pkb-editor-row .pkb-num { flex: none; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; border: 2px solid var(--pkb-accent); color: var(--pkb-accent); }
+.pkb-editor-text { flex: 1; min-width: 0; min-height: 22px; padding: 2px 4px; border-radius: 6px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pkb-editor-text:focus { outline: 2px solid var(--pkb-accent); outline-offset: -1px; }
+.pkb-handle { flex: none; border: 0; background: transparent; color: var(--pkb-muted); cursor: grab; font: inherit; padding: 2px 4px; touch-action: none; }
+.pkb-editor-tools { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--pkb-border); background: var(--pkb-surface); }
+.pkb-editor-tools button { border: 0; border-radius: 8px; padding: 4px 10px; background: var(--pkb-accent); color: var(--pkb-accent-text); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
