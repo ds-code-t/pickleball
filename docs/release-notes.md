@@ -200,6 +200,8 @@ Guided-flow replies. A direct placement still includes `visible`, `hidden`, `hid
 
 Compact refs and panel drag. A compact snap publishes `ref:d<hash>:<backend>` when the literal ref would be longer than 40 characters, including a file URL, so the line keeps `[ref=]` and `act` resolves it. Desktop refs stay literal. The page panel leaves room for a header drag of 400px left and 250px up, and the headless overlay fixture pins the inner viewport to 1280x800 so that in-bounds drag is not rejected.
 
+Warm-path clock. `export-guidance --warm` still prints `pingMs` for the second ping of a controller that is already up (target at most 1 s). A fresh JVM that then runs one verb pays classload. On a 2-CPU host that wall clock was 1111 ms against the mock bridge (samples 1221 and 1111) and 1063 ms against an already-started headless Chrome (samples 1182, 1094, and 1063). The check uses the minimum of those samples and allows 2000 ms. It is not an in-process regression bound. Microsoft Edge is not installed here (`microsoft-edge` is not on PATH, and apt has no Edge package), so live Edge snapshots skip with `skipped: microsoft-edge is not on PATH`. `LiveEdgeSnapshotTest.edgeTokenInTheVersionStringIsEdge` does not need the binary. Linux AT-SPI libraries are installed, but `DBUS_SESSION_BUS_ADDRESS` is unset, so live desktop tests skip with `no AT-SPI bus`. A missing bus stays a skip. It is not replaced with a fake session.
+
 ## 2.2.0
 
 _No changes yet._
