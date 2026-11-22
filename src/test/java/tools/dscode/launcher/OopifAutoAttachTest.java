@@ -95,8 +95,8 @@ class OopifAutoAttachTest {
             Capture found = run("find", "--target=browser:auto", "--query=Inner", "--run-id=oopif");
             assertEquals(0, found.code, found.err + found.out);
             JsonNode hit = JSON.readTree(found.out);
-            assertEquals("Inner", hit.path("hits").get(0).path("name").asText(), found.out);
-            assertEquals(firstId, hit.path("hits").get(0).path("frame").asText(), found.out);
+            assertEquals("Inner", hit.path("items").get(0).path("name").asText(), found.out);
+            assertEquals(firstId, hit.path("items").get(0).path("frame").asText(), found.out);
             assertEquals(firstId, hit.path("frame").asText(), found.out);
             assertTrue(hit.path("applied").asBoolean(), found.out);
 

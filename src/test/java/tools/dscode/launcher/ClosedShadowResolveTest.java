@@ -63,9 +63,9 @@ class ClosedShadowResolveTest {
         Capture found = run("find", "--target=browser:auto", "--query=Secret", "--run-id=shadow");
         assertEquals(0, found.code, found.err + found.out);
         JsonNode hit = JSON.readTree(found.out);
-        assertEquals("Secret", hit.path("hits").get(0).path("name").asText(), found.out);
-        assertEquals("closed", hit.path("hits").get(0).path("shadow").asText(), found.out);
-        assertEquals("/html[1]/body[1]/div[1]", hit.path("hits").get(0).path("shadow_path").asText(), found.out);
+        assertEquals("Secret", hit.path("items").get(0).path("name").asText(), found.out);
+        assertEquals("closed", hit.path("items").get(0).path("shadow").asText(), found.out);
+        assertEquals("/html[1]/body[1]/div[1]", hit.path("items").get(0).path("shadow_path").asText(), found.out);
 
         Capture acted = run("act", "--target=browser:auto", "--query=Secret", "--kind=click", "--run-id=shadow");
         assertEquals(0, acted.code, acted.err + acted.out);
@@ -114,9 +114,9 @@ class ClosedShadowResolveTest {
         Capture open = run("find", "--target=browser:auto", "--query=OpenBtn", "--run-id=once");
         assertEquals(0, open.code, open.err + open.out);
         JsonNode openHit = JSON.readTree(open.out);
-        assertEquals("OpenBtn", openHit.path("hits").get(0).path("name").asText(), open.out);
-        assertEquals("open", openHit.path("hits").get(0).path("shadow").asText(), open.out);
-        assertEquals("/html[1]/body[1]/div[2]", openHit.path("hits").get(0).path("shadow_path").asText(), open.out);
+        assertEquals("OpenBtn", openHit.path("items").get(0).path("name").asText(), open.out);
+        assertEquals("open", openHit.path("items").get(0).path("shadow").asText(), open.out);
+        assertEquals("/html[1]/body[1]/div[2]", openHit.path("items").get(0).path("shadow_path").asText(), open.out);
 
         Capture openAct = run("act", "--target=browser:auto", "--query=OpenBtn", "--kind=click", "--run-id=once");
         assertEquals(0, openAct.code, openAct.err + openAct.out);
@@ -125,9 +125,9 @@ class ClosedShadowResolveTest {
         Capture found = run("find", "--target=browser:auto", "--query=Once", "--run-id=once");
         assertEquals(0, found.code, found.err + found.out);
         JsonNode hit = JSON.readTree(found.out);
-        assertEquals("Once", hit.path("hits").get(0).path("name").asText(), found.out);
-        assertEquals("closed", hit.path("hits").get(0).path("shadow").asText(), found.out);
-        assertEquals("/html[1]/body[1]/div[1]", hit.path("hits").get(0).path("shadow_path").asText(), found.out);
+        assertEquals("Once", hit.path("items").get(0).path("name").asText(), found.out);
+        assertEquals("closed", hit.path("items").get(0).path("shadow").asText(), found.out);
+        assertEquals("/html[1]/body[1]/div[1]", hit.path("items").get(0).path("shadow_path").asText(), found.out);
         assertEquals("diff", hit.path("contexts").asText(""), found.out);
         assertEquals(
                 "steps stay on the main document, same-origin frames, and open shadow; agent also has closed-shadow #host",

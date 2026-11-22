@@ -59,9 +59,9 @@ class SnapBudgetTest {
         assertEquals(0, warm.code, warm.err + warm.out);
         JsonNode body = JSON.readTree(warm.out);
         assertTrue(warm.out.getBytes(StandardCharsets.UTF_8).length <= 16 * 1024, warm.out.length() + " bytes");
-        assertTrue(body.path("lines").size() <= 200, body.path("lines").size() + " lines");
-        assertTrue(body.path("lines").size() > 1, warm.out);
-        assertEquals("# button", body.path("lines").get(0).asText(), warm.out);
+        assertTrue(body.path("items").size() <= 200, body.path("items").size() + " lines");
+        assertTrue(body.path("items").size() > 1, warm.out);
+        assertEquals("# button", body.path("items").get(0).asText(), warm.out);
         assertTrue(body.path("truncated").asBoolean(), warm.out);
         assertFalse(body.has("hits"), warm.out);
         assertTrue(body.path("elapsedMs").asLong(-1) >= 0, warm.out);
@@ -79,7 +79,7 @@ class SnapBudgetTest {
         Capture scoped = run("snap", "--target=browser:auto", "--within=" + ref, "--run-id=snap-budget");
         assertEquals(0, scoped.code, scoped.err + scoped.out);
         JsonNode inside = JSON.readTree(scoped.out);
-        String scopedText = joined(inside.path("lines"));
+        String scopedText = joined(inside.path("items"));
         assertTrue(scopedText.contains("\"In\""), scopedText);
         assertTrue(scopedText.contains("\"Deep\""), scopedText);
         assertFalse(scopedText.contains("\"Out\""), scopedText);
@@ -91,7 +91,7 @@ class SnapBudgetTest {
                 "snap", "--target=browser:auto", "--within=" + ref, "--depth=1", "--run-id=snap-budget");
         assertEquals(0, shallow.code, shallow.err + shallow.out);
         JsonNode top = JSON.readTree(shallow.out);
-        String shallowText = joined(top.path("lines"));
+        String shallowText = joined(top.path("items"));
         assertTrue(shallowText.contains("\"In\""), shallowText);
         assertFalse(shallowText.contains("\"Deep\""), shallowText);
         assertEquals(1, buttonLines(top), shallowText);
@@ -107,7 +107,7 @@ class SnapBudgetTest {
 
     private static int buttonLines(JsonNode body) {
         int count = 0;
-        for (JsonNode line : body.path("lines")) {
+        for (JsonNode line : body.path("items")) {
             if (line.asText().startsWith("- button ")) count++;
         }
         return count;

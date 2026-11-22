@@ -124,7 +124,7 @@ class RefLifetimeTest {
 
     private static String saveRef(JsonNode body) {
         String ref = "";
-        for (JsonNode line : body.path("lines")) {
+        for (JsonNode line : body.path("items")) {
             String text = line.asText();
             if (text.contains("\"Save\"") || text.contains("\"Save later\"")) {
                 int start = text.indexOf("[ref=");

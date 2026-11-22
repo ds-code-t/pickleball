@@ -116,7 +116,7 @@ class ClickOnceTest {
     private void assertQuietFrame(String query, String urlPart, String counterExpr) throws Exception {
         Capture found = run("find", "--target=browser:auto", "--query=" + query, "--run-id=click-once");
         assertEquals(0, found.code, found.err + found.out);
-        String frame = JSON.readTree(found.out).path("hits").get(0).path("frame").asText("");
+        String frame = JSON.readTree(found.out).path("items").get(0).path("frame").asText("");
         assertFalse(frame.isBlank(), found.out);
         Capture acted = run("act", "--target=browser:auto", "--query=" + query, "--kind=click", "--run-id=click-once");
         assertEquals(0, acted.code, acted.err + acted.out);
@@ -149,7 +149,7 @@ class ClickOnceTest {
             Capture found = run("find", "--target=browser:auto", "--query=" + query, "--run-id=click-once");
             if (found.code == 0 && !found.out.isBlank()) {
                 last = JSON.readTree(found.out);
-                if (last.path("hits").size() > 0) return;
+                if (last.path("items").size() > 0) return;
             }
             Thread.sleep(250);
         }

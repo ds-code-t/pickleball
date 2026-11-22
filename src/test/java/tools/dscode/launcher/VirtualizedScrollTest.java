@@ -87,7 +87,7 @@ class VirtualizedScrollTest {
         JsonNode hit = JSON.readTree(found.out);
         assertTrue(hit.path("scrollSearch").asBoolean(false), found.out);
         assertTrue(hit.path("applied").asBoolean(), found.out);
-        assertEquals("Row 40", hit.path("hits").get(0).path("name").asText(), found.out);
+        assertEquals("Row 40", hit.path("items").get(0).path("name").asText(), found.out);
 
         Capture after = run(
                 "eval", "--target=browser:auto", "--world=main", "--run-id=scroll",
@@ -139,7 +139,7 @@ class VirtualizedScrollTest {
         assertEquals(0, found.code, found.err + found.out);
         JsonNode hit = JSON.readTree(found.out);
         assertTrue(hit.path("applied").asBoolean(), found.out);
-        assertEquals("Row 40", hit.path("hits").get(0).path("name").asText(), found.out);
+        assertEquals("Row 40", hit.path("items").get(0).path("name").asText(), found.out);
         String afterHit = scrolls();
         assertTrue(afterHit.startsWith("0,"), afterHit);
         int listTop = Integer.parseInt(afterHit.substring(2));
@@ -209,7 +209,7 @@ class VirtualizedScrollTest {
         assertEquals(0, found.code, found.err + found.out);
         JsonNode hit = JSON.readTree(found.out);
         assertTrue(hit.path("scrollSearch").asBoolean(false), found.out);
-        assertEquals("Item 50", hit.path("hits").get(0).path("name").asText(), found.out);
+        assertEquals("Item 50", hit.path("items").get(0).path("name").asText(), found.out);
         String afterHit = tops("scroll-tall");
         assertTrue(afterHit.startsWith("0,0,"), afterHit);
         int listTop = Integer.parseInt(afterHit.substring(afterHit.lastIndexOf(',') + 1));

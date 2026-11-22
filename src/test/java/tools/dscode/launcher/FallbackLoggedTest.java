@@ -140,10 +140,10 @@ class FallbackLoggedTest {
         long elapsedMs = (System.nanoTime() - startedAt) / 1_000_000L;
         assertEquals(0, watched.code, watched.err + watched.out);
         JsonNode body = JSON.readTree(watched.out);
-        assertTrue(body.path("events").isArray(), watched.out);
+        assertTrue(body.path("items").isArray(), watched.out);
         boolean seen = false;
         boolean sawEarly = false;
-        for (JsonNode event : body.path("events")) {
+        for (JsonNode event : body.path("items")) {
             String text = event.path("text").asText("");
             if (text.contains(early)) sawEarly = true;
             if (text.contains(marker)) {
@@ -170,7 +170,7 @@ class FallbackLoggedTest {
             Capture capture = run("find", "--target=browser:auto", "--query=" + query, "--run-id=" + runId);
             if (capture.code == 0 && !capture.out.isBlank()) {
                 last = JSON.readTree(capture.out);
-                if (last.path("hits").size() > 0) return last;
+                if (last.path("items").size() > 0) return last;
             }
             Thread.sleep(200);
         }

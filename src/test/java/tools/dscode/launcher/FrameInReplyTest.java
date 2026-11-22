@@ -86,7 +86,7 @@ class FrameInReplyTest {
         JsonNode hit = JSON.readTree(found.out);
         String frame = hit.path("frame").asText("");
         assertEquals(main, frame, found.out);
-        assertEquals("Save", hit.path("hits").get(0).path("name").asText(), found.out);
+        assertEquals("Save", hit.path("items").get(0).path("name").asText(), found.out);
         assertEquals("same", hit.path("contexts").asText(""), found.out);
 
         Capture painted = run("highlight", "--handle=save", "--target=browser:auto", "--preset=yellow", "--run-id=frames");
@@ -105,7 +105,7 @@ class FrameInReplyTest {
         JsonNode snap = JSON.readTree(shot.out);
         assertEquals(frame, snap.path("frame").asText(""), shot.out);
         boolean same = false;
-        for (JsonNode row : snap.path("lines")) {
+        for (JsonNode row : snap.path("items")) {
             String text = row.asText();
             if (text.contains("\"Save\"")) {
                 assertTrue(text.contains("frame=" + frame), shot.out);
@@ -126,9 +126,9 @@ class FrameInReplyTest {
         Capture inside = run("find", "--target=browser:auto", "--query=Inside", "--run-id=frames");
         assertEquals(0, inside.code, inside.err + inside.out);
         JsonNode insideHit = JSON.readTree(inside.out);
-        assertEquals("Inside", insideHit.path("hits").get(0).path("name").asText(), inside.out);
+        assertEquals("Inside", insideHit.path("items").get(0).path("name").asText(), inside.out);
         assertEquals(inner, insideHit.path("frame").asText(""), inside.out);
-        assertEquals(inner, insideHit.path("hits").get(0).path("frame").asText(""), inside.out);
+        assertEquals(inner, insideHit.path("items").get(0).path("frame").asText(""), inside.out);
 
         Capture reset = run("frame", "--target=browser:auto", "--reset", "--run-id=frames");
         assertEquals(0, reset.code, reset.err + reset.out);
@@ -136,7 +136,7 @@ class FrameInReplyTest {
 
         Capture again = run("find", "--target=browser:auto", "--query=Save", "--run-id=frames");
         assertEquals(0, again.code, again.err + again.out);
-        assertEquals("Save", JSON.readTree(again.out).path("hits").get(0).path("name").asText(), again.out);
+        assertEquals("Save", JSON.readTree(again.out).path("items").get(0).path("name").asText(), again.out);
 
         Path fixture = temp.resolve("notes.json");
         Files.writeString(fixture, """

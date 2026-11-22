@@ -19,7 +19,7 @@
     try { wait.observe(document, {childList: true, subtree: true}); } catch (ignored) { /* not observable yet */ }
     return;
   }
-  var VERSION = '3.0.0-push';
+  var VERSION = '3.0.0-lean';
   if (window.__pkbUi && window.__pkbUi.version === VERSION) return;
   if (window.__pkbUi && typeof window.__pkbUi.dispose === 'function') {
     try { window.__pkbUi.dispose(); } catch (ignored) { /* older runtime */ }
@@ -112,14 +112,20 @@
   function tryBind(ev) {
     try {
       var fn = window.pkbSurface;
-      if (typeof fn === 'function') fn(JSON.stringify(ev));
+      if (typeof fn === 'function') {
+        fn(JSON.stringify(ev));
+        return true;
+      }
     } catch (ignored) { /* this world has no binding */ }
+    return false;
   }
   function deliver(ev) {
-    events().push(ev);
     var now = Date.now();
     if (now - pushWindow > 1000) {
-      if (pushDropped) tryBind({type: 'dropped', text: String(pushDropped)});
+      if (pushDropped) {
+        var dropped = {type: 'dropped', text: String(pushDropped)};
+        if (!tryBind(dropped)) events().push(dropped);
+      }
       pushWindow = now;
       pushCount = 0;
       pushDropped = 0;
@@ -129,7 +135,9 @@
       return;
     }
     pushCount++;
-    tryBind(ev);
+    // The binding and the in-page queue are the same event. Queue only when nothing is bound,
+    // so a later drain does not record a second copy without the binding name.
+    if (!tryBind(ev)) events().push(ev);
   }
   function pushEvent(ev) {
     if (!ev) return;

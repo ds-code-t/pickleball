@@ -21,6 +21,7 @@ public final class PushChannel {
     public static final int RATE = 20;
     private static final Object LOCK = new Object();
     private static volatile Path bound = Path.of("");
+    private static volatile String session = "";
     private static volatile boolean armed;
     private static long windowStart;
     private static int windowCount;
@@ -30,8 +31,19 @@ public final class PushChannel {
     }
 
     public static void bind(Path project) {
+        bind(project, null);
+    }
+
+    /** Binds the project and, when {@code sessionId} is non-blank, the session stamped on later rows. */
+    public static void bind(Path project, String sessionId) {
         if (project != null) bound = project.toAbsolutePath().normalize();
         armed = project != null;
+        if (sessionId != null && !sessionId.isBlank()) session = sessionId;
+    }
+
+    /** Session id for push rows. Empty until {@link #bind(Path, String)} sets one. */
+    public static String session() {
+        return session == null ? "" : session;
     }
 
     public static Path project() {
@@ -45,6 +57,7 @@ public final class PushChannel {
             dropped = 0;
         }
         bound = Path.of("");
+        session = "";
         armed = false;
     }
 
@@ -63,7 +76,11 @@ public final class PushChannel {
         if (!row.containsKey("type") && row.containsKey("event")) row.put("type", row.get("event"));
         if (!row.containsKey("event")) row.put("event", row.getOrDefault("type", "page"));
         row.putIfAbsent("type", row.get("event"));
-        row.putIfAbsent("sessionId", "");
+        String sid = row.get("sessionId");
+        if (sid == null || sid.isBlank()) {
+            String boundSession = session();
+            row.put("sessionId", boundSession == null || boundSession.isBlank() ? "session" : boundSession);
+        }
         row.putIfAbsent("at", Instant.now().toString());
         row.put("priority", StandardView.priorityName(row));
         synchronized (LOCK) {

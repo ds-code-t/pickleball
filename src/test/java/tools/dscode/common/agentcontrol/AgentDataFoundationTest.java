@@ -104,13 +104,21 @@ class AgentDataFoundationTest {
         AgentControl.Result polled = AgentControl.execute(project, "mix", "ui-poll", ui, List.of(), "a");
         assertEquals(0, polled.exit(), String.valueOf(polled.body()));
         assertEquals(1, polled.body().get("v"));
-        assertTrue(polled.body().get("events") instanceof List<?>);
-        assertFalse(((List<?>) polled.body().get("events")).isEmpty());
+        assertTrue(polled.body().get("items") instanceof List<?>);
+        assertFalse(((List<?>) polled.body().get("items")).isEmpty());
         Map<String, String> uiAgain = new LinkedHashMap<>();
         uiAgain.put("cursor", start);
         uiAgain.put("channel", "run");
         AgentControl.Result uiRepeat = AgentControl.execute(project, "mix", "ui-poll", uiAgain, List.of(), "a");
-        assertEquals(((List<?>) polled.body().get("events")).size(), ((List<?>) uiRepeat.body().get("events")).size());
+        assertEquals(((List<?>) polled.body().get("items")).size(), ((List<?>) uiRepeat.body().get("items")).size());
+        assertFalse(polled.body().containsKey("events"));
+        AgentControl.Result chatAfterUi = AgentControl.execute(project, "mix", "chat-poll", firstArgs, List.of(), "a");
+        assertEquals(2, chatAfterUi.body().get("count"), String.valueOf(chatAfterUi.body()));
+        PageSurfaces.recordInput(project, "mix", Map.of("type", "click", "id", "pkb-1"));
+        List<String> stored = java.nio.file.Files.readAllLines(
+                project.resolve(".pickleball/runs/mix/agent/overlay-events.jsonl"));
+        assertEquals(1, stored.size(), stored.toString());
+        assertTrue(stored.get(0).contains("sessionId"));
     }
 
     @Test

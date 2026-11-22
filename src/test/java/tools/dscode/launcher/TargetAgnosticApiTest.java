@@ -126,7 +126,7 @@ class TargetAgnosticApiTest {
         assertTrue(socket.contains("/devtools/page/"), socket);
         JsonNode again = retryFind("browser:cdp=" + socket, "Saved:1");
         assertTrue(again.path("applied").asBoolean(), again.toString());
-        assertEquals("button", again.path("hits").get(0).path("role").asText(), again.toString());
+        assertEquals("button", again.path("items").get(0).path("role").asText(), again.toString());
         String cdpRef = again.path("ref").asText();
         Capture refAct = run("act", "--target=browser:cdp=" + socket, "--ref=" + cdpRef, "--kind=click", "--run-id=live-cdp");
         assertEquals(0, refAct.code, refAct.err + refAct.out);
@@ -165,17 +165,17 @@ class TargetAgnosticApiTest {
         assertFalse(snap.out.contains("RedBlueRed"), snap.out);
 
         JsonNode launch = retryFind("browser:auto", "Launch");
-        assertEquals("button", launch.path("hits").get(0).path("role").asText(), launch.toString());
-        assertEquals("Launch", launch.path("hits").get(0).path("name").asText(), launch.toString());
+        assertEquals("button", launch.path("items").get(0).path("role").asText(), launch.toString());
+        assertEquals("Launch", launch.path("items").get(0).path("name").asText(), launch.toString());
         JsonNode search = retryFind("browser:auto", "searchbox");
-        assertEquals("Search", search.path("hits").get(0).path("name").asText(), search.toString());
+        assertEquals("Search", search.path("items").get(0).path("name").asText(), search.toString());
         JsonNode city = retryFind("browser:auto", "City");
         JsonNode town = retryFind("browser:auto", "Town");
         JsonNode byId = retryFind("browser:auto", "city");
-        assertFalse("label".equals(city.path("hits").get(0).path("role").asText()), city.toString());
-        long handle = city.path("hits").get(0).path("handle").asLong();
-        assertEquals(handle, town.path("hits").get(0).path("handle").asLong(), town.toString());
-        assertEquals(handle, byId.path("hits").get(0).path("handle").asLong(), byId.toString());
+        assertFalse("label".equals(city.path("items").get(0).path("role").asText()), city.toString());
+        long handle = city.path("items").get(0).path("handle").asLong();
+        assertEquals(handle, town.path("items").get(0).path("handle").asLong(), town.toString());
+        assertEquals(handle, byId.path("items").get(0).path("handle").asLong(), byId.toString());
 
         JsonNode save = explain("Save");
         assertTrue(save.path("report").path("visible").asBoolean(), save.toString());
@@ -227,7 +227,7 @@ class TargetAgnosticApiTest {
 
         JsonNode color = retryFind("browser:auto", "color");
         String colorRef = "";
-        for (JsonNode hit : color.path("hits")) {
+        for (JsonNode hit : color.path("items")) {
             String role = hit.path("role").asText();
             if ("select".equals(role) || "combobox".equals(role)) colorRef = hit.path("ref").asText();
         }
@@ -245,7 +245,7 @@ class TargetAgnosticApiTest {
         assertEquals(0, element.code, element.err + element.out);
         JsonNode found = JSON.readTree(element.out);
         assertTrue(found.path("applied").asBoolean(), element.out);
-        assertEquals("Save", found.path("hits").get(0).path("name").asText(), element.out);
+        assertEquals("Save", found.path("items").get(0).path("name").asText(), element.out);
         Capture inspected = run("inspect-page", "--target=browser:auto", "--run-id=names");
         assertEquals(0, inspected.code, inspected.err + inspected.out);
         assertEquals("snap", JSON.readTree(inspected.out).path("op").asText(), inspected.out);
@@ -270,7 +270,7 @@ class TargetAgnosticApiTest {
         JsonNode watch = JSON.readTree(observed.out);
         assertEquals("watch", watch.path("op").asText(), observed.out);
         boolean sawMarker = false;
-        for (JsonNode event : watch.path("events")) {
+        for (JsonNode event : watch.path("items")) {
             if (event.path("text").asText("").contains(marker)) sawMarker = true;
         }
         assertTrue(sawMarker, observed.out);
@@ -314,14 +314,14 @@ class TargetAgnosticApiTest {
             assertEquals(0, found.exit(), String.valueOf(found.body()));
             assertEquals(Boolean.TRUE, found.body().get("applied"));
             @SuppressWarnings("unchecked")
-            List<Map<String, Object>> hits = (List<Map<String, Object>>) found.body().get("hits");
+            List<Map<String, Object>> hits = (List<Map<String, Object>>) found.body().get("items");
             assertEquals("Save", hits.get(0).get("name"));
             args.put("target", "browser:worker-run");
             AgentControl.Result again = AgentControl.execute(temp, "worker-run", "find", args, List.of(), null);
             assertEquals(0, again.exit(), String.valueOf(again.body()));
             assertEquals(Boolean.TRUE, again.body().get("applied"));
             @SuppressWarnings("unchecked")
-            List<Map<String, Object>> second = (List<Map<String, Object>>) again.body().get("hits");
+            List<Map<String, Object>> second = (List<Map<String, Object>>) again.body().get("items");
             assertEquals("Save", second.get(0).get("name"));
         } finally {
             AgentDriverHooks.host(false);
@@ -505,7 +505,7 @@ class TargetAgnosticApiTest {
             Capture found = run("find", "--target=browser:auto", "--query=Save", "--run-id=worker-tab");
             assertEquals(0, found.code, found.err + found.out);
             JsonNode hit = JSON.readTree(found.out);
-            assertEquals("Save", hit.path("hits").get(0).path("name").asText(), found.out);
+            assertEquals("Save", hit.path("items").get(0).path("name").asText(), found.out);
             assertFalse(found.out.contains("Decoy"), found.out);
             Capture acted = run("act", "--target=" + hit.path("ref").asText(), "--kind=click", "--run-id=worker-tab");
             assertEquals(0, acted.code, acted.err + acted.out);
@@ -549,7 +549,7 @@ class TargetAgnosticApiTest {
         assertEquals("Ready", eval("document.title").path("value").asText(), stillAct.out);
         JsonNode color = retryFind("browser:auto", "color");
         String colorRef = "";
-        for (JsonNode hit : color.path("hits")) {
+        for (JsonNode hit : color.path("items")) {
             String role = hit.path("role").asText();
             if ("select".equals(role) || "combobox".equals(role)) colorRef = hit.path("ref").asText();
         }
@@ -582,7 +582,7 @@ class TargetAgnosticApiTest {
             Capture capture = run("find", "--target=" + target, "--query=" + query, "--run-id=live");
             if (capture.code == 0 && !capture.out.isBlank()) {
                 last = JSON.readTree(capture.out);
-                if (last.path("hits").size() > 0) return last;
+                if (last.path("items").size() > 0) return last;
             } else {
                 last = JSON.readTree(capture.out.isBlank() ? "{\"error\":\"empty\"}" : capture.out);
             }

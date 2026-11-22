@@ -461,6 +461,17 @@ final class PageSurfaces {
         if (liveOnly && managed().isEmpty()) {
             throw new IllegalStateException("no live browser; " + kind + " was not applied");
         }
+        if (visual && liveOnly && handle != null && !handle.isBlank() && !resolved(handle)) {
+            String selector = tools.dscode.common.agentfast.TargetHandles.selector(handle);
+            if (selector != null && !selector.isBlank()) {
+                try {
+                    String found = UiBatch.resolve(selector);
+                    if (found != null && !found.isBlank()) handle = found;
+                } catch (Exception ignored) {
+                    // The live lookup below still reports unknown handle.
+                }
+            }
+        }
         if (visual && liveOnly && handle != null && !handle.isBlank() && !resolved(handle) && !locateLiveHandle(handle)) {
             throw new IllegalArgumentException("unknown handle: " + handle);
         }
@@ -654,10 +665,38 @@ final class PageSurfaces {
         row.put("at", AgentStore.now());
         row.put("codes", List.of("agent_injected", "overlay"));
         row.put("sentence", OVERLAY_SENTENCE);
+        String session = tools.dscode.common.agentfast.PushChannel.session();
+        if (session == null || session.isBlank()) session = runId == null || runId.isBlank() ? "session" : runId;
+        row.putIfAbsent("sessionId", session);
         Path file = AgentStore.root(project, runId).resolve("overlay-events.jsonl");
+        if (duplicateEvent(file, row)) return;
         AgentStore.appendCapped(file, AgentStore.JSON.writeValueAsString(row));
         CompositeLog.info("overlay", "input type=" + event.getOrDefault("type", ""));
         ChatLog.send(project, runId, "overlay", "system", "", "overlay input " + event.getOrDefault("type", "") + " " + event.getOrDefault("id", ""));
+    }
+
+    /** A binding delivery and a queue drain are one event. The second copy is dropped. */
+    private static boolean duplicateEvent(Path file, Map<String, Object> row) {
+        String fingerprint = eventFingerprint(row);
+        if (!Files.isRegularFile(file)) return false;
+        try {
+            String last = "";
+            for (String line : AgentStore.readGroup(file)) last = line;
+            if (last.isBlank()) return false;
+            Map<?, ?> prior = AgentStore.JSON.readValue(last, Map.class);
+            return fingerprint.equals(eventFingerprint(prior));
+        } catch (RuntimeException | java.io.IOException failure) {
+            return false;
+        }
+    }
+
+    private static String eventFingerprint(Map<?, ?> event) {
+        StringBuilder raw = new StringBuilder();
+        for (String key : List.of("type", "id", "text", "value", "source", "choice", "name")) {
+            Object value = event == null ? null : event.get(key);
+            raw.append(key).append('=').append(value == null ? "" : value).append('\n');
+        }
+        return raw.toString();
     }
 
     /** Events after the first {@code after} stored events. The cursor is the stored event count. */

@@ -28,7 +28,7 @@ class OverlayPollCursorTest {
         AgentControl.Result newer = AgentControl.execute(project, "cur", "overlay-poll", Map.of("target", "page", "after", "2"), List.of(), "a");
         assertEquals(1, newer.body().get("count"), String.valueOf(newer.body()));
         assertEquals(3, tools.dscode.common.agentfast.AgentCursor.overlay(String.valueOf(newer.body().get("next"))));
-        assertEquals("pkb-3", String.valueOf(((List<?>) newer.body().get("events")).get(0) instanceof Map<?, ?> m ? m.get("id") : ""));
+        assertEquals("pkb-3", String.valueOf(((List<?>) newer.body().get("items")).get(0) instanceof Map<?, ?> m ? m.get("id") : ""));
         AgentControl.Result bad = AgentControl.execute(project, "cur", "overlay-poll", Map.of("target", "page", "after", "x"), List.of(), "a");
         assertEquals(2, bad.exit());
     }

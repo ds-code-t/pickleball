@@ -51,9 +51,6 @@ public final class AgentEnvelope {
         copy.put("ms", ms);
         copy.put("state", state(copy, project, runId));
         copy.put("sum", sum(copy, verb, ok));
-        copy.put("items", items(copy));
-        Object priorNext = copy.get("next");
-        if (priorNext instanceof Number number) copy.put("seq", number.intValue());
         if (copy.get("chatNext") == null) {
             Object messages = copy.get("messages");
             if (messages instanceof List<?> list && !list.isEmpty() && list.get(list.size() - 1) instanceof Map<?, ?> last
@@ -61,10 +58,35 @@ public final class AgentEnvelope {
                 copy.put("chatNext", String.valueOf(last.get("id")));
             }
         }
+        copy.put("items", takeItems(copy));
+        Object priorNext = copy.get("next");
+        if (priorNext instanceof Number number) copy.put("seq", number.intValue());
         copy.put("next", AgentCursor.stamp(runId, agentId, copy));
-        copy.put("trunc", trunc(copy));
+        compactVersions(copy);
         copy.put("err", ok ? null : error(copy, verb));
+        copy.put("trunc", trunc(copy));
+        int cap = replyCap(copy, verb);
+        if (cap > 0 && SnapView.fitJson(copy, cap)) {
+            for (int spin = 0; spin < 8; spin++) {
+                markTruncated(copy);
+                if (!SnapView.fitJson(copy, cap)) break;
+            }
+            markTruncated(copy);
+        }
         return copy;
+    }
+
+    /** Records that the reply was cut. Line count is refreshed after the rows are dropped. */
+    private static void markTruncated(Map<String, Object> copy) {
+        Object trunc = copy.get("trunc");
+        if (trunc instanceof Map<?, ?> map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> updated = (Map<String, Object>) map;
+            updated.put("on", true);
+            Object items = copy.get("items");
+            if (items instanceof List<?> list) updated.put("lines", list.size());
+        }
+        copy.put("truncated", true);
     }
 
     /** Ping body a warm controller returns without running a verb. */
@@ -161,12 +183,68 @@ public final class AgentEnvelope {
         return op + (ok ? " ok" : " failed");
     }
 
-    private static List<Object> items(Map<String, Object> body) {
-        for (String key : List.of("lines", "messages", "events", "chat", "hits", "ops")) {
+    private static final List<String> ITEM_SOURCES = List.of(
+            "lines", "messages", "events", "chat", "hits", "ops", "placements"
+    );
+
+    /**
+     * One list. The first of {@code lines}, {@code messages}, {@code events}, {@code chat},
+     * {@code hits}, {@code ops}, or {@code placements} becomes {@code items}. That source, and any
+     * other source that is the same list, is removed so a row is not sent twice.
+     */
+    private static List<Object> takeItems(Map<String, Object> body) {
+        String source = null;
+        List<?> taken = null;
+        for (String key : ITEM_SOURCES) {
             Object value = body.get(key);
-            if (value instanceof List<?> list) return new ArrayList<>(list);
+            if (value instanceof List<?> list) {
+                source = key;
+                taken = list;
+                break;
+            }
         }
-        return List.of();
+        if (taken == null) return List.of();
+        List<Object> items = new ArrayList<>(taken);
+        for (String key : ITEM_SOURCES) {
+            Object value = body.get(key);
+            if (value instanceof List<?> list && (key.equals(source) || list.equals(taken))) {
+                body.remove(key);
+            }
+        }
+        return items;
+    }
+
+    /** Reply doc versions stay short. Desktop versions and an already-short URL are unchanged. */
+    private static void compactVersions(Map<String, Object> body) {
+        rewriteVersion(body, "docVersion");
+        rewriteVersion(body, "doc_version");
+        Object snap = body.get("snap");
+        if (snap instanceof Map<?, ?> map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> nested = (Map<String, Object>) map;
+            rewriteVersion(nested, "docVersion");
+        }
+        Object diff = body.get("diff");
+        if (diff instanceof Map<?, ?> map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> nested = (Map<String, Object>) map;
+            rewriteVersion(nested, "docVersion");
+        }
+    }
+
+    private static void rewriteVersion(Map<String, Object> body, String key) {
+        Object value = body.get(key);
+        if (value instanceof String text) body.put(key, TargetVerb.shownVersion(text));
+    }
+
+    /** Snap and find stay inside the documented cap. An explicit {@code replyBudget} wins when smaller. */
+    private static int replyCap(Map<String, Object> body, String verb) {
+        int cap = 0;
+        Object mark = body.remove("replyBudget");
+        if (mark instanceof Number number && number.intValue() > 0) cap = number.intValue();
+        else if ("snap".equals(verb) || "find".equals(verb)) cap = SnapView.REPLY_CAP;
+        if (cap <= 0) return 0;
+        return Math.min(SnapView.REPLY_CAP, cap);
     }
 
     private static Map<String, Object> trunc(Map<String, Object> body) {
@@ -174,7 +252,8 @@ public final class AgentEnvelope {
         boolean on = Boolean.TRUE.equals(body.get("truncated"));
         trunc.put("on", on);
         if (body.get("full") != null) trunc.put("full", body.get("full"));
-        Object lines = body.get("lines");
+        Object lines = body.get("items");
+        if (!(lines instanceof List<?>)) lines = body.get("lines");
         if (lines instanceof List<?> list) trunc.put("lines", list.size());
         return trunc;
     }

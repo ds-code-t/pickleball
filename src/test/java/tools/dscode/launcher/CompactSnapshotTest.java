@@ -116,7 +116,7 @@ class CompactSnapshotTest {
     }
 
     private static String lineNamed(JsonNode body, String name) {
-        for (JsonNode line : body.path("lines")) {
+        for (JsonNode line : body.path("items")) {
             String text = line.asText();
             if (text.startsWith("- button \"" + name + "\"")) return text;
         }

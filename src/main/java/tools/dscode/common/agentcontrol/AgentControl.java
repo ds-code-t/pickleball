@@ -145,7 +145,9 @@ public final class AgentControl {
             String agentId
     ) {
         long started = System.nanoTime();
-        tools.dscode.common.agentfast.PushChannel.bind(project);
+        String session = runId == null || runId.isBlank() ? "session" : runId;
+        if (args != null && args.get("session") != null && !args.get("session").isBlank()) session = args.get("session");
+        tools.dscode.common.agentfast.PushChannel.bind(project, session);
         Map<String, String> values = args == null ? new java.util.LinkedHashMap<>() : new java.util.LinkedHashMap<>(args);
         tools.dscode.common.agentfast.AgentCursor.absorb(op, values);
         try {
@@ -785,7 +787,8 @@ public final class AgentControl {
             Thread.sleep(200);
         }
         boolean explicit = present(args.get("after")) || present(args.get("id"));
-        if (!explicit) {
+        boolean peek = "true".equalsIgnoreCase(args.get("peek"));
+        if (!explicit && !peek) {
             String advanceTo = null;
             if (!messages.isEmpty()) {
                 Object last = messages.get(messages.size() - 1).get("id");
@@ -794,7 +797,7 @@ public final class AgentControl {
             if (filter && lastRawId != null) advanceTo = lastRawId;
             if (advanceTo != null) ChatCursor.advance(project, runId, args.get("channel"), advanceTo);
         }
-        EventCursor.advance(project, runId, agentId, eventNext);
+        if (!peek) EventCursor.advance(project, runId, agentId, eventNext);
         Map<String, Object> body = ok("Chat messages after the given id.");
         body.put("count", messages.size());
         body.put("messages", messages);
@@ -939,6 +942,7 @@ public final class AgentControl {
 
     private static Result highlight(Path project, String runId, Map<String, String> args) throws Exception {
         if (!present(args.get("handle"))) return fail(2, "highlight requires --handle");
+        String handle = expandHandle(args.get("handle"));
         String target = args.get("target");
         if (present(target)) {
             String raw = target.trim();
@@ -951,13 +955,13 @@ public final class AgentControl {
                 }
                 String css = PageSurfaces.presetCss(args.get("preset"), args.get("style"));
                 tools.dscode.common.agentfast.TargetVerb.Outcome painted =
-                        tools.dscode.common.agentfast.TargetVerb.highlight(raw, args.get("handle"), css, runId);
+                        tools.dscode.common.agentfast.TargetVerb.highlight(raw, handle, css, runId);
                 return new Result(painted.exit(), painted.body());
             }
         }
         Map<String, Object> painted = PageSurfaces.highlight(
                 explicitPage(project, args),
-                args.get("handle"),
+                handle,
                 args.get("preset"),
                 args.get("style"),
                 integerOrNull(args.get("x")),
@@ -1021,7 +1025,7 @@ public final class AgentControl {
             return fail(2, op + " --block must be true or false");
         }
         String text = args.get("text");
-        String handle = args.get("handle");
+        String handle = expandHandle(args.get("handle"));
         Integer x = integerOrNull(args.get("x"));
         Integer y = integerOrNull(args.get("y"));
         Integer width = integerOrNull(args.get("width"));
@@ -1523,6 +1527,27 @@ public final class AgentControl {
         body.put("ok", false);
         body.put("error", error);
         return new Result(exit, body);
+    }
+
+    /** A short id or ref becomes the page handle ui-apply would resolve. Other handles stay as given. */
+    private static String expandHandle(String handle) {
+        if (!present(handle)) return handle;
+        String selector = tools.dscode.common.agentfast.TargetHandles.selector(handle);
+        String lookup = selector;
+        if (lookup == null || lookup.isBlank()) {
+            String token = handle.trim();
+            if (token.startsWith("text:") || token.startsWith("role:") || token.startsWith("x:") || token.startsWith("#")) {
+                lookup = token;
+            } else return handle;
+        }
+        try {
+            String found = UiBatch.resolve(lookup);
+            if (found != null && !found.isBlank()) return found;
+        } catch (Exception ignored) {
+            // The original handle is still tried by the page.
+        }
+        if (lookup.startsWith("#") && lookup.length() > 1) return lookup.substring(1);
+        return lookup;
     }
 
     private static String cursorAfter(Path project, String runId, Map<String, String> args) {

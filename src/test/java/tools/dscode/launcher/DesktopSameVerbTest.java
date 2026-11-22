@@ -51,7 +51,7 @@ class DesktopSameVerbTest {
         JsonNode hit = JSON.readTree(found.out);
         assertFalse(hit.path("applied").asBoolean(), found.out);
         assertEquals("desktop", hit.path("used").asText(), found.out);
-        assertEquals("Save", hit.path("hits").get(0).path("name").asText(), found.out);
+        assertEquals("Save", hit.path("items").get(0).path("name").asText(), found.out);
         String ref = hit.path("ref").asText();
         assertTrue(ref.startsWith("ref:desktop:0:"), ref);
 
@@ -101,7 +101,7 @@ class DesktopSameVerbTest {
         Capture found = agent("find", "--target=desktop:" + pid, "--query=" + name, "--run-id=desk-live");
         assertEquals(0, found.code, found.out + found.err);
         assertTrue(JSON.readTree(found.out).path("applied").asBoolean(), found.out);
-        assertEquals(name, JSON.readTree(found.out).path("hits").get(0).path("name").asText(), found.out);
+        assertEquals(name, JSON.readTree(found.out).path("items").get(0).path("name").asText(), found.out);
         Capture wrong = agent("find", "--target=desktop:" + ProcessHandle.current().pid(), "--run-id=desk-wrong");
         if (String.valueOf(ProcessHandle.current().pid()).equals(pid)) {
             wrong = agent("find", "--target=desktop:1", "--run-id=desk-wrong");

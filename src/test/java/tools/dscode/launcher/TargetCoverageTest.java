@@ -47,7 +47,7 @@ class TargetCoverageTest {
         start("Ready");
         assertTrue(Files.isRegularFile(temp.resolve(".pickleball/live-browser/current.json")));
         JsonNode found = find("Save");
-        assertEquals("Save", found.path("hits").get(0).path("name").asText(), found.toString());
+        assertEquals("Save", found.path("items").get(0).path("name").asText(), found.toString());
         assertTrue(found.path("ref").asText("").startsWith("ref:"), found.toString());
         assertEquals("cdp", found.path("used").asText(), found.toString());
     }
@@ -155,7 +155,7 @@ class TargetCoverageTest {
             Capture capture = run("find", "--target=browser:auto", "--query=" + query, "--run-id=cover-find");
             if (capture.code == 0 && !capture.out.isBlank()) {
                 last = JSON.readTree(capture.out);
-                if (last.path("hits").size() > 0) return last;
+                if (last.path("items").size() > 0) return last;
             }
             Thread.sleep(200);
         }

@@ -226,7 +226,12 @@ final class UiBatch {
                 events = emptyOverlay();
             }
             Map<String, String> chatArgs = new LinkedHashMap<>();
+            chatArgs.put("peek", "true");
             if (chatAfter != null && !chatAfter.isBlank()) chatArgs.put("after", chatAfter);
+            else {
+                String stored = ChatCursor.after(project, runId, args.getOrDefault("channel", "run"));
+                chatArgs.put("after", stored == null || stored.isBlank() ? "0" : stored);
+            }
             chatArgs.put("channel", args.getOrDefault("channel", "run"));
             AgentControl.Result chat = AgentControl.dispatch(project, runId, "chat-poll", chatArgs, List.of(), agentId);
             List<Map<String, Object>> eventRows = compact(events.body().get("events"));

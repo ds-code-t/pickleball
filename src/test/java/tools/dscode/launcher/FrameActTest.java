@@ -115,9 +115,9 @@ class FrameActTest {
             Capture found = run("find", "--target=browser:auto", "--query=Inner", "--run-id=frame-act");
             assertEquals(0, found.code, found.err + found.out);
             JsonNode hit = JSON.readTree(found.out);
-            assertEquals("Inner", hit.path("hits").get(0).path("name").asText(), found.out);
-            assertEquals(child, hit.path("hits").get(0).path("frame").asText(""), found.out);
-            assertEquals("coverage", hit.path("hits").get(0).path("via").asText(""), found.out);
+            assertEquals("Inner", hit.path("items").get(0).path("name").asText(), found.out);
+            assertEquals(child, hit.path("items").get(0).path("frame").asText(""), found.out);
+            assertEquals("coverage", hit.path("items").get(0).path("via").asText(""), found.out);
             assertEquals("diff", hit.path("contexts").asText(""), found.out);
             assertTrue(hit.path("contextDiff").asText("").contains("oopif " + child), found.out);
 
@@ -187,9 +187,9 @@ class FrameActTest {
             Capture grandWhileEntered = run("find", "--target=browser:auto", "--query=Grand", "--run-id=frame-act");
             assertEquals(0, grandWhileEntered.code, grandWhileEntered.err + grandWhileEntered.out);
             JsonNode grandEntered = JSON.readTree(grandWhileEntered.out);
-            assertEquals("Grand", grandEntered.path("hits").get(0).path("name").asText(), grandWhileEntered.out);
-            assertEquals(grand, grandEntered.path("hits").get(0).path("frame").asText(""), grandWhileEntered.out);
-            assertNotEquals(child, grandEntered.path("hits").get(0).path("frame").asText(""), grandWhileEntered.out);
+            assertEquals("Grand", grandEntered.path("items").get(0).path("name").asText(), grandWhileEntered.out);
+            assertEquals(grand, grandEntered.path("items").get(0).path("frame").asText(""), grandWhileEntered.out);
+            assertNotEquals(child, grandEntered.path("items").get(0).path("frame").asText(""), grandWhileEntered.out);
 
             Capture scoped = run("act", "--target=browser:auto", "--query=Entered", "--kind=click", "--run-id=frame-act");
             assertEquals(0, scoped.code, scoped.err + scoped.out);
@@ -206,9 +206,9 @@ class FrameActTest {
             Capture nested = run("find", "--target=browser:auto", "--query=Grand", "--run-id=frame-act");
             assertEquals(0, nested.code, nested.err + nested.out);
             JsonNode grandHit = JSON.readTree(nested.out);
-            assertEquals("Grand", grandHit.path("hits").get(0).path("name").asText(), nested.out);
-            assertEquals(grand, grandHit.path("hits").get(0).path("frame").asText(""), nested.out);
-            assertEquals("coverage", grandHit.path("hits").get(0).path("via").asText(""), nested.out);
+            assertEquals("Grand", grandHit.path("items").get(0).path("name").asText(), nested.out);
+            assertEquals(grand, grandHit.path("items").get(0).path("frame").asText(""), nested.out);
+            assertEquals("coverage", grandHit.path("items").get(0).path("via").asText(""), nested.out);
 
             Capture grandAct = run("act", "--target=browser:auto", "--query=Grand", "--kind=click", "--run-id=frame-act");
             assertEquals(0, grandAct.code, grandAct.err + grandAct.out);
@@ -286,7 +286,7 @@ class FrameActTest {
     }
 
     private static boolean hitNamed(JsonNode body, String name) {
-        for (JsonNode line : body.path("lines")) {
+        for (JsonNode line : body.path("items")) {
             if (line.asText().contains("\"" + name + "\"")) return true;
         }
         return false;

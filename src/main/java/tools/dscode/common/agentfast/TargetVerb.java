@@ -111,6 +111,9 @@ public final class TargetVerb {
      * {@code applied} is true only when that page reads back {@code data-pkb-style=style_modified}.
      */
     public static Outcome highlight(String targetRaw, String handle, String css, String runId) {
+        String lookup = handle;
+        String selector = TargetHandles.selector(handle);
+        if (selector != null && !selector.isBlank()) lookup = selector;
         TargetSelector.Parsed target = TargetSelector.parse(targetRaw);
         if (target == null || "desktop".equals(target.kind()) || "none".equals(target.kind())) {
             Outcome failed = fail("highlight", "unknown target");
@@ -122,8 +125,10 @@ public final class TargetVerb {
         try {
             String sentence = tools.dscode.browser.SurfaceAssets.sentence("highlight");
             String script = "(function(){"
-                    + "var handle=" + jsString(handle) + ",css=" + jsString(css) + ",sentence=" + jsString(sentence) + ";"
+                    + "var handle=" + jsString(lookup) + ",css=" + jsString(css) + ",sentence=" + jsString(sentence) + ";"
                     + "var el=document.getElementById(handle);"
+                    + "if(!el && handle && handle.charAt(0)==='#') el=document.getElementById(handle.slice(1));"
+                    + "if(!el){try{el=document.querySelector(handle);}catch(e){el=null;}}"
                     + "if(!el){var all=document.querySelectorAll('[data-pkb-handle],[data-pkb-id]');"
                     + "for(var i=0;i<all.length;i++){var mark=all[i].getAttribute('data-pkb-handle')||all[i].getAttribute('data-pkb-id');"
                     + "if(mark===handle){el=all[i];break;}}}"
@@ -293,6 +298,7 @@ public final class TargetVerb {
             body.put("hits", rows);
             body.put("ref", rows.get(0).get("ref"));
             if (args.get("scroll-search") != null) body.put("scrollSearch", true);
+            markBudget(body, args);
             stamp(body, page.session.connection(), hits.get(0));
             putEntered(body, runId, page.session.connection(), rows);
             stampContexts(body, root);
@@ -314,6 +320,7 @@ public final class TargetVerb {
         body.put("ref", rows.get(0).get("ref"));
         body.put("session", session.id());
         body.put("applied", session.live());
+        markBudget(body, args);
         stampDesktop(body, session);
         return ok(body);
     }
@@ -680,18 +687,43 @@ public final class TargetVerb {
         return "true".equals(read);
     }
 
-    private static DomNode fieldNode(DomNode root, String key) {
+    static DomNode fieldNode(DomNode root, String key) {
         if (root == null || key == null || key.isBlank()) return null;
-        DomNode direct = matchField(root, key);
+        String token = key.trim();
+        DomNode byRef = nodeForTarget(root, token);
+        if (byRef != null) return isField(byRef) ? byRef : firstField(byRef) != null ? firstField(byRef) : byRef;
+        DomNode direct = matchField(root, token);
         if (direct != null) return direct;
-        return controlForLabel(root, key);
+        return controlForLabel(root, token);
+    }
+
+    /** A short id or {@code ref:} names the node that snap published. */
+    static DomNode nodeForTarget(DomNode root, String token) {
+        if (root == null || token == null || token.isBlank()) return null;
+        String expanded = SessionIds.expand(token.trim());
+        String ref = expanded != null ? expanded : token.trim();
+        if (!ref.startsWith("ref:")) return null;
+        return nodeByRef(root, ref);
+    }
+
+    private static String labelKey(String text) {
+        String trimmed = text == null ? "" : text.replaceAll("\\s+", " ").trim();
+        while (trimmed.endsWith(":") || trimmed.endsWith("*")) {
+            trimmed = trimmed.substring(0, trimmed.length() - 1).trim();
+        }
+        return trimmed.toLowerCase(Locale.ROOT);
     }
 
     private static DomNode matchField(DomNode node, String key) {
         if (node == null) return null;
         if (node.nodeType == 1 && isField(node)) {
             if (key.equals(attr(node, "id")) || key.equals(attr(node, "name"))) return node;
-            if (key.equals(node.accessibleName)) return node;
+            String want = labelKey(key);
+            if (!want.isEmpty() && (want.equals(labelKey(attr(node, "id")))
+                    || want.equals(labelKey(attr(node, "name")))
+                    || want.equals(labelKey(node.accessibleName))
+                    || want.equals(labelKey(attr(node, "placeholder")))
+                    || want.equals(labelKey(attr(node, "aria-label"))))) return node;
         }
         for (DomNode child : node.children) {
             DomNode found = matchField(child, key);
@@ -712,7 +744,7 @@ public final class TargetVerb {
     /** The control named by a label's text, via {@code for} or by wrapping that control. */
     private static DomNode controlForLabel(DomNode node, String key) {
         if (node == null) return null;
-        if ("label".equals(node.tag()) && key.equals(HtmlTree.textOf(node).replaceAll("\\s+", " ").trim())) {
+        if ("label".equals(node.tag()) && labelKey(key).equals(labelKey(HtmlTree.textOf(node)))) {
             String forId = attr(node, "for");
             if (!forId.isBlank()) {
                 DomNode root = node;
@@ -1104,7 +1136,7 @@ public final class TargetVerb {
     }
 
     /** Same snapshot as the ambiguous find. Index is 1-based. A name matches the accessible name or id. */
-    private static DomNode pickHit(List<DomNode> hits, String pick) {
+    static DomNode pickHit(List<DomNode> hits, String pick) {
         if (hits == null || hits.isEmpty() || pick == null || pick.isBlank()) return null;
         String token = pick.trim();
         if (token.matches("\\d+")) {
@@ -1119,6 +1151,26 @@ public final class TargetVerb {
             String accessible = node.accessibleName == null ? "" : node.accessibleName;
             if (!accessible.isBlank() && accessible.equalsIgnoreCase(token)) return node;
         }
+        String roleToken = token;
+        if (roleToken.regionMatches(true, 0, "role=", 0, 5)) roleToken = roleToken.substring(5).trim();
+        else if (roleToken.regionMatches(true, 0, "role:", 0, 5)) roleToken = roleToken.substring(5).trim();
+        if (!roleToken.isBlank() && !roleToken.equals(token)) {
+            DomNode matched = null;
+            for (DomNode node : hits) {
+                if (!role(node).equalsIgnoreCase(roleToken)) continue;
+                if (matched != null) return null;
+                matched = node;
+            }
+            if (matched != null) return matched;
+        }
+        DomNode only = null;
+        int count = 0;
+        for (DomNode node : hits) {
+            if (!role(node).equalsIgnoreCase(token)) continue;
+            only = node;
+            count++;
+        }
+        if (count == 1) return only;
         return null;
     }
 
@@ -2669,8 +2721,9 @@ public final class TargetVerb {
         Map<String, String[]> frames = cdp == null ? Map.of() : frameIndex(cdp);
         List<Map<String, Object>> rows = new ArrayList<>();
         for (DomNode node : nodes) {
-            String ref = "ref:" + version + ":" + node.backendNodeId;
-            String shortId = SessionIds.intern(runId, node.backendNodeId, ref);
+            String legacy = "ref:" + version + ":" + node.backendNodeId;
+            String ref = publishedRef(version, node.backendNodeId);
+            String shortId = SessionIds.intern(runId, node.backendNodeId, legacy);
             String selector = selector(node, query);
             String frameId = node.frameId == null ? "" : node.frameId;
             String[] identity = frames.get(frameId);
@@ -2681,17 +2734,18 @@ public final class TargetVerb {
             }
             String url = identity == null ? "" : identity[0];
             String loader = identity == null ? "" : identity[1];
-            HITS.put(ref, new Hit(
+            Hit hit = new Hit(
                     kind, sessionId, node.backendNodeId, version, selector, query == null ? "" : query,
-                    frameId, url, loader, role(node), name(node)));
-            HITS.put(shortId, HITS.get(ref));
+                    frameId, url, loader, role(node), name(node));
+            HITS.put(legacy, hit);
+            if (!legacy.equals(ref)) HITS.put(ref, hit);
+            HITS.put(shortId, hit);
             boolean visible = node.displayed && !node.states.contains("hidden");
             boolean enabled = !node.states.contains("disabled") && !node.attributes.containsKey("disabled");
             String roleName = role(node);
             String tag = node.tag();
             boolean interactive = INTERACTIVE.contains(tag) || INTERACTIVE.contains(roleName) || "button".equals(roleName);
-            String frame = node.framePath != null && !node.framePath.isBlank() ? node.framePath
-                    : (frameId == null || frameId.isBlank() || "main".equals(frameId) ? "top" : frameId);
+            String frame = stableFrame(node, frameId);
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("ref", ref);
             row.put("id", shortId);
@@ -2736,7 +2790,7 @@ public final class TargetVerb {
             boolean alwaysFull,
             Map<String, String> args
     ) {
-        List<Map<String, Object>> shaped = SnapView.filter(rows, args);
+        List<Map<String, Object>> shaped = SnapView.matching(rows, args);
         List<String> all = sectioned(shaped, args);
         int lineBudget = SnapView.lineBudget(args);
         int byteBudget = SnapView.byteBudget(args);
@@ -2749,6 +2803,7 @@ public final class TargetVerb {
             bytes = next;
         }
         body.put("lines", shown);
+        body.put("replyBudget", byteBudget);
         if (args != null && args.get("format") != null && !args.get("format").isBlank()) {
             body.put("format", args.get("format"));
         }
@@ -2775,7 +2830,7 @@ public final class TargetVerb {
             String key = byType
                     ? String.valueOf(row.getOrDefault("type", row.get("role")))
                     : String.valueOf(row.get("role"));
-            groups.computeIfAbsent(key, ignored -> new ArrayList<>()).add(snapLine(row, priority));
+            groups.computeIfAbsent(key, ignored -> new ArrayList<>()).add(snapLine(row, priority, SnapView.fieldNames(args)));
         }
         List<String> lines = new ArrayList<>();
         for (Map.Entry<String, List<String>> groupRow : groups.entrySet()) {
@@ -2800,12 +2855,26 @@ public final class TargetVerb {
         return sectioned(rows, args);
     }
 
-    private static String snapLine(Map<String, Object> row, boolean priority) {
+    private static String snapLine(Map<String, Object> row, boolean priority, List<String> fields) {
+        if (fields != null && !fields.isEmpty()) {
+            StringBuilder picked = new StringBuilder("-");
+            for (String field : fields) {
+                if (!row.containsKey(field) || row.get(field) == null) continue;
+                picked.append(' ').append(field).append('=').append(LineView.token(String.valueOf(row.get(field))));
+            }
+            if (priority) picked.append(" priority=").append(priorityRank(row));
+            return picked.toString();
+        }
         StringBuilder line = new StringBuilder();
-        line.append("- ").append(row.get("role")).append(" \"").append(row.get("name")).append("\" [ref=")
-                .append(row.get("ref")).append("]");
+        line.append("- ").append(row.get("role")).append(" \"").append(row.get("name")).append("\"");
+        Object ref = row.get("ref");
         Object id = row.get("id");
-        if (id != null) line.append(" id=").append(LineView.token(String.valueOf(id)));
+        boolean hasId = id != null && !String.valueOf(id).isBlank();
+        boolean longRef = ref != null && String.valueOf(ref).length() > 72;
+        if (!hasId || !longRef) {
+            if (ref != null) line.append(" [ref=").append(ref).append("]");
+        }
+        if (hasId) line.append(" id=").append(LineView.token(String.valueOf(id)));
         if (row.get("visible") != null) line.append(" visible=").append(row.get("visible"));
         if (row.get("enabled") != null) line.append(" enabled=").append(row.get("enabled"));
         if (row.get("interactive") != null) line.append(" interactive=").append(row.get("interactive"));
@@ -3352,16 +3421,56 @@ public final class TargetVerb {
         }
         String url = identity == null ? "" : identity[0];
         String loader = identity == null ? "" : identity[1];
-        String ref = "ref:" + version + ":" + node.backendNodeId;
-        HITS.put(ref, new Hit(
+        String legacy = "ref:" + version + ":" + node.backendNodeId;
+        String ref = publishedRef(version, node.backendNodeId);
+        Hit hit = new Hit(
                 "browser", sessionId == null ? "" : sessionId, node.backendNodeId, version, selector(node, shown), shown,
-                frameId, url, loader, roleName, shown));
+                frameId, url, loader, roleName, shown);
+        HITS.put(legacy, hit);
+        if (!legacy.equals(ref)) HITS.put(ref, hit);
         StringBuilder line = new StringBuilder();
         line.append("- ").append(roleName).append(" \"").append(shown.replace("\"", "'")).append("\"");
         if (value != null) line.append(" value=\"").append(value.replace("\"", "'")).append("\"");
         if (checked != null) line.append(" checked=").append(checked);
         line.append(" [ref=").append(ref).append("]");
         return new SnapRow(node.backendNodeId, key, line.toString());
+    }
+
+    /** Public ref. Desktop versions stay literal. A data: URL or a long version becomes {@code ref:d<hash>:<backend>}. */
+    static String publishedRef(String version, long backend) {
+        String safe = version == null ? "" : version;
+        if (safe.startsWith("desktop:")) return "ref:" + safe + ":" + backend;
+        if (!bulky(safe)) return "ref:" + safe + ":" + backend;
+        return "ref:d" + Integer.toUnsignedString(safe.hashCode(), 36) + ":" + backend;
+    }
+
+    /** CDP frame id. An XPath or a blank/main id is {@code top}. */
+    static String stableFrame(DomNode node, String frameId) {
+        String id = frameId == null ? "" : frameId.trim();
+        if (id.isBlank() || "main".equals(id) || id.startsWith("/") || id.startsWith("(")) return "top";
+        return id;
+    }
+
+    /** Reply docVersion. Desktop stays. A data: URL or a long document address becomes a short token. */
+    public static String shownVersion(String version) {
+        if (version == null || version.isBlank()) return version == null ? "" : version;
+        int arrow = version.indexOf(" -> ");
+        if (arrow >= 0) {
+            return shownVersion(version.substring(0, arrow)) + " -> " + shownVersion(version.substring(arrow + 4));
+        }
+        if (version.startsWith("desktop:") || !bulky(version)) return version;
+        return "d" + Integer.toUnsignedString(version.hashCode(), 36);
+    }
+
+    private static boolean bulky(String value) {
+        return value.length() > 80 || value.contains("data:") || value.indexOf('\n') >= 0;
+    }
+
+    private static void markBudget(Map<String, Object> body, Map<String, String> args) {
+        if (body == null || args == null) return;
+        String raw = args.get("budget");
+        if (raw == null || raw.isBlank()) return;
+        body.put("replyBudget", SnapView.byteBudget(args));
     }
 
     private static String checkedOf(CdpConnection cdp, DomNode node) {

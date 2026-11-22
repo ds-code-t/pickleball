@@ -94,7 +94,7 @@ class OverlayRuntimeLiveTest {
         browser.findElement(By.cssSelector("[data-pkb-id='" + id + "'] button.done")).click();
         AgentControl.Result polled = run("overlay-poll", Map.of("target", "page"));
         assertEquals(0, polled.exit(), String.valueOf(polled.body()));
-        String events = String.valueOf(polled.body().get("events"));
+        String events = String.valueOf(polled.body().get("items"));
         assertTrue(events.contains("click") && events.contains(id), "overlay click was not drained: " + events);
     }
 
@@ -451,7 +451,7 @@ class OverlayRuntimeLiveTest {
                 + " return n ? n.lastChild.textContent : null;");
         assertEquals("hello\nworld", bubble);
         AgentControl.Result history = run("chat-history", Map.of());
-        assertTrue(String.valueOf(history.body().get("messages")).contains("hello\nworld"), String.valueOf(history.body()));
+        assertTrue(String.valueOf(history.body().get("items")).contains("hello\nworld"), String.valueOf(history.body()));
     }
 
     /** Item 1: a page hotkey on "s" that calls preventDefault cannot eat the letters typed in the panel. */
@@ -477,7 +477,7 @@ class OverlayRuntimeLiveTest {
         inPanel(".pkb-composer button").click();
         AgentControl.Result polled = run("chat-poll", Map.of("wait", "5"));
         assertEquals(0, polled.exit(), String.valueOf(polled.body()));
-        String messages = String.valueOf(polled.body().get("messages"));
+        String messages = String.valueOf(polled.body().get("items"));
         assertTrue(messages.contains("from the page") && messages.contains("source=human"), messages);
         Object state = browser.executeScript(RING.replace(".ring", ".pkb-msg[data-from=human]") + " return n ? n.getAttribute('data-state') : null;");
         assertEquals("sent", state);
@@ -543,7 +543,7 @@ class OverlayRuntimeLiveTest {
         awaitBadge(1, "done");
         assertEquals("current", badge(2));
         OverlayFixtures.shot(browser, "p4-guide-step2");
-        String events = String.valueOf(run("overlay-poll", Map.of()).body().get("events"));
+        String events = String.valueOf(run("overlay-poll", Map.of()).body().get("items"));
         assertTrue(events.contains("type=step") && events.contains("s=1") && events.contains("me@example.test"), events);
     }
 
@@ -555,7 +555,7 @@ class OverlayRuntimeLiveTest {
         browser.findElement(By.id("save")).click();
         frames(2);
         assertEquals("done", badge(1));
-        String events = String.valueOf(run("overlay-poll", Map.of()).body().get("events"));
+        String events = String.valueOf(run("overlay-poll", Map.of()).body().get("items"));
         assertTrue(events.contains("how=click") && events.contains("type=guide"), events);
         AgentControl.Result done = run("guide-done", Map.of());
         assertEquals(0, done.exit(), String.valueOf(done.body()));
@@ -572,7 +572,7 @@ class OverlayRuntimeLiveTest {
         browser.findElement(By.id("password")).sendKeys("Hunter2-Secret!");
         awaitBadge(3, "current");
         AgentControl.Result polled = run("overlay-poll", Map.of());
-        String events = String.valueOf(polled.body().get("events"));
+        String events = String.valueOf(polled.body().get("items"));
         assertTrue(events.contains("s=2") && events.contains("filled=true"), events);
         Path agentDir = AgentStore.root(project, "overlay-live");
         try (var files = java.nio.file.Files.walk(agentDir)) {
@@ -611,7 +611,7 @@ class OverlayRuntimeLiveTest {
         frames(2);
         OverlayFixtures.shot(browser, "p4-ask-confirm");
         layerRoot().findElement(By.cssSelector(".ask button.secondary")).click();
-        String events = String.valueOf(run("overlay-poll", Map.of()).body().get("events"));
+        String events = String.valueOf(run("overlay-poll", Map.of()).body().get("items"));
         assertTrue(events.contains("type=answer") && events.contains("value=No"), events);
     }
 
@@ -721,7 +721,7 @@ class OverlayRuntimeLiveTest {
         bytes += reply.length();
         assertEquals(1, applied.exit(), reply);
         assertTrue(reply.contains("\"miss\":\"#missing\""), reply);
-        assertEquals(5, ((List<?>) applied.body().get("ops")).size(), reply);
+        assertEquals(5, ((List<?>) applied.body().get("items")).size(), reply);
         assertTrue((Boolean) browser.executeScript("return document.querySelectorAll('[data-pkb-kind=label]').length === 1"
                 + " && document.querySelectorAll('[data-pkb-kind=border]').length === 1"), reply);
         browser.findElement(By.id("email")).sendKeys("me@example.test");

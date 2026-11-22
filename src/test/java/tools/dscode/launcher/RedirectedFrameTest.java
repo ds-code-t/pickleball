@@ -81,7 +81,7 @@ class RedirectedFrameTest {
                 Capture found = run("find", "--target=browser:auto", "--query=Save", "--run-id=redirect");
                 assertEquals(0, found.code, found.err + found.out);
                 JsonNode body = JSON.readTree(found.out);
-                assertEquals("Save", body.path("hits").get(0).path("name").asText(), found.out);
+                assertEquals("Save", body.path("items").get(0).path("name").asText(), found.out);
                 long elapsed = body.path("elapsedMs").asLong(Long.MAX_VALUE);
                 assertTrue(elapsed < 1000, "call " + call + " elapsedMs=" + elapsed + " " + found.out);
             }
@@ -89,8 +89,8 @@ class RedirectedFrameTest {
             Capture inner = run("find", "--target=browser:auto", "--query=Land2", "--run-id=redirect");
             assertEquals(0, inner.code, inner.err + inner.out);
             JsonNode hit = JSON.readTree(inner.out);
-            assertEquals("Land2", hit.path("hits").get(0).path("name").asText(), inner.out);
-            assertEquals(landId, hit.path("hits").get(0).path("frame").asText(""), inner.out);
+            assertEquals("Land2", hit.path("items").get(0).path("name").asText(), inner.out);
+            assertEquals(landId, hit.path("items").get(0).path("frame").asText(""), inner.out);
         } finally {
             server.stop(0);
         }

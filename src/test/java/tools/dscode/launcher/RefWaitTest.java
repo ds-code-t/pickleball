@@ -120,7 +120,7 @@ class RefWaitTest {
     }
 
     private static String refNamed(JsonNode body, String name) {
-        for (JsonNode line : body.path("lines")) {
+        for (JsonNode line : body.path("items")) {
             String text = line.asText();
             if (text.contains("\"" + name + "\"")) {
                 int start = text.indexOf("[ref=");
