@@ -105,6 +105,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-java-dom-design.md`
 - `docs/maintainer/3.0.0-linked-tracking-design.md`
 - `docs/maintainer/3.0.0-live-agent-fixes-scoreboard.md`
+- `docs/maintainer/3.0.0-live-chrome-verification.md`
 - `docs/maintainer/3.0.0-locked-decisions-design.md`
 - `docs/maintainer/3.0.0-locked-decisions-prior-audit.md`
 - `docs/maintainer/3.0.0-locked-decisions-sweep.md`
@@ -2199,6 +2200,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/site/components.html`
 - `maven-consumer-project/src/test/resources/site/datetime.html`
 - `maven-consumer-project/src/test/resources/site/dialogs.html`
+- `maven-consumer-project/src/test/resources/site/dynamic-steps.html`
 - `maven-consumer-project/src/test/resources/site/forms.html`
 - `maven-consumer-project/src/test/resources/site/index.html`
 - `maven-consumer-project/src/test/resources/site/keyboard.html`

@@ -194,6 +194,8 @@ Superseded: the embedded store replaced this before release.
 
 Frame ids. A hit's `frame`, and the `frame` on `find` and `act`, is the same id `frame --list` prints for that document. An out-of-process iframe that Chrome omits from the parent `Page.getFrameTree` still uses the covered CDP frame id. It is not replaced with the top frame. A blank or `main` id is still the top document, and an XPath frame is still `top`.
 
+Consumer playground. `URL.dynamicSteps` in the consumer `configs/URL.yaml` is `http://127.0.0.1:8765/dynamic-steps.html`. That page is the dynamic-steps playground and the page `recorded-collaboration.feature` fills in (First Name, Favorite Color, Submit, and the live Name and Favorite Color lines). The consumer `CHROME_HEADLESS` config passes `--no-sandbox` so Chrome can start when the test process is root.
+
 ## 2.2.0
 
 _No changes yet._

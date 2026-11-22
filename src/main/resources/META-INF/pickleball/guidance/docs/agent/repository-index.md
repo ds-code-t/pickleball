@@ -2094,6 +2094,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/site/components.html`
 - `maven-consumer-project/src/test/resources/site/datetime.html`
 - `maven-consumer-project/src/test/resources/site/dialogs.html`
+- `maven-consumer-project/src/test/resources/site/dynamic-steps.html`
 - `maven-consumer-project/src/test/resources/site/forms.html`
 - `maven-consumer-project/src/test/resources/site/index.html`
 - `maven-consumer-project/src/test/resources/site/keyboard.html`

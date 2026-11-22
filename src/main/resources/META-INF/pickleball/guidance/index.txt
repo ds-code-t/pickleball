@@ -133,6 +133,7 @@ maven-consumer-project/src/test/resources/site/catalog.html
 maven-consumer-project/src/test/resources/site/components.html
 maven-consumer-project/src/test/resources/site/datetime.html
 maven-consumer-project/src/test/resources/site/dialogs.html
+maven-consumer-project/src/test/resources/site/dynamic-steps.html
 maven-consumer-project/src/test/resources/site/forms.html
 maven-consumer-project/src/test/resources/site/index.html
 maven-consumer-project/src/test/resources/site/keyboard.html

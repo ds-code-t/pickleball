@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dynamic Steps Playground | Pickleball Test Lab</title>
+    <link rel="stylesheet" href="assets/styles.css">
+    <script src="assets/app.js" defer></script>
+</head>
+<body data-page="dynamic">
+<header class="site-header"><div class="header-inner"><a class="brand" href="index.html">Pickleball Test Lab</a><nav class="site-nav" aria-label="Primary navigation"><a data-nav="home" href="index.html">Home</a><a data-nav="forms" href="forms.html">Forms</a><a data-nav="catalog" href="catalog.html">Catalog</a><a data-nav="workflow" href="workflow.html">Workflow</a><a data-nav="keyboard" href="keyboard.html">Keyboard</a><a data-nav="dialogs" href="dialogs.html">Dialogs</a><a data-nav="components" href="components.html">Components</a></nav></div></header>
+<main>
+    <div class="page-heading"><h1>Dynamic Steps Playground</h1><p>Ready for dynamic steps</p></div>
+    <div class="grid">
+        <section class="test-panel" aria-label="Dynamic Steps Form">
+            <h2>Interaction Form</h2>
+            <form id="dynamic-steps-form">
+                <div class="form-grid">
+                    <div class="field"><label for="first-name">First Name</label><input id="first-name" name="firstName" type="text" autocomplete="off"></div>
+                    <div class="field"><label for="city">City</label><input id="city" name="city" type="text" autocomplete="off"></div>
+                    <div class="field full"><label for="comments">Comments</label><textarea id="comments" name="comments"></textarea></div>
+                    <div class="field full"><label class="choice-row" for="receive-updates"><input id="receive-updates" type="checkbox"> Receive Updates</label></div>
+                    <fieldset><legend>Contact Preference</legend><div class="choice-row"><label><input type="radio" name="contact-preference" value="Email"> Email</label><label><input type="radio" name="contact-preference" value="Phone"> Phone</label></div></fieldset>
+                    <div class="field"><label for="favorite-color">Favorite Color</label><select id="favorite-color"><option value="">Choose a color</option><option>Green</option><option>Blue</option></select></div>
+                    <div class="field full button-row"><button type="button" id="choose-1">Choose</button><button type="button" id="choose-2">Choose</button><button type="button" id="choose-3">Choose</button></div>
+                    <div class="field full button-row"><button type="submit">Submit</button></div>
+                </div>
+            </form>
+        </section>
+        <section class="test-panel" aria-label="Current DOM State">
+            <h2>Current DOM State</h2>
+            <ul class="state-list">
+                <li id="state-name">Name: (empty)</li>
+                <li id="state-city">City: (empty)</li>
+                <li id="state-comments">Comments: (empty)</li>
+                <li id="state-updates">Updates: unchecked</li>
+                <li id="state-contact">Contact Preference: none</li>
+                <li id="state-color">Favorite Color: none</li>
+                <li id="state-chosen">Chosen Button: none</li>
+                <li id="submitted-state">Submitted: not yet</li>
+            </ul>
+        </section>
+    </div>
+</main>
+<footer class="site-footer"><a href="index.html">Return to the test lab home page</a></footer>
+</body>
+</html>

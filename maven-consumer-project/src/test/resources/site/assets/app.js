@@ -291,6 +291,47 @@ function initHomePage() {
     text("load-count", `Load Count: ${loads}`);
 }
 
+function initDynamicStepsPage() {
+    const form = byId("dynamic-steps-form");
+    if (!form) return;
+
+    const firstName = byId("first-name");
+    const city = byId("city");
+    const comments = byId("comments");
+    const updates = byId("receive-updates");
+    const color = byId("favorite-color");
+
+    const contactPreference = () =>
+        document.querySelector('input[name="contact-preference"]:checked')?.value ?? "none";
+
+    const updateState = () => {
+        text("state-name", `Name: ${firstName.value || "(empty)"}`);
+        text("state-city", `City: ${city.value || "(empty)"}`);
+        text("state-comments", `Comments: ${comments.value || "(empty)"}`);
+        text("state-updates", `Updates: ${updates.checked ? "checked" : "unchecked"}`);
+        text("state-contact", `Contact Preference: ${contactPreference()}`);
+        text("state-color", `Favorite Color: ${color.value || "none"}`);
+    };
+
+    form.addEventListener("input", updateState);
+    form.addEventListener("change", updateState);
+    form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        updateState();
+        const commentsText = comments.value.trim() ? comments.value : "none";
+        text(
+            "submitted-state",
+            `Submitted: ${firstName.value || "(blank)"} | ${city.value || "(blank)"} | ${commentsText} | ${updates.checked ? "updates" : "no updates"}`
+        );
+    });
+
+    document.querySelectorAll("#choose-1, #choose-2, #choose-3").forEach((button, index) => {
+        button.addEventListener("click", () => text("state-chosen", `Chosen Button: ${index + 1}`));
+    });
+
+    updateState();
+}
+
 markCurrentNavigation();
 initHomePage();
 initFormsPage();
@@ -299,3 +340,4 @@ initWorkflowPage();
 initKeyboardPage();
 initDialogsPage();
 initComponentsPage();
+initDynamicStepsPage();
