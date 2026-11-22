@@ -110,12 +110,14 @@ public final class StepGenerator {
         }
         List<Map<String, String>> coalesced = new ArrayList<>();
         Map<String, String> pending = null;
+        java.util.Set<String> covered = formCoverage(open);
         for (Map<String, String> row : open) {
             String kind = kind(row);
             if (ownRow(row)) continue;
             if (("focus".equals(kind) || "hover".equals(kind)) && !noise(state)) {
                 continue;
             }
+            if (coveredByForm(kind, row, covered)) continue;
             if (("input".equals(kind) || "change".equals(kind)) && pending != null && sameTarget(pending, row)
                     && ("input".equals(kind(pending)) || "change".equals(kind(pending)))) {
                 Map<String, String> merged = new LinkedHashMap<>(pending);
@@ -160,6 +162,7 @@ public final class StepGenerator {
             case "input", "change" -> enterPhrase(row, name, category, literals, renames, used, parameters);
             case "key" -> new Phrase(", press " + quote(InteractionLog.first(row.get("value"), row.get("name"), "Enter")));
             case "drag" -> dragPhrase(row, name);
+            case "form" -> formPhrase(row, literals, renames, used, parameters);
             default -> null;
         };
     }
@@ -215,6 +218,86 @@ public final class StepGenerator {
         return new Phrase(", dragAndDrop the " + quote(source) + " Button the " + quote(drop) + " Button");
     }
 
+    private static Phrase formPhrase(
+            Map<String, String> row,
+            List<String> literals,
+            Map<String, String> renames,
+            Map<String, Integer> used,
+            List<Map<String, Object>> parameters
+    ) {
+        List<FormField> fields = formFields(row);
+        StringBuilder text = new StringBuilder();
+        for (int i = 0; i < fields.size(); i++) {
+            FormField field = fields.get(i);
+            String piece = switch (field.kind) {
+                case "select" -> {
+                    String token = token(row, field.name, field.value, "text", literals, renames, used, parameters);
+                    yield "select " + token + " in the " + quote(field.name) + " Dropdown";
+                }
+                case "checkbox", "radio" -> {
+                    String category = "radio".equals(field.kind) ? "Radio Button" : "Checkbox";
+                    boolean on = !"false".equalsIgnoreCase(field.value) && !"off".equalsIgnoreCase(field.value) && !field.value.isBlank();
+                    yield "ensure the " + quote(field.name) + " " + category + " is " + (on ? "checked" : "unchecked");
+                }
+                default -> {
+                    String token = token(row, field.name, field.value, "text", literals, renames, used, parameters);
+                    yield "enter " + token + " in the " + quote(field.name) + " Textbox";
+                }
+            };
+            if (i > 0) text.append(i == fields.size() - 1 ? ", and " : ", ");
+            text.append(piece);
+        }
+        if (text.isEmpty()) return null;
+        return new Phrase(", " + text);
+    }
+
+    private record FormField(String kind, String name, String value) {
+    }
+
+    private static List<FormField> formFields(Map<String, String> row) {
+        String raw = InteractionLog.first(row.get("fields"), "");
+        List<FormField> fields = new ArrayList<>();
+        if (raw.isBlank()) return fields;
+        for (String part : raw.split("\\|")) {
+            if (part.isBlank()) continue;
+            String kind = "text";
+            String body = part.trim();
+            int colon = body.indexOf(':');
+            int eq = body.indexOf('=');
+            if (colon > 0 && (eq < 0 || colon < eq)) {
+                String prefix = body.substring(0, colon).toLowerCase(Locale.ROOT);
+                if (prefix.equals("text") || prefix.equals("select") || prefix.equals("checkbox") || prefix.equals("radio")) {
+                    kind = prefix;
+                    body = body.substring(colon + 1);
+                }
+            }
+            eq = body.indexOf('=');
+            if (eq <= 0) continue;
+            fields.add(new FormField(kind, body.substring(0, eq).trim(), body.substring(eq + 1)));
+        }
+        return fields;
+    }
+
+    private static java.util.Set<String> formCoverage(List<Map<String, String>> rows) {
+        java.util.Set<String> covered = new java.util.LinkedHashSet<>();
+        for (Map<String, String> row : rows) {
+            if (!"form".equals(kind(row))) continue;
+            for (FormField field : formFields(row)) {
+                if (!field.name.isBlank()) covered.add(field.name);
+            }
+        }
+        return covered;
+    }
+
+    private static boolean coveredByForm(String kind, Map<String, String> row, java.util.Set<String> covered) {
+        if (covered.isEmpty()) return false;
+        if (!"input".equals(kind) && !"change".equals(kind) && !"select".equals(kind) && !"check".equals(kind)) return false;
+        String name = InteractionLog.first(row.get("name"), "");
+        String id = InteractionLog.first(row.get("id"), "");
+        String target = InteractionLog.first(row.get("target"), "");
+        return covered.contains(name) || covered.contains(id) || covered.contains(target);
+    }
+
     private static String token(
             Map<String, String> row,
             String label,
@@ -262,7 +345,7 @@ public final class StepGenerator {
     }
 
     static String paramBase(String label) {
-        String[] parts = label.trim().split("[^A-Za-z0-9]+");
+        String[] parts = label.trim().split("[^\\p{L}\\p{N}]+");
         StringBuilder name = new StringBuilder();
         for (String part : parts) {
             if (part.isEmpty()) continue;
@@ -302,7 +385,8 @@ public final class StepGenerator {
         if ("textbox".equals(role) || "text".equals(role) || "input".equals(kind) || "change".equals(kind)) {
             return "textarea".equals(role) ? "Textarea" : "Textbox";
         }
-        if ("button".equals(role) || role.isBlank() || "click".equals(kind) || "hover".equals(kind)) return "Button";
+        if ("button".equals(role) || "submit".equals(role) || role.isBlank()) return "Button";
+        if ("tab".equals(role)) return "Tab";
         return Character.toUpperCase(role.charAt(0)) + role.substring(1);
     }
 

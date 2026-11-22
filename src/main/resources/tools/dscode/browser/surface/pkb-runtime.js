@@ -755,11 +755,7 @@
       var control = (node.closest && node.closest('button,a,label,input,summary,[data-choice],[data-pkb-action],[role]')) || node;
       var tag = (control.nodeName || '').toLowerCase();
       if (tag === 'iframe' || tag === 'frame') return;
-      var name = '';
-      if (control.getAttribute) {
-        name = String(control.getAttribute('data-choice') || control.getAttribute('aria-label') || control.innerText || control.value || '')
-          .replace(/\s+/g, ' ').trim().slice(0, 80);
-      }
+      var name = labelOf(control);
       var placed = control.closest && control.closest('[data-pkb-agent]');
       sense('click', control, {
         id: (placed && placed.getAttribute('data-pkb-id')) || (control.id || node.id || ''),

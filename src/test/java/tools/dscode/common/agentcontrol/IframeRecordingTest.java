@@ -65,8 +65,10 @@ class IframeRecordingTest {
         StepGenerator.Script script = StepGenerator.generate(List.of(row), Map.of());
         assertTrue(script.gherkin().contains("in the \"billing\" IFrame"), script.gherkin());
         assertTrue(script.gherkin().contains("\"Pay\""), script.gherkin());
+        assertTrue(script.gherkin().contains("Tab"), script.gherkin());
+        assertFalse(script.gherkin().contains("Button"), script.gherkin());
         assertFalse(script.gherkin().contains("iframe host"), script.gherkin());
-        String phrase = " in the \"billing\" IFrame, click the \"Pay\" Button.";
+        String phrase = " in the \"billing\" IFrame, click the \"Pay\" Tab.";
         QuoteParser quotes = new QuoteParser(phrase);
         String masked = quotes.restoreFromWithOuterBookend(quotes.masked(), GlobalConstants.BOOK_END);
         MatchNode parsed = DefinitionContext.getNodeDictionary().parse(masked);

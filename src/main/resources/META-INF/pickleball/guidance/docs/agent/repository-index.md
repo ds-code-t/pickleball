@@ -757,6 +757,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentcontrol/OverlayPollCursorTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/OverlayRuntimeLiveTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/PersonFeedbackTest.java`
+- `src/test/java/tools/dscode/common/agentcontrol/ScriptQualityTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/SurfaceIdChild.java`
 - `src/test/java/tools/dscode/common/agentcontrol/UiBatchTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/UiCatalogTest.java`

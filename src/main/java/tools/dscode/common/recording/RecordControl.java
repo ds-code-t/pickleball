@@ -62,19 +62,14 @@ public final class RecordControl {
         if (project == null || !RecordingSession.recording(project)) return;
         Map<String, String> flags = args == null ? Map.of() : args;
         if ("form-fill".equals(op)) {
-            String fields = flags.get("fields");
-            if (fields == null) return;
-            for (String part : fields.split("\\|")) {
-                int eq = part.indexOf('=');
-                if (eq <= 0) continue;
-                Map<String, String> row = baseAgent(runId, "input");
-                row.put("name", part.substring(0, eq).trim());
-                row.put("text", row.get("name"));
-                row.put("value", part.substring(eq + 1));
-                row.put("role", "textbox");
-                row.put("target", row.get("name"));
-                InteractionLog.accept(project, row);
-            }
+            String encoded = formFields(flags, body);
+            if (encoded.isBlank()) return;
+            Map<String, String> row = baseAgent(runId, "form");
+            row.put("name", "form");
+            row.put("text", "form");
+            row.put("target", "form");
+            row.put("fields", encoded);
+            InteractionLog.accept(project, row);
             return;
         }
         if (!"act".equals(op)) return;
@@ -93,6 +88,7 @@ public final class RecordControl {
         row.put("text", name);
         row.put("target", name);
         if (flags.get("value") != null) row.put("value", flags.get("value"));
+        if (flags.get("role") != null) row.put("role", flags.get("role"));
         if (flags.get("ref") != null) row.put("ref", flags.get("ref"));
         if (flags.get("id") != null) row.put("id", flags.get("id"));
         String surface = body != null && "desktop".equals(String.valueOf(body.get("kind"))) ? "desktop" : "browser";
@@ -101,6 +97,30 @@ public final class RecordControl {
         Object frame = body == null ? null : body.get("frame");
         if (frame != null) row.put("frame", String.valueOf(frame));
         InteractionLog.accept(project, row);
+    }
+
+    private static String formFields(Map<String, String> flags, Map<String, Object> body) {
+        Object raw = body == null ? null : body.get("fields");
+        if (raw instanceof List<?> list && !list.isEmpty()) {
+            StringBuilder text = new StringBuilder();
+            for (Object item : list) {
+                if (!(item instanceof Map<?, ?> map)) continue;
+                Object field = map.get("field");
+                Object named = field != null ? field : map.get("name");
+                String key = named == null ? "" : String.valueOf(named);
+                if (key.isBlank() || "null".equals(key)) continue;
+                Object kindValue = map.get("kind");
+                String kind = kindValue == null ? "text" : String.valueOf(kindValue);
+                if (kind.isBlank() || "null".equals(kind)) kind = "text";
+                Object rawValue = map.get("value");
+                String value = rawValue == null ? "" : String.valueOf(rawValue);
+                if ("null".equals(value)) value = "";
+                if (!text.isEmpty()) text.append('|');
+                text.append(kind).append(':').append(key).append('=').append(value);
+            }
+            if (!text.isEmpty()) return text.toString();
+        }
+        return flags == null || flags.get("fields") == null ? "" : flags.get("fields");
     }
 
     private static Map<String, String> baseAgent(String runId, String kind) {
