@@ -3434,11 +3434,12 @@ public final class TargetVerb {
         return new SnapRow(node.backendNodeId, key, line.toString());
     }
 
-    /** Public ref. Desktop versions stay literal. A data: URL or a long version becomes {@code ref:d<hash>:<backend>}. */
+    /** Public ref. Desktop versions stay literal. A ref longer than 40 characters, or a data: URL, becomes {@code ref:d<hash>:<backend>}. */
     static String publishedRef(String version, long backend) {
         String safe = version == null ? "" : version;
         if (safe.startsWith("desktop:")) return "ref:" + safe + ":" + backend;
-        if (!bulky(safe)) return "ref:" + safe + ":" + backend;
+        String literal = "ref:" + safe + ":" + backend;
+        if (!bulky(safe) && literal.length() <= 40) return literal;
         return "ref:d" + Integer.toUnsignedString(safe.hashCode(), 36) + ":" + backend;
     }
 

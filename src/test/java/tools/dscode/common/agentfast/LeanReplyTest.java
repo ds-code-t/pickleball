@@ -100,6 +100,11 @@ class LeanReplyTest {
         assertFalse(ref.contains("data:"), ref);
         assertTrue(ref.endsWith(":7"), ref);
         assertEquals("ref:desktop:0:7", TargetVerb.publishedRef("desktop:0", 7));
+        String file = "file:///tmp/" + "p".repeat(40) + "/save.html";
+        String fileRef = TargetVerb.publishedRef(file, 3);
+        assertTrue(fileRef.startsWith("ref:d"), fileRef);
+        assertTrue(fileRef.length() <= 40, fileRef);
+        assertFalse(fileRef.contains("file:"), fileRef);
         DomNode node = new DomNode();
         node.framePath = "/html/body/iframe[1]";
         assertEquals("top", TargetVerb.stableFrame(node, "main"));

@@ -198,6 +198,8 @@ Consumer playground. `URL.dynamicSteps` in the consumer `configs/URL.yaml` is `h
 
 Guided-flow replies. A direct placement still includes `visible`, `hidden`, `hiddenReason`, `overlaps`, and `lost` without `--verbose`. A `ui-apply` row omits those flags unless `--verbose=true`. `ui-apply` and `ui-poll` keep `ms`, `state`, and `next`, and omit `elapsedMs`, `timing`, `cursors`, and `seq`. `ui-poll` keeps name, role, and guide fields (`type`, `s`, `g`, `done`, `how`) and drops bounds, typed values, the system `overlay input` echo, and per-event `binding`, `sessionId`, and `frame`. Empty `chat` and `agentEvents` lists are omitted. The recording file still has the typed value.
 
+Compact refs and panel drag. A compact snap publishes `ref:d<hash>:<backend>` when the literal ref would be longer than 40 characters, including a file URL, so the line keeps `[ref=]` and `act` resolves it. Desktop refs stay literal. The page panel leaves room for a header drag of 400px left and 250px up, and the headless overlay fixture pins the inner viewport to 1280x800 so that in-bounds drag is not rejected.
+
 ## 2.2.0
 
 _No changes yet._

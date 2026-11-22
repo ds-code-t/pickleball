@@ -64,7 +64,18 @@ public final class OverlayFixtures implements AutoCloseable {
         options.setBinary(binary);
         options.addArguments("--headless=new", "--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu",
                 "--remote-allow-origins=*", "--window-size=1280,800", "--force-device-scale-factor=1");
-        return new ChromeDriver(options);
+        ChromeDriver driver = new ChromeDriver(options);
+        try {
+            driver.manage().window().setSize(new org.openqa.selenium.Dimension(1280, 800));
+            driver.executeCdpCommand("Emulation.setDeviceMetricsOverride", java.util.Map.of(
+                    "width", 1280,
+                    "height", 800,
+                    "deviceScaleFactor", 1,
+                    "mobile", false));
+        } catch (RuntimeException ignored) {
+            // The panel still reserves room for an in-bounds drag when the inner viewport is short.
+        }
+        return driver;
     }
 
     /**

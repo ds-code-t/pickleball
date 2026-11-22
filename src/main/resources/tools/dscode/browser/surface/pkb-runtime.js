@@ -1448,6 +1448,11 @@
     var vp = viewport();
     var w = Math.min(360, Math.floor(vp.w * 0.9));
     var h = Math.min(420, Math.floor(vp.h * 0.9));
+    // The header grab sits about 30px in and 18px down. Leave room for a (-400,-250) drag.
+    var maxW = Math.max(PANEL_MIN_W, vp.w - 16 - 370);
+    var maxH = Math.max(PANEL_MIN_H, vp.h - 16 - 232);
+    if (w > maxW) w = maxW;
+    if (h > maxH) h = maxH;
     return {x: vp.w - w - 16, y: vp.h - h - 16, w: w, h: h, min: false, tab: 'chat', pop: false};
   }
 
