@@ -115,6 +115,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-roadmap-2-scoreboard.md`
 - `docs/maintainer/3.0.0-roadmap-3-scoreboard.md`
 - `docs/maintainer/3.0.0-roadmap-4-scoreboard.md`
+- `docs/maintainer/3.0.0-roadmap-5-scoreboard.md`
 - `docs/maintainer/3.0.0-roadmap-6-scoreboard.md`
 - `docs/maintainer/3.0.0-roadmap-7-scoreboard.md`
 - `docs/maintainer/3.0.0-snapshot-coverage-audit.md`
@@ -1035,6 +1036,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/FrameRestoreTest.java`
 - `src/test/java/tools/dscode/launcher/GcRunsDryRunTest.java`
 - `src/test/java/tools/dscode/launcher/GuidanceCommandGoldenTest.java`
+- `src/test/java/tools/dscode/launcher/HousekeepingRoadmapTest.java`
 - `src/test/java/tools/dscode/launcher/JsFallbackHonestyTest.java`
 - `src/test/java/tools/dscode/launcher/MaskQuietTest.java`
 - `src/test/java/tools/dscode/launcher/NavigateDataFileTest.java`
