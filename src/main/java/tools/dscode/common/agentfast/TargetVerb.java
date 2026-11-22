@@ -2147,7 +2147,16 @@ public final class TargetVerb {
             JsonNode tree = cdp.call("Page.getFrameTree", Jsons.object(), Duration.ofSeconds(5));
             collectFrameIndex(tree.path("frameTree"), frames);
         } catch (RuntimeException ignored) {
-            return frames;
+            // Parent tree is optional. Covered out-of-process ids are added below.
+        }
+        // Chrome 158 drops an out-of-process child from the parent tree. frame --list
+        // still prints that id from FrameCoverage. The index has to know it too, or a
+        // hit is reported as the top frame.
+        if (cdp != null) {
+            for (String id : FrameCoverage.frameIds(cdp)) {
+                if (id == null || id.isBlank() || frames.containsKey(id)) continue;
+                frames.put(id, new String[]{FrameCoverage.url(cdp, id), ""});
+            }
         }
         return frames;
     }
@@ -2725,18 +2734,11 @@ public final class TargetVerb {
             String ref = publishedRef(version, node.backendNodeId);
             String shortId = SessionIds.intern(runId, node.backendNodeId, legacy);
             String selector = selector(node, query);
-            String frameId = node.frameId == null ? "" : node.frameId;
-            String[] identity = frames.get(frameId);
-            if (identity == null && !frames.isEmpty()) {
-                Map.Entry<String, String[]> top = frames.entrySet().iterator().next();
-                frameId = top.getKey();
-                identity = top.getValue();
-            }
-            String url = identity == null ? "" : identity[0];
-            String loader = identity == null ? "" : identity[1];
+            String[] identity = new String[2];
+            String frameId = reportedFrame(cdp, node, frames, identity);
             Hit hit = new Hit(
                     kind, sessionId, node.backendNodeId, version, selector, query == null ? "" : query,
-                    frameId, url, loader, role(node), name(node));
+                    frameId, identity[0] == null ? "" : identity[0], identity[1] == null ? "" : identity[1], role(node), name(node));
             HITS.put(legacy, hit);
             if (!legacy.equals(ref)) HITS.put(ref, hit);
             HITS.put(shortId, hit);
@@ -3413,15 +3415,10 @@ public final class TargetVerb {
             checked = checkedOf(cdp, node);
         }
         String key = roleName + "\n" + text + "\n" + (value == null ? "" : value) + "\n" + (checked == null ? "" : checked);
-        String frameId = node.frameId == null ? "" : node.frameId;
-        String[] identity = frames.get(frameId);
-        if (identity == null && !frames.isEmpty()) {
-            Map.Entry<String, String[]> top = frames.entrySet().iterator().next();
-            frameId = top.getKey();
-            identity = top.getValue();
-        }
-        String url = identity == null ? "" : identity[0];
-        String loader = identity == null ? "" : identity[1];
+        String[] identity = new String[2];
+        String frameId = reportedFrame(cdp, node, frames, identity);
+        String url = identity[0] == null ? "" : identity[0];
+        String loader = identity[1] == null ? "" : identity[1];
         String legacy = "ref:" + version + ":" + node.backendNodeId;
         String ref = publishedRef(version, node.backendNodeId);
         Hit hit = new Hit(
@@ -3443,6 +3440,47 @@ public final class TargetVerb {
         if (safe.startsWith("desktop:")) return "ref:" + safe + ":" + backend;
         if (!bulky(safe)) return "ref:" + safe + ":" + backend;
         return "ref:d" + Integer.toUnsignedString(safe.hashCode(), 36) + ":" + backend;
+    }
+
+    /**
+     * Frame id a hit reports. Same value {@code frame --list} prints.
+     * A real CDP id stays, including an out-of-process id the parent frame tree omitted.
+     * Only a blank or {@code main} id borrows the top document.
+     */
+    private static String reportedFrame(CdpConnection cdp, DomNode node, Map<String, String[]> frames, String[] identityOut) {
+        String frameId = node == null || node.frameId == null ? "" : node.frameId.trim();
+        String[] identity = frameId.isBlank() ? null : frames.get(frameId);
+        if (identity == null && cdp != null && !frameId.isBlank() && !"main".equals(frameId)) {
+            String listed = listedFrameId(cdp, frames, frameId);
+            if (!listed.isBlank() && !listed.equals(frameId)) {
+                frameId = listed;
+                identity = frames.get(frameId);
+            }
+            if (identity == null) identity = new String[]{FrameCoverage.url(cdp, frameId), ""};
+        }
+        if ((frameId.isBlank() || "main".equals(frameId)) && frames != null && !frames.isEmpty()) {
+            Map.Entry<String, String[]> top = frames.entrySet().iterator().next();
+            frameId = top.getKey();
+            identity = top.getValue();
+        }
+        identityOut[0] = identity == null || identity.length < 1 || identity[0] == null ? "" : identity[0];
+        identityOut[1] = identity == null || identity.length < 2 || identity[1] == null ? "" : identity[1];
+        return frameId;
+    }
+
+    /** Maps a DOM or target id onto the id {@code frame --list} already shows, when they differ. */
+    private static String listedFrameId(CdpConnection cdp, Map<String, String[]> frames, String raw) {
+        if (raw == null || raw.isBlank() || frames == null || frames.containsKey(raw)) return raw == null ? "" : raw;
+        if (!FrameCoverage.sessionId(cdp, raw).isBlank()) return raw;
+        String url = FrameCoverage.url(cdp, raw);
+        if (url.isBlank()) return raw;
+        for (Map.Entry<String, String[]> entry : frames.entrySet()) {
+            String[] known = entry.getValue();
+            if (known != null && known.length > 0 && url.equals(known[0]) && !FrameCoverage.sessionId(cdp, entry.getKey()).isBlank()) {
+                return entry.getKey();
+            }
+        }
+        return raw;
     }
 
     /** CDP frame id. An XPath or a blank/main id is {@code top}. */
