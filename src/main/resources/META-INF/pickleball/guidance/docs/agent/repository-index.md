@@ -926,6 +926,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/ElementSnapDiffTest.java`
 - `src/test/java/tools/dscode/launcher/EngineCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/FallbackLoggedTest.java`
+- `src/test/java/tools/dscode/launcher/FieldReportRegressionTest.java`
 - `src/test/java/tools/dscode/launcher/FormFillKindTest.java`
 - `src/test/java/tools/dscode/launcher/FrameActTest.java`
 - `src/test/java/tools/dscode/launcher/FrameInReplyTest.java`
