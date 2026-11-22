@@ -1,5 +1,6 @@
 package tools.dscode.launcher;
 
+import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -28,6 +29,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public final class AgentController {
     private static final ObjectMapper JSON = new ObjectMapper();
+    static {
+        JSON.getFactory().configure(JsonGenerator.Feature.ESCAPE_NON_ASCII, true);
+    }
     private static final AtomicBoolean STOP = new AtomicBoolean();
     private static final AtomicBoolean STOP_AFTER = new AtomicBoolean();
 

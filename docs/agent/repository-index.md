@@ -1038,6 +1038,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/ConfirmTest.java`
 - `src/test/java/tools/dscode/launcher/ConsumerReadyCliTest.java`
 - `src/test/java/tools/dscode/launcher/ControllerReliabilityTest.java`
+- `src/test/java/tools/dscode/launcher/ControllerUtf8Test.java`
 - `src/test/java/tools/dscode/launcher/DesktopSameVerbTest.java`
 - `src/test/java/tools/dscode/launcher/DoctorTest.java`
 - `src/test/java/tools/dscode/launcher/DomEngineCliLaunchTest.java`

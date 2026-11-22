@@ -104,6 +104,11 @@ public final class PkbMain {
         Files.writeString(argFile, quoteArg(classpath) + "\n");
         List<String> command = new ArrayList<>();
         command.add(java);
+        command.add("-Dfile.encoding=UTF-8");
+        command.add("-Dstdout.encoding=UTF-8");
+        command.add("-Dstderr.encoding=UTF-8");
+        command.add("-Dsun.stdout.encoding=UTF-8");
+        command.add("-Dsun.stderr.encoding=UTF-8");
         command.add("-cp");
         command.add("@" + argFile.toAbsolutePath().normalize());
         command.add("tools.dscode.launcher.PkbMain");
@@ -152,8 +157,8 @@ public final class PkbMain {
             if (printBody) {
                 String out = stringField(line, "out");
                 String err = stringField(line, "err");
-                if (!out.isEmpty()) System.out.print(out.endsWith("\n") ? out : out + "\n");
-                if (!err.isEmpty()) System.err.print(err.endsWith("\n") ? err : err + "\n");
+                if (!out.isEmpty()) writeUtf8(System.out, out.endsWith("\n") ? out : out + "\n");
+                if (!err.isEmpty()) writeUtf8(System.err, err.endsWith("\n") ? err : err + "\n");
             } else if ("stop".equals(op)) {
                 System.out.println("stopped");
             }
@@ -195,7 +200,7 @@ public final class PkbMain {
                 case '\r' -> json.append("\\r");
                 case '\t' -> json.append("\\t");
                 default -> {
-                    if (ch < 0x20) json.append(String.format("\\u%04x", (int) ch));
+                    if (ch < 0x20 || ch > 0x7e) json.append(String.format("\\u%04x", (int) ch));
                     else json.append(ch);
                 }
             }
@@ -460,6 +465,18 @@ public final class PkbMain {
             }
         }
         return value.toString();
+    }
+
+    /** Bytes, not {@link java.io.PrintStream#print}, so a non-UTF-8 console cannot replace {@code é}. */
+    private static void writeUtf8(java.io.PrintStream stream, String text) {
+        if (stream == null || text == null || text.isEmpty()) return;
+        byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
+        try {
+            stream.write(bytes);
+            stream.flush();
+        } catch (java.io.IOException failure) {
+            stream.print(text);
+        }
     }
 
     private record Handle(long pid, int port, String token) {
