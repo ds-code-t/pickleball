@@ -169,6 +169,12 @@ class CollaborativeRecordingTest {
         assertTrue(js.contains("sense('hover'"), js);
         assertTrue(js.contains("sense('focus'"), js);
         assertTrue(js.contains("sense('drag'"), js);
+        int inputSense = js.indexOf("on(doc, 'input'");
+        assertTrue(inputSense > 0);
+        assertTrue(js.substring(inputSense, inputSense + 200).contains("window.__pkbRecord !== true"));
+        int keySense = js.indexOf("on(doc, 'keydown'");
+        assertTrue(keySense > 0);
+        assertTrue(js.substring(keySense, keySense + 200).contains("window.__pkbRecord !== true"));
         assertTrue(js.contains("data-pkb-record"), js);
         assertTrue(js.contains("setFeedback(node, 'sending')"), js);
         assertTrue(js.contains("setFeedback(node, 'delivered')"), js);

@@ -91,7 +91,7 @@ Reports chrome, session, health, headed, pid, bridge, worker, lease, leaseLeft, 
 
 # help events
 Usage: events [--hooks] [--json] [--cursor=<token>] [--run-id=<id>] [--follow] [--until=<type|text=...>] [--timeout=<seconds>] [--type=<name>] [--echo] [--from=any] [--format=lines|json] [--fields=<a,b>] [--where=<k=v>] [--limit=<n>] [--budget=<bytes>] [--group=type|role] [--priority=on]
---follow tails .pickleball/agent-events.jsonl from the start of the file unless --cursor is set, so early lines are included. It exits on the first match in this process. It does not hop and it does not leave a child process. No Workbench session is required. --timeout default 30, max 120. 0 checks once. Own source=agent lines are hidden unless --echo or --from=any.
+--follow tails .pickleball/agent-events.jsonl from the end of the file unless --cursor is set, so earlier lines are not returned. --until=human is a chat message, an answer, or an agent-UI click, not a keystroke. It exits on the first match in this process. It does not hop and it does not leave a child process. No Workbench session is required. --timeout default 30, max 120. 0 checks once. Own source=agent lines are hidden unless --echo or --from=any.
 
 # help example
 Usage: example --example=<rows>
@@ -323,7 +323,7 @@ Without --ops, ui opens the Workbench controller. With --ops, ui applies a catal
 
 # help ui-poll
 Usage: ui-poll [--after=<n>] [--chat-after=<id>] [--cursor=<token>] [--wait=<seconds, up to 25>] [--channel=<name>] [--run-id=<id>] [--format=lines|json] [--fields=<a,b>] [--where=<k=v>] [--limit=<n>] [--budget=<bytes>] [--group=type|role] [--priority=on] [--echo=hide]
-The cursor channel is ui. The same token returns the same events and does not move the chat cursor.
+The cursor channel is ui. With no --after and no --cursor the poll starts at now. The same token returns the same events and does not move the chat cursor.
 
 # help ui-verify
 Usage: ui-verify [--run-id=<id>]

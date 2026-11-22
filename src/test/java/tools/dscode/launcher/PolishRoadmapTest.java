@@ -55,7 +55,7 @@ class PolishRoadmapTest {
         PushChannel.accept(temp, Map.of("type", "chat", "source", "agent", "text", "echo"));
         PushChannel.accept(temp, Map.of("type", "chat", "source", "human", "text", "ready now"));
         Capture capture = session(
-                "events", temp.toString(), "--follow", "--timeout=0", "--until=text=ready", "--type=chat");
+                "events", temp.toString(), "--follow", "--timeout=0", "--until=text=ready", "--type=chat", "--cursor=0");
         assertEquals(0, capture.code, capture.err);
         assertTrue(capture.out.contains("ready now"), capture.out);
         assertTrue(capture.out.contains("\"op\":\"events\"") || capture.out.contains("\"op\": \"events\""), capture.out);

@@ -1,5 +1,6 @@
 package tools.dscode.common.agentfast;
 
+import tools.dscode.common.recording.RecordingSession;
 import tools.dscode.control.protocol.AgentEvents;
 
 import java.nio.file.Path;
@@ -159,9 +160,51 @@ public final class PushChannel {
             String text = row.getOrDefault("text", "").toLowerCase(Locale.ROOT);
             return text.contains(needle);
         }
+        if ("human".equals(token)) return humanRow(row);
         return token.equalsIgnoreCase(row.get("type"))
                 || token.equalsIgnoreCase(row.get("event"))
                 || token.equalsIgnoreCase(row.get("source"))
                 || token.equalsIgnoreCase(row.get("priority"));
+    }
+
+    /**
+     * Chat that is not from the agent, an answer, or a click on agent UI.
+     * Raw keystrokes (input, key, change, hover, focus) are not a human turn.
+     */
+    static boolean humanRow(Map<String, String> row) {
+        if (row == null) return false;
+        if (keystroke(row.get("type")) || keystroke(row.get("kind")) || keystroke(row.get("event"))) return false;
+        String type = row.get("type") == null ? "" : row.get("type").toLowerCase(Locale.ROOT);
+        String event = row.get("event") == null ? "" : row.get("event").toLowerCase(Locale.ROOT);
+        if ("answer".equals(type) || "answer".equals(event)) return true;
+        if ("chat".equals(type) || "chat".equals(event)) return !"agent".equalsIgnoreCase(row.get("source"));
+        if ("click".equals(type) || "click".equals(event) || "check".equals(type) || "check".equals(event)) {
+            return agentUi(row);
+        }
+        return false;
+    }
+
+    /** A keystroke row is not stored unless recording is on. Clicks, checks, and answers stay. */
+    public static boolean quietKeystroke(Map<String, String> event, Path project) {
+        if (event == null || event.isEmpty()) return false;
+        if (!keystroke(event.get("type")) && !keystroke(event.get("kind"))) return false;
+        return project == null || !RecordingSession.recording(project);
+    }
+
+    static boolean keystroke(String value) {
+        if (value == null) return false;
+        String token = value.toLowerCase(Locale.ROOT);
+        return "input".equals(token) || "key".equals(token) || "keydown".equals(token) || "keyup".equals(token)
+                || "change".equals(token) || "select".equals(token) || "hover".equals(token) || "focus".equals(token);
+    }
+
+    private static boolean agentUi(Map<String, String> row) {
+        if ("true".equalsIgnoreCase(row.get("ui"))) return true;
+        String id = row.getOrDefault("id", "");
+        if (id.startsWith("ask-") || id.startsWith("pkb-")) return true;
+        String choice = row.get("choice");
+        if (choice != null && !choice.isBlank()) return true;
+        String check = row.get("check");
+        return check != null && !check.isBlank();
     }
 }

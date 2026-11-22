@@ -77,10 +77,14 @@ class HousekeepingRoadmapTest {
         PushChannel.accept(temp, Map.of("type", "chat", "source", "human", "text", "alpha ready"));
         PushChannel.accept(temp, Map.of("type", "chat", "source", "human", "text", "beta later"));
         Capture capture = session(
-                "events", temp.toString(), "--follow", "--timeout=0", "--until=text=alpha", "--type=chat");
+                "events", temp.toString(), "--follow", "--timeout=0", "--until=text=alpha", "--type=chat", "--cursor=0");
         assertEquals(0, capture.code, capture.err);
         assertTrue(capture.out.contains("alpha ready"), capture.out);
         assertFalse(capture.out.contains("beta later"), capture.out);
+        Capture now = session(
+                "events", temp.toString(), "--follow", "--timeout=0", "--until=text=alpha", "--type=chat");
+        assertEquals(1, now.code, now.out + now.err);
+        assertFalse(now.out.contains("alpha ready"), now.out);
         assertTrue(!AgentHop.shouldHop("events", new String[]{"events", "--follow"}));
     }
 

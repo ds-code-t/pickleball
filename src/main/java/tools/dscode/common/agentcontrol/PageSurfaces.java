@@ -1600,9 +1600,15 @@ final class PageSurfaces {
         facade.addPreloadIn(SurfaceAssets.js("html"), "pkb-surface");
         facade.addPreloadIn(RUNTIME, "pkb-surface");
         if (facade instanceof CdpAdapter cdp) {
-            cdp.addBinding("pkbSurface", (name, payload) -> PUSHED.add(bindingEvent(name, payload)), "pkb-surface");
+            cdp.addBinding("pkbSurface", (name, payload) -> {
+                Map<String, String> event = bindingEvent(name, payload);
+                if (event != null && !event.isEmpty()) PUSHED.add(event);
+            }, "pkb-surface");
         } else {
-            facade.addBinding("pkbSurface", (name, payload) -> PUSHED.add(bindingEvent(name, payload)));
+            facade.addBinding("pkbSurface", (name, payload) -> {
+                Map<String, String> event = bindingEvent(name, payload);
+                if (event != null && !event.isEmpty()) PUSHED.add(event);
+            });
         }
     }
 
@@ -1625,6 +1631,8 @@ final class PageSurfaces {
         }
         event.putIfAbsent("type", "binding");
         event.put("binding", name == null ? "pkbSurface" : name);
+        if (tools.dscode.common.agentfast.PushChannel.quietKeystroke(
+                event, tools.dscode.common.agentfast.PushChannel.project())) return Map.of();
         tools.dscode.common.agentfast.PushChannel.accept(event);
         tools.dscode.common.recording.InteractionLog.mirrorStream(
                 tools.dscode.common.agentfast.PushChannel.project(), event);

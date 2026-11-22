@@ -986,7 +986,7 @@ public final class WorkbenchSessionCommands {
         }
         if ("any".equalsIgnoreCase(flagValue(parsed, "--from"))) hideEcho = false;
         if (echo != null && ("hide".equalsIgnoreCase(echo) || "false".equalsIgnoreCase(echo))) hideEcho = true;
-        int after = 0;
+        int after;
         String cursor = flagValue(parsed, "--cursor");
         if (cursor != null && !cursor.isBlank()) {
             try {
@@ -995,6 +995,8 @@ public final class WorkbenchSessionCommands {
                 err.print(WorkbenchCliHelp.usageError("events --cursor is a line number", "events"));
                 return 2;
             }
+        } else {
+            after = tools.dscode.control.protocol.AgentEvents.lineCount(project);
         }
         long started = System.nanoTime();
         tools.dscode.common.agentfast.PushChannel.Hit hit = tools.dscode.common.agentfast.PushChannel.follow(

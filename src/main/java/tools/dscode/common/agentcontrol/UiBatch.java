@@ -211,7 +211,10 @@ final class UiBatch {
                 return AgentControl.failure(2, "ui-poll --wait is seconds, up to 25");
             }
         }
-        String after = args.get("after") == null || args.get("after").isBlank() ? "0" : args.get("after").trim();
+        boolean cursor = args.get("cursor") != null && !args.get("cursor").isBlank();
+        String after = args.get("after") == null || args.get("after").isBlank()
+                ? (cursor ? "0" : Integer.toString(PageSurfaces.pollInput(project, runId).size()))
+                : args.get("after").trim();
         String chatAfter = args.get("chat-after");
         long deadline = System.nanoTime() + waitMillis * 1_000_000L;
         while (true) {

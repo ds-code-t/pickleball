@@ -122,6 +122,21 @@ class AgentDataFoundationTest {
     }
 
     @Test
+    void uiPollWithoutACursorDoesNotReplayHistory() throws Exception {
+        PageSurfaces.recordInput(project, "now", Map.of("type", "click", "id", "pkb-old"));
+        Map<String, String> fresh = new LinkedHashMap<>();
+        fresh.put("channel", "run");
+        AgentControl.Result polled = AgentControl.execute(project, "now", "ui-poll", fresh, List.of(), "a");
+        assertEquals(0, polled.exit(), String.valueOf(polled.body()));
+        assertFalse(String.valueOf(polled.body()).contains("pkb-old"), String.valueOf(polled.body()));
+        Map<String, String> replay = new LinkedHashMap<>();
+        replay.put("after", "0");
+        replay.put("channel", "run");
+        AgentControl.Result history = AgentControl.execute(project, "now", "ui-poll", replay, List.of(), "a");
+        assertTrue(String.valueOf(history.body()).contains("pkb-old"), String.valueOf(history.body()));
+    }
+
+    @Test
     void linesAreSmallerAndEscapeAndStayUnderTheCap() {
         assertEquals("Save", LineView.token("Save"));
         assertEquals("\"a\\nb\"", LineView.token("a\nb"));

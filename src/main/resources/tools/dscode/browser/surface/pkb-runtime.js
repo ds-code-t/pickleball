@@ -784,6 +784,7 @@
     var inputTimer = 0;
     var inputEl = null;
     on(doc, 'input', function (event) {
+      if (window.__pkbRecord !== true) return;
       var input = eventLeaf(event);
       if (!input || ours(input)) return;
       inputEl = input;
@@ -796,6 +797,7 @@
       }, 400);
     }, true);
     on(doc, 'change', function (event) {
+      if (window.__pkbRecord !== true) return;
       var input = eventLeaf(event);
       if (!input || ours(input) || input.closest && input.closest('[data-pkb-check]')) return;
       var tag = (input.nodeName || '').toLowerCase();
@@ -805,6 +807,7 @@
       } else sense('change', input, {value: input.value == null ? '' : String(input.value)});
     }, true);
     on(doc, 'keydown', function (event) {
+      if (window.__pkbRecord !== true) return;
       if (!event) return;
       var key = event.key || '';
       if (key !== 'Enter' && key !== 'Tab' && key !== 'Escape') return;
