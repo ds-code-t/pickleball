@@ -3,11 +3,14 @@ package tools.dscode.common.agentcontrol;
 import com.sun.net.httpserver.HttpServer;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.remote.CommandPayload;
+import org.openqa.selenium.remote.Response;
 
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 
 /**
  * Shared live-test helpers for the overlay polish work: a loopback server for the
@@ -64,18 +67,44 @@ public final class OverlayFixtures implements AutoCloseable {
         options.setBinary(binary);
         options.addArguments("--headless=new", "--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu",
                 "--remote-allow-origins=*", "--window-size=1280,800", "--force-device-scale-factor=1");
-        ChromeDriver driver = new ChromeDriver(options);
+        ChromeDriver driver = new MetricsChrome(options);
         try {
             driver.manage().window().setSize(new org.openqa.selenium.Dimension(1280, 800));
-            driver.executeCdpCommand("Emulation.setDeviceMetricsOverride", java.util.Map.of(
-                    "width", 1280,
-                    "height", 800,
-                    "deviceScaleFactor", 1,
-                    "mobile", false));
         } catch (RuntimeException ignored) {
             // The panel still reserves room for an in-bounds drag when the inner viewport is short.
         }
         return driver;
+    }
+
+    /**
+     * Headless Chrome keeps the layout viewport at the first device-metrics override.
+     * A later {@code window.setSize} updates that override so the fixture reflows.
+     */
+    private static final class MetricsChrome extends ChromeDriver {
+        private MetricsChrome(ChromeOptions options) {
+            super(options);
+        }
+
+        @Override
+        protected Response execute(CommandPayload payload) {
+            Response response = super.execute(payload);
+            String name = payload.getName();
+            if (!"setCurrentWindowSize".equals(name) && !"setWindowRect".equals(name)) return response;
+            Map<String, ?> params = payload.getParameters();
+            Object width = params.get("width");
+            Object height = params.get("height");
+            if (!(width instanceof Number) || !(height instanceof Number)) return response;
+            try {
+                executeCdpCommand("Emulation.setDeviceMetricsOverride", Map.of(
+                        "width", ((Number) width).intValue(),
+                        "height", ((Number) height).intValue(),
+                        "deviceScaleFactor", 1,
+                        "mobile", false));
+            } catch (RuntimeException ignored) {
+                // The size command already succeeded. The layout stays at the previous override.
+            }
+            return response;
+        }
     }
 
     /**
