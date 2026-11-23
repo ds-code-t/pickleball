@@ -2,8 +2,8 @@ package tools.dscode.common.agentcontrol;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.domengine.session.BrowserSession;
-import org.openqa.selenium.JavascriptExecutor;
 import tools.dscode.common.agentfast.LiveChromeDriver;
+import tools.dscode.common.composite.ElementOperations;
 import tools.dscode.common.recording.InteractionLog;
 import tools.dscode.common.recording.RecordingSession;
 import tools.dscode.common.recording.StepGenerator;
@@ -59,7 +59,7 @@ public final class RecordSelftest {
                 body.put("sentence", "selftest record did not install the page runtime.");
                 return body;
             }
-            ((JavascriptExecutor) driver).executeScript("""
+            ElementOperations.script(driver, """
                     var pause = document.querySelector('[data-pkb-record] button');
                     if (pause) pause.click();
                     var frame = document.getElementById('billing');

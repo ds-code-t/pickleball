@@ -26,7 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class DomAccessGuardTest {
     static final Pattern RAW = Pattern.compile(
-            "(?<!ElementOperations)\\.(?:findElement|findElements|executeAsyncScript|executeScript|getDomAttribute|getDomProperty|getAttribute|getText|isDisplayed|isEnabled|isSelected|getTagName|getRect|getSize|getCssValue|getShadowRoot|getPageSource)\\s*\\("
+            "(?<!ElementOperations)\\.(?:findElement|findElements|executeAsyncScript|executeScript|getDomAttribute|getDomProperty|getAttribute|getText|isEnabled|isSelected|getTagName|getRect|getSize|getCssValue|getShadowRoot|getPageSource)\\s*\\("
+                    + "|(?<!ElementOperations)(?<!Displayed)\\.isDisplayed\\s*\\("
                     + "|(?<!getCodeSource\\(\\))\\.getLocation\\s*\\("
                     + "|switchTo\\s*\\(\\s*\\)\\s*\\.\\s*(?:frame|defaultContent|parentFrame|activeElement)\\s*\\("
                     + "|new\\s+Actions\\s*\\("
@@ -142,6 +143,10 @@ class DomAccessGuardTest {
         assertEquals(0, hitLines("void x(java.util.List<String> values){ values.clear(); }").size());
         assertEquals(0, hitLines("void x(java.util.Map<String, String> maps){ maps.clear(); }").size());
         assertEquals(0, hitLines("void x(java.util.concurrent.ExecutorService pool){ pool.submit(() -> 1); }").size());
+        assertEquals(1, hitLines("void x(org.openqa.selenium.WebElement element){ return element.isDisplayed(); }").size());
+        assertEquals(1, hitLines("void x(){ return WebElement.isDisplayed(); }").size());
+        assertEquals(0, hitLines("void x(dev.domengine.query.Node node){ return Displayed.isDisplayed(node); }").size());
+        assertEquals(0, hitLines("void x(){ return ElementOperations.isDisplayed(node); }").size());
         assertEquals(0, hitLines("void x(){ ElementOperations.click(driver, el); }").size());
         assertEquals(0, hitLines("void x(){ ElementOperations.sendKeys(driver, el, \"a\"); }").size());
         assertEquals(0, hitLines("void x(){ wrappedElements.clear(); }").size());

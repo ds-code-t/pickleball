@@ -216,8 +216,7 @@ public final class SharedStepRun {
                 String live = ElementOperations.observedFrame(driver);
                 if (live != null && !live.isBlank() && !"top".equals(live)) {
                     drifted = live;
-                    driver.switchTo().defaultContent();
-                    ElementOperations.rewindFrameMark(List.of());
+                    ElementOperations.defaultContent(driver);
                 }
             } catch (RuntimeException ignored) {
                 // A frame the step entered is still named below. The driver stays where the switch left it.

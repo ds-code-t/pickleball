@@ -63,7 +63,8 @@ public final class AgentControl {
         try {
             tools.dscode.common.composite.ElementOperations.defaultContent(web);
             String want = token.trim();
-            for (org.openqa.selenium.WebElement frame : web.findElements(org.openqa.selenium.By.cssSelector("iframe, frame"))) {
+            for (org.openqa.selenium.WebElement frame : tools.dscode.common.composite.ElementOperations.findElements(
+                    web, org.openqa.selenium.By.cssSelector("iframe, frame"))) {
                 if (want.equals(attr(frame, "id")) || want.equals(attr(frame, "name")) || want.equals(attr(frame, "title"))) {
                     tools.dscode.common.composite.ElementOperations.enterFrame(web, frame);
                     return;
@@ -76,7 +77,7 @@ public final class AgentControl {
 
     private static String attr(org.openqa.selenium.WebElement element, String name) {
         try {
-            String value = element.getAttribute(name);
+            String value = tools.dscode.common.composite.ElementOperations.attribute(element, name);
             return value == null ? "" : value.trim();
         } catch (RuntimeException ignored) {
             return "";
@@ -1228,9 +1229,9 @@ public final class AgentControl {
     /** visible, hidden, and lost describe the target. overlaps names placements on the page now. */
     private static void stampSeen(Map<String, Object> placed, String handle, String runId) {
         WebDriver web = PageSurfaces.liveDriver();
-        if (web instanceof org.openqa.selenium.JavascriptExecutor js && present(handle)) {
+        if (web instanceof org.openqa.selenium.JavascriptExecutor && present(handle)) {
             try {
-                Object raw = js.executeScript(SEEN_SCRIPT, handle);
+                Object raw = tools.dscode.common.composite.ElementOperations.script(web, SEEN_SCRIPT, handle);
                 if (raw instanceof Map<?, ?> map) {
                     placed.put("visible", Boolean.TRUE.equals(map.get("visible")));
                     placed.put("hidden", Boolean.TRUE.equals(map.get("hidden")));
@@ -1252,9 +1253,9 @@ public final class AgentControl {
     /** Boxes of the placements on the page, including open shadow roots such as pkb-layer. */
     private static List<Map<String, Object>> liveBoxes() {
         WebDriver web = PageSurfaces.liveDriver();
-        if (!(web instanceof org.openqa.selenium.JavascriptExecutor js)) return List.of();
+        if (!(web instanceof org.openqa.selenium.JavascriptExecutor)) return List.of();
         try {
-            Object raw = js.executeScript(LIVE_BOXES);
+            Object raw = tools.dscode.common.composite.ElementOperations.script(web, LIVE_BOXES);
             if (!(raw instanceof List<?> rows)) return List.of();
             List<Map<String, Object>> boxes = new ArrayList<>();
             for (Object row : rows) {
@@ -1328,10 +1329,10 @@ public final class AgentControl {
         }
         if (index < 1) return fail(2, "checklist --check must be a whole number");
         WebDriver web = PageSurfaces.liveDriver();
-        if (!(web instanceof org.openqa.selenium.JavascriptExecutor js)) return fail(1, "not found");
+        if (!(web instanceof org.openqa.selenium.JavascriptExecutor)) return fail(1, "not found");
         Object raw;
         try {
-            raw = js.executeScript(CHECK_ITEM, args.get("id").trim(), index);
+            raw = tools.dscode.common.composite.ElementOperations.script(web, CHECK_ITEM, args.get("id").trim(), index);
         } catch (RuntimeException failure) {
             return fail(1, "not found");
         }

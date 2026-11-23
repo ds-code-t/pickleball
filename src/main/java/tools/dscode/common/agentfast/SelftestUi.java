@@ -195,7 +195,7 @@ public final class SelftestUi {
                     body.put("sentence", card[0] + " did not place");
                     return body;
                 }
-                Object raw = driver.executeScript("""
+                Object raw = tools.dscode.common.composite.ElementOperations.script(driver, """
                         var text = document.body ? document.body.innerText : '';
                         var layers = document.querySelectorAll('pkb-layer');
                         for (var i = 0; i < layers.length; i++) {
