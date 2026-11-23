@@ -70,6 +70,10 @@ class GlueEditTest {
     @Test
     void compileFailureKeepsTheWorkerAndSuccessRestartsIt() throws Exception {
         Files.writeString(project.resolve("pom.xml"), "<project/>\n");
+        boolean windows = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win");
+        if (windows) {
+            Files.writeString(project.resolve("mvnw.cmd"), "@echo off\r\nif exist fail.marker exit /b 1\r\nexit /b 0\r\n");
+        }
         Path wrapper = project.resolve("mvnw");
         Files.writeString(wrapper, "#!/bin/sh\nif [ -f fail.marker ]; then exit 1; fi\nexit 0\n");
         wrapper.toFile().setExecutable(true);

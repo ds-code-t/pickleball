@@ -215,6 +215,8 @@ From inside a reusable call:
 
 Use `PARENT.SCENARIO:` for caller-owned scenario-map values. Use a RunMap key for a completed keyed deferred call.
 
+An endpoint that still contains `<...>` or `~[~...~]~` fails before HTTP or JDBC. The call is not sent to a default host. A caller that resolved the reference, including a parent `url`, is unchanged.
+
 For XML content, use XML-safe reference bookends:
 
 ```text

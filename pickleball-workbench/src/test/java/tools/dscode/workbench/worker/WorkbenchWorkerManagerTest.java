@@ -5,6 +5,7 @@ import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.control.protocol.ControlBridgeDescriptor;
 import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.control.protocol.Workspace;
+import tools.dscode.control.protocol.speed.JavaArguments;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.sync.WorkbenchSyncMode;
 
@@ -60,6 +61,24 @@ class WorkbenchWorkerManagerTest {
         int tagIndex = command.indexOf("--tags");
         assertEquals("@pickleball-workbench-anchor", command.get(tagIndex + 1));
         assertEquals(anchor.toUri().toString(), command.getLast());
+    }
+
+    @Test
+    void longClasspathMovesIntoAnArgumentFile() throws Exception {
+        Path project = tempDir.resolve("consumer").toAbsolutePath().normalize();
+        Path live = project.resolve(".pickleball/workbench/live/classes");
+        Path dependency = tempDir.resolve("pickleball.jar").toAbsolutePath().normalize();
+        Path anchor = project.resolve(".pickleball/workbench/sessions/test/anchor.feature");
+        String huge = "C:\\jars\\lib.jar;" + "x".repeat(JavaArguments.WINDOWS_COMMAND_LIMIT);
+        List<String> command = WorkbenchWorkerManager.workerCommand(
+                manifest(project, live, dependency),
+                List.of(huge),
+                anchor
+        );
+        String token = command.get(command.indexOf("-cp") + 1);
+        assertTrue(token.startsWith("@"), token);
+        assertEquals(JavaArguments.quote(huge), Files.readString(Path.of(token.substring(1))).trim());
+        assertTrue(command.contains(ControlProtocol.WORKER_MAIN_CLASS));
     }
 
     @Test

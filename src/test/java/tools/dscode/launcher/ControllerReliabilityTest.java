@@ -4,6 +4,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
+import tools.dscode.testsupport.PortableProcess;
+
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.net.InetAddress;
@@ -145,6 +147,7 @@ class ControllerReliabilityTest {
             }
         }
         assertFalse(PkbMain.controllerUp(project));
+        PortableProcess.releaseFile(project.resolve(".pickleball/agent-controller.log"));
     }
 
     private void writeHandle(long pid, int port) throws Exception {

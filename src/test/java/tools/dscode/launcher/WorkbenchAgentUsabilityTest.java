@@ -8,6 +8,7 @@ import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.Workspace;
+import tools.dscode.testsupport.PortableProcess;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -101,9 +102,10 @@ class WorkbenchAgentUsabilityTest {
         assertTrue(unknown.contains("error: Unknown Workbench command: disover"), unknown);
         assertTrue(unknown.contains("fix: discover"), unknown);
         assertFalse(unknown.contains("fix: Usage: help <command>"), unknown);
-        String golden = Files.readString(Path.of("src/test/resources/workbench-help-golden.txt"));
-        assertEquals(golden, WorkbenchCliHelp.catalog());
-        assertEquals(golden, WorkbenchCliHelp.forTopic("help"));
+        String golden = Files.readString(Path.of("src/test/resources/workbench-help-golden.txt"))
+                .replace("\r\n", "\n");
+        assertEquals(golden, WorkbenchCliHelp.catalog().replace("\r\n", "\n"));
+        assertEquals(golden, WorkbenchCliHelp.forTopic("help").replace("\r\n", "\n"));
         assertEquals(
                 "Usage: query <runs|get|query|search|props|errors|tail> [--run-id=<id>] [--scenario=<id>] [--kind=run|scenario|step|event|property|artifact|error|log] [--text=<words>] [--status=<outcome>] [--fields=<a,b>] [--limit=<n>] [--cursor=<token>] [--id=<id>]\n",
                 WorkbenchCliHelp.usage("query")
@@ -238,7 +240,7 @@ class WorkbenchAgentUsabilityTest {
                 args,
                 new PrintStream(stdout, true, StandardCharsets.UTF_8),
                 new PrintStream(stderr, true, StandardCharsets.UTF_8),
-                launch -> new ProcessBuilder("true").start(),
+                launch -> PortableProcess.exited(0),
                 java.net.http.HttpClient.newHttpClient(),
                 (project, runId, agentId) -> {
                     throw new IOException("ui starter not used");

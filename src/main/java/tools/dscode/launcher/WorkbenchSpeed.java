@@ -457,6 +457,8 @@ public final class WorkbenchSpeed {
         command.add(Long.toString(WarmProcess.liveOwner(state)));
         command.add(Long.toString(idleSeconds()));
         try {
+            tools.dscode.control.protocol.speed.JavaArguments.fitClasspath(
+                    command, state.resolve("warm-classpath.args"));
             new ProcessBuilder(command)
                     .directory(project.toFile())
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD)

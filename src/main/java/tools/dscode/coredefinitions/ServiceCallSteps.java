@@ -97,6 +97,12 @@ public class ServiceCallSteps extends CoreSteps {
                     "The service-call REQUEST must contain a non-blank endpoint"
             );
         }
+        if (containsUnresolvedReference(endpoint)) {
+            throw new IllegalArgumentException(
+                    "The service-call endpoint still contains an unresolved reference: "
+                            + endpoint
+            );
+        }
         long started = System.nanoTime();
         if (JdbcServiceCall.isJdbc(endpoint)) {
             logInfo("JDBC service call endpoint: " + endpoint);
@@ -150,6 +156,19 @@ public class ServiceCallSteps extends CoreSteps {
             throw exception;
         }
     }
+    /**
+     * A leftover mapping reference is not a URL. Sending it would use the
+     * HTTP client's default host, which can accept the socket and never answer.
+     */
+    static boolean containsUnresolvedReference(String endpoint) {
+        int open = endpoint.indexOf('<');
+        if (open >= 0 && endpoint.indexOf('>', open + 1) > open) {
+            return true;
+        }
+        int marked = endpoint.indexOf("~[~");
+        return marked >= 0 && endpoint.indexOf("~]~", marked + 3) >= 0;
+    }
+
     public static ScenarioStep scenarioStep(StepBase step) {
         if (step instanceof ScenarioStep scenarioStep) {
             return scenarioStep;

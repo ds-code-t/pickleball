@@ -1,6 +1,7 @@
 package tools.dscode.control.protocol.speed;
 
 import org.junit.jupiter.api.Test;
+import tools.dscode.testsupport.PortableProcess;
 
 import java.time.Instant;
 import java.util.concurrent.TimeUnit;
@@ -20,7 +21,7 @@ class ProcessStartGuardTest {
 
     @Test
     void matchingStartInstantKillsSleep() throws Exception {
-        Process sleep = new ProcessBuilder("sleep", "30").redirectErrorStream(true).start();
+        Process sleep = PortableProcess.sleepBuilder(30).redirectErrorStream(true).start();
         try {
             ProcessHandle handle = ProcessHandle.of(sleep.pid()).orElseThrow();
             long started = handle.info().startInstant().map(Instant::toEpochMilli).orElse(0L);

@@ -380,9 +380,10 @@ public final class PkbMain {
 
     private static void addCodeSource(Class<?> type, LinkedHashSet<String> entries) {
         try {
-            var source = type.getProtectionDomain().getCodeSource();
-            if (source == null || source.getLocation() == null) return;
-            Path path = Path.of(source.getLocation().toURI()).toAbsolutePath().normalize();
+            if (type.getProtectionDomain().getCodeSource() == null
+                    || type.getProtectionDomain().getCodeSource().getLocation() == null) return;
+            Path path = Path.of(type.getProtectionDomain().getCodeSource().getLocation().toURI())
+                    .toAbsolutePath().normalize();
             if (Files.exists(path)) entries.add(path.toString());
         } catch (Exception ignored) {
             // A missing code source is not a classpath entry.

@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.common.agentfast.PushChannel;
 
+import tools.dscode.testsupport.PortableProcess;
+
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
@@ -98,6 +100,7 @@ class PolishRoadmapTest {
         int pingMs = Integer.parseInt(out.replaceAll("(?s).*pingMs=", "").replaceAll("\\D.*", ""));
         assertTrue(pingMs >= 0 && pingMs <= 1000, "pingMs=" + pingMs + "\n" + out);
         agent("controller-stop", temp.toString());
+        PortableProcess.releaseFile(temp.resolve(".pickleball/agent-controller.log"));
     }
 
     private static String page(String command) {

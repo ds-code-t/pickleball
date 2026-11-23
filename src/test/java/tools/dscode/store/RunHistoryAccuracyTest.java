@@ -28,6 +28,7 @@ class RunHistoryAccuracyTest {
 
     @AfterEach
     void clearTracking() {
+        tools.dscode.store.sql.SqlConnections.closeProject(project);
         restore("pkb_store_track", null);
         restore("pkb_run_id", null);
         restore("pkb_store_project", null);

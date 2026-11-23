@@ -3,6 +3,7 @@ package tools.dscode.launcher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.control.protocol.LiveHostFile;
+import tools.dscode.testsupport.PortableProcess;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -45,8 +46,7 @@ class DoctorTest {
 
     @Test
     void deadHostPidReportsHealthDown() throws Exception {
-        Process finished = new ProcessBuilder("true").start();
-        finished.waitFor();
+        Process finished = PortableProcess.exited(0);
         LiveHostFile.write(temp, new LiveHostFile.Host(
                 "http://127.0.0.1:9", "token", 9, finished.pid(), finished.pid(),
                 "dead-host", false, "chrome", false, "", false, 0L, 0L

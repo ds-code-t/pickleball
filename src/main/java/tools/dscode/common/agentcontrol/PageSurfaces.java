@@ -461,6 +461,24 @@ final class PageSurfaces {
         if (liveOnly && managed().isEmpty()) {
             throw new IllegalStateException("no live browser; " + kind + " was not applied");
         }
+        if (visual && liveOnly && handle != null && !handle.isBlank()) {
+            HandleRef ranked = parseHandle(handle);
+            // A published frame:backend has an owner and no box yet. Read the box
+            // before the unknown-handle check. An unbound ranked handle returns
+            // here without a page script when the driver cannot bridge.
+            if (ranked.backend != null && lookupBounds(handle) == null && lookupGeometry(handle) == null) {
+                rememberRankedBox(handle, ranked.backend);
+            }
+        }
+        if (visual && liveOnly && handle != null && !handle.isBlank() && !resolved(handle)) {
+            HandleRef named = parseHandle(handle);
+            if (named.frameId != null || named.browserId != null) {
+                FrameOwner owner = frameOwner(named);
+                if (owner == null || !browserStillManaged(owner)) {
+                    throw new IllegalArgumentException("unknown handle: " + handle);
+                }
+            }
+        }
         if (visual && liveOnly && handle != null && !handle.isBlank() && !resolved(handle)) {
             String placed = tools.dscode.common.agentfast.TargetVerb.placementHandle(handle);
             if (placed != null && !placed.isBlank()) handle = placed;
@@ -723,6 +741,15 @@ final class PageSurfaces {
         return raw.toString();
     }
 
+    /**
+     * Lines already on disk. Does not drain the live page, so a poll that starts at now
+     * can return the events that drain writes and still hide rows that were already stored.
+     */
+    static int storedInputCount(Path project, String runId) throws IOException {
+        Path file = AgentStore.root(project, runId).resolve("overlay-events.jsonl");
+        return AgentStore.readGroup(file).size();
+    }
+
     /** Events after the first {@code after} stored events. The cursor is the stored event count. */
     static List<Map<String, Object>> pollInput(Path project, String runId, int after) throws IOException {
         List<Map<String, Object>> all = pollInput(project, runId);
@@ -887,25 +914,56 @@ final class PageSurfaces {
         flushPushed(project, runId);
         for (Managed managed : MANAGED) {
             if (!(managed.driver instanceof JavascriptExecutor)) continue;
-            String current = currentHandle(managed.driver);
-            List<String> tabs = tabsOf(managed.driver);
-            if (tabs.isEmpty()) throw new IllegalStateException("tab enumeration failed");
-            for (String tab : tabs) {
-                if (!tab.isBlank() && !activate(managed.driver, tab)) {
-                    throw new IllegalStateException("tab switch failed");
-                }
-                if (!resetTop(managed.driver)) throw new IllegalStateException("top document reset failed");
-                drainIsolated(project, runId, managed.driver);
-                drainTab(project, runId, managed.driver);
-                for (String frame : framesFor(managed.driver, tab)) {
-                    if (!enterFrame(managed.driver, frame)) throw new IllegalStateException("frame entry failed");
-                    drainTab(project, runId, managed.driver);
-                }
-            }
-            if (current != null && !current.isBlank() && !activate(managed.driver, current)) {
-                throw new IllegalStateException("tab restore failed");
+            try {
+                drainManaged(project, runId, managed);
+            } catch (RuntimeException failure) {
+                if (!pageSocketGone(failure)) throw failure;
+                CompositeLog.info("overlay", "input poll skipped " + failure.getMessage());
             }
         }
+    }
+
+    /** One driver. A closed page socket is skipped so a poll can still return {@code browser_lost}. */
+    private static void drainManaged(Path project, String runId, Managed managed) throws IOException {
+        String current = currentHandle(managed.driver);
+        List<String> tabs = tabsOf(managed.driver);
+        if (tabs.isEmpty()) throw new IllegalStateException("tab enumeration failed");
+        for (String tab : tabs) {
+            if (!tab.isBlank() && !activate(managed.driver, tab)) {
+                throw new IllegalStateException("tab switch failed");
+            }
+            if (!resetTop(managed.driver)) throw new IllegalStateException("top document reset failed");
+            drainIsolated(project, runId, managed.driver);
+            drainTab(project, runId, managed.driver);
+            for (String frame : framesFor(managed.driver, tab)) {
+                if (!enterFrame(managed.driver, frame)) throw new IllegalStateException("frame entry failed");
+                drainTab(project, runId, managed.driver);
+            }
+        }
+        if (current != null && !current.isBlank() && !activate(managed.driver, current)) {
+            throw new IllegalStateException("tab restore failed");
+        }
+    }
+
+    /** The page socket is gone. The message or a cause names the closed connection. */
+    private static boolean pageSocketGone(Throwable failure) {
+        Throwable current = failure;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null && (message.contains("cdp connection is closed")
+                    || message.contains("cdp connection closed")
+                    || message.contains("no live browser")
+                    || message.contains("tab enumeration failed")
+                    || message.contains("input poll")
+                    || message.contains("tab switch failed")
+                    || message.contains("tab restore failed")
+                    || message.contains("top document reset failed")
+                    || message.contains("frame entry failed"))) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     /**
@@ -954,6 +1012,7 @@ final class PageSurfaces {
                     """);
         } catch (RuntimeException failure) {
             CompositeLog.info("overlay", "input poll failed " + failure.getMessage());
+            if (pageSocketGone(failure)) return;
             throw failure;
         }
         if (!(value instanceof List<?> list)) {
@@ -1210,7 +1269,7 @@ final class PageSurfaces {
     }
 
     private static Hide hideOn(WebDriver web) {
-        if (web == null || absent(web, null) || !cdpCapable(web)) return Hide.SKIPPED;
+        if (web == null || dialogOpen(web) || absent(web, null) || !cdpCapable(web)) return Hide.SKIPPED;
         try {
             BrowserFacade facade = directPage(web);
             if (facade != null && !"cdp".equals(facade.protocol())) return Hide.SKIPPED;
@@ -1287,7 +1346,10 @@ final class PageSurfaces {
 
     /** Viewport box for {@code frame:backend}, so a placement is not rejected before the bridge runs. */
     private static boolean rememberRankedBox(String handle, int backend) {
-        WebDriver web = driver;
+        WebDriver web = null;
+        FrameOwner owner = frameOwner(parseHandle(handle));
+        if (owner != null && owner.driver != null) web = owner.driver;
+        if (web == null) web = driver;
         if (web == null && !managed().isEmpty()) web = managed().get(managed().size() - 1).driver();
         if (web == null || !canBridge(web)) return false;
         try {
@@ -1348,6 +1410,11 @@ final class PageSurfaces {
         return new double[]{minX, minY, Math.max(0, maxX - minX), Math.max(0, maxY - minY)};
     }
 
+    /** True while a JavaScript dialog is up. The page socket must not take {@code Runtime.addBinding}. */
+    private static boolean dialogOpen(WebDriver web) {
+        return tools.dscode.common.browseroperations.BrowserAlerts.isPresent(web);
+    }
+
     private static boolean cdpCapable(WebDriver web) {
         if (web == null) return false;
         if (web instanceof ChromiumDriver) return true;
@@ -1360,6 +1427,11 @@ final class PageSurfaces {
     }
 
     private static Object cdp(WebDriver web, String method, Map<String, Object> params) {
+        if (dialogOpen(web)) {
+            throw new IllegalStateException(
+                    "error: a JavaScript dialog is open.\n"
+                            + "fix: accept or dismiss the dialog before a CDP call.");
+        }
         BrowserFacade facade = directPage(web);
         if (facade != null) return facade.send(method, params);
         return seleniumCdp(web, method, params);
@@ -1388,6 +1460,11 @@ final class PageSurfaces {
     }
 
     private static Object evaluateHelper(WebDriver web, JavascriptExecutor executor, Map<String, Object> spec) {
+        if (dialogOpen(web)) {
+            throw new IllegalStateException(
+                    "error: a JavaScript dialog is open.\n"
+                            + "fix: accept or dismiss the dialog before a page script or Runtime.addBinding.");
+        }
         BrowserFacade facade = directPage(web);
         if (facade != null) {
             installSurface(web, facade);
@@ -1463,6 +1540,7 @@ final class PageSurfaces {
             throw new IllegalStateException(failure);
         }
         int key = System.identityHashCode(web);
+        if (dialogOpen(web)) return null;
         BrowserFacade facade = directPage(web);
         if (facade != null) {
             installSurface(web, facade);
@@ -1696,6 +1774,7 @@ final class PageSurfaces {
     }
 
     private static void installSurface(WebDriver web, BrowserFacade facade) {
+        if (dialogOpen(web)) return;
         if (!SURFACE_PROTOCOL.add(System.identityHashCode(web))) return;
         // Same world as the helper, so one set of listeners queues events where drainIsolated reads them.
         facade.addPreloadIn(SurfaceAssets.js("html"), "pkb-surface");
@@ -1750,7 +1829,7 @@ final class PageSurfaces {
     }
 
     private static BrowserFacade direct(WebDriver web) {
-        if (web == null) return null;
+        if (web == null || dialogOpen(web)) return null;
         int key = System.identityHashCode(web);
         BrowserFacade cached = FACADES.get(key);
         if (cached != null) {

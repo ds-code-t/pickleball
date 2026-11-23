@@ -130,6 +130,7 @@ class StoreGradleForwardTest {
         Path wrapper = Path.of(windows ? "gradlew.bat" : "gradlew").toAbsolutePath();
         List<String> command = new ArrayList<>();
         command.add(wrapper.toString());
+        command.add("--console=plain");
         command.add("--no-daemon");
         command.add("--project-dir");
         command.add(dir.toAbsolutePath().toString());
@@ -153,6 +154,7 @@ class StoreGradleForwardTest {
         Map<String, List<String>> resolved = new LinkedHashMap<>();
         String current = null;
         for (String line : text.split("\\R")) {
+            line = stripCsi(line);
             if (line.startsWith("STORE_TASK ")) {
                 current = line.substring("STORE_TASK ".length()).trim();
                 resolved.put(current, new ArrayList<>());
@@ -168,5 +170,24 @@ class StoreGradleForwardTest {
         }
         assertEquals(TASKS.size(), resolved.size(), text);
         return resolved;
+    }
+
+    /** Gradle may append an erase-to-end sequence on the same line as the class name. */
+    private static String stripCsi(String line) {
+        StringBuilder out = new StringBuilder(line.length());
+        for (int i = 0; i < line.length(); ) {
+            char c = line.charAt(i);
+            if (c == '\u001B' && i + 1 < line.length() && line.charAt(i + 1) == '[') {
+                i += 2;
+                while (i < line.length()) {
+                    char n = line.charAt(i++);
+                    if (n >= 0x40 && n <= 0x7E) break;
+                }
+                continue;
+            }
+            out.append(c);
+            i++;
+        }
+        return out.toString();
     }
 }

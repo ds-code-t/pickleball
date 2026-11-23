@@ -523,11 +523,22 @@ public final class PickleballLocalStore {
                 if defined JAVA_HOME (
                   if exist "%JAVA_HOME%\\bin\\java.exe" (set "JAVA=%JAVA_HOME%\\bin\\java.exe") else set "JAVA=java"
                 ) else set "JAVA=java"
+                rem A quoted bare name makes java.cmd record %~dp0 as the working directory.
+                rem Walk PATH in order so a java.cmd ahead of java.exe stays the one we call.
+                if /I "!JAVA!"=="java" (
+                  set "JAVA_RESOLVED="
+                  for %%D in ("%PATH:;=" "%") do if not defined JAVA_RESOLVED (
+                    if exist "%%~D\\java.exe" set "JAVA_RESOLVED=%%~D\\java.exe"
+                    if not defined JAVA_RESOLVED if exist "%%~D\\java.cmd" set "JAVA_RESOLVED=%%~D\\java.cmd"
+                    if not defined JAVA_RESOLVED if exist "%%~D\\java.bat" set "JAVA_RESOLVED=%%~D\\java.bat"
+                  )
+                  if defined JAVA_RESOLVED set "JAVA=!JAVA_RESOLVED!"
+                )
                 set "M2=%USERPROFILE%\\.m2\\repository"
                 set "JAR="
                 set "VERSION="
                 if exist "%PROJECT%\\.pickleball\\current.json" (
-                  for /f "usebackq tokens=2 delims=:" %%A in (`findstr pickleballVersion "%PROJECT%\\.pickleball\\current.json"`) do (
+                  for /f "usebackq tokens=2 delims=:" %%A in (`%SystemRoot%\\System32\\findstr.exe pickleballVersion "%PROJECT%\\.pickleball\\current.json"`) do (
                     set "VERSION=%%~A"
                   )
                 )
@@ -546,25 +557,25 @@ public final class PickleballLocalStore {
                 )
                 if not defined JAR (
                   for %%F in ("%SCRIPT_DIR%pickleball-*.jar") do (
-                    echo %%~nxF| findstr /i workbench >nul
+                    echo %%~nxF| %SystemRoot%\\System32\\findstr.exe /i workbench >nul
                     if errorlevel 1 if exist "%%~F" set "JAR=%%~F"
                   )
                 )
                 if not defined JAR (
                   for %%F in ("%PROJECT%\\pickleball-*.jar") do (
-                    echo %%~nxF| findstr /i workbench >nul
+                    echo %%~nxF| %SystemRoot%\\System32\\findstr.exe /i workbench >nul
                     if errorlevel 1 if exist "%%~F" set "JAR=%%~F"
                   )
                 )
                 if not defined JAR (
                   for %%F in ("%CD%\\pickleball-*.jar") do (
-                    echo %%~nxF| findstr /i workbench >nul
+                    echo %%~nxF| %SystemRoot%\\System32\\findstr.exe /i workbench >nul
                     if errorlevel 1 if exist "%%~F" set "JAR=%%~F"
                   )
                 )
                 if not defined JAR if exist "%M2%\\tools\\dscode\\pickleball\\" (
                   for /d %%D in ("%M2%\\tools\\dscode\\pickleball\\*") do (
-                    echo %%~nxD| findstr /i SNAPSHOT >nul
+                    echo %%~nxD| %SystemRoot%\\System32\\findstr.exe /i SNAPSHOT >nul
                     if errorlevel 1 if exist "%%D\\pickleball-%%~nxD.jar" set "JAR=%%D\\pickleball-%%~nxD.jar"
                   )
                   if not defined JAR (
@@ -583,33 +594,34 @@ public final class PickleballLocalStore {
                 if not defined CACHE if exist "!PROJECT!\\.pickleball\\workbench\\classpath.cache" set "CACHE=!PROJECT!\\.pickleball\\workbench\\classpath.cache"
                 if "%VERB%"=="" (
                   set "PKB_OPEN_BOOTSTRAP=1"
-                  "%JAVA%" -jar "%JAR%" ui "%PROJECT%"
+                  call "%JAVA%" -jar "%JAR%" ui "%PROJECT%"
                   exit /b !ERRORLEVEL!
                 )
                 if defined CACHE (
-                  "%JAVA%" -cp "@!CACHE!" tools.dscode.launcher.PickleballWorkbenchLauncher %*
+                  call "%JAVA%" -cp "@!CACHE!" tools.dscode.launcher.PickleballWorkbenchLauncher %*
                   exit /b !ERRORLEVEL!
                 )
                 if /I "%VERB%"=="help" (
                   set "PKB_OPEN_BOOTSTRAP=1"
-                  "%JAVA%" -jar "!JAR!" %*
+                  call "%JAVA%" -jar "!JAR!" %*
                   exit /b !ERRORLEVEL!
                 )
                 if exist "!PROJECT!\\mvnw.cmd" (
                   set "RESOLVED=!PROJECT!\\.pickleball\\workbench\\classpath.resolved"
                   if not exist "!PROJECT!\\.pickleball\\workbench" mkdir "!PROJECT!\\.pickleball\\workbench"
-                  "!PROJECT!\\mvnw.cmd" -q org.apache.maven.plugins:maven-dependency-plugin:3.8.1:build-classpath -Dmdep.includeScope=test "-Dmdep.outputFile=!RESOLVED!" >nul 2>&1
+                  call "!PROJECT!\\mvnw.cmd" -q org.apache.maven.plugins:maven-dependency-plugin:3.8.1:build-classpath "-Dmdep.includeScope=test" "-Dmdep.outputFile=!RESOLVED!" >nul 2>&1
                   if exist "!RESOLVED!" (
-                    "%JAVA%" -cp "@!RESOLVED!" tools.dscode.launcher.PickleballWorkbenchLauncher %*
+                    call "%JAVA%" -cp "@!RESOLVED!" tools.dscode.launcher.PickleballWorkbenchLauncher %*
                     exit /b !ERRORLEVEL!
                   )
                 )
                 if exist "!PROJECT!\\gradlew.bat" (
-                  "!PROJECT!\\gradlew.bat" -q pickleballWorkbench "-PpkbArgs=%*"
+                  call "!PROJECT!\\gradlew.bat" -q pickleballWorkbench "-PpkbArgs=%*"
                   exit /b !ERRORLEVEL!
                 )
                 set "PKB_OPEN_BOOTSTRAP=1"
-                "%JAVA%" -jar "%JAR%" %*
+                call "%JAVA%" -jar "%JAR%" %*
+                exit /b !ERRORLEVEL!
                 """;
     }
 

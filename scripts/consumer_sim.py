@@ -167,10 +167,18 @@ def main() -> int:
         record = assert_record(RUN)
         assert_field(record, "status", "PASSED")
         assert_cache_hit(RUN)
+        # Plain validate lists every empty consumer step and exits 1 when any exist.
+        # The marker sync point and the CLI probe are empty on purpose. undefined stays 0.
         validated = run_stage(timings, "validate", [
             "validate", "--tags=" + TAGS, "--name=" + NAME,
-        ], allow_exit={0})
+        ], allow_exit={1})
         assert_in(validated, "validate undefined=0")
+        assert_in(validated, "ambiguous=0")
+        assert_in(validated, "unresolved=0")
+        assert_in(validated, "noop=2")
+        assert_in(validated, "ControlBridgeTestSteps#controlBridgeIpcSyncPoint")
+        assert_in(validated, "WorkbenchCliProbeSteps#pass")
+        assert_not_in(validated, "undefined:")
         assert_not_in(validated, "summary status=")
         assert_validate_warm(validated.stdout)
         rejected = run_stage(timings, "validate-quiet", [
@@ -200,7 +208,19 @@ def main() -> int:
             "isolate", "--run-id=" + SESSION, "--tags=" + TAGS, "--name=" + NAME,
             "--runvar=pkb_browser=CHROME_HEADLESS", "--agent=consumer-sim",
         ], allow_exit={0})
-        assert_first_start_timing(SESSION)
+        # sim-missing-workspace is the first materialize. SESSION is the same
+        # project with unchanged classes, so it skips copy-live.
+        assert_first_start_timing("sim-missing-workspace")
+        second = (CONSUMER / ".pickleball" / "runs" / SESSION / "session" / "session.log")
+        second_text = second.read_text(encoding="utf-8", errors="replace") if second.is_file() else ""
+        assert_true(
+            "progress stage=classpath-cache hashed=false" in second_text,
+            "unchanged second isolate did not skip materialize",
+        )
+        assert_true(
+            "progress stage=copy-live " not in second_text,
+            "unchanged second isolate materialized again",
+        )
         log_path = CONSUMER / ".pickleball" / "runs" / SESSION / "session" / "session.log"
         before = log_path.read_bytes() if log_path.is_file() else b""
         # stop --force would mark SESSION STOPPED. The next isolate is then
@@ -311,7 +331,7 @@ def prepare_tree() -> None:
     # classpath.txt is the session worker classpath (live/classes first).
     # seed-classpath.txt is only the pre-sync fork list. Drop both so the
     # uncompiled discover must compile and record that stage.
-    for name in ("classpath.txt", "seed-classpath.txt"):
+    for name in ("classpath.txt", "seed-classpath.txt", "manifest.json"):
         for classpath in state.glob(f"workbench/{name}"):
             classpath.unlink(missing_ok=True)
         for classpath in state.glob(f"v/*/workbench/{name}"):
@@ -904,7 +924,7 @@ def assert_true(condition: bool, message: str) -> None:
 
 
 def assert_first_start_timing(run_id: str) -> None:
-    """Fresh-cache isolate prints link counts and the post-digest stages.
+    """The isolate that materializes prints link counts and the post-digest stages.
 
     copy-live is on the session log. worker-spawn, jvm-main, and classpath-scan
     are on the worker stderr log. worker-ready is on the session log when
@@ -1166,9 +1186,17 @@ def _report7_body(timings: list[dict], results: list[dict]) -> None:
     regex_defined = "undefined=0" in defined_text and "VERIFY DATA ADDRESS" not in defined_text.split("validate undefined=")[0][-200:]
     # undefined=0 is the summary. A finding line would contain the step before that summary.
     regex_clean = "undefined=0" in defined_text and "undefined:" not in defined_text
+    # Empty glue in that workspace is a noop finding, so exit 1 still has undefined=0.
+    no_other_findings = (
+        "undefined=0" in defined_text
+        and "ambiguous=0" in defined_text
+        and "unresolved=0" in defined_text
+    )
+    noop_clean = "noop=0" in defined_text
+    exit_matches_noops = defined.returncode == (0 if noop_clean else 1)
     _report7_note(
         results, "3-validate-run-workspace",
-        workspace_a and defined.returncode == 0,
+        workspace_a and no_other_findings and exit_matches_noops,
         _snippet(defined_text, "workspace=", "undefined="),
     )
     _report7_note(

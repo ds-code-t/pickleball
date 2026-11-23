@@ -85,7 +85,7 @@ class StoreEntityTest {
         Capture removed = run("store", "entity", "remove", "Account", "ada", "--project=" + project);
         assertEquals(0, removed.code, removed.err);
         assertFalse(Files.exists(file));
-        assertEquals("entities 0\n", run("store", "entity", "list", "--project=" + project).out);
+        assertEquals(line("entities 0"), run("store", "entity", "list", "--project=" + project).out);
     }
 
     @Test
@@ -214,6 +214,10 @@ class StoreEntityTest {
         try (StoreDatabase database = StoreDatabase.open(project)) {
             return StoreFiles.find(database.connection(), "store-entities/Account/ada.entity");
         }
+    }
+
+    private static String line(String text) {
+        return text + System.lineSeparator();
     }
 
     private static Capture run(String... args) {

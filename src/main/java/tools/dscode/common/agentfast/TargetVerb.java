@@ -2097,7 +2097,20 @@ public final class TargetVerb {
             String ref = condition.substring("ref=".length(), condition.length() - ":selected".length());
             return refSelected(cdp, ref, flags);
         }
-        String text = condition.startsWith("text=") ? condition.substring("text=".length()) : query;
+        if (condition.startsWith("text=")) {
+            String want = condition.substring("text=".length());
+            if (sessionId != null && !sessionId.isBlank()) return exactVisibleText(cdp, sessionId, want);
+            try {
+                DomNode root = tree(cdp);
+                if (flags != null && flags.get("frame") != null && !flags.get("frame").isBlank()) {
+                    root = Frames.scope(root, flags);
+                }
+                return exactVisibleText(root, want);
+            } catch (RuntimeException failure) {
+                return false;
+            }
+        }
+        String text = query;
         if (text == null || text.isBlank()) text = condition;
         if (text.isBlank() || EVENT_CONDITIONS.contains(text)) return !title(cdp, sessionId).isBlank();
         try {
@@ -2109,6 +2122,55 @@ public final class TargetVerb {
         } catch (RuntimeException failure) {
             return false;
         }
+    }
+
+    /** Direct visible text in the entered frame. Script and style text and another document's name do not match. */
+    private static boolean exactVisibleText(CdpConnection cdp, String sessionId, String want) {
+        if (want == null || want.isEmpty()) return false;
+        ObjectNode params = Jsons.object();
+        params.put("returnByValue", true);
+        params.put("expression", "(function(){var want=" + jsString(want) + ";"
+                + "var skip={SCRIPT:1,STYLE:1,NOSCRIPT:1};"
+                + "var all=document.getElementsByTagName('*');"
+                + "for(var i=0;i<all.length;i++){var el=all[i];"
+                + "if(skip[el.tagName])continue;"
+                + "if(el.closest&&el.closest('script,style,noscript,head'))continue;"
+                + "var own='';var c=el.firstChild;"
+                + "while(c){if(c.nodeType===3)own+=c.nodeValue;c=c.nextSibling;}"
+                + "if(own.replace(/\\s+/g,' ').trim()===want)return true;}"
+                + "return false;})()");
+        try {
+            JsonNode value = sessionId == null || sessionId.isBlank()
+                    ? cdp.call("Runtime.evaluate", params, Duration.ofSeconds(5))
+                    : cdp.call("Runtime.evaluate", params, sessionId, Duration.ofSeconds(5));
+            return value.path("result").path("value").asBoolean(false);
+        } catch (RuntimeException failure) {
+            return false;
+        }
+    }
+
+    private static boolean exactVisibleText(DomNode node, String want) {
+        if (node == null || want == null || want.isEmpty()) return false;
+        if (node.nodeType == 1 && !node.iframe) {
+            String tag = node.tag();
+            if (!"script".equals(tag) && !"style".equals(tag) && !"noscript".equals(tag) && !"head".equals(tag)
+                    && !inHead(node) && want.equals(directText(node))) {
+                return true;
+            }
+        }
+        for (DomNode child : node.children) {
+            if (child.iframe) continue;
+            if (exactVisibleText(child, want)) return true;
+        }
+        return false;
+    }
+
+    private static String directText(DomNode node) {
+        StringBuilder builder = new StringBuilder();
+        for (DomNode child : node.children) {
+            if (child.nodeType == 3 && child.nodeValue != null) builder.append(child.nodeValue);
+        }
+        return builder.toString().replaceAll("\\s+", " ").trim();
     }
 
     /** A remembered ref, or a name, is selected when aria-selected, selected, or aria-current says so. */
@@ -3712,6 +3774,7 @@ public final class TargetVerb {
 
     private static void indexBackend(DomNode node, Map<Long, DomNode> byId) {
         if (node == null) return;
+        if (node.cdpSession != null && !node.cdpSession.isBlank()) return;
         if (node.backendNodeId > 0) byId.put(node.backendNodeId, node);
         for (DomNode child : node.children) indexBackend(child, byId);
         for (DomNode shadow : node.shadowRoots) indexBackend(shadow, byId);

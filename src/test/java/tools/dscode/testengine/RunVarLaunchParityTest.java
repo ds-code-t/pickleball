@@ -5,9 +5,11 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.control.protocol.Workspace;
+import tools.dscode.control.protocol.speed.JavaArguments;
 import tools.dscode.launcher.PickleballWorkbenchLauncher;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -223,11 +225,12 @@ class RunVarLaunchParityTest {
         return properties;
     }
 
-    private static List<String> java(List<String> properties, String main, List<String> args) {
+    private static List<String> java(List<String> properties, String main, List<String> args) throws IOException {
         return java(properties, main, args, null);
     }
 
-    private static List<String> java(List<String> properties, String main, List<String> args, Path extraClasspathLast) {
+    private static List<String> java(List<String> properties, String main, List<String> args, Path extraClasspathLast)
+            throws IOException {
         List<String> command = new ArrayList<>();
         command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
         command.addAll(properties);
@@ -245,6 +248,12 @@ class RunVarLaunchParityTest {
         command.add(classpath);
         command.add(main);
         command.addAll(args);
+        if (JavaArguments.exceedsWindowsCommandLimit(command)) {
+            int index = command.indexOf("-cp");
+            Path file = Files.createTempFile("pkb-launch-", ".args");
+            file.toFile().deleteOnExit();
+            command.set(index + 1, JavaArguments.classpathReference(file, command.get(index + 1)));
+        }
         return command;
     }
 

@@ -12,6 +12,7 @@ import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.control.protocol.LiveBridgeFile;
 import tools.dscode.control.protocol.LiveHostFile;
 import tools.dscode.control.protocol.speed.ProcessTree;
+import tools.dscode.testsupport.PortableProcess;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -24,6 +25,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -122,7 +126,7 @@ class StartDrivesPageTest {
 
     @Test
     void startRefusesALiveWorkerAndForwardsThatSession() throws Exception {
-        Process worker = new ProcessBuilder("sleep", "180").redirectErrorStream(true).start();
+        Process worker = PortableProcess.sleepBuilder(180).redirectErrorStream(true).start();
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         AtomicReference<String> posted = new AtomicReference<>("");
         server.createContext("/v1/agent/command", exchange -> {
@@ -141,8 +145,10 @@ class StartDrivesPageTest {
             ));
             Capture started = run("start", "--url=about:blank", "--browser=chrome", temp.toString());
             assertEquals(2, started.code, detail(started));
+            String newline = System.lineSeparator();
             assertEquals(
-                    "error: a Workbench worker is live\nfix: use the worker's browser or stop it\n",
+                    "error: a Workbench worker is live" + newline
+                            + "fix: use the worker's browser or stop it" + newline,
                     started.err
             );
             assertTrue(worker.isAlive(), "start killed the workbench worker");
@@ -214,6 +220,66 @@ class StartDrivesPageTest {
         assertEquals(before + 1, placedOnHost(), border.out);
     }
 
+    /** A live start host still receives page verbs. selftest must not be one of them. */
+    @Test
+    @Timeout(value = 60, unit = TimeUnit.SECONDS)
+    void selftestStaysInThisProcessWhileTheHostIsUp() throws Exception {
+        List<String> ops = java.util.Collections.synchronizedList(new ArrayList<>());
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/v1/agent/command", exchange -> {
+            ops.add(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            byte[] response = "{\"exit\":0,\"body\":{\"ok\":true,\"op\":\"border\",\"target\":\"page\"}}"
+                    .getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.start();
+        int port = server.getAddress().getPort();
+        boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
+        String javaBin = Path.of(System.getProperty("java.home"), "bin", windows ? "java.exe" : "java").toString();
+        Path classpath = temp.resolve("host-cp.txt");
+        Files.writeString(classpath, System.getProperty("java.class.path", ""));
+        Process host = new ProcessBuilder(
+                javaBin,
+                "-cp",
+                "@" + classpath.toAbsolutePath().normalize(),
+                "tools.dscode.launcher.WorkbenchWarmMain",
+                "hold"
+        ).redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                .redirectError(ProcessBuilder.Redirect.DISCARD)
+                .start();
+        try {
+            LiveHostFile.write(temp, new LiveHostFile.Host(
+                    "http://127.0.0.1:" + port,
+                    "token",
+                    port,
+                    host.pid(),
+                    0L,
+                    "sess",
+                    false,
+                    "chrome",
+                    true,
+                    "",
+                    true,
+                    System.currentTimeMillis(),
+                    0L
+            ));
+            Capture selftest = run("selftest", temp.toString(), "ui", "--component=feedback");
+            assertEquals(0, selftest.code, selftest.out + selftest.err);
+            assertTrue(selftest.out.contains("feedback"), selftest.out);
+            assertTrue(ops.isEmpty(), ops.toString());
+            Capture border = run("border", "--handle=save", temp.toString());
+            assertEquals(0, border.code, border.out + border.err);
+            assertTrue(ops.stream().anyMatch(body -> body.contains("\"op\":\"border\"")), ops.toString());
+            assertTrue(ops.stream().noneMatch(body -> body.contains("\"op\":\"selftest\"")), ops.toString());
+        } finally {
+            server.stop(0);
+            if (host.isAlive()) ProcessTree.kill(host.pid());
+            LiveHostFile.delete(temp);
+        }
+    }
+
     @Test
     @Timeout(value = 180, unit = TimeUnit.SECONDS)
     void chatPollAfterChromeDiesReturnsBrowserLostOnce() throws Exception {
@@ -268,8 +334,8 @@ class StartDrivesPageTest {
 
     @Test
     void liveStopLeavesAProcessWhoseStartTimeDoesNotMatch() throws Exception {
-        Process host = new ProcessBuilder("sleep", "180").redirectErrorStream(true).start();
-        Process chrome = new ProcessBuilder("sleep", "180").redirectErrorStream(true).start();
+        Process host = PortableProcess.sleepBuilder(180).redirectErrorStream(true).start();
+        Process chrome = PortableProcess.sleepBuilder(180).redirectErrorStream(true).start();
         try {
             LiveHostFile.write(temp, new LiveHostFile.Host(
                     "http://127.0.0.1:9", "token", 9, host.pid(), chrome.pid(), "sess",
@@ -290,8 +356,8 @@ class StartDrivesPageTest {
 
     @Test
     void liveStopDoesNotKillPidsWithNoRecordedStartTimes() throws Exception {
-        Process host = new ProcessBuilder("sleep", "180").redirectErrorStream(true).start();
-        Process chrome = new ProcessBuilder("sleep", "180").redirectErrorStream(true).start();
+        Process host = PortableProcess.sleepBuilder(180).redirectErrorStream(true).start();
+        Process chrome = PortableProcess.sleepBuilder(180).redirectErrorStream(true).start();
         try {
             LiveHostFile.write(temp, new LiveHostFile.Host(
                     "http://127.0.0.1:9", "token", 9, host.pid(), chrome.pid(), "sess",

@@ -149,7 +149,7 @@ final class WorkbenchCliHelp {
             Map.entry("--run-timeout", "Usage: --run-timeout=<seconds>\nPositive whole number of seconds. discover, confirm, and execute-step."),
             Map.entry("--kind", "Usage: --kind=run|scenario|step|event|property|artifact|error|log\nquery and query get. Default for query is event when --run-id is set, otherwise run."),
             Map.entry("--scenario", "Usage: --scenario=<id>\nScenario directory name under the run. query get, query query, and query errors."),
-            Map.entry("--cursor", "Usage: --cursor=<c.token>\nPer-channel cursor from next. The same token reads the same position again. A chat token does not move ui-poll, and ui-poll does not move chat-poll. Pass it back as --cursor= or as --after= when it starts with c."),
+            Map.entry("--cursor", "Usage: --cursor=<c.token>\nPer-channel cursor from next. Query and events pages return nextCursor; pass that token back as --cursor. The same token reads the same position again. A chat token does not move ui-poll, and ui-poll does not move chat-poll. Pass it back as --cursor= or as --after= when it starts with c."),
             Map.entry("--fields", "Usage: --fields=<a,b>\nComma-separated item fields. Only those fields are returned."),
             Map.entry("--text-file", "Usage: --text-file=<path>\nUTF-8 file used as execute-step --text. Keeps inner quotes that a shell would strip."),
             Map.entry("--text-b64", "Usage: --text-b64=<base64>\nBase64 of the UTF-8 step text. Use this when the shell strips quotes."),

@@ -63,7 +63,8 @@ public final class AgentControl {
         try {
             tools.dscode.common.composite.ElementOperations.defaultContent(web);
             String want = token.trim();
-            for (org.openqa.selenium.WebElement frame : web.findElements(org.openqa.selenium.By.cssSelector("iframe, frame"))) {
+            for (org.openqa.selenium.WebElement frame : tools.dscode.common.composite.ElementOperations.findElements(
+                    web, org.openqa.selenium.By.cssSelector("iframe, frame"))) {
                 if (want.equals(attr(frame, "id")) || want.equals(attr(frame, "name")) || want.equals(attr(frame, "title"))) {
                     tools.dscode.common.composite.ElementOperations.enterFrame(web, frame);
                     return;
@@ -76,7 +77,7 @@ public final class AgentControl {
 
     private static String attr(org.openqa.selenium.WebElement element, String name) {
         try {
-            String value = element.getAttribute(name);
+            String value = tools.dscode.common.composite.ElementOperations.attribute(element, name);
             return value == null ? "" : value.trim();
         } catch (RuntimeException ignored) {
             return "";
@@ -1228,9 +1229,9 @@ public final class AgentControl {
     /** visible, hidden, and lost describe the target. overlaps names placements on the page now. */
     private static void stampSeen(Map<String, Object> placed, String handle, String runId) {
         WebDriver web = PageSurfaces.liveDriver();
-        if (web instanceof org.openqa.selenium.JavascriptExecutor js && present(handle)) {
+        if (web instanceof org.openqa.selenium.JavascriptExecutor && present(handle)) {
             try {
-                Object raw = js.executeScript(SEEN_SCRIPT, handle);
+                Object raw = tools.dscode.common.composite.ElementOperations.script(web, SEEN_SCRIPT, handle);
                 if (raw instanceof Map<?, ?> map) {
                     placed.put("visible", Boolean.TRUE.equals(map.get("visible")));
                     placed.put("hidden", Boolean.TRUE.equals(map.get("hidden")));
@@ -1252,9 +1253,9 @@ public final class AgentControl {
     /** Boxes of the placements on the page, including open shadow roots such as pkb-layer. */
     private static List<Map<String, Object>> liveBoxes() {
         WebDriver web = PageSurfaces.liveDriver();
-        if (!(web instanceof org.openqa.selenium.JavascriptExecutor js)) return List.of();
+        if (!(web instanceof org.openqa.selenium.JavascriptExecutor)) return List.of();
         try {
-            Object raw = js.executeScript(LIVE_BOXES);
+            Object raw = tools.dscode.common.composite.ElementOperations.script(web, LIVE_BOXES);
             if (!(raw instanceof List<?> rows)) return List.of();
             List<Map<String, Object>> boxes = new ArrayList<>();
             for (Object row : rows) {
@@ -1328,10 +1329,10 @@ public final class AgentControl {
         }
         if (index < 1) return fail(2, "checklist --check must be a whole number");
         WebDriver web = PageSurfaces.liveDriver();
-        if (!(web instanceof org.openqa.selenium.JavascriptExecutor js)) return fail(1, "not found");
+        if (!(web instanceof org.openqa.selenium.JavascriptExecutor)) return fail(1, "not found");
         Object raw;
         try {
-            raw = js.executeScript(CHECK_ITEM, args.get("id").trim(), index);
+            raw = tools.dscode.common.composite.ElementOperations.script(web, CHECK_ITEM, args.get("id").trim(), index);
         } catch (RuntimeException failure) {
             return fail(1, "not found");
         }
@@ -1693,7 +1694,10 @@ public final class AgentControl {
     private static String expandHandle(String handle) {
         if (!present(handle)) return handle;
         String placed = tools.dscode.common.agentfast.TargetVerb.placementHandle(handle);
-        if (placed != null && !placed.isBlank()) return placed;
+        if (placed != null && !placed.isBlank()) {
+            bindPlacement(placed);
+            return placed;
+        }
         String selector = tools.dscode.common.agentfast.TargetHandles.selector(handle);
         String lookup = selector;
         if (lookup == null || lookup.isBlank()) {
@@ -1710,6 +1714,27 @@ public final class AgentControl {
         }
         if (lookup.startsWith("#") && lookup.length() > 1) return lookup.substring(1);
         return lookup;
+    }
+
+    /**
+     * The browser that published this placement owns the frame.
+     * A later border or label then enters that frame instead of reporting an unknown handle.
+     */
+    private static void bindPlacement(String placed) {
+        WebDriver page = tools.dscode.common.agentfast.LiveBrowserHost.page();
+        if (page == null) {
+            java.util.List<PageSurfaces.Managed> managed = PageSurfaces.managed();
+            if (!managed.isEmpty()) page = managed.get(managed.size() - 1).driver();
+        }
+        if (page == null) return;
+        String tab = "";
+        try {
+            String current = page.getWindowHandle();
+            if (current != null) tab = current;
+        } catch (RuntimeException ignored) {
+            tab = "";
+        }
+        PageSurfaces.bindHandle(page, tab, placed);
     }
 
     private static String cursorAfter(Path project, String runId, Map<String, String> args) {

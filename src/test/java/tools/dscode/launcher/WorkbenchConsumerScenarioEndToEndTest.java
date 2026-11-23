@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Timeout;
 import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.control.protocol.SessionDescriptorWriter;
 import tools.dscode.control.protocol.Workspace;
+import tools.dscode.testsupport.PortableProcess;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
@@ -18,6 +19,7 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -71,15 +73,35 @@ class WorkbenchConsumerScenarioEndToEndTest {
             assertTrue(indexText.contains(runId), index.toString() + "\n" + indexText);
             assertTrue(indexText.contains("PASSED") || indexText.contains("passed"), indexText);
 
-            Run isolate = launchExec("isolate", PROJECT.toString(), "--run-id=" + runId, "--tags=@workbench-cli-probe");
-            assertEquals(0, isolate.exit, isolate.text());
-            Path descriptor = SessionDescriptorWriter.file(PROJECT, runId);
-            assertTrue(Files.isRegularFile(descriptor), isolate.text());
-            String descriptorText = Files.readString(descriptor);
-            assertTrue(descriptorText.contains("session-descriptor"), descriptorText);
-            assertTrue(descriptorText.contains(runId), descriptorText);
-            String after = Files.readString(run.resolve("record.json"));
-            assertTrue(after.contains("sessionDescriptor"), after);
+            Run refused = launchExec("isolate", PROJECT.toString(), "--run-id=" + runId, "--tags=@workbench-cli-probe");
+            assertNotEquals(0, refused.exit, refused.text());
+            assertTrue(refused.text().contains("already finished"), refused.text());
+            assertTrue(Files.isDirectory(run.resolve("diagnostic")), refused.text());
+            assertFalse(Files.isDirectory(run.resolve("attempts")), refused.text());
+            String kept = Files.readString(run.resolve("record.json"));
+            assertTrue(kept.contains("PASSED"), kept);
+            assertFalse(kept.contains("sessionDescriptor"), kept);
+
+            String sessionId = "wb-probe-session";
+            deleteRun(sessionId);
+            try {
+                Run isolate = launchExec("isolate", PROJECT.toString(), "--run-id=" + sessionId, "--tags=@workbench-cli-probe");
+                assertEquals(0, isolate.exit, isolate.text());
+                Path descriptor = SessionDescriptorWriter.file(PROJECT, sessionId);
+                assertTrue(Files.isRegularFile(descriptor), isolate.text());
+                String descriptorText = Files.readString(descriptor);
+                assertTrue(descriptorText.contains("session-descriptor"), descriptorText);
+                assertTrue(descriptorText.contains(sessionId), descriptorText);
+                String after = Files.readString(AgentCoordination.runDirectory(PROJECT, sessionId).resolve("record.json"));
+                assertTrue(after.contains("sessionDescriptor"), after);
+            } finally {
+                try {
+                    launchExec("stop", PROJECT.toString(), "--run-id=" + sessionId);
+                } catch (Exception ignored) {
+                    // The session may already be gone.
+                }
+                deleteRun(sessionId);
+            }
         } finally {
             try {
                 launchExec("stop", PROJECT.toString(), "--run-id=" + runId);
@@ -130,7 +152,7 @@ class WorkbenchConsumerScenarioEndToEndTest {
                 ".m2", "repository", "tools", "dscode", "pickleball", "3.0.0", "pickleball-3.0.0.jar");
         assertTrue(Files.isRegularFile(published),
                 "publishToMavenLocal tools.dscode:pickleball:3.0.0 before this test: " + published);
-        assertTrue(Files.isRegularFile(PROJECT.resolve("mvnw")));
+        assertTrue(Files.isRegularFile(mavenWrapper()));
     }
 
     private static Path findIndex(String runId) throws Exception {
@@ -173,9 +195,16 @@ class WorkbenchConsumerScenarioEndToEndTest {
         assertEquals(0, sync.exit, sync.text());
     }
 
+    /** {@code mvnw.cmd} on Windows when that wrapper is present. Linux keeps {@code mvnw}. */
+    private static Path mavenWrapper() {
+        Path cmd = PROJECT.resolve("mvnw.cmd");
+        if (PortableProcess.windows() && Files.isRegularFile(cmd)) return cmd;
+        return PROJECT.resolve("mvnw");
+    }
+
     private static Run launchExec(String... args) throws Exception {
         List<String> command = new ArrayList<>();
-        command.add(PROJECT.resolve("mvnw").toString());
+        command.add(mavenWrapper().toString());
         command.add("org.codehaus.mojo:exec-maven-plugin:3.5.0:java");
         command.add("-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher");
         command.add("-Dexec.classpathScope=test");

@@ -279,7 +279,7 @@ Feature: Area C context, actions, assertions, and stress
     * , verify "<stressRow.id>" equals "r2"
     * , verify "<stressRow.captureKey>" equals "row2Seen"
 
-  @all @regression @browser @local-site @area-c @area-stress @area-stress-keyboard-dialog
+  @all @regression @browser @local-site @area-c @area-stress @area-stress-keyboard-dialog @winreg
   Scenario: keyboard hold dialog accept and one navigation
     * navigate to: URL.home
     * , ensure "Load Count: 1" Text is displayed

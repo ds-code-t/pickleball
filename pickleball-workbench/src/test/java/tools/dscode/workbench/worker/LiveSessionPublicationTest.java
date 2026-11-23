@@ -7,6 +7,7 @@ import tools.dscode.control.protocol.RunView;
 import tools.dscode.control.protocol.SessionDescriptor;
 import tools.dscode.control.protocol.SessionDescriptorWriter;
 import tools.dscode.control.protocol.Workspace;
+import tools.dscode.testsupport.PortableProcess;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -60,8 +61,7 @@ class LiveSessionPublicationTest {
             assertEquals(opened.startedAt(), refreshed.startedAt());
             assertFalse(Files.isRegularFile(SessionDescriptorWriter.file(project, "run-1").getParent().resolve("provider.log")));
 
-            Path script = project.resolve("composite-test");
-            Files.writeString(script, """
+            Path script = PortableProcess.platformScript(project.resolve("composite-test"), """
                     #!/bin/sh
                     echo "$@" >> "$0.calls"
                     dir=""
@@ -87,13 +87,43 @@ class LiveSessionPublicationTest {
                     fi
                     echo "unexpected $op" >&2
                     exit 2
+                    """, """
+                    @echo off\r
+                    setlocal EnableExtensions EnableDelayedExpansion\r
+                    set "self=%~f0"\r
+                    >>"%self%.calls" echo(%*\r
+                    set "dir="\r
+                    set "id="\r
+                    set "op="\r
+                    set "prev="\r
+                    :loop\r
+                    if "%~1"=="" goto ready\r
+                    if "!prev!"=="--session-dir" set "dir=%~1"\r
+                    if "!prev!"=="--id" set "id=%~1"\r
+                    if "!prev!"=="session" set "op=%~1"\r
+                    set "prev=%~1"\r
+                    shift /1\r
+                    goto loop\r
+                    :ready\r
+                    mkdir "!dir!" 2>nul\r
+                    if "!op!"=="attach" goto attach\r
+                    if "!op!"=="close" goto close\r
+                    echo unexpected !op! 1>&2\r
+                    exit /b 2\r
+                    :attach\r
+                    >"!dir!\\registry.json" echo({"joined":"!id!","sessions":{"!id!":{"id":"!id!","launched":false}}}\r
+                    echo({"id":"!id!","launched":false,"pid":null}\r
+                    exit /b 0\r
+                    :close\r
+                    >"!dir!\\registry.json" echo({"joined":null,"sessions":{}}\r
+                    echo({"closed":true,"detached":true,"killed":false}\r
+                    exit /b 0\r
                     """);
-            assertTrue(script.toFile().setExecutable(true));
             Workspace.writeRunVars(
                     Workspace.directory(project, "run-1"),
                     Map.of(DirectControlProvider.KEY, script.toString())
             );
-            browser = new ProcessBuilder("sleep", "30").start();
+            browser = PortableProcess.sleep(30);
             publication.afterStep(new LiveSessionPublication.Page(
                     "chrome", "127.0.0.1:9222", "https://example.test/home", List.of("window-a")
             ));

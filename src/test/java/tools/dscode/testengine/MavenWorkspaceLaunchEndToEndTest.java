@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -62,8 +63,9 @@ class MavenWorkspaceLaunchEndToEndTest {
                 "publishToMavenLocal tools.dscode:pickleball:3.0.0 before this test: " + published);
 
         Path project = project();
+        Path wrapper = mavenWrapper(project);
         Run prepared = run(project, List.of(
-                project.resolve("mvnw").toString(),
+                wrapper.toString(),
                 "-B",
                 "test",
                 "-DskipTests",
@@ -94,7 +96,11 @@ class MavenWorkspaceLaunchEndToEndTest {
         selection.put(PKB_props.PKB_RUN_ID, "maven-1");
         selection.put(PKB_props.PKB_AGENT_ID, "agent-maven");
         List<String> command = ConsumerMavenTestRunner.command(project, workspace, selection);
-        assertTrue(command.stream().anyMatch(argument -> argument.endsWith("mvnw") || argument.contains("/mvnw")), command.toString());
+        String wrapperName = mavenWrapper(project).getFileName().toString();
+        assertTrue(command.stream().anyMatch(argument -> {
+            String normalized = argument.replace('\\', '/');
+            return normalized.endsWith("/" + wrapperName) || argument.endsWith(wrapperName);
+        }), command.toString());
         assertTrue(command.contains("test"), command.toString());
         assertTrue(command.stream().anyMatch(argument -> argument.startsWith("-Dpkb_workspace=")), command.toString());
         assertTrue(command.contains("-Dpkb_tags=@phase7"), command.toString());
@@ -135,6 +141,14 @@ class MavenWorkspaceLaunchEndToEndTest {
         assertEquals("edited-by-agent", Workspace.readRunVars(workspace).get("pkb_hook_marker"));
     }
 
+    /** {@code mvnw.cmd} on Windows when that wrapper was copied. Linux keeps {@code mvnw}. */
+    private static Path mavenWrapper(Path project) {
+        Path cmd = project.resolve("mvnw.cmd");
+        boolean windows = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win");
+        if (windows && Files.isRegularFile(cmd)) return cmd;
+        return project.resolve("mvnw");
+    }
+
     private Path project() throws Exception {
         Path project = temp.resolve("consumer");
         Files.createDirectories(project.resolve("src/test/java/com/example/probe"));
@@ -169,11 +183,13 @@ class MavenWorkspaceLaunchEndToEndTest {
 
     private static void copyExecutable(Path source, Path destination) throws Exception {
         Files.copy(source, destination, StandardCopyOption.COPY_ATTRIBUTES);
-        Set<PosixFilePermission> permissions = new HashSet<>(Files.getPosixFilePermissions(destination));
+        PosixFileAttributeView view = Files.getFileAttributeView(destination, PosixFileAttributeView.class);
+        if (view == null) return;
+        Set<PosixFilePermission> permissions = new HashSet<>(view.readAttributes().permissions());
         permissions.add(PosixFilePermission.OWNER_EXECUTE);
         permissions.add(PosixFilePermission.GROUP_EXECUTE);
         permissions.add(PosixFilePermission.OTHERS_EXECUTE);
-        Files.setPosixFilePermissions(destination, permissions);
+        view.setPermissions(permissions);
     }
 
     private static List<String> seedCommand(Path project) throws Exception {
@@ -214,8 +230,47 @@ class MavenWorkspaceLaunchEndToEndTest {
         return "";
     }
 
+    /**
+     * cmd splits a batch argument on {@code =}. A wrapper launch is one quoted {@code call},
+     * the same shape {@link ConsumerMavenTestRunner} uses when it starts the process.
+     */
+    private static List<String> launch(List<String> command) {
+        boolean windows = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win");
+        if (!windows || command.isEmpty()) return command;
+        String first = command.get(0).toLowerCase(java.util.Locale.ROOT);
+        if (first.endsWith("cmd.exe")) {
+            int marker = -1;
+            for (int index = 1; index < command.size(); index++) {
+                if ("/c".equalsIgnoreCase(command.get(index)) || "/k".equalsIgnoreCase(command.get(index))) {
+                    marker = index;
+                    break;
+                }
+            }
+            if (marker >= 0 && marker < command.size() - 1) {
+                StringBuilder call = new StringBuilder("call");
+                for (int index = marker + 1; index < command.size(); index++) {
+                    call.append(' ').append(quote(command.get(index)));
+                }
+                List<String> rewritten = new ArrayList<>(command.subList(0, marker + 1));
+                rewritten.add(call.toString());
+                return rewritten;
+            }
+        }
+        if (first.endsWith(".bat") || first.endsWith(".cmd")) {
+            StringBuilder call = new StringBuilder("call");
+            for (String argument : command) call.append(' ').append(quote(argument));
+            return List.of("cmd.exe", "/d", "/c", call.toString());
+        }
+        return command;
+    }
+
+    private static String quote(String value) {
+        String body = value == null ? "" : value;
+        return "\"" + body.replace("\"", "\"\"") + "\"";
+    }
+
     private static Run run(Path directory, List<String> command, int minutes) throws Exception {
-        ProcessBuilder builder = new ProcessBuilder(command).directory(directory.toFile());
+        ProcessBuilder builder = new ProcessBuilder(launch(command)).directory(directory.toFile());
         builder.environment().put("JAVA_HOME", System.getProperty("java.home"));
         Process process = builder.start();
         ByteArrayOutputStream out = new ByteArrayOutputStream();

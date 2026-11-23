@@ -152,7 +152,7 @@ A read that throws: exit 1. `error:` and `fix: dashboard query --project=<dir>` 
 
 ## Distinction and tagging
 
-Person-facing text quotes a concrete value (`Enter "abc" in this textbox`). Guides, question cards, chat, the step editor, callouts, and the recording script paint that quote as a `.pkb-value` chip. The stored `ask-and-wait` answer stays the clicked label, without added quote characters. The card shows `Answer sent: "Alpha"` while the stored answer is `Alpha`.
+Person-facing text quotes a concrete value (`Enter "abc" in this textbox`). Guides, question cards, chat, the step editor, callouts, and the recording script paint that quote as a `.pkb-value` chip. The stored `ask-and-wait` answer stays the clicked label, without added quote characters. The card shows `Answer sent: Alpha` while the stored answer is `Alpha`.
 
 Injected UI carries `data-pkb-meta="true"` and an overlapping `data-pkb-purpose` token: `panel`, `guide`, `placement`, `editor`, `callout`, `recorder`, or `layer`. An assigned id starts with `pkb-`. Recording treats a tagged node as own UI. Select it with `[data-pkb-meta="true"]` or `[data-pkb-purpose~="guide"]`.
 
@@ -207,7 +207,7 @@ ask-and-wait --say=Pick-one --choices=Alpha,Beta --timeout=120000
 
 `--timeout` here is milliseconds. `--choices` is one button per comma-separated token.
 
-The person clicks Alpha. The card shows `Answer sent: "Alpha"` for about 1.5 seconds. The value returned to the agent is `Alpha`, without added quote characters. Only the clicked choice comes back.
+The person clicks Alpha. The card shows `Answer sent: Alpha` for about 1.5 seconds. The value returned to the agent is `Alpha`, without added quote characters. Only the clicked choice comes back.
 
 When the question text must contain a concrete value, quote it in the source (`Enter "abc" in this textbox`). The page paints that quote as a `.pkb-value` chip. Do not drop the quote characters.
 
@@ -223,7 +223,7 @@ Write `guide-steps.json` in the consumer project:
 guide --steps=@guide-steps.json
 ```
 
-The person sees the quoted `abc` as a chip. The step ends on Enter, on blur, or when the field matches `expect`. It does not end on a pause between keystrokes. A missing current target is refused and is not listed in Steps. When the guide ends, field step-done badges are removed. `guide-done` ends it if it is still open.
+The person sees the quoted `abc` as a chip. The step ends on Enter, on blur, or when the field matches `expect`. It does not end on a pause between keystrokes. A missing current target is refused and is not listed in Steps. When the guide ends, field step-done badges are removed. `guide-done` ends it if it is still open. A guide the last step already closed returns closed and does not push a second guide event.
 
 ### Recording with the person
 

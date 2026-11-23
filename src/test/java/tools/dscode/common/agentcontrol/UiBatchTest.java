@@ -35,8 +35,10 @@ class UiBatchTest {
 
     @Test
     void rejectsUnknownComponentsOptionsAndMissingFields() throws Exception {
-        IllegalArgumentException unknown = assertThrows(IllegalArgumentException.class, () -> UiBatch.parse(null, "[{\"c\":\"toast\"}]"));
-        assertTrue(unknown.getMessage().contains("unknown component toast"), unknown.getMessage());
+        IllegalArgumentException unknown = assertThrows(IllegalArgumentException.class, () -> UiBatch.parse(null, "[{\"c\":\"not-a-widget\"}]"));
+        assertTrue(unknown.getMessage().contains("unknown component not-a-widget"), unknown.getMessage());
+        IllegalArgumentException toast = assertThrows(IllegalArgumentException.class, () -> UiBatch.parse(null, "[{\"c\":\"toast\"}]"));
+        assertTrue(toast.getMessage().contains("toast needs text"), toast.getMessage());
         IllegalArgumentException option = assertThrows(IllegalArgumentException.class,
                 () -> UiBatch.parse(null, "[{\"c\":\"label\",\"t\":\"#a\",\"text\":\"x\",\"colour\":\"red\"}]"));
         assertTrue(option.getMessage().contains("has no option colour"), option.getMessage());

@@ -132,6 +132,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-roadmap-7-scoreboard.md`
 - `docs/maintainer/3.0.0-roadmap-8-scoreboard.md`
 - `docs/maintainer/3.0.0-snapshot-coverage-audit.md`
+- `docs/maintainer/3.0.0-windows-regression-portability.md`
+- `docs/maintainer/3.0.0-windows-regression.md`
 - `docs/maintainer/3.0.0-workbench-edit-design.md`
 - `docs/maintainer/consumer-sim-harness.md`
 - `docs/maintainer/execution-path-audit-2026-11-15.md`
@@ -867,6 +869,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentcontrol/BindingEventTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/ChatCursorTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/ChatLockChild.java`
+- `src/test/java/tools/dscode/common/agentcontrol/DialogBlocksBindingTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/FallbackLogTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/ForgetLeavesPanelTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/HumanValueTest.java`
@@ -919,6 +922,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/assertions/AssertionClauseSplitterTest.java`
 - `src/test/java/tools/dscode/common/assertions/MultilineAssertFeatureTest.java`
 - `src/test/java/tools/dscode/common/assertions/MultilineAssertTest.java`
+- `src/test/java/tools/dscode/common/browseroperations/JavaScriptDialogTest.java`
 - `src/test/java/tools/dscode/common/composite/ActionVerbPlanTest.java`
 - `src/test/java/tools/dscode/common/composite/AllContextsPlanTest.java`
 - `src/test/java/tools/dscode/common/composite/CapabilityProbeTest.java`
@@ -1196,6 +1200,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/store/StoreRunProbe.java`
 - `src/test/java/tools/dscode/store/StoreRunRecordingSpeedTest.java`
 - `src/test/java/tools/dscode/store/StoreRunTest.java`
+- `src/test/java/tools/dscode/store/StoreRunTiming.java`
 - `src/test/java/tools/dscode/store/StoreSandboxBindingTest.java`
 - `src/test/java/tools/dscode/store/StoreSandboxCliTest.java`
 - `src/test/java/tools/dscode/store/StoreSandboxHardenTest.java`
@@ -1415,6 +1420,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/SleepGapMonitor.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/ClasspathCache.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/InputFingerprint.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/JavaArguments.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/ProcessTree.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/StageScheduler.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/WarmProcess.java`
@@ -1443,6 +1449,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/SessionDescriptorTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/SessionHoldTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/SleepGapMonitorTest.java`
+- `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/speed/JavaArgumentsTest.java`
+- `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/speed/ProcessTreeKillTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/speed/SpeedTypesTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/surface/NativeHighlightBoxTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/WorkbenchFeatureIndexTest.java`

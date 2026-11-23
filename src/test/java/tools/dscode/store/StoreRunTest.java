@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.common.mappings.MappingProcessor;
 import tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner;
+import tools.dscode.testsupport.PortableProcess;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -16,6 +17,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
@@ -30,6 +32,7 @@ class StoreRunTest {
 
     @AfterEach
     void releaseSandbox() {
+        tools.dscode.store.sql.SqlConnections.closeProject(project);
         StoreScope.clear();
     }
 
@@ -44,9 +47,10 @@ class StoreRunTest {
 
         String first = StoreRun.glueFingerprint(project);
         StoreRun.Plan missing = StoreRun.plan(project);
+        boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
         assertTrue(missing.compile(), missing.line());
         assertTrue(missing.restart());
-        assertTrue(missing.compileCommand().get(0).endsWith("mvnw"), missing.compileCommand().toString());
+        assertTrue(missing.compileCommand().get(0).endsWith(windows ? "mvnw.cmd" : "mvnw"), missing.compileCommand().toString());
         assertEquals("test-compile", missing.compileCommand().get(2));
 
         String os = System.getProperty("os.name");
@@ -67,14 +71,16 @@ class StoreRunTest {
 
         Files.delete(project.resolve("pom.xml"));
         Files.delete(project.resolve("mvnw"));
+        Files.deleteIfExists(project.resolve("mvnw.cmd"));
         Files.writeString(project.resolve("build.gradle"), "plugins {}\n");
-        Files.writeString(project.resolve("gradlew"), "#!/bin/sh\n");
+        String gradleName = windows ? "gradlew.bat" : "gradlew";
+        Files.writeString(project.resolve(gradleName), windows ? "@echo off\r\n" : "#!/bin/sh\n");
         List<String> gradle = StoreRun.compileCommand(project);
-        assertTrue(gradle.get(0).endsWith("gradlew"), gradle.toString());
+        assertTrue(gradle.get(0).endsWith(gradleName), gradle.toString());
         assertEquals("testClasses", gradle.get(1));
 
         Files.delete(project.resolve("build.gradle"));
-        Files.delete(project.resolve("gradlew"));
+        Files.delete(project.resolve(gradleName));
         assertTrue(StoreRun.compileCommand(project).isEmpty());
     }
 
@@ -296,9 +302,7 @@ class StoreRunTest {
         Path gradlew = project.resolve("gradlew");
         Files.writeString(gradlew, coldShell());
         Files.writeString(project.resolve("gradlew.bat"), coldBat());
-        if (!System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win")) {
-            Files.setPosixFilePermissions(gradlew, PosixFilePermissions.fromString("rwxr-xr-x"));
-        }
+        PortableProcess.markExecutable(gradlew);
         Files.createDirectories(project.resolve(".pickleball/store/sandboxes/main/worker"));
         Files.writeString(project.resolve(".pickleball/store/sandboxes/main/worker/glue.fingerprint"), StoreRun.glueFingerprint(project));
         Path classpathFile = Path.of("build", "store-run-classpath.txt");
@@ -309,20 +313,19 @@ class StoreRunTest {
         Files.writeString(classpathFile, classpath + "\n");
         String featureDir = features.toAbsolutePath().normalize().toString().replace('\\', '/');
         try {
-            Process process = new ProcessBuilder(
-                    "python3",
-                    "scripts/time_store_run.py",
-                    "--project",
-                    project.toString(),
-                    "--tags=@store-time",
-                    "--glue=tools.dscode.coredefinitions",
-                    "--define=pkb_features=wd-file:" + featureDir,
-                    "--define=pkb_loglevel=error",
-                    "--define=pkb_parallel=1",
-                    "--define=cucumber.execution.parallel.enabled=false"
-            ).directory(Path.of("").toAbsolutePath().toFile()).redirectErrorStream(true).start();
-            String text = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            assertEquals(0, process.waitFor(), text);
+            StoreRunTiming.Result result = StoreRunTiming.compare(
+                    project,
+                    "@store-time",
+                    null,
+                    "tools.dscode.coredefinitions",
+                    List.of(
+                            "pkb_features=wd-file:" + featureDir,
+                            "pkb_loglevel=error",
+                            "pkb_parallel=1",
+                            "cucumber.execution.parallel.enabled=false"
+                    ));
+            String text = result.text();
+            assertEquals(0, result.exit(), text);
             assertTrue(text.contains("coldMs="), text);
             assertTrue(text.contains("coldExit=0"), text);
             assertTrue(text.contains("warm1Ms="), text);
@@ -467,7 +470,7 @@ class StoreRunTest {
                 set "EXTRA="
                 :collect
                 if "%~1"=="" goto launch
-                echo %~1| findstr /b /c:"-D" >nul && set "EXTRA=%EXTRA% %~1"
+                echo %~1| %SystemRoot%\\System32\\findstr.exe /b /c:"-D" >nul && set "EXTRA=%EXTRA% %~1"
                 shift
                 goto collect
                 :launch
@@ -482,12 +485,9 @@ class StoreRunTest {
     @Test
     @Timeout(value = 180, unit = TimeUnit.SECONDS)
     void timingScriptSelfCheckDoesNotLaunchASuite() throws Exception {
-        Process process = new ProcessBuilder("python3", "scripts/time_store_run.py", "--self-check")
-                .directory(Path.of("").toAbsolutePath().toFile())
-                .redirectErrorStream(true)
-                .start();
-        String text = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        assertEquals(0, process.waitFor(), text);
+        StoreRunTiming.Result result = StoreRunTiming.selfCheck();
+        String text = result.text();
+        assertEquals(0, result.exit(), text);
         assertTrue(text.contains("pickleball-test-engine"), text);
         assertTrue(text.contains("does not launch a suite"), text);
     }

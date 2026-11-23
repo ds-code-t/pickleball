@@ -241,6 +241,38 @@ public final class ConsumerMavenTestRunner {
         return List.of(launcher.toString());
     }
 
+    /**
+     * cmd.exe parses {@code =}, {@code ;}, and {@code ,} as argument separators.
+     * A Maven {@code -Dname=value} must stay one argument, so the tail after {@code /c}
+     * is a single {@code call} command with each argument quoted.
+     */
+    static List<String> windowsCommand(List<String> command) {
+        if (!isWindows() || command == null || command.size() < 4) return command;
+        String executable = command.get(0);
+        if (executable == null || !executable.toLowerCase(Locale.ROOT).endsWith("cmd.exe")) return command;
+        int marker = -1;
+        for (int index = 1; index < command.size(); index++) {
+            String token = command.get(index);
+            if ("/c".equalsIgnoreCase(token) || "/k".equalsIgnoreCase(token)) {
+                marker = index;
+                break;
+            }
+        }
+        if (marker < 0 || marker >= command.size() - 1) return command;
+        StringBuilder call = new StringBuilder("call");
+        for (int index = marker + 1; index < command.size(); index++) {
+            call.append(' ').append(quoteCmdArg(command.get(index)));
+        }
+        List<String> rewritten = new ArrayList<>(command.subList(0, marker + 1));
+        rewritten.add(call.toString());
+        return rewritten;
+    }
+
+    private static String quoteCmdArg(String value) {
+        String body = value == null ? "" : value;
+        return "\"" + body.replace("\"", "\"\"") + "\"";
+    }
+
     private static boolean isWindows() {
         return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
     }
@@ -256,7 +288,7 @@ public final class ConsumerMavenTestRunner {
             // stdout and stderr must be the streams the caller passed in.
             // inheritIO() writes to the JVM's original descriptors and skips them,
             // so Workbench console capture stayed empty.
-            ProcessBuilder builder = new ProcessBuilder(command)
+            ProcessBuilder builder = new ProcessBuilder(windowsCommand(command))
                     .directory(directory.toFile())
                     .redirectInput(ProcessBuilder.Redirect.INHERIT);
             Process process = builder.start();

@@ -13,6 +13,14 @@ java {
     toolchain { languageVersion = JavaLanguageVersion.of(21) }
 }
 
+sourceSets {
+    test {
+        java {
+            srcDir '../src/testSupport/java'
+        }
+    }
+}
+
 dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter:5.13.4'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.13.4'

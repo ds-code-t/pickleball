@@ -2,8 +2,8 @@ package tools.dscode.common.agentcontrol;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.domengine.session.BrowserSession;
-import org.openqa.selenium.JavascriptExecutor;
 import tools.dscode.common.agentfast.LiveChromeDriver;
+import tools.dscode.common.composite.ElementOperations;
 import tools.dscode.common.recording.InteractionLog;
 import tools.dscode.common.recording.RecordingSession;
 import tools.dscode.common.recording.StepGenerator;
@@ -59,9 +59,7 @@ public final class RecordSelftest {
                 body.put("sentence", "selftest record did not install the page runtime.");
                 return body;
             }
-            ((JavascriptExecutor) driver).executeScript("""
-                    var pause = document.querySelector('[data-pkb-record] button');
-                    if (pause) pause.click();
+            ElementOperations.script(driver, """
                     var frame = document.getElementById('billing');
                     var doc = frame.contentDocument;
                     doc.getElementById('pay').click();
@@ -72,6 +70,10 @@ public final class RecordSelftest {
                     field.dispatchEvent(new Event('change', {bubbles: true}));
                     """);
             Thread.sleep(700);
+            ElementOperations.script(driver, """
+                    var pause = document.querySelector('[data-pkb-record] button');
+                    if (pause) pause.click();
+                    """);
             String sensed = PageSurfaces.runtimeCall("sensed", null, false);
             List<Map<String, String>> rows = rows(sensed);
             StepGenerator.Script script = StepGenerator.generate(rows, Map.of());

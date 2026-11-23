@@ -3,6 +3,7 @@ package tools.dscode.launcher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.control.protocol.speed.WarmProcess;
+import tools.dscode.testsupport.PortableProcess;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
@@ -140,7 +141,7 @@ class WorkbenchWarmFallbackTest {
         Path state = project.resolve("state");
         Files.createDirectories(state);
         try (ServerSocket server = new ServerSocket(0, 50, InetAddress.getLoopbackAddress())) {
-            Process ended = new ProcessBuilder("true").start();
+            Process ended = PortableProcess.exited(0);
             ended.waitFor();
             WarmProcess.write(state, new WarmProcess.Handle(ended.pid(), server.getLocalPort(), "watch"));
             Thread loop = new Thread(() -> {
@@ -274,7 +275,7 @@ class WorkbenchWarmFallbackTest {
             serverThread.setDaemon(true);
             serverThread.start();
         }
-        Process ended = new ProcessBuilder("true").start();
+        Process ended = PortableProcess.exited(0);
         ended.waitFor();
         WarmProcess.write(state, new WarmProcess.Handle(ended.pid(), port, "watch"));
         WorkbenchSpeed.DirectAttempt result = WorkbenchSpeed.record(

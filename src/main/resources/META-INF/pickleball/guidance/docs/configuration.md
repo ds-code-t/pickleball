@@ -510,6 +510,8 @@ The bundled headless config uses `--headless=new`, a fixed `--window-size=1920,1
 
 `pkb_browser` is that configuration name, not a path to a browser binary. A normal `mvn test` uses the project value. Workbench keeps that project browser in the run workspace. `CHROME_HEADLESS` is used only when the project names none.
 
+Local Chrome and Edge also set `unhandledPromptBehavior` to `ignore` before `driver.capabilities` is applied. A project value in that map replaces it. The dialog then stays up until the scenario accepts or dismisses it. See `docs/dynamic-steps.md`.
+
 ## Local driver download
 
 Local Chrome and Edge start through Selenium. Remote WebDriver is unchanged. Bundled and consumer `CHROME_HEADLESS` configs set `driver.service.port` and `driver.service.verbose` and do not set `driver.service.driverExecutable`. Selenium Manager then resolves the driver. Behind a corporate proxy that child often cannot log in, trust a re-signed certificate, or reach `storage.googleapis.com`.

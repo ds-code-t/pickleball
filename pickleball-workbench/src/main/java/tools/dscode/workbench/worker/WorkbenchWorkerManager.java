@@ -17,6 +17,7 @@ import tools.dscode.workbench.terminal.WorkerLogFiles;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -319,7 +320,17 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
         command.add("--tags");
         command.add("@pickleball-workbench-anchor");
         command.add(anchorFeature.toAbsolutePath().normalize().toUri().toString());
+        try {
+            fitClasspath(command, anchorFeature.toAbsolutePath().normalize().resolveSibling("worker-classpath.args"));
+        } catch (IOException failure) {
+            throw new UncheckedIOException(failure);
+        }
         return List.copyOf(command);
+    }
+
+    /** A classpath that would exceed the Windows command-line limit moves into an argument file. */
+    private static void fitClasspath(List<String> command, Path file) throws IOException {
+        tools.dscode.control.protocol.speed.JavaArguments.fitClasspath(command, file);
     }
 
     /**
@@ -349,8 +360,9 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
         command.add(ControlProtocol.SEED_MAIN_CLASS);
         command.add("--project=" + project.toAbsolutePath().normalize());
         command.add("--run=" + parent.getFileName());
-        ProcessBuilder builder = new ProcessBuilder(command).directory(project.toFile());
         try {
+            fitClasspath(command, project.resolve(".pickleball").resolve("workbench").resolve("seed-classpath.args"));
+            ProcessBuilder builder = new ProcessBuilder(command).directory(project.toFile());
             Process process = builder.start();
             int exit = process.waitFor();
             if (exit != 0 || !Workspace.exists(workspace)) {

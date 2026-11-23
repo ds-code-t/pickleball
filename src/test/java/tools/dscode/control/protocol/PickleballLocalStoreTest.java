@@ -2,14 +2,17 @@ package tools.dscode.control.protocol;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.testsupport.PortableProcess;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -108,31 +111,11 @@ class PickleballLocalStoreTest {
         Files.writeString(cache, "\"/tmp/pickleball-oneshot.jar\"\n");
         Files.setLastModifiedTime(project.resolve("pom.xml"), FileTime.from(Instant.now().minusSeconds(60)));
         Path javaHome = tempDir.resolve("java-home");
-        Path bin = javaHome.resolve("bin");
-        Files.createDirectories(bin);
-        Files.writeString(bin.resolve("java"), """
-                #!/bin/sh
-                printf '%s\\n' "$@" > "$(dirname "$0")/recorded"
-                exit 0
-                """);
-        bin.resolve("java").toFile().setExecutable(true);
-        Path mvnw = project.resolve("mvnw");
-        Files.writeString(mvnw, """
-                #!/bin/sh
-                echo maven >> "$PWD/maven-ran"
-                exit 9
-                """);
-        mvnw.toFile().setExecutable(true);
-        Path script = project.resolve(".pickleball/open/pickleball-workbench.sh");
-        Files.writeString(script, PickleballLocalStore.unixOpenScript());
-        script.toFile().setExecutable(true);
+        Path bin = binWithJava(javaHome, 0);
+        writeMavenFake(project, false);
+        Path script = opener(project);
 
-        ProcessBuilder builder = new ProcessBuilder(script.toString(), "hint")
-                .directory(project.toFile())
-                .redirectErrorStream(true);
-        builder.environment().put("JAVA_HOME", javaHome.toString());
-        builder.environment().put("PATH", bin + ":" + builder.environment().getOrDefault("PATH", ""));
-        Process process = builder.start();
+        Process process = startOpener(script, project, javaHome, bin, "hint");
         String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
         int exit = process.waitFor();
         assertEquals(0, exit, output);
@@ -144,12 +127,7 @@ class PickleballLocalStoreTest {
         assertFalse(recorded.contains("mvnw"), recorded);
         assertFalse(Files.isRegularFile(project.resolve("maven-ran")), output);
 
-        ProcessBuilder discover = new ProcessBuilder(script.toString(), "discover", "--tags=@smoke")
-                .directory(project.toFile())
-                .redirectErrorStream(true);
-        discover.environment().put("JAVA_HOME", javaHome.toString());
-        discover.environment().put("PATH", bin + ":" + discover.environment().getOrDefault("PATH", ""));
-        Process discoverProcess = discover.start();
+        Process discoverProcess = startOpener(script, project, javaHome, bin, "discover", "--tags=@smoke");
         String discoverOut = new String(discoverProcess.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
         assertEquals(0, discoverProcess.waitFor(), discoverOut);
         String discovered = Files.readString(bin.resolve("recorded"));
@@ -157,12 +135,7 @@ class PickleballLocalStoreTest {
         assertTrue(discovered.contains("tools.dscode.launcher.PickleballWorkbenchLauncher"), discovered);
         assertFalse(discovered.contains(" ui "), discovered);
 
-        ProcessBuilder unknown = new ProcessBuilder(script.toString(), "not-a-verb")
-                .directory(project.toFile())
-                .redirectErrorStream(true);
-        unknown.environment().put("JAVA_HOME", javaHome.toString());
-        unknown.environment().put("PATH", bin + ":" + unknown.environment().getOrDefault("PATH", ""));
-        Process unknownProcess = unknown.start();
+        Process unknownProcess = startOpener(script, project, javaHome, bin, "not-a-verb");
         String unknownOut = new String(unknownProcess.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
         assertEquals(0, unknownProcess.waitFor(), unknownOut);
         String unknownRecorded = Files.readString(bin.resolve("recorded"));
@@ -170,12 +143,7 @@ class PickleballLocalStoreTest {
         assertTrue(unknownRecorded.contains("tools.dscode.launcher.PickleballWorkbenchLauncher"), unknownRecorded);
         assertFalse(unknownRecorded.lines().anyMatch("ui"::equals), unknownRecorded);
 
-        ProcessBuilder gui = new ProcessBuilder(script.toString())
-                .directory(project.toFile())
-                .redirectErrorStream(true);
-        gui.environment().put("JAVA_HOME", javaHome.toString());
-        gui.environment().put("PATH", bin + ":" + gui.environment().getOrDefault("PATH", ""));
-        Process guiProcess = gui.start();
+        Process guiProcess = startOpener(script, project, javaHome, bin);
         String guiOut = new String(guiProcess.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
         assertEquals(0, guiProcess.waitFor(), guiOut);
         String guiRecorded = Files.readString(bin.resolve("recorded"));
@@ -190,40 +158,10 @@ class PickleballLocalStoreTest {
         Files.writeString(project.resolve("pom.xml"), "<project/>\n");
         Files.write(project.resolve("pickleball-test.jar"), new byte[]{1, 2, 3});
         Path javaHome = tempDir.resolve("java-home-exit");
-        Path bin = javaHome.resolve("bin");
-        Files.createDirectories(bin);
-        Files.writeString(bin.resolve("java"), """
-                #!/bin/sh
-                printf '%s\\n' "$@" > "$(dirname "$0")/recorded"
-                exit 2
-                """);
-        bin.resolve("java").toFile().setExecutable(true);
-        Path mvnw = project.resolve("mvnw");
-        Files.writeString(mvnw, """
-                #!/bin/sh
-                echo "$@" >> "$PWD/mvn-args"
-                out=""
-                for arg in "$@"; do
-                  case "$arg" in
-                    -Dmdep.outputFile=*) out="${arg#-Dmdep.outputFile=}" ;;
-                  esac
-                done
-                if [ -n "$out" ]; then
-                  printf '%s\\n' "/tmp/pickleball-oneshot.jar" > "$out"
-                  exit 0
-                fi
-                exit 1
-                """);
-        mvnw.toFile().setExecutable(true);
-        Path script = project.resolve(".pickleball/open/pickleball-workbench.sh");
-        Files.writeString(script, PickleballLocalStore.unixOpenScript());
-        script.toFile().setExecutable(true);
-        ProcessBuilder builder = new ProcessBuilder(script.toString(), "not-a-verb")
-                .directory(project.toFile())
-                .redirectErrorStream(true);
-        builder.environment().put("JAVA_HOME", javaHome.toString());
-        builder.environment().put("PATH", bin + ":" + builder.environment().getOrDefault("PATH", ""));
-        Process process = builder.start();
+        Path bin = binWithJava(javaHome, 2);
+        writeMavenFake(project, true);
+        Path script = opener(project);
+        Process process = startOpener(script, project, javaHome, bin, "not-a-verb");
         String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
         assertEquals(2, process.waitFor(), output);
         String recorded = Files.readString(bin.resolve("recorded"));
@@ -314,6 +252,113 @@ class PickleballLocalStoreTest {
         assertTrue(err.toString(StandardCharsets.UTF_8).contains("export-guidance from Pickleball 9.9.9 is required"));
         assertEquals("2.0.0", PickleballLocalLayout.readCurrent(pickleball).orElseThrow().pickleballVersion());
         assertTrue(Files.isRegularFile(pickleball.resolve("v/2.0.0/AGENT-GUIDE.md")));
+    }
+
+    /**
+     * POSIX keeps a shell {@code java}. Windows does not create {@code java.exe}
+     * (a batch file with that name will not run). {@code java.cmd} is what
+     * {@code JAVA=java} finds on PATH when {@code JAVA_HOME\\bin\\java.exe} is absent.
+     */
+    private static Path binWithJava(Path javaHome, int exitCode) throws IOException {
+        Path bin = javaHome.resolve("bin");
+        Files.createDirectories(bin);
+        Path java = bin.resolve("java");
+        Files.writeString(java, """
+                #!/bin/sh
+                printf '%%s\\n' "$@" > "$(dirname "$0")/recorded"
+                exit %d
+                """.formatted(exitCode));
+        PortableProcess.markExecutable(java);
+        Files.writeString(bin.resolve("java.cmd"), """
+                @echo off
+                setlocal EnableExtensions
+                set "OUT=%%~dp0recorded"
+                if exist "%%OUT%%" del /q "%%OUT%%"
+                :loop
+                if "%%~1"=="" goto done
+                >>"%%OUT%%" echo(%%~1
+                shift /1
+                goto loop
+                :done
+                exit /b %d
+                """.formatted(exitCode));
+        return bin;
+    }
+
+    private static void writeMavenFake(Path project, boolean stale) throws IOException {
+        Path mvnw = project.resolve("mvnw");
+        if (stale) {
+            Files.writeString(mvnw, """
+                    #!/bin/sh
+                    echo "$@" >> "$PWD/mvn-args"
+                    out=""
+                    for arg in "$@"; do
+                      case "$arg" in
+                        -Dmdep.outputFile=*) out="${arg#-Dmdep.outputFile=}" ;;
+                      esac
+                    done
+                    if [ -n "$out" ]; then
+                      printf '%s\\n' "/tmp/pickleball-oneshot.jar" > "$out"
+                      exit 0
+                    fi
+                    exit 1
+                    """);
+            Files.writeString(project.resolve("mvnw.cmd"), """
+                    @echo off
+                    setlocal EnableExtensions EnableDelayedExpansion
+                    :loop
+                    if "%~1"=="" exit /b 1
+                    >>"%CD%\\mvn-args" echo(%~1
+                    set "ARG=%~1"
+                    if "!ARG:~0,18!"=="-Dmdep.outputFile=" (
+                      set "OUT=!ARG:~18!"
+                      >"!OUT!" echo(/tmp/pickleball-oneshot.jar
+                      exit /b 0
+                    )
+                    shift /1
+                    goto loop
+                    """);
+        } else {
+            Files.writeString(mvnw, """
+                    #!/bin/sh
+                    echo maven >> "$PWD/maven-ran"
+                    exit 9
+                    """);
+            Files.writeString(project.resolve("mvnw.cmd"), """
+                    @echo off
+                    echo maven>> "%CD%\\maven-ran"
+                    exit /b 9
+                    """);
+        }
+        PortableProcess.markExecutable(mvnw);
+    }
+
+    /** {@code pickleball-workbench.cmd} on Windows. The shell opener stays on POSIX. */
+    private static Path opener(Path project) throws IOException {
+        Path open = project.resolve(".pickleball/open");
+        Files.createDirectories(open);
+        if (PortableProcess.windows()) {
+            Path script = open.resolve("pickleball-workbench.cmd");
+            Files.writeString(script, PickleballLocalStore.cmdOpenScript());
+            return script;
+        }
+        Path script = open.resolve("pickleball-workbench.sh");
+        Files.writeString(script, PickleballLocalStore.unixOpenScript());
+        PortableProcess.markExecutable(script);
+        return script;
+    }
+
+    private static Process startOpener(Path script, Path project, Path javaHome, Path bin, String... args) throws IOException {
+        ArrayList<String> command = new ArrayList<>();
+        command.add(script.toString());
+        command.addAll(List.of(args));
+        ProcessBuilder builder = new ProcessBuilder(command)
+                .directory(project.toFile())
+                .redirectErrorStream(true);
+        builder.environment().put("JAVA_HOME", javaHome.toString());
+        String path = builder.environment().getOrDefault("PATH", "");
+        builder.environment().put("PATH", bin + java.io.File.pathSeparator + path);
+        return builder.start();
     }
 
     private static void writeComplete(Path pickleball, String version, String marker) throws Exception {

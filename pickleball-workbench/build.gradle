@@ -19,6 +19,14 @@ java {
     withJavadocJar()
 }
 
+sourceSets {
+    test {
+        java {
+            srcDir '../src/testSupport/java'
+        }
+    }
+}
+
 def mcpSdkVersion = '2.0.0'
 def javafxVersion = '21.0.6'
 def javafxModules = ['base', 'graphics', 'controls', 'swing', 'media', 'web']

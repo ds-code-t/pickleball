@@ -12,6 +12,7 @@ import tools.dscode.control.protocol.speed.ClasspathCache;
 import tools.dscode.control.protocol.speed.InputFingerprint;
 import tools.dscode.control.protocol.speed.WarmProcess;
 import tools.dscode.testengine.PKB_props;
+import tools.dscode.testsupport.PortableProcess;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
@@ -263,7 +264,7 @@ class WorkbenchLaunchOutputContractTest {
                     List.of(classes.toString())
             );
             ServerSocket server = new ServerSocket(0, 50, InetAddress.getLoopbackAddress());
-            Process sleeper = new ProcessBuilder("sleep", "60").start();
+            Process sleeper = PortableProcess.sleep(60);
             WarmProcess.write(
                     PickleballLocalLayout.workbenchStateRoot(project),
                     new WarmProcess.Handle(sleeper.pid(), server.getLocalPort(), InputFingerprint.watchHash(project))

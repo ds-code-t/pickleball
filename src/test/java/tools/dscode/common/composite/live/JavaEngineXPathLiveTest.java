@@ -112,22 +112,13 @@ class JavaEngineXPathLiveTest {
         return new ChromeDriver(options);
     }
 
+    /** Same lookup the live engine uses, including the Windows install path. */
     private static String chromeBinary() {
-        String pinned = System.getenv("DOMENGINE_CHROME");
-        if (pinned == null || pinned.isBlank()) pinned = System.getenv("CHROME_BIN");
+        String pinned = System.getenv("CHROME_BIN");
         if (pinned != null && !pinned.isBlank()) {
             Path file = Path.of(pinned.trim());
-            if (Files.isRegularFile(file) && Files.isExecutable(file)) return file.toString();
+            if (Files.isRegularFile(file)) return file.toString();
         }
-        String path = System.getenv("PATH");
-        if (path == null) return null;
-        for (String name : new String[] {"google-chrome", "google-chrome-stable", "chromium", "chrome"}) {
-            for (String entry : path.split(java.io.File.pathSeparator)) {
-                if (entry.isBlank()) continue;
-                Path file = Path.of(entry).resolve(name);
-                if (Files.isRegularFile(file) && Files.isExecutable(file)) return file.toString();
-            }
-        }
-        return null;
+        return dev.domengine.session.BrowserSession.findChrome();
     }
 }

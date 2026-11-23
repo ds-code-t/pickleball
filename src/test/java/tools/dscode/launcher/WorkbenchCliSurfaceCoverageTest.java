@@ -10,6 +10,7 @@ import tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner;
 import tools.dscode.control.protocol.SessionDescriptor;
 import tools.dscode.control.protocol.SessionDescriptorWriter;
 import tools.dscode.control.protocol.Workspace;
+import tools.dscode.testsupport.PortableProcess;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -117,7 +118,7 @@ class WorkbenchCliSurfaceCoverageTest {
         AtomicReference<WorkbenchSessionCommands.SessionLaunch> launch = new AtomicReference<>();
         Capture capture = session(command -> {
             launch.set(command);
-            return new ProcessBuilder("true").start();
+            return PortableProcess.exited(0);
         }, "isolate", temp.toString(), "--tags=@one", "--name=The one", "--runvar=pkb_environment=QA", "--run-id=iso-1");
         assertEquals(1, capture.code);
         assertTrue(capture.err.contains("exited before becoming healthy") || capture.err.contains("Session start failed"), capture.err);
@@ -141,7 +142,7 @@ class WorkbenchCliSurfaceCoverageTest {
         AtomicReference<WorkbenchSessionCommands.SessionLaunch> launch = new AtomicReference<>();
         Capture capture = session(command -> {
             launch.set(command);
-            return new ProcessBuilder("true").start();
+            return PortableProcess.exited(0);
         }, "session-start", temp.toString(), "--agent-id=ada", "--example=2");
         assertEquals(1, capture.code);
         assertEquals("2", launch.get().example());
@@ -475,10 +476,10 @@ class WorkbenchCliSurfaceCoverageTest {
 
     @Test
     void covers_command_execute_step() {
-        Capture usage = session((launch) -> new ProcessBuilder("true").start(), "execute-step", temp.toString());
+        Capture usage = session((launch) -> PortableProcess.exited(0), "execute-step", temp.toString());
         assertEquals(2, usage.code);
         assertTrue(usage.err.contains("Usage: execute-step"), usage.err);
-        Capture missing = session((launch) -> new ProcessBuilder("true").start(),
+        Capture missing = session((launch) -> PortableProcess.exited(0),
                 "execute-step", temp.toString(), "--text=Given a step", "--ack-only");
         assertEquals(1, missing.code);
         assertTrue(missing.err.contains("No healthy Workbench session"), missing.err);
@@ -486,14 +487,14 @@ class WorkbenchCliSurfaceCoverageTest {
 
     @Test
     void covers_command_status() {
-        Capture capture = session((launch) -> new ProcessBuilder("true").start(), "status", temp.toString());
+        Capture capture = session((launch) -> PortableProcess.exited(0), "status", temp.toString());
         assertEquals(1, capture.code);
         assertTrue(capture.err.contains("No healthy Workbench session"), capture.err);
     }
 
     @Test
     void covers_command_events() {
-        Capture capture = session((launch) -> new ProcessBuilder("true").start(), "events", temp.toString());
+        Capture capture = session((launch) -> PortableProcess.exited(0), "events", temp.toString());
         assertEquals(1, capture.code);
         assertTrue(capture.err.contains("No healthy Workbench session"), capture.err);
     }
@@ -501,7 +502,7 @@ class WorkbenchCliSurfaceCoverageTest {
     @Test
     void covers_command_stop() throws Exception {
         AgentCoordination.begin(temp, AgentCoordination.Request.of("stop-1", "ada", null, null, null, null, "isolate"));
-        Capture capture = session((launch) -> new ProcessBuilder("true").start(),
+        Capture capture = session((launch) -> PortableProcess.exited(0),
                 "stop", temp.toString(), "--run-id=stop-1", "--learned=user stop");
         assertEquals(0, capture.code, capture.err);
         assertTrue(capture.out.contains("already-stopped"), capture.out);
@@ -512,7 +513,7 @@ class WorkbenchCliSurfaceCoverageTest {
     @Test
     void covers_command_kill() throws Exception {
         AgentCoordination.begin(temp, AgentCoordination.Request.of("kill-1", "ada", null, null, null, null, "isolate"));
-        Capture capture = session((launch) -> new ProcessBuilder("true").start(),
+        Capture capture = session((launch) -> PortableProcess.exited(0),
                 "kill", temp.toString(), "--run-id=kill-1", "--force");
         assertEquals(0, capture.code, capture.err);
         assertTrue(capture.out.contains("already-stopped") || capture.out.contains("killed"), capture.out);
@@ -521,14 +522,14 @@ class WorkbenchCliSurfaceCoverageTest {
 
     @Test
     void covers_command_open_scenario() {
-        Capture capture = session((launch) -> new ProcessBuilder("true").start(), "open-scenario", temp.toString());
+        Capture capture = session((launch) -> PortableProcess.exited(0), "open-scenario", temp.toString());
         assertEquals(2, capture.code);
         assertTrue(capture.err.contains("Usage: open-scenario"), capture.err);
     }
 
     @Test
     void covers_command_example() {
-        Capture capture = session((launch) -> new ProcessBuilder("true").start(), "example", temp.toString());
+        Capture capture = session((launch) -> PortableProcess.exited(0), "example", temp.toString());
         assertEquals(2, capture.code);
         assertTrue(capture.err.contains("Usage: example"), capture.err);
     }
@@ -553,14 +554,14 @@ class WorkbenchCliSurfaceCoverageTest {
 
     @Test
     void covers_command_insert_step() {
-        Capture capture = session((launch) -> new ProcessBuilder("true").start(), "insert-step", temp.toString());
+        Capture capture = session((launch) -> PortableProcess.exited(0), "insert-step", temp.toString());
         assertEquals(2, capture.code);
         assertTrue(capture.err.contains("Usage: insert-step"), capture.err);
     }
 
     @Test
     void covers_command_update_step() {
-        Capture capture = session((launch) -> new ProcessBuilder("true").start(),
+        Capture capture = session((launch) -> PortableProcess.exited(0),
                 "update-step", temp.toString(), "--text=Given edited");
         assertEquals(1, capture.code);
         assertTrue(capture.err.contains("No healthy Workbench session"), capture.err);
@@ -568,7 +569,7 @@ class WorkbenchCliSurfaceCoverageTest {
 
     @Test
     void covers_command_diagnostic_run() {
-        Capture capture = session((launch) -> new ProcessBuilder("true").start(), "diagnostic-run", temp.toString());
+        Capture capture = session((launch) -> PortableProcess.exited(0), "diagnostic-run", temp.toString());
         assertEquals(2, capture.code);
         assertTrue(capture.err.contains("Usage: diagnostic-run"), capture.err);
     }
@@ -612,7 +613,7 @@ class WorkbenchCliSurfaceCoverageTest {
     @Test
     void covers_command_open_window() throws Exception {
         Capture usage = session(
-                (launch) -> new ProcessBuilder("true").start(),
+                (launch) -> PortableProcess.exited(0),
                 (WorkbenchSessionCommands.UiStarter) null,
                 "open-window", temp.toString()
         );
@@ -620,8 +621,8 @@ class WorkbenchCliSurfaceCoverageTest {
         assertTrue(usage.err.contains("--run-id"), usage.err);
         AgentCoordination.begin(temp, AgentCoordination.Request.of("win-1", "ada", null, null, null, null, "discover"));
         Capture capture = session(
-                (launch) -> new ProcessBuilder("true").start(),
-                (project, runId, agentId) -> new ProcessBuilder("true").start(),
+                (launch) -> PortableProcess.exited(0),
+                (project, runId, agentId) -> PortableProcess.exited(0),
                 "open-window", temp.toString(), "--run-id=win-1", "--agent=ada"
         );
         assertEquals(1, capture.code);
@@ -631,7 +632,7 @@ class WorkbenchCliSurfaceCoverageTest {
 
     @Test
     void covers_command_close_window() {
-        Capture capture = session((launch) -> new ProcessBuilder("true").start(), "close-window", temp.toString());
+        Capture capture = session((launch) -> PortableProcess.exited(0), "close-window", temp.toString());
         assertEquals(0, capture.code, capture.err);
         assertTrue(capture.out.contains("ACK WINDOW closed"));
         assertTrue(capture.out.contains("short log"));
@@ -639,10 +640,10 @@ class WorkbenchCliSurfaceCoverageTest {
 
     @Test
     void covers_command_show_run() throws Exception {
-        Capture missing = session((launch) -> new ProcessBuilder("true").start(), "show-run", temp.toString(), "--run-id=missing");
+        Capture missing = session((launch) -> PortableProcess.exited(0), "show-run", temp.toString(), "--run-id=missing");
         assertEquals(1, missing.code);
         AgentCoordination.begin(temp, AgentCoordination.Request.of("show-1", "ada", null, null, null, null, "discover"));
-        Capture capture = session((launch) -> new ProcessBuilder("true").start(), "show-run", temp.toString(), "--run-id=show-1");
+        Capture capture = session((launch) -> PortableProcess.exited(0), "show-run", temp.toString(), "--run-id=show-1");
         assertEquals(0, capture.code, capture.err + capture.out);
         assertTrue(capture.out.contains("ACK WINDOW shown"));
         assertTrue(capture.out.contains("read-only"));
@@ -715,7 +716,7 @@ class WorkbenchCliSurfaceCoverageTest {
         AtomicReference<WorkbenchSessionCommands.SessionLaunch> launch = new AtomicReference<>();
         Capture capture = session(command -> {
             launch.set(command);
-            return new ProcessBuilder("true").start();
+            return PortableProcess.exited(0);
         }, "isolate", temp.toString(), "--example=4");
         assertEquals(1, capture.code);
         assertEquals("4", launch.get().example());
@@ -1140,7 +1141,7 @@ class WorkbenchCliSurfaceCoverageTest {
         assertFalse(flags.wait);
         try (HeldSession held = HeldSession.open(temp)) {
             held.succeedAfter = false;
-            Capture capture = session((launch) -> new ProcessBuilder("true").start(),
+            Capture capture = session((launch) -> PortableProcess.exited(0),
                     "play", temp.toString(), "--ack-only");
             assertEquals(0, capture.code, capture.err + capture.out);
             assertTrue(capture.out.contains("ACK "), capture.out);
@@ -1157,7 +1158,7 @@ class WorkbenchCliSurfaceCoverageTest {
         assertTrue(flags.wait);
         try (HeldSession held = HeldSession.open(temp)) {
             held.succeedAfter = true;
-            Capture capture = session((launch) -> new ProcessBuilder("true").start(),
+            Capture capture = session((launch) -> PortableProcess.exited(0),
                     "pause", temp.toString(), "--wait");
             assertEquals(0, capture.code, capture.err + capture.out);
             assertTrue(capture.out.contains("DONE "), capture.out);
@@ -1173,7 +1174,7 @@ class WorkbenchCliSurfaceCoverageTest {
         );
         assertFalse(flags.wait);
         try (HeldSession held = HeldSession.open(temp)) {
-            Capture capture = session((launch) -> new ProcessBuilder("true").start(),
+            Capture capture = session((launch) -> PortableProcess.exited(0),
                     "refresh", temp.toString(), "--no-wait");
             assertEquals(0, capture.code, capture.err + capture.out);
             assertTrue(capture.out.contains("ACK "), capture.out);
@@ -1185,10 +1186,10 @@ class WorkbenchCliSurfaceCoverageTest {
     @Test
     void covers_flag_force() throws Exception {
         assertTrue(WorkbenchSessionCommands.SessionFlags.parse(new String[]{"kill", "--force"}).force);
-        Process sleep = new ProcessBuilder("sleep", "30").start();
+        Process sleep = PortableProcess.sleep(30);
         try (HeldSession held = HeldSession.open(temp)) {
             held.setPid(sleep.pid());
-            Capture capture = session((launch) -> new ProcessBuilder("true").start(),
+            Capture capture = session((launch) -> PortableProcess.exited(0),
                     "kill", temp.toString(), "--force");
             assertEquals(0, capture.code, capture.err + capture.out);
             assertTrue(capture.out.contains("ACK SESSION killed pid=" + sleep.pid()), capture.out);
@@ -1255,7 +1256,7 @@ class WorkbenchCliSurfaceCoverageTest {
         AtomicReference<WorkbenchSessionCommands.SessionLaunch> launch = new AtomicReference<>();
         session(command -> {
             launch.set(command);
-            return new ProcessBuilder("true").start();
+            return PortableProcess.exited(0);
         }, "isolate", temp.toString(), "--session-file=" + sessionFile, "--run-id=sf-1");
         assertEquals(sessionFile.toAbsolutePath().normalize(), launch.get().sessionFile().toAbsolutePath().normalize());
     }
@@ -1438,7 +1439,12 @@ class WorkbenchCliSurfaceCoverageTest {
         Path bat = gradle.resolve("gradlew.bat");
         Files.writeString(bat, "@echo off\r\n");
         List<String> gradleCommand = ConsumerMavenTestRunner.command(gradle, workspace, Map.of());
-        assertEquals(bat.toString(), gradleCommand.get(0), gradleCommand.toString());
+        if (PortableProcess.windows()) {
+            assertEquals(List.of("cmd.exe", "/d", "/c", bat.toString()), gradleCommand.subList(0, 4), gradleCommand.toString());
+        } else {
+            assertEquals(bat.toString(), gradleCommand.get(0), gradleCommand.toString());
+        }
+        assertEquals(1L, gradleCommand.stream().filter(item -> item.contains("caf\u00e9 build")).count(), gradleCommand.toString());
     }
 
     /** Plain text, a compact phrase, or the full file. A missing fact still fails. */
@@ -1501,7 +1507,7 @@ class WorkbenchCliSurfaceCoverageTest {
         full[0] = args[0];
         full[1] = temp.toString();
         if (args.length > 1) System.arraycopy(args, 1, full, 2, args.length - 1);
-        Capture capture = session((launch) -> new ProcessBuilder("true").start(), full);
+        Capture capture = session((launch) -> PortableProcess.exited(0), full);
         assertEquals(1, capture.code, capture.err);
         assertTrue(capture.err.contains("No healthy Workbench session"), capture.err);
     }
@@ -1689,7 +1695,7 @@ class WorkbenchCliSurfaceCoverageTest {
         );
         assertEquals("Then the \"Save\" button is visible", flags.text);
         try (HeldSession held = HeldSession.open(temp)) {
-            Capture capture = session((launch) -> new ProcessBuilder("true").start(),
+            Capture capture = session((launch) -> PortableProcess.exited(0),
                     "execute-step", temp.toString(), "--text-file=" + file, "--ack-only");
             assertEquals(0, capture.code, capture.err + capture.out);
             assertTrue(capture.out.contains("ACK "), capture.out);
@@ -1708,7 +1714,7 @@ class WorkbenchCliSurfaceCoverageTest {
         );
         assertEquals("Then the \"Save\" button is visible", flags.text);
         try (HeldSession held = HeldSession.open(temp)) {
-            Capture capture = session((launch) -> new ProcessBuilder("true").start(),
+            Capture capture = session((launch) -> PortableProcess.exited(0),
                     "execute-step", temp.toString(), "--text-b64=" + encoded, "--ack-only");
             assertEquals(0, capture.code, capture.err + capture.out);
             assertTrue(capture.out.contains("Then the \"Save\" button is visible"), capture.out);
@@ -1720,11 +1726,11 @@ class WorkbenchCliSurfaceCoverageTest {
     void covers_flag_hooks() throws Exception {
         assertTrue(WorkbenchSessionCommands.SessionFlags.parse(new String[]{"events", "--hooks"}).hooks);
         try (HeldSession ignored = HeldSession.open(temp)) {
-            Capture filtered = session((launch) -> new ProcessBuilder("true").start(), "events", temp.toString());
+            Capture filtered = session((launch) -> PortableProcess.exited(0), "events", temp.toString());
             assertEquals(0, filtered.code, filtered.err + filtered.out);
             assertTrue(filtered.out.contains("step Given stay"), filtered.out);
             assertFalse(filtered.out.contains("hook-only"), filtered.out);
-            Capture raw = session((launch) -> new ProcessBuilder("true").start(), "events", temp.toString(), "--hooks");
+            Capture raw = session((launch) -> PortableProcess.exited(0), "events", temp.toString(), "--hooks");
             assertEquals(0, raw.code, raw.err + raw.out);
             assertTrue(raw.out.contains("hook-only"), raw.out);
             assertTrue(raw.out.contains("elapsed-run-ms="), raw.out);
@@ -1774,7 +1780,7 @@ class WorkbenchCliSurfaceCoverageTest {
         }
         if (!ack) args.add("--ack-only");
         try (HeldSession held = HeldSession.open(temp)) {
-            Capture capture = session((launch) -> new ProcessBuilder("true").start(), args.toArray(String[]::new));
+            Capture capture = session((launch) -> PortableProcess.exited(0), args.toArray(String[]::new));
             assertEquals(0, capture.code, capture.err + capture.out);
             assertTrue(capture.out.contains("ACK "), capture.out);
             for (String needle : needles) {

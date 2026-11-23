@@ -1,5 +1,6 @@
 package tools.dscode.common.composite;
 
+import tools.dscode.testsupport.StdioFake;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.AfterEach;
@@ -13,10 +14,8 @@ import tools.dscode.common.seleniumextensions.ElementSnapshotScript;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.PosixFilePermission;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -161,74 +160,6 @@ class ContextNestGateTest {
     }
 
     private static Path stub(Path path, Path log, boolean gates) throws Exception {
-        String flags = gates ? "[\"within\", \"nesting\"]" : "[]";
-        String evalNodes = gates ? "\"one or many\"" : "None";
-        String script = """
-                #!/usr/bin/env python3
-                import json, sys
-                log = %s
-                flags = %s
-                eval_nodes = %s
-                def note(argv):
-                    with open(log, "a", encoding="utf-8") as handle:
-                        handle.write(" ".join(argv) + "\\n")
-                def node(node_id, text):
-                    return {
-                        "id": node_id,
-                        "node_name": "SPAN",
-                        "text": text,
-                        "attributes": {},
-                        "bounds": {"x": 1, "y": 2, "width": 10, "height": 8}
-                    }
-                for line in sys.stdin:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    req = json.loads(line)
-                    argv = req.get("argv") or []
-                    note(argv)
-                    text = " ".join(argv)
-                    if "version" in argv:
-                        payload = {"version": "2.9.0"}
-                    elif "capabilities" in argv:
-                        payload = {
-                            "ok": True,
-                            "actions": ["click", "type", "scroll", "eval"],
-                            "query_flags": flags,
-                            "eval_nodes": eval_nodes
-                        }
-                    elif "create" in argv:
-                        payload = {"ok": True, "id": "sess-1", "launched": False}
-                    elif argv and argv[0] == "eval":
-                        payload = {"ok": True, "kind": "eval", "values": [
-                            {"node_id": "main:1", "backend_node_id": 1, "value": {"tag": "div", "text": "a", "siblingIndex": 1, "sameTagIndex": 0, "stableSelector": "#a", "attributes": {}}},
-                            {"node_id": "main:2", "backend_node_id": 2, "value": {"tag": "div", "text": "b", "siblingIndex": 2, "sameTagIndex": 1, "stableSelector": "#b", "attributes": {}}}
-                        ]}
-                    elif argv and argv[0] == "query" and "--nesting" in argv:
-                        payload = {"ok": True, "nodes": [node("main:inner", "deep")]}
-                    elif argv and argv[0] == "query" and "--within" in argv:
-                        payload = {"ok": True, "nodes": [node("main:span", "inside")]}
-                    else:
-                        payload = {"ok": True}
-                    sys.stdout.write(json.dumps({
-                        "id": req.get("id"),
-                        "exit": 0,
-                        "stdout": json.dumps(payload) + "\\n",
-                        "stderr": ""
-                    }) + "\\n")
-                    sys.stdout.flush()
-                """.formatted(quote(log.toString()), flags, evalNodes);
-        Files.createDirectories(path.getParent());
-        Files.writeString(path, script);
-        Files.setPosixFilePermissions(path, Set.of(
-                PosixFilePermission.OWNER_READ,
-                PosixFilePermission.OWNER_WRITE,
-                PosixFilePermission.OWNER_EXECUTE
-        ));
-        return path;
-    }
-
-    private static String quote(String value) {
-        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+        return StdioFake.install(path, "nest", log.toString(), Boolean.toString(gates));
     }
 }

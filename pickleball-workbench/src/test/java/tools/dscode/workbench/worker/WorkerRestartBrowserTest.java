@@ -3,6 +3,8 @@ package tools.dscode.workbench.worker;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import tools.dscode.testsupport.PortableProcess;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -18,7 +20,7 @@ class WorkerRestartBrowserTest {
 
     @Test
     void stopKillsTheChildTreeAndEmitsBrowserLost() throws Exception {
-        Process process = new ProcessBuilder("sh", "-c", "sleep 60 & wait").redirectErrorStream(true).start();
+        Process process = PortableProcess.sleepTree(60);
         try {
             long child = awaitChild(process);
             AtomicBoolean quit = new AtomicBoolean();
@@ -36,7 +38,7 @@ class WorkerRestartBrowserTest {
     }
 
     private static long awaitChild(Process process) throws Exception {
-        long deadline = System.nanoTime() + Duration.ofSeconds(3).toNanos();
+        long deadline = System.nanoTime() + Duration.ofSeconds(15).toNanos();
         while (System.nanoTime() < deadline) {
             long child = process.descendants().mapToLong(ProcessHandle::pid).findFirst().orElse(-1);
             if (child > 0) return child;

@@ -4,7 +4,7 @@ First-read only. Detail: `docs/workbench-agent-detail.md`. Self-test: `docs/coll
 
 ## Tool chooser
 
-Workbench is the one front door. Do not open the GUI for your own testing. Stay headless. When a window is already open, only one agent is the one driver on their own run id. Agents are not daemons. Read short log `.pickleball/agent-log`. `mvnw` or `mvnw.cmd`. Do not require a machine-wide Maven or Gradle. Pure CLI. IDE MCP is not required.
+Workbench is the one front door. Do not open the GUI for your own testing. While testing for yourself, stay headless. When a window is already open, only one agent is the one driver on their own run id. Agents are not daemons. Read short log `.pickleball/agent-log`. `mvnw` or `mvnw.cmd`. Do not require a machine-wide Maven or Gradle. Pure CLI. IDE MCP is not required.
 
 ```text
 ./mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=discover"
@@ -12,7 +12,7 @@ Workbench is the one front door. Do not open the GUI for your own testing. Stay 
 
 only change `exec.args`: `-Dexec.args=discover`, `-Dexec.args=isolate`, `execute-step`, `confirm`.
 
-`start --url-key=URL.app --browser=chrome --headed --panel` opens Chrome (live-start is start; also `--url`, `--hold`, `--size`). Then `chat-turn --text=hi --until=human --timeout=120`, `act --query=Save --pick=1`, `ui-verify`, `doctor`. `call chat-send --args-file=args.json` uses `.pickleball/agent-controller.json`. `execute-steps --file=steps.json --stop-on-fail`. `watch --ref=s1.h1 --until=visible`. `chat_wait` ignores own messages unless `--from=any`. Else `error: no live browser`. `live-stop` leaves a worker. `export-guidance --warm`. `events --follow --until=text=`.
+`start --url-key=URL.app --browser=chrome --headed --panel` opens Chrome. Then `chat-turn --text=hi --until=human --timeout=120`, `act --query=Save --pick=1`, `ui-verify`, `doctor`. `call chat-send --args-file=args.json` uses `.pickleball/agent-controller.json`. `execute-steps --file=steps.json --stop-on-fail`. `watch --ref=s1.h1 --until=visible`. `chat_wait` ignores own messages unless `--from=any`. Else `error: no live browser`. `live-stop` leaves a worker. `export-guidance --warm`. `events --follow --until=text=`.
 
 ### Live isolation loop
 

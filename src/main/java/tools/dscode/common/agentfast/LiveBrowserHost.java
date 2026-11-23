@@ -360,9 +360,9 @@ public final class LiveBrowserHost {
             }
         }
         WebDriver page = PAGE.get();
-        if (page instanceof JavascriptExecutor js) {
+        if (page instanceof JavascriptExecutor) {
             try {
-                Object raw = js.executeScript("return document.querySelectorAll('[data-pkb-id]').length");
+                Object raw = tools.dscode.common.composite.ElementOperations.script(page, "return document.querySelectorAll('[data-pkb-id]').length");
                 if (raw instanceof Number number) placed = number.intValue();
             } catch (RuntimeException ignored) {
                 placed = 0;

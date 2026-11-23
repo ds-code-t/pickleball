@@ -2138,7 +2138,9 @@ public final class WorkbenchAgentCommands {
                 else if ("--arg".equals(token) && index + 1 < forwarded.length) extra.add(forwarded[++index]);
             }
         }
-        if (liveBridge.isPresent()) {
+        // selftest launches its own Chrome. Posting it to the start host swaps that
+        // host's page driver, so a later border lands on the bench instead of the page.
+        if (liveBridge.isPresent() && !"selftest".equals(command)) {
             long forwardStarted = System.nanoTime();
             long askedAt = System.currentTimeMillis();
             tools.dscode.common.agentfast.AgentForward.Posted posted = tools.dscode.common.agentfast.AgentForward.post(
