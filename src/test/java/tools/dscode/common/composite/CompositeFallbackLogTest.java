@@ -8,14 +8,14 @@ import org.openqa.selenium.remote.RemoteWebDriver;
 import org.openqa.selenium.remote.Response;
 import tools.dscode.common.reporting.diagnostic.DiagnosticRuntime;
 import tools.dscode.control.protocol.DirectControlProvider;
+import tools.dscode.testsupport.PortableProcess;
+import tools.dscode.testsupport.StdioFake;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.PosixFilePermission;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -80,7 +80,7 @@ class CompositeFallbackLogTest {
 
     @Test
     void clientFailureAndJoinFailureEachLogOnce() throws Exception {
-        Path dead = executable(temp.resolve("dead").resolve("composite"), "#!/bin/sh\nexit 0\n");
+        Path dead = PortableProcess.exitZero(temp.resolve("dead").resolve("composite"));
         ClassLoader empty = new ClassLoader(null) {
         };
         CompositeRuntime.use(
@@ -99,29 +99,7 @@ class CompositeFallbackLogTest {
         assertFalse(client.get(0).contains("engine=none"), client.toString());
 
         CompositeRuntime.resetForTests();
-        Path binary = executable(temp.resolve("join").resolve("composite"), """
-                #!/usr/bin/env python3
-                import json, sys
-                for line in sys.stdin:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    req = json.loads(line)
-                    argv = req.get("argv") or []
-                    if "version" in argv:
-                        exit_code = 0
-                        stdout = json.dumps({"version": "2.4.0"})
-                    else:
-                        exit_code = 1
-                        stdout = ""
-                    sys.stdout.write(json.dumps({
-                        "id": req.get("id"),
-                        "exit": exit_code,
-                        "stdout": stdout,
-                        "stderr": "join refused"
-                    }) + "\\n")
-                    sys.stdout.flush()
-                """);
+        Path binary = StdioFake.install(temp.resolve("join").resolve("composite"), "join-refused");
         CompositeRuntime.use(
                 temp.resolve("join-project"),
                 Map.of(DirectControlProvider.BIN_ENV, binary.toString(), "pkb_composite", "on"),
@@ -161,7 +139,7 @@ class CompositeFallbackLogTest {
 
     @Test
     void explicitCompositeBinLogsTheOverrideSource() throws Exception {
-        Path binary = executable(temp.resolve("explicit").resolve("composite"), "#!/bin/sh\nexit 0\n");
+        Path binary = PortableProcess.exitZero(temp.resolve("explicit").resolve("composite"));
         Path cwd = Path.of("").toAbsolutePath();
         String relative = cwd.relativize(binary.toAbsolutePath()).toString();
         CompositeBinaryLocator.locate(
@@ -202,16 +180,5 @@ class CompositeFallbackLogTest {
         return CompositeLog.linesForTests().stream()
                 .filter(line -> line.contains("composite.fallback") || line.startsWith("error:") || line.startsWith("fix:"))
                 .toList();
-    }
-
-    private static Path executable(Path path, String body) throws Exception {
-        Files.createDirectories(path.getParent());
-        Files.writeString(path, body);
-        Files.setPosixFilePermissions(path, Set.of(
-                PosixFilePermission.OWNER_READ,
-                PosixFilePermission.OWNER_WRITE,
-                PosixFilePermission.OWNER_EXECUTE
-        ));
-        return path;
     }
 }

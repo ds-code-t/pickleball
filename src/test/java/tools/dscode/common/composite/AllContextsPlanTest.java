@@ -1,5 +1,6 @@
 package tools.dscode.common.composite;
 
+import tools.dscode.testsupport.StdioFake;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -12,9 +13,7 @@ import tools.dscode.common.seleniumextensions.AllContextsScan;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.PosixFilePermission;
 import java.util.List;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -211,72 +210,6 @@ class AllContextsPlanTest {
     }
 
     private static Path stub(Path path, Path log) throws Exception {
-        String script = """
-                #!/usr/bin/env python3
-                import json, sys
-                log = %s
-                def note(argv):
-                    with open(log, "a", encoding="utf-8") as handle:
-                        handle.write(" ".join(argv) + "\\n")
-                body = {
-                    "count": 1,
-                    "nodes": [{
-                        "id": "child:4",
-                        "frame_id": "child",
-                        "element_id": "spin",
-                        "node_name": "DIV",
-                        "frame_depth": 1,
-                        "shadow_depth": 0,
-                        "displayed": True,
-                        "in_closed_shadow": False,
-                        "cross_origin": False,
-                        "attributes": {"id": "spin"}
-                    }],
-                    "context": {
-                        "depth_exceeded": False,
-                        "frame_capped": False,
-                        "frames": [
-                            {"id": "main", "parent": None, "name": "", "element_id": "", "depth": 0, "cross_origin": False, "is_main": True, "order": None, "index": 0},
-                            {"id": "child", "parent": "main", "name": "only", "element_id": "only", "depth": 1, "cross_origin": False, "is_main": False, "order": 0, "index": 0}
-                        ]
-                    }
-                }
-                for line in sys.stdin:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    req = json.loads(line)
-                    argv = req.get("argv") or []
-                    note(argv)
-                    if "version" in argv:
-                        payload = {"version": "2.7.0"}
-                    elif "capabilities" in argv:
-                        payload = {"ok": True, "desktop": ["list", "query", "close"], "actions": ["click", "type", "scroll"]}
-                    elif "create" in argv:
-                        payload = {"ok": True, "id": "sess-1", "launched": False}
-                    elif argv and argv[0] == "query":
-                        payload = body
-                    else:
-                        payload = {"ok": True}
-                    sys.stdout.write(json.dumps({
-                        "id": req.get("id"),
-                        "exit": 0,
-                        "stdout": json.dumps(payload) + "\\n",
-                        "stderr": ""
-                    }) + "\\n")
-                    sys.stdout.flush()
-                """.formatted(quote(log.toString()));
-        Files.createDirectories(path.getParent());
-        Files.writeString(path, script);
-        Files.setPosixFilePermissions(path, Set.of(
-                PosixFilePermission.OWNER_READ,
-                PosixFilePermission.OWNER_WRITE,
-                PosixFilePermission.OWNER_EXECUTE
-        ));
-        return path;
-    }
-
-    private static String quote(String value) {
-        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+        return StdioFake.install(path, "contexts", log.toString());
     }
 }

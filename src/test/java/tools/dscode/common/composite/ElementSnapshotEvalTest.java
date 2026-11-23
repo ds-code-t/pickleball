@@ -1,5 +1,6 @@
 package tools.dscode.common.composite;
 
+import tools.dscode.testsupport.StdioFake;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.domcomposite.Argv;
@@ -19,11 +20,9 @@ import tools.dscode.common.seleniumextensions.SeleniumSnapshotProducer;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.PosixFilePermission;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -152,81 +151,6 @@ class ElementSnapshotEvalTest {
     }
 
     private static Path stub(Path path, Path log, boolean eval) throws Exception {
-        String actions = eval
-                ? "[\"click\", \"type\", \"scroll\", \"submit\", \"key\", \"dblclick\", \"contextclick\", \"drag\", \"eval\"]"
-                : "[\"click\", \"type\", \"scroll\"]";
-        String script = """
-                #!/usr/bin/env python3
-                import json, sys
-                log = %s
-                def note(argv):
-                    with open(log, "a", encoding="utf-8") as handle:
-                        handle.write(" ".join(argv) + "\\n")
-                value = {
-                    "tag": "div",
-                    "text": "Hello",
-                    "value": "",
-                    "selectedValue": "sv",
-                    "attributes": {"id": "host"},
-                    "siblingIndex": 2,
-                    "sameTagIndex": 1,
-                    "stableSelector": "#host",
-                    "elementState": {
-                        "disabled": True,
-                        "blank": False,
-                        "required": False,
-                        "expanded": True,
-                        "attributeOn": False,
-                        "selectable": False,
-                        "domSelected": False
-                    }
-                }
-                for line in sys.stdin:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    req = json.loads(line)
-                    argv = req.get("argv") or []
-                    note(argv)
-                    if "version" in argv:
-                        body = {"version": "2.6.0"}
-                    elif "capabilities" in argv:
-                        body = {"ok": True, "desktop": ["list", "query", "close"], "actions": %s}
-                    elif "create" in argv:
-                        body = {"ok": True, "id": "sess-1", "launched": False}
-                    elif argv and argv[0] == "eval":
-                        body = {"ok": True, "kind": "eval", "backend_node_id": 12, "value": value}
-                    elif "query" in argv or "click" in argv:
-                        body = {"ok": True, "composite": [{
-                            "id": "main:12",
-                            "text": "Save",
-                            "role": "button",
-                            "bounds": {"x": 1, "y": 2, "width": 10, "height": 8},
-                            "attributes": {"id": "host"},
-                            "states": ["enabled"],
-                            "source": "Dom"
-                        }]}
-                    else:
-                        body = {"ok": True}
-                    sys.stdout.write(json.dumps({
-                        "id": req.get("id"),
-                        "exit": 0,
-                        "stdout": json.dumps(body) + "\\n",
-                        "stderr": ""
-                    }) + "\\n")
-                    sys.stdout.flush()
-                """.formatted(quote(log.toString()), actions);
-        Files.createDirectories(path.getParent());
-        Files.writeString(path, script);
-        Files.setPosixFilePermissions(path, Set.of(
-                PosixFilePermission.OWNER_READ,
-                PosixFilePermission.OWNER_WRITE,
-                PosixFilePermission.OWNER_EXECUTE
-        ));
-        return path;
-    }
-
-    private static String quote(String value) {
-        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+        return StdioFake.install(path, "snapshot", log.toString(), Boolean.toString(eval));
     }
 }

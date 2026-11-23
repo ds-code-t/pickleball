@@ -13,6 +13,7 @@ import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.remote.RemoteWebDriver;
 import org.openqa.selenium.remote.Response;
 import tools.dscode.common.composite.CompositeRuntime;
+import tools.dscode.testsupport.StdioFake;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -29,7 +30,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.nio.file.attribute.PosixFilePermission;
 import java.util.concurrent.TimeUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -707,45 +707,8 @@ class AgentLiveFixTest {
 
     @Test
     void aSecondBrowserKeepsItsOwnEngineSession() throws Exception {
-        Path binary = temp.resolve("composite");
         Path log = temp.resolve("stdio.log");
-        Files.writeString(binary, """
-                #!/usr/bin/env python3
-                import json, sys
-                log = open(%s, "a", encoding="utf-8")
-                for line in sys.stdin:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    req = json.loads(line)
-                    argv = req.get("argv") or []
-                    log.write(json.dumps(argv) + "\\n")
-                    log.flush()
-                    def flag(name):
-                        if name in argv:
-                            index = argv.index(name)
-                            if index + 1 < len(argv):
-                                return argv[index + 1]
-                        return ""
-                    if "version" in argv:
-                        body = {"version": "2.4.0"}
-                    elif len(argv) >= 2 and argv[0] == "session" and argv[1] == "create":
-                        body = {"ok": True, "id": flag("--id"), "cdp": flag("--cdp"), "launched": False}
-                    else:
-                        body = {"ok": True}
-                    sys.stdout.write(json.dumps({
-                        "id": req.get("id"),
-                        "exit": 0,
-                        "stdout": json.dumps(body),
-                        "stderr": ""
-                    }) + "\\n")
-                    sys.stdout.flush()
-                """.formatted(new ObjectMapper().writeValueAsString(log.toString())));
-        Files.setPosixFilePermissions(binary, Set.of(
-                PosixFilePermission.OWNER_READ,
-                PosixFilePermission.OWNER_WRITE,
-                PosixFilePermission.OWNER_EXECUTE
-        ));
+        Path binary = StdioFake.install(temp.resolve("composite"), "session", log.toString(), "none");
         try {
             CompositeRuntime.use(temp, Map.of("COMPOSITE_BIN", binary.toString(), "pkb_composite", "on"),
                     getClass().getClassLoader(), temp);
@@ -964,45 +927,8 @@ class AgentLiveFixTest {
 
     @Test
     void twoTabsOnOneBrowserKeepIndependentEngineSessions() throws Exception {
-        Path binary = temp.resolve("composite-tabs");
         Path log = temp.resolve("tabs.log");
-        Files.writeString(binary, """
-                #!/usr/bin/env python3
-                import json, sys
-                log = open(%s, "a", encoding="utf-8")
-                for line in sys.stdin:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    req = json.loads(line)
-                    argv = req.get("argv") or []
-                    log.write(json.dumps(argv) + "\\n")
-                    log.flush()
-                    def flag(name):
-                        if name in argv:
-                            index = argv.index(name)
-                            if index + 1 < len(argv):
-                                return argv[index + 1]
-                        return ""
-                    if "version" in argv:
-                        body = {"version": "2.4.0"}
-                    elif len(argv) >= 2 and argv[0] == "session" and argv[1] == "create":
-                        body = {"ok": True, "id": flag("--id"), "cdp": flag("--cdp"), "launched": False}
-                    else:
-                        body = {"ok": True}
-                    sys.stdout.write(json.dumps({
-                        "id": req.get("id"),
-                        "exit": 0,
-                        "stdout": json.dumps(body),
-                        "stderr": ""
-                    }) + "\\n")
-                    sys.stdout.flush()
-                """.formatted(new ObjectMapper().writeValueAsString(log.toString())));
-        Files.setPosixFilePermissions(binary, Set.of(
-                PosixFilePermission.OWNER_READ,
-                PosixFilePermission.OWNER_WRITE,
-                PosixFilePermission.OWNER_EXECUTE
-        ));
+        Path binary = StdioFake.install(temp.resolve("composite-tabs"), "session", log.toString(), "none");
         try {
             assertNotEquals(
                     dev.domcomposite.Client.cdpKey("ws://127.0.0.1:9222/devtools/page/AAA"),
@@ -2256,99 +2182,12 @@ class AgentLiveFixTest {
     }
 
     private static Path stdioBinary(Path binary, Path log, String rejectToken) throws IOException {
-        Files.writeString(binary, """
-                #!/usr/bin/env python3
-                import json, sys
-                log = open(%s, "a", encoding="utf-8")
-                reject = %s
-                for line in sys.stdin:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    req = json.loads(line)
-                    argv = req.get("argv") or []
-                    log.write(json.dumps(argv) + "\\n")
-                    log.flush()
-                    def flag(name):
-                        if name in argv:
-                            index = argv.index(name)
-                            if index + 1 < len(argv):
-                                return argv[index + 1]
-                        return ""
-                    exit_code = 0
-                    if "version" in argv:
-                        body = {"version": "2.4.0"}
-                    elif len(argv) >= 2 and argv[0] == "session" and argv[1] == "create":
-                        cdp = flag("--cdp")
-                        if reject and reject in cdp:
-                            exit_code = 1
-                            body = {"ok": False, "error": "page session refused"}
-                        else:
-                            body = {"ok": True, "id": flag("--id"), "cdp": cdp, "launched": False}
-                    else:
-                        body = {"ok": True}
-                    sys.stdout.write(json.dumps({
-                        "id": req.get("id"),
-                        "exit": exit_code,
-                        "stdout": json.dumps(body),
-                        "stderr": ""
-                    }) + "\\n")
-                    sys.stdout.flush()
-                """.formatted(new ObjectMapper().writeValueAsString(log.toString()), new ObjectMapper().writeValueAsString(rejectToken)));
-        Files.setPosixFilePermissions(binary, Set.of(
-                PosixFilePermission.OWNER_READ,
-                PosixFilePermission.OWNER_WRITE,
-                PosixFilePermission.OWNER_EXECUTE
-        ));
-        return binary;
+        return StdioFake.install(binary, "session", log.toString(), "token", rejectToken);
     }
 
     private static Path stdioBinary(Path binary, Path log, boolean rejectPageTargets) throws IOException {
-        Files.writeString(binary, """
-                #!/usr/bin/env python3
-                import json, sys
-                log = open(%s, "a", encoding="utf-8")
-                reject_pages = %s
-                for line in sys.stdin:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    req = json.loads(line)
-                    argv = req.get("argv") or []
-                    log.write(json.dumps(argv) + "\\n")
-                    log.flush()
-                    def flag(name):
-                        if name in argv:
-                            index = argv.index(name)
-                            if index + 1 < len(argv):
-                                return argv[index + 1]
-                        return ""
-                    exit_code = 0
-                    if "version" in argv:
-                        body = {"version": "2.4.0"}
-                    elif len(argv) >= 2 and argv[0] == "session" and argv[1] == "create":
-                        cdp = flag("--cdp")
-                        if reject_pages and "/devtools/page/" in cdp:
-                            exit_code = 1
-                            body = {"ok": False, "error": "page session refused"}
-                        else:
-                            body = {"ok": True, "id": flag("--id"), "cdp": cdp, "launched": False}
-                    else:
-                        body = {"ok": True}
-                    sys.stdout.write(json.dumps({
-                        "id": req.get("id"),
-                        "exit": exit_code,
-                        "stdout": json.dumps(body),
-                        "stderr": ""
-                    }) + "\\n")
-                    sys.stdout.flush()
-                """.formatted(new ObjectMapper().writeValueAsString(log.toString()), rejectPageTargets ? "True" : "False"));
-        Files.setPosixFilePermissions(binary, Set.of(
-                PosixFilePermission.OWNER_READ,
-                PosixFilePermission.OWNER_WRITE,
-                PosixFilePermission.OWNER_EXECUTE
-        ));
-        return binary;
+        String mode = rejectPageTargets ? "page" : "none";
+        return StdioFake.install(binary, "session", log.toString(), mode);
     }
 
     private static WebDriver closingTabs(AtomicReference<String> current, LinkedHashSet<String> tabs) {

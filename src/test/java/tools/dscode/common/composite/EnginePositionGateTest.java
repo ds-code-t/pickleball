@@ -1,5 +1,6 @@
 package tools.dscode.common.composite;
 
+import tools.dscode.testsupport.StdioFake;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.openqa.selenium.By;
@@ -12,9 +13,7 @@ import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.PosixFilePermission;
 import java.util.List;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -163,86 +162,6 @@ class EnginePositionGateTest {
     }
 
     private static Path stub(Path path, Path log, boolean nth) throws Exception {
-        String flags = nth
-                ? "[\"within\", \"nesting\", \"nth\", \"every\", \"count-only\"]"
-                : "[\"within\", \"nesting\"]";
-        String script = """
-                #!/usr/bin/env python3
-                import json, sys
-                log = %s
-                flags = %s
-                names = ["one", "two", "three", "four", "five"]
-                def note(argv):
-                    with open(log, "a", encoding="utf-8") as handle:
-                        handle.write(" ".join(argv) + "\\n")
-                def node(node_id, text):
-                    return {
-                        "id": node_id,
-                        "node_name": "SPAN",
-                        "text": text,
-                        "attributes": {},
-                        "bounds": {"x": 1, "y": 2, "width": 10, "height": 8}
-                    }
-                def flag(argv, name):
-                    if name not in argv:
-                        return None
-                    at = argv.index(name)
-                    return argv[at + 1] if at + 1 < len(argv) else None
-                for line in sys.stdin:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    req = json.loads(line)
-                    argv = req.get("argv") or []
-                    note(argv)
-                    if "version" in argv:
-                        payload = {"version": "2.10.0"}
-                    elif "capabilities" in argv:
-                        payload = {"ok": True, "actions": ["click", "type", "scroll", "eval"], "query_flags": flags, "eval_nodes": None}
-                    elif "create" in argv:
-                        payload = {"ok": True, "id": "sess-1", "launched": False}
-                    elif argv and argv[0] == "query":
-                        rows = [node("main:" + str(i + 1), name) for i, name in enumerate(names)]
-                        if "--count-only" in argv:
-                            payload = {"ok": True, "count": len(rows), "nodes": [], "count_only": True}
-                        else:
-                            nth = flag(argv, "--nth")
-                            every = flag(argv, "--every")
-                            if nth is not None:
-                                start = int(nth)
-                                if start < 0:
-                                    start = len(rows) + start
-                                step = int(every) if every is not None else None
-                                if start < 0 or start >= len(rows):
-                                    chosen = []
-                                elif step:
-                                    chosen = rows[start::step]
-                                else:
-                                    chosen = [rows[start]]
-                            else:
-                                chosen = rows
-                            payload = {"ok": True, "count": len(chosen), "nodes": chosen}
-                    else:
-                        payload = {"ok": True}
-                    sys.stdout.write(json.dumps({
-                        "id": req.get("id"),
-                        "exit": 0,
-                        "stdout": json.dumps(payload) + "\\n",
-                        "stderr": ""
-                    }) + "\\n")
-                    sys.stdout.flush()
-                """.formatted(quote(log.toString()), flags);
-        Files.createDirectories(path.getParent());
-        Files.writeString(path, script);
-        Files.setPosixFilePermissions(path, Set.of(
-                PosixFilePermission.OWNER_READ,
-                PosixFilePermission.OWNER_WRITE,
-                PosixFilePermission.OWNER_EXECUTE
-        ));
-        return path;
-    }
-
-    private static String quote(String value) {
-        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+        return StdioFake.install(path, "position", log.toString(), Boolean.toString(nth));
     }
 }

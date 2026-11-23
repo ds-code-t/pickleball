@@ -1,13 +1,12 @@
 package tools.dscode.common.composite;
 
+import tools.dscode.testsupport.StdioFake;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.PosixFilePermission;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -74,70 +73,6 @@ class CapabilityProbeTest {
     }
 
     private static Path stub(Path path, Path log, String version, String name, String fail) throws Exception {
-        String script = """
-                #!/usr/bin/env python3
-                import json, sys
-                log = %s
-                version = %s
-                name = %s
-                fail = %s
-                caps = 0
-                def note(argv):
-                    with open(log, "a", encoding="utf-8") as handle:
-                        handle.write(" ".join(argv) + "\\n")
-                hit = {"ok": True, "composite": [{
-                    "id": "main:1", "text": "Save", "role": "button",
-                    "bounds": {"x": 1, "y": 2, "width": 10, "height": 8},
-                    "attributes": {"id": "save"}, "states": ["enabled"], "source": "Desktop"
-                }]}
-                for line in sys.stdin:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    req = json.loads(line)
-                    argv = req.get("argv") or []
-                    note(argv)
-                    joined = " ".join(argv)
-                    if "version" in argv and "capabilities" not in argv:
-                        body = {"name": name, "version": version}
-                        exit_code = 0
-                        err = ""
-                    elif "capabilities" in argv:
-                        caps += 1
-                        if fail == "always" or caps == 1:
-                            body = None
-                            exit_code = 1
-                            err = json.dumps({"ok": False, "error": "boom", "code": "failed"})
-                        else:
-                            body = {"ok": True, "name": name, "version": version,
-                                    "desktop": ["list", "attach", "walk", "query", "resolve", "close", "click", "type"],
-                                    "actions": ["click", "type", "scroll", "hover"],
-                                    "query_flags": ["limit", "nth"]}
-                            exit_code = 0
-                            err = ""
-                    else:
-                        body = hit if "desktop" in argv else {"ok": True, "id": "sess-1", "launched": False}
-                        exit_code = 0
-                        err = ""
-                    sys.stdout.write(json.dumps({
-                        "id": req.get("id"),
-                        "exit": exit_code,
-                        "stdout": "" if body is None else json.dumps(body) + "\\n",
-                        "stderr": err
-                    }) + "\\n")
-                    sys.stdout.flush()
-                """.formatted(quote(log.toString()), quote(version), quote(name), quote(fail));
-        Files.createDirectories(path.getParent() == null ? Path.of(".") : path.getParent());
-        Files.writeString(path, script);
-        Files.setPosixFilePermissions(path, Set.of(
-                PosixFilePermission.OWNER_READ,
-                PosixFilePermission.OWNER_WRITE,
-                PosixFilePermission.OWNER_EXECUTE
-        ));
-        return path;
-    }
-
-    private static String quote(String value) {
-        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+        return StdioFake.install(path, "capability", log.toString(), version, name, fail);
     }
 }
