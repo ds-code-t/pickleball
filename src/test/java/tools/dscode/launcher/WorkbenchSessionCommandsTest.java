@@ -10,6 +10,7 @@ import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.Workspace;
+import tools.dscode.control.protocol.speed.ProcessTree;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -38,6 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 class WorkbenchSessionCommandsTest {
     @TempDir
@@ -259,14 +261,15 @@ class WorkbenchSessionCommandsTest {
     }
 
     @Test
-    @Timeout(value = 12, unit = TimeUnit.SECONDS)
+    @Timeout(value = 30, unit = TimeUnit.SECONDS)
     void sessionStartTimeoutKillsTheProcessTreeAndDeletesTheSessionFile() throws Exception {
         String property = SessionHealthWait.START_TIMEOUT_PROPERTY;
         String previous = System.getProperty(property);
         Path pidFile = project.resolve("orphan-child.pid");
-        AtomicReference<Process> child = new AtomicReference<>();
+        Process parent = startProcessTree(pidFile);
         AtomicReference<Path> sessionFile = new AtomicReference<>();
         try {
+            long grandchild = awaitPidFile(pidFile);
             System.setProperty(property, "1");
             seedWorkspace(project, "orphan-run");
             Output output = run(
@@ -277,10 +280,7 @@ class WorkbenchSessionCommandsTest {
                         Files.writeString(launch.sessionFile(), "{\"url\":\"http://127.0.0.1:9\",\"token\":\"t\",\"pid\":1}\n");
                         Files.createDirectories(launch.logFile().getParent());
                         Files.writeString(launch.logFile(), "progress stage=jvm\n");
-                        String script = "sleep 40 & echo $! > '" + pidFile.toAbsolutePath() + "'; wait";
-                        Process process = new ProcessBuilder("bash", "-c", script).start();
-                        child.set(process);
-                        return process;
+                        return parent;
                     }
             );
             assertEquals(1, output.exitCode, output.stderr + output.stdout);
@@ -288,19 +288,15 @@ class WorkbenchSessionCommandsTest {
             assertTrue(output.stderr.contains("fix:"), output.stderr);
             assertTrue(output.stderr.contains("stage=jvm"), output.stderr);
             assertTrue(output.stderr.contains("startup-timing:"), output.stderr);
-            Process parent = child.get();
-            assertNotNull(parent);
             assertFalse(parent.isAlive(), "parent still alive");
             assertTrue(Files.isRegularFile(pidFile), pidFile.toString());
-            long grandchild = Long.parseLong(Files.readString(pidFile).trim());
             assertFalse(ProcessHandle.of(grandchild).map(ProcessHandle::isAlive).orElse(false), "child still alive");
             assertFalse(Files.exists(sessionFile.get()), String.valueOf(sessionFile.get()));
             String log = Files.readString(AgentCoordination.logFile(project));
             assertTrue(log.contains("startup-timing"), log);
         } finally {
             restoreProperty(property, previous);
-            Process process = child.get();
-            if (process != null && process.isAlive()) process.destroyForcibly();
+            if (parent.isAlive()) ProcessTree.kill(parent.pid());
         }
     }
 
@@ -661,18 +657,12 @@ class WorkbenchSessionCommandsTest {
     }
 
     @Test
-    @Timeout(value = 15, unit = TimeUnit.SECONDS)
+    @Timeout(value = 40, unit = TimeUnit.SECONDS)
     void stopForceKillsTheProcessTreeAndRecordsStopped() throws Exception {
         Path childFile = project.resolve("child.pid");
-        Process parent = new ProcessBuilder(
-                "bash", "-c", "sleep 120 & echo $! > '" + childFile.toAbsolutePath() + "'; wait"
-        ).start();
+        Process parent = startProcessTree(childFile);
         try {
-            for (int attempt = 0; attempt < 50 && !Files.isRegularFile(childFile); attempt++) {
-                Thread.sleep(20);
-            }
-            assertTrue(Files.isRegularFile(childFile), "child pid was not published");
-            long child = Long.parseLong(Files.readString(childFile).trim());
+            long child = awaitPidFile(childFile);
             AgentCoordination.begin(
                     project,
                     AgentCoordination.Request.of("force-run", "agent", null, null, null, null, "stop"),
@@ -701,7 +691,7 @@ class WorkbenchSessionCommandsTest {
                 assertTrue(record.contains("STOPPED"), record);
             }
         } finally {
-            if (parent.isAlive()) parent.destroyForcibly();
+            if (parent.isAlive()) ProcessTree.kill(parent.pid());
         }
     }
 
@@ -1436,6 +1426,71 @@ class WorkbenchSessionCommandsTest {
             assertTrue(running.stdout.contains("status=idle"), running.stdout);
             assertTrue(running.stdout.contains("elapsed-step-ms=idle"), running.stdout);
         }
+    }
+
+    /**
+     * Java parent plus Java child. The parent writes the child pid. Bash and
+     * {@code sleep} do not publish that pid on Windows, so a tree kill cannot be observed.
+     */
+    private static Process startProcessTree(Path pidFile) throws IOException {
+        String java = javaBin();
+        Path source = pidFile.resolveSibling("TreeHold.java");
+        Files.writeString(source, treeHoldSource());
+        Path error = pidFile.resolveSibling("tree-hold.err");
+        return new ProcessBuilder(
+                java,
+                source.toAbsolutePath().normalize().toString(),
+                java,
+                source.toAbsolutePath().normalize().toString(),
+                pidFile.toAbsolutePath().normalize().toString()
+        ).redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                .redirectError(error.toFile())
+                .start();
+    }
+
+    private static long awaitPidFile(Path file) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
+        while (System.nanoTime() < deadline) {
+            if (Files.isRegularFile(file)) {
+                String raw = Files.readString(file).trim();
+                if (!raw.isEmpty()) {
+                    try {
+                        return Long.parseLong(raw);
+                    } catch (NumberFormatException ignored) {
+                        // The writer has not finished the line.
+                    }
+                }
+            }
+            Thread.sleep(50);
+        }
+        Path error = file.resolveSibling("tree-hold.err");
+        String detail = Files.isRegularFile(error) ? Files.readString(error) : "";
+        fail("child pid was not published " + detail);
+        return -1;
+    }
+
+    private static String treeHoldSource() {
+        return """
+                public class TreeHold {
+                  public static void main(String[] args) throws Exception {
+                    if (args.length > 3 && "child".equals(args[3])) {
+                      Thread.sleep(Long.MAX_VALUE);
+                      return;
+                    }
+                    Process child = new ProcessBuilder(args[0], args[1], args[0], args[1], args[2], "child")
+                        .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                        .redirectError(ProcessBuilder.Redirect.DISCARD)
+                        .start();
+                    java.nio.file.Files.writeString(java.nio.file.Path.of(args[2]), Long.toString(child.pid()));
+                    Thread.sleep(Long.MAX_VALUE);
+                  }
+                }
+                """;
+    }
+
+    private static String javaBin() {
+        boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
+        return Path.of(System.getProperty("java.home"), "bin", windows ? "java.exe" : "java").toString();
     }
 
     /**

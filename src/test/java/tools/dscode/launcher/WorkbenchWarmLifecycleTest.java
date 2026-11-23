@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.control.protocol.PickleballLocalLayout;
+import tools.dscode.control.protocol.speed.ProcessTree;
 import tools.dscode.control.protocol.speed.WarmProcess;
 
 import java.io.ByteArrayOutputStream;
@@ -76,13 +77,13 @@ class WorkbenchWarmLifecycleTest {
         Path state = state();
         Process warm = startWarm(state, ProcessHandle.current().pid(), 900);
         try {
-            List<ProcessHandle> children = awaitTree(warm.pid());
+            List<ProcessHandle> children = awaitTree(state, warm.pid());
             assertTrue(Files.isRegularFile(WarmProcess.file(state)));
             assertEquals(warm.pid(), WarmProcess.rememberedPid(state));
             Files.delete(WarmProcess.file(state));
             awaitDead(warm.pid(), children);
         } finally {
-            warm.destroyForcibly();
+            stopWarm(warm, state);
         }
     }
 
@@ -110,7 +111,7 @@ class WorkbenchWarmLifecycleTest {
         Path state = state();
         Process warm = startWarm(state, ProcessHandle.current().pid(), 900);
         try {
-            List<ProcessHandle> children = awaitTree(warm.pid());
+            List<ProcessHandle> children = awaitTree(state, warm.pid());
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             ByteArrayOutputStream err = new ByteArrayOutputStream();
             int code = WorkbenchSessionCommands.run(
@@ -126,7 +127,7 @@ class WorkbenchWarmLifecycleTest {
             awaitDead(warm.pid(), children);
             assertFalse(Files.isRegularFile(WarmProcess.file(state)));
         } finally {
-            warm.destroyForcibly();
+            stopWarm(warm, state);
         }
     }
 
@@ -136,11 +137,11 @@ class WorkbenchWarmLifecycleTest {
         Path state = state();
         Process warm = startWarm(state, ProcessHandle.current().pid(), 2);
         try {
-            List<ProcessHandle> children = awaitTree(warm.pid());
+            List<ProcessHandle> children = awaitTree(state, warm.pid());
             awaitDead(warm.pid(), children);
             assertFalse(Files.isRegularFile(WarmProcess.file(state)));
         } finally {
-            warm.destroyForcibly();
+            stopWarm(warm, state);
         }
     }
 
@@ -151,7 +152,7 @@ class WorkbenchWarmLifecycleTest {
         Process warm = startWarm(state, 0, 900);
         Process cli = null;
         try {
-            List<ProcessHandle> children = awaitTree(warm.pid());
+            List<ProcessHandle> children = awaitTree(state, warm.pid());
             cli = startHold(state);
             awaitAlive(cli.pid());
             cli.destroyForcibly();
@@ -173,7 +174,7 @@ class WorkbenchWarmLifecycleTest {
             assertFalse(Files.isRegularFile(WarmProcess.file(state)));
         } finally {
             if (cli != null) cli.destroyForcibly();
-            warm.destroyForcibly();
+            stopWarm(warm, state);
         }
     }
 
@@ -186,7 +187,7 @@ class WorkbenchWarmLifecycleTest {
         try {
             awaitAlive(owner.pid());
             warm = startWarm(state, 0, 900);
-            List<ProcessHandle> children = awaitTree(warm.pid());
+            List<ProcessHandle> children = awaitTree(state, warm.pid());
             WarmProcess.claim(state, owner.pid());
             assertEquals(owner.pid(), WarmProcess.liveOwner(state));
             owner.destroyForcibly();
@@ -195,7 +196,7 @@ class WorkbenchWarmLifecycleTest {
             assertFalse(Files.isRegularFile(WarmProcess.file(state)));
         } finally {
             owner.destroyForcibly();
-            if (warm != null) warm.destroyForcibly();
+            stopWarm(warm, state);
             WarmProcess.deleteOwner(state);
         }
     }
@@ -209,14 +210,14 @@ class WorkbenchWarmLifecycleTest {
         try {
             awaitAlive(parent.pid());
             warm = startWarm(state, parent.pid(), 900);
-            List<ProcessHandle> children = awaitTree(warm.pid());
+            List<ProcessHandle> children = awaitTree(state, warm.pid());
             parent.destroyForcibly();
             assertTrue(parent.waitFor(10, TimeUnit.SECONDS));
             awaitDead(warm.pid(), children);
             assertFalse(Files.isRegularFile(WarmProcess.file(state)));
         } finally {
             parent.destroyForcibly();
-            if (warm != null) warm.destroyForcibly();
+            stopWarm(warm, state);
         }
     }
 
@@ -226,7 +227,7 @@ class WorkbenchWarmLifecycleTest {
         Path state = state();
         Process warm = startWarm(state, ProcessHandle.current().pid(), 900);
         try {
-            List<ProcessHandle> children = awaitTree(warm.pid());
+            List<ProcessHandle> children = awaitTree(state, warm.pid());
             WorkbenchSessionCommandsTest.seedWorkspace(project, "warm-died");
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             ByteArrayOutputStream err = new ByteArrayOutputStream();
@@ -240,7 +241,7 @@ class WorkbenchWarmLifecycleTest {
             awaitDead(warm.pid(), children);
             assertFalse(Files.isRegularFile(WarmProcess.file(state)));
         } finally {
-            warm.destroyForcibly();
+            stopWarm(warm, state);
         }
     }
 
@@ -254,7 +255,7 @@ class WorkbenchWarmLifecycleTest {
         AtomicReference<Process> session = new AtomicReference<>();
         Process warm = startWarm(state, ProcessHandle.current().pid(), 900);
         try {
-            List<ProcessHandle> children = awaitTree(warm.pid());
+            List<ProcessHandle> children = awaitTree(state, warm.pid());
             WorkbenchSessionCommandsTest.seedWorkspace(project, "warm-timeout");
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             ByteArrayOutputStream err = new ByteArrayOutputStream();
@@ -276,8 +277,30 @@ class WorkbenchWarmLifecycleTest {
             else System.setProperty(property, previous);
             Process hold = session.get();
             if (hold != null) hold.destroyForcibly();
-            warm.destroyForcibly();
+            stopWarm(warm, state);
         }
+    }
+
+    /** Ends a warm JVM and waits until its stderr redirect can be removed. */
+    private static void stopWarm(Process warm, Path state) throws Exception {
+        if (warm != null && warm.isAlive()) {
+            ProcessTree.kill(warm.pid());
+            warm.waitFor(5, TimeUnit.SECONDS);
+        }
+        if (state == null) return;
+        Path log = state.resolve("warm-test.log");
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        IOException last = null;
+        while (System.nanoTime() < deadline) {
+            try {
+                Files.deleteIfExists(log);
+                return;
+            } catch (IOException failure) {
+                last = failure;
+                Thread.sleep(50);
+            }
+        }
+        throw new IOException("warm stderr redirect stayed locked: " + log, last);
     }
 
     private Path state() throws IOException {
@@ -343,17 +366,38 @@ class WorkbenchWarmLifecycleTest {
         return Path.of(System.getProperty("java.home"), "bin", windows ? "java.exe" : "java").toString();
     }
 
-    private static List<ProcessHandle> awaitTree(long pid) throws Exception {
+    private static List<ProcessHandle> awaitTree(Path state, long pid) throws Exception {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
         while (System.nanoTime() < deadline) {
-            if (WarmProcess.alive(pid)) {
+            if (WarmProcess.alive(pid) && Files.isRegularFile(WarmProcess.file(state))) {
                 List<ProcessHandle> children = descendants(pid);
                 if (!children.isEmpty()) return children;
             }
             Thread.sleep(50);
         }
-        fail("warm pid " + pid + " did not start a child; alive=" + WarmProcess.alive(pid));
+        String listing = directoryListing(state);
+        String log = warmLog(state);
+        fail("warm pid " + pid + " did not publish a handle and a child; alive="
+                + WarmProcess.alive(pid) + " files=" + listing + " log=" + log);
         return List.of();
+    }
+
+    private static String directoryListing(Path state) {
+        try (var stream = Files.list(state)) {
+            return stream.map(path -> path.getFileName().toString()).toList().toString();
+        } catch (IOException failure) {
+            return failure.getMessage();
+        }
+    }
+
+    private static String warmLog(Path state) {
+        Path log = state.resolve("warm-test.log");
+        if (!Files.isRegularFile(log)) return "";
+        try {
+            return Files.readString(log);
+        } catch (IOException failure) {
+            return failure.getMessage();
+        }
     }
 
     private static void awaitAlive(long pid) throws Exception {
