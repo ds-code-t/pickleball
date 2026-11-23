@@ -732,6 +732,15 @@ final class PageSurfaces {
         return raw.toString();
     }
 
+    /**
+     * Lines already on disk. Does not drain the live page, so a poll that starts at now
+     * can return the events that drain writes and still hide rows that were already stored.
+     */
+    static int storedInputCount(Path project, String runId) throws IOException {
+        Path file = AgentStore.root(project, runId).resolve("overlay-events.jsonl");
+        return AgentStore.readGroup(file).size();
+    }
+
     /** Events after the first {@code after} stored events. The cursor is the stored event count. */
     static List<Map<String, Object>> pollInput(Path project, String runId, int after) throws IOException {
         List<Map<String, Object>> all = pollInput(project, runId);

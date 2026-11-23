@@ -224,7 +224,7 @@ final class UiBatch {
         } else {
             int stored = 0;
             try {
-                stored = PageSurfaces.pollInput(project, runId).size();
+                stored = PageSurfaces.storedInputCount(project, runId);
             } catch (RuntimeException failure) {
                 if (!pageGone(failure.getMessage())) throw failure;
             }
