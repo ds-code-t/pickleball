@@ -4,6 +4,9 @@ import org.openqa.selenium.Alert;
 import org.openqa.selenium.NoAlertPresentException;
 import org.openqa.selenium.WebDriver;
 
+import java.lang.reflect.Method;
+import java.util.Map;
+
 /**
  * Browser-level alert utilities.
  *
@@ -28,11 +31,13 @@ public final class BrowserAlerts {
 
     /**
      * Accepts the currently displayed alert.
+     * Selenium's alert is tried first. When that call fails while a dialog still
+     * blocks the page, the driver's own connection runs {@code Page.handleJavaScriptDialog}.
      *
      * @throws NoAlertPresentException if no alert is present
      */
     public static void accept(WebDriver driver) {
-        getAlert(driver).accept();
+        handle(driver, true);
     }
 
     /**
@@ -41,7 +46,52 @@ public final class BrowserAlerts {
      * @throws NoAlertPresentException if no alert is present
      */
     public static void dismiss(WebDriver driver) {
-        getAlert(driver).dismiss();
+        handle(driver, false);
+    }
+
+    /**
+     * A JavaScript dialog is open. A null alert is not open.
+     * Callers use this to avoid {@code Runtime.addBinding} and page scripts
+     * while Chrome will not answer the page socket.
+     */
+    public static boolean isPresent(WebDriver driver) {
+        if (driver == null) return false;
+        try {
+            return driver.switchTo().alert() != null;
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    private static void handle(WebDriver driver, boolean accept) {
+        RuntimeException seleniumFailure = null;
+        try {
+            Alert alert = driver.switchTo().alert();
+            if (alert == null) throw new NoAlertPresentException("no alert");
+            if (accept) alert.accept();
+            else alert.dismiss();
+            return;
+        } catch (RuntimeException failure) {
+            seleniumFailure = failure;
+        }
+        if (handleJavaScriptDialog(driver, accept)) return;
+        if (seleniumFailure instanceof NoAlertPresentException missing) throw missing;
+        throw seleniumFailure;
+    }
+
+    /**
+     * Chromedriver's connection, not Pickleball's page socket.
+     * Returns false when this driver has no CDP command or the command fails.
+     */
+    static boolean handleJavaScriptDialog(WebDriver driver, boolean accept) {
+        if (driver == null) return false;
+        try {
+            Method method = driver.getClass().getMethod("executeCdpCommand", String.class, Map.class);
+            method.invoke(driver, "Page.handleJavaScriptDialog", Map.of("accept", accept));
+            return true;
+        } catch (ReflectiveOperationException failure) {
+            return false;
+        }
     }
 
     /**
@@ -89,18 +139,4 @@ public final class BrowserAlerts {
         return text;
     }
 
-    /**
-     * Checks whether an alert is currently present.
-     */
-    public static boolean isPresent(WebDriver driver) {
-        if (driver == null)
-            return false;
-
-        try {
-            driver.switchTo().alert();
-            return true;
-        } catch (RuntimeException e) {
-            return false;
-        }
-    }
 }

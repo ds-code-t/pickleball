@@ -152,6 +152,8 @@ Examples:
 * , accept the Alert
 ```
 
+An `alert`, `confirm`, or `prompt` stays open until `accept` or `dismiss`. Local Chrome and Edge start with `unhandledPromptBehavior` set to `ignore` unless `driver.capabilities` already sets that key. A loading-mask check does not run a script while the dialog is open, and `Runtime.addBinding` is not sent on the page socket until the dialog is handled. Accept and dismiss use the Selenium alert first. When that call cannot see the dialog, they send `Page.handleJavaScriptDialog` on the driver connection. There is still no phrase that types into a prompt.
+
 `navigate to:` loads the resolved URL once. A second call is a second navigation. The text is a config key first, as in `URL.forms`. When that lookup is not a URL string, a literal `http://` or `https://` value is used, including a value a placeholder already resolved to. A missing key that is not a URL still fails. An existing `URL.xxx` key is unchanged.
 
 A phrase that is only `false` is a truthiness check: `IF: false` does not take the branch. `is false` is the falsy assertion, and `is true` is the truthy assertion. `is on` and `is off` check a control. Keep each comparison in its own phrase; do not combine it with another operator.

@@ -24,7 +24,7 @@ Feature: Internal Pickleball Java checks
   Scenario: Run Step Override checks
     * RUN STEP OVERRIDE JAVA TESTS
 
-  @all @regression @internal-java-checks @diagnostic-reporting
+  @all @regression @internal-java-checks @diagnostic-reporting @winreg
   Scenario: Run diagnostic reporting checks
     * RUN DIAGNOSTIC REPORTING JAVA TESTS
 

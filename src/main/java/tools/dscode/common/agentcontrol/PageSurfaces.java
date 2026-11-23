@@ -1210,7 +1210,7 @@ final class PageSurfaces {
     }
 
     private static Hide hideOn(WebDriver web) {
-        if (web == null || absent(web, null) || !cdpCapable(web)) return Hide.SKIPPED;
+        if (web == null || dialogOpen(web) || absent(web, null) || !cdpCapable(web)) return Hide.SKIPPED;
         try {
             BrowserFacade facade = directPage(web);
             if (facade != null && !"cdp".equals(facade.protocol())) return Hide.SKIPPED;
@@ -1348,6 +1348,11 @@ final class PageSurfaces {
         return new double[]{minX, minY, Math.max(0, maxX - minX), Math.max(0, maxY - minY)};
     }
 
+    /** True while a JavaScript dialog is up. The page socket must not take {@code Runtime.addBinding}. */
+    private static boolean dialogOpen(WebDriver web) {
+        return tools.dscode.common.browseroperations.BrowserAlerts.isPresent(web);
+    }
+
     private static boolean cdpCapable(WebDriver web) {
         if (web == null) return false;
         if (web instanceof ChromiumDriver) return true;
@@ -1360,6 +1365,11 @@ final class PageSurfaces {
     }
 
     private static Object cdp(WebDriver web, String method, Map<String, Object> params) {
+        if (dialogOpen(web)) {
+            throw new IllegalStateException(
+                    "error: a JavaScript dialog is open.\n"
+                            + "fix: accept or dismiss the dialog before a CDP call.");
+        }
         BrowserFacade facade = directPage(web);
         if (facade != null) return facade.send(method, params);
         return seleniumCdp(web, method, params);
@@ -1388,6 +1398,11 @@ final class PageSurfaces {
     }
 
     private static Object evaluateHelper(WebDriver web, JavascriptExecutor executor, Map<String, Object> spec) {
+        if (dialogOpen(web)) {
+            throw new IllegalStateException(
+                    "error: a JavaScript dialog is open.\n"
+                            + "fix: accept or dismiss the dialog before a page script or Runtime.addBinding.");
+        }
         BrowserFacade facade = directPage(web);
         if (facade != null) {
             installSurface(web, facade);
@@ -1463,6 +1478,7 @@ final class PageSurfaces {
             throw new IllegalStateException(failure);
         }
         int key = System.identityHashCode(web);
+        if (dialogOpen(web)) return null;
         BrowserFacade facade = directPage(web);
         if (facade != null) {
             installSurface(web, facade);
@@ -1696,6 +1712,7 @@ final class PageSurfaces {
     }
 
     private static void installSurface(WebDriver web, BrowserFacade facade) {
+        if (dialogOpen(web)) return;
         if (!SURFACE_PROTOCOL.add(System.identityHashCode(web))) return;
         // Same world as the helper, so one set of listeners queues events where drainIsolated reads them.
         facade.addPreloadIn(SurfaceAssets.js("html"), "pkb-surface");
@@ -1750,7 +1767,7 @@ final class PageSurfaces {
     }
 
     private static BrowserFacade direct(WebDriver web) {
-        if (web == null) return null;
+        if (web == null || dialogOpen(web)) return null;
         int key = System.identityHashCode(web);
         BrowserFacade cached = FACADES.get(key);
         if (cached != null) {

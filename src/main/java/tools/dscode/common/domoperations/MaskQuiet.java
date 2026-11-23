@@ -117,9 +117,9 @@ public final class MaskQuiet {
 
     /** Waits until the covering mask is gone, or until {@code timeoutMs} ends. A miss is not a wait. */
     public static Wait await(WebDriver driver, WebElement element, long timeoutMs) {
-        if (!(driver instanceof JavascriptExecutor js) || element == null) return new Wait(0, false);
+        if (!(driver instanceof JavascriptExecutor) || element == null) return new Wait(0, false);
         long start = System.nanoTime();
-        if (!covers(driver, js, element)) return new Wait(0, false);
+        if (!covers(driver, element)) return new Wait(0, false);
         long deadline = start + TimeUnit.MILLISECONDS.toNanos(Math.max(0, timeoutMs));
         while (true) {
             if (System.nanoTime() >= deadline) return new Wait(elapsed(start), false);
@@ -129,7 +129,7 @@ public final class MaskQuiet {
                 Thread.currentThread().interrupt();
                 return new Wait(elapsed(start), false);
             }
-            if (!covers(driver, js, element)) return new Wait(Math.max(1, elapsed(start)), true);
+            if (!covers(driver, element)) return new Wait(Math.max(1, elapsed(start)), true);
         }
     }
 
@@ -145,7 +145,10 @@ public final class MaskQuiet {
         }
     }
 
-    private static boolean covers(WebDriver driver, JavascriptExecutor js, WebElement element) {
+    private static boolean covers(WebDriver driver, WebElement element) {
+        // A script while alert() is open is a page command. Chrome dismisses the dialog
+        // unless unhandledPromptBehavior is ignore, and either way the mask check must not run.
+        if (tools.dscode.common.browseroperations.BrowserAlerts.isPresent(driver)) return false;
         Duration previous = null;
         try {
             previous = driver.manage().timeouts().getScriptTimeout();
@@ -158,7 +161,7 @@ public final class MaskQuiet {
             // The script call still has to return on its own.
         }
         try {
-            Object raw = js.executeScript(COVERS, element);
+            Object raw = tools.dscode.common.composite.ElementOperations.script(driver, COVERS, element);
             return Boolean.TRUE.equals(raw) || "true".equalsIgnoreCase(String.valueOf(raw));
         } catch (RuntimeException failure) {
             return false;

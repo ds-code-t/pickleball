@@ -359,6 +359,7 @@ public final class DriverConstruction {
         ChromeOptions options = new ChromeOptions();
 
         ObjectNode capabilities = getObject(driverConfig, "capabilities");
+        leaveJavaScriptDialogsOpen(options);
 
         applyCapabilitiesExcept(options, capabilities, Set.of(CHROME_OPTIONS_CAPABILITY));
         applyChromiumOptions(
@@ -380,6 +381,7 @@ public final class DriverConstruction {
         EdgeOptions options = new EdgeOptions();
 
         ObjectNode capabilities = getObject(driverConfig, "capabilities");
+        leaveJavaScriptDialogsOpen(options);
 
         applyCapabilitiesExcept(options, capabilities, Set.of(EDGE_OPTIONS_CAPABILITY));
         applyChromiumOptions(
@@ -395,6 +397,16 @@ public final class DriverConstruction {
             applyDebugPort(options, "edge", fullConfiguration);
         }
         return options;
+    }
+
+    /**
+     * Chrome and Edge leave an {@code alert}, {@code confirm}, or {@code prompt} open.
+     * Set before {@code driver.capabilities} so a project value replaces this default.
+     */
+    public static final String UNHANDLED_PROMPT = "unhandledPromptBehavior";
+
+    private static void leaveJavaScriptDialogsOpen(MutableCapabilities options) {
+        options.setCapability(UNHANDLED_PROMPT, "ignore");
     }
 
     public static void applyCapabilities(MutableCapabilities target, ObjectNode capabilities) {
