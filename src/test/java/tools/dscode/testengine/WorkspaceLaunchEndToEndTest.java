@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner;
 import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.control.protocol.Workspace;
+import tools.dscode.control.protocol.speed.JavaArguments;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
@@ -231,7 +232,7 @@ class WorkspaceLaunchEndToEndTest {
         return "";
     }
 
-    private static List<String> seedCommand(Path project, String runId, boolean reseed, String from) {
+    private static List<String> seedCommand(Path project, String runId, boolean reseed, String from) throws Exception {
         List<String> command = new ArrayList<>();
         command.add(java());
         command.add("-cp");
@@ -241,6 +242,7 @@ class WorkspaceLaunchEndToEndTest {
         command.add("--run=" + runId);
         if (reseed) command.add("--reseed");
         if (from != null) command.add("--from=" + from);
+        fitClasspath(project, command);
         return command;
     }
 
@@ -264,10 +266,11 @@ class WorkspaceLaunchEndToEndTest {
         command.add("@pickleball-workbench-anchor");
         command.add(anchor.toAbsolutePath().normalize().toUri().toString());
         assertFalse(command.stream().anyMatch(argument -> argument.contains("pkb_parallel=1")), command.toString());
+        fitClasspath(project, command);
         return command;
     }
 
-    private static List<String> javaCommand(List<String> dashD) {
+    private static List<String> javaCommand(List<String> dashD) throws Exception {
         List<String> command = new ArrayList<>();
         command.add(java());
         command.addAll(dashD);
@@ -276,7 +279,14 @@ class WorkspaceLaunchEndToEndTest {
         command.add("-cp");
         command.add(classpath());
         command.add(WorkspaceDriverProbe.class.getName());
+        Path args = Files.createTempFile("pkb-launch-", ".args");
+        args.toFile().deleteOnExit();
+        JavaArguments.fitClasspath(command, args);
         return command;
+    }
+
+    private static void fitClasspath(Path directory, List<String> command) throws Exception {
+        JavaArguments.fitClasspath(command, directory.toAbsolutePath().normalize().resolve("java-classpath.args"));
     }
 
     private static List<String> dashD(List<String> command) {
