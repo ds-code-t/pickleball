@@ -127,6 +127,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-roadmap-5-scoreboard.md`
 - `docs/maintainer/3.0.0-roadmap-6-historical-dashboard-scoreboard.md`
 - `docs/maintainer/3.0.0-roadmap-6-scoreboard.md`
+- `docs/maintainer/3.0.0-roadmap-7-remaining-controls-scoreboard.md`
 - `docs/maintainer/3.0.0-roadmap-7-scoreboard.md`
 - `docs/maintainer/3.0.0-snapshot-coverage-audit.md`
 - `docs/maintainer/3.0.0-workbench-edit-design.md`

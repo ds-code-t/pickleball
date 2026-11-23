@@ -205,9 +205,30 @@ if (spec.kind === 'magnifier' && anchor) {
   clone.setAttribute('inert', '');
   clone.setAttribute('aria-hidden', 'true');
   paintCopy(anchor, clone);
-  clone.style.transform = 'scale(' + zoom + ')';
-  clone.style.transformOrigin = '0 0';
+  if ('value' in anchor && 'value' in clone && anchor.value) clone.value = anchor.value;
+  var copied = '';
+  try { copied = anchor.innerText || ''; } catch (e) { copied = ''; }
+  if (!String(copied).trim()) copied = anchor.textContent || anchor.value || '';
+  if (!String(copied).trim() && anchor.getAttribute) copied = anchor.getAttribute('aria-label') || anchor.getAttribute('alt') || anchor.getAttribute('title') || '';
+  copied = String(copied).replace(/\s+/g, ' ').trim().slice(0, 80);
+  if (!((clone.innerText || clone.textContent || '') + '').replace(/\s/g, '') && copied) clone.textContent = copied;
+  // Scale around the centre so the label stays inside the oval. Origin 0 0 crops the padding.
+  clone.style.position = 'absolute';
+  clone.style.left = '50%';
+  clone.style.top = '50%';
+  clone.style.margin = '0';
+  clone.style.transformOrigin = 'center center';
+  clone.style.transform = 'translate(-50%, -50%) scale(' + zoom + ')';
   clone.style.pointerEvents = 'none';
+  clone.style.display = 'flex';
+  clone.style.alignItems = 'center';
+  clone.style.justifyContent = 'center';
+  clone.style.textAlign = 'center';
+  try {
+    var painted = window.getComputedStyle(anchor);
+    var match = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(painted.color || '');
+    if (match && (0.3 * match[1]) + (0.59 * match[2]) + (0.11 * match[3]) > 210) clone.style.color = '#1b1f24';
+  } catch (ignored) { /* keep the copied color */ }
   host.textContent = '';
   host.appendChild(clone);
   var blank = !((clone.textContent || '').replace(/\s/g, '')) && !clone.querySelector('img,svg,canvas,video,input');

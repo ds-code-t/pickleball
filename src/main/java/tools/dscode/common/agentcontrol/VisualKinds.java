@@ -113,8 +113,10 @@ public final class VisualKinds {
     public static String magnifierMarkup(String text, String zoomRaw) {
         String zoom = zoom(zoomRaw);
         String body = text == null || text.isBlank() ? "magnifier" : HumanValue.html(text);
-        return "<div data-pkb-zoom=\"" + zoom + "\" data-pkb-copy=\"fallback\" style=\"transform:scale(" + zoom
-                + ");transform-origin:0 0;color:#111;font:12px sans-serif;\">"
+        return "<div data-pkb-zoom=\"" + zoom + "\" data-pkb-copy=\"fallback\" style=\"position:absolute;left:50%;top:50%;"
+                + "transform:translate(-50%,-50%) scale(" + zoom + ");transform-origin:center center;"
+                + "color:#1b1f24;background:#ffffff;font:600 13px/1.2 system-ui,sans-serif;white-space:nowrap;"
+                + "display:flex;align-items:center;justify-content:center;\">"
                 + body + "</div>";
     }
 

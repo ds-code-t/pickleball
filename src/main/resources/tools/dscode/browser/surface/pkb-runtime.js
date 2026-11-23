@@ -603,6 +603,23 @@
     clone.setAttribute('data-pkb-copy', 'live');
   }
 
+  function visibleText(source) {
+    var raw = '';
+    try { raw = source.innerText || ''; } catch (e) { raw = ''; }
+    if (!String(raw).trim()) raw = source.textContent || source.value || '';
+    if (!String(raw).trim() && source.getAttribute) {
+      raw = source.getAttribute('aria-label') || source.getAttribute('alt') || source.getAttribute('title') || '';
+    }
+    return String(raw).replace(/\s+/g, ' ').trim().slice(0, 80);
+  }
+
+  function readableColor(color) {
+    var match = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(color || '');
+    if (!match) return color || '#1b1f24';
+    var light = (0.3 * match[1]) + (0.59 * match[2]) + (0.11 * match[3]);
+    return light > 210 ? '#1b1f24' : color;
+  }
+
   function sanitizeClone(anchor, zoom) {
     var clone = anchor.cloneNode(true);
     clone.querySelectorAll('script').forEach(function (s) { s.remove(); });
@@ -615,9 +632,27 @@
     clone.setAttribute('inert', '');
     clone.setAttribute('aria-hidden', 'true');
     paintCopy(anchor, clone);
-    clone.style.transform = 'scale(' + zoom + ')';
-    clone.style.transformOrigin = '0 0';
+    if (anchor && 'value' in anchor && 'value' in clone && anchor.value) clone.value = anchor.value;
+    var text = visibleText(anchor);
+    var shown = ((clone.innerText || clone.textContent || '') + '').replace(/\s/g, '');
+    if (!shown && text) clone.textContent = text;
+    var z = zoom || 2;
+    // Scale around the centre so the label stays inside the oval. Origin 0 0 crops the padding.
+    clone.style.position = 'absolute';
+    clone.style.left = '50%';
+    clone.style.top = '50%';
+    clone.style.margin = '0';
+    clone.style.transformOrigin = 'center center';
+    clone.style.transform = 'translate(-50%, -50%) scale(' + z + ')';
     clone.style.pointerEvents = 'none';
+    clone.style.display = 'flex';
+    clone.style.alignItems = 'center';
+    clone.style.justifyContent = 'center';
+    clone.style.textAlign = 'center';
+    try {
+      var painted = window.getComputedStyle(anchor);
+      clone.style.color = readableColor(painted.color);
+    } catch (ignored) { /* keep the copied color */ }
     if (anchor) clone.setAttribute('data-pkb-copy', 'live');
     else clone.setAttribute('data-pkb-copy', 'fallback');
     return clone;

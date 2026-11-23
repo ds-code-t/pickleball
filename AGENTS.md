@@ -470,7 +470,7 @@ The overlay polish (3.0.0) is implemented: popup and Workbench chat send on Ente
 
 Agent data (3.0.0) stays on that same CLI. `controller-start` is one JVM per project (`PkbMain`, `AgentController`, `.pickleball/agent-controller.json`). A later verb is a client of that process. `controller-stop` ends it. MCP and the live worker bridge are unchanged. Every reply is the envelope in `AgentEnvelope` (`v`, `ok`, `op`, `ms`, `state`, `sum`, `items`, `next`, `trunc`, `err`). `SessionIds` adds a short id (`s1.h42`) beside the long `ref:`. `ref` expands it. `AgentCursor` is the one `next` token for chat and ui-poll, and the same token reads the same position again. `SnapView` and `LineView` apply `--format=lines|json`, `--fields`, `--where`, `--limit`, and `--budget`. The default snap stays at most 200 lines or 16 KB. Schema: `docs/dynamic-control-api.md`.
 
-Visual-component verify (coordinator): step badge and magnifier text is escaped; a live magnifier copy is inert and has no ids, names, inline handlers, or scripts; `un*` logs under its own entity; a native `un*` with no id hides `native-<kind>`; scenario end hides every native rectangle. Tests: `AgentExpansionTest`, `NativeHighlightRouteTest`, `NativeHighlightBoxTest`, `LiveChromeCdpTest`.
+Visual-component verify (coordinator): step badge and magnifier text is escaped; a live magnifier copy is scaled around its center so the label stays in the oval, stays inert, and has no ids, names, inline handlers, or scripts; `un*` logs under its own entity; a native `un*` with no id hides `native-<kind>`; scenario end hides every native rectangle. Tests: `AgentExpansionTest`, `NativeHighlightRouteTest`, `NativeHighlightBoxTest`, `LiveChromeCdpTest`.
 
 ## Workbench
 

@@ -20,7 +20,7 @@ all: act arrow ask ask-and-wait attach border bridge-health call capture capture
 
 # help act
 Usage: act --target=<selector> [--kind=click|type|hover|press|select] [--query=<text>] [--ref=<ref>] [--pick=<n|name>] [--value=<text>] [--condition=title=<text>|text=<text>|url=<text>|ref=<id>:selected] [--snap=diff|auto] [--timeout=<ms>]
---pick chooses one hit in the same snapshot, so the ref cannot go stale. A success includes checked and settleMs. Hover on a visible element is applied and dispatched. A click is applied when the page or that element's text or state changes. A covering mask that does not clear fails the click. Replies include frame. A short id (s1.h18) names that element and is not expanded to its accessible name.
+--pick chooses one hit in the same snapshot, so the ref cannot go stale. A success includes checked and settleMs. Hover on a visible element is applied and dispatched. A click is applied when the page or that element's text or state changes. A covering mask that does not clear fails the click. visible is whether the element is shown, the same value explain reports. Replies include frame. A short id (s1.h18) names that element and is not expanded to its accessible name.
 
 # help ask-and-wait
 Usage: ask-and-wait --say=<question> [--choices=a,b] [--id=<id>] [--timeout=<ms>]
@@ -110,7 +110,7 @@ Usage: export-guidance [output-directory] [--warm]
 
 # help find
 Usage: find --target=<selector> [--query=<text>] [--format=lines|json] [--fields=<a,b>] [--where=<k=v>] [--limit=<n>] [--budget=<bytes>] [--group=type|role] [--priority=on]
-Hits are returned once, as items. A long page ref is not embedded. --fields keeps only the named keys.
+Hits are returned once, as items. A long page ref is not embedded. --fields keeps only the named keys. An icon inside a link, including a glued prefix, resolves to that link.
 
 # help find-element
 Usage: find-element (--category=<Button> [--text=<label>] | --query=<selector>) [--exposure=human|lower] [--limit=<n>] [--explain] [--promote-visual] [--html=<file>]
@@ -210,7 +210,7 @@ Templates: chrome-headed-verbose, chrome-headed-quiet, chrome-headless-verbose, 
 
 # help magnifier
 Usage: magnifier [--text=<caption>] [--zoom=<1-8>] [--handle=<id>] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--target=auto|page|popup|native] [--block=true] [--html=<page>]
-A short id (s1.h18) names that element and is not expanded to its accessible name.
+A short id (s1.h18) names that element and is not expanded to its accessible name. The live oval scales the copied target around its center so the label stays visible.
 
 # help note
 Usage: note --text=<one line> [--agent=<id>] [--run-id=<id>]
@@ -303,7 +303,7 @@ Usage: show-run --run-id=<id>
 
 # help snap
 Usage: snap [--target=browser:auto|browser:<id>|browser:cdp=<url>|desktop:<pid>|desktop:app~<name>|ref:<doc>:<handle>] [--session=<id>] [--within=<id>] [--depth=<n>] [--group=role|type] [--priority=on] [--format=lines|json] [--fields=<a,b>] [--where=<role=button>] [--limit=<n>] [--budget=<bytes>]
---within is a ref, short id, backend id, or element id. --session is the start or isolate session id. Omit it to use the current live session. --fields prints only those keys. --budget is the whole reply in bytes (at most 16 KB). Default lines use a short id and omit a long ref.
+--within is a ref, short id, backend id, or element id. --session is the start or isolate session id. Omit it to use the current live session. --fields prints only those keys. --budget is the whole reply in bytes (at most 16 KB). Default lines use a short id and omit a long ref. A document, shadow root, html, body, and head do not consume a depth level.
 
 # help spotlight
 Usage: spotlight [--dim=<0-1>] [--handle=<id>] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--target=auto|page|popup|native] [--block=true] [--html=<page>]

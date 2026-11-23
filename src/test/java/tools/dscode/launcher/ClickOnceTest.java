@@ -107,7 +107,7 @@ class ClickOnceTest {
         assertTrue(body.path("ok").asBoolean(), acted.out);
         assertFalse(body.path("applied").asBoolean(), acted.out);
         assertTrue(body.path("dispatched").asBoolean(), acted.out);
-        assertFalse(body.path("visible").asBoolean(), acted.out);
+        assertTrue(body.path("visible").asBoolean(), acted.out);
         assertEquals("no visible change", body.path("reason").asText(), acted.out);
         assertFalse(body.has("error"), acted.out);
         assertEquals("1", eval(counterExpr), acted.out);
@@ -124,7 +124,7 @@ class ClickOnceTest {
         assertTrue(body.path("ok").asBoolean(), acted.out);
         assertFalse(body.path("applied").asBoolean(), acted.out);
         assertTrue(body.path("dispatched").asBoolean(), acted.out);
-        assertFalse(body.path("visible").asBoolean(), acted.out);
+        assertTrue(body.path("visible").asBoolean(), acted.out);
         assertEquals("no visible change", body.path("reason").asText(), acted.out);
         assertFalse(body.has("error"), acted.out);
         assertEquals(frame, body.path("frame").asText(""), acted.out);

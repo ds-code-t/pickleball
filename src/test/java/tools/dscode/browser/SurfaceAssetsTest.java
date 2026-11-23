@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SurfaceAssetsTest {
     @Test
     void loadsEachAssetAtItsHash() throws Exception {
-        assertEquals("3cf69d8d89abf1eb289c81eb68896be045a0d46a3a6bcf269529a391eebbdb69", sha(SurfaceAssets.script("live-helper")));
+        assertEquals("4ce205f7fc21a0776d756a623099a8d8c4a07cfce93b10ec3d645d0225ba0e8e", sha(SurfaceAssets.script("live-helper")));
         assertEquals("5d6b24e641d70c4c252804b3d0bfae48f6170037434b6d43b2b8e2650c0821a7", sha(SurfaceAssets.script("bridge-mark")));
         assertEquals("ab8f90e2e4d04214af67e933ab190a0bfab7c89e57ba6cdfe5e10bd3eec6e29a", sha(SurfaceAssets.script("frame-mark")));
         assertEquals("afc0169aba6b94679a425b8b8868193583b8813e8bcf52fadf089389d7999c88", sha(SurfaceAssets.script("frame-restore")));
@@ -126,6 +126,7 @@ class SurfaceAssetsTest {
         assertTrue(runtime.contains("addEventListener") && runtime.contains("capture: true"), "runtime has no capture-phase scroll listener");
         assertTrue(runtime.contains("ResizeObserver") && runtime.contains("MutationObserver"), "runtime does not observe resize and mutation");
         assertTrue(runtime.contains("getComputedStyle") && runtime.contains("data-pkb-copy"), "runtime magnifier does not copy the target");
+        assertTrue(runtime.contains("translate(-50%, -50%) scale("), "runtime magnifier does not center the copy");
         assertSame(runtime, SurfaceAssets.script("PKB-RUNTIME"));
     }
 }

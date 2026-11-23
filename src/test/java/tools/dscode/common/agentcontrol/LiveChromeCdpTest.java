@@ -185,6 +185,10 @@ class LiveChromeCdpTest {
                             + "name:n.querySelector('button').getAttribute('name'), onclick:n.querySelector('button').getAttribute('onclick'),"
                             + "inert:n.querySelector('button').hasAttribute('inert'), agent:n.querySelector('button').getAttribute('data-pkb-agent'),"
                             + "meta:n.querySelector('button').getAttribute('data-pkb-meta')}:null,"
+                            + "mag:(function(){var b=n.querySelector('button'); if(!b||n.getAttribute('data-pkb-kind')!=='magnifier') return null;"
+                            + "var host=n.getBoundingClientRect(); var r=document.createRange(); r.selectNodeContents(b); var box=r.getBoundingClientRect();"
+                            + "var cx=host.left+host.width/2, cy=host.top+host.height/2;"
+                            + "return {text:(b.innerText||b.textContent||''), hit:box.width>0&&box.height>0&&cx>=box.left&&cx<=box.right&&cy>=box.top&&cy<=box.bottom};})(),"
                             + "saves:document.querySelectorAll('#save').length}",
                     id);
             assertNotNull(seen, call.getKey() + " was not injected into the live page");
@@ -227,6 +231,11 @@ class LiveChromeCdpTest {
                 assertEquals(true, clone.get("inert"), clone.toString());
                 assertEquals("agent_injected", clone.get("agent"), clone.toString());
                 assertEquals("true", clone.get("meta"), clone.toString());
+                @SuppressWarnings("unchecked")
+                Map<String, Object> mag = (Map<String, Object>) seen.get("mag");
+                assertNotNull(mag, seen.toString());
+                assertTrue(String.valueOf(mag.get("text")).contains("Save"), seen.toString());
+                assertEquals(Boolean.TRUE, mag.get("hit"), seen.toString());
             }
         }
 
@@ -379,6 +388,8 @@ class LiveChromeCdpTest {
                 "chrome"
         );
         if (onPath != null) return onPath;
+        String installed = dev.domengine.session.BrowserSession.findChrome();
+        if (installed != null) return installed;
         return executableFile("/opt/pw-browsers/chromium_headless_shell-1248/chrome-headless-shell-linux64/chrome-headless-shell");
     }
 

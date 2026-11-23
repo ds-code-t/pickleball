@@ -245,6 +245,42 @@ final class ConsumerReadyCommands {
 
     private static StopOutcome stopOwned(Path project) {
         if (project == null) return new StopOutcome(false, false);
+        try {
+            return stopOwnedNow(project);
+        } finally {
+            killProjectProcesses(project);
+            releaseBrowserLog(project);
+        }
+    }
+
+    /**
+     * A host that exits can leave Chrome holding the browser log.
+     * Match the live-browser host and a browser whose profile is this project.
+     * A command line that only names the project, such as an IDE, is left alone.
+     */
+    private static void killProjectProcesses(Path project) {
+        String token = project.toAbsolutePath().normalize().toString();
+        if (token.isBlank()) return;
+        long self = ProcessHandle.current().pid();
+        ProcessHandle.allProcesses().forEach(handle -> {
+            if (handle.pid() == self) return;
+            String line = handle.info().commandLine().orElse("");
+            if (ownedBrowserProcess(line, token)) {
+                tools.dscode.control.protocol.speed.ProcessTree.kill(handle.pid());
+            }
+        });
+    }
+
+    /** The live-browser JVM, or Chrome or Edge launched with this project's user-data-dir. */
+    private static boolean ownedBrowserProcess(String line, String token) {
+        if (line == null || line.isBlank() || token == null || token.isBlank() || !line.contains(token)) return false;
+        String lower = line.toLowerCase(Locale.ROOT);
+        if (lower.contains("java") && lower.contains("live-browser")) return true;
+        boolean browser = lower.contains("chrome") || lower.contains("msedge") || lower.contains("chromium");
+        return browser && lower.contains("user-data-dir");
+    }
+
+    private static StopOutcome stopOwnedNow(Path project) {
         deleteSession(project);
         Optional<LiveHostFile.Host> host = LiveHostFile.read(project);
         if (host.isEmpty()) return new StopOutcome(false, false);
@@ -278,6 +314,27 @@ final class ConsumerReadyCommands {
         LiveHostFile.delete(project);
         tools.dscode.common.agentfast.LiveBrowserHost.pruneProfiles(project, null);
         return new StopOutcome(stopped, false);
+    }
+
+    /** Windows refuses to delete a log another process still has open. */
+    private static void releaseBrowserLog(Path project) {
+        Path log = project.resolve(".pickleball").resolve("logs").resolve("live-browser.log");
+        if (!Files.isRegularFile(log)) return;
+        Path probe = log.resolveSibling("live-browser.log.probe");
+        for (int attempt = 0; attempt < 20; attempt++) {
+            try {
+                Files.move(log, probe);
+                Files.move(probe, log);
+                return;
+            } catch (IOException locked) {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+        }
     }
 
     /** Project-scoped Chrome that is not the recorded host. A Workbench worker is not Chrome. */

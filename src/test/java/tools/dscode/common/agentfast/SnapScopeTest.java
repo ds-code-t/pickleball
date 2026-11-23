@@ -42,6 +42,42 @@ class SnapScopeTest {
     }
 
     @Test
+    void withinSeesShadowAndIframeContent() {
+        DomNode root = node("div", "page", "", 1);
+        DomNode host = node("div", "host", "", 2);
+        DomNode shadow = node("div", "", "", 3);
+        shadow.shadowRoot = true;
+        shadow.nodeType = 11;
+        DomNode button = node("button", "inshadow", "button", 4);
+        shadow.children.add(button);
+        host.shadowRoots.add(shadow);
+
+        DomNode frame = node("iframe", "frame", "", 5);
+        frame.iframe = true;
+        DomNode doc = node("#document", "", "", 6);
+        doc.localName = "";
+        doc.nodeName = "#document";
+        doc.nodeType = 9;
+        DomNode html = node("html", "", "", 7);
+        DomNode body = node("body", "", "", 8);
+        DomNode link = node("a", "inframe", "link", 9);
+        DomNode wrap = node("div", "wrap", "", 10);
+        DomNode deep = node("button", "framedeep", "button", 11);
+        wrap.children.add(deep);
+        body.children.add(link);
+        body.children.add(wrap);
+        html.children.add(body);
+        doc.children.add(html);
+        frame.children.add(doc);
+        root.children.add(host);
+        root.children.add(frame);
+
+        assertEquals(List.of("inshadow"), ids(TargetVerb.scopedInteractive(root, "host", 1)));
+        assertEquals(List.of("inframe"), ids(TargetVerb.scopedInteractive(root, "frame", 1)));
+        assertEquals(List.of("inframe", "framedeep"), ids(TargetVerb.scopedInteractive(root, "frame", 2)));
+    }
+
+    @Test
     void groupAndPriorityChangeTheLines() {
         List<Map<String, Object>> rows = List.of(row("link", "a", "Docs"), row("button", "button", "Save"));
         String plain = String.join("\n", TargetVerb.snapLines(rows, Map.of()));

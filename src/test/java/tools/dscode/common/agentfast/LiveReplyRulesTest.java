@@ -65,10 +65,68 @@ class LiveReplyRulesTest {
     @Test
     void iconPrefixStillMatchesTheVisibleLabel() {
         assertTrue(TargetVerb.labelMatches("account_circle Dan", "Dan"));
+        assertTrue(TargetVerb.labelMatches("account_circleDan", "Dan"));
+        assertTrue(TargetVerb.labelMatches("account-circleDan", "Dan"));
         assertTrue(TargetVerb.labelMatches("Dan", "dan"));
         assertFalse(TargetVerb.labelMatches("Danville", "Dan"));
         assertFalse(TargetVerb.labelMatches("Jordan", "Dan"));
+        assertFalse(TargetVerb.labelMatches("network", "work"));
+        assertFalse(TargetVerb.labelMatches("xDan", "Dan"));
         assertFalse(TargetVerb.labelMatches("", "Dan"));
+    }
+
+    @Test
+    void iconPrefixedLinkIsTheAnchor() {
+        DomNode root = element("div", "page");
+        DomNode link = element("a", "acct");
+        DomNode icon = element("i", "icon");
+        icon.children.add(text("account_circleDan"));
+        link.children.add(icon);
+        root.children.add(link);
+
+        List<DomNode> hits = TargetVerb.findNamed(root, "Dan");
+        assertEquals(List.of("acct"), hits.stream().map(node -> node.attributes.get("id")).toList());
+        assertEquals("a", hits.get(0).tag());
+    }
+
+    @Test
+    void visibleLabelPrefersTheControlOverACopiedBody() {
+        DomNode root = element("div", "page");
+        DomNode button = element("button", "count");
+        button.role = "button";
+        button.children.add(text("Count"));
+        DomNode body = element("body", "");
+        body.role = "StaticText";
+        body.accessibleName = "Count";
+        DomNode grafted = element("body", "graft");
+        grafted.role = "button";
+        grafted.accessibleName = "Count";
+        root.children.add(button);
+        root.children.add(body);
+        root.children.add(grafted);
+        assertEquals(List.of("count"), TargetVerb.findNamed(root, "Count").stream().map(node -> node.attributes.get("id")).toList());
+
+        DomNode only = element("div", "only");
+        DomNode paragraph = element("p", "para");
+        paragraph.children.add(text("Hello"));
+        only.children.add(paragraph);
+        assertEquals(List.of("para"), TargetVerb.findNamed(only, "Hello").stream().map(node -> node.attributes.get("id")).toList());
+    }
+
+    private static DomNode element(String tag, String id) {
+        DomNode node = new DomNode();
+        node.localName = tag;
+        node.nodeName = tag;
+        node.nodeType = 1;
+        if (!id.isBlank()) node.attributes.put("id", id);
+        return node;
+    }
+
+    private static DomNode text(String value) {
+        DomNode node = new DomNode();
+        node.nodeType = 3;
+        node.nodeValue = value;
+        return node;
     }
 
     private static Map<String, Object> quiet(boolean changed) {

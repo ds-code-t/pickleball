@@ -504,7 +504,7 @@ public final class TargetVerb {
                 Outcome failed = fail("act", covered ? "covered" : "could not land");
                 failed.body().put("used", effect.used());
                 failed.body().put("dispatched", false);
-                failed.body().put("visible", false);
+                failed.body().put("visible", covered ? false : elementVisible(node, page.session.connection()));
                 failed.body().put("reason", effect.reason());
                 if (covered) failed.body().put("coveredBy", effect.detail());
                 stamp(failed.body(), page.session.connection(), node);
@@ -539,7 +539,7 @@ public final class TargetVerb {
                     failed.body().put("title", titleAfter);
                     if (kind.isBlank() || "click".equals(kind) || "hover".equals(kind)) {
                         failed.body().put("dispatched", true);
-                        failed.body().put("visible", effect.applied());
+                        failed.body().put("visible", elementVisible(node, page.session.connection()));
                     }
                     putSnapDiff(failed.body(), args, titleBefore, titleAfter, before, after, rowsBefore, rowsAfter);
                     putAutoSnap(failed.body(), args, project, runId, autoBefore, () -> compactBrowser(page.session, runId, target));
@@ -557,7 +557,7 @@ public final class TargetVerb {
                 body.put("title", titleAfter);
                 if (kind.isBlank() || "click".equals(kind) || "hover".equals(kind)) {
                     body.put("dispatched", true);
-                    body.put("visible", true);
+                    body.put("visible", elementVisible(node, page.session.connection()));
                 }
                 putSnapDiff(body, args, titleBefore, titleAfter, before, after, rowsBefore, rowsAfter);
                 putAutoSnap(body, args, project, runId, autoBefore, () -> compactBrowser(page.session, runId, target));
@@ -574,7 +574,7 @@ public final class TargetVerb {
                 Map<String, Object> body = base("act", effect.used(), "browser", target);
                 body.put("applied", false);
                 body.put("dispatched", true);
-                body.put("visible", false);
+                body.put("visible", elementVisible(node, page.session.connection()));
                 body.put("reason", effect.reason());
                 body.put("kind", kind.isBlank() ? "click" : kind);
                 body.put("docVersion", after);
@@ -607,7 +607,7 @@ public final class TargetVerb {
             body.put("kind", kind.isBlank() ? "click" : kind);
             if (kind.isBlank() || "click".equals(kind) || "hover".equals(kind)) {
                 body.put("dispatched", true);
-                body.put("visible", true);
+                body.put("visible", elementVisible(node, page.session.connection()));
             }
             putSnapDiff(body, args, titleBefore, titleAfter, before, after, rowsBefore, rowsAfter);
             putAutoSnap(body, args, project, runId, autoBefore, () -> compactBrowser(page.session, runId, target));
@@ -1275,8 +1275,9 @@ public final class TargetVerb {
         boolean enabled = node != null && !node.states.contains("disabled") && !node.attributes.containsKey("disabled");
         Object reason = body.get("reason");
         boolean covered = reason != null && String.valueOf(reason).toLowerCase(Locale.ROOT).contains("cover");
+        boolean shown = body.get("visible") instanceof Boolean flag ? flag : sameVisibility(node, covered);
         Map<String, Object> checked = new LinkedHashMap<>();
-        checked.put("visible", visible || Boolean.TRUE.equals(body.get("visible")));
+        checked.put("visible", shown);
         checked.put("enabled", enabled);
         checked.put("covered", covered);
         checked.put("settled", settled);
@@ -2577,7 +2578,7 @@ public final class TargetVerb {
             if (!message.contains("not found") && !message.contains("query requires")) throw failure;
         }
         if (query != null && !query.isBlank()) hits.addAll(named(search, query));
-        return deepest(controlsFor(search, preferBody(hits)));
+        return deepest(controlsFor(search, preferControls(preferBody(preferLinks(hits)))));
     }
 
     /**
@@ -2668,7 +2669,7 @@ public final class TargetVerb {
         return value != null && !value.isBlank() && query.equalsIgnoreCase(value);
     }
 
-    /** Exact name, or the visible label after an icon prefix that is not a letter or digit. */
+    /** Exact name, a symbol prefix, or a font-icon ligature such as {@code account_circleDan}. */
     static boolean labelMatches(String name, String query) {
         if (name == null || query == null) return false;
         String left = name.replaceAll("\\s+", " ").trim();
@@ -2676,9 +2677,58 @@ public final class TargetVerb {
         if (left.isEmpty() || right.isEmpty()) return false;
         if (left.equalsIgnoreCase(right)) return true;
         if (left.length() <= right.length()) return false;
-        if (!left.substring(left.length() - right.length()).equalsIgnoreCase(right)) return false;
-        char before = left.charAt(left.length() - right.length() - 1);
-        return !Character.isLetterOrDigit(before);
+        if (!left.regionMatches(true, left.length() - right.length(), right, 0, right.length())) return false;
+        int cut = left.length() - right.length();
+        char before = left.charAt(cut - 1);
+        if (!Character.isLetterOrDigit(before)) return true;
+        String prefix = left.substring(0, cut);
+        return prefix.indexOf('_') >= 0 || prefix.indexOf('-') >= 0;
+    }
+
+    /**
+     * An icon inside a link is the link. {@code img}, {@code svg}, {@code i}, and {@code span}
+     * promote to the enclosing anchor so find returns the link, not the icon.
+     */
+    private static List<DomNode> preferLinks(List<DomNode> hits) {
+        List<DomNode> promoted = new ArrayList<>();
+        if (hits == null) return promoted;
+        for (DomNode node : hits) {
+            addHit(promoted, linkOf(node));
+        }
+        return promoted;
+    }
+
+    private static DomNode linkOf(DomNode node) {
+        if (node == null || !iconCarrier(node)) return node;
+        for (DomNode cursor = node.parent; cursor != null; cursor = cursor.parent) {
+            if ("a".equals(cursor.tag()) || "link".equalsIgnoreCase(role(cursor))) return cursor;
+        }
+        return node;
+    }
+
+    private static boolean iconCarrier(DomNode node) {
+        String tag = node.tag();
+        return "img".equals(tag) || "svg".equals(tag) || "i".equals(tag) || "span".equals(tag)
+                || "use".equals(tag) || "path".equals(tag);
+    }
+
+    /** Name match used by tests. Promotes an icon hit to its link and keeps the control. */
+    static List<DomNode> findNamed(DomNode root, String query) {
+        if (root != null) root.linkParents();
+        return deepest(preferControls(preferLinks(named(root, query))));
+    }
+
+    /**
+     * A copied static name is not a second target when a button or link already matches.
+     * A document shell stays out even when its accessible role is button.
+     */
+    private static List<DomNode> preferControls(List<DomNode> hits) {
+        List<DomNode> controls = new ArrayList<>();
+        if (hits == null) return controls;
+        for (DomNode node : hits) {
+            if (node != null && interactiveNode(node) && !depthWrapper(node)) controls.add(node);
+        }
+        return controls.isEmpty() ? hits : controls;
     }
 
     private static String attr(DomNode node, String name) {
@@ -2697,11 +2747,27 @@ public final class TargetVerb {
         return hits;
     }
 
-    private static void walkInteractive(DomNode node, int depthLeft, List<DomNode> hits) {
-        if (node == null) return;
+    /** A document, shadow root, or html/body shell is not a content level. */
+    private static boolean depthWrapper(DomNode node) {
+        if (node.shadowRoot || node.nodeType == 9 || node.nodeType == 11) return true;
+        String tag = node.tag();
+        return "html".equals(tag) || "body".equals(tag) || "head".equals(tag);
+    }
+
+    private static boolean interactiveNode(DomNode node) {
         String tag = node.tag();
         String roleName = node.role == null ? "" : node.role.toLowerCase(Locale.ROOT);
-        if (INTERACTIVE.contains(tag) || INTERACTIVE.contains(roleName) || "button".equals(roleName)) hits.add(node);
+        return INTERACTIVE.contains(tag) || INTERACTIVE.contains(roleName) || "button".equals(roleName);
+    }
+
+    private static void walkInteractive(DomNode node, int depthLeft, List<DomNode> hits) {
+        if (node == null) return;
+        if (depthWrapper(node)) {
+            for (DomNode child : node.children) walkInteractive(child, depthLeft, hits);
+            for (DomNode shadow : node.shadowRoots) walkInteractive(shadow, depthLeft, hits);
+            return;
+        }
+        if (interactiveNode(node)) hits.add(node);
         if (depthLeft == 0) return;
         int next = depthLeft < 0 ? -1 : depthLeft - 1;
         for (DomNode child : node.children) walkInteractive(child, next, hits);
@@ -2750,9 +2816,10 @@ public final class TargetVerb {
     static DomNode resolveWithin(DomNode root, String within) {
         if (root == null || within == null || within.isBlank()) return null;
         String token = within.trim();
+        Hit remembered = null;
         try {
-            Hit scope = requireHit(token);
-            DomNode stored = findNode(root, "", scope.backend);
+            remembered = requireHit(token);
+            DomNode stored = findNode(root, "", remembered.backend);
             if (stored != null) return stored;
         } catch (Miss ignored) {
             // A fresh id is still an element id or a backend id.
@@ -2769,7 +2836,12 @@ public final class TargetVerb {
             }
         }
         String id = token.startsWith("#") ? token.substring(1) : token;
-        return findByElementId(root, id);
+        DomNode byId = findByElementId(root, id);
+        if (byId != null) return byId;
+        if (remembered != null && remembered.selector() != null && remembered.selector().startsWith("#")) {
+            return findByElementId(root, remembered.selector().substring(1));
+        }
+        return null;
     }
 
     static List<DomNode> scopedInteractive(DomNode root, String within, int depth) {
@@ -3112,16 +3184,57 @@ public final class TargetVerb {
             Displayed.prepare(cdp, List.of(node));
             RowStates.fill(cdp, List.of(node));
         }
+        String cover = "";
+        if (cdp != null && node != null && node.nodeId > 0) {
+            try {
+                cover = coverOf(cdp, cdpSessionOf(node), node);
+            } catch (RuntimeException ignored) {
+                cover = "";
+            }
+        }
         Map<String, Object> report = new LinkedHashMap<>();
-        boolean visible = Displayed.isDisplayed(node);
+        boolean visible = sameVisibility(node, cover != null && !cover.isBlank());
         boolean enabled = !disabled(node);
         report.put("role", role(node));
         report.put("name", name(node));
         report.put("visible", visible);
         report.put("enabled", enabled);
         report.put("actionable", visible && enabled);
-        report.put("reason", visible && enabled ? "visible and enabled" : (visible ? "disabled" : "not visible"));
+        if (cover != null && !cover.isBlank()) report.put("coveredBy", cover);
+        report.put("reason", cover != null && !cover.isBlank()
+                ? "covered"
+                : (visible && enabled ? "visible and enabled" : (visible ? "disabled" : "not visible")));
         return report;
+    }
+
+    /**
+     * The same shown-or-not answer {@code explain} puts on {@code report.visible}.
+     * A covering mask is not shown. A node with no box yet keeps {@code displayed}.
+     */
+    static boolean sameVisibility(DomNode node, boolean covered) {
+        if (node == null || covered) return false;
+        if (node.states.contains("hidden")) return false;
+        if (node.boxRead || node.hasBox || !node.computed.isEmpty()) return Displayed.isDisplayed(node);
+        return node.displayed;
+    }
+
+    private static boolean elementVisible(DomNode node, CdpConnection cdp) {
+        if (node == null) return false;
+        if (cdp != null && node.nodeId > 0) {
+            try {
+                Displayed.prepare(cdp, List.of(node));
+                RowStates.fill(cdp, List.of(node));
+            } catch (RuntimeException ignored) {
+                // The stored displayed flag is still the answer.
+            }
+            try {
+                String cover = coverOf(cdp, cdpSessionOf(node), node);
+                if (cover != null && !cover.isBlank()) return false;
+            } catch (RuntimeException ignored) {
+                // No cover reading. The box test still applies.
+            }
+        }
+        return sameVisibility(node, false);
     }
 
     private static boolean inert(DomNode node) {
