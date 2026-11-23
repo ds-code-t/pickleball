@@ -216,9 +216,20 @@ final class UiBatch {
             }
         }
         boolean cursor = args.get("cursor") != null && !args.get("cursor").isBlank();
-        String after = args.get("after") == null || args.get("after").isBlank()
-                ? (cursor ? "0" : Integer.toString(PageSurfaces.pollInput(project, runId).size()))
-                : args.get("after").trim();
+        String after;
+        if (args.get("after") != null && !args.get("after").isBlank()) {
+            after = args.get("after").trim();
+        } else if (cursor) {
+            after = "0";
+        } else {
+            int stored = 0;
+            try {
+                stored = PageSurfaces.pollInput(project, runId).size();
+            } catch (RuntimeException failure) {
+                if (!pageGone(failure.getMessage())) throw failure;
+            }
+            after = Integer.toString(stored);
+        }
         String chatAfter = args.get("chat-after");
         long deadline = System.nanoTime() + waitMillis * 1_000_000L;
         while (true) {

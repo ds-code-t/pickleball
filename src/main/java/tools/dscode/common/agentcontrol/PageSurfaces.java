@@ -887,25 +887,56 @@ final class PageSurfaces {
         flushPushed(project, runId);
         for (Managed managed : MANAGED) {
             if (!(managed.driver instanceof JavascriptExecutor)) continue;
-            String current = currentHandle(managed.driver);
-            List<String> tabs = tabsOf(managed.driver);
-            if (tabs.isEmpty()) throw new IllegalStateException("tab enumeration failed");
-            for (String tab : tabs) {
-                if (!tab.isBlank() && !activate(managed.driver, tab)) {
-                    throw new IllegalStateException("tab switch failed");
-                }
-                if (!resetTop(managed.driver)) throw new IllegalStateException("top document reset failed");
-                drainIsolated(project, runId, managed.driver);
-                drainTab(project, runId, managed.driver);
-                for (String frame : framesFor(managed.driver, tab)) {
-                    if (!enterFrame(managed.driver, frame)) throw new IllegalStateException("frame entry failed");
-                    drainTab(project, runId, managed.driver);
-                }
-            }
-            if (current != null && !current.isBlank() && !activate(managed.driver, current)) {
-                throw new IllegalStateException("tab restore failed");
+            try {
+                drainManaged(project, runId, managed);
+            } catch (RuntimeException failure) {
+                if (!pageSocketGone(failure)) throw failure;
+                CompositeLog.info("overlay", "input poll skipped " + failure.getMessage());
             }
         }
+    }
+
+    /** One driver. A closed page socket is skipped so a poll can still return {@code browser_lost}. */
+    private static void drainManaged(Path project, String runId, Managed managed) throws IOException {
+        String current = currentHandle(managed.driver);
+        List<String> tabs = tabsOf(managed.driver);
+        if (tabs.isEmpty()) throw new IllegalStateException("tab enumeration failed");
+        for (String tab : tabs) {
+            if (!tab.isBlank() && !activate(managed.driver, tab)) {
+                throw new IllegalStateException("tab switch failed");
+            }
+            if (!resetTop(managed.driver)) throw new IllegalStateException("top document reset failed");
+            drainIsolated(project, runId, managed.driver);
+            drainTab(project, runId, managed.driver);
+            for (String frame : framesFor(managed.driver, tab)) {
+                if (!enterFrame(managed.driver, frame)) throw new IllegalStateException("frame entry failed");
+                drainTab(project, runId, managed.driver);
+            }
+        }
+        if (current != null && !current.isBlank() && !activate(managed.driver, current)) {
+            throw new IllegalStateException("tab restore failed");
+        }
+    }
+
+    /** The page socket is gone. The message or a cause names the closed connection. */
+    private static boolean pageSocketGone(Throwable failure) {
+        Throwable current = failure;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null && (message.contains("cdp connection is closed")
+                    || message.contains("cdp connection closed")
+                    || message.contains("no live browser")
+                    || message.contains("tab enumeration failed")
+                    || message.contains("input poll")
+                    || message.contains("tab switch failed")
+                    || message.contains("tab restore failed")
+                    || message.contains("top document reset failed")
+                    || message.contains("frame entry failed"))) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     /**
@@ -954,6 +985,7 @@ final class PageSurfaces {
                     """);
         } catch (RuntimeException failure) {
             CompositeLog.info("overlay", "input poll failed " + failure.getMessage());
+            if (pageSocketGone(failure)) return;
             throw failure;
         }
         if (!(value instanceof List<?> list)) {
