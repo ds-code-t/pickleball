@@ -155,8 +155,8 @@ class WorkbenchWarmLifecycleTest {
             List<ProcessHandle> children = awaitTree(state, warm.pid());
             cli = startHold(state);
             awaitAlive(cli.pid());
-            cli.destroyForcibly();
-            assertTrue(cli.waitFor(10, TimeUnit.SECONDS));
+            ProcessTree.kill(cli.pid());
+            assertTrue(cli.waitFor(10, TimeUnit.SECONDS), "the one-shot CLI did not exit");
             Thread.sleep(1000);
             assertTrue(WarmProcess.alive(warm.pid()), "a one-shot CLI must not be the warm owner");
             assertTrue(alive(children.getFirst()), "the warm child must survive the CLI");
@@ -173,7 +173,7 @@ class WorkbenchWarmLifecycleTest {
             awaitDead(warm.pid(), children);
             assertFalse(Files.isRegularFile(WarmProcess.file(state)));
         } finally {
-            if (cli != null) cli.destroyForcibly();
+            if (cli != null && cli.isAlive()) ProcessTree.kill(cli.pid());
             stopWarm(warm, state);
         }
     }

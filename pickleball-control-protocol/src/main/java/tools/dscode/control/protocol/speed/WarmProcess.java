@@ -47,15 +47,20 @@ public final class WarmProcess {
         if (stateRoot == null) return Optional.empty();
         Path path = file(stateRoot);
         if (!Files.isRegularFile(path)) return Optional.empty();
-        try {
-            List<String> lines = Files.readAllLines(path, StandardCharsets.UTF_8);
-            if (lines.size() < 4 || !"v1".equals(lines.get(0).trim())) return Optional.empty();
-            long pid = Long.parseLong(lines.get(1).trim());
-            int port = Integer.parseInt(lines.get(2).trim());
-            return Optional.of(new Handle(pid, port, lines.get(3).trim()));
-        } catch (IOException | NumberFormatException failure) {
-            return Optional.empty();
+        for (int attempt = 0; attempt < 3; attempt++) {
+            try {
+                List<String> lines = Files.readAllLines(path, StandardCharsets.UTF_8);
+                if (lines.size() < 4 || !"v1".equals(lines.get(0).trim())) return Optional.empty();
+                long pid = Long.parseLong(lines.get(1).trim());
+                int port = Integer.parseInt(lines.get(2).trim());
+                return Optional.of(new Handle(pid, port, lines.get(3).trim()));
+            } catch (NumberFormatException failure) {
+                return Optional.empty();
+            } catch (IOException failure) {
+                // A sharing violation while the handle is replaced. Try the read again.
+            }
         }
+        return Optional.empty();
     }
 
     public static boolean alive(long pid) {
@@ -83,12 +88,18 @@ public final class WarmProcess {
      * Delete first so a replacement JVM can write a new handle while the old tree dies.
      */
     public static void release(Path stateRoot) {
-        long pid = read(stateRoot).map(Handle::pid).orElse(0L);
-        if (pid <= 0) pid = rememberedPid(stateRoot);
+        long pid = pidToRelease(stateRoot);
         delete(stateRoot);
         deleteOwner(stateRoot);
+        if (pid <= 0) pid = pidToRelease(stateRoot);
         if (pid > 0) ProcessTree.kill(pid);
         deleteRememberedPid(stateRoot);
+    }
+
+    private static long pidToRelease(Path stateRoot) {
+        long pid = read(stateRoot).map(Handle::pid).orElse(0L);
+        if (pid <= 0) pid = rememberedPid(stateRoot);
+        return pid;
     }
 
     /** Pid from {@link #PID_FILE_NAME}, or zero. Survives deletion of the handle file. */
@@ -96,14 +107,19 @@ public final class WarmProcess {
         if (stateRoot == null) return 0L;
         Path path = pidFile(stateRoot);
         if (!Files.isRegularFile(path)) return 0L;
-        try {
-            String raw = Files.readString(path, StandardCharsets.UTF_8).trim();
-            if (raw.isEmpty()) return 0L;
-            long pid = Long.parseLong(raw);
-            return pid > 0 ? pid : 0L;
-        } catch (IOException | NumberFormatException failure) {
-            return 0L;
+        for (int attempt = 0; attempt < 3; attempt++) {
+            try {
+                String raw = Files.readString(path, StandardCharsets.UTF_8).trim();
+                if (raw.isEmpty()) return 0L;
+                long pid = Long.parseLong(raw);
+                return pid > 0 ? pid : 0L;
+            } catch (NumberFormatException failure) {
+                return 0L;
+            } catch (IOException failure) {
+                // A sharing violation while the pid file is replaced. Try the read again.
+            }
         }
+        return 0L;
     }
 
     public static Path pidFile(Path stateRoot) {
