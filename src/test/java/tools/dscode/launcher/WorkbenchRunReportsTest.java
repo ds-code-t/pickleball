@@ -9,6 +9,8 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
+import java.time.Instant;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
@@ -219,6 +221,135 @@ class WorkbenchRunReportsTest {
         assertTrue(text.contains("failed=1"), text);
         assertTrue(text.contains("failedScenarios=[\"Bad case\"]"), text);
         assertFalse(text.contains("failedScenariosMore"), text);
+    }
+
+    @Test
+    void confirmSummaryCountsOnlyTheIndexedAttempt() throws Exception {
+        Path project = tempDir.resolve("confirm-counts");
+        String runId = "run-confirm";
+        Path run = AgentCoordination.runDirectory(project, runId);
+        Path oldDir = run.resolve("diagnostic").resolve(runId).resolve("scenarios").resolve("old-fail");
+        Path freshDir = run.resolve("diagnostic").resolve(runId).resolve("scenarios").resolve("fresh-pass");
+        Files.createDirectories(oldDir);
+        Files.createDirectories(freshDir);
+        Files.writeString(oldDir.resolve("summary.json"), """
+                {"outcome":"FAILED","identity":{"scenarioName":"Old fail"},"steps":{"executed":1,"failed":1}}
+                """);
+        Files.writeString(freshDir.resolve("summary.json"), """
+                {"outcome":"PASSED","identity":{"scenarioName":"Fresh pass"},"steps":{"executed":2,"passed":2}}
+                """);
+        Files.writeString(run.resolve("diagnostic").resolve(runId).resolve("run-index.json"), """
+                {
+                  "outcome": "PASSED",
+                  "counts": { "total": 1, "passed": 1, "failed": 0 },
+                  "steps": { "executed": 2 },
+                  "scenarios": [
+                    { "scenarioExecutionId": "fresh-pass", "outcome": "PASSED", "summary": "scenarios/fresh-pass/summary.json" }
+                  ]
+                }
+                """);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        WorkbenchRunReports.publish(
+                project, runId, List.of(), "", "PASSED",
+                new PrintStream(out, true, StandardCharsets.UTF_8)
+        );
+        String text = out.toString(StandardCharsets.UTF_8);
+        assertTrue(text.contains("summary status=PASSED"), text);
+        assertTrue(text.contains("scenarios=1"), text);
+        assertTrue(text.contains("failed=0"), text);
+        assertFalse(text.contains("Old fail"), text);
+    }
+
+    @Test
+    void passedSummaryBecomesFailedWhenThisAttemptFailed() throws Exception {
+        Path project = tempDir.resolve("confirm-failed");
+        String runId = "run-confirm-fail";
+        Path run = AgentCoordination.runDirectory(project, runId);
+        Path oldDir = run.resolve("diagnostic").resolve(runId).resolve("scenarios").resolve("old-fail");
+        Path freshDir = run.resolve("diagnostic").resolve(runId).resolve("scenarios").resolve("fresh-fail");
+        Files.createDirectories(oldDir);
+        Files.createDirectories(freshDir);
+        Files.writeString(oldDir.resolve("summary.json"), """
+                {"outcome":"FAILED","identity":{"scenarioName":"Old fail"},"steps":{"executed":1,"failed":1}}
+                """);
+        Files.writeString(freshDir.resolve("summary.json"), """
+                {"outcome":"FAILED","identity":{"scenarioName":"Fresh fail"},"steps":{"executed":1,"failed":1}}
+                """);
+        Files.writeString(run.resolve("diagnostic").resolve(runId).resolve("run-index.json"), """
+                {
+                  "outcome": "PASSED",
+                  "counts": { "total": 1, "passed": 0, "failed": 1 },
+                  "scenarios": [ { "scenarioExecutionId": "fresh-fail", "outcome": "FAILED" } ]
+                }
+                """);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        WorkbenchRunReports.publish(
+                project, runId, List.of(), "", "PASSED",
+                new PrintStream(out, true, StandardCharsets.UTF_8)
+        );
+        String text = out.toString(StandardCharsets.UTF_8);
+        assertTrue(text.contains("summary status=FAILED"), text);
+        assertFalse(text.contains("summary status=PASSED"), text);
+        assertTrue(text.contains("failed=1"), text);
+        assertTrue(text.contains("Fresh fail"), text);
+        assertFalse(text.contains("Old fail"), text);
+    }
+
+    @Test
+    void emptyScenarioListCountsNothingFromAnEarlierAttempt() throws Exception {
+        Path project = tempDir.resolve("confirm-empty");
+        String runId = "run-empty-attempt";
+        Path run = AgentCoordination.runDirectory(project, runId);
+        Path oldDir = run.resolve("diagnostic").resolve(runId).resolve("scenarios").resolve("old-fail");
+        Files.createDirectories(oldDir);
+        Files.writeString(oldDir.resolve("summary.json"), """
+                {"outcome":"FAILED","identity":{"scenarioName":"Old fail"},"steps":{"executed":1,"failed":1}}
+                """);
+        Files.writeString(run.resolve("diagnostic").resolve(runId).resolve("run-index.json"), """
+                {"outcome":"PASSED","counts":{"total":0,"passed":0,"failed":0},"scenarios":[]}
+                """);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        WorkbenchRunReports.publish(
+                project, runId, List.of(), "", "PASSED",
+                new PrintStream(out, true, StandardCharsets.UTF_8)
+        );
+        String text = out.toString(StandardCharsets.UTF_8);
+        assertTrue(text.contains("scenarios=0"), text);
+        assertTrue(text.contains("failed=0"), text);
+        assertTrue(text.contains("summary status=PASSED"), text);
+        assertFalse(text.contains("Old fail"), text);
+    }
+
+    @Test
+    void newestFoldersFillATotalThatHasNoScenarioList() throws Exception {
+        Path project = tempDir.resolve("confirm-newest");
+        String runId = "run-newest";
+        Path run = AgentCoordination.runDirectory(project, runId);
+        Path oldDir = run.resolve("diagnostic").resolve(runId).resolve("scenarios").resolve("old-fail");
+        Path freshDir = run.resolve("diagnostic").resolve(runId).resolve("scenarios").resolve("fresh-pass");
+        Files.createDirectories(oldDir);
+        Files.createDirectories(freshDir);
+        Files.writeString(oldDir.resolve("summary.json"), """
+                {"outcome":"FAILED","identity":{"scenarioName":"Old fail"},"steps":{"executed":1,"failed":1}}
+                """);
+        Files.writeString(freshDir.resolve("summary.json"), """
+                {"outcome":"PASSED","identity":{"scenarioName":"Fresh pass"},"steps":{"executed":2,"passed":2}}
+                """);
+        Files.setLastModifiedTime(oldDir, FileTime.from(Instant.now().minusSeconds(30)));
+        Files.setLastModifiedTime(freshDir, FileTime.from(Instant.now()));
+        Files.writeString(run.resolve("diagnostic").resolve(runId).resolve("run-index.json"), """
+                {"counts":{"total":1},"steps":{"executed":2}}
+                """);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        WorkbenchRunReports.publish(
+                project, runId, List.of(), "", "PASSED",
+                new PrintStream(out, true, StandardCharsets.UTF_8)
+        );
+        String text = out.toString(StandardCharsets.UTF_8);
+        assertTrue(text.contains("scenarios=1"), text);
+        assertTrue(text.contains("passed=1"), text);
+        assertTrue(text.contains("failed=0"), text);
+        assertFalse(text.contains("Old fail"), text);
     }
 
     @Test

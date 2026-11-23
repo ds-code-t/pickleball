@@ -1793,6 +1793,9 @@ public final class AgentCoordination {
         }
         if (signal != null && signal.failed()) return "FAILED";
         if (requestedValue != null && "FAILED".equalsIgnoreCase(requestedValue)) return "FAILED";
+        if (signal != null && !signal.failed() && "PASSED".equalsIgnoreCase(signal.outcome())) {
+            return "PASSED";
+        }
         if (alreadyStopped && existing.status() != null && "FAILED".equalsIgnoreCase(existing.status().trim())) {
             return "FAILED";
         }

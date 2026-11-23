@@ -15,10 +15,13 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -245,11 +248,31 @@ public final class WorkbenchRunReports {
             if (fromConsole != null && fromConsole[1] > 0) steps = fromConsole[1];
         }
         if (!launchError && scenarios == 0) scenarios = names.size();
+        int passed = 0;
+        int failed = 0;
+        List<String> failedNames = List.of();
+        if (!launchError) {
+            int[] counted = passFail(bodies);
+            passed = counted[0];
+            failed = counted[1];
+            failedNames = failedScenarioNames(project, bodies);
+            if (bodies.isEmpty()) {
+                int[] indexed = indexPassFail(project, runId);
+                if (indexed != null) {
+                    passed = indexed[0];
+                    failed = indexed[1];
+                }
+            }
+        }
+        String shown = status;
+        if (!launchError && failed > 0 && (shown == null || shown.isBlank() || "PASSED".equalsIgnoreCase(shown.trim()))) {
+            shown = "FAILED";
+        }
         if (runId != null && !runId.isBlank()) {
             try {
                 writeRunSummary(
                         AgentCoordination.runDirectory(project, runId),
-                        status,
+                        shown,
                         bodies,
                         traces,
                         scenarios,
@@ -260,16 +283,7 @@ public final class WorkbenchRunReports {
             }
         }
         if (out != null) {
-            int passed = 0;
-            int failed = 0;
-            List<String> failedNames = List.of();
-            if (!launchError) {
-                int[] counted = passFail(bodies);
-                passed = counted[0];
-                failed = counted[1];
-                failedNames = failedScenarioNames(project, bodies);
-            }
-            out.println(compact(status, scenarios, steps, environment, browser, passed, failed, failedNames));
+            out.println(compact(shown, scenarios, steps, environment, browser, passed, failed, failedNames));
         }
         return steps;
     }
@@ -398,19 +412,116 @@ public final class WorkbenchRunReports {
         }
         List<Path> privateDirs = scenarioDirs(privateRoot);
         try {
-            if (Files.isDirectory(AgentCoordination.runDirectory(project, runId))) return privateDirs;
+            if (Files.isDirectory(AgentCoordination.runDirectory(project, runId))) {
+                return scopeToThisAttempt(project, runId, privateDirs);
+            }
         } catch (IllegalArgumentException invalid) {
-            return privateDirs;
+            return scopeToThisAttempt(project, runId, privateDirs);
         }
-        if (!privateDirs.isEmpty()) return privateDirs;
-        return scenarioDirs(project.resolve("reports").resolve("diagnostic-runs").resolve(runId));
+        if (!privateDirs.isEmpty()) return scopeToThisAttempt(project, runId, privateDirs);
+        return scopeToThisAttempt(
+                project, runId, scenarioDirs(project.resolve("reports").resolve("diagnostic-runs").resolve(runId))
+        );
+    }
+
+    /**
+     * Confirm does not archive {@code diagnostic/}, so an earlier attempt's
+     * scenario folders stay beside this launch. When the index lists
+     * {@code scenarios}, only those execution ids count. An empty list counts
+     * nothing. With no list, a {@code counts.total} smaller than the walk keeps
+     * the newest folders. {@code attempts/} is outside this walk.
+     */
+    private static List<Path> scopeToThisAttempt(Path project, String runId, List<Path> dirs) {
+        if (dirs == null || dirs.isEmpty()) return dirs == null ? List.of() : dirs;
+        Path index = AgentCoordination.findRunIndex(project, runId);
+        if (index == null || !Files.isRegularFile(index)) return dirs;
+        try {
+            JsonNode root = JSON.readTree(index.toFile());
+            JsonNode scenarios = root.get("scenarios");
+            if (scenarios != null && scenarios.isArray()) {
+                Set<String> ids = new LinkedHashSet<>();
+                for (JsonNode scenario : scenarios) {
+                    String id = executionId(scenario);
+                    if (!id.isBlank()) ids.add(id);
+                }
+                List<Path> kept = new ArrayList<>();
+                for (Path dir : dirs) {
+                    String name = dir.getFileName() == null ? "" : dir.getFileName().toString();
+                    if (ids.contains(name)) kept.add(dir);
+                }
+                return kept;
+            }
+            JsonNode counts = root.get("counts");
+            if (counts != null && counts.isObject() && counts.has("total")) {
+                int total = counts.path("total").asInt(-1);
+                if (total >= 0 && dirs.size() > total) {
+                    List<Path> newest = new ArrayList<>(dirs);
+                    newest.sort(Comparator.comparingLong(WorkbenchRunReports::modifiedMillis).reversed());
+                    if (total == 0) return List.of();
+                    return List.copyOf(newest.subList(0, total));
+                }
+            }
+            return dirs;
+        } catch (IOException failure) {
+            return dirs;
+        }
+    }
+
+    private static String executionId(JsonNode scenario) {
+        if (scenario == null) return "";
+        String id = scenario.path("scenarioExecutionId").asText("");
+        if (!id.isBlank()) return id;
+        String summary = scenario.path("summary").asText("");
+        String marker = "scenarios/";
+        int at = summary.indexOf(marker);
+        if (at < 0) return "";
+        String rest = summary.substring(at + marker.length());
+        int slash = rest.indexOf('/');
+        return slash < 0 ? rest : rest.substring(0, slash);
+    }
+
+    private static long modifiedMillis(Path path) {
+        try {
+            return Files.getLastModifiedTime(path).toMillis();
+        } catch (IOException failure) {
+            return 0L;
+        }
+    }
+
+    /** Passed and failed from this attempt's index when its scenario files were pruned. */
+    private static int[] indexPassFail(Path project, String runId) {
+        Path index = AgentCoordination.findRunIndex(project, runId);
+        if (index == null || !Files.isRegularFile(index)) return null;
+        try {
+            JsonNode root = JSON.readTree(index.toFile());
+            JsonNode scenarios = root.get("scenarios");
+            if (scenarios == null || !scenarios.isArray() || scenarios.isEmpty()) return null;
+            JsonNode counts = root.get("counts");
+            if (counts == null || !counts.isObject()) return null;
+            if (!counts.has("passed") && !counts.has("failed") && !counts.has("errors")) return null;
+            int passed = counts.path("passed").asInt(0);
+            int failed = counts.path("failed").asInt(0) + counts.path("errors").asInt(0);
+            return new int[]{passed, failed};
+        } catch (IOException failure) {
+            return null;
+        }
     }
 
     private static List<Path> scenarioDirs(Path root) throws IOException {
         if (root == null || !Files.isDirectory(root)) return List.of();
         try (var walk = Files.walk(root, 6)) {
-            return walk.filter(WorkbenchRunReports::scenarioDirectory).toList();
+            return walk.filter(WorkbenchRunReports::scenarioDirectory)
+                    .filter(path -> !underAttempts(path))
+                    .toList();
         }
+    }
+
+    private static boolean underAttempts(Path path) {
+        if (path == null) return false;
+        for (Path part : path) {
+            if (part.getFileName() != null && "attempts".equals(part.getFileName().toString())) return true;
+        }
+        return false;
     }
 
     /** A scenario folder still holding events, or the core summary left after dense evidence was pruned. */

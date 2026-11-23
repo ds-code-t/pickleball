@@ -10,8 +10,14 @@ import dev.domengine.query.Query;
 import dev.domengine.session.BrowserSession;
 import dev.domengine.tree.DomNode;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
@@ -122,7 +128,7 @@ public final class Observe {
         String out = flags.get("out");
         if (out != null && !out.isBlank()) {
             try {
-                Files.write(Path.of(out), java.util.Base64.getDecoder().decode(data));
+                writePng(Path.of(out), java.util.Base64.getDecoder().decode(data));
                 result.put("path", out);
             } catch (Exception failure) {
                 throw new CdpException("screenshot: " + failure.getMessage());
@@ -130,6 +136,31 @@ public final class Observe {
         }
         EngineLog.info("action", "screenshot bytes=" + data.length());
         return result;
+    }
+
+    /** Closed and replaced before the caller returns, so the PNG can be opened at once. */
+    static void writePng(Path file, byte[] png) {
+        byte[] payload = png == null ? new byte[0] : png;
+        Path temp = file.resolveSibling(file.getFileName().toString() + ".part");
+        try {
+            if (file.getParent() != null) Files.createDirectories(file.getParent());
+            try (FileChannel channel = FileChannel.open(
+                    temp,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.WRITE,
+                    StandardOpenOption.TRUNCATE_EXISTING
+            )) {
+                channel.write(ByteBuffer.wrap(payload));
+                channel.force(true);
+            }
+            try {
+                Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException failure) {
+                Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException failure) {
+            throw new CdpException("screenshot: " + failure.getMessage());
+        }
     }
 
     public static DomNode rootFrom(Map<String, String> flags, BrowserSession session) {

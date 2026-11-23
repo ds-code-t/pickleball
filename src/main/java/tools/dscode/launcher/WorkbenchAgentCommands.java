@@ -639,6 +639,7 @@ public final class WorkbenchAgentCommands {
             ByteArrayOutputStream capturedErr = captureBuffer();
             PrintStream captureOut = new PrintStream(capturedOut, true, StandardCharsets.UTF_8);
             PrintStream captureErr = new PrintStream(capturedErr, true, StandardCharsets.UTF_8);
+            Instant launchStart = Instant.now();
             Bounded mavenResult = directOrFallback(
                     parsed, run, command, out, err, capturedOut, capturedErr, captureOut, captureErr, maven
             );
@@ -648,7 +649,7 @@ public final class WorkbenchAgentCommands {
             }
             int exit = mavenResult.exit();
             boolean empty = selection.matchedNone();
-            Observed observed = observe(parsed.project(), run.runId(), exit, empty, captured(capturedOut, capturedErr));
+            Observed observed = observe(parsed.project(), run.runId(), exit, empty, captured(capturedOut, capturedErr), launchStart);
             String status = observed.status();
             int reported = observed.exitCode();
             String[] fault = "LAUNCH_ERROR".equals(status)
@@ -770,6 +771,7 @@ public final class WorkbenchAgentCommands {
             ByteArrayOutputStream capturedErr = captureBuffer();
             PrintStream captureOut = new PrintStream(capturedOut, true, StandardCharsets.UTF_8);
             PrintStream captureErr = new PrintStream(capturedErr, true, StandardCharsets.UTF_8);
+            Instant launchStart = Instant.now();
             Bounded mavenResult = directOrFallback(
                     parsed, run, command, out, err, capturedOut, capturedErr, captureOut, captureErr, maven
             );
@@ -779,7 +781,7 @@ public final class WorkbenchAgentCommands {
             }
             int exit = mavenResult.exit();
             boolean empty = selection.matchedNone();
-            Observed observed = observe(parsed.project(), run.runId(), exit, empty, captured(capturedOut, capturedErr));
+            Observed observed = observe(parsed.project(), run.runId(), exit, empty, captured(capturedOut, capturedErr), launchStart);
             String status = observed.status();
             int reported = observed.exitCode();
             String[] fault = "LAUNCH_ERROR".equals(status)
@@ -2592,14 +2594,14 @@ public final class WorkbenchAgentCommands {
      * including a Surefire Error recorded as {@code counts.errors} or outcome
      * {@code ERROR}. The failure count is the larger of the index and Surefire XML.
      */
-    private static Observed observe(Path project, String runId, int mavenExit, boolean empty, String console) {
+    private static Observed observe(
+            Path project, String runId, int mavenExit, boolean empty, String console, Instant launchedAt
+    ) {
         if (empty) {
             return new Observed("EMPTY", mavenExit == 0 ? 1 : mavenExit);
         }
-        AgentCoordination.DiagnosticSignal signal = AgentCoordination.readDiagnosticSignal(
-                project, runId, recordStarted(AgentCoordination.runDirectory(project, runId).resolve(AgentCoordination.RECORD_FILE))
-        );
-        DiagnosticVerdict verdict = surefireVerdict(project, AgentCoordination.runDirectory(project, runId).resolve(AgentCoordination.RECORD_FILE));
+        AgentCoordination.DiagnosticSignal signal = AgentCoordination.readDiagnosticSignal(project, runId, launchedAt);
+        DiagnosticVerdict verdict = surefireVerdict(project, launchedAt);
         int recordedSteps = WorkbenchRunReports.recordedExecutedSteps(project, runId, console);
         boolean failed = (signal != null && signal.failed()) || (verdict != null && verdict.failed());
         if (failed && recordedSteps == 0) {
@@ -2655,8 +2657,7 @@ public final class WorkbenchAgentCommands {
     private static final Pattern SUREFIRE_FAILURES = Pattern.compile("\\bfailures=\"(\\d+)\"");
     private static final Pattern SUREFIRE_ERRORS = Pattern.compile("\\berrors=\"(\\d+)\"");
 
-    private static DiagnosticVerdict surefireVerdict(Path project, Path recordFile) {
-        Instant started = recordStarted(recordFile);
+    private static DiagnosticVerdict surefireVerdict(Path project, Instant started) {
         int failures = 0;
         boolean sawReport = false;
         for (Path dir : List.of(

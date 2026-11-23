@@ -1114,8 +1114,8 @@ class WorkbenchSessionCommandsTest {
     }
 
     @Test
-    @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void isolateWithoutAWorkspaceFailsBeforeSpawn() {
+    @Timeout(value = 20, unit = TimeUnit.SECONDS)
+    void isolateWithoutAWorkspaceSeedsThenSpawns() {
         AtomicBoolean started = new AtomicBoolean();
         Output output = run(
                 new String[]{"isolate", project.toString(), "--run-id=missing-ws"},
@@ -1125,10 +1125,11 @@ class WorkbenchSessionCommandsTest {
                 }
         );
         assertEquals(1, output.exitCode, output.stderr + output.stdout);
-        assertFalse(started.get());
-        assertTrue(output.stderr.contains("error: no workspace for run id missing-ws"), output.stderr);
-        assertTrue(output.stderr.contains("fix: Run workspace-seed or discover for that run id."), output.stderr);
-        assertFalse(output.stderr.contains("exited before becoming healthy"), output.stderr);
+        assertTrue(started.get(), output.stderr + output.stdout);
+        assertTrue(output.stdout.contains("seeded run-id=missing-ws"), output.stdout + output.stderr);
+        assertTrue(Workspace.exists(Workspace.directory(project, "missing-ws")), output.stdout + output.stderr);
+        assertFalse(output.stderr.contains("no workspace for run id"), output.stderr);
+        assertFalse(output.stdout.contains("no workspace for run id"), output.stdout);
     }
 
     @Test
@@ -1449,9 +1450,15 @@ class WorkbenchSessionCommandsTest {
     }
 
     private static Process exitedProcess() throws IOException {
-        Process process = new ProcessBuilder("true").start();
+        ProcessBuilder builder = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win")
+                ? new ProcessBuilder("cmd.exe", "/c", "exit", "1")
+                : new ProcessBuilder("true");
+        Process process = builder.start();
         try {
-            process.waitFor(2, TimeUnit.SECONDS);
+            if (!process.waitFor(2, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                throw new IOException("The exited-process stub was still alive.");
+            }
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             throw new IOException("Interrupted while waiting for the exited process.", interrupted);

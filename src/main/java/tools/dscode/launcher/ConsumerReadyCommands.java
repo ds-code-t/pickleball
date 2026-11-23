@@ -42,6 +42,8 @@ final class ConsumerReadyCommands {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final long LOG_CAP = 1_048_576L;
     private static final Duration HEALTH_TIMEOUT = Duration.ofSeconds(2);
+    /** Covers Chrome's DevToolsActivePort wait. A slow first start can still become healthy. */
+    static final int HEALTH_WAIT_SECONDS = 50;
     private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(HEALTH_TIMEOUT).build();
 
     private ConsumerReadyCommands() {
@@ -131,7 +133,7 @@ final class ConsumerReadyCommands {
             return 1;
         }
         try {
-            if (!awaitHealthy(process, project, logFile, err)) {
+            if (!awaitHealthy(process, project, id, logFile, err)) {
                 destroyHost(process);
                 stopQuiet(project);
                 return 1;
@@ -534,12 +536,12 @@ final class ConsumerReadyCommands {
         return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
     }
 
-    private static boolean awaitHealthy(Process process, Path project, Path logFile, java.io.PrintStream err) {
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
+    private static boolean awaitHealthy(Process process, Path project, String id, Path logFile, java.io.PrintStream err) {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(HEALTH_WAIT_SECONDS);
         try {
             while (System.nanoTime() < deadline) {
                 if (!process.isAlive()) {
-                    err.println("error: live browser host exited\nfix: see " + logFile + "\n" + tail(logFile));
+                    err.print(unhealthyMessage(readStage(project, id), tail(logFile), logFile, true));
                     return false;
                 }
                 Optional<LiveHostFile.Host> host = LiveHostFile.read(project);
@@ -551,8 +553,47 @@ final class ConsumerReadyCommands {
             err.println("error: live browser host wait was interrupted\nfix: retry start\n");
             return false;
         }
-        err.println("error: live browser host did not become healthy\nfix: see " + logFile + "\n" + tail(logFile));
+        err.print(unhealthyMessage(readStage(project, id), tail(logFile), logFile, false));
         return false;
+    }
+
+    static String unhealthyMessage(String stage, String logTail, Path logFile) {
+        return unhealthyMessage(stage, logTail, logFile, false);
+    }
+
+    private static String unhealthyMessage(String stage, String logTail, Path logFile, boolean exited) {
+        StringBuilder text = new StringBuilder();
+        if (exited) {
+            text.append("error: live browser host exited");
+        } else {
+            text.append("error: live browser host did not become healthy within ").append(HEALTH_WAIT_SECONDS).append('s');
+        }
+        if (stage != null && !stage.isBlank()) text.append(" (stage=").append(stage.trim()).append(')');
+        String error = firstErrorLine(logTail);
+        if (!error.isBlank()) text.append(": ").append(error);
+        text.append("\nfix: the partial Chrome process was stopped. Retry start. See ").append(logFile);
+        if (logTail != null && !logTail.isBlank()) text.append('\n').append(logTail);
+        if (text.charAt(text.length() - 1) != '\n') text.append('\n');
+        return text.toString();
+    }
+
+    private static String firstErrorLine(String logTail) {
+        if (logTail == null || logTail.isBlank()) return "";
+        for (String line : logTail.split("\\R")) {
+            String trimmed = line.trim();
+            if (trimmed.startsWith("error:")) return trimmed;
+        }
+        return "";
+    }
+
+    private static String readStage(Path project, String id) {
+        if (project == null || id == null || id.isBlank()) return "";
+        Path file = project.resolve(".pickleball").resolve("live-browser").resolve(id).resolve("stage.txt");
+        try {
+            return Files.readString(file).trim();
+        } catch (IOException failure) {
+            return "";
+        }
     }
 
     private record HealthPayload(String status, String page) {
@@ -630,14 +671,8 @@ final class ConsumerReadyCommands {
     }
 
     private static void destroyHost(Process process) {
-        if (process == null) return;
-        process.destroy();
-        try {
-            if (!process.waitFor(8, TimeUnit.SECONDS)) ProcessTree.kill(process.pid());
-        } catch (InterruptedException failure) {
-            Thread.currentThread().interrupt();
-            ProcessTree.kill(process.pid());
-        }
+        if (process == null || !process.isAlive()) return;
+        ProcessTree.kill(process.toHandle());
     }
 
     private record CliHealth(String status, String headed, String pid, String page) {

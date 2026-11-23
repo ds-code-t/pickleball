@@ -135,6 +135,9 @@ public final class LiveBrowserHost {
         try {
             System.err.println("browser=" + browser + " headed=" + headed);
             pruneProfiles(project, id);
+            writeStage(project, id, "launching");
+            System.err.println("stage=launching");
+            System.err.flush();
             Path profile = project.resolve(".pickleball").resolve("live-browser").resolve(id).resolve("profile");
             Files.createDirectories(profile);
             BrowserSession session = BrowserSession.launch(
@@ -167,16 +170,30 @@ public final class LiveBrowserHost {
                     base, token, port, pid, session.pid, id, headed, browser, navigated, navError, pageAttached,
                     startMillis(ProcessHandle.current()), startMillis(ProcessHandle.of(session.pid).orElse(null))
             ));
+            writeStage(project, id, "healthy");
             if (!navigated) System.err.println("error: navigation failed: " + navError);
             stopped.await();
         } catch (Exception failure) {
+            writeStage(project, id, "failed");
             String message = failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
             System.err.println("error: " + message);
+            System.err.flush();
             code = 1;
         } finally {
             release(project, CHROME.get(), server);
         }
         if (code != 0) System.exit(code);
+    }
+
+    private static void writeStage(Path project, String id, String stage) {
+        if (project == null || id == null || id.isBlank()) return;
+        try {
+            Path file = project.resolve(".pickleball").resolve("live-browser").resolve(id).resolve("stage.txt");
+            Files.createDirectories(file.getParent());
+            Files.writeString(file, stage == null ? "" : stage);
+        } catch (IOException ignored) {
+            // The log line is the other copy of this stage.
+        }
     }
 
     /** Removes old {@code live-browser/<id>} directories. {@code keepId} null removes every id directory. */

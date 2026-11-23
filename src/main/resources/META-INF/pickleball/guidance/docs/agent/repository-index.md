@@ -776,6 +776,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentfast/LeanReplyTest.java`
 - `src/test/java/tools/dscode/common/agentfast/LiveReplyRulesTest.java`
 - `src/test/java/tools/dscode/common/agentfast/PushAndViewTest.java`
+- `src/test/java/tools/dscode/common/agentfast/ScreenshotFlushTest.java`
 - `src/test/java/tools/dscode/common/agentfast/SelftestCpuBenchTest.java`
 - `src/test/java/tools/dscode/common/agentfast/SnapNameTest.java`
 - `src/test/java/tools/dscode/common/agentfast/SnapScopeTest.java`
@@ -969,6 +970,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/SnapBudgetTest.java`
 - `src/test/java/tools/dscode/launcher/SnapshotDiffOnActTest.java`
 - `src/test/java/tools/dscode/launcher/StartDrivesPageTest.java`
+- `src/test/java/tools/dscode/launcher/StartHealthMessageTest.java`
 - `src/test/java/tools/dscode/launcher/StartLaunchesBrowserTest.java`
 - `src/test/java/tools/dscode/launcher/StoreCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/TargetAgnosticApiTest.java`
@@ -1583,6 +1585,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/tree/LiveTree.java`
 - `dom-engine/src/main/resources/dev/domengine/snapshot/composite-snapshot.schema.json`
 - `dom-engine/src/main/resources/dev/domengine/snapshot/page-walk.js`
+- `dom-engine/src/test/java/dev/domengine/action/ScreenshotFlushTest.java`
 - `dom-engine/src/test/java/dev/domengine/ActionSmokeTest.java`
 - `dom-engine/src/test/java/dev/domengine/affinity/AffinityScoreTest.java`
 - `dom-engine/src/test/java/dev/domengine/affinity/AffinityWeightsTest.java`

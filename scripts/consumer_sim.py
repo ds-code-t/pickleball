@@ -77,7 +77,7 @@ BUDGETS = {
     "validate": 30,
     "validate-quiet": 30,
     "discover-quiet": 120,
-    "isolate-no-workspace": 60,
+    "isolate-no-workspace": 600,
     "isolate-again": 600,
     "isolate": 600,
     "execute-step-b64": 180,
@@ -186,10 +186,13 @@ def main() -> int:
         assert_not_in(quiet_discover, "does not use --quiet")
         missing = run_stage(timings, "isolate-no-workspace", [
             "isolate", "--run-id=sim-missing-workspace", "--agent=consumer-sim",
-        ], allow_exit={1})
-        assert_in(missing, "error: no workspace for run id sim-missing-workspace")
-        assert_in(missing, "fix: Run workspace-seed or discover for that run id.")
-        assert_not_in(missing, "exited before becoming healthy")
+            "--runvar=pkb_browser=CHROME_HEADLESS",
+        ], allow_exit={0})
+        assert_in(missing, "seeded run-id=sim-missing-workspace")
+        assert_in(missing, "ACK SESSION")
+        assert_not_in(missing, "error: no workspace for run id")
+        # A healthy session for any run id makes the next isolate already-running.
+        release_session_for_rotate("sim-missing-workspace")
         run_stage(timings, "workspace-seed-session", [
             "workspace-seed", "--run-id=" + SESSION, "--reseed",
         ], allow_exit={0})
@@ -299,7 +302,7 @@ def publish() -> None:
 
 def prepare_tree() -> None:
     runs = CONSUMER / ".pickleball" / "runs"
-    for run_id in (RUN_UNCOMPILED, RUN, SESSION, *_REPORT_RUNS):
+    for run_id in (RUN_UNCOMPILED, RUN, SESSION, "sim-missing-workspace", *_REPORT_RUNS):
         shutil.rmtree(runs / run_id, ignore_errors=True)
     classes = CONSUMER / "target" / "test-classes"
     if classes.exists():

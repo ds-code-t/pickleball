@@ -681,6 +681,28 @@ class AgentCoordinationTest {
     }
 
     @Test
+    void passedFinishReplacesAFailedRecordWhenTheIndexIsClean() throws Exception {
+        AgentCoordination.Run run = AgentCoordination.begin(project, request("run-clean-pass", "agent-pass"));
+        AgentCoordination.finish(project, run.runId(), "first", "FAILED");
+        assertTrue(Files.readString(run.recordFile()).contains("\"status\" : \"FAILED\""));
+        Path index = run.diagnosticDirectory().resolve("run-index.json");
+        Files.createDirectories(index.getParent());
+        Files.writeString(index, """
+                {
+                  "runId": "run-clean-pass",
+                  "outcome": "PASSED",
+                  "counts": { "total": 1, "passed": 1, "failed": 0, "errors": 0 },
+                  "scenarios": [ { "scenarioExecutionId": "fresh", "name": "Fresh", "outcome": "PASSED" } ]
+                }
+                """);
+        AgentCoordination.finish(project, run.runId(), null, "PASSED");
+        String record = Files.readString(run.recordFile());
+        assertTrue(record.contains("\"status\" : \"PASSED\""), record);
+        assertFalse(record.contains("\"status\" : \"FAILED\""), record);
+        assertFalse(record.contains("\"failureCount\" : 2"), record);
+    }
+
+    @Test
     void edgeLockfileHoldsTheProfileTheSameWayAsChromeSingletonLock() throws Exception {
         AgentCoordination.Run edge = AgentCoordination.begin(project, request("run-edge", "agent-edge"));
         Path cookies = edge.browserProfileDirectory().resolve("Default").resolve("Cookies");

@@ -14,6 +14,7 @@ import tools.dscode.control.protocol.SecretRedactor;
 import tools.dscode.control.protocol.SleepGapMonitor;
 import tools.dscode.control.protocol.WindowDriver;
 import tools.dscode.control.protocol.Workspace;
+import tools.dscode.testengine.WorkspaceSeed;
 
 import java.io.IOException;
 import java.io.PrintStream;
@@ -576,12 +577,27 @@ public final class WorkbenchSessionCommands {
         String requestedRun = parsed.coordination().runId();
         if (requestedRun != null && !requestedRun.isBlank()
                 && !Workspace.exists(Workspace.directory(project, requestedRun.trim()))) {
-            String error = "no workspace for run id " + requestedRun.trim();
-            String fix = "Run workspace-seed or discover for that run id.";
-            if (err != null) err.print(WorkbenchCliHelp.structured(error, fix));
-            finishReason(project, run.runId(), "Session start failed: " + error, out);
-            WorkbenchSpeed.release(project);
-            return 1;
+            String id = requestedRun.trim();
+            try {
+                WorkspaceSeed.seed(
+                        project,
+                        id,
+                        false,
+                        null,
+                        null,
+                        path -> WorkspaceLaunch.capture(project, path, false, err),
+                        err
+                );
+                if (out != null) out.println("seeded run-id=" + id);
+            } catch (RuntimeException failure) {
+                String error = "no workspace for run id " + id;
+                String detail = failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
+                String fix = "Run workspace-seed or discover for that run id. " + detail;
+                if (err != null) err.print(WorkbenchCliHelp.structured(error, fix));
+                finishReason(project, run.runId(), "Session start failed: " + error, out);
+                WorkbenchSpeed.release(project);
+                return 1;
+            }
         }
 
         Path logFile = run.sessionDirectory().resolve("session.log");

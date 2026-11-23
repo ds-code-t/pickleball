@@ -60,6 +60,7 @@ Usage: close-window
 
 # help confirm
 Usage: confirm [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<path:line>] [--quiet] [--runvar=key=value] [--run-id=<id>] [--agent=<id>] [--run-timeout=<seconds>]
+The summary counts are this launch only. A PASSED summary does not include an earlier attempt's failures.
 
 # help controller-ping
 Usage: controller-ping [project]
@@ -196,6 +197,7 @@ Lists interactive elements and the phrase that would target each one. It takes n
 
 # help isolate
 Usage: isolate [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--runvar=key=value] [--run-id=<id>] [--agent=<id>] [--session-file=<path>]
+A new --run-id with no workspace is seeded from the project, then the session starts.
 
 # help kill
 Usage: kill
@@ -291,6 +293,7 @@ Bare session starts the controller. Agents testing alone use isolate.
 
 # help session-start
 Usage: session-start [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--run-id=<id>] [--agent=<id>] [--session-file=<path>]
+A new --run-id with no workspace is seeded from the project, then the session starts.
 
 # help session-sync
 Usage: session-sync
@@ -311,7 +314,7 @@ A short id (s1.h18) names that element and is not expanded to its accessible nam
 
 # help start
 Usage: start --url=<page> | --url-key=<URL.key> --browser=<chrome|edge|chrome-headless> [--headed] [--hold=<seconds|forever>] [--panel] [--size=1600x1000] [--env=KEY=VALUE]
-Opens the browser, navigates, and waits until GET /health is ok. fixture: names a built-in page. --panel opens the page panel. live-start is start. The reply includes the agent envelope. The page engine is Chrome DevTools. --engine=selenium is rejected.
+Opens the browser, navigates, and waits until GET /health is ok. fixture: names a built-in page. --panel opens the page panel. live-start is start. The reply includes the agent envelope. The page engine is Chrome DevTools. --engine=selenium is rejected. A start that does not become healthy names the stage, stops the partial Chrome, and prints the log tail.
 
 # help status
 Usage: status [command-id] [--json] [--run-id=<id>]
