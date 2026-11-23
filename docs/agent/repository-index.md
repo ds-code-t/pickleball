@@ -32,6 +32,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/audits/3.0.0-architecture-doc-audit.md`
 - `docs/block-conditionals.md`
 - `docs/collaborative-recording.md`
+- `docs/collaborative-self-test.md`
 - `docs/component-scenarios.md`
 - `docs/config-files-and-resource-mapping.md`
 - `docs/configuration.md`

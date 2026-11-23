@@ -30,6 +30,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/ai-run-configuration.md`
 - `docs/block-conditionals.md`
 - `docs/collaborative-recording.md`
+- `docs/collaborative-self-test.md`
 - `docs/component-scenarios.md`
 - `docs/config-files-and-resource-mapping.md`
 - `docs/configuration.md`

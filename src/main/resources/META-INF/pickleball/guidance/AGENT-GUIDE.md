@@ -1,10 +1,10 @@
 # Pickleball Consumer Agent Guide
 
-First-read only. Longer notes: `docs/workbench-agent-detail.md`.
+First-read only. Detail: `docs/workbench-agent-detail.md`. Self-test: `docs/collaborative-self-test.md`.
 
 ## Tool chooser
 
-Workbench is the one front door. Do not open the GUI for your own testing. While testing for yourself, stay headless. When a window is already open, only one agent is the one driver on their own run id. Agents are not daemons. Read short log `.pickleball/agent-log`. `mvnw` or `mvnw.cmd` (`gradlew`/`gradlew.bat`). Do not require a machine-wide Maven or Gradle. Pure CLI. IDE MCP is not required.
+Workbench is the one front door. Do not open the GUI for your own testing. Stay headless. When a window is already open, only one agent is the one driver on their own run id. Agents are not daemons. Read short log `.pickleball/agent-log`. `mvnw` or `mvnw.cmd`. Do not require a machine-wide Maven or Gradle. Pure CLI. IDE MCP is not required.
 
 ```text
 ./mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=discover"

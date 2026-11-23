@@ -40,6 +40,8 @@ The panel tabs are Chat, Guide, and Recorder. The tab ids stay `chat`, `steps`, 
 
 `dashboard overlap` groups runs that were active at the same time and lists a failure line only when at least two runs in that group share it. A blank finish is a point at the start. Use `--from` and `--to` to keep one window. When a failure looks intermittent, run overlap first, then xref for the element on the page. MCP `workbench_dashboard_overlap` forwards that command.
 
+Unattended recipes for feedback, the step editor, recording noise, and these dashboard reads are in `docs/collaborative-self-test.md`.
+
 ## Tool chooser
 
 Pickleball Workbench is the one front door. It is a Java program launched from the consumer project, not a GUI requirement. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test. Do not click the JavaFX or WebView UI.
