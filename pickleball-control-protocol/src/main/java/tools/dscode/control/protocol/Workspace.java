@@ -3,10 +3,12 @@ package tools.dscode.control.protocol;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.concurrent.locks.LockSupport;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -823,18 +825,47 @@ public final class Workspace {
     }
 
     public static void atomicWrite(Path target, byte[] bytes) {
+        Path temp = null;
         try {
             if (target.getParent() != null) Files.createDirectories(target.getParent());
-            Path temp = target.resolveSibling(target.getFileName() + ".tmp-" + UUID.randomUUID());
+            temp = target.resolveSibling(target.getFileName() + ".tmp-" + UUID.randomUUID());
             Files.write(temp, bytes);
-            try {
-                Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-            } catch (AtomicMoveNotSupportedException ignored) {
-                Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING);
-            }
+            moveIntoPlace(temp, target);
         } catch (IOException failure) {
             throw new IllegalStateException("Could not write " + target + ": " + failure.getMessage(), failure);
+        } finally {
+            if (temp != null) {
+                try {
+                    Files.deleteIfExists(temp);
+                } catch (IOException ignored) {
+                    // The replacement already consumed the temp file, or a later write will use a new name.
+                }
+            }
         }
+    }
+
+    /**
+     * Replaces {@code target} with {@code temp}. A Windows reader can make the first
+     * atomic replace return access denied. Retry that replace. A volume that cannot
+     * move atomically uses a plain replace. A failed attempt deletes {@code temp}
+     * in the caller so the previous descriptor stays complete.
+     */
+    private static void moveIntoPlace(Path temp, Path target) throws IOException {
+        AccessDeniedException last = null;
+        for (int attempt = 0; attempt < 50; attempt++) {
+            try {
+                try {
+                    Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                } catch (AtomicMoveNotSupportedException unsupported) {
+                    Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING);
+                }
+                return;
+            } catch (AccessDeniedException denied) {
+                last = denied;
+                LockSupport.parkNanos(1_000_000L);
+            }
+        }
+        throw last;
     }
 
     public static void atomicWriteString(Path target, String text) {
