@@ -208,7 +208,19 @@ def main() -> int:
             "isolate", "--run-id=" + SESSION, "--tags=" + TAGS, "--name=" + NAME,
             "--runvar=pkb_browser=CHROME_HEADLESS", "--agent=consumer-sim",
         ], allow_exit={0})
-        assert_first_start_timing(SESSION)
+        # sim-missing-workspace is the first materialize. SESSION is the same
+        # project with unchanged classes, so it skips copy-live.
+        assert_first_start_timing("sim-missing-workspace")
+        second = (CONSUMER / ".pickleball" / "runs" / SESSION / "session" / "session.log")
+        second_text = second.read_text(encoding="utf-8", errors="replace") if second.is_file() else ""
+        assert_true(
+            "progress stage=classpath-cache hashed=false" in second_text,
+            "unchanged second isolate did not skip materialize",
+        )
+        assert_true(
+            "progress stage=copy-live " not in second_text,
+            "unchanged second isolate materialized again",
+        )
         log_path = CONSUMER / ".pickleball" / "runs" / SESSION / "session" / "session.log"
         before = log_path.read_bytes() if log_path.is_file() else b""
         # stop --force would mark SESSION STOPPED. The next isolate is then
@@ -319,7 +331,7 @@ def prepare_tree() -> None:
     # classpath.txt is the session worker classpath (live/classes first).
     # seed-classpath.txt is only the pre-sync fork list. Drop both so the
     # uncompiled discover must compile and record that stage.
-    for name in ("classpath.txt", "seed-classpath.txt"):
+    for name in ("classpath.txt", "seed-classpath.txt", "manifest.json"):
         for classpath in state.glob(f"workbench/{name}"):
             classpath.unlink(missing_ok=True)
         for classpath in state.glob(f"v/*/workbench/{name}"):
@@ -912,7 +924,7 @@ def assert_true(condition: bool, message: str) -> None:
 
 
 def assert_first_start_timing(run_id: str) -> None:
-    """Fresh-cache isolate prints link counts and the post-digest stages.
+    """The isolate that materializes prints link counts and the post-digest stages.
 
     copy-live is on the session log. worker-spawn, jvm-main, and classpath-scan
     are on the worker stderr log. worker-ready is on the session log when
