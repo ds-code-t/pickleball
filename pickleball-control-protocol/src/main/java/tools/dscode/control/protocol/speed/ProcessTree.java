@@ -1,8 +1,12 @@
 package tools.dscode.control.protocol.speed;
 
+import java.io.IOException;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Kills a process and every descendant. The launcher, the warm JVM, and
@@ -79,12 +83,52 @@ public final class ProcessTree {
         }
     }
 
+    /**
+     * Windows {@code ProcessHandle.destroyForcibly} leaves the process and its
+     * children alive. {@code taskkill /F /T} ends that tree. POSIX keeps
+     * {@code destroyForcibly}.
+     */
     private static void destroy(ProcessHandle handle) {
+        if (handle == null) return;
+        if (windows() && taskkillTree(handle.pid())) return;
         try {
             handle.destroyForcibly();
         } catch (RuntimeException ignored) {
             // The process can exit between the snapshot and the kill.
         }
+    }
+
+    private static boolean windows() {
+        return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
+    }
+
+    private static boolean taskkillTree(long pid) {
+        if (pid <= 0 || pid == ProcessHandle.current().pid()) return false;
+        String executable = "taskkill";
+        String root = System.getenv("SystemRoot");
+        if (root != null && !root.isBlank()) {
+            executable = Path.of(root, "System32", "taskkill.exe").toString();
+        }
+        try {
+            Process process = new ProcessBuilder(executable, "/F", "/T", "/PID", Long.toString(pid))
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .start();
+            if (!process.waitFor(5, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                return false;
+            }
+            return process.exitValue() == 0 || !alivePid(pid);
+        } catch (IOException failure) {
+            return false;
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    private static boolean alivePid(long pid) {
+        return ProcessHandle.of(pid).map(ProcessTree::alive).orElse(false);
     }
 
     private static boolean alive(ProcessHandle handle) {
