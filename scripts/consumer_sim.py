@@ -1186,9 +1186,17 @@ def _report7_body(timings: list[dict], results: list[dict]) -> None:
     regex_defined = "undefined=0" in defined_text and "VERIFY DATA ADDRESS" not in defined_text.split("validate undefined=")[0][-200:]
     # undefined=0 is the summary. A finding line would contain the step before that summary.
     regex_clean = "undefined=0" in defined_text and "undefined:" not in defined_text
+    # Empty glue in that workspace is a noop finding, so exit 1 still has undefined=0.
+    no_other_findings = (
+        "undefined=0" in defined_text
+        and "ambiguous=0" in defined_text
+        and "unresolved=0" in defined_text
+    )
+    noop_clean = "noop=0" in defined_text
+    exit_matches_noops = defined.returncode == (0 if noop_clean else 1)
     _report7_note(
         results, "3-validate-run-workspace",
-        workspace_a and defined.returncode == 0,
+        workspace_a and no_other_findings and exit_matches_noops,
         _snippet(defined_text, "workspace=", "undefined="),
     )
     _report7_note(
