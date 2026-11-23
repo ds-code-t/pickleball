@@ -501,6 +501,17 @@ final class WorkbenchMcpTools {
                         "limit", integerProperty("Maximum runs. Optional.")
                 )),
                 args -> forwardReady(dashboardQueryArgs(args)));
+        add("workbench_dashboard_xref",
+                "Forward dashboard xref. Related runs, scenario paths, log excerpts, screenshot paths, and overlapping runs for one element. summary, overlay, and chat are short text. window writes one HTML file. Does not write the store.",
+                schema(Map.of(
+                        "id", stringProperty("Short id or element id. Optional."),
+                        "selector", stringProperty("Selector hint. Optional."),
+                        "role", stringProperty("Role hint. Optional."),
+                        "name", stringProperty("Accessible name. Optional."),
+                        "limit", integerProperty("Maximum runs. Optional."),
+                        "window", booleanProperty("Write one HTML file when true.")
+                )),
+                args -> forwardReady(dashboardXrefArgs(args)));
         add("workbench_entity_lookup",
                 "Forward entity-lookup --ref. Prints the field value.",
                 schema(Map.of("ref", stringProperty("entity:Type#id.field or the angle-bracket form.")), "ref"),
@@ -727,6 +738,26 @@ final class WorkbenchMcpTools {
         String limit = optionalScalar(args, "limit");
         if (!limit.isBlank()) verb.add("--limit=" + limit);
         return verb;
+    }
+
+    private static List<String> dashboardXrefArgs(Map<String, Object> args) {
+        List<String> verb = new ArrayList<>();
+        verb.add("dashboard");
+        verb.add("xref");
+        addOptional(verb, "id", optionalText(args, "id"));
+        addOptional(verb, "selector", optionalText(args, "selector"));
+        addOptional(verb, "role", optionalText(args, "role"));
+        addOptional(verb, "name", optionalText(args, "name"));
+        String limit = optionalScalar(args, "limit");
+        if (!limit.isBlank()) verb.add("--limit=" + limit);
+        if (flag(args, "window")) verb.add("--window");
+        return verb;
+    }
+
+    private static boolean flag(Map<String, Object> args, String name) {
+        Object value = args == null ? null : args.get(name);
+        if (value instanceof Boolean on) return on;
+        return value instanceof String text && "true".equalsIgnoreCase(text.trim());
     }
 
     private static void addOptional(List<String> verb, String name, String value) {

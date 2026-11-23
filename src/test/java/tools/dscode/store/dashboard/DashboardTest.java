@@ -260,6 +260,120 @@ class DashboardTest {
     }
 
     @Test
+    void xrefReturnsHistoryForAFixtureElementAndDoesNotChangeTheStore() throws Exception {
+        var emptyOut = new ByteArrayOutputStream();
+        var emptyErr = new ByteArrayOutputStream();
+        int empty = DashboardCli.execute(new String[]{
+                "dashboard", "xref", "--project=" + project, "--id=#save"
+        }, new PrintStream(emptyOut), new PrintStream(emptyErr));
+        assertEquals(0, empty, emptyErr.toString(StandardCharsets.UTF_8));
+        var emptyTree = new com.fasterxml.jackson.databind.ObjectMapper().readTree(emptyOut.toString(StandardCharsets.UTF_8));
+        assertEquals("xref", emptyTree.get("op").asText());
+        assertEquals(0, emptyTree.get("count").asInt());
+        assertTrue(emptyTree.get("overlay").asText().contains("no related runs"));
+        assertFalse(Files.exists(StorePaths.runState(project)));
+        assertFalse(Files.exists(StorePaths.mainDatabase(project)));
+
+        seed();
+        try (Connection connection = DriverManager.getConnection(
+                "jdbc:sqlite:" + StorePaths.runState(project).toAbsolutePath());
+             Statement statement = connection.createStatement()) {
+            statement.execute("UPDATE runs SET finished_at = '2020-02-01T01:00:00Z' WHERE run_id = 'pay-run'");
+            statement.execute("""
+                    INSERT INTO runs VALUES
+                    ('side-run','2020-02-01T00:30:00Z','2020-02-01T00:40:00Z','PASSED','Side',1,0,'','','features/side.feature'),
+                    ('spot-run','2020-02-01T00:00:00Z',NULL,'PASSED','Spot',1,0,'','','features/spot.feature'),
+                    ('later-run','2020-03-01T00:00:00Z','2020-03-01T00:10:00Z','PASSED','Later',1,0,'','','features/later.feature')
+                    """);
+            statement.execute("""
+                    INSERT INTO step_executions VALUES
+                    ('st-save','ex1','click the #save button','2020-02-01T00:00:04Z','PASSED')
+                    """);
+            statement.execute("ALTER TABLE run_logs ADD COLUMN message TEXT");
+            statement.execute("""
+                    INSERT INTO run_logs (run_id, logged_at, message) VALUES
+                    ('pay-run','2020-02-01T00:00:05Z','save clicked in the pay form')
+                    """);
+            statement.execute("ALTER TABLE artifacts ADD COLUMN kind TEXT");
+            statement.execute("INSERT INTO artifacts (path, run_id, kind) VALUES ('reports/pay/frame.bin','pay-run','screenshot')");
+            statement.execute("INSERT INTO artifacts (path, run_id, kind) VALUES ('data/accounts/ada.yaml','pay-run','')");
+        }
+        byte[] runs = Files.readAllBytes(StorePaths.runState(project));
+        byte[] main = Files.readAllBytes(StorePaths.mainDatabase(project));
+        var out = new ByteArrayOutputStream();
+        var err = new ByteArrayOutputStream();
+        int code = DashboardCli.execute(new String[]{
+                "dashboard", "xref", "--project=" + project, "--id=#save"
+        }, new PrintStream(out), new PrintStream(err));
+        assertEquals(0, code, err.toString(StandardCharsets.UTF_8));
+        var tree = new com.fasterxml.jackson.databind.ObjectMapper().readTree(out.toString(StandardCharsets.UTF_8));
+        assertEquals(1, tree.get("count").asInt());
+        assertEquals("pay-run", tree.get("runs").get(0).get("ref").asText());
+        assertEquals("features/pay.feature|12", tree.get("scenarios").get(0).asText());
+        assertTrue(tree.get("logs").toString().contains("the card was declined"), tree.get("logs").toString());
+        assertTrue(tree.get("logs").toString().contains("save clicked in the pay form"), tree.get("logs").toString());
+        assertTrue(tree.get("screenshots").toString().contains("reports/pay/shot.png"), tree.get("screenshots").toString());
+        assertTrue(tree.get("screenshots").toString().contains("reports/pay/frame.bin"), tree.get("screenshots").toString());
+        assertFalse(tree.get("screenshots").toString().contains("ada.yaml"), tree.get("screenshots").toString());
+        assertEquals(2, tree.get("concurrent").size());
+        assertEquals("spot-run", tree.get("concurrent").get(0).get("ref").asText());
+        assertEquals("side-run", tree.get("concurrent").get(1).get("ref").asText());
+        assertEquals("1 run mentions #save: Pay FAILED. 2 other runs overlap that time.", tree.get("summary").asText());
+        assertTrue(tree.get("overlay").asText().contains("(pay-run) FAILED"));
+        assertTrue(tree.get("overlay").asText().contains("reports/pay/frame.bin"));
+        assertTrue(tree.get("chat").asText().contains("pay-run FAILED"));
+        assertTrue(tree.get("chat").asText().contains("features/pay.feature|12"));
+        assertFalse(tree.has("window"));
+        assertFalse(tree.get("runs").get(0).has("note"));
+        assertArrayEquals(runs, Files.readAllBytes(StorePaths.runState(project)));
+        assertArrayEquals(main, Files.readAllBytes(StorePaths.mainDatabase(project)));
+
+        out.reset();
+        code = DashboardCli.execute(new String[]{
+                "dashboard", "xref", "--project=" + project, "--role=button", "--name=Save"
+        }, new PrintStream(out), new PrintStream(err));
+        assertEquals(0, code, err.toString(StandardCharsets.UTF_8));
+        tree = new com.fasterxml.jackson.databind.ObjectMapper().readTree(out.toString(StandardCharsets.UTF_8));
+        assertEquals("pay-run", tree.get("runs").get(0).get("ref").asText());
+
+        out.reset();
+        code = DashboardCli.execute(new String[]{
+                "dashboard", "xref", "--project=" + project, "--id=#save", "--name=Cancel"
+        }, new PrintStream(out), new PrintStream(err));
+        assertEquals(0, code, err.toString(StandardCharsets.UTF_8));
+        tree = new com.fasterxml.jackson.databind.ObjectMapper().readTree(out.toString(StandardCharsets.UTF_8));
+        assertEquals(0, tree.get("count").asInt());
+        assertEquals(0, tree.get("concurrent").size());
+
+        code = DashboardCli.execute(new String[]{
+                "dashboard", "xref", "--project=" + project
+        }, new PrintStream(new ByteArrayOutputStream()), new PrintStream(err));
+        assertEquals(2, code);
+        assertTrue(err.toString(StandardCharsets.UTF_8).contains(
+                "error: dashboard xref needs --id, --selector, or --role and --name"));
+
+        out.reset();
+        code = DashboardCli.execute(new String[]{
+                "dashboard", "xref", "--project=" + project, "--selector=#save", "--window"
+        }, new PrintStream(out), new PrintStream(err));
+        assertEquals(0, code, err.toString(StandardCharsets.UTF_8));
+        tree = new com.fasterxml.jackson.databind.ObjectMapper().readTree(out.toString(StandardCharsets.UTF_8));
+        assertEquals(".pickleball/dashboard/xref.html", tree.get("window").asText());
+        String html = Files.readString(project.resolve(".pickleball/dashboard/xref.html"));
+        assertTrue(html.contains("pay-run"));
+        assertTrue(html.contains("features/pay.feature|12"));
+        assertTrue(html.contains("reports/pay/shot.png"));
+        assertTrue(html.contains("side-run"));
+        assertFalse(html.contains("<script"));
+        assertFalse(html.toLowerCase().contains("cdn"));
+        assertFalse(html.contains("localhost"));
+        assertArrayEquals(runs, Files.readAllBytes(StorePaths.runState(project)));
+        String help = new String(helpText(), StandardCharsets.UTF_8);
+        assertTrue(help.contains("dashboard xref"));
+        assertTrue(help.contains("--window"));
+    }
+
+    @Test
     void oldBlankRunStaysBlankAfterDashboard() throws Exception {
         Path file = runsFile(true);
         byte[] before = Files.readAllBytes(file);

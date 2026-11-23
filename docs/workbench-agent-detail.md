@@ -36,6 +36,8 @@ The panel tabs are Chat, Guide, and Recorder. The tab ids stay `chat`, `steps`, 
 
 `dashboard query` is the agent read. It prints one JSON object and does not write the store. Use `--from`, `--to`, `--status`, `--feature`, `--entity`, `--text`, `--element`, and `--limit`. `--element` matches step text, scenario keys, artifact paths, entity ids, and log lines. Each run has `name`, `ref`, `status`, `scenarios`, `artifacts`, `data`, and `summary`. MCP `workbench_dashboard_query` forwards the same flags. This is separate from history-query and from the store query read.
 
+`dashboard xref` links the live element to that history. Pass `--id`, `--selector`, or `--role` and `--name`. Every hint must match. The JSON has runs, scenario paths, log excerpts, screenshot paths, and other runs that overlap in time. It always includes summary, overlay, and chat text. Pass the overlay text to the overlay verb, or put the chat text in chat. `--window` writes one HTML file and does not open a browser. MCP `workbench_dashboard_xref` forwards that command.
+
 ## Tool chooser
 
 Pickleball Workbench is the one front door. It is a Java program launched from the consumer project, not a GUI requirement. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test. Do not click the JavaFX or WebView UI.

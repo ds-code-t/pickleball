@@ -24,4 +24,10 @@ The default file is `.pickleball/dashboard/index.html`. Feature, data, and artif
 dashboard query [--project=<dir>] [--from=<iso>] [--to=<iso>] [--status=<status>] [--feature=<path>] [--run=<id>] [--entity=<Type#id>] [--text=<words>] [--element=<hint>] [--limit=<n>]
 ```
 
+`dashboard xref` links one element to that history. Pass `--id`, `--selector`, or `--role` and `--name`. When more than one hint is set, every hint must match. The JSON lists the runs, scenario paths, log excerpts, screenshot paths, and other runs whose time overlaps. A blank finish is a point at the start. Two points overlap only when the timestamps are equal. A point overlaps a range when the start is at or before the point and the point is at or before the end. The object always includes `summary`, `overlay`, and `chat`. Pass `overlay` to the overlay verb, or send `chat` in chat. `--window` writes one HTML file (`.pickleball/dashboard/xref.html` unless `--out` is set) and does not open a browser. The file has no network and no script. The store is not written. MCP `workbench_dashboard_xref` forwards the same command.
+
+```text
+dashboard xref [--project=<dir>] [--id=<id>] [--selector=<selector>] [--role=<role>] [--name=<name>] [--limit=<n>] [--window] [--out=<file>]
+```
+
 Deferred: central hosting, Java source views, and case opened or closed events.

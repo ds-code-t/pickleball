@@ -42,6 +42,9 @@ public final class DashboardCli {
         if ("query".equals(bare(tokens))) {
             return DashboardHistory.query(project, tokens, stdout, stderr);
         }
+        if ("xref".equals(bare(tokens))) {
+            return DashboardHistory.xref(project, tokens, stdout, stderr);
+        }
         Path destination = out(tokens, project);
         DashboardQuery query = new DashboardQuery(
                 value(tokens, "--from"),
@@ -73,7 +76,8 @@ public final class DashboardCli {
                 Writes one static HTML page from the embedded store. It does not change the store and it does not start a server. The page has sticky filters, a colored timeline, clickable entity panels, and links grouped as Features, Data, Artifacts, and Commit.
                 Usage: dashboard query [--project=<dir>] [--from=<iso>] [--to=<iso>] [--status=<status>] [--feature=<path>] [--run=<id>] [--entity=<Type#id>] [--text=<words>] [--element=<hint>] [--limit=<n>]
                 Prints one JSON object of historical runs. Fields are name, ref, status, scenarios, artifacts, data, and summary. --element matches a step, scenario, artifact, entity, or log line. It does not write the store.
-               
+                Usage: dashboard xref [--project=<dir>] [--id=<id>] [--selector=<selector>] [--role=<role>] [--name=<name>] [--limit=<n>] [--window] [--out=<file>]
+                Prints one JSON object for one element. Fields are runs, scenarios, logs, screenshots, concurrent, summary, overlay, and chat. --id, --selector, --role, and --name must all match when more than one is set. --window writes one HTML file and does not open a browser. It does not write the store.
                 """;
     }
 

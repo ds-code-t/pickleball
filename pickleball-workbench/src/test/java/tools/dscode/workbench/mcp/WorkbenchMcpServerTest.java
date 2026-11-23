@@ -115,6 +115,7 @@ class WorkbenchMcpServerTest {
             "workbench_history_summary",
             "workbench_history_query",
             "workbench_dashboard_query",
+            "workbench_dashboard_xref",
             "workbench_entity_lookup",
             "workbench_open_run",
             "workbench_bridge_health",
@@ -683,6 +684,45 @@ class WorkbenchMcpServerTest {
             assertTrue(seen.contains("--limit=5"), seen.toString());
             assertEquals(0, reply.get("exit"));
             assertEquals("Pay", ((Map<?, ?>) ((List<?>) reply.get("runs")).get(0)).get("name"));
+        } finally {
+            ConsumerReadyForwarder.runner = null;
+        }
+    }
+
+    @Test
+    void dashboardXrefForwardsElementHints() {
+        java.util.List<String> seen = new java.util.ArrayList<>();
+        ConsumerReadyForwarder.runner = command -> {
+            seen.addAll(command);
+            return new ConsumerReadyForwarder.Result(
+                    0,
+                    "{\"ok\":true,\"op\":\"xref\",\"count\":1,\"runs\":[{\"name\":\"Pay\",\"ref\":\"pay-run\"}],\"chat\":\"History for #save\"}",
+                    "",
+                    command);
+        };
+        try {
+            WorkbenchMcpTools tools = new WorkbenchMcpTools(fakeServices((method, args) -> {
+                if ("projectRoot".equals(method)) return project;
+                return null;
+            }), JSON);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> reply = (Map<String, Object>) tools.call("workbench_dashboard_xref", Map.of(
+                    "id", "#save",
+                    "role", "button",
+                    "name", "Save",
+                    "limit", 3,
+                    "window", true
+            ));
+            assertTrue(seen.contains("dashboard"), seen.toString());
+            assertTrue(seen.contains("xref"), seen.toString());
+            assertTrue(seen.contains("--id=#save"), seen.toString());
+            assertTrue(seen.contains("--role=button"), seen.toString());
+            assertTrue(seen.contains("--name=Save"), seen.toString());
+            assertTrue(seen.contains("--limit=3"), seen.toString());
+            assertTrue(seen.contains("--window"), seen.toString());
+            assertEquals(0, reply.get("exit"));
+            assertEquals("Pay", ((Map<?, ?>) ((List<?>) reply.get("runs")).get(0)).get("name"));
+            assertEquals("History for #save", reply.get("chat"));
         } finally {
             ConsumerReadyForwarder.runner = null;
         }
