@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -228,6 +229,118 @@ class MaskQuietTest {
             System.clearProperty("pkb_composite");
             CompositeRuntime.resetForTests();
         }
+    }
+
+    @Test
+    @Timeout(value = 180, unit = TimeUnit.SECONDS)
+    void stuckSpinnerClickFailsAndDoesNotDispatch() throws Exception {
+        assumeTrue(BrowserSession.findChrome() != null, "skipped: chrome is not on PATH");
+        Path page = temp.resolve("spinner.html");
+        Files.writeString(page, """
+                <!DOCTYPE html><html><head><title>Ready</title></head><body>
+                <div class="spinner" style="position:fixed;inset:0;background:rgba(255,255,255,.85);z-index:5"></div>
+                <button id="go">Go</button>
+                <script>
+                window.clicks = 0;
+                document.getElementById('go').onclick = function () { window.clicks++; document.title = 'Gone'; };
+                </script>
+                </body></html>
+                """);
+        Capture started = run("start", "--url=" + page.toUri(), "--browser=chrome-headless", "--run-id=spin");
+        assertEquals(0, started.code, started.err + started.out);
+        Capture acted = run(
+                "act", "--target=browser:auto", "--query=Go", "--kind=click", "--timeout=700", "--run-id=spin");
+        assertEquals(1, acted.code, acted.out + acted.err);
+        JsonNode body = JSON.readTree(acted.out);
+        assertEquals("covered", body.path("error").asText(), acted.out);
+        assertFalse(body.path("applied").asBoolean(), acted.out);
+        assertFalse(body.path("dispatched").asBoolean(), acted.out);
+        assertTrue(body.path("reason").asText("").contains("loading mask still covers"), acted.out);
+        assertTrue(body.path("waitedMs").asLong() >= 600, acted.out);
+        assertTrue(body.path("waitedMs").asLong() < 2500, acted.out);
+        assertFalse(body.path("maskCleared").asBoolean(), acted.out);
+        assertEquals("0", eval("String(window.clicks||0)", "spin"));
+        assertEquals("Ready", eval("document.title", "spin"));
+
+        ChromeOptions options = new ChromeOptions();
+        options.setBinary(BrowserSession.findChrome());
+        options.addArguments("--headless=new", "--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage");
+        MaskPageGlue.driver = new ChromeDriver(options);
+        System.setProperty("pkb_composite", "off");
+        try {
+            MaskPageGlue.driver.get(page.toUri().toString());
+            long startedAt = System.nanoTime();
+            IllegalStateException thrown = assertThrows(
+                    IllegalStateException.class,
+                    () -> ElementOperations.click(MaskPageGlue.driver, MaskPageGlue.driver.findElement(By.id("go"))));
+            long elapsed = (System.nanoTime() - startedAt) / 1_000_000L;
+            assertTrue(thrown.getMessage().contains("loading mask still covers"), thrown.getMessage());
+            assertTrue(elapsed >= 2500, "library click waited " + elapsed);
+            assertEquals(0L, ((Number) MaskPageGlue.driver.executeScript("return window.clicks||0")).longValue());
+            assertEquals("Ready", MaskPageGlue.driver.getTitle());
+        } finally {
+            System.clearProperty("pkb_composite");
+        }
+    }
+
+    @Test
+    @Timeout(value = 180, unit = TimeUnit.SECONDS)
+    void watchSeesAnIframeTabChange() throws Exception {
+        assumeTrue(BrowserSession.findChrome() != null, "skipped: chrome is not on PATH");
+        Path page = temp.resolve("tabs.html");
+        Files.writeString(page, """
+                <!DOCTYPE html><html><head><title>Tabs</title></head><body>
+                <iframe id="app" srcdoc="<html><body><button id='one' role='tab' aria-selected='true'>One</button><button id='two' role='tab' aria-selected='false'>Two</button><div id='panel'>Alpha</div></body></html>"></iframe>
+                </body></html>
+                """);
+        Capture started = run("start", "--url=" + page.toUri(), "--browser=chrome-headless", "--run-id=framewatch");
+        assertEquals(0, started.code, started.err + started.out);
+        assertEquals("Alpha", eval(
+                "document.getElementById('app').contentDocument.getElementById('panel').textContent",
+                "framewatch"));
+        Capture quiet = run(
+                "watch", "--target=browser:auto", "--until=mutation", "--timeout=600", "--run-id=framewatch");
+        assertEquals(1, quiet.code, quiet.out + quiet.err);
+        assertTrue(quiet.out.contains("timeout"), quiet.out);
+
+        assertEquals("armed", eval("""
+                (function(){
+                  setTimeout(function(){
+                    var doc = document.getElementById('app').contentDocument;
+                    doc.getElementById('one').setAttribute('aria-selected', 'false');
+                    doc.getElementById('two').setAttribute('aria-selected', 'true');
+                    doc.getElementById('panel').textContent = 'Beta';
+                  }, 400);
+                  return 'armed';
+                })()
+                """, "framewatch"));
+        Capture mutation = run(
+                "watch", "--target=browser:auto", "--until=mutation", "--timeout=4000", "--run-id=framewatch");
+        assertEquals(0, mutation.code, mutation.out + mutation.err);
+        JsonNode mutationBody = JSON.readTree(mutation.out);
+        assertTrue(mutationBody.path("met").asBoolean(), mutation.out);
+        assertEquals("mutation", mutationBody.path("until").asText(), mutation.out);
+        assertEquals("Beta", eval(
+                "document.getElementById('app').contentDocument.getElementById('panel').textContent",
+                "framewatch"));
+
+        assertEquals("armed", eval("""
+                (function(){
+                  setTimeout(function(){
+                    document.getElementById('app').srcdoc = "<html><body><button id='two' role='tab' aria-selected='true'>Two</button><div id='panel'>Gamma</div></body></html>";
+                  }, 400);
+                  return 'armed';
+                })()
+                """, "framewatch"));
+        Capture change = run(
+                "watch", "--target=browser:auto", "--until=change", "--timeout=4000", "--run-id=framewatch");
+        assertEquals(0, change.code, change.out + change.err);
+        JsonNode changeBody = JSON.readTree(change.out);
+        assertTrue(changeBody.path("met").asBoolean(), change.out);
+        assertEquals("change", changeBody.path("until").asText(), change.out);
+        assertEquals("Gamma", eval(
+                "document.getElementById('app').contentDocument.getElementById('panel').textContent",
+                "framewatch"));
     }
 
     private String eval(String expr, String runId) throws Exception {

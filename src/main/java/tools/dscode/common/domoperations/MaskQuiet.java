@@ -55,6 +55,13 @@ public final class MaskQuiet {
               if (el.getAttribute('data-state') === 'loading') return true;
               if (role === 'status' && el.getAttribute('aria-busy') === 'true') return true;
               if (hasToken(el.getAttribute('data-testid'), 'loading') || hasToken(el.getAttribute('data-testid'), 'spinner')) return true;
+              if ((el.getAttribute('data-loader') || '') === 'spinner') return true;
+              var classText = String(el.getAttribute('class') || '').toLowerCase();
+              if (classText.indexOf('spinner') >= 0 || classText.indexOf('loading') >= 0) return true;
+              var classParts = tokens(classText);
+              for (var c = 0; c < classParts.length; c++) {
+                if (classParts[c] === 'mask' || classParts[c] === 'busy' || classParts[c] === 'modal-mask') return true;
+              }
               var tag = el.tagName;
               if (tag === 'METER') return el.getAttribute('aria-busy') === 'true';
               if (tag === 'PROGRESS') {

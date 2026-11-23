@@ -97,6 +97,9 @@ class SnapScopeTest {
         assertTrue(expression.contains("contentDocument"), expression);
         assertTrue(expression.contains("__pkbDocCount"), expression);
         assertTrue(expression.contains("iframe,frame"), expression);
+        assertTrue(expression.contains("__pkbSeenDoc"), expression);
+        assertTrue(expression.contains("aria-selected"), expression);
+        assertTrue(expression.contains("addEventListener"), expression);
     }
 
     private static List<String> ids(List<DomNode> nodes) {

@@ -571,6 +571,24 @@ public final class TargetVerb {
             if (effect.quiet()) {
                 String titleAfter = title(page.session.connection());
                 String after = docVersion(page.session.connection());
+                boolean stillCovered = maskCovers(page.session.connection(), node);
+                if (stillCovered || maskStillCovering(mask)) {
+                    Outcome failed = fail("act", "covered");
+                    failed.body().put("applied", false);
+                    failed.body().put("dispatched", true);
+                    failed.body().put("visible", false);
+                    failed.body().put("reason", "loading mask still covers the click");
+                    failed.body().put("kind", kind.isBlank() ? "click" : kind);
+                    failed.body().put("docVersion", after);
+                    putSnapDiff(failed.body(), args, titleBefore, titleAfter, before, after, rowsBefore, rowsAfter);
+                    putAutoSnap(failed.body(), args, project, runId, autoBefore, () -> compactBrowser(page.session, runId, target));
+                    stamp(failed.body(), page.session.connection(), node);
+                    putEntered(failed.body(), runId, page.session.connection());
+                    putShadow(failed.body(), node);
+                    putMask(failed.body(), mask);
+                    putReadBack(failed.body(), node, true);
+                    return failed;
+                }
                 Map<String, Object> body = base("act", effect.used(), "browser", target);
                 body.put("applied", false);
                 body.put("dispatched", true);
@@ -1707,29 +1725,45 @@ public final class TargetVerb {
         return text.isBlank() ? "0:0" : text;
     }
 
-    /** Top document plus same-origin iframe documents. Child sessions are folded in by {@link #docVersion(CdpConnection)}. */
+    /**
+     * Top document plus same-origin iframe documents. Child sessions are folded in by {@link #docVersion(CdpConnection)}.
+     * A replaced iframe document and a changed selected tab change the version even when that document's counter starts at zero.
+     */
     static String docVersionExpression() {
-        return "(function(){var root=document.documentElement;if(!root)return '0:0';"
-                + "var g=globalThis;"
-                + "function arm(doc){if(!doc||!doc.documentElement)return 0;if(doc.__pkbFrameWatch)return doc.__pkbFrameCount||0;"
-                + "doc.__pkbFrameCount=0;doc.__pkbFrameWatch=new MutationObserver(function(records){"
-                + "for(var i=0;i<records.length;i++){var r=records[i];var t=r.target;"
-                + "if(r.type==='attributes'&&r.attributeName&&r.attributeName.indexOf('data-pkb-')===0)continue;"
-                + "if(t&&t.nodeType===1&&t.closest&&t.closest('[data-pkb-agent],[data-pkb-layer],[data-pkb-record],[data-pkb-meta=\"true\"]'))continue;"
-                + "doc.__pkbFrameCount++;return;}});"
-                + "try{doc.__pkbFrameWatch.observe(doc.documentElement,{subtree:true,childList:true,attributes:true,characterData:true});}catch(e){}"
-                + "return 0;}"
-                + "function sum(doc){if(!doc||!doc.documentElement)return 0;var n=arm(doc);"
-                + "var frames=doc.querySelectorAll?doc.querySelectorAll('iframe,frame'):[];"
-                + "for(var i=0;i<frames.length;i++){try{var child=frames[i].contentDocument;if(child&&child!==doc)n+=sum(child);}catch(e){}}"
-                + "return n;}"
-                + "if(!g.__pkbDocWatch){g.__pkbDocCount=0;g.__pkbDocWatch=new MutationObserver(function(records){"
-                + "for(var i=0;i<records.length;i++){var r=records[i];var t=r.target;"
-                + "if(r.type==='attributes'&&r.attributeName&&r.attributeName.indexOf('data-pkb-')===0)continue;"
-                + "if(t&&t.nodeType===1&&t.closest&&t.closest('[data-pkb-agent],[data-pkb-layer],[data-pkb-record],[data-pkb-meta=\"true\"]'))continue;"
-                + "g.__pkbDocCount++;return;}});"
-                + "g.__pkbDocWatch.observe(root,{subtree:true,childList:true,attributes:true,characterData:true});}"
-                + "return location.href+':'+g.__pkbDocCount+':'+sum(document);})()";
+        return """
+                (function(){var root=document.documentElement;if(!root)return '0:0';
+                var g=globalThis;
+                function ignore(record){var t=record.target;
+                if(record.type==='attributes'&&record.attributeName&&record.attributeName.indexOf('data-pkb-')===0)return true;
+                if(t&&t.nodeType===1&&t.closest&&t.closest('[data-pkb-agent],[data-pkb-layer],[data-pkb-record],[data-pkb-meta="true"]'))return true;
+                return false;}
+                function arm(doc){if(!doc||!doc.documentElement)return 0;if(doc.__pkbFrameWatch)return doc.__pkbFrameCount||0;
+                doc.__pkbFrameCount=0;doc.__pkbFrameWatch=new MutationObserver(function(records){
+                for(var i=0;i<records.length;i++){if(ignore(records[i]))continue;doc.__pkbFrameCount++;return;}});
+                try{doc.__pkbFrameWatch.observe(doc.documentElement,{subtree:true,childList:true,attributes:true,characterData:true});}catch(e){}
+                return 0;}
+                function noteFrame(frame){var doc=null;try{doc=frame.contentDocument;}catch(e){doc=null;}
+                var mark='';
+                if(doc){if(!doc.__pkbDocId){g.__pkbDocSeq=(g.__pkbDocSeq||0)+1;try{doc.__pkbDocId=g.__pkbDocSeq;}catch(e2){}}
+                var href='';try{href=doc.location?doc.location.href:'';}catch(e3){}
+                mark=String(doc.__pkbDocId||'')+'@'+href;}else{mark='x:'+(frame.src||'');}
+                var seen=frame.__pkbSeenDoc||'';if(seen&&seen!==mark)g.__pkbDocCount++;frame.__pkbSeenDoc=mark;return mark;}
+                function selected(doc){var out='';try{var nodes=doc.querySelectorAll('[aria-selected="true"]');
+                for(var i=0;i<nodes.length&&i<8;i++){var n=nodes[i];out+=(n.id||n.getAttribute('aria-controls')||'')+',';}}catch(e){}
+                return out;}
+                function sum(doc){if(!doc||!doc.documentElement)return {n:0,mark:'',sel:''};var n=arm(doc);var mark='';var sel=selected(doc);
+                var frames=doc.querySelectorAll?doc.querySelectorAll('iframe,frame'):[];
+                for(var i=0;i<frames.length;i++){var frame=frames[i];mark+='|'+noteFrame(frame);
+                try{var child=frame.contentDocument;if(child&&child!==doc){var sub=sum(child);n+=sub.n;mark+=sub.mark;sel+=sub.sel;}}catch(e){}}
+                return {n:n,mark:mark,sel:sel};}
+                if(!g.__pkbDocWatch){g.__pkbDocCount=0;g.__pkbDocWatch=new MutationObserver(function(records){
+                for(var i=0;i<records.length;i++){if(ignore(records[i]))continue;g.__pkbDocCount++;return;}});
+                g.__pkbDocWatch.observe(root,{subtree:true,childList:true,attributes:true,characterData:true});}
+                if(!g.__pkbFrameLoad){g.__pkbFrameLoad=true;document.addEventListener('load',function(ev){
+                var t=ev.target;if(!t||!t.tagName)return;var tag=t.tagName;if(tag==='IFRAME'||tag==='FRAME')g.__pkbDocCount++;},true);}
+                var rolled=sum(document);
+                return location.href+':'+g.__pkbDocCount+':'+rolled.n+':'+rolled.sel+':'+rolled.mark;})()
+                """;
     }
 
     private static String docVersion(CdpConnection cdp) {
@@ -2131,7 +2165,11 @@ public final class TargetVerb {
                 + "(async function(){return await new Promise(function(resolve){"
                 + "var timer=setTimeout(function(){resolve('timeout');}," + timeout + ");"
                 + "var obs=new MutationObserver(function(){clearTimeout(timer);obs.disconnect();resolve('mutation');});"
-                + "obs.observe(document.documentElement,{subtree:true,childList:true,attributes:true,characterData:true});"
+                + "function watch(doc){if(!doc||!doc.documentElement)return;"
+                + "try{obs.observe(doc.documentElement,{subtree:true,childList:true,attributes:true,characterData:true});}catch(e){}"
+                + "var frames=doc.querySelectorAll?doc.querySelectorAll('iframe,frame'):[];"
+                + "for(var i=0;i<frames.length;i++){try{var child=frames[i].contentDocument;if(child&&child!==doc)watch(child);}catch(e){}}}"
+                + "watch(document);"
                 + "});})()");
         Duration budget = Duration.ofMillis(Math.max(1000, timeout + 2000));
         JsonNode value = sessionId == null || sessionId.isBlank()

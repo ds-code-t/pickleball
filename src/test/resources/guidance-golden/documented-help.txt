@@ -20,7 +20,7 @@ all: act arrow ask ask-and-wait attach border bridge-health call capture capture
 
 # help act
 Usage: act --target=<selector> [--kind=click|type|hover|press|select] [--query=<text>] [--ref=<ref>] [--pick=<n|name>] [--value=<text>] [--condition=title=<text>|text=<text>|url=<text>|ref=<id>:selected] [--snap=diff|auto] [--timeout=<ms>]
---pick chooses one hit in the same snapshot, so the ref cannot go stale. A success includes checked and settleMs. Hover on a visible element is applied and dispatched. A click is applied when the page or that element's text or state changes. A covering mask that does not clear fails the click. visible is whether the element is shown, the same value explain reports. Replies include frame. A short id (s1.h18) names that element and is not expanded to its accessible name.
+--pick chooses one hit in the same snapshot, so the ref cannot go stale. A success includes checked and settleMs. Hover on a visible element is applied and dispatched. A click is applied when the page or that element's text or state changes. A covering mask that does not clear fails the click. --timeout is that wait in milliseconds, including a spinner or loading class. visible is whether the element is shown, the same value explain reports. Replies include frame. A short id (s1.h18) names that element and is not expanded to its accessible name.
 
 # help ask-and-wait
 Usage: ask-and-wait --say=<question> [--choices=a,b] [--id=<id>] [--timeout=<ms>]
@@ -353,7 +353,7 @@ Reports undefined steps, ambiguous glue, and unresolved RUN SCENARIO targets. Ou
 
 # help watch
 Usage: watch --target=<selector> [--ref=<ref>] [--until=mutation|change|visible|hidden|text=<text>|click] [--kinds=<kinds>] [--duration=<ms>]
-mutation and change include same-origin iframe documents and attached child frames.
+mutation and change include same-origin iframe documents and attached child frames. A replaced iframe document and a changed selected tab count even when that document's counter starts at zero.
 
 # help windows
 Usage: windows [--switch=<handle>] [--close=<handle>] [--run-id=<id>]
