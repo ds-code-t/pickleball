@@ -11,10 +11,12 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Lean, read-only answers over the same store the HTML page reads.
@@ -108,6 +110,36 @@ public final class DashboardHistory {
         } catch (Exception failure) {
             stderr.println("error: " + (failure.getMessage() == null ? failure : failure.getMessage()));
             stderr.println("fix: dashboard xref --project=<dir> --id=#save");
+            return 1;
+        }
+    }
+
+    /**
+     * Runs whose times overlap, and the failure text shared inside each group.
+     * A blank finish is a point at the start. The store is not written.
+     */
+    public static int overlap(Path project, List<String> tokens, PrintStream out, PrintStream err) {
+        PrintStream stdout = out == null ? System.out : out;
+        PrintStream stderr = err == null ? System.err : err;
+        int limit = limit(tokens, stderr);
+        if (limit < 0) return 2;
+        String from = value(tokens, "--from");
+        String to = value(tokens, "--to");
+        try {
+            DashboardSnapshot snapshot = new SqliteDashboardSource(project).read(DashboardQuery.all());
+            Map<String, List<String>> failures = failures(project);
+            List<DashboardSnapshot.RunView> window = new ArrayList<>();
+            for (DashboardSnapshot.RunView run : snapshot.runs()) {
+                if (inWindow(run, from, to)) window.add(run);
+            }
+            List<List<DashboardSnapshot.RunView>> groups = groups(window);
+            int total = groups.size();
+            if (groups.size() > limit) groups = new ArrayList<>(groups.subList(0, limit));
+            stdout.println(overlapJson(total, groups, failures));
+            return 0;
+        } catch (Exception failure) {
+            stderr.println("error: " + (failure.getMessage() == null ? failure : failure.getMessage()));
+            stderr.println("fix: dashboard overlap --project=<dir>");
             return 1;
         }
     }
@@ -252,6 +284,129 @@ public final class DashboardHistory {
 
     private static boolean between(String point, String start, String end) {
         return start.compareTo(point) <= 0 && point.compareTo(end) <= 0;
+    }
+
+    private static boolean inWindow(DashboardSnapshot.RunView run, String from, String to) {
+        String start = run.startedAt() == null ? "" : run.startedAt();
+        if (start.isBlank()) return false;
+        String end = run.finishedAt() == null || run.finishedAt().isBlank() ? start : run.finishedAt();
+        if (from != null && !from.isEmpty() && end.compareTo(from) < 0) return false;
+        return to == null || to.isEmpty() || start.compareTo(to) <= 0;
+    }
+
+    private static List<List<DashboardSnapshot.RunView>> groups(List<DashboardSnapshot.RunView> runs) {
+        int count = runs.size();
+        int[] parent = new int[count];
+        for (int index = 0; index < count; index++) parent[index] = index;
+        for (int left = 0; left < count; left++) {
+            for (int right = left + 1; right < count; right++) {
+                if (overlaps(runs.get(left), runs.get(right))) union(parent, left, right);
+            }
+        }
+        Map<Integer, List<DashboardSnapshot.RunView>> buckets = new LinkedHashMap<>();
+        for (int index = 0; index < count; index++) {
+            buckets.computeIfAbsent(find(parent, index), key -> new ArrayList<>()).add(runs.get(index));
+        }
+        List<List<DashboardSnapshot.RunView>> groups = new ArrayList<>();
+        for (List<DashboardSnapshot.RunView> group : buckets.values()) {
+            if (group.size() < 2) continue;
+            group.sort((left, right) -> {
+                int time = String.valueOf(left.startedAt()).compareTo(String.valueOf(right.startedAt()));
+                return time == 0 ? left.id().compareTo(right.id()) : time;
+            });
+            groups.add(group);
+        }
+        groups.sort((left, right) -> {
+            int time = String.valueOf(left.get(0).startedAt()).compareTo(String.valueOf(right.get(0).startedAt()));
+            return time == 0 ? left.get(0).id().compareTo(right.get(0).id()) : time;
+        });
+        return groups;
+    }
+
+    private static int find(int[] parent, int index) {
+        int root = index;
+        while (parent[root] != root) root = parent[root];
+        while (parent[index] != root) {
+            int next = parent[index];
+            parent[index] = root;
+            index = next;
+        }
+        return root;
+    }
+
+    private static void union(int[] parent, int left, int right) {
+        int a = find(parent, left);
+        int b = find(parent, right);
+        if (a != b) parent[b] = a;
+    }
+
+    private static Map<String, List<String>> failures(Path project) throws SQLException {
+        Map<String, List<String>> found = new LinkedHashMap<>();
+        try (DashboardAccess.Open open = DashboardAccess.open(project)) {
+            if (open == null) return found;
+            String qualifier = open.runs();
+            if (table(open, "scenario_executions") && table(open, "step_executions")) {
+                readPairs(open, "SELECT se.run_id, st.step_text FROM " + qualifier
+                        + "step_executions st JOIN " + qualifier
+                        + "scenario_executions se ON se.exec_id = st.scenario_exec_id "
+                        + "WHERE lower(st.status) IN ('failed', 'failure')", found);
+            }
+            if (table(open, "run_logs") && column(open, "run_logs", "message") && table(open, "runs")) {
+                readPairs(open, "SELECT run_id, message FROM " + qualifier
+                        + "run_logs WHERE run_id IN (SELECT run_id FROM " + qualifier
+                        + "runs WHERE lower(status) IN ('failed', 'failure'))", found);
+            }
+        }
+        return found;
+    }
+
+    private static String overlapJson(
+            int total,
+            List<List<DashboardSnapshot.RunView>> groups,
+            Map<String, List<String>> failures
+    ) {
+        StringBuilder out = new StringBuilder();
+        out.append("{\"ok\":true,\"op\":\"overlap\",\"count\":").append(groups.size())
+                .append(",\"total\":").append(total).append(",\"groups\":[");
+        for (int groupIndex = 0; groupIndex < groups.size(); groupIndex++) {
+            if (groupIndex > 0) out.append(',');
+            List<DashboardSnapshot.RunView> group = groups.get(groupIndex);
+            out.append("{\"runs\":[");
+            for (int index = 0; index < group.size(); index++) {
+                if (index > 0) out.append(',');
+                DashboardSnapshot.RunView run = group.get(index);
+                String label = run.scenario() == null || run.scenario().isBlank() ? run.id() : run.scenario();
+                out.append("{\"name\":\"").append(esc(label))
+                        .append("\",\"ref\":\"").append(esc(run.id()))
+                        .append("\",\"status\":\"").append(esc(run.status()))
+                        .append("\",\"startedAt\":\"").append(esc(run.startedAt()))
+                        .append("\",\"finishedAt\":\"").append(esc(run.finishedAt()))
+                        .append("\"}");
+            }
+            out.append("],\"shared\":").append(array(shared(group, failures))).append('}');
+        }
+        return out.append("]}").toString();
+    }
+
+    private static List<String> shared(
+            List<DashboardSnapshot.RunView> group,
+            Map<String, List<String>> failures
+    ) {
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        for (DashboardSnapshot.RunView run : group) {
+            Set<String> seen = new HashSet<>();
+            for (String value : failures.getOrDefault(run.id(), List.of())) {
+                String text = excerpt(value);
+                if (text.isEmpty() || !seen.add(text)) continue;
+                counts.merge(text, 1, Integer::sum);
+            }
+        }
+        List<String> shared = new ArrayList<>();
+        for (Map.Entry<String, Integer> entry : counts.entrySet()) {
+            if (entry.getValue() >= 2) shared.add(entry.getKey());
+        }
+        shared.sort(String::compareTo);
+        return shared.size() <= 20 ? shared : shared.subList(0, 20);
     }
 
     private static String summary(

@@ -374,6 +374,104 @@ class DashboardTest {
     }
 
     @Test
+    void overlapGroupsSharedFailuresAndDoesNotChangeTheStore() throws Exception {
+        var emptyOut = new ByteArrayOutputStream();
+        var emptyErr = new ByteArrayOutputStream();
+        int empty = DashboardCli.execute(new String[]{
+                "dashboard", "overlap", "--project=" + project
+        }, new PrintStream(emptyOut), new PrintStream(emptyErr));
+        assertEquals(0, empty, emptyErr.toString(StandardCharsets.UTF_8));
+        var emptyTree = new com.fasterxml.jackson.databind.ObjectMapper().readTree(emptyOut.toString(StandardCharsets.UTF_8));
+        assertEquals("overlap", emptyTree.get("op").asText());
+        assertEquals(0, emptyTree.get("count").asInt());
+        assertFalse(Files.exists(StorePaths.runState(project)));
+
+        seed();
+        try (Connection connection = DriverManager.getConnection(
+                "jdbc:sqlite:" + StorePaths.runState(project).toAbsolutePath());
+             Statement statement = connection.createStatement()) {
+            statement.execute("UPDATE runs SET finished_at = '2020-02-01T01:00:00Z' WHERE run_id = 'pay-run'");
+            statement.execute("""
+                    INSERT INTO runs VALUES
+                    ('side-run','2020-02-01T00:30:00Z','2020-02-01T00:40:00Z','FAILED','Side',0,1,'','','features/side.feature'),
+                    ('spot-run','2020-02-01T00:00:00Z',NULL,'PASSED','Spot',1,0,'','','features/spot.feature'),
+                    ('later-run','2020-03-01T00:00:00Z','2020-03-01T00:10:00Z','FAILED','Later',0,1,'','','features/later.feature'),
+                    ('twin-a','2020-04-01T00:00:00Z',NULL,'FAILED','Twin A',0,1,'','','features/twin.feature'),
+                    ('twin-b','2020-04-01T00:00:00Z',NULL,'FAILED','Twin B',0,1,'','','features/twin.feature'),
+                    ('lone-run','2020-05-01T00:00:00Z',NULL,'FAILED','Lone',0,1,'','','features/lone.feature')
+                    """);
+            statement.execute("""
+                    INSERT INTO scenario_executions VALUES
+                    ('ex-side','side-run','features/side.feature|1','2020-02-01T00:30:01Z'),
+                    ('ex-later','later-run','features/later.feature|1','2020-03-01T00:00:01Z'),
+                    ('ex-a','twin-a','features/twin.feature|1','2020-04-01T00:00:01Z'),
+                    ('ex-b','twin-b','features/twin.feature|2','2020-04-01T00:00:01Z'),
+                    ('ex-lone','lone-run','features/lone.feature|1','2020-05-01T00:00:01Z')
+                    """);
+            statement.execute("""
+                    INSERT INTO step_executions VALUES
+                    ('st-side','ex-side','the card was declined','2020-02-01T00:30:02Z','FAILED'),
+                    ('st-later','ex-later','the card was declined','2020-03-01T00:00:02Z','FAILED'),
+                    ('st-a','ex-a','timeout talking to the bank','2020-04-01T00:00:02Z','FAILED'),
+                    ('st-b','ex-b','timeout talking to the bank','2020-04-01T00:00:02Z','FAILED'),
+                    ('st-lone','ex-lone','only me','2020-05-01T00:00:02Z','FAILED')
+                    """);
+            statement.execute("ALTER TABLE run_logs ADD COLUMN message TEXT");
+            statement.execute("""
+                    INSERT INTO run_logs (run_id, logged_at, message) VALUES
+                    ('pay-run','2020-02-01T00:00:06Z','bank timeout'),
+                    ('side-run','2020-02-01T00:30:06Z','bank timeout')
+                    """);
+        }
+        byte[] runs = Files.readAllBytes(StorePaths.runState(project));
+        byte[] main = Files.readAllBytes(StorePaths.mainDatabase(project));
+        var out = new ByteArrayOutputStream();
+        var err = new ByteArrayOutputStream();
+        int code = DashboardCli.execute(new String[]{
+                "dashboard", "overlap", "--project=" + project
+        }, new PrintStream(out), new PrintStream(err));
+        assertEquals(0, code, err.toString(StandardCharsets.UTF_8));
+        var tree = new com.fasterxml.jackson.databind.ObjectMapper().readTree(out.toString(StandardCharsets.UTF_8));
+        assertEquals(2, tree.get("count").asInt());
+        assertEquals(2, tree.get("total").asInt());
+        var first = tree.get("groups").get(0);
+        assertEquals("pay-run", first.get("runs").get(0).get("ref").asText());
+        assertEquals("spot-run", first.get("runs").get(1).get("ref").asText());
+        assertEquals("side-run", first.get("runs").get(2).get("ref").asText());
+        assertEquals("bank timeout", first.get("shared").get(0).asText());
+        assertEquals("the card was declined", first.get("shared").get(1).asText());
+        var second = tree.get("groups").get(1);
+        assertEquals("twin-a", second.get("runs").get(0).get("ref").asText());
+        assertEquals("twin-b", second.get("runs").get(1).get("ref").asText());
+        assertEquals("timeout talking to the bank", second.get("shared").get(0).asText());
+        String refs = tree.get("groups").toString();
+        assertFalse(refs.contains("later-run"), refs);
+        assertFalse(refs.contains("lone-run"), refs);
+        assertArrayEquals(runs, Files.readAllBytes(StorePaths.runState(project)));
+        assertArrayEquals(main, Files.readAllBytes(StorePaths.mainDatabase(project)));
+
+        out.reset();
+        code = DashboardCli.execute(new String[]{
+                "dashboard", "overlap", "--project=" + project,
+                "--from=2020-04-01T00:00:00Z", "--to=2020-04-01T00:00:00Z", "--limit=1"
+        }, new PrintStream(out), new PrintStream(err));
+        assertEquals(0, code, err.toString(StandardCharsets.UTF_8));
+        tree = new com.fasterxml.jackson.databind.ObjectMapper().readTree(out.toString(StandardCharsets.UTF_8));
+        assertEquals(1, tree.get("count").asInt());
+        assertEquals(1, tree.get("total").asInt());
+        assertEquals("twin-a", tree.get("groups").get(0).get("runs").get(0).get("ref").asText());
+
+        code = DashboardCli.execute(new String[]{
+                "dashboard", "overlap", "--project=" + project, "--limit=no"
+        }, new PrintStream(new ByteArrayOutputStream()), new PrintStream(err));
+        assertEquals(2, code);
+        assertTrue(err.toString(StandardCharsets.UTF_8).contains("error: --limit must be a whole number"));
+        String help = new String(helpText(), StandardCharsets.UTF_8);
+        assertTrue(help.contains("dashboard overlap"));
+        assertArrayEquals(runs, Files.readAllBytes(StorePaths.runState(project)));
+    }
+
+    @Test
     void oldBlankRunStaysBlankAfterDashboard() throws Exception {
         Path file = runsFile(true);
         byte[] before = Files.readAllBytes(file);

@@ -45,6 +45,9 @@ public final class DashboardCli {
         if ("xref".equals(bare(tokens))) {
             return DashboardHistory.xref(project, tokens, stdout, stderr);
         }
+        if ("overlap".equals(bare(tokens))) {
+            return DashboardHistory.overlap(project, tokens, stdout, stderr);
+        }
         Path destination = out(tokens, project);
         DashboardQuery query = new DashboardQuery(
                 value(tokens, "--from"),
@@ -78,6 +81,8 @@ public final class DashboardCli {
                 Prints one JSON object of historical runs. Fields are name, ref, status, scenarios, artifacts, data, and summary. --element matches a step, scenario, artifact, entity, or log line. It does not write the store.
                 Usage: dashboard xref [--project=<dir>] [--id=<id>] [--selector=<selector>] [--role=<role>] [--name=<name>] [--limit=<n>] [--window] [--out=<file>]
                 Prints one JSON object for one element. Fields are runs, scenarios, logs, screenshots, concurrent, summary, overlay, and chat. --id, --selector, --role, and --name must all match when more than one is set. --window writes one HTML file and does not open a browser. It does not write the store.
+                Usage: dashboard overlap [--project=<dir>] [--from=<iso>] [--to=<iso>] [--limit=<n>]
+                Prints one JSON object of runs whose times overlap and the failure text those runs share. A blank finish is a point at the start. Two points overlap only when the timestamps are equal. A point overlaps a range when the start is at or before the point and the point is at or before the end. A group has at least two runs. A shared line appears in at least two runs of that group. It does not write the store.
                 """;
     }
 

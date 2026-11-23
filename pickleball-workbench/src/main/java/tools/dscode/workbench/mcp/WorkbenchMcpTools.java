@@ -512,6 +512,14 @@ final class WorkbenchMcpTools {
                         "window", booleanProperty("Write one HTML file when true.")
                 )),
                 args -> forwardReady(dashboardXrefArgs(args)));
+        add("workbench_dashboard_overlap",
+                "Forward dashboard overlap. Groups of runs whose times overlap, and the failure text shared by at least two runs in a group. Does not write the store.",
+                schema(Map.of(
+                        "from", stringProperty("ISO start. Optional."),
+                        "to", stringProperty("ISO end. Optional."),
+                        "limit", integerProperty("Maximum groups. Optional.")
+                )),
+                args -> forwardReady(dashboardOverlapArgs(args)));
         add("workbench_entity_lookup",
                 "Forward entity-lookup --ref. Prints the field value.",
                 schema(Map.of("ref", stringProperty("entity:Type#id.field or the angle-bracket form.")), "ref"),
@@ -751,6 +759,17 @@ final class WorkbenchMcpTools {
         String limit = optionalScalar(args, "limit");
         if (!limit.isBlank()) verb.add("--limit=" + limit);
         if (flag(args, "window")) verb.add("--window");
+        return verb;
+    }
+
+    private static List<String> dashboardOverlapArgs(Map<String, Object> args) {
+        List<String> verb = new ArrayList<>();
+        verb.add("dashboard");
+        verb.add("overlap");
+        addOptional(verb, "from", optionalText(args, "from"));
+        addOptional(verb, "to", optionalText(args, "to"));
+        String limit = optionalScalar(args, "limit");
+        if (!limit.isBlank()) verb.add("--limit=" + limit);
         return verb;
     }
 

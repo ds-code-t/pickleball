@@ -30,4 +30,10 @@ dashboard query [--project=<dir>] [--from=<iso>] [--to=<iso>] [--status=<status>
 dashboard xref [--project=<dir>] [--id=<id>] [--selector=<selector>] [--role=<role>] [--name=<name>] [--limit=<n>] [--window] [--out=<file>]
 ```
 
+`dashboard overlap` groups runs whose times overlap and lists the failure text shared by at least two runs in a group. A blank finish is a point at the start. Two points overlap only when the timestamps are equal. A point overlaps a range when the start is at or before the point and the point is at or before the end. `--from` and `--to` keep runs whose interval meets that window. A failure line is a failed step, or a log line on a failed run. The store is not written. MCP `workbench_dashboard_overlap` forwards the same command. For an intermittent failure, run `dashboard overlap` first, then `dashboard xref` for the element on the page.
+
+```text
+dashboard overlap [--project=<dir>] [--from=<iso>] [--to=<iso>] [--limit=<n>]
+```
+
 Deferred: central hosting, Java source views, and case opened or closed events.

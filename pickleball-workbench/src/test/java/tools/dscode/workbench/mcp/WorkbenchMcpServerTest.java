@@ -116,6 +116,7 @@ class WorkbenchMcpServerTest {
             "workbench_history_query",
             "workbench_dashboard_query",
             "workbench_dashboard_xref",
+            "workbench_dashboard_overlap",
             "workbench_entity_lookup",
             "workbench_open_run",
             "workbench_bridge_health",
@@ -723,6 +724,40 @@ class WorkbenchMcpServerTest {
             assertEquals(0, reply.get("exit"));
             assertEquals("Pay", ((Map<?, ?>) ((List<?>) reply.get("runs")).get(0)).get("name"));
             assertEquals("History for #save", reply.get("chat"));
+        } finally {
+            ConsumerReadyForwarder.runner = null;
+        }
+    }
+
+    @Test
+    void dashboardOverlapForwardsTheTimeWindow() {
+        java.util.List<String> seen = new java.util.ArrayList<>();
+        ConsumerReadyForwarder.runner = command -> {
+            seen.addAll(command);
+            return new ConsumerReadyForwarder.Result(
+                    0,
+                    "{\"ok\":true,\"op\":\"overlap\",\"count\":1,\"groups\":[{\"runs\":[{\"name\":\"Pay\",\"ref\":\"pay-run\"}],\"shared\":[\"the card was declined\"]}]}",
+                    "",
+                    command);
+        };
+        try {
+            WorkbenchMcpTools tools = new WorkbenchMcpTools(fakeServices((method, args) -> {
+                if ("projectRoot".equals(method)) return project;
+                return null;
+            }), JSON);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> reply = (Map<String, Object>) tools.call("workbench_dashboard_overlap", Map.of(
+                    "from", "2020-02-01",
+                    "to", "2020-02-02",
+                    "limit", 4
+            ));
+            assertTrue(seen.contains("dashboard"), seen.toString());
+            assertTrue(seen.contains("overlap"), seen.toString());
+            assertTrue(seen.contains("--from=2020-02-01"), seen.toString());
+            assertTrue(seen.contains("--to=2020-02-02"), seen.toString());
+            assertTrue(seen.contains("--limit=4"), seen.toString());
+            assertEquals(0, reply.get("exit"));
+            assertEquals("the card was declined", ((List<?>) ((Map<?, ?>) ((List<?>) reply.get("groups")).get(0)).get("shared")).get(0));
         } finally {
             ConsumerReadyForwarder.runner = null;
         }
