@@ -55,7 +55,7 @@ sourceSets {
     consumerGlue {
         java.srcDir 'maven-consumer-project/src/test/java'
     }
-    test { java { srcDirs += ['src/test/aspectj'] } }
+    test { java { srcDirs += ['src/test/aspectj', 'src/testSupport/java'] } }
 }
 
 configurations {

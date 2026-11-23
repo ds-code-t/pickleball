@@ -1,5 +1,6 @@
 package tools.dscode.common.composite;
 
+import tools.dscode.testsupport.StdioFake;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -13,9 +14,7 @@ import tools.dscode.common.seleniumextensions.ElementSnapshot;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.PosixFilePermission;
 import java.util.List;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -340,94 +339,9 @@ class GeometryViewTest {
     }
 
     private static Path stub(Path path, Path log, boolean geometry, boolean scrollport, boolean open, boolean point) throws Exception {
-        String flags = geometry
-                ? "[\"within\", \"nesting\", \"nth\", \"every\", \"count-only\", \"geometry\"" + (point ? ", \"point\"" : "") + "]"
-                : "[\"within\", \"nesting\", \"nth\", \"every\", \"count-only\"" + (point ? ", \"point\"" : "") + "]";
-        String script = """
-                #!/usr/bin/env python3
-                import json, sys
-                log = %s
-                flags = %s
-                scrollport = %s
-                opened = %s
-                def note(argv):
-                    with open(log, "a", encoding="utf-8") as handle:
-                        handle.write(" ".join(argv) + "\\n")
-                def space(x, y, w, h):
-                    return {
-                        "kind": "quad",
-                        "corners": [[x, y], [x + w, y], [x + w, y + h], [x, y + h]],
-                        "x": x, "y": y, "width": w, "height": h
-                    }
-                def node(with_geometry):
-                    row = {
-                        "id": "main:7",
-                        "node_name": "BUTTON",
-                        "text": "Go",
-                        "attributes": {"id": "go"},
-                        "bounds": {"x": 12, "y": 20, "width": 20, "height": 16}
-                    }
-                    if with_geometry:
-                        row["geometry"] = {
-                            "closed_shadow": False,
-                            "closed_shadow_limit": "Page script hit-testing retargets to the host. Corners are CDP or stored quads, not page-JS elementFromPoint.",
-                            "document_css_px": space(12, 20, 20, 16),
-                            "visual_viewport_relative": space(10, 17, 20, 16),
-                            "layout_viewport_relative": space(12, 18, 20, 16),
-                            "nearest_scrollport_relative": space(2, 4, 20, 16),
-                            "frame_document_relative": space(12, 20, 20, 16),
-                            "nearest_scrollport": {"kind": "viewport", "id": "main", "origin": "frame-scroll"}
-                        }
-                        if scrollport:
-                            row["geometry"]["nearest_scrollport"]["origin"] = "client-box"
-                            row["geometry"]["scrollport"] = {
-                                "client": {"document_css_px": space(108, 104, 180, 140)},
-                                "content": {"document_css_px": space(78, 54, 400, 800)}
-                            }
-                        if opened:
-                            row["geometry"]["expanded"] = True
-                            row["geometry"]["expanded_source"] = "aria-expanded"
-                            row["geometry"]["revealed"] = {"document_css_px": space(4, 30, 40, 18)}
-                            row["geometry"]["corners"] = [{
-                                "box": "border", "index": 0, "x": 5.0, "y": 7.0, "hit": True, "reason": None
-                            }]
-                    return row
-                for line in sys.stdin:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    req = json.loads(line)
-                    argv = req.get("argv") or []
-                    note(argv)
-                    if "version" in argv:
-                        payload = {"version": "2.11.0"}
-                    elif "capabilities" in argv:
-                        payload = {"ok": True, "actions": ["click", "type", "scroll", "eval"], "query_flags": flags, "eval_nodes": "one node"}
-                    elif "create" in argv:
-                        payload = {"ok": True, "id": "sess-1", "launched": False}
-                    elif argv and argv[0] == "query":
-                        payload = {"ok": True, "count": 1, "nodes": [node("--geometry" in argv)], "composite": [node("--geometry" in argv)]}
-                    else:
-                        payload = {"ok": True}
-                    sys.stdout.write(json.dumps({
-                        "id": req.get("id"),
-                        "exit": 0,
-                        "stdout": json.dumps(payload) + "\\n",
-                        "stderr": ""
-                    }) + "\\n")
-                    sys.stdout.flush()
-                """.formatted(quote(log.toString()), flags, scrollport ? "True" : "False", open ? "True" : "False");
-        Files.createDirectories(path.getParent());
-        Files.writeString(path, script);
-        Files.setPosixFilePermissions(path, Set.of(
-                PosixFilePermission.OWNER_READ,
-                PosixFilePermission.OWNER_WRITE,
-                PosixFilePermission.OWNER_EXECUTE
-        ));
-        return path;
-    }
-
-    private static String quote(String value) {
-        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+        return StdioFake.install(
+                path, "geometry", log.toString(),
+                Boolean.toString(geometry), Boolean.toString(scrollport),
+                Boolean.toString(open), Boolean.toString(point));
     }
 }

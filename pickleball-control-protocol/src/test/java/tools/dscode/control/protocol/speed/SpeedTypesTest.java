@@ -2,6 +2,7 @@ package tools.dscode.control.protocol.speed;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.testsupport.PortableProcess;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -108,7 +109,7 @@ class SpeedTypesTest {
 
     @Test
     void warmHandleIsReusableOnlyWhileThePidAndHashMatch() throws Exception {
-        Process process = new ProcessBuilder("sleep", "30").start();
+        Process process = PortableProcess.sleep(30);
         try {
             WarmProcess.write(root, new WarmProcess.Handle(process.pid(), 9, "watch"));
             assertTrue(WarmProcess.reusable(root, "watch").isPresent());

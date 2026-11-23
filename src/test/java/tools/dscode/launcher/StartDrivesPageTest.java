@@ -12,6 +12,7 @@ import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.control.protocol.LiveBridgeFile;
 import tools.dscode.control.protocol.LiveHostFile;
 import tools.dscode.control.protocol.speed.ProcessTree;
+import tools.dscode.testsupport.PortableProcess;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -125,7 +126,7 @@ class StartDrivesPageTest {
 
     @Test
     void startRefusesALiveWorkerAndForwardsThatSession() throws Exception {
-        Process worker = new ProcessBuilder("sleep", "180").redirectErrorStream(true).start();
+        Process worker = PortableProcess.sleepBuilder(180).redirectErrorStream(true).start();
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         AtomicReference<String> posted = new AtomicReference<>("");
         server.createContext("/v1/agent/command", exchange -> {
@@ -331,8 +332,8 @@ class StartDrivesPageTest {
 
     @Test
     void liveStopLeavesAProcessWhoseStartTimeDoesNotMatch() throws Exception {
-        Process host = new ProcessBuilder("sleep", "180").redirectErrorStream(true).start();
-        Process chrome = new ProcessBuilder("sleep", "180").redirectErrorStream(true).start();
+        Process host = PortableProcess.sleepBuilder(180).redirectErrorStream(true).start();
+        Process chrome = PortableProcess.sleepBuilder(180).redirectErrorStream(true).start();
         try {
             LiveHostFile.write(temp, new LiveHostFile.Host(
                     "http://127.0.0.1:9", "token", 9, host.pid(), chrome.pid(), "sess",
@@ -353,8 +354,8 @@ class StartDrivesPageTest {
 
     @Test
     void liveStopDoesNotKillPidsWithNoRecordedStartTimes() throws Exception {
-        Process host = new ProcessBuilder("sleep", "180").redirectErrorStream(true).start();
-        Process chrome = new ProcessBuilder("sleep", "180").redirectErrorStream(true).start();
+        Process host = PortableProcess.sleepBuilder(180).redirectErrorStream(true).start();
+        Process chrome = PortableProcess.sleepBuilder(180).redirectErrorStream(true).start();
         try {
             LiveHostFile.write(temp, new LiveHostFile.Host(
                     "http://127.0.0.1:9", "token", 9, host.pid(), chrome.pid(), "sess",

@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.common.mappings.MappingProcessor;
 import tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner;
+import tools.dscode.testsupport.PortableProcess;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -300,9 +301,7 @@ class StoreRunTest {
         Path gradlew = project.resolve("gradlew");
         Files.writeString(gradlew, coldShell());
         Files.writeString(project.resolve("gradlew.bat"), coldBat());
-        if (!System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win")) {
-            Files.setPosixFilePermissions(gradlew, PosixFilePermissions.fromString("rwxr-xr-x"));
-        }
+        PortableProcess.markExecutable(gradlew);
         Files.createDirectories(project.resolve(".pickleball/store/sandboxes/main/worker"));
         Files.writeString(project.resolve(".pickleball/store/sandboxes/main/worker/glue.fingerprint"), StoreRun.glueFingerprint(project));
         Path classpathFile = Path.of("build", "store-run-classpath.txt");
@@ -313,20 +312,19 @@ class StoreRunTest {
         Files.writeString(classpathFile, classpath + "\n");
         String featureDir = features.toAbsolutePath().normalize().toString().replace('\\', '/');
         try {
-            Process process = new ProcessBuilder(
-                    "python3",
-                    "scripts/time_store_run.py",
-                    "--project",
-                    project.toString(),
-                    "--tags=@store-time",
-                    "--glue=tools.dscode.coredefinitions",
-                    "--define=pkb_features=wd-file:" + featureDir,
-                    "--define=pkb_loglevel=error",
-                    "--define=pkb_parallel=1",
-                    "--define=cucumber.execution.parallel.enabled=false"
-            ).directory(Path.of("").toAbsolutePath().toFile()).redirectErrorStream(true).start();
-            String text = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            assertEquals(0, process.waitFor(), text);
+            StoreRunTiming.Result result = StoreRunTiming.compare(
+                    project,
+                    "@store-time",
+                    null,
+                    "tools.dscode.coredefinitions",
+                    List.of(
+                            "pkb_features=wd-file:" + featureDir,
+                            "pkb_loglevel=error",
+                            "pkb_parallel=1",
+                            "cucumber.execution.parallel.enabled=false"
+                    ));
+            String text = result.text();
+            assertEquals(0, result.exit(), text);
             assertTrue(text.contains("coldMs="), text);
             assertTrue(text.contains("coldExit=0"), text);
             assertTrue(text.contains("warm1Ms="), text);
@@ -486,12 +484,9 @@ class StoreRunTest {
     @Test
     @Timeout(value = 180, unit = TimeUnit.SECONDS)
     void timingScriptSelfCheckDoesNotLaunchASuite() throws Exception {
-        Process process = new ProcessBuilder("python3", "scripts/time_store_run.py", "--self-check")
-                .directory(Path.of("").toAbsolutePath().toFile())
-                .redirectErrorStream(true)
-                .start();
-        String text = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        assertEquals(0, process.waitFor(), text);
+        StoreRunTiming.Result result = StoreRunTiming.selfCheck();
+        String text = result.text();
+        assertEquals(0, result.exit(), text);
         assertTrue(text.contains("pickleball-test-engine"), text);
         assertTrue(text.contains("does not launch a suite"), text);
     }

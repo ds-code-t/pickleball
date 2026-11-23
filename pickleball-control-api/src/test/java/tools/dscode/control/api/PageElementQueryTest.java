@@ -1,5 +1,6 @@
 package tools.dscode.control.api;
 
+import tools.dscode.testsupport.StdioFake;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,11 +23,9 @@ import tools.dscode.control.protocol.DirectControlProvider;
 import java.lang.reflect.Proxy;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.PosixFilePermission;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -392,165 +391,6 @@ class PageElementQueryTest {
     }
 
     private static Path stub(Path path, boolean geometry) throws Exception {
-        String flags = geometry
-                ? "\"within\", \"nesting\", \"nth\", \"every\", \"count-only\", \"geometry\", \"point\", \"exposure\", \"limit\""
-                : "\"within\", \"nesting\", \"nth\", \"every\", \"count-only\", \"point\", \"exposure\", \"limit\"";
-        String engines = geometry
-                ? "\"css\", \"xpath\", \"text\", \"near\", \"below\", \"above\", \"left-of\", \"right-of\""
-                : "\"css\", \"xpath\", \"text\"";
-        String script = """
-                #!/usr/bin/env python3
-                import json, sys, os
-                log = os.path.splitext(sys.argv[0])[0] + ".requests"
-                for line in sys.stdin:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    req = json.loads(line)
-                    argv = req.get("argv") or []
-                    with open(log, "a", encoding="utf-8") as handle:
-                        handle.write(json.dumps(argv) + "\\n")
-                    if "version" in argv:
-                        body = {"version": "2.4.0"}
-                    elif "create" in argv:
-                        body = {"ok": True, "id": "sess-1", "launched": False}
-                    elif "capabilities" in argv:
-                        body = {"ok": True, "query_flags": [__FLAGS__], "engines": [__ENGINES__]}
-                    elif "query" in argv:
-                        selector = ""
-                        if "--selector" in argv:
-                            selector = argv[argv.index("--selector") + 1]
-                        promote = "--promote-visual" in argv
-                        if selector.startswith("image="):
-                            if promote:
-                                nodes = [{
-                                    "id": "main:4",
-                                    "handle": "main:4",
-                                    "text": "logo",
-                                    "role": "img",
-                                    "source": "cdp",
-                                    "bounds": {"x": 1, "y": 2, "width": 10, "height": 8},
-                                    "attributes": {"id": "logo"},
-                                    "states": ["enabled"],
-                                    "rank": 0,
-                                    "score": 0.8
-                                }]
-                            else:
-                                nodes = [{
-                                    "id": "visual:1",
-                                    "text": "logo",
-                                    "role": "image",
-                                    "source": "visual",
-                                    "bounds": {"x": 1, "y": 2, "width": 10, "height": 8},
-                                    "states": ["enabled"],
-                                    "rank": 0,
-                                    "score": 0.8,
-                                    "human_limits": {
-                                        "codes": ["source_only", "human_could_not_follow"],
-                                        "sentence": "a person could not follow this hit because it is a visual match with no DOM node"
-                                    }
-                                }]
-                            body = {"ok": True, "composite": nodes}
-                        elif selector == "css=a":
-                            nodes = [
-                                {
-                                    "id": "main:7",
-                                    "handle": "main:7",
-                                    "text": "Docs",
-                                    "role": "link",
-                                    "source": "cdp",
-                                    "bounds": {"x": 1, "y": 2, "width": 10, "height": 8},
-                                    "attributes": {"id": "docs"},
-                                    "states": ["enabled"],
-                                    "rank": 0,
-                                    "score": 0.9
-                                },
-                                {
-                                    "id": "main:8",
-                                    "handle": "main:8",
-                                    "text": "Api",
-                                    "role": "link",
-                                    "source": "cdp",
-                                    "bounds": {"x": 20, "y": 2, "width": 10, "height": 8},
-                                    "attributes": {"id": "api"},
-                                    "states": ["enabled"],
-                                    "rank": 1,
-                                    "score": 0.4
-                                }
-                            ]
-                            body = {"ok": True, "composite": nodes}
-                        else:
-                            composite = [{
-                                "id": "main:7",
-                                "text": selector or "Save",
-                                "role": "button",
-                                "source": "Dom",
-                                "bounds": {"x": 1, "y": 2, "width": 10, "height": 8},
-                                "attributes": {"id": "save"},
-                                "states": ["enabled"],
-                                "score": 0.5
-                            }]
-                            nodes = [{
-                                "frame_id": "main",
-                                "backend_node_id": 7,
-                                "node_name": "BUTTON",
-                                "text": selector or "Save",
-                                "handle": "main:7",
-                                "rank": 0,
-                                "score": 0.5,
-                                "human_limits": {
-                                    "codes": ["off_visual_viewport"],
-                                    "sentence": "scrolled out of the visual viewport"
-                                }
-                            }]
-                            body = {"ok": True, "composite": composite, "nodes": nodes, "explain": [{"why": "css matched 1"}]}
-                    elif "click" in argv or "type" in argv:
-                        selector = ""
-                        if "--selector" in argv:
-                            selector = argv[argv.index("--selector") + 1]
-                        exposure = ""
-                        if "--exposure" in argv:
-                            exposure = argv[argv.index("--exposure") + 1]
-                        if exposure == "human" and ":" not in selector:
-                            body = {"ok": True}
-                        else:
-                            handle = selector if ":" in selector else "main:9"
-                            sentence = "a person could not have seen or clicked it because it is scrolled out of the visual viewport and has opacity:0"
-                            limits = {
-                                "codes": ["human_could_not_see", "human_could_not_click", "off_visual_viewport", "opacity_zero"],
-                                "sentence": sentence
-                            }
-                            body = {"ok": True, "node": {
-                                "id": handle,
-                                "handle": handle,
-                                "text": "hidden" if exposure == "lower" else "Docs",
-                                "role": "button",
-                                "bounds": {"x": 1, "y": 900, "width": 10, "height": 8},
-                                "states": ["hidden"] if exposure == "lower" else ["enabled"],
-                                "human_limits": limits if exposure == "lower" else None
-                            }}
-                            if exposure == "lower":
-                                body["human_limits"] = {
-                                    "codes": limits["codes"],
-                                    "sentence": "acted on node " + handle + "; " + sentence
-                                }
-                    else:
-                        body = {"ok": True}
-                    sys.stdout.write(json.dumps({
-                        "id": req.get("id"),
-                        "exit": 0,
-                        "stdout": json.dumps(body) + "\\n",
-                        "stderr": ""
-                    }) + "\\n")
-                    sys.stdout.flush()
-                """.replace("__FLAGS__", flags).replace("__ENGINES__", engines);
-        Files.createDirectories(path.getParent());
-        Files.writeString(path, script);
-        Files.setPosixFilePermissions(path, Set.of(
-                PosixFilePermission.OWNER_READ,
-                PosixFilePermission.OWNER_WRITE,
-                PosixFilePermission.OWNER_EXECUTE
-        ));
-        return path;
+        return StdioFake.install(path, "page-query", path.toString(), Boolean.toString(geometry));
     }
 }

@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.control.protocol.SessionDescriptor;
 import tools.dscode.control.protocol.SessionDescriptorWriter;
+import tools.dscode.testsupport.PortableProcess;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
@@ -15,7 +16,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -209,8 +209,7 @@ class WorkbenchCliProcessCoverageTest {
                     Given one
                 """, StandardCharsets.UTF_8);
         Files.writeString(temp.resolve("pom.xml"), "<project/>\n");
-        Path script = temp.resolve("mvnw");
-        Files.writeString(script, """
+        PortableProcess.platformScript(temp.resolve("mvnw"), """
                 #!/bin/sh
                 run_id=""
                 for arg in "$@"; do
@@ -226,12 +225,26 @@ class WorkbenchCliProcessCoverageTest {
                 mkdir -p "$dir"
                 printf '%s\\n' "{\\"runId\\":\\"$run_id\\",\\"outcome\\":\\"FAILED\\",\\"counts\\":{\\"failed\\":1,\\"errors\\":0}}" > "$dir/run-index.json"
                 exit 0
-                """, StandardCharsets.UTF_8);
-        Files.setPosixFilePermissions(script, Set.of(
-                java.nio.file.attribute.PosixFilePermission.OWNER_READ,
-                java.nio.file.attribute.PosixFilePermission.OWNER_WRITE,
-                java.nio.file.attribute.PosixFilePermission.OWNER_EXECUTE
-        ));
+                """, """
+                @echo off\r
+                setlocal EnableExtensions EnableDelayedExpansion\r
+                set "run_id="\r
+                :loop\r
+                if "%~1"=="" goto done\r
+                set "arg=%~1"\r
+                if "!arg:~0,13!"=="-Dpkb_run_id=" set "run_id=!arg:~13!"\r
+                shift /1\r
+                goto loop\r
+                :done\r
+                if not defined run_id (\r
+                  echo missing pkb_run_id 1>&2\r
+                  exit /b 1\r
+                )\r
+                set "dir=.pickleball\\runs\\!run_id!\\diagnostic\\!run_id!"\r
+                mkdir "!dir!" 2>nul\r
+                >"!dir!\\run-index.json" echo({"runId":"!run_id!","outcome":"FAILED","counts":{"failed":1,"errors":0}}\r
+                exit /b 0\r
+                """);
 
         Run discover = launch("discover", temp.toString(), "--tags=@boom", "--run-id=ignore-proc");
         assertEquals(1, discover.exit, discover.out + discover.err);

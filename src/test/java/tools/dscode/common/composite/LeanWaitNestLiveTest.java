@@ -1,5 +1,6 @@
 package tools.dscode.common.composite;
 
+import tools.dscode.testsupport.StdioFake;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.domcomposite.Argv;
@@ -17,12 +18,10 @@ import tools.dscode.common.seleniumextensions.ElementWrapper;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.PosixFilePermission;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -210,106 +209,6 @@ class LeanWaitNestLiveTest {
     }
 
     private static Path stub(Path path, Path log, String queryMode, boolean eval) throws Exception {
-        String actions = eval
-                ? "[\"click\", \"type\", \"scroll\", \"eval\"]"
-                : "[\"click\", \"type\", \"scroll\"]";
-        String script = """
-                #!/usr/bin/env python3
-                import json, sys
-                log = %s
-                mode = %s
-                actions = %s
-                def note(argv):
-                    with open(log, "a", encoding="utf-8") as handle:
-                        handle.write(" ".join(argv) + "\\n")
-                def node(node_id, html_id):
-                    return {
-                        "id": node_id,
-                        "node_name": "DIV",
-                        "text": html_id,
-                        "attributes": {"id": html_id},
-                        "bounds": {"x": 1, "y": 2, "width": 10, "height": 8}
-                    }
-                snapshot = {
-                    "tag": "div",
-                    "text": "Hello",
-                    "value": "",
-                    "selectedValue": "",
-                    "attributes": {"id": "host"},
-                    "siblingIndex": 0,
-                    "sameTagIndex": 0,
-                    "stableSelector": "#host",
-                    "elementState": {
-                        "disabled": False,
-                        "blank": True,
-                        "required": False,
-                        "expanded": False,
-                        "attributeOn": False,
-                        "selectable": False,
-                        "domSelected": False
-                    }
-                }
-                for line in sys.stdin:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    req = json.loads(line)
-                    argv = req.get("argv") or []
-                    note(argv)
-                    text = " ".join(argv)
-                    exit_code = 0
-                    stderr = ""
-                    if "version" in argv:
-                        payload = {"version": "2.8.0"}
-                    elif "capabilities" in argv:
-                        payload = {"ok": True, "desktop": ["list", "query", "close"], "actions": actions}
-                    elif "create" in argv:
-                        payload = {"ok": True, "id": "sess-1", "launched": False}
-                    elif argv and argv[0] == "eval":
-                        if "isConnected" in text:
-                            payload = {"ok": True, "kind": "eval", "value": True}
-                        else:
-                            payload = {"ok": True, "kind": "eval", "backend_node_id": 42, "value": snapshot}
-                    elif argv and argv[0] == "query":
-                        if mode == "reject":
-                            exit_code = 2
-                            stderr = "unexpected argument --poll-ms"
-                            payload = {}
-                        elif mode == "timeout":
-                            exit_code = 1
-                            stderr = json.dumps({"code": "timeout", "error": "timed out waiting"})
-                            payload = {}
-                        elif "ancestor::" in text:
-                            payload = {"ok": True, "composite": [node("main:1", "outer")]}
-                        elif "descendant::" in text:
-                            payload = {"ok": True, "composite": [node("main:3", "inner")]}
-                        else:
-                            payload = {"ok": True, "composite": [
-                                node("main:1", "outer"),
-                                node("main:2", "mid"),
-                                node("main:3", "inner")
-                            ]}
-                    else:
-                        payload = {"ok": True}
-                    sys.stdout.write(json.dumps({
-                        "id": req.get("id"),
-                        "exit": exit_code,
-                        "stdout": json.dumps(payload) + "\\n",
-                        "stderr": stderr
-                    }) + "\\n")
-                    sys.stdout.flush()
-                """.formatted(quote(log.toString()), quote(queryMode), actions);
-        Files.createDirectories(path.getParent());
-        Files.writeString(path, script);
-        Files.setPosixFilePermissions(path, Set.of(
-                PosixFilePermission.OWNER_READ,
-                PosixFilePermission.OWNER_WRITE,
-                PosixFilePermission.OWNER_EXECUTE
-        ));
-        return path;
-    }
-
-    private static String quote(String value) {
-        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+        return StdioFake.install(path, "lean", log.toString(), queryMode, Boolean.toString(eval));
     }
 }

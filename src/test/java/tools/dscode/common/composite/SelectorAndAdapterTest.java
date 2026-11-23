@@ -1,5 +1,6 @@
 package tools.dscode.common.composite;
 
+import tools.dscode.testsupport.StdioFake;
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.domengine.json.Jsons;
 import dev.domengine.query.HtmlTree;
@@ -14,11 +15,9 @@ import org.openqa.selenium.WebElement;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.PosixFilePermission;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -196,61 +195,6 @@ class SelectorAndAdapterTest {
     }
 
     private static Path stub(Path path, Path log, boolean desktopClick) throws Exception {
-        String desktop = desktopClick
-                ? "[\"list\", \"attach\", \"walk\", \"query\", \"resolve\", \"close\", \"click\", \"type\"]"
-                : "[\"list\", \"attach\", \"walk\", \"query\", \"resolve\", \"close\"]";
-        String script = """
-                #!/usr/bin/env python3
-                import json, sys
-                log = sys.argv[1] if False else %s
-                def note(argv):
-                    with open(log, "a", encoding="utf-8") as handle:
-                        handle.write(" ".join(argv) + "\\n")
-                for line in sys.stdin:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    req = json.loads(line)
-                    argv = req.get("argv") or []
-                    note(argv)
-                    joined = " ".join(argv)
-                    if "version" in argv:
-                        body = {"version": "2.4.0"}
-                    elif "capabilities" in argv:
-                        body = {"ok": True, "desktop": %s, "actions": ["click", "type", "scroll"]}
-                    elif "create" in argv:
-                        body = {"ok": True, "id": "sess-1", "launched": False}
-                    elif "desktop" in argv or "query" in argv or "click" in argv or "type" in argv or "scroll" in argv:
-                        body = {"ok": True, "composite": [{
-                            "id": "main:1",
-                            "text": "Save",
-                            "role": "button",
-                            "bounds": {"x": 1, "y": 2, "width": 10, "height": 8},
-                            "attributes": {"id": "save"},
-                            "states": ["enabled"],
-                            "source": "Dom" if "desktop" not in argv else "Desktop"
-                        }]}
-                    else:
-                        body = {"ok": True}
-                    sys.stdout.write(json.dumps({
-                        "id": req.get("id"),
-                        "exit": 0,
-                        "stdout": json.dumps(body) + "\\n",
-                        "stderr": ""
-                    }) + "\\n")
-                    sys.stdout.flush()
-                """.formatted(quote(log.toString()), desktop);
-        Files.createDirectories(path.getParent());
-        Files.writeString(path, script);
-        Files.setPosixFilePermissions(path, Set.of(
-                PosixFilePermission.OWNER_READ,
-                PosixFilePermission.OWNER_WRITE,
-                PosixFilePermission.OWNER_EXECUTE
-        ));
-        return path;
-    }
-
-    private static String quote(String value) {
-        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+        return StdioFake.install(path, "selector", log.toString(), Boolean.toString(desktopClick));
     }
 }

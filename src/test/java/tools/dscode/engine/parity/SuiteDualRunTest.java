@@ -15,10 +15,14 @@ import tools.dscode.untilpass.UntilPassBrowserSteps;
 import com.example.pickleball.SyntaxProofSteps;
 import com.example.pickleball.support.LocalTestSite;
 
+import java.io.IOException;
+import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -108,10 +112,16 @@ class SuiteDualRunTest {
         Path calls = Path.of("src/test/resources/calls");
         Path callsTarget = Path.of("maven-consumer-project/src/test/resources/calls").toAbsolutePath().normalize();
         boolean linkedCalls = false;
+        boolean copiedCalls = false;
         if (!Files.exists(calls)) {
             Files.createDirectories(calls.getParent());
-            Files.createSymbolicLink(calls, callsTarget);
-            linkedCalls = true;
+            try {
+                Files.createSymbolicLink(calls, callsTarget);
+                linkedCalls = true;
+            } catch (UnsupportedOperationException | FileSystemException denied) {
+                copyTree(callsTarget, calls);
+                copiedCalls = true;
+            }
         }
         try (LocalTestSite site = LocalTestSite.start(8765)) {
             Path resources = Path.of("maven-consumer-project/src/test/resources");
@@ -122,9 +132,37 @@ class SuiteDualRunTest {
                 }
             }
         } finally {
-            if (linkedCalls) Files.deleteIfExists(calls);
+            if (copiedCalls) deleteTree(calls);
+            else if (linkedCalls) Files.deleteIfExists(calls);
         }
         assertTrue(problems.isEmpty(), problems.size() + " features diverged\n" + String.join("\n\n", problems));
+    }
+
+    /** Copies the tree. Does not follow a link into the target. */
+    private static void copyTree(Path source, Path destination) throws IOException {
+        try (Stream<Path> walk = Files.walk(source)) {
+            for (Path path : walk.toList()) {
+                Path target = destination.resolve(source.relativize(path));
+                if (Files.isDirectory(path)) {
+                    Files.createDirectories(target);
+                } else {
+                    Files.createDirectories(target.getParent());
+                    Files.copy(path, target);
+                }
+            }
+        }
+    }
+
+    /** Deletes a copied tree. A symlink is removed as a link, not followed. */
+    private static void deleteTree(Path root) throws IOException {
+        if (Files.isSymbolicLink(root)) {
+            Files.deleteIfExists(root);
+            return;
+        }
+        if (!Files.exists(root)) return;
+        try (Stream<Path> walk = Files.walk(root)) {
+            for (Path path : walk.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(path);
+        }
     }
 
     private static Class<?> glueFor(Path feature) {

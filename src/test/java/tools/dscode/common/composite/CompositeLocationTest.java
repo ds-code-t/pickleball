@@ -5,15 +5,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import tools.dscode.control.protocol.DirectControlProvider;
+import tools.dscode.testsupport.PortableProcess;
+import tools.dscode.testsupport.StdioFake;
 
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.PosixFilePermission;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 
@@ -252,47 +252,10 @@ class CompositeLocationTest {
     }
 
     private static Path executable(Path path) throws Exception {
-        Files.createDirectories(path.getParent());
-        Files.writeString(path, "#!/bin/sh\nexit 0\n");
-        Files.setPosixFilePermissions(path, Set.of(
-                PosixFilePermission.OWNER_READ,
-                PosixFilePermission.OWNER_WRITE,
-                PosixFilePermission.OWNER_EXECUTE
-        ));
-        return path;
+        return PortableProcess.exitZero(path);
     }
 
     private static Path stub(Path path) throws Exception {
-        String script = """
-                #!/usr/bin/env python3
-                import json, sys
-                for line in sys.stdin:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    req = json.loads(line)
-                    argv = req.get("argv") or []
-                    if "version" in argv:
-                        body = {"version": "2.4.0"}
-                    elif "create" in argv:
-                        body = {"ok": True, "id": "sess-1", "launched": False}
-                    else:
-                        body = {"ok": True}
-                    sys.stdout.write(json.dumps({
-                        "id": req.get("id"),
-                        "exit": 0,
-                        "stdout": json.dumps(body) + "\\n",
-                        "stderr": ""
-                    }) + "\\n")
-                    sys.stdout.flush()
-                """;
-        Files.createDirectories(path.getParent());
-        Files.writeString(path, script);
-        Files.setPosixFilePermissions(path, Set.of(
-                PosixFilePermission.OWNER_READ,
-                PosixFilePermission.OWNER_WRITE,
-                PosixFilePermission.OWNER_EXECUTE
-        ));
-        return path;
+        return StdioFake.install(path, "location");
     }
 }

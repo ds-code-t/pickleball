@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.io.TempDir;
 import dev.domengine.session.ChromeProcess;
+import tools.dscode.testsupport.PortableProcess;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -101,7 +102,7 @@ class DirectControlProviderTest {
     void presentBinaryAttachesAndDetachLeavesTheBrowserRunning() throws Exception {
         Path script = fakeComposite();
         publishPaused();
-        Process browser = new ProcessBuilder("sleep", "30").start();
+        Process browser = PortableProcess.sleep(30);
         DirectControlProvider.Handle provider = null;
         try {
             DirectControlProvider.Outcome outcome = DirectControlProvider.open(request(true, script.toString(), "127.0.0.1:9222"));
@@ -149,7 +150,7 @@ class DirectControlProviderTest {
     @Test
     void providerExitDoesNotKillTheBrowser() throws Exception {
         Path script = fakeComposite();
-        Process browser = new ProcessBuilder("sleep", "30").start();
+        Process browser = PortableProcess.sleep(30);
         DirectControlProvider.Handle provider = null;
         try {
             provider = DirectControlProvider.open(request(true, script.toString(), "http://127.0.0.1:9333")).handle();
@@ -321,7 +322,7 @@ class DirectControlProviderTest {
     }
 
     private Path fakeComposite() throws IOException {
-        return script("""
+        String shell = """
                 #!/bin/sh
                 echo "$@" >> "$0.calls"
                 dir=""
@@ -351,7 +352,46 @@ class DirectControlProviderTest {
                 fi
                 echo "unexpected $op" >&2
                 exit 2
-                """);
+                """;
+        String batch = """
+                @echo off\r
+                setlocal EnableExtensions EnableDelayedExpansion\r
+                set "self=%~f0"\r
+                >>"%self%.calls" echo(%*\r
+                set "dir="\r
+                set "id="\r
+                set "op="\r
+                set "prev="\r
+                :loop\r
+                if "%~1"=="" goto ready\r
+                if "!prev!"=="--session-dir" set "dir=%~1"\r
+                if "!prev!"=="--id" set "id=%~1"\r
+                if "!prev!"=="session" set "op=%~1"\r
+                set "prev=%~1"\r
+                shift /1\r
+                goto loop\r
+                :ready\r
+                if not defined dir goto missing\r
+                if not defined id goto missing\r
+                if not defined op goto missing\r
+                mkdir "!dir!" 2>nul\r
+                if "!op!"=="attach" goto attach\r
+                if "!op!"=="close" goto close\r
+                echo unexpected !op! 1>&2\r
+                exit /b 2\r
+                :missing\r
+                echo missing args 1>&2\r
+                exit /b 2\r
+                :attach\r
+                >"!dir!\\registry.json" echo({"joined":"!id!","sessions":{"!id!":{"id":"!id!","launched":false}}}\r
+                echo({"id":"!id!","cdp":"http://127.0.0.1:9222","launched":false,"pid":null,"profile":null,"allowlist":[],"created":"t","process":false,"url":null,"kind":"browser","backend":"","app_name":"","fixture":null}\r
+                exit /b 0\r
+                :close\r
+                >"!dir!\\registry.json" echo({"joined":null,"sessions":{}}\r
+                echo({"id":"!id!","closed":true,"detached":true,"killed":false,"launched":false}\r
+                exit /b 0\r
+                """;
+        return PortableProcess.platformScript(temp.resolve("composite-" + System.nanoTime()), shell, batch);
     }
 
     private void publishPaused() {

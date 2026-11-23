@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -169,11 +170,13 @@ class MavenWorkspaceLaunchEndToEndTest {
 
     private static void copyExecutable(Path source, Path destination) throws Exception {
         Files.copy(source, destination, StandardCopyOption.COPY_ATTRIBUTES);
-        Set<PosixFilePermission> permissions = new HashSet<>(Files.getPosixFilePermissions(destination));
+        PosixFileAttributeView view = Files.getFileAttributeView(destination, PosixFileAttributeView.class);
+        if (view == null) return;
+        Set<PosixFilePermission> permissions = new HashSet<>(view.readAttributes().permissions());
         permissions.add(PosixFilePermission.OWNER_EXECUTE);
         permissions.add(PosixFilePermission.GROUP_EXECUTE);
         permissions.add(PosixFilePermission.OTHERS_EXECUTE);
-        Files.setPosixFilePermissions(destination, permissions);
+        view.setPermissions(permissions);
     }
 
     private static List<String> seedCommand(Path project) throws Exception {
