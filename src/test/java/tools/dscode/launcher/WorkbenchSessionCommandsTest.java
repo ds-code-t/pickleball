@@ -1503,20 +1503,7 @@ class WorkbenchSessionCommandsTest {
     }
 
     private static Process exitedProcess() throws IOException {
-        ProcessBuilder builder = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win")
-                ? new ProcessBuilder("cmd.exe", "/c", "exit", "1")
-                : new ProcessBuilder("true");
-        Process process = builder.start();
-        try {
-            if (!process.waitFor(2, TimeUnit.SECONDS)) {
-                process.destroyForcibly();
-                throw new IOException("The exited-process stub was still alive.");
-            }
-        } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
-            throw new IOException("Interrupted while waiting for the exited process.", interrupted);
-        }
-        return process;
+        return PortableProcess.exited(0);
     }
 
     private static final class FakeSession implements AutoCloseable {

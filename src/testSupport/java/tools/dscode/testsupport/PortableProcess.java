@@ -63,18 +63,25 @@ public final class PortableProcess {
 
     /**
      * A Java process that has already exited. Replaces Unix {@code true} when
-     * {@code code} is 0.
+     * {@code code} is 0. An interrupted wait becomes {@link IOException} so a
+     * starter that only throws {@code IOException} can call this.
      */
-    public static Process exited(int code) throws IOException, InterruptedException {
+    public static Process exited(int code) throws IOException {
         Path source = source("PkbExit.java", EXIT);
         Process process = new ProcessBuilder(
                 javaBin().toString(),
                 source.toAbsolutePath().toString(),
                 Integer.toString(code)
         ).start();
-        if (!process.waitFor(30, TimeUnit.SECONDS)) {
+        try {
+            if (!process.waitFor(30, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                throw new IOException("already-exited child was still alive");
+            }
+        } catch (InterruptedException interrupted) {
             process.destroyForcibly();
-            throw new IOException("already-exited child was still alive");
+            Thread.currentThread().interrupt();
+            throw new IOException("already-exited child was interrupted", interrupted);
         }
         return process;
     }

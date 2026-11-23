@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.common.agentfast.AgentEnvelope;
 import tools.dscode.control.protocol.LiveHostFile;
+import tools.dscode.testsupport.PortableProcess;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -23,8 +24,7 @@ class BrowserStateTest {
 
     @Test
     void deadChromeIsDownEvenWhenTheHostJvmIsAlive() throws Exception {
-        Process finished = new ProcessBuilder("true").start();
-        finished.waitFor();
+        Process finished = PortableProcess.exited(0);
         long host = ProcessHandle.current().pid();
         LiveHostFile.write(temp, new LiveHostFile.Host(
                 "http://127.0.0.1:9", "token", 9, host, finished.pid(),
@@ -76,8 +76,7 @@ class BrowserStateTest {
 
     @Test
     void liveStopClearsSessionAndChromePresence() throws Exception {
-        Process finished = new ProcessBuilder("true").start();
-        finished.waitFor();
+        Process finished = PortableProcess.exited(0);
         LiveHostFile.write(temp, new LiveHostFile.Host(
                 "http://127.0.0.1:9", "token", 9, finished.pid(), finished.pid(),
                 "gone", false, "chrome", false, "", false, 1L, 1L

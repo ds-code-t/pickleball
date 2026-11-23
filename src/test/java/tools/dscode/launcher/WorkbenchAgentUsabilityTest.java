@@ -8,6 +8,7 @@ import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.Workspace;
+import tools.dscode.testsupport.PortableProcess;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -238,7 +239,7 @@ class WorkbenchAgentUsabilityTest {
                 args,
                 new PrintStream(stdout, true, StandardCharsets.UTF_8),
                 new PrintStream(stderr, true, StandardCharsets.UTF_8),
-                launch -> new ProcessBuilder("true").start(),
+                launch -> PortableProcess.exited(0),
                 java.net.http.HttpClient.newHttpClient(),
                 (project, runId, agentId) -> {
                     throw new IOException("ui starter not used");
