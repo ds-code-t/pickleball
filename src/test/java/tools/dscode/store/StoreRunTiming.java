@@ -147,9 +147,25 @@ final class StoreRunTiming {
         Files.writeString(cache, text + "\n");
     }
 
+    /**
+     * A Windows batch file is started through one quoted {@code call}.
+     * cmd splits {@code %1} on {@code =}, which would drop {@code -Dname=value}.
+     */
+    private static List<String> launch(List<String> command) {
+        if (!PortableProcess.windows() || command.isEmpty()) return command;
+        String file = command.get(0).toLowerCase(java.util.Locale.ROOT);
+        if (!file.endsWith(".bat") && !file.endsWith(".cmd")) return command;
+        StringBuilder call = new StringBuilder("call");
+        for (String argument : command) {
+            String body = argument == null ? "" : argument;
+            call.append(' ').append('"').append(body.replace("\"", "\"\"")).append('"');
+        }
+        return List.of("cmd.exe", "/d", "/c", call.toString());
+    }
+
     private static Run timed(List<String> command, Path directory) throws Exception {
         long started = System.nanoTime();
-        Process process = new ProcessBuilder(command).directory(directory.toFile()).start();
+        Process process = new ProcessBuilder(launch(command)).directory(directory.toFile()).start();
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
         Thread stdout = pump(process.getInputStream(), out);

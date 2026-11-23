@@ -32,6 +32,7 @@ class StoreRunTest {
 
     @AfterEach
     void releaseSandbox() {
+        tools.dscode.store.sql.SqlConnections.closeProject(project);
         StoreScope.clear();
     }
 
@@ -469,7 +470,7 @@ class StoreRunTest {
                 set "EXTRA="
                 :collect
                 if "%~1"=="" goto launch
-                echo %~1| findstr /b /c:"-D" >nul && set "EXTRA=%EXTRA% %~1"
+                echo %~1| %SystemRoot%\\System32\\findstr.exe /b /c:"-D" >nul && set "EXTRA=%EXTRA% %~1"
                 shift
                 goto collect
                 :launch
