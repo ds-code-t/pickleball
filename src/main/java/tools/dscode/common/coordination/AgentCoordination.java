@@ -602,6 +602,10 @@ public final class AgentCoordination {
                 }
             }
             tools.dscode.store.RunCatalog.publishAgent(project, existing.runId(), statusValue, existing.why());
+            if (safeRun.equals(System.getProperty(PKB_props.PKB_RUN_ID))) {
+                // A finished id must not stay the next in-process runner's launch id.
+                System.clearProperty(PKB_props.PKB_RUN_ID);
+            }
             print(out, "run-id=" + existing.runId());
             print(out, "run-record=" + recordFile);
         } catch (IOException failure) {

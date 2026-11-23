@@ -13,6 +13,8 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -76,5 +78,22 @@ class RunIdReuseGuardTest {
         assertTrue(stored.failed() > 0, stored.toString());
         kept = Files.readString(discover.recordFile());
         assertTrue(kept.contains("\"status\" : \"FAILED\""), kept);
+    }
+
+    @Test
+    void aFinishedRunDoesNotStayTheNextInProcessId() {
+        System.setProperty("pkb_agent_id", "agent-hold");
+        try {
+            AgentCoordination.Run run = AgentCoordination.openConsumerRun(project, new StringBuilder());
+            assertEquals(run.runId(), System.getProperty("pkb_run_id"));
+            AgentCoordination.finish(project, run.runId(), "done", "PASSED");
+            assertNull(System.getProperty("pkb_run_id"));
+            AgentCoordination.Run next = AgentCoordination.openConsumerRun(project, new StringBuilder());
+            assertNotEquals(run.runId(), next.runId());
+        } finally {
+            System.clearProperty("pkb_agent_id");
+            System.clearProperty("pkb_run_id");
+            AgentCoordination.clearCurrent();
+        }
     }
 }
