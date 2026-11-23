@@ -1,6 +1,6 @@
 # Collaborative self-test
 
-Instruction recipes for a consumer AI agent. They check collaborative recording, the step editor, feedback states, question-card text, and the historical dashboard. They are not an `@all` suite and they are not a substitute for the contracts in `docs/collaborative-recording.md` and `docs/dashboard.md`.
+Instruction recipes for a consumer AI agent. The sections above Human participation are unattended. Human participation needs a person, or a second agent taking that role. Neither kind is an `@all` suite, and neither replaces the contracts in `docs/collaborative-recording.md` and `docs/dashboard.md`.
 
 Run them from the consumer project with that project's wrapper. Do not require a machine-wide Maven or Gradle install. A scratch directory is optional. Use one whose path contains no spaces.
 
@@ -163,3 +163,108 @@ Unattended proof: the feedback selftest for the three states, `selftest record` 
 `maven-consumer-project/src/test/resources/features/recorded-collaboration.feature` is the shape `record --export --format=feature` writes. It navigates to `URL.dynamicSteps` (`site/dynamic-steps.html`) and names `record --editor`, `--popout`, and the example rows. It is not a live collaborative session. Do not add a second feature for that path.
 
 The five-command path stays in the first-read guide: `start --url-key`, `chat-turn`, `act --query`, `ui-verify`, `doctor`. This file is the longer self-test.
+
+## Human participation
+
+These scenarios need a person at the page, or a second agent who only types and clicks. The agent that starts a wait must not also be the one who answers it. They cannot run as unattended regression. A timeout with nobody present is the result already described above, not a new failure.
+
+Keep launcher flag values free of spaces. Put text that needs spaces or quotes in a file, and pass that file.
+
+Use a headed page with the panel. From the consumer project:
+
+```text
+start --url=fixture:form --browser=chrome --headed --panel
+```
+
+`fixture:form` is a built-in data page with an Email field and a Go button. A consumer page that contains a content iframe is the right target when the iframe check below is in scope. Leave this browser up until `live-stop`.
+
+Pass: exit 0. `sentence` is `live browser ready, panel open`. `panel` is `open` and `navigated` is true. `headed` is true only when this JVM has a display. A headless JVM keeps `headed` false even with `--headed`, and a person cannot see that window. Do not run the rest of this section unless `headed` is true.
+
+### Chat delivery and read state
+
+```text
+chat-turn --text=ready --until=human --timeout=120
+```
+
+`--timeout` here is seconds, from 0 to 120. The command waits.
+
+The person types a short message in the panel and sends it. The bubble shows `sending` at once, then `delivered` when the push channel or the event store takes it, then `read` when the agent consumes it. The agent reply lists that message once. A message the panel already shows as Read is not returned again.
+
+Pop the chat out and back in while a second agent message is unread:
+
+```text
+record --popout --panel=chat
+record --popin --panel=chat
+```
+
+The Read mark on the person's message stays. An unread agent message stays unread. If the browser blocks the window, the result says `popup blocked` and the panel stays on the page.
+
+### Question card
+
+```text
+ask-and-wait --say=Pick-one --choices=Alpha,Beta --timeout=120000
+```
+
+`--timeout` here is milliseconds. `--choices` is one button per comma-separated token.
+
+The person clicks Alpha. The card shows `Answer sent: "Alpha"` for about 1.5 seconds. The value returned to the agent is `Alpha`, without added quote characters. Only the clicked choice comes back.
+
+When the question text must contain a concrete value, quote it in the source (`Enter "abc" in this textbox`). The page paints that quote as a `.pkb-value` chip. Do not drop the quote characters.
+
+### Guide
+
+Write `guide-steps.json` in the consumer project:
+
+```json
+[{"t":"#email","say":"Enter \"abc\" in this textbox","do":"input","expect":"abc"}]
+```
+
+```text
+guide --steps=@guide-steps.json
+```
+
+The person sees the quoted `abc` as a chip. The step ends on Enter, on blur, or when the field matches `expect`. It does not end on a pause between keystrokes. A missing current target is refused and is not listed in Steps. When the guide ends, field step-done badges are removed. `guide-done` ends it if it is still open.
+
+### Recording with the person
+
+```text
+record --start --session=human
+```
+
+The person clicks Go on the page, then types in Email. They also hover the recording bar and may click Pause.
+
+`record --script` then shows the page click and one step for the email field. Consecutive edits of that field are one step. The script does not contain `Pause`, `hover`, or `Accept`. The panel, the step editor, and the recording bar are not steps.
+
+On a page with a content iframe, a click or type inside that frame is `in the "<id>" IFrame` plus the inner element. It is not a hover on the iframe host.
+
+```text
+record --stop
+```
+
+`sentence` is `recording stopped`.
+
+### Step editor pop-out
+
+With the recording still useful to look at, open the editor and pop it out before stop, or start again. The person looks at the page:
+
+```text
+record --editor
+record --popout --panel=editor
+record --popin --panel=editor
+```
+
+A real window titled for the step editor means `where` is `window` and `sentence` is `popped out`. `record --popin` returns it to the page (`where` is `page`, `sentence` is `popped in`). `popup blocked` leaves the editor on the page. Either observation is valid. The unattended pop-out above only updates the panel map and does not prove this window.
+
+### Dashboard while the page is up
+
+Leave the browser open. In another invocation:
+
+```text
+dashboard xref --role=button --name=Go
+```
+
+Add `--project=` when the working directory is not the consumer project. The browser stays up. The JSON still has `summary`, `overlay`, and `chat`. An empty store says `No history mentions button Go.` A store that has retained runs lists those runs, scenario paths, log excerpts, and screenshot paths. `dashboard xref --window` writes one HTML file and does not open a second browser.
+
+When a failure looks intermittent, `dashboard overlap` is the time grouping. Run it, then xref for the element. A failure line appears only when at least two runs in the group share it.
+
+Finish with `live-stop`. Do not add this section to `@all`.

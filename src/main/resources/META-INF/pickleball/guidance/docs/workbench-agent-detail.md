@@ -40,7 +40,7 @@ The panel tabs are Chat, Guide, and Recorder. The tab ids stay `chat`, `steps`, 
 
 `dashboard overlap` groups runs that were active at the same time and lists a failure line only when at least two runs in that group share it. A blank finish is a point at the start. Use `--from` and `--to` to keep one window. When a failure looks intermittent, run overlap first, then xref for the element on the page. MCP `workbench_dashboard_overlap` forwards that command.
 
-Unattended recipes for feedback, the step editor, recording noise, and these dashboard reads are in `docs/collaborative-self-test.md`.
+Unattended recipes and the human-participation script for feedback, the step editor, recording noise, and these dashboard reads are in `docs/collaborative-self-test.md`. The human script is not an unattended regression.
 
 ## Tool chooser
 

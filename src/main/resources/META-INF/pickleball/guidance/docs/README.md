@@ -9,7 +9,7 @@ When these docs are materialized from the Maven dependency with Workbench `expor
 - [Getting started](getting-started.md) — add the Maven dependency, create one runner, and run feature files.
 - [Consumer project guide](consumer-project.md) — run the executable Maven consumer, local test site, tag suites, configuration, diagnostic workflow, and exported reference snapshot.
 - [Consumer AI agent guide](consumer-agent-guide.md) — canonical instructions for AI agents authoring, running, diagnosing, and rerunning Pickleball scenarios from a Maven consumer.
-- [Collaborative self-test](collaborative-self-test.md) — unattended recipes for recording, the step editor, feedback states, and the dashboard.
+- [Collaborative self-test](collaborative-self-test.md) — unattended recipes and the human-participation script for recording, the step editor, feedback states, and the dashboard.
 - [Cucumber compatibility](cucumber-compatibility.md) — mix Pickleball dynamic steps with standard Cucumber steps, hooks, tags, tables, and plugins.
 
 ## Browser scenarios
