@@ -1522,7 +1522,7 @@ public final class WorkbenchSynchronizer {
         Files.walkFileTree(source, new SimpleFileVisitor<>() {
             @Override
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-                if (!dir.equals(source) && Files.isSymbolicLink(dir)) {
+                if (!dir.equals(source) && (attrs.isSymbolicLink() || (attrs.isDirectory() && attrs.isOther()))) {
                     Path destination = target.resolve(source.relativize(dir).toString());
                     if (destination.getParent() != null) Files.createDirectories(destination.getParent());
                     Files.copy(dir, destination, StandardCopyOption.REPLACE_EXISTING, java.nio.file.LinkOption.NOFOLLOW_LINKS);
@@ -1567,7 +1567,9 @@ public final class WorkbenchSynchronizer {
         Files.walkFileTree(root, new SimpleFileVisitor<>() {
             @Override
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-                if (Files.isSymbolicLink(dir)) {
+                // A Windows junction is a directory with isOther, not a symbolic link.
+                // Walking it deletes base/classes, which is the directory the junction names.
+                if (attrs.isSymbolicLink() || (attrs.isDirectory() && attrs.isOther())) {
                     Files.deleteIfExists(dir);
                     return FileVisitResult.SKIP_SUBTREE;
                 }
