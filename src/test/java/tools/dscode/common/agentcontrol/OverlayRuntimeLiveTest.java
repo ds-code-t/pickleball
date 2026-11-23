@@ -571,7 +571,7 @@ class OverlayRuntimeLiveTest {
         assertEquals("[]", String.valueOf(started.body().get("miss")));
         assertEquals("current", badge(1));
         assertEquals("todo", badge(2));
-        browser.findElement(By.id("email")).sendKeys("a");
+        browser.findElement(By.id("email")).sendKeys("m");
         Thread.sleep(900);
         assertEquals("current", badge(1), "a pause must not complete the step");
         browser.findElement(By.id("email")).sendKeys("me@example.test".substring(1));
