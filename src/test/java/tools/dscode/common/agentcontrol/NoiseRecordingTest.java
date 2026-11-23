@@ -152,6 +152,58 @@ class NoiseRecordingTest {
         assertTrue(String.valueOf(tags.get("panelPurpose")).contains("panel"), tags.toString());
         assertEquals("true", tags.get("editorMeta"), tags.toString());
         assertTrue(String.valueOf(tags.get("editorPurpose")).contains("editor"), tags.toString());
+        String barText = String.valueOf(((JavascriptExecutor) driver).executeScript(
+                "var bar = document.querySelector('[data-pkb-record]'); return bar ? bar.innerText : '';"));
+        assertTrue(barText.contains("Paused"), barText);
+        assertTrue(barText.contains("Keep step"), barText);
+        assertTrue(barText.contains("Drop step"), barText);
+        String guideTab = String.valueOf(((JavascriptExecutor) driver).executeScript("""
+                var layer = document.querySelector('pkb-layer');
+                var root = layer && layer.shadowRoot;
+                var tab = root ? root.querySelector('[data-tab="steps"]') : null;
+                return tab ? tab.textContent : '';
+                """));
+        assertTrue(guideTab.contains("Guide"), guideTab);
+        assertEquals("true", PageSurfaces.runtimeCall("editorClose", Map.of(), false));
+        Boolean editorGone = (Boolean) ((JavascriptExecutor) driver).executeScript("""
+                var layer = document.querySelector('pkb-layer');
+                var root = layer && layer.shadowRoot;
+                return !(root && root.querySelector('[data-pkb-editor]'));
+                """);
+        assertEquals(Boolean.TRUE, editorGone);
+        ((JavascriptExecutor) driver).executeScript("""
+                var layer = document.querySelector('pkb-layer');
+                var root = layer && layer.shadowRoot;
+                var pill = root ? root.querySelector('[aria-label="Open step editor"]') : null;
+                if (pill) pill.click();
+                """);
+        Boolean editorBack = (Boolean) ((JavascriptExecutor) driver).executeScript("""
+                var layer = document.querySelector('pkb-layer');
+                var root = layer && layer.shadowRoot;
+                var editor = root ? root.querySelector('[data-pkb-editor]') : null;
+                return !!(editor && editor.isConnected);
+                """);
+        assertEquals(Boolean.TRUE, editorBack, "Steps pill did not reopen the editor");
+        assertEquals("true", PageSurfaces.runtimeCall("panelClose", Map.of(), false));
+        Boolean panelGone = (Boolean) ((JavascriptExecutor) driver).executeScript("""
+                var layer = document.querySelector('pkb-layer');
+                var root = layer && layer.shadowRoot;
+                return !(root && root.querySelector('[data-pkb-panel]'));
+                """);
+        assertEquals(Boolean.TRUE, panelGone);
+        ((JavascriptExecutor) driver).executeScript("""
+                var layer = document.querySelector('pkb-layer');
+                var root = layer && layer.shadowRoot;
+                var pill = root ? root.querySelector('[aria-label="Open agent panel"]') : null;
+                if (pill) pill.click();
+                """);
+        Boolean panelBack = (Boolean) ((JavascriptExecutor) driver).executeScript("""
+                var layer = document.querySelector('pkb-layer');
+                var root = layer && layer.shadowRoot;
+                var panel = root ? root.querySelector('[data-pkb-panel]') : null;
+                return !!(panel && panel.isConnected);
+                """);
+        assertEquals(Boolean.TRUE, panelBack, "panel pill did not reopen the panel");
     }
 
     private static void assertEqualsOneEnter(String gherkin) {

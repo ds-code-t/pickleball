@@ -72,11 +72,11 @@ Repeated input on the same control keeps the last value. Focus is not a step. A 
 
 Routines are JSON files under `.pickleball/recordings/routines/<name>.json`. They survive a new process. `--export --format=feature` writes a Scenario Outline whose steps are dynamic steps and whose Examples row is the recorded values. `--run --param=name=value` substitutes those placeholders, writes `.pickleball/recordings/replay/<name>.feature`, and writes `execute-step` rows in `<name>.steps.json`. Replay uses the same dynamic-step path as any other feature. `<name>` is an Examples or mapping placeholder, not a new syntax.
 
-The in-page bar (`window.__pkbUi.record`) shows the script while recording. A quoted value in that script, and in each editor row, is a `.pkb-value` chip. The row text still contains the quotes. Pause, Resume, Accept, and Reject use the same `sending` then `delivered` feedback as the panel. Those buttons push `type:record` onto the event stream.
+The in-page bar (`window.__pkbUi.record`) shows the script while recording. A quoted value in that script, and in each editor row, is a `.pkb-value` chip. The row text still contains the quotes. The title is the word Recording or Paused. The buttons are Pause or Resume, Keep step, and Drop step. Keep step and Drop step still push the actions `accept` and `reject`. Pause, Resume, Keep step, and Drop step use the same `sending` then `delivered` feedback as the panel. Those buttons push `type:record` onto the event stream. The bar sits above the Steps pill.
 
 ## Step editor
 
-`record --start` opens a floating step editor (`data-pkb-editor`, `window.__pkbUi.editor`). It lists each generated step with a short id (`s1`, or `m1` for a step you added). The panel matches the chat panel: drag the header to move it, drag an edge or corner to resize, and collapse it to a Steps pill. Light, dark, and reduced motion follow `panel.css`.
+`record --start` opens a floating step editor (`data-pkb-editor`, `window.__pkbUi.editor`). It lists each generated step with a short id (`s1`, or `m1` for a step you added). The panel matches the chat panel: drag the header to move it, drag an edge or corner to resize, and collapse it to a Steps pill docked at the bottom-left. Closing it leaves that pill, and the pill reopens the editor. The agent panel tabs are Chat, Guide, and Recorder. Closing that panel leaves a pill at the bottom-right that reopens it. Light, dark, and reduced motion follow `panel.css`.
 
 The list stays live. A new human or agent interaction appends. A desktop `act` (`surface=desktop`) is the same kind of row.
 

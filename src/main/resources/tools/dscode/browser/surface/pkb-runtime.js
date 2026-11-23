@@ -44,8 +44,9 @@
     + '[data-pkb-ui][data-pkb-kind=overlay][data-pkb-at=over][data-pkb-block=true]{pointer-events:auto!important;}'
     + '[data-pkb-ui][data-pkb-at=over] :is(a,button,input,select,textarea,[data-pkb-action]){pointer-events:auto;}'
     + '[data-pkb-ui][data-pkb-kind=overlay] button{font:inherit;border:0;background:var(--pkb-accent);color:#fff;border-radius:6px;padding:3px 10px;margin:4px 4px 0 0;cursor:pointer;}'
-    + '[data-pkb-ui][data-pkb-kind=label]{background:#111827!important;color:#fff!important;border-radius:6px!important;'
-    + 'font:600 12px/1.3 ' + FONT + '!important;padding:3px 8px!important;box-shadow:0 2px 8px rgba(0,0,0,.25);pointer-events:none;white-space:nowrap;}'
+    + '[data-pkb-ui][data-pkb-kind=label]{background:var(--pkb-bg)!important;color:var(--pkb-fg)!important;'
+    + 'border:1px solid var(--pkb-line)!important;border-radius:8px!important;'
+    + 'font:600 13px/1.3 ' + FONT + '!important;padding:4px 10px!important;box-shadow:var(--pkb-shadow);pointer-events:none;white-space:nowrap;}'
     + '[data-pkb-ui][data-pkb-kind=label]:has([data-pkb-card]){background:var(--pkb-bg)!important;color:var(--pkb-fg)!important;'
     + 'pointer-events:auto!important;white-space:normal!important;border:1px solid var(--pkb-line)!important;border-radius:10px!important;'
     + 'padding:10px 12px!important;box-shadow:var(--pkb-shadow)!important;font:14px/1.45 ' + FONT + '!important;max-width:280px!important;}'
@@ -645,7 +646,7 @@
         note.setAttribute('data-pkb-copy', 'fallback');
         note.textContent = 'target not captured';
         tagMeta(note, 'placement');
-        note.style.cssText = 'color:#111;font:12px sans-serif;padding:8px;';
+        note.style.cssText = 'color:#1b1f24;background:#ffffff;font:600 13px/1.3 system-ui,sans-serif;padding:8px;border:1px solid #dfe3e8;border-radius:8px;';
         item.host.appendChild(note);
       }
     } else if (note) {
@@ -1211,7 +1212,7 @@
     if (!panel) return;
     var pane = panel.stepsPane;
     pane.textContent = '';
-    if (!guides.size) { pane.appendChild(el('div', 'pkb-empty', 'No steps yet.')); return; }
+    if (!guides.size) { pane.appendChild(el('div', 'pkb-empty', 'No guide yet.')); return; }
     guides.forEach(function (g) {
       var list = el('ol', 'pkb-steps');
       g.steps.forEach(function (step) {
@@ -1297,9 +1298,7 @@
     g.pulse = true;
     if (g.current >= g.steps.length) {
       pushEvent({type: 'guide', g: g.id, done: true});
-      clearFieldChrome(g);
-      stepsList();
-      window.__pkbGuideState = guideState();
+      guideClose(g.id);
       return;
     }
     guideRender(g);
@@ -1701,7 +1700,7 @@
     var maxH = Math.max(PANEL_MIN_H, vp.h - 16 - 232);
     if (w > maxW) w = maxW;
     if (h > maxH) h = maxH;
-    return {x: vp.w - w - 16, y: vp.h - h - 16, w: w, h: h, min: false, tab: 'chat', pop: false};
+    return {x: vp.w - w - 16, y: vp.h - h - 16, w: w, h: h, min: false, tab: 'chat', pop: false, closed: false};
   }
 
   function panelClamp(st) {
@@ -1726,20 +1725,25 @@
     if (!panel) return;
     var st = panelClamp(panel.state);
     var card = panel.card;
+    var closed = !!st.closed || !card.isConnected;
     card.style.transform = 'translate3d(' + Math.round(st.x) + 'px,' + Math.round(st.y) + 'px,0)';
     card.style.width = Math.round(st.w) + 'px';
     card.style.height = Math.round(st.h) + 'px';
-    card.hidden = !!st.min || !!st.pop;
-    panel.pill.hidden = !st.min && !st.pop;
-    if (st.min || st.pop) {
+    card.hidden = !!st.min || !!st.pop || closed;
+    panel.pill.hidden = !st.min && !st.pop && !closed;
+    if (st.min || st.pop || closed) {
+      var vp = viewport();
       var pw = panel.pill.offsetWidth || 120;
       var ph = panel.pill.offsetHeight || 32;
-      panel.pill.style.transform = 'translate3d(' + Math.round(st.x + st.w - pw) + 'px,' + Math.round(st.y + st.h - ph) + 'px,0)';
+      var x = Math.max(8, vp.w - pw - 16);
+      var y = Math.max(8, vp.h - ph - 16);
+      panel.pill.style.transform = 'translate3d(' + Math.round(x) + 'px,' + Math.round(y) + 'px,0)';
     }
     var label = panel.pill.querySelector('.pkb-pill-label');
     if (label) label.textContent = st.pop ? 'Chat window' : 'Agent';
     panel.pill.setAttribute('aria-label', st.pop ? 'Pop chat back in' : 'Open agent panel');
-    window.__pkbPanelState = {x: Math.round(st.x), y: Math.round(st.y), w: Math.round(st.w), h: Math.round(st.h), min: !!st.min, tab: st.tab, pop: !!st.pop};
+    window.__pkbPanelState = closed ? null : {x: Math.round(st.x), y: Math.round(st.y), w: Math.round(st.w), h: Math.round(st.h), min: !!st.min, tab: st.tab, pop: !!st.pop};
+    recountUnread();
   }
 
   function panelTab(name) {
@@ -1748,27 +1752,17 @@
     panel.tabs.forEach(function (b) {
       var on = b.getAttribute('data-tab') === name;
       b.setAttribute('aria-selected', on ? 'true' : 'false');
-      if (on) b.querySelector('.pkb-badge').textContent = '';
     });
     panel.chatPane.hidden = name !== 'chat';
     panel.stepsPane.hidden = name !== 'steps';
+    if (panel.recordPane) panel.recordPane.hidden = name !== 'record';
     panel.composer.hidden = name !== 'chat';
     if (name === 'chat') panel.chatPane.scrollTop = panel.chatPane.scrollHeight;
     panelPlace();
   }
 
   function panelUnread() {
-    if (!panel) return;
-    if (panel.state.min || panel.state.tab !== 'chat') panel.unread++; else panel.unread = 0;
-    var count = panel.unread || 0;
-    var chatTab = panel.tabs[0];
-    var badge = chatTab.querySelector('.pkb-badge');
-    var show = panel.state.tab !== 'chat' && count;
-    badge.textContent = show ? String(count) : '';
-    if (show) chatTab.setAttribute('data-unread', String(count));
-    else chatTab.removeAttribute('data-unread');
-    chatTab.setAttribute('aria-label', show ? 'Chat, ' + count + ' unread' : 'Chat');
-    panel.pill.querySelector('.pkb-unread').textContent = panel.state.min && count ? String(count) : '';
+    recountUnread();
   }
 
   function bubble(row) {
@@ -1906,7 +1900,14 @@
           host.style.top = Math.round(drag.t + event.clientY - drag.y) + 'px';
           host.setAttribute('data-pkb-parked', 'user');
         });
-        host.addEventListener('pointerup', function () { drag = null; });
+        host.addEventListener('pointerup', function (event) {
+          if (!drag || event.pointerId !== drag.id) { drag = null; return; }
+          var x = Math.round(parseFloat(host.style.left) || 0);
+          var y = Math.round(parseFloat(host.style.top) || 0);
+          var moved = x !== Math.round(drag.l) || y !== Math.round(drag.t);
+          drag = null;
+          if (moved) pushEvent({type: 'card', action: 'drag', x: x, y: y, id: host.getAttribute('data-pkb-id') || ''});
+        });
       }
     });
     return {parked: hosts.length};
@@ -1970,7 +1971,7 @@
     var title = el('strong', 'pkb-title', 'Agent');
     var tabs = el('nav', 'pkb-tabs');
     tabs.setAttribute('role', 'tablist');
-    var tabButtons = [['chat', 'Chat'], ['steps', 'Steps']].map(function (t) {
+    var tabButtons = [['chat', 'Chat'], ['steps', 'Guide'], ['record', 'Recorder']].map(function (t) {
       var b = el('button', '', t[1]);
       b.type = 'button';
       b.setAttribute('role', 'tab');
@@ -2005,7 +2006,10 @@
     chatPane.appendChild(empty);
     var stepsPane = el('div', 'pkb-pane');
     stepsPane.hidden = true;
-    stepsPane.appendChild(el('div', 'pkb-empty', 'No steps yet.'));
+    stepsPane.appendChild(el('div', 'pkb-empty', 'No guide yet.'));
+    var recordPane = el('div', 'pkb-pane');
+    recordPane.hidden = true;
+    recordPane.appendChild(el('div', 'pkb-empty', 'Not recording.'));
     var composer = el('form', 'pkb-composer');
     composer.setAttribute('autocomplete', 'off');
     var input = el('textarea');
@@ -2020,6 +2024,7 @@
     card.appendChild(head);
     card.appendChild(chatPane);
     card.appendChild(stepsPane);
+    card.appendChild(recordPane);
     card.appendChild(composer);
     ['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw'].forEach(function (dir) {
       var grip = el('div', 'pkb-grip');
@@ -2041,7 +2046,7 @@
     isolateKeys(card);
     isolateKeys(pill);
     var p = {card: card, pill: pill, head: head, title: title, tabs: tabButtons, chatPane: chatPane, stepsPane: stepsPane,
-      composer: composer, input: input, send: send, empty: empty, seen: {}, unread: 0, state: panelDefaults()};
+      recordPane: recordPane, composer: composer, input: input, send: send, empty: empty, seen: {}, unread: 0, state: panelDefaults()};
     input.addEventListener('input', function () { send.disabled = !input.value.trim(); });
     input.addEventListener('keydown', function (event) {
       if (event.key === 'Enter' && !event.shiftKey && !event.isComposing && event.keyCode !== 229) {
@@ -2058,9 +2063,12 @@
     });
     pill.addEventListener('click', function () {
       if (p.state.pop) { popIn('chat'); return; }
+      if (p.state.closed || !p.card.isConnected) {
+        p.state.closed = false;
+        var root = ensureLayer();
+        if (!p.card.isConnected) root.appendChild(p.card);
+      }
       p.state.min = false;
-      p.unread = 0;
-      pill.querySelector('.pkb-unread').textContent = '';
       panelPlace();
     });
     var start = null;
@@ -2075,6 +2083,7 @@
       card.classList.remove('pkb-dragging');
       panelSnap(p.state);
       panelPlace();
+      pushEvent({type: 'card', action: 'drag', x: Math.round(p.state.x), y: Math.round(p.state.y), id: 'panel'});
     });
     head.addEventListener('dblclick', function (event) {
       if (event.target.closest && event.target.closest('button')) return;
@@ -2143,7 +2152,9 @@
     else if (opts.theme === 'auto') { panel.card.removeAttribute('data-theme'); panel.pill.removeAttribute('data-theme'); }
     if (Array.isArray(opts.history)) chat(opts.history);
     stepsList();
-    panelTab(opts.tab === 'steps' ? 'steps' : (opts.tab === 'chat' ? 'chat' : st.tab || 'chat'));
+    st.closed = false;
+    panelTab(opts.tab === 'steps' ? 'steps' : (opts.tab === 'record' ? 'record' : (opts.tab === 'chat' ? 'chat' : st.tab || 'chat')));
+    paintRecordPane();
     raiseLayer();
     if (opts.focus !== false && !st.min && st.tab === 'chat') {
       try { panel.input.focus({preventScroll: true}); } catch (ignored) { /* focus refused */ }
@@ -2153,11 +2164,12 @@
 
   function panelClose() {
     if (!panel) return false;
-    panel.card.remove();
-    panel.pill.remove();
-    panel = null;
+    if (panel.card.parentNode) panel.card.remove();
+    panel.state.closed = true;
+    panel.state.min = false;
+    panel.state.pop = false;
     window.__pkbPanelState = null;
-    if (idle() && layer && layer.isConnected) layer.remove();
+    panelPlace();
     return true;
   }
 
@@ -2331,16 +2343,18 @@
       recordBar.setAttribute('data-pkb-layer', '');
       recordBar.setAttribute('data-pkb-record', '');
       tagMeta(recordBar, 'recorder');
-      recordBar.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:2147483646;max-width:420px;'
-        + 'background:#111827;color:#f9fafb;border-radius:10px;padding:8px 10px;'
-        + 'box-shadow:0 8px 24px rgba(0,0,0,.28);font:12px/1.4 ' + FONT + ';';
+      recordBar.style.cssText = 'position:fixed;left:16px;bottom:64px;z-index:2147483646;max-width:420px;'
+        + 'background:#ffffff;color:#1b1f24;border:1px solid #dfe3e8;border-radius:12px;padding:10px 12px;'
+        + 'box-shadow:0 12px 32px rgba(15,23,42,.18);font:13px/1.45 ' + FONT + ';';
       (document.documentElement || document.body).appendChild(recordBar);
     }
     metaPurpose = 'recorder';
     recordBar.textContent = '';
     tagMeta(recordBar, 'recorder');
+    var pausedNow = status === 'paused' || window.__pkbRecord !== true;
+    recordBar.setAttribute('data-state', pausedNow ? 'paused' : 'recording');
     var title = document.createElement('div');
-    title.textContent = status === 'paused' ? 'Recording paused' : 'Recording';
+    title.textContent = pausedNow ? 'Paused' : 'Recording';
     tagMeta(title, 'recorder');
     recordBar.appendChild(title);
     var pre = document.createElement('pre');
@@ -2358,24 +2372,32 @@
       node.style.cursor = 'pointer';
       node.style.marginRight = '6px';
       node.addEventListener('click', function () {
+        var actionNow = node.getAttribute('data-pkb-action') || action;
         lastPressed = node;
         setFeedback(node, 'sending');
-        var ev = {type: 'record', event: 'record', action: action, source: 'human'};
-        if (action === 'accept' || action === 'reject') {
+        var ev = {type: 'record', event: 'record', action: actionNow, source: 'human'};
+        if (actionNow === 'accept' || actionNow === 'reject') {
           var lines = (pre.textContent || '').split('\n').filter(function (line) { return line.trim(); });
           ev.index = String(Math.max(0, lines.length - 1));
         }
         pushEvent(ev);
         setFeedback(node, 'delivered');
-        if (action === 'pause') window.__pkbRecord = false;
-        if (action === 'resume') window.__pkbRecord = true;
+        if (actionNow === 'pause' || actionNow === 'resume') {
+          window.__pkbRecord = actionNow === 'resume';
+          var nowPaused = window.__pkbRecord !== true;
+          title.textContent = nowPaused ? 'Paused' : 'Recording';
+          recordBar.setAttribute('data-state', nowPaused ? 'paused' : 'recording');
+          node.textContent = nowPaused ? 'Resume' : 'Pause';
+          node.setAttribute('data-pkb-action', nowPaused ? 'resume' : 'pause');
+          paintRecordPane();
+        }
       });
       return node;
     }
-    recordBar.appendChild(button(status === 'paused' || !window.__pkbRecord ? 'Resume' : 'Pause',
-      status === 'paused' || !window.__pkbRecord ? 'resume' : 'pause'));
-    recordBar.appendChild(button('Accept', 'accept'));
-    recordBar.appendChild(button('Reject', 'reject'));
+    recordBar.appendChild(button(pausedNow ? 'Resume' : 'Pause', pausedNow ? 'resume' : 'pause'));
+    recordBar.appendChild(button('Keep step', 'accept'));
+    recordBar.appendChild(button('Drop step', 'reject'));
+    paintRecordPane();
     editorSync(spec);
     return {on: !!window.__pkbRecord, status: status, script: spec.script || '', editor: window.__pkbEditorState || null};
   }
@@ -2458,20 +2480,23 @@
   function editorPlace() {
     if (!editor) return;
     var st = editorClamp(editor.state);
-    editor.card.hidden = !!st.min || !!st.pop;
-    editor.pill.hidden = !st.min && !st.pop;
+    var closed = editorDismissed || !editor.card.isConnected;
+    editor.card.hidden = !!st.min || !!st.pop || closed;
+    editor.pill.hidden = !st.min && !st.pop && !closed;
     editor.card.style.transform = 'translate3d(' + Math.round(st.x) + 'px,' + Math.round(st.y) + 'px,0)';
     editor.card.style.width = Math.round(st.w) + 'px';
     editor.card.style.height = Math.round(st.h) + 'px';
-    if (st.min || st.pop) {
-      var pw = editor.pill.offsetWidth || 120;
+    if (st.min || st.pop || closed) {
+      var vp = viewport();
       var ph = editor.pill.offsetHeight || 32;
-      editor.pill.style.transform = 'translate3d(' + Math.round(st.x + st.w - pw) + 'px,' + Math.round(st.y) + 'px,0)';
+      var x = 16;
+      var y = Math.max(8, vp.h - ph - 16);
+      editor.pill.style.transform = 'translate3d(' + x + 'px,' + Math.round(y) + 'px,0)';
     }
     var label = editor.pill.querySelector('.pkb-pill-label');
     if (label) label.textContent = st.pop ? 'Steps window' : 'Steps';
     editor.pill.setAttribute('aria-label', st.pop ? 'Pop steps back in' : 'Open step editor');
-    window.__pkbEditorState = {
+    window.__pkbEditorState = closed ? null : {
       x: Math.round(st.x), y: Math.round(st.y), w: Math.round(st.w), h: Math.round(st.h),
       min: !!st.min, pop: !!st.pop, count: (editor.steps || []).length
     };
@@ -2620,11 +2645,11 @@
   function editorClose() {
     editorDismissed = true;
     if (!editor) return false;
-    editor.card.remove();
-    editor.pill.remove();
-    editor = null;
+    if (editor.card.parentNode) editor.card.remove();
+    editor.state.min = false;
+    editor.state.pop = false;
     window.__pkbEditorState = null;
-    if (idle() && layer && layer.isConnected) layer.remove();
+    editorPlace();
     return true;
   }
 
@@ -2781,6 +2806,11 @@
     close.addEventListener('click', function () { editorClose(); });
     pill.addEventListener('click', function () {
       if (built.state.pop) { popIn('editor'); return; }
+      if (editorDismissed || !built.card.isConnected) {
+        editorDismissed = false;
+        var root = ensureLayer();
+        if (!built.card.isConnected) root.appendChild(built.card);
+      }
       built.state.min = false;
       editorPlace();
     });
@@ -2801,6 +2831,7 @@
       if (vp.w - (st.x + st.w) <= SNAP) st.x = vp.w - st.w;
       if (vp.h - (st.y + st.h) <= SNAP) st.y = vp.h - st.h;
       editorPlace();
+      pushEvent({type: 'card', action: 'drag', x: Math.round(st.x), y: Math.round(st.y), id: 'editor'});
     });
     Array.prototype.forEach.call(card.querySelectorAll('.pkb-grip'), function (grip) {
       var dir = grip.getAttribute('data-dir');
@@ -2830,6 +2861,15 @@
       });
     });
     return built;
+  }
+
+  function paintRecordPane() {
+    if (!panel || !panel.recordPane) return;
+    var text = window.__pkbRecord === true
+      ? 'Recording. New steps appear in the Steps window.'
+      : (recordBar ? 'Paused. Use Resume on the recording bar. The Steps window keeps the steps.' : 'Not recording.');
+    panel.recordPane.textContent = '';
+    panel.recordPane.appendChild(el('div', 'pkb-empty', text));
   }
 
   function editorSync(spec) {
@@ -2896,7 +2936,6 @@
     var rows = chatMirror.slice();
     panel.chatPane.textContent = '';
     panel.seen = {};
-    panel.unread = 0;
     if (panel.empty) { panel.empty.remove(); panel.empty = null; }
     chatMirror = [];
     rows.forEach(function (row) {
@@ -2907,24 +2946,24 @@
   }
 
   function recountUnread() {
-    if (!panel) return;
+    if (!panel || !panel.tabs || !panel.tabs.length) return;
     var n = 0;
-    if (panel.state.min || panel.state.tab !== 'chat' || panel.state.pop) {
-      chatMirror.forEach(function (row) {
-        var from = row.from || 'agent';
-        if (from !== 'human' && row.state !== 'read') n++;
-      });
-    }
+    chatMirror.forEach(function (row) {
+      var from = row.from || 'agent';
+      if (from !== 'human' && row.state !== 'read') n++;
+    });
     panel.unread = n;
-    var count = panel.unread || 0;
+    var looking = !panel.state.min && !panel.state.pop && !panel.state.closed && panel.state.tab === 'chat' && panel.card.isConnected;
     var chatTab = panel.tabs[0];
     var badge = chatTab.querySelector('.pkb-badge');
-    var show = panel.state.tab !== 'chat' && count;
-    badge.textContent = show ? String(count) : '';
-    if (show) chatTab.setAttribute('data-unread', String(count));
+    var show = !looking && n;
+    if (badge) badge.textContent = show ? String(n) : '';
+    if (show) chatTab.setAttribute('data-unread', String(n));
     else chatTab.removeAttribute('data-unread');
-    chatTab.setAttribute('aria-label', show ? 'Chat, ' + count + ' unread' : 'Chat');
-    panel.pill.querySelector('.pkb-unread').textContent = panel.state.min && count ? String(count) : '';
+    chatTab.setAttribute('aria-label', show ? 'Chat, ' + n + ' unread' : 'Chat');
+    var pill = panel.pill && panel.pill.querySelector('.pkb-unread');
+    var showPill = (panel.state.min || panel.state.pop || panel.state.closed || !panel.card.isConnected) && n;
+    if (pill) pill.textContent = showPill ? String(n) : '';
   }
 
   function syncPop(kind) {

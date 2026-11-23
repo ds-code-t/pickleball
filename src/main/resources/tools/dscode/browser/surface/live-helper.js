@@ -216,7 +216,7 @@ if (spec.kind === 'magnifier' && anchor) {
     note.setAttribute('data-pkb-copy', 'fallback');
     note.textContent = 'target not captured';
     tagMeta(note, purposeOf(spec.kind));
-    note.style.cssText = 'color:#111;font:12px sans-serif;padding:8px;';
+    note.style.cssText = 'color:#1b1f24;background:#ffffff;font:600 13px/1.3 system-ui,sans-serif;padding:8px;border:1px solid #dfe3e8;border-radius:8px;';
     host.appendChild(note);
   }
   markTree(clone, spec.kind, spec.sentence);

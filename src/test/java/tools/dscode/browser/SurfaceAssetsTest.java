@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SurfaceAssetsTest {
     @Test
     void loadsEachAssetAtItsHash() throws Exception {
-        assertEquals("26e93b8e22d5b9975bb30ba38d7d8f81cfa8f6630367ebf3bd8d74a590a4f20f", sha(SurfaceAssets.script("live-helper")));
+        assertEquals("3cf69d8d89abf1eb289c81eb68896be045a0d46a3a6bcf269529a391eebbdb69", sha(SurfaceAssets.script("live-helper")));
         assertEquals("5d6b24e641d70c4c252804b3d0bfae48f6170037434b6d43b2b8e2650c0821a7", sha(SurfaceAssets.script("bridge-mark")));
         assertEquals("ab8f90e2e4d04214af67e933ab190a0bfab7c89e57ba6cdfe5e10bd3eec6e29a", sha(SurfaceAssets.script("frame-mark")));
         assertEquals("afc0169aba6b94679a425b8b8868193583b8813e8bcf52fadf089389d7999c88", sha(SurfaceAssets.script("frame-restore")));
@@ -77,7 +77,7 @@ class SurfaceAssetsTest {
         assertEquals(SurfaceAssets.sentence("step"), SurfaceAssets.sentence("step-badge"));
         assertEquals("agent-injected magnifier; a person did not author this magnifier", SurfaceAssets.sentence("magnifier"));
         assertEquals("agent-injected spotlight; a person did not author this dim", SurfaceAssets.sentence("spotlight"));
-        assertTrue(SurfaceAssets.css("label").contains("background: #111"));
+        assertTrue(SurfaceAssets.css("label").contains("background: #ffffff"));
         assertTrue(SurfaceAssets.css("border").contains("#0a7a32"));
         assertTrue(SurfaceAssets.css("spotlight").contains("9999px"));
         assertFalse(SurfaceAssets.css("border").contains("left:"));

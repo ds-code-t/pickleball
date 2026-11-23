@@ -327,7 +327,7 @@ class AgentExpansionTest {
         String html = Files.readString(page);
         assertTrue(html.contains("Save name"), html);
         assertTrue(html.contains("data-pkb-kind=\"label\""), html);
-        assertTrue(html.contains("background:#111"), html);
+        assertTrue(html.contains("background:#ffffff;color:#1b1f24"), html);
         assertTrue(html.contains("left:4px"), html);
         Capture dirty = agent(
                 "label", temp.toString(), "--html=" + page, "--text=<b>ok</b><script>alert(1)</script>",

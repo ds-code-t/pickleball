@@ -77,7 +77,7 @@ public final class VisualKinds {
         int[] size = paintedSize(kind, box);
         String positioned = "position:fixed;z-index:2147483646;left:" + x + "px;top:" + y + "px;";
         return switch (kind == null ? "" : kind) {
-            case "label" -> positioned + "background:#111;color:#fff;font:12px sans-serif;padding:2px 6px;border-radius:3px;";
+            case "label" -> positioned + "background:#ffffff;color:#1b1f24;font:600 13px/1.3 system-ui,sans-serif;padding:4px 10px;border:1px solid #dfe3e8;border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,.16);";
             case "border" -> "position:fixed;z-index:2147483645;left:" + x + "px;top:" + y + "px;background:transparent;"
                     + "pointer-events:none;box-sizing:border-box;border:" + borderValue(args) + ";" + sizeCss(size);
             case "arrow" -> positioned + "pointer-events:none;" + sizeCss(size);

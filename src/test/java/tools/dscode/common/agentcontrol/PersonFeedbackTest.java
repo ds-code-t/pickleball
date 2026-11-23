@@ -88,6 +88,15 @@ class PersonFeedbackTest {
         assertTrue(js.contains("function byDomId"));
         assertTrue(js.contains("getElementById"));
         assertTrue(js.contains("function panelUnread()"));
+        assertTrue(js.contains("function recountUnread()"));
+        assertTrue(js.contains("row.state !== 'read'"));
+        assertTrue(js.contains("['chat', 'Chat'], ['steps', 'Guide'], ['record', 'Recorder']"));
+        assertTrue(js.contains("No guide yet."));
+        assertTrue(js.contains("Keep step"));
+        assertTrue(js.contains("Drop step"));
+        assertTrue(js.contains("Open step editor"));
+        assertTrue(js.contains("action: 'drag'"));
+        assertTrue(js.contains("editorDismissed"));
         assertTrue(js.contains("function appendDistinguished"));
         assertTrue(js.contains("function quoteValue"));
         assertTrue(js.contains("function tagMeta"));
