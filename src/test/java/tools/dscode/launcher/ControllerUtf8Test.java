@@ -4,6 +4,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
+import tools.dscode.testsupport.PortableProcess;
+
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
@@ -68,6 +70,7 @@ class ControllerUtf8Test {
             } catch (Exception ignored) {
                 // The controller is already gone.
             }
+            PortableProcess.releaseFile(project.resolve(".pickleball/agent-controller.log"));
             System.setOut(savedOut);
             System.setErr(savedErr);
         }

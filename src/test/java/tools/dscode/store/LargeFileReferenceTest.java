@@ -206,8 +206,36 @@ class LargeFileReferenceTest {
 
     private static void deleteTree(Path root) throws Exception {
         if (!Files.exists(root)) return;
+        try {
+            removeTree(root);
+        } catch (java.nio.file.AccessDeniedException denied) {
+            if (root.getFileName() == null || !".git".equals(root.getFileName().toString())) throw denied;
+            Path objects = root.resolve("objects");
+            Files.createDirectories(objects);
+            try (var walk = Files.walk(objects)) {
+                for (Path path : walk.filter(Files::isRegularFile).toList()) {
+                    clearReadonly(path);
+                    Files.deleteIfExists(path);
+                }
+            }
+        }
+    }
+
+    /** Windows git marks object files read-only. Clearing that bit is a no-op when the volume has no DOS view. */
+    private static void removeTree(Path root) throws java.io.IOException {
         try (var walk = Files.walk(root)) {
-            for (Path path : walk.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(path);
+            for (Path path : walk.sorted(Comparator.reverseOrder()).toList()) {
+                clearReadonly(path);
+                Files.deleteIfExists(path);
+            }
+        }
+    }
+
+    private static void clearReadonly(Path path) {
+        try {
+            Files.setAttribute(path, "dos:readonly", false);
+        } catch (Exception ignored) {
+            // Not a DOS volume, or the file is already gone.
         }
     }
 

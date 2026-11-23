@@ -4,6 +4,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import tools.dscode.testsupport.PortableProcess;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -43,15 +45,8 @@ class PopupLifecycleTest {
         onTop = System.getProperty("pkb_agent_popup_on_top");
         headless = System.getProperty("pkb_agent_popup_headless");
         idle = System.getProperty("pkb_agent_popup_idle_minutes");
-        Path script = project.resolve("fake-browser.sh");
-        Files.writeString(script, """
-                #!/bin/sh
-                printf '%s\\n' "$@" >> "$(dirname "$0")/argv.txt"
-                if [ "$1" = "--exit-now" ]; then exit 0; fi
-                trap 'exit 0' TERM INT
-                while true; do sleep 0.2; done
-                """);
-        script.toFile().setExecutable(true);
+        Path script = PortableProcess.argumentLog(
+                project.resolve("fake-browser.sh"), project.resolve("argv.txt"), true);
         System.setProperty("pkb_agent_popup_browser", script.toString());
         System.setProperty("pkb_agent_popup_on_top", "false");
         System.setProperty("pkb_agent_popup_headless", "true");
@@ -69,13 +64,8 @@ class PopupLifecycleTest {
         assertTrue(waitGone(project, "reuse"));
         assertFalse(Files.exists(PopupLog.popupDir(project, "reuse").resolve("profile")));
 
-        Path exitBrowser = project.resolve("exit-browser.sh");
-        Files.writeString(exitBrowser, """
-                #!/bin/sh
-                printf '%s\\n' "$@" >> "$(dirname "$0")/exit-argv.txt"
-                exit 0
-                """);
-        exitBrowser.toFile().setExecutable(true);
+        Path exitBrowser = PortableProcess.argumentLog(
+                project.resolve("exit-browser.sh"), project.resolve("exit-argv.txt"), false);
         System.setProperty("pkb_agent_popup_browser", exitBrowser.toString());
         AtomicReference<Exception> failure = new AtomicReference<>();
         Thread exited = new Thread(() -> {
@@ -92,7 +82,7 @@ class PopupLifecycleTest {
         assertEquals("closed-by-user", String.valueOf(PopupStatus.read(project, "bye").get("state")));
 
         System.setProperty("pkb_agent_popup_browser", script.toString());
-        Process owner = new ProcessBuilder("sleep", "30").start();
+        Process owner = PortableProcess.sleep(30);
         processes.add(owner);
         Thread hosted = new Thread(() -> {
             try {

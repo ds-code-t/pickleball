@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Timeout;
 import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.control.protocol.SessionDescriptorWriter;
 import tools.dscode.control.protocol.Workspace;
+import tools.dscode.testsupport.PortableProcess;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
@@ -130,7 +131,7 @@ class WorkbenchConsumerScenarioEndToEndTest {
                 ".m2", "repository", "tools", "dscode", "pickleball", "3.0.0", "pickleball-3.0.0.jar");
         assertTrue(Files.isRegularFile(published),
                 "publishToMavenLocal tools.dscode:pickleball:3.0.0 before this test: " + published);
-        assertTrue(Files.isRegularFile(PROJECT.resolve("mvnw")));
+        assertTrue(Files.isRegularFile(mavenWrapper()));
     }
 
     private static Path findIndex(String runId) throws Exception {
@@ -173,9 +174,16 @@ class WorkbenchConsumerScenarioEndToEndTest {
         assertEquals(0, sync.exit, sync.text());
     }
 
+    /** {@code mvnw.cmd} on Windows when that wrapper is present. Linux keeps {@code mvnw}. */
+    private static Path mavenWrapper() {
+        Path cmd = PROJECT.resolve("mvnw.cmd");
+        if (PortableProcess.windows() && Files.isRegularFile(cmd)) return cmd;
+        return PROJECT.resolve("mvnw");
+    }
+
     private static Run launchExec(String... args) throws Exception {
         List<String> command = new ArrayList<>();
-        command.add(PROJECT.resolve("mvnw").toString());
+        command.add(mavenWrapper().toString());
         command.add("org.codehaus.mojo:exec-maven-plugin:3.5.0:java");
         command.add("-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher");
         command.add("-Dexec.classpathScope=test");

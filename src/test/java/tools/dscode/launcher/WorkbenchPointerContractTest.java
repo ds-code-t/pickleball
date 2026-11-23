@@ -127,7 +127,10 @@ class WorkbenchPointerContractTest {
         assertTrue(text.contains("-Dexec.args=execute-step --text-file=step.txt"), text);
         assertTrue(text.contains("-Dexec.args=execute-step --text-b64"), text);
         assertFalse(text.contains("Maintainer-only: pointer-eval harness"), text);
-        assertTrue(Files.size(Path.of("docs/workbench-agent-detail.md")) > lfBytes);
+        String detail = Files.readString(Path.of("docs/workbench-agent-detail.md"));
+        int detailBytes = detail.replace("\r\n", "\n").replace("\r", "\n")
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+        assertTrue(detailBytes > lfBytes, "detail " + detailBytes + " LF bytes, guide " + lfBytes);
     }
 
     @Test

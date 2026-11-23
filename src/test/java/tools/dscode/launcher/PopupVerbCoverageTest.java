@@ -4,6 +4,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import tools.dscode.common.agentsurface.PopupLog;
+import tools.dscode.testsupport.PortableProcess;
+
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
@@ -22,12 +25,16 @@ class PopupVerbCoverageTest {
     }
 
     @Test
-    void covers_command_popup_open() {
+    void covers_command_popup_open() throws Exception {
         System.setProperty("pkb_agent_popup_headless", "true");
         Capture capture = agent("popup-open", project.toString(), "--run-id=r1", "--headless=true");
         assertEquals(0, capture.code, capture.err + capture.out);
         assertTrue(capture.out.contains("\"op\":\"popup-status\"") || capture.out.contains("popup-open"), capture.out);
         assertTrue(WorkbenchCommandLine.isAgentCoreCommand("popup-open"));
+        Capture closed = agent("popup-close", project.toString(), "--run-id=r1");
+        assertEquals(0, closed.code, closed.err + closed.out);
+        PortableProcess.releaseFile(PopupLog.popupDir(project, "r1").resolve("host.out"));
+        PortableProcess.releaseFile(PopupLog.popupDir(project, "r1").resolve("browser.out"));
     }
 
     @Test

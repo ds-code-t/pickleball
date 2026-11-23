@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import tools.dscode.testengine.DynamicSuiteEngine;
 import tools.dscode.testengine.PKB_props;
+import tools.dscode.testsupport.PortableProcess;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -252,16 +253,10 @@ class ConsumerMavenTestRunnerTest {
     void wrapperOutputIsCopiedOntoTheStreamsTheCallerPassed() throws Exception {
         Path message = project.resolve("message.txt");
         Files.writeString(message, "C:\\Users\\Dan She'll\\body.html\n");
-        Path script = project.resolve("speak.sh");
-        Files.writeString(script, """
-                #!/bin/sh
-                printf '%s\\n' 'Scenario: Pend case NEW UI # C:/Program Files/Pickleball/page.feature:12'
-                cat "$1" >&2
-                """);
         ByteArrayOutputStream outBytes = new ByteArrayOutputStream();
         ByteArrayOutputStream errBytes = new ByteArrayOutputStream();
         int exit = ConsumerMavenTestRunner.inheritIoLauncher().run(
-                List.of("/bin/sh", script.toString(), message.toString()),
+                PortableProcess.speakCommand(message),
                 project,
                 new PrintStream(outBytes, true, StandardCharsets.UTF_8),
                 new PrintStream(errBytes, true, StandardCharsets.UTF_8)

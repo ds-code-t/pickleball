@@ -34,6 +34,30 @@ public final class PortableProcess {
               }
             }
             """;
+    private static final String TREE = """
+            public class PkbTree {
+              public static void main(String[] args) throws Exception {
+                Process child = new ProcessBuilder(args[0], args[1], args[2])
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .start();
+                try {
+                  Thread.sleep(Long.parseLong(args[2]));
+                } finally {
+                  child.destroyForcibly();
+                  child.waitFor();
+                }
+              }
+            }
+            """;
+    private static final String SPEAK = """
+            public class PkbSpeak {
+              public static void main(String[] args) throws Exception {
+                System.out.println("Scenario: Pend case NEW UI # C:/Program Files/Pickleball/page.feature:12");
+                System.err.print(java.nio.file.Files.readString(java.nio.file.Path.of(args[0])));
+              }
+            }
+            """;
 
     private PortableProcess() {
     }
@@ -84,6 +108,73 @@ public final class PortableProcess {
             throw new IOException("already-exited child was interrupted", interrupted);
         }
         return process;
+    }
+
+    /**
+     * A parent and a child that both stay up for {@code seconds}. The child is a
+     * descendant of the returned process. Replaces {@code sh -c "sleep & wait"}.
+     */
+    public static Process sleepTree(long seconds) throws IOException {
+        Path hold = source("PkbHold.java", HOLD);
+        Path tree = source("PkbTree.java", TREE);
+        long millis = Math.max(0, seconds) * 1000L;
+        return new ProcessBuilder(
+                javaBin().toString(),
+                tree.toAbsolutePath().toString(),
+                javaBin().toString(),
+                hold.toAbsolutePath().toString(),
+                Long.toString(millis)
+        ).start();
+    }
+
+    /**
+     * Command whose stdout is one scenario line and whose stderr is the bytes of
+     * {@code message}. Replaces {@code /bin/sh} for stream-copy tests.
+     */
+    public static List<String> speakCommand(Path message) throws IOException {
+        Path source = source("PkbSpeak.java", SPEAK);
+        return List.of(javaBin().toString(), source.toAbsolutePath().toString(), message.toAbsolutePath().toString());
+    }
+
+    /**
+     * A launcher that writes each argument on its own line, then either exits 0
+     * or stays up until it is killed. The returned path is the file to execute.
+     */
+    public static Path argumentLog(Path path, Path log, boolean stay) throws IOException {
+        Path hold = source("PkbHold.java", HOLD);
+        String logText = log.toAbsolutePath().toString();
+        String java = javaBin().toString();
+        String holdText = hold.toAbsolutePath().toString();
+        String posix = "#!/bin/sh\nprintf '%s\\n' \"$@\" >> " + shQuote(logText) + "\n"
+                + (stay
+                ? "if [ \"$1\" = \"--exit-now\" ]; then exit 0; fi\nexec " + shQuote(java) + " " + shQuote(holdText) + " 3600000\n"
+                : "exit 0\n");
+        String windows = "@echo off\r\nsetlocal EnableExtensions\r\nset \"FIRST=%~1\"\r\n:log\r\n"
+                + "if \"%~1\"==\"\" goto after\r\n>>\"" + logText + "\" echo(%~1\r\nshift /1\r\ngoto log\r\n:after\r\n"
+                + (stay
+                ? "if \"%FIRST%\"==\"--exit-now\" exit /b 0\r\n\"" + java + "\" \"" + holdText + "\" 3600000\r\nexit /b %ERRORLEVEL%\r\n"
+                : "exit /b 0\r\n");
+        return platformScript(path, posix, windows);
+    }
+
+    /** Deletes {@code file} once nothing holds it. A missing file returns at once. */
+    public static void releaseFile(Path file) throws IOException, InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
+        IOException last = null;
+        while (System.nanoTime() < deadline) {
+            try {
+                Files.deleteIfExists(file);
+                return;
+            } catch (IOException failure) {
+                last = failure;
+                Thread.sleep(50);
+            }
+        }
+        throw new IOException("file stayed locked: " + file, last);
+    }
+
+    private static String shQuote(String value) {
+        return "'" + value.replace("'", "'\\''") + "'";
     }
 
     /**

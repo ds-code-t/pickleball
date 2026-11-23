@@ -41,7 +41,7 @@ class FeaturePathLoadCacheTest {
         for (int index = 0; index < 12; index++) {
             Files.writeString(features.resolve(String.format("n-%02d.feature", index)), feature("N" + index, "Scenario " + index));
         }
-        FeaturePathFeatureSupplier supplier = supplier("file:" + features.toAbsolutePath());
+        FeaturePathFeatureSupplier supplier = supplier(features.toUri().toString());
 
         FeaturePathLoadCache.bypass = true;
         List<String> original = fingerprint(supplier.get());
