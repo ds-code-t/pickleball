@@ -502,7 +502,7 @@ final class WorkbenchMcpTools {
                 )),
                 args -> forwardReady(dashboardQueryArgs(args)));
         add("workbench_dashboard_xref",
-                "Forward dashboard xref. Related runs, scenario paths, log excerpts, screenshot paths, and overlapping runs for one element. summary, overlay, and chat are short text. window writes one HTML file. Does not write the store.",
+                "Forward dashboard xref for one element: runs, paths, logs, screenshots, overlaps, summary, overlay, and chat. window writes HTML. Does not write the store.",
                 schema(Map.of(
                         "id", stringProperty("Short id or element id. Optional."),
                         "selector", stringProperty("Selector hint. Optional."),
@@ -1234,6 +1234,9 @@ final class WorkbenchMcpTools {
         body.put("ok", false);
         body.put("error", error);
         if (!fix.isBlank()) body.put("fix", fix);
+        // The JSON fields stay. The original lines stay in the text so a reader
+        // still sees "error:" and "fix:" the way the launcher prints them.
+        if (text.contains("\nfix:")) body.put("message", text);
         return body;
     }
 

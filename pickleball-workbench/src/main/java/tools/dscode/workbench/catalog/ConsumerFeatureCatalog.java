@@ -192,22 +192,22 @@ public final class ConsumerFeatureCatalog {
     }
 
     public boolean selected(Path file) {
-        return selectedFeatures.contains(file.toAbsolutePath().normalize());
+        return selectedFeatures.contains(pathKey(file));
     }
 
     public void toggleFeature(Path file) {
-        Path key = file.toAbsolutePath().normalize();
+        Path key = pathKey(file);
         if (!selectedFeatures.add(key)) {
             selectedFeatures.remove(key);
         }
     }
 
     public void selectFeature(Path file) {
-        selectedFeatures.add(file.toAbsolutePath().normalize());
+        selectedFeatures.add(pathKey(file));
     }
 
     public void deselectFeature(Path file) {
-        selectedFeatures.remove(file.toAbsolutePath().normalize());
+        selectedFeatures.remove(pathKey(file));
     }
 
     public void clearFeatureSelection() {
@@ -226,7 +226,7 @@ public final class ConsumerFeatureCatalog {
     public List<ScenarioEntry> candidateScenarios() {
         List<ScenarioEntry> pool = new ArrayList<>();
         for (FeatureEntry feature : features) {
-            if (selectedFeatures.isEmpty() || selectedFeatures.contains(feature.file())) {
+            if (selectedFeatures.isEmpty() || selectedFeatures.contains(pathKey(feature.file()))) {
                 pool.addAll(feature.scenarios());
             }
         }
@@ -246,11 +246,16 @@ public final class ConsumerFeatureCatalog {
     }
 
     public FeatureEntry feature(Path file) {
-        Path key = file.toAbsolutePath().normalize();
+        Path key = pathKey(file);
         return features.stream()
-                .filter(feature -> feature.file().equals(key))
+                .filter(feature -> pathKey(feature.file()).equals(key))
                 .findFirst()
                 .orElse(null);
+    }
+
+    /** Selection keys use one absolute path. A leading slash is not a Windows drive. */
+    private static Path pathKey(Path file) {
+        return file.toAbsolutePath().normalize();
     }
 
     static List<FeatureEntry> discover(Path projectRoot, WorkbenchManifest manifest) {
