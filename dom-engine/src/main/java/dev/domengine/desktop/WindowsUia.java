@@ -201,8 +201,13 @@ final class WindowsUia {
     }
 
     private static NativeDesktop.CommandResult powershell(String script, Map<String, String> env) {
+        // powershell.exe -Command reparses the raw command line and drops quotes, so
+        // a character class such as "[`t`r`n]" becomes a type literal. -EncodedCommand
+        // is the script as UTF-16LE Base64, and the quotes and backticks stay.
+        String encoded = java.util.Base64.getEncoder().encodeToString(
+                script.getBytes(java.nio.charset.StandardCharsets.UTF_16LE));
         return NativeDesktop.run(java.util.List.of(
-                "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script
+                "powershell.exe", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded
         ), env);
     }
 }

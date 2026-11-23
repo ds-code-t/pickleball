@@ -184,7 +184,8 @@ public final class SurfaceAssets {
                         "error: missing surface asset " + path
                                 + "\nfix: Ship it under src/main/resources" + path + ".");
             }
-            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            // The committed assets are LF. A Windows checkout may hand the same file back as CRLF.
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8).replace("\r\n", "\n").replace('\r', '\n');
         } catch (IOException failure) {
             throw new IllegalStateException(
                     "error: could not read surface asset " + path

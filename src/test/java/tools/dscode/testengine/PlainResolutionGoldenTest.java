@@ -51,7 +51,7 @@ class PlainResolutionGoldenTest {
             Files.createDirectories(GOLDEN.getParent());
             Files.writeString(GOLDEN, actual, StandardCharsets.UTF_8);
         }
-        String expected = Files.readString(GOLDEN, StandardCharsets.UTF_8);
+        String expected = Files.readString(GOLDEN, StandardCharsets.UTF_8).replace("\r\n", "\n").replace('\r', '\n');
         assertEquals(expected, actual);
     }
 

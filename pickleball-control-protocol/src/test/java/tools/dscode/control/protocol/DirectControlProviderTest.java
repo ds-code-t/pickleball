@@ -168,11 +168,16 @@ class DirectControlProviderTest {
 
     @Test
     void nonZeroAttachFailsClearly() throws Exception {
-        Path script = script("""
+        boolean windows = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win");
+        Path script = windows
+                ? script(temp.resolve("composite-" + System.nanoTime() + ".cmd"),
+                "@echo off\r\necho {\"ok\":false,\"error\":\"no DevTools\"} 1>&2\r\nexit /b 7\r\n")
+                : script("""
                 #!/bin/sh
                 echo '{"ok":false,"error":"no DevTools"}' >&2
                 exit 7
                 """);
+        assertTrue(Files.isExecutable(script), script.toString());
         IllegalStateException failure = assertThrows(IllegalStateException.class, () ->
                 DirectControlProvider.open(request(true, script.toString(), "127.0.0.1:9222")));
         assertTrue(failure.getMessage().contains("exited 7"));
@@ -306,7 +311,10 @@ class DirectControlProviderTest {
     }
 
     private Path script(String body) throws IOException {
-        Path file = temp.resolve("composite-" + System.nanoTime());
+        return script(temp.resolve("composite-" + System.nanoTime()), body);
+    }
+
+    private Path script(Path file, String body) throws IOException {
         Files.writeString(file, body);
         assertTrue(file.toFile().setExecutable(true));
         return file;

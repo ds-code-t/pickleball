@@ -886,7 +886,9 @@ class AgentExpansionTest {
     void covers_command_ui_poll() {
         Capture polled = agent("ui-poll", temp.toString(), "--run-id=ui");
         assertEquals(0, polled.code, polled.out + polled.err);
-        assertTrue(polled.out.contains("\"events\"") && polled.out.contains("\"chat\""), polled.out);
+        assertTrue(polled.out.contains("\"op\":\"ui-poll\"") && polled.out.contains("\"items\""), polled.out);
+        assertFalse(polled.out.contains("\"events\""), polled.out);
+        assertFalse(polled.out.contains("\"chat\""), polled.out);
         Capture bad = agent("ui-poll", temp.toString(), "--run-id=ui", "--wait=soon");
         assertEquals(2, bad.code, bad.out + bad.err);
     }

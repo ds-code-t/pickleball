@@ -1,6 +1,7 @@
 package dev.domengine;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.domengine.cli.CliResult;
 import dev.domengine.cli.DomEngineMain;
 import dev.domengine.json.Jsons;
@@ -129,10 +130,10 @@ class SessionJoinLogTest {
         Path dir = Files.createTempDirectory("domengine-mcp-join");
         try (FakeCdp cdp = FakeCdp.start()) {
             assertEquals(0, session(dir, "attach", "--id", "alpha", "--cdp", cdp.http(), "--i-accept-local-attach").exit());
-            String request = """
-                    {"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"domengine","arguments":{"argv":["session","join","--id","alpha","--session-dir","%s"]}}}
-                    {"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"domengine","arguments":{"argv":["session","log","--id","alpha","--session-dir","%s"]}}}
-                    """.formatted(dir, dir);
+            String request = mcp("4", "session", "join", "--id", "alpha", "--session-dir", dir.toString())
+                    + "\n"
+                    + mcp("5", "session", "log", "--id", "alpha", "--session-dir", dir.toString())
+                    + "\n";
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             McpServer.serve(new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8)), out);
             String text = out.toString(StandardCharsets.UTF_8);
@@ -159,6 +160,19 @@ class SessionJoinLogTest {
             assertEquals(body.path("joined").asText(), body.path("session").path("id").asText());
             assertFalse(body.path("session").path("launched").asBoolean());
         }
+    }
+
+    /** One MCP tools/call line. A JSON writer keeps a Windows path inside one string. */
+    private static String mcp(String id, String... argv) {
+        ObjectNode node = Jsons.object();
+        node.put("jsonrpc", "2.0");
+        node.put("id", Integer.parseInt(id));
+        node.put("method", "tools/call");
+        ObjectNode params = node.putObject("params");
+        params.put("name", "domengine");
+        var args = params.putObject("arguments").putArray("argv");
+        for (String arg : argv) args.add(arg);
+        return Jsons.compact(node);
     }
 
     private static CliResult session(Path dir, String... args) {

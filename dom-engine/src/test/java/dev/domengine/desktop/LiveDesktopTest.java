@@ -29,27 +29,67 @@ class LiveDesktopTest {
 
     @Test
     void liveAttachFailsClearlyAndForeignPlatformsDoNotRun() {
+        String family = NativeDesktop.family();
         AtSpi.useSessionBusForTests("unix:path=/tmp/pickleball-no-atspi-bus");
         CliResult live = DomEngineMain.dispatch(List.of("desktop", "attach", "--id", "live1", "--live"));
-        assertEquals(1, live.exit(), live.stderr());
-        assertTrue(live.stderr().contains("AT-SPI unavailable"), live.stderr());
-        assertFalse(live.stderr().contains("\"ok\" : true"), live.stderr());
-        assertFalse(live.stdout().contains("\"ok\" : true"), live.stdout());
-        assertFalse(live.stdout().contains("\"ok\":true"), live.stdout());
-        assertFalse(live.stderr().contains("\"ok\": true"), live.stderr());
-        assertFalse(live.stdout().contains("\"ok\": true"), live.stdout());
+        if ("linux".equals(family)) {
+            assertEquals(1, live.exit(), live.stderr());
+            assertTrue(live.stderr().contains("AT-SPI unavailable"), live.stderr());
+            assertNoSuccessfulAttach(live);
+        } else {
+            assertFalse(live.stderr().contains("AT-SPI unavailable"), live.stderr());
+            assertFalse(live.stderr().contains("Missing type name"), live.stderr());
+            if ("windows".equals(family) && live.exit() != 0) {
+                assertEquals(1, live.exit(), live.stderr());
+                assertTrue(live.stderr().contains("UIA unavailable"), live.stderr());
+                assertNoSuccessfulAttach(live);
+            } else if ("macos".equals(family) && live.exit() != 0) {
+                assertEquals(1, live.exit(), live.stderr());
+                assertNoSuccessfulAttach(live);
+                assertTrue(live.stderr().contains("osascript") || live.stderr().contains("requires")
+                        || live.stderr().contains("unavailable"), live.stderr());
+            } else {
+                assertEquals(0, live.exit(), live.stderr());
+                assertTrue(live.stdout().contains("\"ok\": true") || live.stdout().contains("\"ok\":true")
+                        || live.stdout().contains("\"ok\" : true"), live.stdout());
+                assertTrue(live.stdout().contains(family), live.stdout());
+            }
+        }
 
-        CdpException windows = assertThrows(CdpException.class, () -> WindowsUia.capture(""));
-        assertTrue(windows.getMessage().contains("requires Windows"), windows.getMessage());
-        CdpException mac = assertThrows(CdpException.class, () -> MacAccessibility.capture(""));
-        assertTrue(mac.getMessage().contains("requires macOS"), mac.getMessage());
+        if ("linux".equals(family)) {
+            CdpException windows = assertThrows(CdpException.class, () -> WindowsUia.capture(""));
+            assertTrue(windows.getMessage().contains("requires Windows"), windows.getMessage());
+            CdpException mac = assertThrows(CdpException.class, () -> MacAccessibility.capture(""));
+            assertTrue(mac.getMessage().contains("requires macOS"), mac.getMessage());
+        } else if ("windows".equals(family)) {
+            try {
+                assertTrue(WindowsUia.capture("") != null);
+            } catch (CdpException failure) {
+                assertTrue(failure.getMessage().contains("UIA unavailable"), failure.getMessage());
+                assertFalse(failure.getMessage().contains("Missing type name"), failure.getMessage());
+                assertFalse(failure.getMessage().contains("requires Windows"), failure.getMessage());
+            }
+            CdpException mac = assertThrows(CdpException.class, () -> MacAccessibility.capture(""));
+            assertTrue(mac.getMessage().contains("requires macOS"), mac.getMessage());
+            CdpException linux = assertThrows(CdpException.class, () -> AtSpi.capture(""));
+            assertTrue(linux.getMessage().contains("requires Linux"), linux.getMessage());
+        } else {
+            CdpException windows = assertThrows(CdpException.class, () -> WindowsUia.capture(""));
+            assertTrue(windows.getMessage().contains("requires Windows"), windows.getMessage());
+            CdpException linux = assertThrows(CdpException.class, () -> AtSpi.capture(""));
+            assertTrue(linux.getMessage().contains("requires Linux"), linux.getMessage());
+        }
 
         DomNode node = new DomNode();
         node.attributes.put("desktop-backend", "atspi");
         node.attributes.put("atspi-dest", "org.a11y.atspi.Registry");
         node.attributes.put("atspi-path", "/org/a11y/atspi/accessible/root");
         CdpException click = assertThrows(CdpException.class, () -> NativeDesktop.click(node));
-        assertTrue(click.getMessage().contains("AT-SPI"), click.getMessage());
+        if ("linux".equals(family)) {
+            assertTrue(click.getMessage().contains("AT-SPI"), click.getMessage());
+        } else {
+            assertTrue(click.getMessage().contains("requires Linux"), click.getMessage());
+        }
 
         assertTrue(WindowsUia.captureScript().contains("UIAutomationClient"));
         assertTrue(WindowsUia.clickScript().contains("InvokePattern"));
@@ -58,7 +98,15 @@ class LiveDesktopTest {
         assertTrue(MacAccessibility.clickScript().contains("AXPress"));
         assertEquals(12, NativeDesktop.WALK_DEPTH);
         assertEquals(500, NativeDesktop.WALK_NODES);
-        assertTrue(NativeDesktop.platformId().startsWith("linux-"));
+        assertTrue(NativeDesktop.platformId().startsWith(family + "-"), NativeDesktop.platformId());
+    }
+
+    private static void assertNoSuccessfulAttach(CliResult live) {
+        assertFalse(live.stderr().contains("\"ok\" : true"), live.stderr());
+        assertFalse(live.stdout().contains("\"ok\" : true"), live.stdout());
+        assertFalse(live.stdout().contains("\"ok\":true"), live.stdout());
+        assertFalse(live.stderr().contains("\"ok\": true"), live.stderr());
+        assertFalse(live.stdout().contains("\"ok\": true"), live.stdout());
     }
 
     @Test

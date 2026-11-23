@@ -71,9 +71,9 @@ class CompositeVerbsCliTest {
         JsonNode node = new ObjectMapper().readTree(turn.out);
         assertEquals(1, node.path("v").asInt());
         assertTrue(node.path("state").isObject(), turn.out);
-        assertEquals(1, node.path("messages").size(), turn.out);
-        assertTrue(node.path("messages").toString().contains("only-once-human"), turn.out);
+        assertFalse(node.has("messages"), turn.out);
         assertFalse(node.has("lines"), turn.out);
+        assertEquals(1, node.path("items").size(), turn.out);
         assertTrue(node.path("items").toString().contains("only-once-human"), turn.out);
         int copies = 0;
         int from = 0;
@@ -81,7 +81,7 @@ class CompositeVerbsCliTest {
             copies++;
             from += "only-once-human".length();
         }
-        assertEquals(2, copies, turn.out);
+        assertEquals(1, copies, turn.out);
     }
 
     @Test

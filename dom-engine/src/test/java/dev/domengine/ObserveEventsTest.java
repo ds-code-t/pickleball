@@ -30,6 +30,15 @@ class ObserveEventsTest {
         SessionRegistry.resetForTests();
     }
 
+    /** One stdio request. A JSON writer keeps a Windows path inside one string. */
+    private static String stdio(String id, List<String> argv) {
+        ObjectNode node = Jsons.object();
+        node.put("id", id);
+        var args = node.putArray("argv");
+        for (String arg : argv) args.add(arg);
+        return Jsons.compact(node);
+    }
+
     private static ObjectNode request(String id, String url, String method) {
         ObjectNode event = Jsons.object();
         event.put("method", "Network.requestWillBeSent");
@@ -129,9 +138,13 @@ class ObserveEventsTest {
     void workerServeAttachThenObserveOnTheSameProcess() throws Exception {
         Path dir = Files.createTempDirectory("domengine-observe-serve");
         try (FakeCdp cdp = fakeWithTraffic()) {
-            String requests = "{\"id\":\"a\",\"argv\":[\"session\",\"create\",\"--id\",\"w\",\"--cdp\",\"" + cdp.http()
-                    + "\",\"--i-accept-local-attach\",\"--session-dir\",\"" + dir + "\"]}\n"
-                    + "{\"id\":\"b\",\"argv\":[\"observe\",\"--session\",\"w\",\"--type\",\"network\",\"--url\",\"orders\",\"--wait-ms\",\"3000\"]}\n";
+            String requests = stdio("a", List.of(
+                    "session", "create", "--id", "w", "--cdp", cdp.http(),
+                    "--i-accept-local-attach", "--session-dir", dir.toString()))
+                    + "\n"
+                    + stdio("b", List.of(
+                    "observe", "--session", "w", "--type", "network", "--url", "orders", "--wait-ms", "3000"))
+                    + "\n";
             ByteArrayOutputStream sink = new ByteArrayOutputStream();
             DomEngineMain.serve(new ByteArrayInputStream(requests.getBytes(StandardCharsets.UTF_8)), sink);
             String[] lines = sink.toString(StandardCharsets.UTF_8).lines().filter(line -> line.startsWith("{")).toArray(String[]::new);
