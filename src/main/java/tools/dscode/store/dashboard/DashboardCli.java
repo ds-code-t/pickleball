@@ -67,7 +67,7 @@ public final class DashboardCli {
     static String help() {
         return """
                 Usage: dashboard [--project=<dir>] [--out=<file>] [--from=<iso>] [--to=<iso>] [--status=<status>] [--feature=<path>] [--run=<id>] [--entity=<Type#id>] [--text=<words>]
-                Writes a static HTML page from the embedded store. No second database and no server.
+                Writes one static HTML page from the embedded store. It does not change the store and it does not start a server. The page has sticky filters, a colored timeline, clickable entity panels, and links grouped as Features, Data, Artifacts, and Commit.
                 """;
     }
 

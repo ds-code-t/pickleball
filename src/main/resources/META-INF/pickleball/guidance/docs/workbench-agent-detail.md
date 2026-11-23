@@ -30,6 +30,10 @@ Recording ignores a tagged node, so a click on the panel, the editor, the record
 
 The panel tabs are Chat, Guide, and Recorder. The tab ids stay `chat`, `steps`, and `record`. The step editor is the Steps window. Minimizing or closing the panel leaves a pill at the bottom-right. Minimizing or closing the step editor leaves a pill at the bottom-left. Either pill reopens that window. The recording bar title is Recording or Paused. Its buttons are Pause or Resume, Keep step, and Drop step. The event actions stay `accept` and `reject`. A finished guide leaves the Guide list and clears its badges. An empty Guide tab says No guide yet. The unread count is hidden while the person is looking at Chat on the page. A drag of the panel, the editor, or a card pushes `{type:card, action:drag, x, y, id}`. Labels use the same light panel chip as the cards.
 
+## Historical dashboard
+
+`dashboard` writes one static HTML file from the embedded store. It does not start a server and it does not change the store. The page has sticky filters (status, feature, entity or case, text, rewind), a colored timeline, and a count of the runs on screen. Clear resets the filters. Clicking a business entity or a case id fills the entity filter. Clicking a common error fills the text filter. A run's links are grouped under Features, Data, Artifacts, and Commit. Open the file from the Tracking tab or from the CLI. The default path is `.pickleball/dashboard/index.html`.
+
 ## Tool chooser
 
 Pickleball Workbench is the one front door. It is a Java program launched from the consumer project, not a GUI requirement. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test. Do not click the JavaFX or WebView UI.

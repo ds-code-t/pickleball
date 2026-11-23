@@ -35,30 +35,46 @@ public final class DashboardHtml {
                 :root { color-scheme: light; --ink:#1c1915; --muted:#5c564c; --line:#e4ddd2; --paper:#f7f4ee; --card:#fffdf9; --accent:#0f6e56; --bad:#9f2d2d; --warn:#8a5a12; }
                 * { box-sizing: border-box; }
                 body { margin: 0; font: 15px/1.45 "Segoe UI", "Source Sans 3", sans-serif; color: var(--ink); background: var(--paper); }
-                header { padding: 28px 32px 12px; }
+                header, main { max-width: 1180px; margin-left: auto; margin-right: auto; }
+                header { padding: 28px 32px 8px; }
                 h1 { font-size: 28px; font-weight: 650; margin: 0 0 4px; letter-spacing: -0.03em; }
                 h2 { font-size: 15px; margin: 0 0 8px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+                h3 { font-size: 12px; margin: 12px 0 4px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
                 .sub { color: var(--muted); margin: 0; }
                 main { padding: 8px 32px 48px; display: grid; gap: 16px; }
                 .bar, .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
-                .bar { padding: 14px 16px; display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: end; }
+                .bar { position: sticky; top: 0; z-index: 2; padding: 14px 16px; display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: end; box-shadow: 0 8px 20px rgba(28,25,21,.06); }
                 label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
                 input[type=search], input[type=text] { border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; font: inherit; color: inherit; background: #fff; min-width: 9rem; }
-                input[type=range] { width: 220px; accent-color: var(--accent); }
+                input[type=range] { width: min(220px, 46vw); accent-color: var(--accent); }
+                #clear { border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); font: inherit; padding: 7px 12px; cursor: pointer; }
                 .grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; }
                 .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
                 .card { padding: 14px 16px; min-width: 0; }
-                .viewport { position: relative; height: 280px; overflow: auto; border-top: 1px solid var(--line); }
+                .legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin: 0 0 8px; color: var(--muted); font-size: 12px; }
+                .legend span, .kind { display: inline-flex; align-items: center; gap: 6px; }
+                .legend span::before, .kind::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+                .legend [data-kind=scenario]::before, .kind[data-kind=scenario]::before { background: #2f5f98; }
+                .legend [data-kind=case]::before, .kind[data-kind=case]::before { background: var(--warn); }
+                .legend [data-kind=entity]::before, .kind[data-kind=entity]::before { background: #5c564c; }
+                .legend [data-kind=error]::before, .kind[data-kind=error]::before { background: var(--bad); }
+                .viewport { position: relative; height: min(42vh, 440px); overflow: auto; border-top: 1px solid var(--line); }
                 .spacer { position: relative; width: 100%; }
                 .window { position: absolute; left: 0; right: 0; top: 0; }
-                button.row, .row { display: block; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: transparent; padding: 8px 4px; font: inherit; color: inherit; }
+                button.row, .row { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: transparent; padding: 8px 4px; font: inherit; color: inherit; min-height: 36px; }
                 button.row { cursor: pointer; }
                 button.row[aria-current=true], button.row:hover { background: #f3faf6; }
+                .row > div:first-child, button.row > span.title { min-width: 0; overflow-wrap: anywhere; }
                 .meta { color: var(--muted); font-size: 12px; }
+                .row > .meta, #count { margin-left: auto; }
                 .bad { color: var(--bad); }
-                .links a { color: var(--accent); margin-right: 12px; }
+                .chip { display: inline-block; border-radius: 999px; padding: 1px 8px; font-size: 12px; font-weight: 650; background: #f3efe8; }
+                .chip[data-status=failed], .chip[data-status=failure] { color: var(--bad); background: #fdecec; }
+                .chip[data-status=passed] { color: var(--accent); background: #e7f6f1; }
+                .links a { color: var(--accent); display: inline-block; margin: 0 12px 6px 0; overflow-wrap: anywhere; }
                 .empty { color: var(--muted); padding: 12px 0; }
-                @media (max-width: 900px) { .grid, .cards { grid-template-columns: 1fr; } main, header { padding-left: 16px; padding-right: 16px; } }
+                button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+                @media (max-width: 900px) { .grid, .cards { grid-template-columns: 1fr; } main, header { padding-left: 16px; padding-right: 16px; } .viewport { height: min(50vh, 360px); } }
                 </style>
                 </head>
                 <body>
@@ -73,9 +89,11 @@ public final class DashboardHtml {
                     <label>Entity or case <input id="entity" type="search" placeholder="Case#12"></label>
                     <label>Text <input id="text" type="search" placeholder="declined"></label>
                     <label>Rewind <input id="rewind" type="range" min="0" max="0" value="0"><span id="rewind-label" class="meta"></span></label>
+                    <button type="button" id="clear">Clear</button>
+                    <p id="count" class="meta"></p>
                   </form>
                   <section class="grid">
-                    <article class="card"><h2>Timeline</h2><div id="timeline" class="viewport"></div></article>
+                    <article class="card"><h2>Timeline</h2><p class="legend" id="legend"><span data-kind="run">Run</span><span data-kind="scenario">Scenario</span><span data-kind="case">Case</span><span data-kind="entity">Entity</span><span data-kind="error">Error</span></p><div id="timeline" class="viewport"></div></article>
                     <article class="card"><h2>Run</h2><div id="detail"></div></article>
                   </section>
                   <section class="cards">
@@ -112,7 +130,11 @@ public final class DashboardHtml {
                     if (end && run.startedAt && run.startedAt > end) return false;
                     if (status && String(run.status).toLowerCase() !== status) return false;
                     if (feature && !(run.features || []).join("\\n").toLowerCase().includes(feature) && !String(run.featurePath).toLowerCase().includes(feature)) return false;
-                    if (text && !(String(run.note) + " " + String(run.scenario)).toLowerCase().includes(text)) return false;
+                    if (text) {
+                      const blob = (String(run.note) + " " + String(run.scenario) + " " + (run.scenarios || []).join(" ") + " " + (run.features || []).join(" ")).toLowerCase();
+                      const markerHit = data.markers.some(m => m.runId === run.id && (String(m.id) + " " + String(m.label)).toLowerCase().includes(text));
+                      if (!blob.includes(text) && !markerHit) return false;
+                    }
                     if (entity) {
                       const hit = data.markers.some(m => m.runId === run.id && (m.kind === "entity" || m.kind === "case") && String(m.id).toLowerCase().includes(entity) && visible(m.at));
                       if (!hit) return false;
@@ -166,13 +188,41 @@ public final class DashboardHtml {
                   el.lastChild.textContent = meta || "";
                   return el;
                 }
+                function pick(text, meta, bad, apply) {
+                  const el = document.createElement("button");
+                  el.type = "button";
+                  el.className = "row";
+                  el.innerHTML = '<span class="title' + (bad ? ' bad' : '') + '"></span><span class="meta"></span>';
+                  el.firstChild.textContent = text;
+                  el.lastChild.textContent = meta || "";
+                  el.onclick = apply;
+                  return el;
+                }
                 function render() {
                   const end = cursor();
-                  $("rewind-label").textContent = end ? end : "all";
+                  $("rewind-label").textContent = end ? "Through " + end : "all";
                   const runs = runsNow();
+                  $("count").textContent = "Showing " + runs.length + (runs.length === 1 ? " run" : " runs");
                   if (!runs.some(run => run.id === selected)) selected = runs.length ? runs[0].id : "";
                   const markers = markersNow(runs);
-                  virtualize($("timeline"), markers, m => line(m.kind + " " + m.id, m.at, m.kind === "error"));
+                  virtualize($("timeline"), markers, m => {
+                    const button = document.createElement("button");
+                    button.type = "button";
+                    button.className = "row";
+                    button.setAttribute("data-kind", m.kind);
+                    const dot = document.createElement("span");
+                    dot.className = "kind";
+                    dot.setAttribute("data-kind", m.kind);
+                    const title = document.createElement("span");
+                    title.className = "title" + (m.kind === "error" ? " bad" : "");
+                    title.textContent = m.kind + " " + m.id;
+                    const meta = document.createElement("span");
+                    meta.className = "meta";
+                    meta.textContent = m.at || "";
+                    button.append(dot, title, meta);
+                    button.onclick = () => { selected = m.runId; render(); };
+                    return button;
+                  });
                   virtualize($("runs"), runs, run => {
                     const button = document.createElement("button");
                     button.type = "button";
@@ -184,9 +234,9 @@ public final class DashboardHtml {
                     button.onclick = () => { selected = run.id; render(); };
                     return button;
                   });
-                  virtualize($("entities"), counts(markers, "entity"), pair => line(pair[0], String(pair[1])));
-                  virtualize($("cases"), counts(markers, "case"), pair => line(pair[0], String(pair[1])));
-                  virtualize($("errors"), counts(markers, "error"), pair => line(pair[0], String(pair[1]), true));
+                  virtualize($("entities"), counts(markers, "entity"), pair => pick(pair[0], String(pair[1]), false, () => { $("entity").value = pair[0]; render(); }));
+                  virtualize($("cases"), counts(markers, "case"), pair => pick(pair[0], String(pair[1]), false, () => { $("entity").value = pair[0]; render(); }));
+                  virtualize($("errors"), counts(markers, "error"), pair => pick(pair[0], String(pair[1]), true, () => { $("text").value = pair[0]; render(); }));
                   virtualize($("case-types"), caseTypes(markers), pair => line(pair[0], String(pair[1])));
                   const run = runs.find(item => item.id === selected);
                   const detail = $("detail");
@@ -197,26 +247,45 @@ public final class DashboardHtml {
                   detail.appendChild(title);
                   const meta = document.createElement("p");
                   meta.className = "meta";
-                  meta.textContent = run.status + "  passed " + run.passed + "  failed " + run.failed + (run.gitCommit ? "  " + run.gitCommit : "");
+                  const chip = document.createElement("span");
+                  chip.className = "chip";
+                  chip.setAttribute("data-status", String(run.status || "").toLowerCase());
+                  chip.textContent = run.status || "";
+                  meta.append(chip, document.createTextNode("  passed " + run.passed + "  failed " + run.failed + (run.gitCommit ? "  " + run.gitCommit : "")));
                   detail.appendChild(meta);
-                  const links = document.createElement("p");
-                  links.className = "links";
+                  let links = null;
                   const local = (path) => /^([a-z][a-z0-9+.-]*:|\\/|[a-z]:[\\\\/])/i.test(path) ? path : (data.linkBase || "") + path;
                   const add = (href, label) => {
-                    if (!href) return;
+                    if (!href || !links) return;
                     const a = document.createElement("a");
                     a.href = href;
                     a.textContent = label;
                     links.appendChild(a);
                   };
+                  const section = (name) => {
+                    const heading = document.createElement("h3");
+                    heading.textContent = name;
+                    detail.appendChild(heading);
+                    links = document.createElement("p");
+                    links.className = "links";
+                    detail.appendChild(links);
+                  };
+                  if ((run.features || []).length) section("Features");
                   (run.features || []).forEach(path => add(local(path), path));
+                  if ((run.dataFiles || []).length) section("Data");
                   (run.dataFiles || []).forEach(path => add(local(path), path));
+                  if ((run.artifacts || []).length) section("Artifacts");
                   (run.artifacts || []).forEach(path => add(local(path), path));
+                  if (run.commitUrl) section("Commit");
                   if (run.commitUrl) add(run.commitUrl, run.gitCommit || "commit");
-                  detail.appendChild(links);
                 }
                 ["status", "feature", "entity", "text"].forEach(id => $(id).addEventListener("input", render));
                 rewind.addEventListener("input", render);
+                $("clear").addEventListener("click", () => {
+                  ["status", "feature", "entity", "text"].forEach(id => $(id).value = "");
+                  rewind.value = rewind.max;
+                  render();
+                });
                 render();
                 </script>
                 </body>

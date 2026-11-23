@@ -95,6 +95,16 @@ class DashboardTest {
         assertTrue(html.contains("pay-run"));
         assertTrue(html.contains("features/pay.feature"));
         assertTrue(html.contains("Business entities"));
+        assertTrue(html.contains("id=\"legend\""));
+        assertTrue(html.contains("id=\"clear\""));
+        assertTrue(html.contains("Showing "));
+        assertTrue(html.contains("function pick"));
+        assertTrue(html.contains("section(\"Features\")"));
+        assertTrue(html.contains("section(\"Data\")"));
+        assertTrue(html.contains("section(\"Artifacts\")"));
+        assertTrue(html.contains("section(\"Commit\")"));
+        assertTrue(html.contains("overflow: auto"));
+        assertTrue(html.contains("max-width: 1180px"));
         assertFalse(html.contains("<script src="));
         assertFalse(html.toLowerCase().contains("cdn"));
         assertFalse(html.contains("localhost"));
