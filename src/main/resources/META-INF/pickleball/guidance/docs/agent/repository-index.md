@@ -1082,6 +1082,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/store/StoreRunProbe.java`
 - `src/test/java/tools/dscode/store/StoreRunRecordingSpeedTest.java`
 - `src/test/java/tools/dscode/store/StoreRunTest.java`
+- `src/test/java/tools/dscode/store/StoreRunTiming.java`
 - `src/test/java/tools/dscode/store/StoreSandboxBindingTest.java`
 - `src/test/java/tools/dscode/store/StoreSandboxCliTest.java`
 - `src/test/java/tools/dscode/store/StoreSandboxHardenTest.java`

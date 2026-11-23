@@ -1,12 +1,15 @@
 package tools.dscode.engine.parity;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import tools.dscode.coredefinitions.LogAndAssertSteps;
+import tools.dscode.coredefinitions.ServiceCallSteps;
 import tools.dscode.engine.EngineOptions;
 import tools.dscode.engine.PickleballEngine;
 import tools.dscode.engine.adapter.CucumberAdapterRun;
 import tools.dscode.engine.model.RunResult;
 import tools.dscode.engine.model.ScenarioResult;
+import tools.dscode.engine.model.Status;
 import tools.dscode.engine.model.StepResult;
 import tools.dscode.expectedfailure.ExpectedFailureSteps;
 import tools.dscode.scenarioobject.ScenarioObjectSteps;
@@ -22,8 +25,10 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SuiteDualRunTest {
@@ -136,6 +141,50 @@ class SuiteDualRunTest {
             else if (linkedCalls) Files.deleteIfExists(calls);
         }
         assertTrue(problems.isEmpty(), problems.size() + " features diverged\n" + String.join("\n\n", problems));
+    }
+
+    /**
+     * TokenCall without a parent leaves {@code <PARENT.SCENARIO:url>} in the
+     * endpoint. Both engines fail that step. The call does not open a socket.
+     */
+    @Test
+    @Timeout(value = 90, unit = TimeUnit.SECONDS)
+    void unresolvedEndpointFailsOnBothEngines() throws Exception {
+        String feature = """
+                Feature: Unresolved service endpoint
+                  Scenario: No parent leaves the reference in the endpoint
+                    * MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
+                      | endpoint | <PARENT.SCENARIO:url>/api/service-calls/token |
+                      | method   | POST                                         |
+                    * EXECUTE SERVICE CALL
+                """;
+        Path dir = Files.createTempDirectory("pkb-unresolved-endpoint");
+        Path file = dir.resolve("unresolved.feature");
+        try {
+            Files.writeString(file, feature);
+            long started = System.nanoTime();
+            RunResult adapter = CucumberAdapterRun.run(file, ServiceCallSteps.class.getPackageName());
+            RunResult nativeResult = PickleballEngine.run(feature, EngineOptions.of(ServiceCallSteps.class));
+            long elapsedMs = (System.nanoTime() - started) / 1_000_000L;
+            assertTrue(elapsedMs < 60_000, "unresolved endpoint blocked for " + elapsedMs + " ms");
+            assertEquals(1, adapter.scenarios().size(), adapter.toString());
+            assertEquals(1, nativeResult.scenarios().size(), nativeResult.toString());
+            assertEquals(Status.FAILED, adapter.scenarios().get(0).status(), dump("adapter", adapter));
+            assertEquals(Status.FAILED, nativeResult.scenarios().get(0).status(), dump("native", nativeResult));
+            assertTrue(
+                    nativeResult.scenarios().get(0).message().contains("unresolved reference"),
+                    nativeResult.scenarios().get(0).message()
+            );
+            assertTrue(
+                    nativeResult.scenarios().get(0).message().contains("<PARENT.SCENARIO:url>"),
+                    nativeResult.scenarios().get(0).message()
+            );
+            List<DualRun.Divergence> found = DualRun.diff(adapter, nativeResult);
+            assertTrue(found.isEmpty(), found.size() + "\n" + dump("adapter", adapter) + "\n" + dump("native", nativeResult));
+        } finally {
+            Files.deleteIfExists(file);
+            Files.deleteIfExists(dir);
+        }
     }
 
     /** Copies the tree. Does not follow a link into the target. */

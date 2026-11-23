@@ -137,8 +137,10 @@ public final class PortableProcess {
     }
 
     /**
-     * A launcher that writes each argument on its own line, then either exits 0
-     * or stays up until it is killed. The returned path is the file to execute.
+     * A launcher that records its arguments, then either exits 0 or stays up until
+     * it is killed. POSIX writes one argument per line. Windows writes the raw
+     * command tail so a {@code =} stays inside the argument. The returned path
+     * is the file to execute.
      */
     public static Path argumentLog(Path path, Path log, boolean stay) throws IOException {
         Path hold = source("PkbHold.java", HOLD);
@@ -149,8 +151,9 @@ public final class PortableProcess {
                 + (stay
                 ? "if [ \"$1\" = \"--exit-now\" ]; then exit 0; fi\nexec " + shQuote(java) + " " + shQuote(holdText) + " 3600000\n"
                 : "exit 0\n");
-        String windows = "@echo off\r\nsetlocal EnableExtensions\r\nset \"FIRST=%~1\"\r\n:log\r\n"
-                + "if \"%~1\"==\"\" goto after\r\n>>\"" + logText + "\" echo(%~1\r\nshift /1\r\ngoto log\r\n:after\r\n"
+        // cmd splits a batch %1 on "=". %* is the raw tail, so --app=http:// stays one argument.
+        String windows = "@echo off\r\nsetlocal EnableExtensions\r\nset \"FIRST=%~1\"\r\n"
+                + "if not \"%~1\"==\"\" >>\"" + logText + "\" echo(%*\r\n"
                 + (stay
                 ? "if \"%FIRST%\"==\"--exit-now\" exit /b 0\r\n\"" + java + "\" \"" + holdText + "\" 3600000\r\nexit /b %ERRORLEVEL%\r\n"
                 : "exit /b 0\r\n");

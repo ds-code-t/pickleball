@@ -132,6 +132,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-roadmap-7-scoreboard.md`
 - `docs/maintainer/3.0.0-roadmap-8-scoreboard.md`
 - `docs/maintainer/3.0.0-snapshot-coverage-audit.md`
+- `docs/maintainer/3.0.0-windows-regression-portability.md`
 - `docs/maintainer/3.0.0-windows-regression.md`
 - `docs/maintainer/3.0.0-workbench-edit-design.md`
 - `docs/maintainer/consumer-sim-harness.md`
@@ -1199,6 +1200,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/store/StoreRunProbe.java`
 - `src/test/java/tools/dscode/store/StoreRunRecordingSpeedTest.java`
 - `src/test/java/tools/dscode/store/StoreRunTest.java`
+- `src/test/java/tools/dscode/store/StoreRunTiming.java`
 - `src/test/java/tools/dscode/store/StoreSandboxBindingTest.java`
 - `src/test/java/tools/dscode/store/StoreSandboxCliTest.java`
 - `src/test/java/tools/dscode/store/StoreSandboxHardenTest.java`
