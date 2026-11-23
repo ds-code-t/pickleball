@@ -25,7 +25,7 @@ class NoRuntimeDownloadTest {
         Path feature = project.resolve("features/one.feature");
         Files.createDirectories(feature.getParent());
         Files.writeString(feature, "Feature: One\n", StandardCharsets.UTF_8);
-        long processes = ProcessHandle.current().descendants().count();
+        Set<Long> processes = descendantPids();
         Set<String> sockets = sockets();
         assertEquals(0, StoreCli.execute(new String[] {"store", "hydrate", "--project=" + project},
                 new PrintStream(new ByteArrayOutputStream()),
@@ -36,7 +36,7 @@ class NoRuntimeDownloadTest {
                 new PrintStream(new ByteArrayOutputStream())));
         String status = out.toString(StandardCharsets.UTF_8);
         assertTrue(status.contains("store=embedded"), status);
-        assertEquals(processes, ProcessHandle.current().descendants().count());
+        assertNoNewDescendant(processes);
         assertEquals(sockets, sockets());
         assertFalse(Files.exists(project.resolve(".pickleball/store/server.json")));
         assertTrue(StorePaths.ready(project));
@@ -60,11 +60,11 @@ class NoRuntimeDownloadTest {
     @Test
     void hydrateStartsNoChildProcess() throws Exception {
         writeFeature();
-        long processes = ProcessHandle.current().descendants().count();
+        Set<Long> processes = descendantPids();
         assertEquals(0, StoreCli.execute(new String[] {"store", "hydrate", "--project=" + project},
                 new PrintStream(new ByteArrayOutputStream()),
                 new PrintStream(new ByteArrayOutputStream())));
-        assertEquals(processes, ProcessHandle.current().descendants().count());
+        assertNoNewDescendant(processes);
     }
 
     @Test
@@ -141,6 +141,19 @@ class NoRuntimeDownloadTest {
     private static void restore(String key, String value) {
         if (value == null) System.clearProperty(key);
         else System.setProperty(key, value);
+    }
+
+    /** Pids of processes this JVM started. A descendant that exits is not a store launch. */
+    private static Set<Long> descendantPids() {
+        Set<Long> pids = new HashSet<>();
+        ProcessHandle.current().descendants().forEach(handle -> pids.add(handle.pid()));
+        return pids;
+    }
+
+    private static void assertNoNewDescendant(Set<Long> before) {
+        Set<Long> started = descendantPids();
+        started.removeAll(before);
+        assertTrue(started.isEmpty(), "store started a process: " + started);
     }
 
     private static Set<String> sockets() throws Exception {
