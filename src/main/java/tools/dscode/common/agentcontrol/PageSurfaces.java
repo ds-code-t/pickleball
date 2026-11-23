@@ -462,6 +462,15 @@ final class PageSurfaces {
             throw new IllegalStateException("no live browser; " + kind + " was not applied");
         }
         if (visual && liveOnly && handle != null && !handle.isBlank() && !resolved(handle)) {
+            HandleRef named = parseHandle(handle);
+            if (named.frameId != null || named.browserId != null) {
+                FrameOwner owner = frameOwner(named);
+                if (owner == null || !browserStillManaged(owner)) {
+                    throw new IllegalArgumentException("unknown handle: " + handle);
+                }
+            }
+        }
+        if (visual && liveOnly && handle != null && !handle.isBlank() && !resolved(handle)) {
             String placed = tools.dscode.common.agentfast.TargetVerb.placementHandle(handle);
             if (placed != null && !placed.isBlank()) handle = placed;
             else {
