@@ -25,7 +25,7 @@ class WorkbenchSessionQueryTest {
     void emptyListPrintsNothingLive() {
         Capture text = run("session", "list", temp.toString());
         assertEquals(0, text.code);
-        assertEquals("(no live sessions)\n", text.out);
+        assertEquals(line("(no live sessions)"), text.out);
         assertEquals("", text.err);
 
         Capture json = run("session", "list", "--json", temp.toString());
@@ -68,8 +68,8 @@ class WorkbenchSessionQueryTest {
         Capture list = run("session", "list", temp.toString());
         assertEquals(0, list.code);
         assertEquals(
-                "sessionId\trunId\tstate\tbrowser\tcdp\turl\n"
-                        + "session-1\trun-1\trunning\tchrome\t127.0.0.1:9222\thttps://example.test/\n",
+                line("sessionId\trunId\tstate\tbrowser\tcdp\turl")
+                        + line("session-1\trun-1\trunning\tchrome\t127.0.0.1:9222\thttps://example.test/"),
                 list.out
         );
 
@@ -161,6 +161,10 @@ class WorkbenchSessionQueryTest {
         Capture missing = run("session", "release", "missing", temp.toString());
         assertEquals(1, missing.code);
         assertTrue(missing.err.contains("No session descriptor for missing."));
+    }
+
+    private static String line(String text) {
+        return text + System.lineSeparator();
     }
 
     private Capture run(String... args) {

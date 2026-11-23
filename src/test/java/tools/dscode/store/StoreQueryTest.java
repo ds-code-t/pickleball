@@ -39,14 +39,14 @@ class StoreQueryTest {
 
     @Test
     void missingDatabaseListsAreEmptyAndDoNotCreateOne() {
-        assertEquals("{\"files\":[]}\n", run("store", "files", "list", "--json", "--project=" + project).out);
-        assertEquals("{\"features\":[]}\n", run("store", "features", "--json", "--project=" + project).out);
-        assertEquals("{\"scenarios\":[]}\n", run("store", "scenarios", "list", "--json", "--project=" + project).out);
-        assertEquals("{\"steps\":[]}\n", run("store", "steps", "list", "--json", "--project=" + project).out);
-        assertEquals("{\"conflicts\":[]}\n", run("store", "conflicts", "--json", "--project=" + project).out);
+        assertEquals(line("{\"files\":[]}"), run("store", "files", "list", "--json", "--project=" + project).out);
+        assertEquals(line("{\"features\":[]}"), run("store", "features", "--json", "--project=" + project).out);
+        assertEquals(line("{\"scenarios\":[]}"), run("store", "scenarios", "list", "--json", "--project=" + project).out);
+        assertEquals(line("{\"steps\":[]}"), run("store", "steps", "list", "--json", "--project=" + project).out);
+        assertEquals(line("{\"conflicts\":[]}"), run("store", "conflicts", "--json", "--project=" + project).out);
         Capture text = run("store", "files", "list", "--project=" + project);
         assertEquals(0, text.code, text.err);
-        assertEquals("files 0\n", text.out);
+        assertEquals(line("files 0"), text.out);
         Capture missing = run("store", "files", "show", "features/pay.feature", "--project=" + project);
         assertEquals(1, missing.code);
         assertTrue(missing.err.contains("file not found: features/pay.feature"), missing.err);
@@ -117,7 +117,7 @@ class StoreQueryTest {
 
         Capture conflicts = run("store", "conflicts", "--project=" + project);
         assertEquals(0, conflicts.code, conflicts.err);
-        assertEquals("conflicts 0\n", conflicts.out);
+        assertEquals(line("conflicts 0"), conflicts.out);
         Capture status = run("store", "status", "--json", "--project=" + project);
         assertEquals(0, JSON.readTree(status.out).get("conflicts").asInt());
     }
@@ -167,6 +167,10 @@ class StoreQueryTest {
         Path file = project.resolve(relative);
         Files.createDirectories(file.getParent());
         Files.writeString(file, text, StandardCharsets.UTF_8);
+    }
+
+    private static String line(String text) {
+        return text + System.lineSeparator();
     }
 
     private static Capture run(String... args) {
