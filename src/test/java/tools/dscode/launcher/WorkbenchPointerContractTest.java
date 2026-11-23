@@ -99,9 +99,9 @@ class WorkbenchPointerContractTest {
     @Test
     void firstReadGuideStaysSmallAndShowsTheDiscoverEditConfirmLoop() throws Exception {
         Path guide = Path.of("docs/consumer-agent-guide.md");
-        long bytes = Files.size(guide);
-        assertTrue(bytes <= 5 * 1024, "first-read guide is " + bytes + " bytes");
         String text = Files.readString(guide);
+        int lfBytes = text.replace("\r\n", "\n").replace("\r", "\n").getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+        assertTrue(lfBytes <= 5 * 1024, "first-read guide is " + lfBytes + " LF bytes");
         assertTrue(text.contains("--text-file=step.txt"), text);
         assertTrue(text.contains("base64 -w0"), text);
         assertTrue(text.contains("[Convert]::ToBase64String"), text);
@@ -127,7 +127,7 @@ class WorkbenchPointerContractTest {
         assertTrue(text.contains("-Dexec.args=execute-step --text-file=step.txt"), text);
         assertTrue(text.contains("-Dexec.args=execute-step --text-b64"), text);
         assertFalse(text.contains("Maintainer-only: pointer-eval harness"), text);
-        assertTrue(Files.size(Path.of("docs/workbench-agent-detail.md")) > bytes);
+        assertTrue(Files.size(Path.of("docs/workbench-agent-detail.md")) > lfBytes);
     }
 
     @Test

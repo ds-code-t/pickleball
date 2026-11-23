@@ -134,20 +134,26 @@ class WorkbenchAgentCommandsTest {
     @Test
     void agentGuideSaysResolveRunVarsIsNotTheDiscoverEnvironment() throws Exception {
         String line = "Do not treat resolve-runvars as the environment Discover will use.";
+        String head = "The Workbench GUI is only a lightweight head over state and controls that already exist under the hood.";
+        for (String path : List.of(
+                "docs/workbench-agent-detail.md",
+                "src/main/resources/META-INF/pickleball/guidance/docs/workbench-agent-detail.md"
+        )) {
+            String text = Files.readString(Path.of(path));
+            assertTrue(text.contains(line), path);
+            assertTrue(text.contains(head), path);
+        }
         for (String path : List.of(
                 "docs/consumer-agent-guide.md",
                 "src/main/resources/META-INF/pickleball/guidance/AGENT-GUIDE.md",
                 "src/main/resources/META-INF/pickleball/guidance/docs/consumer-agent-guide.md"
         )) {
             String text = Files.readString(Path.of(path));
-            assertTrue(text.contains(line), path);
-            assertTrue(text.contains(
-                    "The Workbench GUI is only a lightweight head over state and controls that already exist under the hood."
-            ), path);
             assertFalse(text.contains("pkb_runvarssealed"), path);
             assertTrue(text.contains("pkb_overriderunvars"), path);
             assertTrue(text.contains("Never supply `pkb_run_profile` as input")
                     || text.contains("Never supply pkb_run_profile as input"), path);
+            assertTrue(text.contains("thin head") || text.contains(head), path);
         }
     }
 

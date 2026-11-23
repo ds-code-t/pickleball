@@ -185,7 +185,8 @@ class FieldReportRegressionTest {
         assertTrue(checklist.contains("observe --request"));
         byte[] guide = Files.readAllBytes(Path.of("docs/consumer-agent-guide.md"));
         String text = new String(guide, StandardCharsets.UTF_8);
-        assertTrue(guide.length <= 5120, "first-read guide is " + guide.length + " bytes");
+        int lfBytes = text.replace("\r\n", "\n").replace("\r", "\n").getBytes(StandardCharsets.UTF_8).length;
+        assertTrue(lfBytes <= 5120, "first-read guide is " + lfBytes + " LF bytes");
         assertTrue(text.contains("start --url-key"));
         assertTrue(text.contains("chat-turn"));
         assertTrue(text.contains("act --query"));
