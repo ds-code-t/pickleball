@@ -3,16 +3,18 @@
   var token = params.get("t") || "";
   var last = 0;
   var echoes = [];
-  var chat = document.getElementById("pkb-chat");
+  var chat = document.getElementById("chat");
   var status = document.getElementById("pkb-status");
-  var input = document.getElementById("pkb-text");
-  var sendButton = document.getElementById("pkb-send");
+  var input = document.getElementById("text");
+  var sendButton = document.getElementById("send");
 
   function tagPopup(node) {
     if (!node || node.nodeType !== 1 || !node.setAttribute) return node;
     node.setAttribute("data-pkb-meta", "true");
     if (!node.getAttribute("data-pkb-purpose")) node.setAttribute("data-pkb-purpose", "panel");
-    if (node.id && node.id.indexOf("pkb-") !== 0) node.id = "pkb-" + node.id;
+    if (node.id && node.id.indexOf("pkb-") !== 0 && node.id !== "text" && node.id !== "send" && node.id !== "chat") {
+      node.id = "pkb-" + node.id;
+    }
     return node;
   }
 
@@ -34,7 +36,7 @@
   }
 
   function pane(name) {
-    return document.getElementById(name === "diagram" ? "pkb-diagram" : name === "chat" ? "pkb-chat" : "pkb-instructions");
+    return document.getElementById(name === "diagram" ? "pkb-diagram" : name === "chat" ? "chat" : "pkb-instructions");
   }
 
   function node(handle) {
@@ -307,7 +309,8 @@
       }
     });
     ["chat", "instructions", "diagram"].forEach(function (id) {
-      document.getElementById("pkb-" + id).hidden = id !== name;
+      var pane = document.getElementById(id) || document.getElementById("pkb-" + id);
+      if (pane) pane.hidden = id !== name;
     });
     document.getElementById("pkb-composer").hidden = name !== "chat";
   }
