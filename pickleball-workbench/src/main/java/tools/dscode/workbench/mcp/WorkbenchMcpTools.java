@@ -487,6 +487,20 @@ final class WorkbenchMcpTools {
                         "runId", stringProperty("Optional run id.")
                 )),
                 args -> forwardReady(historyQueryArgs(args)));
+        add("workbench_dashboard_query",
+                "Forward dashboard query. Lean historical rows: name, ref, status, scenarios, artifacts, data, and a short summary. Does not write the store.",
+                schema(Map.of(
+                        "from", stringProperty("ISO start. Optional."),
+                        "to", stringProperty("ISO end. Optional."),
+                        "status", stringProperty("Run status. Optional."),
+                        "feature", stringProperty("Feature path fragment. Optional."),
+                        "entity", stringProperty("Type#id. Optional."),
+                        "text", stringProperty("Words. Optional."),
+                        "element", stringProperty("Element hint. Optional."),
+                        "run", stringProperty("Run id. Optional."),
+                        "limit", integerProperty("Maximum runs. Optional.")
+                )),
+                args -> forwardReady(dashboardQueryArgs(args)));
         add("workbench_entity_lookup",
                 "Forward entity-lookup --ref. Prints the field value.",
                 schema(Map.of("ref", stringProperty("entity:Type#id.field or the angle-bracket form.")), "ref"),
@@ -696,6 +710,27 @@ final class WorkbenchMcpTools {
         int cap = budgetOf(budget);
         if (cap > 0 && fitJson(body, cap)) body.put("truncated", true);
         return body;
+    }
+
+    private static List<String> dashboardQueryArgs(Map<String, Object> args) {
+        List<String> verb = new ArrayList<>();
+        verb.add("dashboard");
+        verb.add("query");
+        addOptional(verb, "from", optionalText(args, "from"));
+        addOptional(verb, "to", optionalText(args, "to"));
+        addOptional(verb, "status", optionalText(args, "status"));
+        addOptional(verb, "feature", optionalText(args, "feature"));
+        addOptional(verb, "entity", optionalText(args, "entity"));
+        addOptional(verb, "text", optionalText(args, "text"));
+        addOptional(verb, "element", optionalText(args, "element"));
+        addOptional(verb, "run", optionalText(args, "run"));
+        String limit = optionalScalar(args, "limit");
+        if (!limit.isBlank()) verb.add("--limit=" + limit);
+        return verb;
+    }
+
+    private static void addOptional(List<String> verb, String name, String value) {
+        if (value != null && !value.isBlank()) verb.add("--" + name + "=" + value);
     }
 
     private static List<String> waitArgs(Map<String, Object> args) {

@@ -34,6 +34,8 @@ The panel tabs are Chat, Guide, and Recorder. The tab ids stay `chat`, `steps`, 
 
 `dashboard` writes one static HTML file from the embedded store. It does not start a server and it does not change the store. The page has sticky filters (status, feature, entity or case, text, rewind), a colored timeline, and a count of the runs on screen. Clear resets the filters. Clicking a business entity or a case id fills the entity filter. Clicking a common error fills the text filter. A run's links are grouped under Features, Data, Artifacts, and Commit. Open the file from the Tracking tab or from the CLI. The default path is `.pickleball/dashboard/index.html`.
 
+`dashboard query` is the agent read. It prints one JSON object and does not write the store. Use `--from`, `--to`, `--status`, `--feature`, `--entity`, `--text`, `--element`, and `--limit`. `--element` matches step text, scenario keys, artifact paths, entity ids, and log lines. Each run has `name`, `ref`, `status`, `scenarios`, `artifacts`, `data`, and `summary`. MCP `workbench_dashboard_query` forwards the same flags. This is separate from history-query and from the store query read.
+
 ## Tool chooser
 
 Pickleball Workbench is the one front door. It is a Java program launched from the consumer project, not a GUI requirement. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test. Do not click the JavaFX or WebView UI.

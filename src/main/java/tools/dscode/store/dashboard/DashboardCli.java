@@ -39,6 +39,9 @@ public final class DashboardCli {
             return 0;
         }
         Path project = project(tokens);
+        if ("query".equals(bare(tokens))) {
+            return DashboardHistory.query(project, tokens, stdout, stderr);
+        }
         Path destination = out(tokens, project);
         DashboardQuery query = new DashboardQuery(
                 value(tokens, "--from"),
@@ -68,6 +71,9 @@ public final class DashboardCli {
         return """
                 Usage: dashboard [--project=<dir>] [--out=<file>] [--from=<iso>] [--to=<iso>] [--status=<status>] [--feature=<path>] [--run=<id>] [--entity=<Type#id>] [--text=<words>]
                 Writes one static HTML page from the embedded store. It does not change the store and it does not start a server. The page has sticky filters, a colored timeline, clickable entity panels, and links grouped as Features, Data, Artifacts, and Commit.
+                Usage: dashboard query [--project=<dir>] [--from=<iso>] [--to=<iso>] [--status=<status>] [--feature=<path>] [--run=<id>] [--entity=<Type#id>] [--text=<words>] [--element=<hint>] [--limit=<n>]
+                Prints one JSON object of historical runs. Fields are name, ref, status, scenarios, artifacts, data, and summary. --element matches a step, scenario, artifact, entity, or log line. It does not write the store.
+               
                 """;
     }
 
@@ -81,6 +87,14 @@ public final class DashboardCli {
         } catch (IllegalArgumentException differentRoot) {
             return root.toUri().toString();
         }
+    }
+
+    private static String bare(List<String> tokens) {
+        for (String token : tokens) {
+            if (token.startsWith("-")) continue;
+            return token;
+        }
+        return "";
     }
 
     private static Path project(List<String> tokens) {

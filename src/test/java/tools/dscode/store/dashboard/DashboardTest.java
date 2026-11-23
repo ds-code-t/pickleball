@@ -173,6 +173,93 @@ class DashboardTest {
     }
 
     @Test
+    void queryReturnsLeanRowsAndDoesNotChangeTheStore() throws Exception {
+        seed();
+        try (Connection connection = DriverManager.getConnection(
+                "jdbc:sqlite:" + StorePaths.runState(project).toAbsolutePath());
+             Statement statement = connection.createStatement()) {
+            statement.execute("""
+                    INSERT INTO scenario_executions VALUES
+                    ('ex2','other-run','features/other.feature|1','2020-01-01T00:00:01Z')
+                    """);
+            statement.execute("""
+                    INSERT INTO step_executions VALUES
+                    ('st2','ex2','click the #save button','2020-01-01T00:00:02Z','PASSED')
+                    """);
+        }
+        byte[] runs = Files.readAllBytes(StorePaths.runState(project));
+        byte[] main = Files.readAllBytes(StorePaths.mainDatabase(project));
+        var out = new ByteArrayOutputStream();
+        var err = new ByteArrayOutputStream();
+        int code = DashboardCli.execute(new String[]{
+                "dashboard", "query", "--project=" + project, "--status=FAILED", "--json"
+        }, new PrintStream(out), new PrintStream(err));
+        assertEquals(0, code, err.toString(StandardCharsets.UTF_8));
+        var tree = new com.fasterxml.jackson.databind.ObjectMapper().readTree(out.toString(StandardCharsets.UTF_8));
+        assertEquals("query", tree.get("op").asText());
+        assertEquals(1, tree.get("count").asInt());
+        assertEquals("pay-run", tree.get("runs").get(0).get("ref").asText());
+        assertEquals("Pay", tree.get("runs").get(0).get("name").asText());
+        assertEquals("FAILED", tree.get("runs").get(0).get("status").asText());
+        assertEquals("features/pay.feature", tree.get("runs").get(0).get("feature").asText());
+        assertEquals("features/pay.feature|12", tree.get("runs").get(0).get("scenarios").get(0).asText());
+        assertEquals("reports/pay/shot.png", tree.get("runs").get(0).get("artifacts").get(0).asText());
+        assertEquals("data/accounts/ada.yaml", tree.get("runs").get(0).get("data").get(0).asText());
+        assertTrue(tree.get("runs").get(0).get("summary").asText().contains("FAILED"));
+        assertFalse(tree.get("runs").get(0).has("note"));
+        assertArrayEquals(runs, Files.readAllBytes(StorePaths.runState(project)));
+        assertArrayEquals(main, Files.readAllBytes(StorePaths.mainDatabase(project)));
+
+        out.reset();
+        code = DashboardCli.execute(new String[]{
+                "dashboard", "query", "--project=" + project, "--element=#save"
+        }, new PrintStream(out), new PrintStream(err));
+        assertEquals(0, code, err.toString(StandardCharsets.UTF_8));
+        tree = new com.fasterxml.jackson.databind.ObjectMapper().readTree(out.toString(StandardCharsets.UTF_8));
+        assertEquals(1, tree.get("count").asInt());
+        assertEquals("other-run", tree.get("runs").get(0).get("ref").asText());
+
+        out.reset();
+        code = DashboardCli.execute(new String[]{
+                "dashboard", "query", "--project=" + project, "--from=2020-02-01", "--to=2020-02-02",
+                "--feature=pay.feature", "--entity=Account#ada", "--text=declined", "--limit=1"
+        }, new PrintStream(out), new PrintStream(err));
+        assertEquals(0, code, err.toString(StandardCharsets.UTF_8));
+        tree = new com.fasterxml.jackson.databind.ObjectMapper().readTree(out.toString(StandardCharsets.UTF_8));
+        assertEquals("pay-run", tree.get("runs").get(0).get("ref").asText());
+
+        out.reset();
+        code = DashboardCli.execute(new String[]{
+                "dashboard", "query", "--project=" + project, "--element=missing-widget"
+        }, new PrintStream(out), new PrintStream(err));
+        assertEquals(0, code, err.toString(StandardCharsets.UTF_8));
+        tree = new com.fasterxml.jackson.databind.ObjectMapper().readTree(out.toString(StandardCharsets.UTF_8));
+        assertEquals(0, tree.get("count").asInt());
+        assertEquals(0, tree.get("total").asInt());
+
+        code = DashboardCli.execute(new String[]{
+                "dashboard", "query", "--project=" + project, "--limit=no"
+        }, new PrintStream(new ByteArrayOutputStream()), new PrintStream(err));
+        assertEquals(2, code);
+        assertTrue(err.toString(StandardCharsets.UTF_8).contains("error: --limit must be a whole number"));
+        String help = new String(helpText(), StandardCharsets.UTF_8);
+        assertTrue(help.contains("dashboard query"));
+        assertTrue(help.contains("--element=<hint>"));
+        assertArrayEquals(runs, Files.readAllBytes(StorePaths.runState(project)));
+    }
+
+    private byte[] helpText() {
+        var out = new ByteArrayOutputStream();
+        int code = DashboardCli.execute(
+                new String[]{"dashboard", "help"},
+                new PrintStream(out),
+                new PrintStream(new ByteArrayOutputStream())
+        );
+        assertEquals(0, code);
+        return out.toByteArray();
+    }
+
+    @Test
     void oldBlankRunStaysBlankAfterDashboard() throws Exception {
         Path file = runsFile(true);
         byte[] before = Files.readAllBytes(file);

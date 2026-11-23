@@ -614,6 +614,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/release/WorkingTreeDiffHash.java`
 - `src/main/java/tools/dscode/store/CategoryRules.java`
 - `src/main/java/tools/dscode/store/dashboard/DashboardCli.java`
+- `src/main/java/tools/dscode/store/dashboard/DashboardHistory.java`
 - `src/main/java/tools/dscode/store/dashboard/DashboardHtml.java`
 - `src/main/java/tools/dscode/store/dashboard/DashboardQuery.java`
 - `src/main/java/tools/dscode/store/dashboard/DashboardSnapshot.java`

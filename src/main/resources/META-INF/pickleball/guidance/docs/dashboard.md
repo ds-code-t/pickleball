@@ -18,4 +18,10 @@ dashboard --project=<dir> [--out=<file>] [--from=<iso>] [--to=<iso>] [--status=<
 
 The default file is `.pickleball/dashboard/index.html`. Feature, data, and artifact links are written relative to the page's folder, so they open from the file. A commit link is present only when the store already recorded a GitHub repository. Secret values are not on the page.
 
+`dashboard query` prints one JSON object and does not write the HTML file or the store. Filters are `--from`, `--to`, `--status`, `--feature`, `--run`, `--entity`, `--text`, and `--element`. `--element` is a hint matched against step text, scenario keys, artifact paths, entity ids, and log lines. `--limit` defaults to 20 and stops at 100. The object has `op` `query`, `count`, `total`, and `runs`. Each run has `name`, `ref`, `status`, `startedAt`, `finishedAt`, `feature`, `scenarios`, `artifacts`, `data`, and a short `summary`. MCP `workbench_dashboard_query` forwards the same command. It is not `history-query` and it is not `store query`.
+
+```text
+dashboard query [--project=<dir>] [--from=<iso>] [--to=<iso>] [--status=<status>] [--feature=<path>] [--run=<id>] [--entity=<Type#id>] [--text=<words>] [--element=<hint>] [--limit=<n>]
+```
+
 Deferred: central hosting, Java source views, and case opened or closed events.

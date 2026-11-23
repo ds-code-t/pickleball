@@ -114,6 +114,7 @@ class WorkbenchMcpServerTest {
             "workbench_chat_wait",
             "workbench_history_summary",
             "workbench_history_query",
+            "workbench_dashboard_query",
             "workbench_entity_lookup",
             "workbench_open_run",
             "workbench_bridge_health",
@@ -648,6 +649,42 @@ class WorkbenchMcpServerTest {
             }
         } finally {
             tools.dscode.workbench.launch.ConsumerReadyForwarder.runner = null;
+        }
+    }
+
+    @Test
+    void dashboardQueryForwardsLeanHistoryFilters() {
+        java.util.List<String> seen = new java.util.ArrayList<>();
+        ConsumerReadyForwarder.runner = command -> {
+            seen.addAll(command);
+            return new ConsumerReadyForwarder.Result(
+                    0,
+                    "{\"ok\":true,\"op\":\"query\",\"count\":1,\"runs\":[{\"name\":\"Pay\",\"ref\":\"pay-run\"}]}",
+                    "",
+                    command);
+        };
+        try {
+            WorkbenchMcpTools tools = new WorkbenchMcpTools(fakeServices((method, args) -> {
+                if ("projectRoot".equals(method)) return project;
+                return null;
+            }), JSON);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> reply = (Map<String, Object>) tools.call("workbench_dashboard_query", Map.of(
+                    "status", "FAILED",
+                    "element", "#save",
+                    "from", "2020-01-01",
+                    "limit", 5
+            ));
+            assertTrue(seen.contains("dashboard"), seen.toString());
+            assertTrue(seen.contains("query"), seen.toString());
+            assertTrue(seen.contains("--status=FAILED"), seen.toString());
+            assertTrue(seen.contains("--element=#save"), seen.toString());
+            assertTrue(seen.contains("--from=2020-01-01"), seen.toString());
+            assertTrue(seen.contains("--limit=5"), seen.toString());
+            assertEquals(0, reply.get("exit"));
+            assertEquals("Pay", ((Map<?, ?>) ((List<?>) reply.get("runs")).get(0)).get("name"));
+        } finally {
+            ConsumerReadyForwarder.runner = null;
         }
     }
 
