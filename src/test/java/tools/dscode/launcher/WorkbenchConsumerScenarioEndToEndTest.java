@@ -19,6 +19,7 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -72,15 +73,35 @@ class WorkbenchConsumerScenarioEndToEndTest {
             assertTrue(indexText.contains(runId), index.toString() + "\n" + indexText);
             assertTrue(indexText.contains("PASSED") || indexText.contains("passed"), indexText);
 
-            Run isolate = launchExec("isolate", PROJECT.toString(), "--run-id=" + runId, "--tags=@workbench-cli-probe");
-            assertEquals(0, isolate.exit, isolate.text());
-            Path descriptor = SessionDescriptorWriter.file(PROJECT, runId);
-            assertTrue(Files.isRegularFile(descriptor), isolate.text());
-            String descriptorText = Files.readString(descriptor);
-            assertTrue(descriptorText.contains("session-descriptor"), descriptorText);
-            assertTrue(descriptorText.contains(runId), descriptorText);
-            String after = Files.readString(run.resolve("record.json"));
-            assertTrue(after.contains("sessionDescriptor"), after);
+            Run refused = launchExec("isolate", PROJECT.toString(), "--run-id=" + runId, "--tags=@workbench-cli-probe");
+            assertNotEquals(0, refused.exit, refused.text());
+            assertTrue(refused.text().contains("already finished"), refused.text());
+            assertTrue(Files.isDirectory(run.resolve("diagnostic")), refused.text());
+            assertFalse(Files.isDirectory(run.resolve("attempts")), refused.text());
+            String kept = Files.readString(run.resolve("record.json"));
+            assertTrue(kept.contains("PASSED"), kept);
+            assertFalse(kept.contains("sessionDescriptor"), kept);
+
+            String sessionId = "wb-probe-session";
+            deleteRun(sessionId);
+            try {
+                Run isolate = launchExec("isolate", PROJECT.toString(), "--run-id=" + sessionId, "--tags=@workbench-cli-probe");
+                assertEquals(0, isolate.exit, isolate.text());
+                Path descriptor = SessionDescriptorWriter.file(PROJECT, sessionId);
+                assertTrue(Files.isRegularFile(descriptor), isolate.text());
+                String descriptorText = Files.readString(descriptor);
+                assertTrue(descriptorText.contains("session-descriptor"), descriptorText);
+                assertTrue(descriptorText.contains(sessionId), descriptorText);
+                String after = Files.readString(AgentCoordination.runDirectory(PROJECT, sessionId).resolve("record.json"));
+                assertTrue(after.contains("sessionDescriptor"), after);
+            } finally {
+                try {
+                    launchExec("stop", PROJECT.toString(), "--run-id=" + sessionId);
+                } catch (Exception ignored) {
+                    // The session may already be gone.
+                }
+                deleteRun(sessionId);
+            }
         } finally {
             try {
                 launchExec("stop", PROJECT.toString(), "--run-id=" + runId);
