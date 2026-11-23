@@ -228,7 +228,10 @@
   }
 
   function ensureLayer() {
-    if (layer && layer.isConnected) return shadow;
+    if (layer && layer.isConnected) {
+      layer.setAttribute('data-pkb-layer', 'agent_injected');
+      return shadow;
+    }
     if (!layer) {
       layer = document.createElement('pkb-layer');
       layer.setAttribute('data-pkb-layer', 'agent_injected');
@@ -1483,7 +1486,7 @@
 
   function guideDone(spec) {
     var id = String((spec && spec.id) || 'g1');
-    if (!guides.has(id)) return null;
+    if (!guides.has(id)) return {id: id, closed: true};
     pushEvent({type: 'guide', g: id, done: true, how: 'agent'});
     guideClose(id);
     return {id: id, closed: true};
@@ -1547,8 +1550,7 @@
       metaPurpose = 'callout';
       var picked = String(value == null ? '' : value);
       var note = el('div', 'pkb-confirm');
-      note.appendChild(document.createTextNode('Answer sent: '));
-      appendDistinguished(note, quoteValue(picked));
+      note.appendChild(document.createTextNode('Answer sent: ' + picked));
       node.appendChild(note);
       if (btn) setFeedback(btn, 'sending');
       var ev = {type: 'answer', id: id, choice: picked, value: picked};
@@ -2205,6 +2207,9 @@
     panel.state.pop = false;
     window.__pkbPanelState = null;
     panelPlace();
+    if (items.size === 0 && !editor && guides.size === 0 && asks.size === 0 && layer && layer.isConnected) {
+      layer.removeAttribute('data-pkb-layer');
+    }
     return true;
   }
 

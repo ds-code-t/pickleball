@@ -18,7 +18,7 @@ Reads (`snap`, `find`, `chat-poll`, `ui-poll`, `overlay-poll`, `inspect-page`, `
 
 ## Human-value distinction
 
-When instructional text includes a concrete value, quote that value. Write `Enter "abc" in this textbox`, not `Enter abc in this textbox`. Overlays, callouts, guides, question cards, the step editor, chat, the recording script, and HTML report titles paint each quoted span as a `.pkb-value` chip (monospace, bold, a light background). The quote characters stay in the text, so a copy of the sentence still contains `"abc"`. A guide `expect` is quoted inside the step sentence when the sentence does not already quote it. The stored answer from `ask-and-wait` stays the clicked label. The card confirms with `Answer sent: "Alpha"`.
+When instructional text includes a concrete value, quote that value. Write `Enter "abc" in this textbox`, not `Enter abc in this textbox`. Overlays, callouts, guides, question cards, the step editor, chat, the recording script, and HTML report titles paint each quoted span as a `.pkb-value` chip (monospace, bold, a light background). The quote characters stay in the text, so a copy of the sentence still contains `"abc"`. A guide `expect` is quoted inside the step sentence when the sentence does not already quote it. The stored answer from `ask-and-wait` stays the clicked label. The card confirms with `Answer sent: Alpha`.
 
 ## Injected-element tagging
 

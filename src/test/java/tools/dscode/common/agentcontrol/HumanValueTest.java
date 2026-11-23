@@ -50,7 +50,7 @@ class HumanValueTest {
         assertTrue(js.contains("function quoteValue"));
         assertTrue(js.contains("function instruction"));
         assertTrue(js.contains("Answer sent: "));
-        assertTrue(js.contains("appendDistinguished(note, quoteValue(picked))"));
+        assertTrue(js.contains("Answer sent: ' + picked"));
         assertTrue(popup.contains("function appendDistinguished"));
         assertTrue(popup.contains("pkb-value"));
         assertTrue(report.contains("HumanValue.chip"));
