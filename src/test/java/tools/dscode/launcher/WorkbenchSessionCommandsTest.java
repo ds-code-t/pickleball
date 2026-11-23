@@ -11,6 +11,7 @@ import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.Workspace;
 import tools.dscode.control.protocol.speed.ProcessTree;
+import tools.dscode.testsupport.PortableProcess;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -150,7 +151,7 @@ class WorkbenchSessionCommandsTest {
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
     void startDetachedClosesStdinAndTheChildStarts() throws Exception {
         Path log = project.resolve("session-smoke.log");
-        Process process = WorkbenchSessionCommands.startDetached(project, List.of("sleep", "30"), log);
+        Process process = WorkbenchSessionCommands.startDetached(project, PortableProcess.sleepCommand(30), log);
         try {
             assertTrue(process.isAlive());
             assertThrows(IOException.class, () -> {
@@ -1494,14 +1495,11 @@ class WorkbenchSessionCommandsTest {
     }
 
     /**
-     * Placeholder controller process. Unix {@code sleep} is not on Windows PATH;
-     * session-start must return without waiting for this child to exit.
+     * Placeholder controller process. Session-start must return without waiting
+     * for this child to exit.
      */
     private static Process startLongLivedChild() throws IOException {
-        if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win")) {
-            return new ProcessBuilder("cmd.exe", "/c", "ping", "-n", "31", "127.0.0.1").start();
-        }
-        return new ProcessBuilder("sleep", "30").start();
+        return PortableProcess.sleep(30);
     }
 
     private static Process exitedProcess() throws IOException {

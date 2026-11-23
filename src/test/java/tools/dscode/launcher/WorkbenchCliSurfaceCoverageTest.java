@@ -10,6 +10,7 @@ import tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner;
 import tools.dscode.control.protocol.SessionDescriptor;
 import tools.dscode.control.protocol.SessionDescriptorWriter;
 import tools.dscode.control.protocol.Workspace;
+import tools.dscode.testsupport.PortableProcess;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -1185,7 +1186,7 @@ class WorkbenchCliSurfaceCoverageTest {
     @Test
     void covers_flag_force() throws Exception {
         assertTrue(WorkbenchSessionCommands.SessionFlags.parse(new String[]{"kill", "--force"}).force);
-        Process sleep = new ProcessBuilder("sleep", "30").start();
+        Process sleep = PortableProcess.sleep(30);
         try (HeldSession held = HeldSession.open(temp)) {
             held.setPid(sleep.pid());
             Capture capture = session((launch) -> new ProcessBuilder("true").start(),
