@@ -461,6 +461,15 @@ final class PageSurfaces {
         if (liveOnly && managed().isEmpty()) {
             throw new IllegalStateException("no live browser; " + kind + " was not applied");
         }
+        if (visual && liveOnly && handle != null && !handle.isBlank()) {
+            HandleRef ranked = parseHandle(handle);
+            // A published frame:backend has an owner and no box yet. Read the box
+            // before the unknown-handle check. An unbound ranked handle returns
+            // here without a page script when the driver cannot bridge.
+            if (ranked.backend != null && lookupBounds(handle) == null && lookupGeometry(handle) == null) {
+                rememberRankedBox(handle, ranked.backend);
+            }
+        }
         if (visual && liveOnly && handle != null && !handle.isBlank() && !resolved(handle)) {
             HandleRef named = parseHandle(handle);
             if (named.frameId != null || named.browserId != null) {
@@ -1337,7 +1346,10 @@ final class PageSurfaces {
 
     /** Viewport box for {@code frame:backend}, so a placement is not rejected before the bridge runs. */
     private static boolean rememberRankedBox(String handle, int backend) {
-        WebDriver web = driver;
+        WebDriver web = null;
+        FrameOwner owner = frameOwner(parseHandle(handle));
+        if (owner != null && owner.driver != null) web = owner.driver;
+        if (web == null) web = driver;
         if (web == null && !managed().isEmpty()) web = managed().get(managed().size() - 1).driver();
         if (web == null || !canBridge(web)) return false;
         try {

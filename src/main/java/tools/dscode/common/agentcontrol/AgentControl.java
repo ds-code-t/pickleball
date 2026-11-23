@@ -1694,7 +1694,10 @@ public final class AgentControl {
     private static String expandHandle(String handle) {
         if (!present(handle)) return handle;
         String placed = tools.dscode.common.agentfast.TargetVerb.placementHandle(handle);
-        if (placed != null && !placed.isBlank()) return placed;
+        if (placed != null && !placed.isBlank()) {
+            bindPlacement(placed);
+            return placed;
+        }
         String selector = tools.dscode.common.agentfast.TargetHandles.selector(handle);
         String lookup = selector;
         if (lookup == null || lookup.isBlank()) {
@@ -1711,6 +1714,27 @@ public final class AgentControl {
         }
         if (lookup.startsWith("#") && lookup.length() > 1) return lookup.substring(1);
         return lookup;
+    }
+
+    /**
+     * The browser that published this placement owns the frame.
+     * A later border or label then enters that frame instead of reporting an unknown handle.
+     */
+    private static void bindPlacement(String placed) {
+        WebDriver page = tools.dscode.common.agentfast.LiveBrowserHost.page();
+        if (page == null) {
+            java.util.List<PageSurfaces.Managed> managed = PageSurfaces.managed();
+            if (!managed.isEmpty()) page = managed.get(managed.size() - 1).driver();
+        }
+        if (page == null) return;
+        String tab = "";
+        try {
+            String current = page.getWindowHandle();
+            if (current != null) tab = current;
+        } catch (RuntimeException ignored) {
+            tab = "";
+        }
+        PageSurfaces.bindHandle(page, tab, placed);
     }
 
     private static String cursorAfter(Path project, String runId, Map<String, String> args) {
