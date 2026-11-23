@@ -29,6 +29,7 @@ class EntityResolutionTest {
 
     @AfterEach
     void restore() {
+        tools.dscode.store.sql.SqlConnections.closeProject(project);
         System.clearProperty("pkb_store");
         System.clearProperty("pkb_store_project");
         MappingProcessor.resetCommonMaps();
