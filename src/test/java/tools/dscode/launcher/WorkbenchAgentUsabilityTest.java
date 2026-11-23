@@ -102,9 +102,10 @@ class WorkbenchAgentUsabilityTest {
         assertTrue(unknown.contains("error: Unknown Workbench command: disover"), unknown);
         assertTrue(unknown.contains("fix: discover"), unknown);
         assertFalse(unknown.contains("fix: Usage: help <command>"), unknown);
-        String golden = Files.readString(Path.of("src/test/resources/workbench-help-golden.txt"));
-        assertEquals(golden, WorkbenchCliHelp.catalog());
-        assertEquals(golden, WorkbenchCliHelp.forTopic("help"));
+        String golden = Files.readString(Path.of("src/test/resources/workbench-help-golden.txt"))
+                .replace("\r\n", "\n");
+        assertEquals(golden, WorkbenchCliHelp.catalog().replace("\r\n", "\n"));
+        assertEquals(golden, WorkbenchCliHelp.forTopic("help").replace("\r\n", "\n"));
         assertEquals(
                 "Usage: query <runs|get|query|search|props|errors|tail> [--run-id=<id>] [--scenario=<id>] [--kind=run|scenario|step|event|property|artifact|error|log] [--text=<words>] [--status=<outcome>] [--fields=<a,b>] [--limit=<n>] [--cursor=<token>] [--id=<id>]\n",
                 WorkbenchCliHelp.usage("query")

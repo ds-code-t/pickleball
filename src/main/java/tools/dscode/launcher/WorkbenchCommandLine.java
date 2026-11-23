@@ -1023,6 +1023,12 @@ final class WorkbenchCommandLine {
         if (token == null || token.isBlank()) return false;
         if (".".equals(token) || "..".equals(token)) return true;
         if (token.contains("/") || token.contains("\\")) return true;
-        return Files.isDirectory(Path.of(token));
+        try {
+            return Files.isDirectory(Path.of(token));
+        } catch (java.nio.file.InvalidPathException failure) {
+            // A quote is a legal file name on some systems and illegal on Windows.
+            // An illegal path is not a project directory, so the token stays a choice.
+            return false;
+        }
     }
 }

@@ -145,8 +145,10 @@ class StartDrivesPageTest {
             ));
             Capture started = run("start", "--url=about:blank", "--browser=chrome", temp.toString());
             assertEquals(2, started.code, detail(started));
+            String newline = System.lineSeparator();
             assertEquals(
-                    "error: a Workbench worker is live\nfix: use the worker's browser or stop it\n",
+                    "error: a Workbench worker is live" + newline
+                            + "fix: use the worker's browser or stop it" + newline,
                     started.err
             );
             assertTrue(worker.isAlive(), "start killed the workbench worker");
