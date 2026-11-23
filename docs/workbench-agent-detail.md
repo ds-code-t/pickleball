@@ -20,6 +20,12 @@ Reads (`snap`, `find`, `chat-poll`, `ui-poll`, `overlay-poll`, `inspect-page`, `
 
 When instructional text includes a concrete value, quote that value. Write `Enter "abc" in this textbox`, not `Enter abc in this textbox`. Overlays, callouts, guides, question cards, the step editor, chat, the recording script, and HTML report titles paint each quoted span as a `.pkb-value` chip (monospace, bold, a light background). The quote characters stay in the text, so a copy of the sentence still contains `"abc"`. A guide `expect` is quoted inside the step sentence when the sentence does not already quote it. The stored answer from `ask-and-wait` stays the clicked label. The card confirms with `Answer sent: "Alpha"`.
 
+## Injected-element tagging
+
+Every node Pickleball injects through the API or MCP carries `data-pkb-meta="true"`. `data-pkb-purpose` names the role and may list more than one token: `panel`, `guide`, `placement`, `editor`, `callout`, `recorder`, or `layer`. A placement callout uses `placement callout`. An `id` or `data-pkb-id` is prefixed with `pkb-` only when one is already assigned, and an id that already starts with `pkb-` is left as it is. A magnifier copy stays without an `id`. A highlight restyles the page control and does not tag it.
+
+Recording ignores a tagged node, so a click on the panel, the editor, the recording bar, a guide, or a placement is not a reusable step. Select injected UI with `[data-pkb-meta="true"]` or `[data-pkb-purpose~="panel"]`. Page finds still skip that UI.
+
 ## Tool chooser
 
 Pickleball Workbench is the one front door. It is a Java program launched from the consumer project, not a GUI requirement. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test. Do not click the JavaFX or WebView UI.

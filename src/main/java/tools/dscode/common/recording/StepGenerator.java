@@ -415,6 +415,7 @@ public final class StepGenerator {
     private static boolean ownRow(Map<String, String> row) {
         if (row == null) return false;
         if ("true".equalsIgnoreCase(row.get("own"))) return true;
+        if ("true".equalsIgnoreCase(row.get("meta"))) return true;
         String id = InteractionLog.first(row.get("id"), "");
         return id.startsWith("pkb-") || id.startsWith("ask-");
     }

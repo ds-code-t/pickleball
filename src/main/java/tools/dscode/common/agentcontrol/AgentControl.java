@@ -1547,7 +1547,7 @@ public final class AgentControl {
                 else cursor = cursor.parentElement;
               }
               if (ancestor) break;
-              if (top.closest && top.closest('[data-pkb-agent],[data-pkb-layer]')) continue;
+              if (top.closest && top.closest('[data-pkb-agent],[data-pkb-layer],[data-pkb-record],[data-pkb-meta="true"]')) continue;
               return {lost:false, visible:false, hidden:true, hiddenReason:'covered'};
             }
             return {lost:false, visible:true, hidden:false};

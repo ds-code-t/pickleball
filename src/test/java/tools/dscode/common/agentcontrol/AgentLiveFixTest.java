@@ -150,6 +150,19 @@ class AgentLiveFixTest {
     void labelsAndScriptPathsCoverDescendantsSrcdocAndEncodedHandlers() {
         String labeled = PageSurfaces.labelElements("<div><span>x</span></div>", "html", "sentence");
         assertEquals(2, count(labeled, "data-pkb-agent=\"agent_injected\""));
+        assertEquals(2, count(labeled, "data-pkb-meta=\"true\""));
+        assertTrue(labeled.contains("data-pkb-purpose=\"placement callout\""), labeled);
+        String prefixed = PageSurfaces.labelElements("<button id=\"save\" data-pkb-id=\"ask-1\">Go</button>", "label", "sentence");
+        assertTrue(prefixed.contains("id=\"pkb-save\""), prefixed);
+        assertFalse(prefixed.contains("id=\"save\""), prefixed);
+        assertTrue(prefixed.contains("data-pkb-id=\"pkb-ask-1\""), prefixed);
+        assertFalse(prefixed.contains("data-pkb-id=\"ask-1\""), prefixed);
+        String already = PageSurfaces.labelElements("<b id=\"pkb-1\" data-pkb-id=\"pkb-1\">x</b>", "border", "sentence");
+        assertFalse(already.contains("pkb-pkb-"), already);
+        assertEquals(1, count(already, " id=\"pkb-1\""));
+        assertEquals(1, count(already, "data-pkb-id=\"pkb-1\""));
+        assertTrue(already.contains("data-pkb-purpose=\"placement\""), already);
+        assertFalse(already.contains("placement callout"), already);
         String srcdoc = PageSurfaces.neutralize("<iframe srcdoc=\"<script>alert(1)</script>\"></iframe><p>ok</p>");
         assertFalse(srcdoc.toLowerCase().contains("srcdoc"), srcdoc);
         assertFalse(srcdoc.toLowerCase().contains("script"), srcdoc);

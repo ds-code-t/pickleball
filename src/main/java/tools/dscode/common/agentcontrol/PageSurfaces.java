@@ -505,7 +505,8 @@ final class PageSurfaces {
         int left = point == null ? 0 : point[0];
         int top = point == null ? 0 : point[1];
         String css = overlay ? overlayCss(kind, point, box) : (visual ? VisualKinds.css(kind, point[0], point[1], box, extras) : "");
-        String block = "<!--pkb-start:" + id + "--><div data-pkb-id=\"" + id + "\" data-pkb-agent=\"agent_injected\" data-pkb-kind=\""
+        String block = "<!--pkb-start:" + id + "--><div data-pkb-id=\"" + id + "\" data-pkb-agent=\"agent_injected\" data-pkb-meta=\"true\" data-pkb-purpose=\""
+                + purposeTokens(kind) + "\" data-pkb-kind=\""
                 + kind + "\" data-pkb-sentence=\"" + sentence + "\""
                 + (css.isBlank() ? "" : " style=\"" + css + "\"")
                 + ">" + html + "</div><!--pkb-end:" + id + "-->";
@@ -2584,13 +2585,44 @@ final class PageSurfaces {
         return -1;
     }
 
+    static String purposeTokens(String kind) {
+        if (kind == null) return "placement";
+        return switch (kind) {
+            case "overlay", "label", "html", "step", "instructions", "diagram", "callout" -> "placement callout";
+            case "panel" -> "panel";
+            case "guide" -> "guide";
+            case "editor" -> "editor";
+            case "recorder", "record" -> "recorder";
+            case "layer" -> "layer";
+            default -> "placement";
+        };
+    }
+
+    /** Prefixes an assigned id. An id that already starts with {@code pkb-} is left as it is. */
+    static String prefixAssignedIds(String html) {
+        if (html == null || html.isEmpty()) return html == null ? "" : html;
+        String prefixed = html.replaceAll(
+                "(?i)(\\sid\\s*=\\s*)([\"'])(?!pkb-)([^\"']+)\\2",
+                "$1$2pkb-$3$2");
+        return prefixed.replaceAll(
+                "(?i)(\\sdata-pkb-id\\s*=\\s*)([\"'])(?!pkb-)([^\"']+)\\2",
+                "$1$2pkb-$3$2");
+    }
+
     static String labelElements(String html, String kind, String sentence) {
         if (html == null || html.isBlank()) return html == null ? "" : html;
-        return html.replaceAll(
+        String purpose = purposeTokens(kind);
+        String stamped = html.replaceAll(
                 "(?i)<(?![/!])([a-zA-Z][\\w:-]*)\\b(?![^>]*data-pkb-agent)",
-                "<$1 data-pkb-agent=\"agent_injected\" data-pkb-kind=\"" + kind
+                "<$1 data-pkb-agent=\"agent_injected\" data-pkb-meta=\"true\" data-pkb-purpose=\"" + purpose
+                        + "\" data-pkb-kind=\"" + kind
                         + "\" data-pkb-sentence=\"" + sentence + "\""
         );
+        stamped = stamped.replaceAll(
+                "(?i)<(?![/!])([a-zA-Z][\\w:-]*)\\b(?![^>]*data-pkb-meta)",
+                "<$1 data-pkb-meta=\"true\" data-pkb-purpose=\"" + purpose + "\""
+        );
+        return prefixAssignedIds(stamped);
     }
 
     private static String decodeEntities(String value) {

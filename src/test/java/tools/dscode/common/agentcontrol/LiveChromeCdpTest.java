@@ -179,14 +179,23 @@ class LiveChromeCdpTest {
             Map<String, Object> seen = (Map<String, Object>) js.executeScript(
                     "var n=document.querySelector('[data-pkb-id=\"'+arguments[0]+'\"]');"
                             + "if(!n) return null; return {agent:n.getAttribute('data-pkb-agent'), kind:n.getAttribute('data-pkb-kind'),"
+                            + "meta:n.getAttribute('data-pkb-meta'), purpose:n.getAttribute('data-pkb-purpose'), id:n.getAttribute('data-pkb-id'),"
                             + "left:n.style.left, top:n.style.top, width:n.style.width, shadow:n.style.boxShadow, text:n.textContent,"
                             + "bold:n.querySelector('b')!==null, cloneButton:n.querySelector('button')?{id:n.querySelector('button').getAttribute('id'),"
                             + "name:n.querySelector('button').getAttribute('name'), onclick:n.querySelector('button').getAttribute('onclick'),"
-                            + "inert:n.querySelector('button').hasAttribute('inert'), agent:n.querySelector('button').getAttribute('data-pkb-agent')}:null,"
+                            + "inert:n.querySelector('button').hasAttribute('inert'), agent:n.querySelector('button').getAttribute('data-pkb-agent'),"
+                            + "meta:n.querySelector('button').getAttribute('data-pkb-meta')}:null,"
                             + "saves:document.querySelectorAll('#save').length}",
                     id);
             assertNotNull(seen, call.getKey() + " was not injected into the live page");
             assertEquals("agent_injected", seen.get("agent"), call.getKey() + " " + seen);
+            assertEquals("true", seen.get("meta"), call.getKey() + " " + seen);
+            assertTrue(String.valueOf(seen.get("id")).startsWith("pkb-"), call.getKey() + " " + seen);
+            String purpose = String.valueOf(seen.get("purpose"));
+            assertTrue(purpose.contains("placement"), call.getKey() + " " + purpose);
+            if ("label".equals(call.getKey()) || "step-badge".equals(call.getKey())) {
+                assertTrue(purpose.contains("callout"), call.getKey() + " " + purpose);
+            }
             String kind = "step-badge".equals(call.getKey()) ? "step" : call.getKey();
             assertEquals(kind, seen.get("kind"), seen.toString());
             assertEquals(1L, ((Number) seen.get("saves")).longValue(), "the page button was duplicated by " + call.getKey());
@@ -217,6 +226,7 @@ class LiveChromeCdpTest {
                 assertEquals(null, clone.get("onclick"), clone.toString());
                 assertEquals(true, clone.get("inert"), clone.toString());
                 assertEquals("agent_injected", clone.get("agent"), clone.toString());
+                assertEquals("true", clone.get("meta"), clone.toString());
             }
         }
 

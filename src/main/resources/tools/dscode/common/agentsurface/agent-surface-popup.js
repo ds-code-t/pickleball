@@ -3,10 +3,18 @@
   var token = params.get("t") || "";
   var last = 0;
   var echoes = [];
-  var chat = document.getElementById("chat");
-  var status = document.getElementById("status");
-  var input = document.getElementById("text");
-  var sendButton = document.getElementById("send");
+  var chat = document.getElementById("pkb-chat");
+  var status = document.getElementById("pkb-status");
+  var input = document.getElementById("pkb-text");
+  var sendButton = document.getElementById("pkb-send");
+
+  function tagPopup(node) {
+    if (!node || node.nodeType !== 1 || !node.setAttribute) return node;
+    node.setAttribute("data-pkb-meta", "true");
+    if (!node.getAttribute("data-pkb-purpose")) node.setAttribute("data-pkb-purpose", "panel");
+    if (node.id && node.id.indexOf("pkb-") !== 0) node.id = "pkb-" + node.id;
+    return node;
+  }
 
   function url(path) {
     return path + (path.indexOf("?") >= 0 ? "&" : "?") + "t=" + encodeURIComponent(token);
@@ -26,7 +34,7 @@
   }
 
   function pane(name) {
-    return document.getElementById(name === "diagram" ? "diagram" : name === "chat" ? "chat" : "instructions");
+    return document.getElementById(name === "diagram" ? "pkb-diagram" : name === "chat" ? "pkb-chat" : "pkb-instructions");
   }
 
   function node(handle) {
@@ -73,6 +81,7 @@
       var chip = document.createElement("span");
       chip.className = "pkb-value";
       chip.textContent = match[0];
+      tagPopup(chip);
       node.appendChild(chip);
       last = match.index + match[0].length;
     }
@@ -84,13 +93,16 @@
   function bubble(text, from, at, state) {
     var stick = nearBottom();
     var line = document.createElement("div");
+    tagPopup(line);
     line.className = "pkb-msg";
     line.setAttribute("data-from", from);
     if (state) line.setAttribute("data-state", state);
     var meta = document.createElement("span");
+    tagPopup(meta);
     meta.className = "pkb-meta";
     meta.textContent = (from === "human" ? "You" : from === "system" ? "System" : "Agent") + " \u00b7 " + time(at);
     var body = document.createElement("span");
+    tagPopup(body);
     body.className = "pkb-body";
     appendDistinguished(body, text);
     line.appendChild(meta);
@@ -115,13 +127,16 @@
 
   function mount(row) {
     var holder = document.createElement("div");
+    tagPopup(holder);
     if (row.handle) holder.setAttribute("data-pkb-handle", row.handle);
     var shadow = holder.attachShadow({ mode: "open" });
     var kind = kindOf(row);
     var link = document.createElement("link");
+    tagPopup(link);
     link.rel = "stylesheet";
     link.href = url("assets/surface/" + kind + ".css");
     var body = document.createElement("div");
+    tagPopup(body);
     body.className = "pkb-surface";
     body.innerHTML = row.html || "";
     shadow.appendChild(link);
@@ -136,8 +151,8 @@
     var target = pane(row.pane || "instructions");
     if (!target) return;
     if (row.op === "cleanup") {
-      document.getElementById("instructions").replaceChildren();
-      document.getElementById("diagram").replaceChildren();
+      document.getElementById("pkb-instructions").replaceChildren();
+      document.getElementById("pkb-diagram").replaceChildren();
       ack(row);
       return;
     }
@@ -168,7 +183,8 @@
     } else {
       target.appendChild(holder);
     }
-    if (target.id !== "chat" && !isActive(target.id)) badge(target.id);
+    var paneName = target.getAttribute("data-pane") || "";
+    if (paneName !== "chat" && !isActive(paneName)) badge(paneName);
     ack(row);
   }
 
@@ -233,6 +249,7 @@
         if (at >= 0) echoes.splice(at, 1);
         line.setAttribute("data-state", "failed");
         var retry = document.createElement("button");
+        tagPopup(retry);
         retry.type = "button";
         retry.className = "pkb-retry";
         retry.textContent = "Retry";
@@ -250,7 +267,7 @@
     deliver(text, line);
   }
 
-  document.getElementById("composer").addEventListener("submit", function (event) {
+  document.getElementById("pkb-composer").addEventListener("submit", function (event) {
     event.preventDefault();
     submit();
   });
@@ -273,6 +290,7 @@
     var mark = tab.querySelector(".pkb-badge");
     if (!mark) {
       mark = document.createElement("span");
+      tagPopup(mark);
       mark.className = "pkb-badge";
       mark.textContent = "\u25cf";
       tab.appendChild(mark);
@@ -289,9 +307,9 @@
       }
     });
     ["chat", "instructions", "diagram"].forEach(function (id) {
-      document.getElementById(id).hidden = id !== name;
+      document.getElementById("pkb-" + id).hidden = id !== name;
     });
-    document.getElementById("composer").hidden = name !== "chat";
+    document.getElementById("pkb-composer").hidden = name !== "chat";
   }
 
   document.querySelectorAll("[data-tab]").forEach(function (tab) {
@@ -305,6 +323,8 @@
     post("/input", { type: "click", id: placed.getAttribute("data-pkb-id"), value: "" }).catch(function () {});
   });
 
+  tagPopup(document.body);
+  document.querySelectorAll("body *").forEach(tagPopup);
   setStatus("connecting");
   refreshSend();
   connect();

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-pkb-meta="true" data-pkb-purpose="panel">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -10,7 +10,7 @@
 <body>
 <main class="pkb-card">
 <header class="pkb-head">
-<span class="pkb-dot" id="status" title="connecting"></span>
+<span class="pkb-dot" id="pkb-status" data-pkb-meta="true" data-pkb-purpose="panel" title="connecting"></span>
 <strong class="pkb-title">Agent</strong>
 <nav class="pkb-tabs" role="tablist">
 <button type="button" role="tab" data-tab="chat" aria-selected="true">Chat</button>
@@ -18,12 +18,12 @@
 <button type="button" role="tab" data-tab="diagram" aria-selected="false">Diagram</button>
 </nav>
 </header>
-<section id="chat" data-pane="chat" class="pkb-pane pkb-chat" role="log" aria-live="polite"></section>
-<section id="instructions" data-pane="instructions" class="pkb-pane" hidden></section>
-<section id="diagram" data-pane="diagram" class="pkb-pane" hidden></section>
-<form id="composer" class="pkb-composer" autocomplete="off">
-<textarea id="text" name="text" rows="1" placeholder="Message the agent (Enter to send, Shift+Enter for a new line)" aria-label="Message"></textarea>
-<button type="submit" id="send" disabled>Send</button>
+<section id="pkb-chat" data-pane="chat" data-pkb-meta="true" data-pkb-purpose="panel" class="pkb-pane pkb-chat" role="log" aria-live="polite"></section>
+<section id="pkb-instructions" data-pane="instructions" data-pkb-meta="true" data-pkb-purpose="panel callout" class="pkb-pane" hidden></section>
+<section id="pkb-diagram" data-pane="diagram" data-pkb-meta="true" data-pkb-purpose="panel callout" class="pkb-pane" hidden></section>
+<form id="pkb-composer" data-pkb-meta="true" data-pkb-purpose="panel" class="pkb-composer" autocomplete="off">
+<textarea id="pkb-text" data-pkb-meta="true" data-pkb-purpose="panel" name="text" rows="1" placeholder="Message the agent (Enter to send, Shift+Enter for a new line)" aria-label="Message"></textarea>
+<button type="submit" id="pkb-send" data-pkb-meta="true" data-pkb-purpose="panel" disabled>Send</button>
 </form>
 </main>
 <script src="assets/agent-surface-popup.js"></script>

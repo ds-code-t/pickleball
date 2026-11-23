@@ -1714,7 +1714,7 @@ public final class TargetVerb {
                 + "doc.__pkbFrameCount=0;doc.__pkbFrameWatch=new MutationObserver(function(records){"
                 + "for(var i=0;i<records.length;i++){var r=records[i];var t=r.target;"
                 + "if(r.type==='attributes'&&r.attributeName&&r.attributeName.indexOf('data-pkb-')===0)continue;"
-                + "if(t&&t.nodeType===1&&t.closest&&t.closest('[data-pkb-agent],[data-pkb-layer]'))continue;"
+                + "if(t&&t.nodeType===1&&t.closest&&t.closest('[data-pkb-agent],[data-pkb-layer],[data-pkb-record],[data-pkb-meta=\"true\"]'))continue;"
                 + "doc.__pkbFrameCount++;return;}});"
                 + "try{doc.__pkbFrameWatch.observe(doc.documentElement,{subtree:true,childList:true,attributes:true,characterData:true});}catch(e){}"
                 + "return 0;}"
@@ -1725,7 +1725,7 @@ public final class TargetVerb {
                 + "if(!g.__pkbDocWatch){g.__pkbDocCount=0;g.__pkbDocWatch=new MutationObserver(function(records){"
                 + "for(var i=0;i<records.length;i++){var r=records[i];var t=r.target;"
                 + "if(r.type==='attributes'&&r.attributeName&&r.attributeName.indexOf('data-pkb-')===0)continue;"
-                + "if(t&&t.nodeType===1&&t.closest&&t.closest('[data-pkb-agent],[data-pkb-layer]'))continue;"
+                + "if(t&&t.nodeType===1&&t.closest&&t.closest('[data-pkb-agent],[data-pkb-layer],[data-pkb-record],[data-pkb-meta=\"true\"]'))continue;"
                 + "g.__pkbDocCount++;return;}});"
                 + "g.__pkbDocWatch.observe(root,{subtree:true,childList:true,attributes:true,characterData:true});}"
                 + "return location.href+':'+g.__pkbDocCount+':'+sum(document);})()";
@@ -3570,7 +3570,9 @@ public final class TargetVerb {
         if (node == null) return;
         boolean pkb = insidePkb
                 || node.attributes.containsKey("data-pkb-agent")
-                || node.attributes.containsKey("data-pkb-layer");
+                || node.attributes.containsKey("data-pkb-layer")
+                || node.attributes.containsKey("data-pkb-record")
+                || "true".equals(node.attributes.get("data-pkb-meta"));
         if (!pkb && node.nodeType == 1) {
             String tag = node.tag();
             if (!"script".equals(tag) && !"style".equals(tag) && !"noscript".equals(tag)) {

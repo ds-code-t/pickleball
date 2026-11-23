@@ -231,6 +231,7 @@
     if (!layer) {
       layer = document.createElement('pkb-layer');
       layer.setAttribute('data-pkb-layer', 'agent_injected');
+      tagMeta(layer, 'layer');
       layer.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;max-width:none;max-height:none;margin:0;padding:0;'
         + 'border:0;background:transparent;overflow:visible;pointer-events:none;z-index:2147483647;display:block;';
       shadow = layer.attachShadow({mode: 'open'});
@@ -241,6 +242,7 @@
       } catch (unsupported) {
         var style = document.createElement('style');
         style.textContent = LAYER_CSS;
+        tagMeta(style, 'layer');
         shadow.appendChild(style);
       }
     }
@@ -268,16 +270,66 @@
     finally { raisingLayer = false; }
   }
 
+  var OWN = '[data-pkb-agent],[data-pkb-layer],[data-pkb-record],[data-pkb-meta="true"]';
+  var metaPurpose = '';
+
+  /** Marks one injected node. An id is prefixed only when one is already assigned. */
+  function tagMeta(node, purpose) {
+    if (!node || node.nodeType !== 1 || !node.setAttribute) return node;
+    node.setAttribute('data-pkb-meta', 'true');
+    var add = purpose || metaPurpose;
+    if (add) {
+      var have = (node.getAttribute('data-pkb-purpose') || '').split(/\s+/).filter(Boolean);
+      String(add).split(/\s+/).forEach(function (token) {
+        if (token && have.indexOf(token) < 0) have.push(token);
+      });
+      node.setAttribute('data-pkb-purpose', have.join(' '));
+    }
+    function prefix(attr) {
+      var current = attr === 'id' ? node.id : node.getAttribute(attr);
+      if (!current || current.indexOf('pkb-') === 0) return;
+      var next = 'pkb-' + current;
+      if (attr === 'id') node.id = next;
+      else node.setAttribute(attr, next);
+    }
+    prefix('id');
+    prefix('data-pkb-id');
+    return node;
+  }
+
+  function tagTree(node, purpose) {
+    tagMeta(node, purpose);
+    if (!node || !node.querySelectorAll) return node;
+    Array.prototype.forEach.call(node.querySelectorAll('*'), function (child) { tagMeta(child, purpose); });
+    return node;
+  }
+
+  function purposeFor(kind) {
+    var name = String(kind || '');
+    if (name === 'overlay' || name === 'label' || name === 'html' || name === 'step' || name === 'instructions' || name === 'diagram' || name === 'callout') return 'placement callout';
+    if (name === 'panel') return 'panel';
+    if (name === 'guide') return 'guide';
+    if (name === 'editor') return 'editor';
+    if (name === 'recorder' || name === 'record') return 'recorder';
+    if (name === 'layer') return 'layer';
+    return 'placement';
+  }
+
   function ours(node) {
     var el = node && node.nodeType === 1 ? node : (node && node.parentElement);
     var guard = 0;
     while (el && guard++ < 24) {
-      if (el.nodeType === 1 && el.closest && el.closest('[data-pkb-agent],[data-pkb-layer],[data-pkb-record]')) return true;
+      if (el.nodeType === 1 && el.closest && el.closest(OWN)) return true;
       var root = el.getRootNode ? el.getRootNode() : null;
       if (root && root.host && root.host !== el) el = root.host;
       else break;
     }
     return false;
+  }
+
+  function taggedNode(node) {
+    return node && node.nodeType === 1 && node.hasAttribute
+      && (node.hasAttribute('data-pkb-agent') || node.hasAttribute('data-pkb-layer') || node.hasAttribute('data-pkb-record') || node.getAttribute('data-pkb-meta') === 'true');
   }
 
   function eventLeaf(event) {
@@ -582,6 +634,7 @@
       el.setAttribute('data-pkb-kind', kind);
       el.setAttribute('data-pkb-sentence', sentence);
       el.setAttribute('data-pkb-id', item.id);
+      tagMeta(el, 'placement');
     });
     old.replaceWith(clone);
     var blank = !((clone.textContent || '').replace(/\s/g, '')) && !clone.querySelector('img,svg,canvas,video,input');
@@ -591,6 +644,7 @@
         note = document.createElement('div');
         note.setAttribute('data-pkb-copy', 'fallback');
         note.textContent = 'target not captured';
+        tagMeta(note, 'placement');
         note.style.cssText = 'color:#111;font:12px sans-serif;padding:8px;';
         item.host.appendChild(note);
       }
@@ -605,6 +659,7 @@
     ring.className = 'ring';
     ring.setAttribute('data-ring', id);
     ring.setAttribute('aria-hidden', 'true');
+    tagMeta(ring, 'placement');
     root.appendChild(ring);
     return ring;
   }
@@ -719,7 +774,7 @@
       var rec = records[i];
       if (rec.type === 'childList') {
         var foreign = Array.prototype.some.call(rec.addedNodes, function (n) { return !ours(n); })
-          || Array.prototype.some.call(rec.removedNodes, function (n) { return !(n.nodeType === 1 && n.hasAttribute && (n.hasAttribute('data-pkb-agent') || n.hasAttribute('data-pkb-layer'))); });
+          || Array.prototype.some.call(rec.removedNodes, function (n) { return !taggedNode(n); });
         if (!foreign) continue;
         Array.prototype.forEach.call(rec.addedNodes, function (n) {
           if (n.nodeName === 'DIALOG' || (n.querySelector && n.querySelector('dialog[open]'))) dialog = true;
@@ -923,7 +978,7 @@
       if (!leaf || !leaf.closest) return;
       var hit = leaf.closest('button,[role="button"],[data-pkb-check],.pkb-step,.ask button');
       if (!hit) return;
-      if (!ours(hit) && !(hit.closest && hit.closest('[data-pkb-agent]'))) return;
+      if (!ours(hit) && !(hit.closest && hit.closest(OWN))) return;
       lastPressed = hit;
       setFeedback(hit, 'sending');
     }, true);
@@ -966,6 +1021,7 @@
     host.setAttribute('data-pkb-ui', '');
     host.setAttribute('data-pkb-at', at);
     if (spec.theme === 'light' || spec.theme === 'dark') host.setAttribute('data-pkb-theme', spec.theme);
+    tagTree(host, purposeFor(spec.kind || host.getAttribute('data-pkb-kind') || ''));
     var r = anchor.getBoundingClientRect();
     var item = {
       id: id, host: host, anchor: anchor, kind: spec.kind || host.getAttribute('data-pkb-kind') || '', at: at,
@@ -1105,11 +1161,13 @@
     node.textContent = '';
     var b = document.createElement('b');
     b.textContent = n + '. ';
+    tagMeta(b, metaPurpose || 'guide');
     node.appendChild(b);
     appendDistinguished(node, instruction(say, value));
   }
 
   function guideRender(g) {
+    metaPurpose = 'guide';
     var root = ensureLayer();
     g.steps.forEach(function (step, i) {
       if (!step.badge) {
@@ -1149,6 +1207,7 @@
   }
 
   function stepsList() {
+    metaPurpose = 'guide';
     if (!panel) return;
     var pane = panel.stepsPane;
     pane.textContent = '';
@@ -1432,6 +1491,7 @@
   }
 
   function ask(spec) {
+    metaPurpose = 'callout';
     spec = spec || {};
     var id = String(spec.id || 'q1');
     askClose(id);
@@ -1442,6 +1502,7 @@
     node.setAttribute('aria-label', 'Question from the agent');
     var q = el('div');
     var b = document.createElement('b');
+    tagMeta(b, 'callout');
     appendDistinguished(b, String(spec.say || ''));
     q.appendChild(b);
     node.appendChild(q);
@@ -1449,6 +1510,7 @@
     var row = el('div', 'row');
     var field = null;
     function answer(value, btn) {
+      metaPurpose = 'callout';
       var picked = String(value == null ? '' : value);
       var note = el('div', 'pkb-confirm');
       note.appendChild(document.createTextNode('Answer sent: '));
@@ -1487,6 +1549,7 @@
     node.appendChild(row);
     node.setAttribute('data-pkb-id', 'ask-' + id);
     node.setAttribute('data-pkb-card', 'ask');
+    tagMeta(node, 'callout');
     isolateKeys(node);
     root.appendChild(node);
     asks.set(id, {id: id, node: node, t: spec.t, anchor: spec.t ? findTarget(spec.t) : null, scrollers: []});
@@ -1574,6 +1637,7 @@
     var node = document.createElement(tag);
     if (cls) node.className = cls;
     if (text != null) node.textContent = text;
+    tagMeta(node, metaPurpose);
     return node;
   }
 
@@ -1613,6 +1677,7 @@
       var chip = document.createElement('span');
       chip.className = 'pkb-value';
       chip.textContent = match[0];
+      tagMeta(chip, metaPurpose);
       node.appendChild(chip);
       last = match.index + match[0].length;
     }
@@ -1707,6 +1772,7 @@
   }
 
   function bubble(row) {
+    metaPurpose = 'panel';
     var from = row.from || (row.source === 'human' ? 'human' : (row.source === 'system' ? 'system' : 'agent'));
     var node = el('div', 'pkb-msg');
     node.setAttribute('data-from', from);
@@ -1724,6 +1790,7 @@
   }
 
   function chat(rows) {
+    metaPurpose = 'panel';
     if (!panel) return 0;
     var list = Array.isArray(rows) ? rows : [rows];
     var added = 0;
@@ -1892,6 +1959,7 @@
   }
 
   function buildPanel(root) {
+    metaPurpose = 'panel';
     var card = el('section', 'pkb-card pkb-panel');
     card.setAttribute('role', 'dialog');
     card.setAttribute('aria-label', 'Agent');
@@ -2055,6 +2123,7 @@
     } catch (unsupported) {
       var style = document.createElement('style');
       style.textContent = PANEL_CSS;
+      tagMeta(style, 'panel');
       root.appendChild(style);
     }
   }
@@ -2261,17 +2330,22 @@
       recordBar = document.createElement('div');
       recordBar.setAttribute('data-pkb-layer', '');
       recordBar.setAttribute('data-pkb-record', '');
+      tagMeta(recordBar, 'recorder');
       recordBar.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:2147483646;max-width:420px;'
         + 'background:#111827;color:#f9fafb;border-radius:10px;padding:8px 10px;'
         + 'box-shadow:0 8px 24px rgba(0,0,0,.28);font:12px/1.4 ' + FONT + ';';
       (document.documentElement || document.body).appendChild(recordBar);
     }
+    metaPurpose = 'recorder';
     recordBar.textContent = '';
+    tagMeta(recordBar, 'recorder');
     var title = document.createElement('div');
     title.textContent = status === 'paused' ? 'Recording paused' : 'Recording';
+    tagMeta(title, 'recorder');
     recordBar.appendChild(title);
     var pre = document.createElement('pre');
     pre.setAttribute('data-pkb-script', '');
+    tagMeta(pre, 'recorder');
     appendDistinguished(pre, spec.script || '');
     pre.style.cssText = 'white-space:pre-wrap;margin:6px 0;max-height:140px;overflow:auto;';
     recordBar.appendChild(pre);
@@ -2280,6 +2354,7 @@
       node.type = 'button';
       node.textContent = label;
       node.setAttribute('data-pkb-action', action);
+      tagMeta(node, 'recorder');
       node.style.cursor = 'pointer';
       node.style.marginRight = '6px';
       node.addEventListener('click', function () {
@@ -2422,6 +2497,7 @@
   }
 
   function editorRender() {
+    metaPurpose = 'editor';
     if (!editor || editorRendering) return;
     editorRendering = true;
     try {
@@ -2553,6 +2629,7 @@
   }
 
   function buildEditor(root) {
+    metaPurpose = 'editor';
     var card = el('section', 'pkb-card pkb-panel');
     card.setAttribute('role', 'dialog');
     card.setAttribute('aria-label', 'Step editor');
@@ -2884,7 +2961,8 @@
 
   function popHtml(kind) {
     var title = kind === 'chat' ? 'Chat' : 'Steps';
-    return '<!DOCTYPE html><html data-pkb-pop="' + kind + '"><head><meta charset="utf-8"><title>' + title
+    var purpose = kind === 'chat' ? 'panel' : 'editor';
+    return '<!DOCTYPE html><html data-pkb-pop="' + kind + '" data-pkb-meta="true" data-pkb-purpose="' + purpose + '"><head><meta charset="utf-8"><title>' + title
       + '</title><style>'
       + 'body{margin:0;background:#15181d;color:#e6e9ee;font:14px/1.45 system-ui,sans-serif;}'
       + 'header{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#1d2127;}'
@@ -2903,22 +2981,23 @@
       + '@media (prefers-color-scheme: light){body{background:#fff;color:#1b1f24;}header{background:#f6f7f9;}.msg{background:#f6f7f9;border-color:#dfe3e8;}}'
       + '@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important;}}'
       + '</style></head><body><header><strong>' + title + '</strong>'
-      + '<button type="button" id="popin" data-action="popin">Pop in</button></header>'
-      + '<div id="list"></div>'
-      + (kind === 'chat' ? '<form id="composer"><textarea aria-label="Message"></textarea><button type="submit">Send</button></form>' : '<div><button type="button" id="add" data-action="add">Add step</button></div>')
+      + '<button type="button" id="pkb-popin" data-pkb-meta="true" data-pkb-purpose="' + purpose + '" data-action="popin">Pop in</button></header>'
+      + '<div id="pkb-list" data-pkb-meta="true" data-pkb-purpose="' + purpose + '"></div>'
+      + (kind === 'chat' ? '<form id="pkb-composer" data-pkb-meta="true" data-pkb-purpose="' + purpose + '"><textarea aria-label="Message"></textarea><button type="submit" data-pkb-meta="true">Send</button></form>' : '<div data-pkb-meta="true"><button type="button" id="pkb-add" data-pkb-meta="true" data-pkb-purpose="' + purpose + '" data-action="add">Add step</button></div>')
       + '<script>' + popScript(kind) + '<\/script></body></html>';
   }
 
   function popScript(kind) {
     return ''
       + 'var PANEL="' + kind + '";'
-      + 'var list=document.getElementById("list");'
-      + 'function chip(node,text){var src=String(text==null?"":text);node.textContent="";var re=/"([^"\\\\]|\\\\.)*"|\'([^\'\\\\]|\\\\.)*\'/g;var last=0,m,any=false;while((m=re.exec(src))){any=true;if(m.index>last)node.appendChild(document.createTextNode(src.slice(last,m.index)));var s=document.createElement("span");s.className="pkb-value";s.textContent=m[0];node.appendChild(s);last=m.index+m[0].length;}if(!any)node.textContent=src;else if(last<src.length)node.appendChild(document.createTextNode(src.slice(last)));}'
+      + 'var list=document.getElementById("pkb-list");'
+      + 'function tag(node){if(!node||!node.setAttribute)return node;node.setAttribute("data-pkb-meta","true");node.setAttribute("data-pkb-purpose",PANEL==="chat"?"panel":"editor");if(node.id&&node.id.indexOf("pkb-")!==0)node.id="pkb-"+node.id;return node;}'
+      + 'function chip(node,text){var src=String(text==null?"":text);node.textContent="";var re=/"([^"\\\\]|\\\\.)*"|\'([^\'\\\\]|\\\\.)*\'/g;var last=0,m,any=false;while((m=re.exec(src))){any=true;if(m.index>last)node.appendChild(document.createTextNode(src.slice(last,m.index)));var s=document.createElement("span");s.className="pkb-value";s.textContent=m[0];tag(s);node.appendChild(s);last=m.index+m[0].length;}if(!any)node.textContent=src;else if(last<src.length)node.appendChild(document.createTextNode(src.slice(last)));}'
       + 'function send(op,extra){extra=extra||{};extra.pkb="pop";extra.panel=PANEL;extra.op=op;if(window.opener)window.opener.postMessage(extra,"*");}'
       + 'function phrase(text){var value=String(text==null?"":text).trim();if(!value)return", ";if(value.charAt(0)===","||value.charAt(0)===":"||value.indexOf("Then ")===0||value.indexOf("And ")===0)return value;return", "+value;}'
       + 'function renderSteps(steps){list.textContent="";(steps||[]).forEach(function(step,index){'
-      + 'var row=document.createElement("div");row.className="row";row.setAttribute("data-index",String(index));row.style.marginLeft=((step.depth||0)*16)+"px";'
-      + 'var text=document.createElement("div");text.className="text";text.contentEditable="true";text.setAttribute("role","textbox");chip(text,step.text||"");'
+      + 'var row=document.createElement("div");row.className="row";row.setAttribute("data-index",String(index));row.style.marginLeft=((step.depth||0)*16)+"px";tag(row);'
+      + 'var text=document.createElement("div");text.className="text";text.contentEditable="true";text.setAttribute("role","textbox");tag(text);chip(text,step.text||"");'
       + 'text.addEventListener("focusin",function(){if(text.querySelector(".pkb-value"))text.textContent=text.textContent;});'
       + 'text.addEventListener("keydown",function(event){if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();send("edit",{index:index,text:text.textContent});}'
       + 'if(event.key==="Tab"){event.preventDefault();send(event.shiftKey?"outdent":"nest",{index:index});}'
@@ -2926,21 +3005,21 @@
       + 'if((event.metaKey||event.ctrlKey)&&event.key==="Enter"){event.preventDefault();send("add",{index:index+1,text:", "});}'
       + 'if((event.metaKey||event.ctrlKey)&&event.key==="Backspace"){event.preventDefault();send("delete",{index:index});}});'
       + 'text.addEventListener("focusout",function(){send("edit",{index:index,text:text.textContent});});'
-      + 'var nest=document.createElement("button");nest.type="button";nest.textContent="Nest";nest.addEventListener("click",function(){send("nest",{index:index});});'
-      + 'var out=document.createElement("button");out.type="button";out.textContent="Outdent";out.addEventListener("click",function(){send("outdent",{index:index});});'
-      + 'var del=document.createElement("button");del.type="button";del.textContent="Delete";del.addEventListener("click",function(){send("delete",{index:index});});'
+      + 'var nest=document.createElement("button");nest.type="button";nest.textContent="Nest";tag(nest);nest.addEventListener("click",function(){send("nest",{index:index});});'
+      + 'var out=document.createElement("button");out.type="button";out.textContent="Outdent";tag(out);out.addEventListener("click",function(){send("outdent",{index:index});});'
+      + 'var del=document.createElement("button");del.type="button";del.textContent="Delete";tag(del);del.addEventListener("click",function(){send("delete",{index:index});});'
       + 'row.appendChild(text);row.appendChild(out);row.appendChild(nest);row.appendChild(del);list.appendChild(row);});}'
       + 'function renderChat(messages){list.textContent="";(messages||[]).forEach(function(row){'
-      + 'var node=document.createElement("div");node.className="msg";node.setAttribute("data-from",row.from||"agent");'
+      + 'var node=document.createElement("div");node.className="msg";node.setAttribute("data-from",row.from||"agent");tag(node);'
       + 'if(row.state){node.setAttribute("data-state",row.state);node.setAttribute("data-pkb-feedback",row.state);}chip(node,row.text||"");list.appendChild(node);});'
       + 'list.scrollTop=list.scrollHeight;}'
       + 'window.addEventListener("message",function(event){var data=event.data;if(!data||data.pkb!=="pop-state"||data.panel!==PANEL)return;'
       + 'if(PANEL==="editor")renderSteps(data.steps||[]);else renderChat(data.messages||[]);});'
-      + 'document.getElementById("popin").addEventListener("click",function(){send("popin");});'
+      + 'document.getElementById("pkb-popin").addEventListener("click",function(){send("popin");});'
       + (kind === 'chat'
-        ? 'var form=document.getElementById("composer");form.addEventListener("submit",function(event){event.preventDefault();var field=form.querySelector("textarea");send("send",{text:field.value});field.value="";});'
+        ? 'var form=document.getElementById("pkb-composer");form.addEventListener("submit",function(event){event.preventDefault();var field=form.querySelector("textarea");send("send",{text:field.value});field.value="";});'
           + 'form.querySelector("textarea").addEventListener("keydown",function(event){if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();form.requestSubmit?form.requestSubmit():form.dispatchEvent(new Event("submit"));}});'
-        : 'document.getElementById("add").addEventListener("click",function(){send("add",{text:", "});});')
+        : 'document.getElementById("pkb-add").addEventListener("click",function(){send("add",{text:", "});});')
       + 'if(window.opener)send("hello");';
   }
 

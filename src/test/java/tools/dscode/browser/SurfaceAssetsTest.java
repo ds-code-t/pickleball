@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SurfaceAssetsTest {
     @Test
     void loadsEachAssetAtItsHash() throws Exception {
-        assertEquals("11cf0533661f2e5176857fb0e340b2f6c80ce95e56f4f56e07eb9e8a2999ff0a", sha(SurfaceAssets.script("live-helper")));
+        assertEquals("26e93b8e22d5b9975bb30ba38d7d8f81cfa8f6630367ebf3bd8d74a590a4f20f", sha(SurfaceAssets.script("live-helper")));
         assertEquals("5d6b24e641d70c4c252804b3d0bfae48f6170037434b6d43b2b8e2650c0821a7", sha(SurfaceAssets.script("bridge-mark")));
         assertEquals("ab8f90e2e4d04214af67e933ab190a0bfab7c89e57ba6cdfe5e10bd3eec6e29a", sha(SurfaceAssets.script("frame-mark")));
         assertEquals("afc0169aba6b94679a425b8b8868193583b8813e8bcf52fadf089389d7999c88", sha(SurfaceAssets.script("frame-restore")));

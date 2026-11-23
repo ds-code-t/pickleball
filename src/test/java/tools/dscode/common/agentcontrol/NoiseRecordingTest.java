@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -58,13 +59,17 @@ class NoiseRecordingTest {
         Map<String, String> second = row("change", "Note", "textbox", "Ada");
         second.put("id", "note");
         Map<String, String> click = row("click", "Save order", "button", "");
-        StepGenerator.Script script = StepGenerator.generate(List.of(hover, focus, panel, first, second, click), Map.of());
+        Map<String, String> tagged = row("click", "Keep step", "button", "");
+        tagged.put("id", "pkb-ask-q1");
+        tagged.put("meta", "true");
+        StepGenerator.Script script = StepGenerator.generate(List.of(hover, focus, panel, first, second, click, tagged), Map.of());
         String gherkin = script.gherkin();
         assertTrue(gherkin.contains("enter \"<note>\" in the \"Note\" Textbox"), gherkin);
         assertTrue(gherkin.contains("click the \"Save order\" Button"), gherkin);
         assertFalse(gherkin.contains("hover"), gherkin);
         assertFalse(gherkin.contains("focus"), gherkin);
         assertFalse(gherkin.contains("Pause"), gherkin);
+        assertFalse(gherkin.contains("Keep step"), gherkin);
         assertEqualsOneEnter(gherkin);
         assertTrue(script.parameters().stream().anyMatch(p -> "Ada".equals(String.valueOf(p.get("example")))), script.parameters().toString());
     }
@@ -98,11 +103,6 @@ class NoiseRecordingTest {
         assertTrue(PageSurfaces.runtimeCall("record", spec, true) != null, "runtime did not install");
         PageSurfaces.runtimeCall("panelOpen", Map.of("title", "Agent"), false);
         ((JavascriptExecutor) driver).executeScript("""
-                var pause = document.querySelector('[data-pkb-record] button');
-                if (pause) pause.click();
-                var layer = document.querySelector('pkb-layer');
-                var chrome = layer && layer.shadowRoot ? layer.shadowRoot.querySelector('button') : null;
-                if (chrome) chrome.click();
                 var save = document.getElementById('save');
                 save.dispatchEvent(new PointerEvent('pointerover', {bubbles: true}));
                 save.click();
@@ -111,6 +111,11 @@ class NoiseRecordingTest {
                 field.value = 'Ada';
                 field.dispatchEvent(new Event('input', {bubbles: true}));
                 field.dispatchEvent(new Event('change', {bubbles: true}));
+                var pause = document.querySelector('[data-pkb-record] button');
+                if (pause) pause.click();
+                var layer = document.querySelector('pkb-layer');
+                var chrome = layer && layer.shadowRoot ? layer.shadowRoot.querySelector('button') : null;
+                if (chrome) chrome.click();
                 """);
         Thread.sleep(700);
         String sensed = PageSurfaces.runtimeCall("sensed", null, false);
@@ -121,6 +126,32 @@ class NoiseRecordingTest {
         assertFalse(sensed.contains("Pause"), sensed);
         assertFalse(sensed.contains("Accept"), sensed);
         assertFalse(sensed.contains("Send"), sensed);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> tags = (Map<String, Object>) ((JavascriptExecutor) driver).executeScript("""
+                var bar = document.querySelector('[data-pkb-record]');
+                var layer = document.querySelector('pkb-layer');
+                var root = layer && layer.shadowRoot;
+                var panel = root ? root.querySelector('[data-pkb-panel]') : null;
+                var editor = root ? root.querySelector('[data-pkb-editor]') : null;
+                return {
+                  barMeta: bar && bar.getAttribute('data-pkb-meta'),
+                  barPurpose: bar && bar.getAttribute('data-pkb-purpose'),
+                  layerMeta: layer && layer.getAttribute('data-pkb-meta'),
+                  layerPurpose: layer && layer.getAttribute('data-pkb-purpose'),
+                  panelMeta: panel && panel.getAttribute('data-pkb-meta'),
+                  panelPurpose: panel && panel.getAttribute('data-pkb-purpose'),
+                  editorMeta: editor && editor.getAttribute('data-pkb-meta'),
+                  editorPurpose: editor && editor.getAttribute('data-pkb-purpose')
+                };
+                """);
+        assertEquals("true", tags.get("barMeta"), tags.toString());
+        assertTrue(String.valueOf(tags.get("barPurpose")).contains("recorder"), tags.toString());
+        assertEquals("true", tags.get("layerMeta"), tags.toString());
+        assertTrue(String.valueOf(tags.get("layerPurpose")).contains("layer"), tags.toString());
+        assertEquals("true", tags.get("panelMeta"), tags.toString());
+        assertTrue(String.valueOf(tags.get("panelPurpose")).contains("panel"), tags.toString());
+        assertEquals("true", tags.get("editorMeta"), tags.toString());
+        assertTrue(String.valueOf(tags.get("editorPurpose")).contains("editor"), tags.toString());
     }
 
     private static void assertEqualsOneEnter(String gherkin) {

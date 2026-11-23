@@ -90,6 +90,9 @@ class PersonFeedbackTest {
         assertTrue(js.contains("function panelUnread()"));
         assertTrue(js.contains("function appendDistinguished"));
         assertTrue(js.contains("function quoteValue"));
+        assertTrue(js.contains("function tagMeta"));
+        assertTrue(js.contains("data-pkb-meta"));
+        assertTrue(js.contains("[data-pkb-meta=\"true\"]"));
         assertTrue(js.contains("Chat, "));
         assertTrue(js.contains("installId"));
         assertTrue(css.contains("[data-state=\"sending\"]"));

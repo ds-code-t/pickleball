@@ -123,6 +123,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-roadmap-3-scoreboard.md`
 - `docs/maintainer/3.0.0-roadmap-4-mcp-session-scoreboard.md`
 - `docs/maintainer/3.0.0-roadmap-4-scoreboard.md`
+- `docs/maintainer/3.0.0-roadmap-5-person-facing-scoreboard.md`
 - `docs/maintainer/3.0.0-roadmap-5-scoreboard.md`
 - `docs/maintainer/3.0.0-roadmap-6-scoreboard.md`
 - `docs/maintainer/3.0.0-roadmap-7-scoreboard.md`

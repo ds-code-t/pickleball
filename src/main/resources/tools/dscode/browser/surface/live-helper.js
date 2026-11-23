@@ -45,12 +45,36 @@ function setHtml(el, html) {
   }
   el.innerHTML = text;
 }
+function purposeOf(kind) {
+  var name = String(kind || '');
+  if (name === 'overlay' || name === 'label' || name === 'html' || name === 'step' || name === 'instructions' || name === 'diagram' || name === 'callout') return 'placement callout';
+  return 'placement';
+}
+function tagMeta(el, purpose) {
+  if (!el || el.nodeType !== 1 || !el.setAttribute) return;
+  el.setAttribute('data-pkb-meta', 'true');
+  var have = (el.getAttribute('data-pkb-purpose') || '').split(/\s+/).filter(Boolean);
+  String(purpose || '').split(/\s+/).forEach(function (token) {
+    if (token && have.indexOf(token) < 0) have.push(token);
+  });
+  if (have.length) el.setAttribute('data-pkb-purpose', have.join(' '));
+  function prefix(attr) {
+    var current = attr === 'id' ? el.id : el.getAttribute(attr);
+    if (!current || current.indexOf('pkb-') === 0) return;
+    var next = 'pkb-' + current;
+    if (attr === 'id') el.id = next;
+    else el.setAttribute(attr, next);
+  }
+  prefix('id');
+  prefix('data-pkb-id');
+}
 function mark(el, kind, sentence) {
   if (!el || el.nodeType !== 1) return;
   el.setAttribute('data-pkb-agent', 'agent_injected');
   el.setAttribute('data-pkb-kind', kind);
   el.setAttribute('data-pkb-sentence', sentence);
   if (spec.id) el.setAttribute('data-pkb-id', spec.id);
+  tagMeta(el, purposeOf(kind));
 }
 function markTree(el, kind, sentence) {
   mark(el, kind, sentence);
@@ -191,6 +215,7 @@ if (spec.kind === 'magnifier' && anchor) {
     var note = document.createElement('div');
     note.setAttribute('data-pkb-copy', 'fallback');
     note.textContent = 'target not captured';
+    tagMeta(note, purposeOf(spec.kind));
     note.style.cssText = 'color:#111;font:12px sans-serif;padding:8px;';
     host.appendChild(note);
   }
