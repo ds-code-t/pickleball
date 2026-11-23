@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
@@ -44,9 +45,10 @@ class StoreRunTest {
 
         String first = StoreRun.glueFingerprint(project);
         StoreRun.Plan missing = StoreRun.plan(project);
+        boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
         assertTrue(missing.compile(), missing.line());
         assertTrue(missing.restart());
-        assertTrue(missing.compileCommand().get(0).endsWith("mvnw"), missing.compileCommand().toString());
+        assertTrue(missing.compileCommand().get(0).endsWith(windows ? "mvnw.cmd" : "mvnw"), missing.compileCommand().toString());
         assertEquals("test-compile", missing.compileCommand().get(2));
 
         String os = System.getProperty("os.name");
@@ -67,14 +69,16 @@ class StoreRunTest {
 
         Files.delete(project.resolve("pom.xml"));
         Files.delete(project.resolve("mvnw"));
+        Files.deleteIfExists(project.resolve("mvnw.cmd"));
         Files.writeString(project.resolve("build.gradle"), "plugins {}\n");
-        Files.writeString(project.resolve("gradlew"), "#!/bin/sh\n");
+        String gradleName = windows ? "gradlew.bat" : "gradlew";
+        Files.writeString(project.resolve(gradleName), windows ? "@echo off\r\n" : "#!/bin/sh\n");
         List<String> gradle = StoreRun.compileCommand(project);
-        assertTrue(gradle.get(0).endsWith("gradlew"), gradle.toString());
+        assertTrue(gradle.get(0).endsWith(gradleName), gradle.toString());
         assertEquals("testClasses", gradle.get(1));
 
         Files.delete(project.resolve("build.gradle"));
-        Files.delete(project.resolve("gradlew"));
+        Files.delete(project.resolve(gradleName));
         assertTrue(StoreRun.compileCommand(project).isEmpty());
     }
 

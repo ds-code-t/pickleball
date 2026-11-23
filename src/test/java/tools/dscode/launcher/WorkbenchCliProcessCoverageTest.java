@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -247,12 +248,27 @@ class WorkbenchCliProcessCoverageTest {
         Files.createDirectories(project.resolve("src/test/resources"));
         Files.writeString(project.resolve("pom.xml"), "<project/>\n");
         Path wrapper = project.resolve("mvnw.cmd");
-        Files.writeString(wrapper, """
-                #!/bin/sh
-                printf '%s\\n' "$@" > argv.txt
-                exit 0
-                """);
-        wrapper.toFile().setExecutable(true);
+        boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
+        if (windows) {
+            // cmd.exe runs mvnw.cmd as a batch file. shift /1 keeps %0 as the script.
+            Files.writeString(wrapper, """
+                    @echo off\r
+                    setlocal EnableExtensions\r
+                    set "here=%~dp0"\r
+                    :loop\r
+                    if "%~1"=="" exit /b 0\r
+                    >>"%here%argv.txt" echo(%~1\r
+                    shift /1\r
+                    goto loop\r
+                    """);
+        } else {
+            Files.writeString(wrapper, """
+                    #!/bin/sh
+                    printf '%s\\n' "$@" > argv.txt
+                    exit 0
+                    """);
+            wrapper.toFile().setExecutable(true);
+        }
         Files.writeString(project.resolve("src/test/resources/pickleball.properties"),
                 "pkb_name=caf\u00e9\npkb_configpath=wd-file:C:\\\\Users\\\\Dan\\\\My Projects\\\\configs\n",
                 StandardCharsets.UTF_8);

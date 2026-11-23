@@ -7,6 +7,7 @@ import tools.dscode.control.protocol.PickleballLocalLayout;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.nio.file.attribute.FileTime;
 import java.time.Duration;
 import java.time.Instant;
@@ -84,23 +85,7 @@ class WorkbenchOneShotLaunchTest {
         Files.createDirectories(project);
         Files.writeString(project.resolve("pom.xml"), "<project/>\n");
         Files.writeString(project.resolve("real.classpath"), System.getProperty("java.class.path"));
-        Path mvnw = project.resolve("mvnw");
-        Files.writeString(mvnw, """
-                #!/bin/sh
-                echo "$@" >> "$PWD/mvn-args"
-                out=""
-                for arg in "$@"; do
-                  case "$arg" in
-                    -Dmdep.outputFile=*) out="${arg#-Dmdep.outputFile=}" ;;
-                  esac
-                done
-                if [ -n "$out" ]; then
-                  cp "$PWD/real.classpath" "$out"
-                  exit 0
-                fi
-                exit 1
-                """);
-        mvnw.toFile().setExecutable(true);
+        writeWrapper(project, "copy");
         java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
         java.io.ByteArrayOutputStream err = new java.io.ByteArrayOutputStream();
         List<String> command = WorkbenchOneShotLaunch.command(project, List.of("status", "--step-timeout=nope"));
@@ -169,8 +154,40 @@ class WorkbenchOneShotLaunchTest {
                 .resolve("pickleball-workbench.jar");
         Files.createDirectories(controller.getParent());
         Files.write(controller, new byte[]{2});
-        Path mvnw = project.resolve("mvnw");
-        Files.writeString(mvnw, """
+        writeWrapper(project, "classpath");
+        return project;
+    }
+
+    private static void writeWrapper(Path project, String kind) throws Exception {
+        boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
+        if (!windows) {
+            Path mvnw = project.resolve("mvnw");
+            Files.writeString(mvnw, unixWrapper(kind));
+            mvnw.toFile().setExecutable(true);
+            return;
+        }
+        Files.writeString(project.resolve("mvnw.cmd"), windowsWrapper(kind));
+    }
+
+    private static String unixWrapper(String kind) {
+        if ("copy".equals(kind)) {
+            return """
+                    #!/bin/sh
+                    echo "$@" >> "$PWD/mvn-args"
+                    out=""
+                    for arg in "$@"; do
+                      case "$arg" in
+                        -Dmdep.outputFile=*) out="${arg#-Dmdep.outputFile=}" ;;
+                      esac
+                    done
+                    if [ -n "$out" ]; then
+                      cp "$PWD/real.classpath" "$out"
+                      exit 0
+                    fi
+                    exit 1
+                    """;
+        }
+        return """
                 #!/bin/sh
                 echo "$@" >> "$PWD/wrapper-args"
                 out=""
@@ -183,8 +200,30 @@ class WorkbenchOneShotLaunchTest {
                   printf '%s' "$PWD/dependency.jar" > "$out"
                 fi
                 exit 0
-                """);
-        mvnw.toFile().setExecutable(true);
-        return project;
+                """;
+    }
+
+    private static String windowsWrapper(String kind) {
+        String log = "copy".equals(kind) ? "mvn-args" : "wrapper-args";
+        // shift without /1 also shifts %0, so %~dp0 is saved before the loop.
+        String writeOut = "copy".equals(kind)
+                ? "copy /y \"!here!real.classpath\" \"!out!\" >nul\r\nif errorlevel 1 exit /b 1\r\nexit /b 0\r\n"
+                : "set \"line=!here!dependency.jar\"\r\n>\"!out!\" echo !line!\r\nexit /b 0\r\n";
+        String missing = "copy".equals(kind) ? "exit /b 1\r\n" : "exit /b 0\r\n";
+        return "@echo off\r\n"
+                + "setlocal EnableExtensions EnableDelayedExpansion\r\n"
+                + "set \"here=%~dp0\"\r\n"
+                + ":loop\r\n"
+                + "if \"%~1\"==\"\" goto done\r\n"
+                + ">>\"!here!" + log + "\" echo(\"%~1\"\r\n"
+                + "set \"arg=%~1\"\r\n"
+                + "if \"!arg:~0,18!\"==\"-Dmdep.outputFile=\" set \"out=!arg:~18!\"\r\n"
+                + "shift /1\r\n"
+                + "goto loop\r\n"
+                + ":done\r\n"
+                + "if not defined out (\r\n"
+                + missing
+                + ")\r\n"
+                + writeOut;
     }
 }
