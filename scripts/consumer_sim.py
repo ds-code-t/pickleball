@@ -167,10 +167,18 @@ def main() -> int:
         record = assert_record(RUN)
         assert_field(record, "status", "PASSED")
         assert_cache_hit(RUN)
+        # Plain validate lists every empty consumer step and exits 1 when any exist.
+        # The marker sync point and the CLI probe are empty on purpose. undefined stays 0.
         validated = run_stage(timings, "validate", [
             "validate", "--tags=" + TAGS, "--name=" + NAME,
-        ], allow_exit={0})
+        ], allow_exit={1})
         assert_in(validated, "validate undefined=0")
+        assert_in(validated, "ambiguous=0")
+        assert_in(validated, "unresolved=0")
+        assert_in(validated, "noop=2")
+        assert_in(validated, "ControlBridgeTestSteps#controlBridgeIpcSyncPoint")
+        assert_in(validated, "WorkbenchCliProbeSteps#pass")
+        assert_not_in(validated, "undefined:")
         assert_not_in(validated, "summary status=")
         assert_validate_warm(validated.stdout)
         rejected = run_stage(timings, "validate-quiet", [
