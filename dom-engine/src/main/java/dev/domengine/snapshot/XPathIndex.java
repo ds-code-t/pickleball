@@ -9,8 +9,8 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Absolute index-qualified XPaths. The offline query engine rejects {@code [n]}
- * predicates, so this index is the resolver that honors them.
+ * Absolute index-qualified XPaths. Query evaluation uses this as the fast path
+ * when every step is {@code tag[n]}. Other expressions evaluate on the canonical tree.
  */
 public final class XPathIndex {
     private XPathIndex() {

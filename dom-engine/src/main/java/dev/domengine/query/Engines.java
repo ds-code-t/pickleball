@@ -7,8 +7,19 @@ import dev.domengine.cdp.CdpException;
 import dev.domengine.image.TemplateMatch;
 import dev.domengine.json.Jsons;
 import dev.domengine.log.EngineLog;
+import dev.domengine.snapshot.XPathIndex;
 import dev.domengine.tree.DomNode;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 
+import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathExpressionException;
+import javax.xml.xpath.XPathFactory;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,6 +27,7 @@ import java.util.Locale;
 
 /** Built-in pipeline engines. Each stage receives the previous nodes and returns the next set. */
 public final class Engines {
+    private static final String XML_NODE = "pkb.dom-node";
     private static final ThreadLocal<TemplateMatch.Gray> VIEWPORT = new ThreadLocal<>();
     private static final ThreadLocal<String> SPACE = new ThreadLocal<>();
 
@@ -143,30 +155,169 @@ public final class Engines {
             return new Query.Hit(distinct, "xpath matched " + distinct.size());
         }
         String offline = stripWrapping(cleaned);
-        if (!offlineSupported(offline)) throw new CdpException("invalid xpath: " + cleaned);
         boolean intoShadow = pierce != null && (pierce.equals("open") || pierce.equals("all"));
-        List<DomNode> hits = new ArrayList<>();
-        for (DomNode scope : scopes) {
-            List<DomNode> pool = new ArrayList<>(lightElements(scope, true));
-            if (intoShadow) {
+        if (indexQualified(offline)) {
+            List<DomNode> hits = new ArrayList<>();
+            for (DomNode scope : scopes) {
+                collectIndex(scope, offline, hits);
+                if (!intoShadow) continue;
                 for (DomNode shadow : collectShadows(scope)) {
                     if ("open".equals(pierce) && "closed".equalsIgnoreCase(shadow.shadowMode)) continue;
-                    pool.addAll(lightElements(shadow, true));
+                    collectIndex(shadow, offline, hits);
                 }
             }
-            for (DomNode candidate : pool) {
-                if (xpathMatches(candidate, offline)) hits.add(candidate);
+            List<DomNode> distinct = Query.distinct(hits);
+            return new Query.Hit(distinct, "xpath matched " + distinct.size());
+        }
+        if (offlineSupported(offline)) {
+            List<DomNode> hits = new ArrayList<>();
+            for (DomNode scope : scopes) {
+                List<DomNode> pool = new ArrayList<>(lightElements(scope, true));
+                if (intoShadow) {
+                    for (DomNode shadow : collectShadows(scope)) {
+                        if ("open".equals(pierce) && "closed".equalsIgnoreCase(shadow.shadowMode)) continue;
+                        pool.addAll(lightElements(shadow, true));
+                    }
+                }
+                for (DomNode candidate : pool) {
+                    if (xpathMatches(candidate, offline)) hits.add(candidate);
+                }
+            }
+            List<DomNode> distinct = Query.distinct(hits);
+            return new Query.Hit(distinct, "xpath matched " + distinct.size());
+        }
+        List<DomNode> hits = new ArrayList<>();
+        for (DomNode scope : scopes) {
+            hits.addAll(evaluateXml(offline, scope));
+            if (!intoShadow) continue;
+            for (DomNode shadow : collectShadows(scope)) {
+                if ("open".equals(pierce) && "closed".equalsIgnoreCase(shadow.shadowMode)) continue;
+                hits.addAll(evaluateXml(offline, shadow));
             }
         }
         List<DomNode> distinct = Query.distinct(hits);
         return new Query.Hit(distinct, "xpath matched " + distinct.size());
     }
 
+    /** Every step is {@code tag[n]}. {@link XPathIndex} answers this without building an XML document. */
+    static boolean indexQualified(String expr) {
+        if (expr == null || !expr.startsWith("/") || expr.startsWith("//")) return false;
+        if (expr.indexOf('[') < 0 || expr.contains("@") || expr.contains("(") || expr.contains("::")) return false;
+        boolean any = false;
+        for (String raw : expr.split("/")) {
+            if (raw.isBlank()) continue;
+            any = true;
+            int bracket = raw.indexOf('[');
+            if (bracket <= 0 || raw.indexOf('[', bracket + 1) >= 0 || !raw.endsWith("]")) return false;
+            String inside = raw.substring(bracket + 1, raw.length() - 1).trim();
+            if (inside.isEmpty() || inside.charAt(0) == '0' || !inside.chars().allMatch(Character::isDigit)) return false;
+            String tag = raw.substring(0, bracket);
+            if (tag.isBlank() || tag.indexOf(' ') >= 0 || tag.indexOf(':') >= 0) return false;
+        }
+        return any;
+    }
+
+    private static void collectIndex(DomNode scope, String expr, List<DomNode> hits) {
+        DomNode found = XPathIndex.resolve(scope, expr, "");
+        if (found != null) hits.add(found);
+    }
+
+    /**
+     * XPath 1.0 on an XML document built from the scope's light tree.
+     * An expression the JDK rejects is an error, not zero hits.
+     */
+    private static List<DomNode> evaluateXml(String expr, DomNode scope) {
+        if (scope == null) return List.of();
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            factory.setNamespaceAware(false);
+            factory.setExpandEntityReferences(false);
+            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+            Document doc = factory.newDocumentBuilder().newDocument();
+            List<DomNode> tops = elementChildren(scope);
+            if (tops.isEmpty()) return List.of();
+            boolean document = scope.nodeType == 9 || scope.nodeType == 11 || scope.shadowRoot;
+            if (tops.size() == 1 && document) {
+                appendElement(doc, doc, tops.get(0));
+            } else {
+                Element wrap = doc.createElement("pkb-root");
+                doc.appendChild(wrap);
+                for (DomNode child : tops) appendElement(doc, wrap, child);
+            }
+            NodeList list = (NodeList) XPathFactory.newInstance().newXPath()
+                    .compile(expr)
+                    .evaluate(doc, XPathConstants.NODESET);
+            List<DomNode> hits = new ArrayList<>();
+            for (int i = 0; i < list.getLength(); i++) {
+                Node node = list.item(i);
+                if (!(node instanceof Element element)) continue;
+                Object data = element.getUserData(XML_NODE);
+                if (data instanceof DomNode dom) hits.add(dom);
+            }
+            return hits;
+        } catch (XPathExpressionException | ParserConfigurationException failure) {
+            throw new CdpException("invalid xpath: " + expr);
+        }
+    }
+
+    private static List<DomNode> elementChildren(DomNode scope) {
+        List<DomNode> tops = new ArrayList<>();
+        if (scope == null) return tops;
+        for (DomNode child : scope.children) {
+            if (child != null && child.nodeType == 1 && !child.shadowRoot) tops.add(child);
+        }
+        return tops;
+    }
+
+    private static void appendElement(Document doc, Node parent, DomNode node) {
+        if (node == null || node.nodeType != 1 || node.shadowRoot) return;
+        Element element = doc.createElement(xmlName(node.localName == null || node.localName.isBlank() ? node.nodeName : node.localName));
+        element.setUserData(XML_NODE, node, null);
+        node.attributes.forEach((name, value) -> {
+            String attr = xmlAttr(name);
+            if (attr != null) element.setAttribute(attr, value == null ? "" : value);
+        });
+        parent.appendChild(element);
+        if (node.iframe) return;
+        for (DomNode child : node.children) {
+            if (child == null || child.shadowRoot) continue;
+            if (child.nodeType == 3) {
+                element.appendChild(doc.createTextNode(child.nodeValue == null ? "" : child.nodeValue));
+            } else if (child.nodeType == 1) {
+                appendElement(doc, element, child);
+            }
+        }
+    }
+
+    private static String xmlName(String raw) {
+        String name = raw == null ? "" : raw.trim().toLowerCase(Locale.ROOT);
+        if (name.startsWith("#")) name = name.substring(1);
+        return isXmlName(name) ? name : "node";
+    }
+
+    private static String xmlAttr(String raw) {
+        if (raw == null) return null;
+        String name = raw.trim().toLowerCase(Locale.ROOT);
+        return isXmlName(name) ? name : null;
+    }
+
+    private static boolean isXmlName(String name) {
+        if (name.isEmpty()) return false;
+        char first = name.charAt(0);
+        if (!Character.isLetter(first) && first != '_') return false;
+        for (int i = 1; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (Character.isLetterOrDigit(c) || c == '-' || c == '_' || c == '.') continue;
+            return false;
+        }
+        return true;
+    }
+
     private static boolean documentScope(DomNode scope) {
         return scope != null && (scope.nodeType == 9 || scope.parent == null);
     }
 
-    /** The parsed-tree matcher only understands this subset. Anything else is an error, not zero hits. */
+    /** Tag, attribute, and contains() scans. Anything else is XPath 1.0 on the canonical tree. */
     static boolean offlineSupported(String expr) {
         if (expr == null || expr.isBlank()) return false;
         if (expr.startsWith("//")) {
@@ -753,15 +904,32 @@ public final class Engines {
         List<String> compounds = new ArrayList<>();
         List<Character> combinators = new ArrayList<>();
         StringBuilder current = new StringBuilder();
+        int depth = 0;
+        Character pending = null;
         for (int i = 0; i < selector.length(); i++) {
             char c = selector.charAt(i);
-            if (c == '>' || c == ' ') {
-                if (current.isEmpty()) continue;
+            if (c == '[') depth++;
+            else if (c == ']' && depth > 0) depth--;
+            boolean split = depth == 0 && (c == '>' || c == '+' || c == '~' || c == ' ');
+            if (!split) {
+                if (pending != null) {
+                    combinators.add(pending);
+                    pending = null;
+                }
+                current.append(c);
+                continue;
+            }
+            if (c == ' ' && current.isEmpty()) continue;
+            if (!current.isEmpty()) {
                 compounds.add(current.toString().trim());
                 current.setLength(0);
-                combinators.add(c == '>' ? '>' : ' ');
+                pending = c == ' ' ? ' ' : c;
+            } else if (c != ' ') {
+                pending = c;
+            }
+            if (c != ' ') {
                 while (i + 1 < selector.length() && selector.charAt(i + 1) == ' ') i++;
-            } else current.append(c);
+            }
         }
         if (!current.isEmpty()) compounds.add(current.toString().trim());
         if (compounds.isEmpty()) return false;
@@ -774,12 +942,30 @@ public final class Engines {
         if (index == 0) return true;
         char combinator = combinators.get(index - 1);
         if (combinator == '>') return matchFrom(elementParent(node), compounds, combinators, index - 1);
+        if (combinator == '+') return matchFrom(previousElement(node), compounds, combinators, index - 1);
+        if (combinator == '~') {
+            for (DomNode prev = previousElement(node); prev != null; prev = previousElement(prev)) {
+                if (matchFrom(prev, compounds, combinators, index - 1)) return true;
+            }
+            return false;
+        }
         DomNode parent = elementParent(node);
         while (parent != null) {
             if (matchFrom(parent, compounds, combinators, index - 1)) return true;
             parent = elementParent(parent);
         }
         return false;
+    }
+
+    private static DomNode previousElement(DomNode node) {
+        DomNode parent = node.parent;
+        if (parent == null) return null;
+        DomNode previous = null;
+        for (DomNode child : parent.children) {
+            if (child == node) return previous;
+            if (child.nodeType == 1 && !child.shadowRoot) previous = child;
+        }
+        return null;
     }
 
     private static DomNode elementParent(DomNode node) {
@@ -834,7 +1020,7 @@ public final class Engines {
 
     private static boolean matchAttr(DomNode node, String body) {
         String op = "=";
-        for (String candidate : List.of("*=", "^=", "$=", "=")) {
+        for (String candidate : List.of("~=", "|=", "*=", "^=", "$=", "=")) {
             if (body.contains(candidate)) {
                 op = candidate;
                 break;
@@ -850,8 +1036,15 @@ public final class Engines {
             case "*=" -> actual.contains(value);
             case "^=" -> actual.startsWith(value);
             case "$=" -> actual.endsWith(value);
+            case "~=" -> word(actual, value);
+            case "|=" -> actual.equals(value) || actual.startsWith(value + "-");
             default -> actual.equals(value);
         };
+    }
+
+    private static boolean word(String actual, String value) {
+        for (String part : actual.split("\\s+")) if (part.equals(value)) return true;
+        return false;
     }
 
     private static boolean hasClass(DomNode node, String className) {
