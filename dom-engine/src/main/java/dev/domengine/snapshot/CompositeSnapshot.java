@@ -9,10 +9,11 @@ import dev.domengine.premap.PreMap;
 import java.util.ArrayList;
 import java.util.List;
 
-/** `pickleball.composite-snapshot` version 1. */
+/** `pickleball.composite-snapshot` version 1, and version 2 when a canonical tree is present. */
 public final class CompositeSnapshot {
     public static final String SCHEMA = "pickleball.composite-snapshot";
     public static final int VERSION = 1;
+    public static final int VERSION_V2 = 2;
 
     private final String id;
     private final String sessionId;
@@ -45,6 +46,8 @@ public final class CompositeSnapshot {
     private final List<ObjectNode> nodes;
     private final PreMap premap;
     private final List<String> warnings;
+    private final int schemaVersion;
+    private final ObjectNode canonical;
 
     CompositeSnapshot(
             String id,
@@ -77,7 +80,9 @@ public final class CompositeSnapshot {
             List<XPathIndex.Frame> frames,
             List<ObjectNode> nodes,
             PreMap premap,
-            List<String> warnings
+            List<String> warnings,
+            int schemaVersion,
+            ObjectNode canonical
     ) {
         this.id = id == null ? "" : id;
         this.sessionId = sessionId == null ? "" : sessionId;
@@ -110,16 +115,62 @@ public final class CompositeSnapshot {
         this.nodes = nodes == null ? List.of() : List.copyOf(nodes);
         this.premap = premap == null ? PreMap.empty(this.sessionId, this.docVersion) : premap;
         this.warnings = warnings == null ? List.of() : List.copyOf(warnings);
+        if (schemaVersion != VERSION && schemaVersion != VERSION_V2) {
+            throw new IllegalArgumentException("error: unsupported snapshot version " + schemaVersion);
+        }
+        if (schemaVersion == VERSION_V2 && canonical == null) {
+            throw new IllegalArgumentException("error: version 2 requires canonical");
+        }
+        if (schemaVersion == VERSION && canonical != null) {
+            throw new IllegalArgumentException("error: version 1 cannot include canonical");
+        }
+        this.schemaVersion = schemaVersion;
+        this.canonical = canonical == null ? null : canonical.deepCopy();
+    }
+
+    public int schemaVersion() {
+        return schemaVersion;
     }
 
     public PreMap premap() {
         return premap;
     }
 
+    /** Version 1 when {@code version} is absent and no canonical tree is present. Version 2 requires {@code canonical}. */
+    public static int schemaVersionOf(JsonNode raw) {
+        JsonNode node = raw == null || raw.isNull() ? Jsons.object() : raw;
+        if (!node.isObject()) throw new IllegalArgumentException("error: snapshot is not an object");
+        boolean hasCanonical = node.has("canonical") && !node.get("canonical").isNull();
+        JsonNode version = node.get("version");
+        boolean versionMissing = version == null || version.isNull()
+                || (version.isTextual() && version.asText().isBlank());
+        if (versionMissing) {
+            if (hasCanonical) throw new IllegalArgumentException("error: canonical without version");
+            String schema = node.path("schema").asText("");
+            if (!schema.isBlank() && !SCHEMA.equals(schema)) {
+                throw new IllegalArgumentException("error: unsupported snapshot schema " + schema);
+            }
+            return VERSION;
+        }
+        if (!version.isIntegralNumber()) throw new IllegalArgumentException("error: unsupported snapshot version");
+        int value = version.intValue();
+        if (value == VERSION) {
+            if (hasCanonical) throw new IllegalArgumentException("error: version 1 cannot include canonical");
+            return VERSION;
+        }
+        if (value == VERSION_V2) {
+            if (!hasCanonical || !node.get("canonical").isObject()) {
+                throw new IllegalArgumentException("error: version 2 requires canonical");
+            }
+            return VERSION_V2;
+        }
+        throw new IllegalArgumentException("error: unsupported snapshot version " + value);
+    }
+
     public ObjectNode toJson() {
         ObjectNode node = Jsons.object();
         node.put("schema", SCHEMA);
-        node.put("version", VERSION);
+        node.put("version", schemaVersion);
         node.put("id", id);
         node.put("session_id", sessionId);
         node.put("doc_version", docVersion);
@@ -155,6 +206,7 @@ public final class CompositeSnapshot {
         source.put("kind", sourceKind);
         source.put("text", sourceText);
         source.put("bytes", sourceText.getBytes(java.nio.charset.StandardCharsets.UTF_8).length);
+        if (canonical != null) node.set("canonical", canonical.deepCopy());
         ArrayNode frameNode = node.putArray("frames");
         for (XPathIndex.Frame frame : frames) {
             ObjectNode one = frameNode.addObject();
@@ -198,6 +250,10 @@ public final class CompositeSnapshot {
         node.path("warnings").forEach(warning -> warnings.add(warning.asText("")));
         String session = node.path("session_id").asText("");
         String version = node.path("doc_version").asText("");
+        int schemaVersion = schemaVersionOf(node);
+        ObjectNode canonical = schemaVersion == VERSION_V2 && node.get("canonical") instanceof ObjectNode object
+                ? object.deepCopy()
+                : null;
         return new CompositeSnapshot(
                 node.path("id").asText(""),
                 session,
@@ -229,7 +285,9 @@ public final class CompositeSnapshot {
                 frames,
                 nodes,
                 PreMap.fromJson(node.path("premap"), session, version),
-                warnings
+                warnings,
+                schemaVersion,
+                canonical
         );
     }
 }

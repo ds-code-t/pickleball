@@ -28,10 +28,18 @@ public final class CompositeSnapshotBuilder {
     }
 
     public static CompositeSnapshot build(DomNode root, SnapshotContext context) {
-        return build(root, context, System.nanoTime());
+        return build(root, context, System.nanoTime(), null);
+    }
+
+    public static CompositeSnapshot build(DomNode root, SnapshotContext context, CanonicalDocument canonical) {
+        return build(root, context, System.nanoTime(), canonical);
     }
 
     static CompositeSnapshot build(DomNode root, SnapshotContext context, long startedNanos) {
+        return build(root, context, startedNanos, null);
+    }
+
+    static CompositeSnapshot build(DomNode root, SnapshotContext context, long startedNanos, CanonicalDocument canonical) {
         SnapshotContext ctx = context == null ? SnapshotContext.empty() : context;
         if (root != null) root.linkParents();
         XPathIndex.Result index = XPathIndex.assign(root);
@@ -52,6 +60,12 @@ public final class CompositeSnapshotBuilder {
             }
         }
         dev.domengine.log.EngineLog.info("snapshot", "snapshot offline id=" + id + " nodes=" + nodes.size() + " ms=" + duration);
+        int schemaVersion = CompositeSnapshot.VERSION;
+        ObjectNode canonicalJson = null;
+        if (canonical != null) {
+            schemaVersion = CompositeSnapshot.VERSION_V2;
+            canonicalJson = canonical.toJson();
+        }
         return new CompositeSnapshot(
                 id,
                 ctx.sessionId(),
@@ -83,7 +97,9 @@ public final class CompositeSnapshotBuilder {
                 index.frames(),
                 nodes,
                 premap,
-                List.copyOf(ctx.warnings())
+                List.copyOf(ctx.warnings()),
+                schemaVersion,
+                canonicalJson
         );
     }
 

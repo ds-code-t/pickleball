@@ -13,9 +13,14 @@ public final class SnapshotSchemas {
     }
 
     public static void assertValid(JsonNode schema, JsonNode document) {
+        List<String> errors = violations(schema, document);
+        if (!errors.isEmpty()) throw new AssertionError(String.join("\n", errors));
+    }
+
+    public static List<String> violations(JsonNode schema, JsonNode document) {
         List<String> errors = new ArrayList<>();
         check(schema, schema, document, "$", errors);
-        if (!errors.isEmpty()) throw new AssertionError(String.join("\n", errors));
+        return errors;
     }
 
     private static void check(JsonNode root, JsonNode schema, JsonNode value, String path, List<String> errors) {
@@ -76,11 +81,16 @@ public final class SnapshotSchemas {
                 }
             }
         }
-        if (value != null && value.isArray() && schema.has("items")) {
-            int index = 0;
-            for (JsonNode item : value) {
-                check(root, schema.get("items"), item, path + "[" + index + "]", errors);
-                index++;
+        if (value != null && value.isArray()) {
+            if (schema.has("minItems") && value.size() < schema.get("minItems").asInt()) {
+                errors.add(path + " minItems " + schema.get("minItems").asInt());
+            }
+            if (schema.has("items")) {
+                int index = 0;
+                for (JsonNode item : value) {
+                    check(root, schema.get("items"), item, path + "[" + index + "]", errors);
+                    index++;
+                }
             }
         }
     }

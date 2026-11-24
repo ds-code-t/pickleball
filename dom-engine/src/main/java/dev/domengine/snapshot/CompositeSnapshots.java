@@ -17,11 +17,16 @@ public final class CompositeSnapshots {
     }
 
     public static ObjectNode offline(DomNode root, SnapshotOptions options) {
+        return offline(root, options, null);
+    }
+
+    /** Version 1 when {@code canonical} is null. Version 2 when a canonical tree is supplied. */
+    public static ObjectNode offline(DomNode root, SnapshotOptions options, CanonicalDocument canonical) {
         long started = System.nanoTime();
         SnapshotOptions used = options == null ? new SnapshotOptions() : options;
         String html = read(used.file());
         SnapshotContext context = SnapshotContext.offline(root, used, html);
-        return CompositeSnapshotBuilder.build(root, context, started).toJson();
+        return CompositeSnapshotBuilder.build(root, context, started, canonical).toJson();
     }
 
     public static ObjectNode browser(BrowserSession session, SnapshotOptions options) {
