@@ -579,6 +579,13 @@ final class WorkbenchMcpTools {
                         "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
                 ), "method"),
                 args -> forwardReady(pwArgs("cdp", args)));
+        add("workbench_browser_events",
+                "Forward browser-events: read the unified browser event stream (net, console, error, nav, dialog, ...) with a seq cursor; --start, --follow, --stop. Control tier.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for browser-events; see help browser-events."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("browser-events", args)));
         add("workbench_chat_turn",
                 "Send one agent line, then wait for a human message, an answer, or a click.",
                 schema(view),
@@ -722,6 +729,17 @@ final class WorkbenchMcpTools {
     }
 
     /** pw/cdp MCP arguments to CLI tokens: area, action, then --flags. */
+    /** Protocol verbs (E1-E12): the verb, then space-separated --name=value flags, then an optional target. */
+    static List<String> protoArgs(String verb, Map<String, Object> args) {
+        List<String> out = new ArrayList<>();
+        out.add(verb);
+        String flags = optionalScalar(args, "flags");
+        for (String token : flags.trim().split("\\s+(?=--)")) if (!token.isBlank()) out.add(token.trim());
+        String target = optionalScalar(args, "target");
+        if (!target.isBlank()) out.add("--target=" + target);
+        return out;
+    }
+
     static List<String> pwArgs(String verb, Map<String, Object> args) {
         List<String> out = new ArrayList<>();
         out.add(verb);

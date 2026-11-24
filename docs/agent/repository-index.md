@@ -31,6 +31,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/ai-run-configuration.md`
 - `docs/audits/3.0.0-architecture-doc-audit.md`
 - `docs/block-conditionals.md`
+- `docs/browser-events.md`
 - `docs/browser-protocols.md`
 - `docs/collaborative-recording.md`
 - `docs/collaborative-self-test.md`
@@ -304,6 +305,15 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/browser/JsonRpc.java`
 - `src/main/java/tools/dscode/browser/PlaywrightAdapter.java`
 - `src/main/java/tools/dscode/browser/PlaywrightConnection.java`
+- `src/main/java/tools/dscode/browser/proto/BrowserEventHub.java`
+- `src/main/java/tools/dscode/browser/proto/CdpSession.java`
+- `src/main/java/tools/dscode/browser/proto/EventCommands.java`
+- `src/main/java/tools/dscode/browser/proto/Projectors.java`
+- `src/main/java/tools/dscode/browser/proto/ProtoClient.java`
+- `src/main/java/tools/dscode/browser/proto/ProtoHost.java`
+- `src/main/java/tools/dscode/browser/proto/ProtoJson.java`
+- `src/main/java/tools/dscode/browser/proto/ProtoRedact.java`
+- `src/main/java/tools/dscode/browser/proto/PwBridge.java`
 - `src/main/java/tools/dscode/browser/ProtocolSelector.java`
 - `src/main/java/tools/dscode/browser/ProtocolSocket.java`
 - `src/main/java/tools/dscode/browser/ProtocolSockets.java`
@@ -730,6 +740,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/launcher/PickleballWorkbenchLauncher.java`
 - `src/main/java/tools/dscode/launcher/PkbMain.java`
 - `src/main/java/tools/dscode/launcher/PlaywrightNode.java`
+- `src/main/java/tools/dscode/launcher/ProtoVerbs.java`
 - `src/main/java/tools/dscode/launcher/PwCommand.java`
 - `src/main/java/tools/dscode/launcher/QuietWarnings.java`
 - `src/main/java/tools/dscode/launcher/RelaunchWithDebug.java`
@@ -1083,6 +1094,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/AutoSnapshotTest.java`
 - `src/test/java/tools/dscode/launcher/BackendHandoffLiveTest.java`
 - `src/test/java/tools/dscode/launcher/BrowserAttachTest.java`
+- `src/test/java/tools/dscode/launcher/BrowserEventsBidiLiveTest.java`
+- `src/test/java/tools/dscode/launcher/BrowserEventsLiveTest.java`
 - `src/test/java/tools/dscode/launcher/BrowserLostRunIdTest.java`
 - `src/test/java/tools/dscode/launcher/BrowserProtocolsLiveTest.java`
 - `src/test/java/tools/dscode/launcher/BrowserStateTest.java`

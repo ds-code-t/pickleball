@@ -77,6 +77,8 @@ public final class RpcChannel implements AutoCloseable {
     }
 
     /** Sends one command; a CDP {@code sessionId} targets a flattened child session. Errors keep the protocol text. */
+    private final Object sendLock = new Object();
+
     public JsonNode call(String method, Map<String, ?> params, String sessionId) {
         if (closed) throw new IllegalStateException("error: " + method + ": the protocol socket is closed.\nfix: Reconnect to the browser.");
         long id = ids.incrementAndGet();
@@ -89,7 +91,11 @@ public final class RpcChannel implements AutoCloseable {
         pending.put(id, future);
         JsonNode response;
         try {
-            socket.sendText(MAPPER.writeValueAsString(request));
+            String text = MAPPER.writeValueAsString(request);
+            // java.net.http.WebSocket allows one outstanding send; callers on several threads share this channel.
+            synchronized (sendLock) {
+                socket.sendText(text);
+            }
             response = future.get(timeoutMs, TimeUnit.MILLISECONDS);
         } catch (Exception failure) {
             pending.remove(id);

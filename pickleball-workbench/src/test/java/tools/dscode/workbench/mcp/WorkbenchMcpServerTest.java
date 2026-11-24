@@ -128,6 +128,7 @@ class WorkbenchMcpServerTest {
             "workbench_navigate",
             "workbench_pw",
             "workbench_cdp",
+            "workbench_browser_events",
             "workbench_chat_turn",
             "workbench_execute_steps",
             "workbench_ui_verify",
