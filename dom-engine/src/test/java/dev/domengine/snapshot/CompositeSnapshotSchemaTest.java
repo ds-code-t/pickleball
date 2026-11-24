@@ -40,6 +40,9 @@ class CompositeSnapshotSchemaTest {
         ObjectNode v1 = (ObjectNode) produced.deepCopy();
         v1.remove("canonical");
         v1.put("version", 1);
+        v1.path("nodes").forEach(node -> {
+            if (node instanceof ObjectNode object) object.remove("identity");
+        });
         assertTrue(v1.path("canonical").isMissingNode());
         assertEquals("urn:pickleball:composite-snapshot:1", SnapshotDocuments.schema(1).path("$id").asText());
         SnapshotSchemas.assertValid(SnapshotDocuments.schema(1), v1);

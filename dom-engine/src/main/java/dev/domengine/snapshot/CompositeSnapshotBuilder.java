@@ -72,6 +72,7 @@ public final class CompositeSnapshotBuilder {
         if (generated != null) {
             schemaVersion = CompositeSnapshot.VERSION_V2;
             canonicalJson = generated.toJson();
+            IdentityChain.attach(projected, nodes, ctx);
         }
         return new CompositeSnapshot(
                 id,
