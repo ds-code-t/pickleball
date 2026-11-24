@@ -11,146 +11,183 @@ session: isolate session-start execute-step status events stop kill open-scenari
 coordination: short-log note inbox finish presence post history gc-runs gc-versions use-version export-guidance
 descriptors: session list | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>
 page: inspect-page find-element
-agent: observe launch windows tabs chat-send chat-history chat-poll chat_wait chat-turn chat-read highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close panel-open panel-close panel-state guide guide-next guide-back guide-done ask ask-and-wait answer-wait pin toast checklist ui-apply ui-poll ui-catalog ui-verify capture-scenario capture-steps record screenshot selftest doctor act form-fill snap find frame wait wait-for watch explain capture attach upload navigate eval ref controller-start controller-stop controller-status controller-ping call execute-steps
+agent: observe launch windows tabs chat-send chat-history chat-poll chat_wait chat-turn chat-read highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close panel-open panel-close panel-state session-mode guide guide-next guide-back guide-done ask ask-and-wait answer-wait pin toast checklist ui-apply ui-poll ui-catalog ui-verify capture-scenario capture-steps record screenshot selftest doctor act form-fill snap find frame wait wait-for watch explain capture attach upload navigate eval ref controller-start controller-stop controller-status controller-ping call execute-steps
 consumer: start live-stop history-summary history-query entity-lookup open-run bridge-health
 retrieval: query runs | query get | query query | query search | query props | query errors | query tail
 controller: sync worker-check live-check ui mcp session
 dashboard: dashboard [--project=<dir>] [--out=<file>] | dashboard query | dashboard xref | dashboard overlap
-all: act answer-wait arrow ask ask-and-wait attach border bridge-health call capture capture-scenario capture-steps chat-history chat-poll chat-read chat-send chat-turn chat_wait checklist close-window confirm controller-ping controller-start controller-status controller-stop diagnostic-run discover discover-hint doctor entity-lookup eval events example execute-step execute-steps explain export-guidance find find-element finish form-fill frame from-here gc-runs gc-versions guide guide-back guide-done guide-next help highlight hint history history-query history-summary html-cleanup html-insert html-remove html-replace html-write inbox insert-step inspect-page isolate kill label launch live-check magnifier mcp navigate note observe open-run open-scenario open-window overlay overlay-poll overlay-remove panel-close panel-open panel-state pause pin plan play popup-close popup-open popup-status post presence query record ref refresh resolve-runvars save screenshot selftest session session-hold session-info session-list session-release session-start session-sync short-log show-run snap spotlight start status step-badge stop sync tabs toast ui ui-apply ui-catalog ui-poll ui-verify unarrow unborder unhighlight unlabel unmagnifier unspotlight unstep-badge update-step upload use-version validate wait wait-for watch windows worker-check worker-restart worker-start worker-stop workspace-edit workspace-seed workspace-show
+all: act answer-wait arrow ask ask-and-wait attach border bridge-health call capture capture-scenario capture-steps chat-history chat-poll chat-read chat-send chat-turn chat_wait checklist close-window confirm controller-ping controller-start controller-status controller-stop diagnostic-run discover discover-hint doctor entity-lookup eval events example execute-step execute-steps explain export-guidance find find-element finish form-fill frame from-here gc-runs gc-versions guide guide-back guide-done guide-next help highlight hint history history-query history-summary html-cleanup html-insert html-remove html-replace html-write inbox insert-step inspect-page isolate kill label launch live-check magnifier mcp navigate note observe open-run open-scenario open-window overlay overlay-poll overlay-remove panel-close panel-open panel-state pause pin plan play popup-close popup-open popup-status post presence query record ref refresh resolve-runvars save screenshot selftest session session-hold session-info session-list session-mode session-release session-start session-sync short-log show-run snap spotlight start status step-badge stop sync tabs toast ui ui-apply ui-catalog ui-poll ui-verify unarrow unborder unhighlight unlabel unmagnifier unspotlight unstep-badge update-step upload use-version validate wait wait-for watch windows worker-check worker-restart worker-start worker-stop workspace-edit workspace-seed workspace-show
 
 # help act
 Usage: act --target=<selector> [--kind=click|type|hover|press|select|attach] [--query=<text>] [--ref=<ref>] [--pick=<n|name>] [--purpose=<token>] [--value=<text>] [--condition=title=<text>|text=<text>|url=<text>|ref=<id>:selected] [--snap=diff|auto] [--timeout=<ms>]
 With --pick and several hits the reply lists candidates and picked (index, name, why). --pick chooses one hit in the same snapshot, so the ref cannot go stale. A success includes checked and settleMs. Hover on a visible element is applied and dispatched. A click is applied when the page or that element's text or state changes. A covering mask that does not clear fails the click. --timeout is that wait in milliseconds, including a spinner or loading class. visible is whether the element is shown, the same value explain reports. Replies include frame. A short id (s1.h18) names that element and is not expanded to its accessible name.
+Tier: human.
 
 # help answer-wait
 Usage: answer-wait --id=<question> [--timeout=<ms>] [--choices=a,b]
 Reads the choice for a question ask or ask-and-wait --async already showed. Same fields as ask-and-wait: id, value, choice, applied. Missing --id exits 2. Timeout exits 1 with error timeout and closes the card. The wait does not hold the command lane.
+Tier: control.
 
 # help ask
 Usage: ask --say=<question> [--choices=Yes,No] [--handle=<target>] [--id=<question>] [--sensitive=true] [--min-show=<ms>] [--run-id=<id>]
 --min-show keeps an unanswered card on screen at least that long. --choices is a comma list or a JSON array. Each choice is its own button.
+Tier: control.
 
 # help ask-and-wait
 Usage: ask-and-wait --say=<question> [--choices=a,b] [--id=<id>] [--timeout=<ms>] [--async]
 Returns only the clicked choice. --choices is a comma list or a JSON array, one button each. The card shows Answer sent: <choice> for about 1.5 seconds. An answer already stored is returned even if the worker call is tight. --async returns id immediately. answer-wait --id reads the choice. A bare timeout is milliseconds. A trailing s is seconds.
+Tier: control.
 
 # help border
 Usage: border [--text=<html>] [--handle=<id>] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--color=<color>] [--style=<css>] [--target=auto|page|popup|native] [--block=true] [--html=<page>]
 A short id (s1.h18) names that element and is not expanded to its accessible name.
+Tier: control.
 
 # help call
 Usage: call <tool> [--args-file=<json>] [--args-b64=<base64>] [--args=<json>|-] [--text=<message>]
 Forwards one MCP tool to the shell. The controller is .pickleball/agent-controller.json. The reply is the agent envelope. An unmapped tool is error unavailable.
+Tier: control.
 
 # help capture-scenario
 Usage: capture-scenario [--url=<substring>] [--since=<epoch-ms>] [--until=<epoch-ms>] [--events=<file>] [--out=<feature>] [--run-id=<id>]
+Tier: control.
 
 # help capture-steps
 Usage: capture-steps [--events=<file>] [--out=<json>] [--run-id=<id>]
 Writes {op,args} steps for execute-steps --file. Click and answer rows in --events and .pickleball/agent-events.jsonl become steps. An empty capture writes [] , count 0, and sentence no steps captured.
+Tier: control.
 
 # help chat-history
 Usage: chat-history [--channel=<name>] [--limit=<n>] [--run-id=<id>]
+Tier: control.
 
 # help chat-poll
 Usage: chat-poll [--channel=<name>] [--id=<after>] [--cursor=<token>] [--wait=<seconds>] [--run-id=<id>] [--format=lines|json] [--fields=<a,b>] [--where=<k=v>] [--limit=<n>] [--budget=<bytes>] [--group=type|role] [--priority=on] [--echo=hide]
 --echo=hide drops source=agent. --priority=on keeps human, answer, click, then mutation. --cursor is per channel and repeatable.
+Tier: control.
 
 # help chat-read
 Usage: chat-read [--last=<n>] [--mark-read=true] [--channel=<name>] [--run-id=<id>]
 The last n messages (default 20) as the person sees them, plus recent cards. Read-only: it does not move the chat cursor or mark anything read unless --mark-read=true.
+Tier: human.
 
 # help chat-send
 Usage: chat-send --text=<message> [--source=agent|human|system] [--channel=<name>] [--agent=<id>] [--run-id=<id>]
+Tier: control.
 
 # help chat-turn
 Usage: chat-turn --text=<message> [--until=human|answer|click] [--timeout=<seconds>] [--channel=<name>] [--run-id=<id>]
 Sends the text as the agent first and reports sentId and status=delivered, then waits for a human, an answer, or a click. Only a human message after sentId is the reply; an older unread one is listed under earlier with earlier=true. --timeout accepts a trailing s or ms. The person's message is listed once. A live worker that is still up reports timeout, not unreachable. --timeout default 30, max 120.
+Tier: control.
 
 # help close-window
 Usage: close-window
+Tier: control.
 
 # help confirm
 Usage: confirm [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<path:line>] [--quiet] [--runvar=key=value] [--run-id=<id>] [--agent=<id>] [--run-timeout=<seconds>]
 The summary counts are this launch only. A PASSED summary does not include an earlier attempt's failures.
+Tier: control.
 
 # help controller-ping
 Usage: controller-ping [project]
 One warm round trip. The reply is the agent envelope.
+Tier: control.
 
 # help controller-start
 Usage: controller-start [project]
 Starts the long-lived agent controller for this project. Later verbs are clients of that process. The classpath is classpath.cache or this program's own classes, not a wrapper classpath that lacks PkbMain. A down controller runs the verb in-process and does not wait. PKB_NO_AGENT_HOP=1 stays in-process.
+Tier: control.
 
 # help controller-status
 Usage: controller-status [project]
 Prints running=true and the pid when the controller is up.
+Tier: control.
 
 # help controller-stop
 Usage: controller-stop [project]
 Stops the agent controller and deletes its handle file.
+Tier: control.
 
 # help diagnostic-run
 Usage: diagnostic-run --run=<id> [--run-id=<live-session>]
+Tier: control.
 
 # help discover
 Usage: discover [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<path:line>] [--plan] [--quiet] [--refresh] [--no-narrow|--full-scan] [--runvar=key=value] [--retention=all|failed|none] [--run-id=<id>] [--agent=<id>] [--run-timeout=<seconds>]
+Tier: control.
 
 # help discover-hint
 Usage: discover-hint [--json]
+Tier: control.
 
 # help doctor
 Usage: doctor
 Reports chrome, session, health, headed, pid, bridge, worker, lease, leaseLeft, orphans, frame, placed, and waits. chrome=present only while the recorded Chrome pid is alive. lease is open when leaseLeft is 0. live-stop clears the session. No session still exits 0. waits is how many blocking waits are off the command lane. A wait in progress stays health=ok.
+Tier: human.
 
 # help events
 Usage: events [--hooks] [--json] [--cursor=<token>] [--run-id=<id>] [--follow] [--until=<type|text=...>] [--timeout=<seconds>] [--type=<name>] [--echo] [--from=any] [--format=lines|json] [--fields=<a,b>] [--where=<k=v>] [--limit=<n>] [--budget=<bytes>] [--group=type|role] [--priority=on]
 --follow tails .pickleball/agent-events.jsonl from the end of the file unless --cursor is set, so earlier lines are not returned. --until=human is a chat message, an answer, or an agent-UI click, not a keystroke. It exits on the first match in this process. It does not hop and it does not leave a child process. No Workbench session is required. --timeout default 30, max 120. 0 checks once. Own source=agent lines are hidden unless --echo or --from=any.
+Tier: control.
 
 # help example
 Usage: example --example=<rows>
+Tier: control.
 
 # help execute-step
 Usage: execute-step <gherkin> | execute-step --text=<gherkin> | --text-file=<path> | --text-b64=<base64> [--ack-only] [--step-timeout=<seconds>]
+Tier: control.
 
 # help execute-steps
 Usage: execute-steps --file=<steps.json> [--stop-on-fail]
 Runs a JSON array of {op,args} or one verb per line. Page verbs post to the live worker when it is up. doctor runs in this process. stopped is true only with --stop-on-fail. A failure without that flag says steps failed.
+Tier: control.
 
 # help export-guidance
 Usage: export-guidance [output-directory] [--warm]
 --warm writes classpath.cache, starts the controller, and prints warm=true, classpath=, pingMs=, and pingExit=. pingMs is the second ping.
+Tier: control.
 
 # help find
 Usage: find --target=<selector> [--query=<text>] [--format=lines|json] [--fields=<a,b>] [--where=<k=v>] [--limit=<n>] [--budget=<bytes>] [--group=type|role] [--priority=on] [--purpose=<token>] [--exposure=human|full] [--include=<groups>]
 An exact accessible name beats a substring: when one hit's name equals the query, substring hits are dropped. --purpose (or purpose=<token> in the query) keeps controls whose data-pkb-purpose has that token. Hits are returned once, as items. A long page ref is not embedded. --fields keeps only the named keys. An icon inside a link, including a glued prefix, resolves to that link.
+Tier: human.
 
 # help find-element
 Usage: find-element (--category=<Button> [--text=<label>] | --query=<selector>) [--exposure=human|lower] [--limit=<n>] [--explain] [--promote-visual] [--html=<file>]
+Tier: control.
 
 # help finish
 Usage: finish --run-id=<id> [--learned=<one line>] [--status=PASSED|FAILED|EMPTY|TIMEOUT|STOPPED]
+Tier: control.
 
 # help form-fill
 Usage: form-fill --target=<selector> --fields=id=value|id=value
 A field is an id, a name, a short id, or the visible label (case and a trailing colon are ignored).
+Tier: control.
 
 # help frame
 Usage: frame --target=<selector> [--list] [--reset] [--enter=<id|name>]
 Lists frames, returns later steps to the top document, or enters a frame. --reset clears the entered frame and the page driver. The page engine is Chrome DevTools. --engine=selenium is not supported. --enter scopes later find, act, snap, and inspect to that frame, and enters an iframe with that id, name, or title when the driver can see it. Replies include frame.
+Tier: control.
 
 # help from-here
 Usage: from-here
+Tier: control.
 
 # help gc-runs
 Usage: gc-runs [--dry-run]
 Deletes expired run payloads and stopped browser profiles that nothing holds. It is not part of finish. --dry-run prints would-remove paths and deletes nothing. Any other flag is rejected and deletes nothing.
+Tier: control.
 
 # help gc-versions
 Usage: gc-versions
+Tier: control.
 
 # help guide
 Usage: guide --steps=<json array>|@file.json [--id=<guide>] [--scroll=true] [--run-id=<id>]  (step: {"t":"#email","say":"Type your email","do":"input"}; do is click, input, select, check, or any; t may be a digit-leading id, #id, or [id="..."]; an input step ends on Enter, blur, or expect, not a typing pause; a missing current target is refused and is not listed in Steps; field badges are removed when the guide ends)
+Tier: control.
 
 # help help
 Pickleball Workbench. help <command> prints usage. help <flag> prints that flag.
@@ -165,132 +202,169 @@ session: isolate session-start execute-step status events stop kill open-scenari
 coordination: short-log note inbox finish presence post history gc-runs gc-versions use-version export-guidance
 descriptors: session list | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>
 page: inspect-page find-element
-agent: observe launch windows tabs chat-send chat-history chat-poll chat_wait chat-turn chat-read highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close panel-open panel-close panel-state guide guide-next guide-back guide-done ask ask-and-wait answer-wait pin toast checklist ui-apply ui-poll ui-catalog ui-verify capture-scenario capture-steps record screenshot selftest doctor act form-fill snap find frame wait wait-for watch explain capture attach upload navigate eval ref controller-start controller-stop controller-status controller-ping call execute-steps
+agent: observe launch windows tabs chat-send chat-history chat-poll chat_wait chat-turn chat-read highlight unhighlight overlay overlay-poll overlay-remove label unlabel border unborder arrow unarrow step-badge unstep-badge magnifier unmagnifier spotlight unspotlight html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close panel-open panel-close panel-state session-mode guide guide-next guide-back guide-done ask ask-and-wait answer-wait pin toast checklist ui-apply ui-poll ui-catalog ui-verify capture-scenario capture-steps record screenshot selftest doctor act form-fill snap find frame wait wait-for watch explain capture attach upload navigate eval ref controller-start controller-stop controller-status controller-ping call execute-steps
 consumer: start live-stop history-summary history-query entity-lookup open-run bridge-health
 retrieval: query runs | query get | query query | query search | query props | query errors | query tail
 controller: sync worker-check live-check ui mcp session
 dashboard: dashboard [--project=<dir>] [--out=<file>] | dashboard query | dashboard xref | dashboard overlap
-all: act answer-wait arrow ask ask-and-wait attach border bridge-health call capture capture-scenario capture-steps chat-history chat-poll chat-read chat-send chat-turn chat_wait checklist close-window confirm controller-ping controller-start controller-status controller-stop diagnostic-run discover discover-hint doctor entity-lookup eval events example execute-step execute-steps explain export-guidance find find-element finish form-fill frame from-here gc-runs gc-versions guide guide-back guide-done guide-next help highlight hint history history-query history-summary html-cleanup html-insert html-remove html-replace html-write inbox insert-step inspect-page isolate kill label launch live-check magnifier mcp navigate note observe open-run open-scenario open-window overlay overlay-poll overlay-remove panel-close panel-open panel-state pause pin plan play popup-close popup-open popup-status post presence query record ref refresh resolve-runvars save screenshot selftest session session-hold session-info session-list session-release session-start session-sync short-log show-run snap spotlight start status step-badge stop sync tabs toast ui ui-apply ui-catalog ui-poll ui-verify unarrow unborder unhighlight unlabel unmagnifier unspotlight unstep-badge update-step upload use-version validate wait wait-for watch windows worker-check worker-restart worker-start worker-stop workspace-edit workspace-seed workspace-show
+all: act answer-wait arrow ask ask-and-wait attach border bridge-health call capture capture-scenario capture-steps chat-history chat-poll chat-read chat-send chat-turn chat_wait checklist close-window confirm controller-ping controller-start controller-status controller-stop diagnostic-run discover discover-hint doctor entity-lookup eval events example execute-step execute-steps explain export-guidance find find-element finish form-fill frame from-here gc-runs gc-versions guide guide-back guide-done guide-next help highlight hint history history-query history-summary html-cleanup html-insert html-remove html-replace html-write inbox insert-step inspect-page isolate kill label launch live-check magnifier mcp navigate note observe open-run open-scenario open-window overlay overlay-poll overlay-remove panel-close panel-open panel-state pause pin plan play popup-close popup-open popup-status post presence query record ref refresh resolve-runvars save screenshot selftest session session-hold session-info session-list session-mode session-release session-start session-sync short-log show-run snap spotlight start status step-badge stop sync tabs toast ui ui-apply ui-catalog ui-poll ui-verify unarrow unborder unhighlight unlabel unmagnifier unspotlight unstep-badge update-step upload use-version validate wait wait-for watch windows worker-check worker-restart worker-start worker-stop workspace-edit workspace-seed workspace-show
 
 # help highlight
 Usage: highlight --handle=<id> (--preset=yellow|outline-red) [--style=<css>] [--html=<page>] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>]
 A short id (s1.h18) names that element and is not expanded to its accessible name.
+Tier: control.
 
 # help hint
 Usage: hint [--json]
+Tier: control.
 
 # help history
 Usage: history --append --text=<one line>
+Tier: control.
 
 # help html-cleanup
 Usage: html-cleanup [--html=<page>]
+Tier: control.
 
 # help html-insert
 Usage: html-insert --handle=<id> --text=<html> [--where=before|after] [--html=<page>]
+Tier: control.
 
 # help html-remove
 Usage: html-remove --id=<id> [--html=<page>]
+Tier: control.
 
 # help html-replace
 Usage: html-replace --handle=<id> --text=<html> [--html=<page>]
+Tier: control.
 
 # help html-write
 Usage: html-write --text=<html> [--html=<page>]
+Tier: control.
 
 # help inbox
 Usage: inbox --write --to=<agent-id|any> --text=<one line> [--from=<agent-id>] [--run-id=<id>] | inbox --list|--take --agent=<id>
+Tier: control.
 
 # help insert-step
 Usage: insert-step --text=<gherkin>
+Tier: control.
 
 # help inspect-page
 Usage: inspect-page [--query=<selector>] [--html=<file>] [--target=<selector>] [--format=lines|json] [--fields=<a,b>] [--where=<k=v>] [--limit=<n>] [--budget=<bytes>] [--group=type|role] [--priority=on]
 Lists interactive elements and the phrase that would target each one. It takes no category. The reply names the current frame. A compact reply keeps the first phrase and at least one element line. --target uses the same page as snap.
+Tier: control.
 
 # help isolate
 Usage: isolate [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--runvar=key=value] [--run-id=<id>] [--agent=<id>] [--session-file=<path>]
 A new --run-id with no workspace is seeded from the project, then the session starts.
+Tier: control.
 
 # help kill
 Usage: kill
+Tier: control.
 
 # help label
 Usage: label --text=<label> [--handle=<id>] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--geometry=<json>] [--target=auto|page|popup|native] [--block=true] [--html=<page>]
 A short id (s1.h18) names that element and is not expanded to its accessible name.
+Tier: control.
 
 # help launch
 Usage: launch --template=<name> [--arg=<chrome-arg>] [--start] [--run-id=<id>]
 Templates: chrome-headed-verbose, chrome-headed-quiet, chrome-headless-verbose, chrome-headless-quiet, edge-headed-quiet, edge-headless-quiet, chrome-headed-logs, chromium-headed-quiet. Args are added to the existing pkb_browser / Selenium Manager launch. Chromium uses that Chrome launcher. --start calls DriverConstruction. The page engine is Chrome DevTools. --engine=selenium is not a browser engine and is rejected.
+Tier: control.
 
 # help magnifier
 Usage: magnifier [--text=<caption>] [--zoom=<1-8>] [--handle=<id>] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--target=auto|page|popup|native] [--block=true] [--html=<page>]
 A short id (s1.h18) names that element and is not expanded to its accessible name. The live oval scales the copied target around its center so the label stays visible.
+Tier: control.
 
 # help note
 Usage: note --text=<one line> [--agent=<id>] [--run-id=<id>]
+Tier: control.
 
 # help observe
 Usage: observe [--type=<Network|console|log>] [--url=<substring>] [--request=<substring>] [--response=<substring>] [--since=<epoch-ms>] [--until=<epoch-ms>] [--limit=<n>] [--wait-ms=<n>] [--follow] [--timeout=<seconds>] [--events=<file>] [--cdp=<url>] [--session=<id>] [--run-id=<id>]
 --request keeps Network.requestWillBeSent rows. --response keeps response and loading rows. * keeps every row of that kind. Both flags keep a row that matches either one. --follow reads the current buffer and returns. It does not leave a process. With --follow, --timeout is seconds (default 0, one read, max 120).
+Tier: control.
 
 # help open-scenario
 Usage: open-scenario --feature=<path-or-name> --name=<scenario> [--example=<rows>]
+Tier: control.
 
 # help open-window
 Usage: open-window --run-id=<id>
+Tier: control.
 
 # help overlay
 Usage: overlay --text=<html> [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--handle=<id>] [--at=auto|top|bottom|left|right|over] [--theme=auto|light|dark] [--block=true] [--geometry=<json>] [--html=<page>]
+Tier: control.
 
 # help overlay-poll
 Usage: overlay-poll [--after=<next>] [--run-id=<id>] [--format=lines|json] [--fields=<a,b>] [--where=<k=v>] [--limit=<n>] [--budget=<bytes>] [--group=type|role] [--priority=on] [--echo=hide]
+Tier: control.
 
 # help overlay-remove
 Usage: overlay-remove --id=<id> [--html=<page>]
+Tier: control.
 
 # help pause
 Usage: pause
+Tier: control.
 
 # help plan
 Usage: plan [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<path:line>] [--refresh] [--json]
+Tier: control.
 
 # help play
 Usage: play
+Tier: control.
 
 # help popup-close
 Usage: popup-close
+Tier: control.
 
 # help popup-open
 Usage: popup-open
+Tier: control.
 
 # help popup-status
 Usage: popup-status
+Tier: control.
 
 # help post
 Usage: post --write --to=<agent-id|all> --text=<one line> [--run-id=<id>] [--ttl=1h] | post --renew --id=<id> [--ttl=1h]
+Tier: control.
 
 # help presence
 Usage: presence --touch --agent=<id> [--run-id=<id>] | presence --list | presence --sweep
+Tier: control.
 
 # help query
 Usage: query <runs|get|query|search|props|errors|tail> [--run-id=<id>] [--scenario=<id>] [--kind=run|scenario|step|event|property|artifact|error|log] [--text=<words>] [--status=<outcome>] [--fields=<a,b>] [--limit=<n>] [--cursor=<token>] [--id=<id>]
+Tier: control.
 
 # help record
 Usage: record --start [--session=<id>] | --stop | --status | --pause | --resume | --script | --editor | --edit --index=<n> --text=<phrase> | --move --from=<n> --to=<n> [--depth=<n>] | --nest --index=<n> | --outdent --index=<n> | --add [--index=<n>] [--text=<phrase>] [--depth=<n>] | --delete --index=<n> | --popout --panel=editor|chat | --popin --panel=editor|chat | --save --name=<name> | --load --name=<name> | --list | --export --name=<name> --format=feature [--out=<file>] | --run --name=<name> [--param=<name=value>] | --inject --kind=<click|input|select|key|hover|drag|check> [--query=<label>] [--value=<text>] [--role=<role>] | --rename --from=<param> --to=<param> | --literal=<param> | --reject --index=<n> | --accept --index=<n> | --context --text=<phrase>
 Records DOM and desktop interactions. Rows use event=interaction and land in .pickleball/agent-events.jsonl and .pickleball/recordings/stream.jsonl. events --follow --type=interaction reads them. --script prints parameterized dynamic steps. A typed value becomes <name>. --run substitutes --param values. Routines are stored under .pickleball/recordings/routines. The in-page step editor is collapsible, resizable, and draggable. --editor returns its rows (id, index, text, depth). --edit, --move, --nest, --outdent, --add, and --delete write the list back; a new interaction still appends. Nesting is a leading colon. --popout and --popin move the step editor or the chat panel between the page and its own browser window. Keyboard: Alt+Up/Down reorder, Tab/Shift+Tab nest, Ctrl+Enter or Cmd+Enter add, Ctrl+Backspace delete.
+Tier: control.
 
 # help ref
 Usage: ref --id=<short-id>
 Expands a short id such as s1.h42 to its full ref. The id follows the DOM node until that node is removed.
+Tier: control.
 
 # help refresh
 Usage: refresh
+Tier: control.
 
 # help resolve-runvars
 Usage: resolve-runvars [--json]
+Tier: control.
 
 # help save
 Usage: save
+Tier: control.
 
 # help selftest
 Usage: selftest ui --cpu [--component=panel]
@@ -298,95 +372,123 @@ selftest ui --component=pages
 selftest ui --component=feedback
 selftest record
 Chrome is found on PATH, then Windows LOCALAPPDATA and Program Files, macOS applications, and the usual Linux paths. The idle window is 2000 ms. --component=feedback checks sending, delivered, and read in the page runtime. It does not need Chrome. selftest record clicks and types inside a fixture iframe and checks that the script names that frame and element, with no own-UI noise. It needs Chrome.
+Tier: control.
 
 # help session
 Usage: session list [--json] | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>
 Bare session starts the controller. Agents testing alone use isolate.
+Tier: control.
 
 # help session-start
 Usage: session-start [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--run-id=<id>] [--agent=<id>] [--session-file=<path>]
 A new --run-id with no workspace is seeded from the project, then the session starts.
+Tier: control.
 
 # help session-sync
 Usage: session-sync
+Tier: control.
 
 # help short-log
 Usage: short-log [--limit=<n>]
+Tier: control.
 
 # help show-run
 Usage: show-run --run-id=<id>
+Tier: control.
 
 # help snap
 Usage: snap [--target=browser:auto|browser:<id>|browser:cdp=<url>|desktop:<pid>|desktop:app~<name>|ref:<doc>:<handle>] [--session=<id>] [--within=<id>] [--depth=<n>] [--group=role|type] [--priority=on] [--format=lines|json] [--fields=<a,b>] [--where=<role=button>] [--limit=<n>] [--budget=<bytes>] [--include=values,highlights,cards,guide,placements,chat] [--exposure=human|full] [--since=<snapCursor>]
 Rows carry value (passwords redacted), checked, purpose, badge, highlight, guide, card, and msg when present; --include narrows them. --since prints only rows added or changed since that snap and lists removed rows. --within is a ref, short id, backend id, or element id. --session is the start or isolate session id. Omit it to use the current live session. --fields prints only those keys. --budget is the whole reply in bytes (at most 16 KB). Default lines use a short id and omit a long ref. A document, shadow root, html, body, and head do not consume a depth level.
+Tier: human.
 
 # help spotlight
 Usage: spotlight [--dim=<0-1>] [--handle=<id>] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--target=auto|page|popup|native] [--block=true] [--html=<page>]
 A short id (s1.h18) names that element and is not expanded to its accessible name.
+Tier: control.
 
 # help start
 Usage: start --url=<page> | --url-key=<URL.key> --browser=<chrome|edge|chrome-headless> [--headed] [--hold=<seconds|forever>] [--panel] [--size=1600x1000] [--env=KEY=VALUE]
 Opens the browser, navigates, and waits until GET /health is ok. fixture: names a built-in page. --panel opens the page panel. live-start is start. The reply includes the agent envelope. The page engine is Chrome DevTools. --engine=selenium is rejected. A start that does not become healthy names the stage, stops the partial Chrome, and prints the log tail.
+Tier: control.
 
 # help status
 Usage: status [command-id] [--json] [--run-id=<id>]
+Tier: control.
 
 # help stop
 Usage: stop [--force] [--run-id=<id>]
+Tier: control.
 
 # help sync
 Usage: sync
+Tier: control.
 
 # help tabs
 Usage: tabs [--switch=<handle>] [--close=<handle>] [--run-id=<id>]
+Tier: control.
 
 # help ui
 Usage: ui [--ops=<json array>]
 Without --ops, ui opens the Workbench controller. With --ops, ui applies a catalog batch (same as ui-apply).
+Tier: control.
 
 # help ui-poll
 Usage: ui-poll [--after=<n>] [--chat-after=<id>] [--cursor=<token>] [--wait=<seconds, up to 25>] [--id=<question>] [--channel=<name>] [--run-id=<id>] [--format=lines|json] [--fields=<a,b>] [--where=<k=v>] [--limit=<n>] [--budget=<bytes>] [--group=type|role] [--priority=on] [--echo=hide]
 The cursor channel is ui. With no --after and no --cursor the poll starts at now. The same token returns the same events and does not move the chat cursor. --id returns that question and ignores other events until the answer or the wait ends.
+Tier: control.
 
 # help ui-verify
 Usage: ui-verify [--run-id=<id>]
 Reads every placement: visible, rect, and overlaps. Needs a live browser.
+Tier: control.
 
 # help unhighlight
 Usage: unhighlight [--handle=<id>] [--html=<page>]
 A short id (s1.h18) names that element and is not expanded to its accessible name.
+Tier: control.
 
 # help update-step
 Usage: update-step --text=<gherkin>
+Tier: control.
 
 # help use-version
 Usage: use-version --version=<safe-version>
+Tier: control.
 
 # help validate
 Usage: validate [--tags=<expr>] [--name=<regex>] [--run-id=<id>] [--max-steps=<n>] [--all] [--noop]
 Reports undefined steps, ambiguous glue, and unresolved RUN SCENARIO targets. Outline rows are expanded. Core steps count as defined. A long suite prints progress and stops at a step cap unless --max-steps or --all is set, and reports how many scenarios were skipped. Plain validate lists empty consumer step definitions (noop:true) and exits 1 when any are found. --noop is accepted. --noop with --tags still filters the feature scan and lists those noops. A non-empty body is not listed. Runs nothing. A flag this command does not use, including --quiet, is rejected with error: and fix:.
+Tier: control.
 
 # help watch
 Usage: watch --target=<selector> [--ref=<ref>] [--until=mutation|change|visible|hidden|text=<text>|click] [--kinds=<kinds>] [--duration=<ms>]
 mutation and change include same-origin iframe documents and attached child frames. A replaced iframe document and a changed selected tab count even when that document's counter starts at zero.
+Tier: control.
 
 # help windows
 Usage: windows [--switch=<handle>] [--close=<handle>] [--run-id=<id>]
+Tier: control.
 
 # help worker-restart
 Usage: worker-restart
+Tier: control.
 
 # help worker-start
 Usage: worker-start
+Tier: control.
 
 # help worker-stop
 Usage: worker-stop
+Tier: control.
 
 # help workspace-edit
 Usage: workspace-edit --run-id=<id> (--runvar=key=value | --config=<relative> --text=<body>) [--expect=<fingerprint>]
+Tier: control.
 
 # help workspace-seed
 Usage: workspace-seed --run-id=<id> [--reseed] [--from-run=<id>]
+Tier: control.
 
 # help workspace-show
 Usage: workspace-show --run-id=<id> [--json]
+Tier: control.

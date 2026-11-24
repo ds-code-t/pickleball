@@ -17,7 +17,7 @@ final class AgentHop {
             "step-badge", "unstep-badge", "magnifier", "unmagnifier", "spotlight", "unspotlight",
             "html-write", "html-replace", "html-insert", "html-remove", "html-cleanup",
             "popup-open", "popup-status", "popup-close",
-            "panel-open", "panel-close", "panel-state",
+            "panel-open", "panel-close", "panel-state", "session-mode",
             "guide", "guide-next", "guide-back", "guide-done", "ask",
             "ui-apply", "ui-poll", "ui-catalog", "ui-verify",
             "capture-scenario", "capture-steps", "record", "screenshot", "selftest",

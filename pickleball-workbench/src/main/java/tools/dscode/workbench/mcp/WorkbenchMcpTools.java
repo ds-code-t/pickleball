@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.modelcontextprotocol.server.McpServerFeatures;
 import io.modelcontextprotocol.spec.McpSchema;
 import tools.dscode.control.protocol.AgentLog;
+import tools.dscode.control.protocol.VerbTiers;
 import tools.dscode.control.protocol.OutputFormatter;
 import tools.dscode.control.protocol.SecretRedactor;
 import tools.dscode.control.protocol.ControlBridgeMappingSnapshot;
@@ -1176,7 +1177,9 @@ final class WorkbenchMcpTools {
             Map<String, Object> inputSchema,
             Function<Map<String, Object>, Object> action
     ) {
-        tools.put(name, new ToolBinding(name, description, inputSchema, action));
+        // The tier comes from the one registry (VerbTiers): human tools use the human view and human input only.
+        String tiered = description + " Tier: " + VerbTiers.toolTier(name) + ".";
+        tools.put(name, new ToolBinding(name, tiered, inputSchema, action));
     }
 
     private McpServerFeatures.SyncToolSpecification specification(ToolBinding binding) {

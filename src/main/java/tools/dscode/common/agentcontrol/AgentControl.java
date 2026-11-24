@@ -151,6 +151,8 @@ public final class AgentControl {
         tools.dscode.common.agentfast.PushChannel.bind(project, session);
         Map<String, String> values = args == null ? new java.util.LinkedHashMap<>() : new java.util.LinkedHashMap<>(args);
         tools.dscode.common.agentfast.AgentCursor.absorb(op, values);
+        String humanRefusal = HumanLock.check(project, runId, op, values, agentId);
+        if (humanRefusal != null) return timed(refusal(humanRefusal), started, project, runId, op);
         try {
             Optional<Result> routed = AgentSurfaceRouter.route(project, runId, op, values, agentId);
             if (routed.isPresent()) return timed(routed.get(), started, project, runId, op);
@@ -1898,6 +1900,22 @@ public final class AgentControl {
         body.put("ok", true);
         body.put("sentence", sentence);
         return body;
+    }
+
+    /** An error/fix refusal: {@code error} and {@code fix} fields, exit 2. */
+    static Result refusal(String text) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("ok", false);
+        String error = text;
+        String fix = "";
+        int split = text.indexOf("\nfix: ");
+        if (split >= 0) {
+            error = text.substring(0, split);
+            fix = text.substring(split + "\nfix: ".length());
+        }
+        body.put("error", error.startsWith("error: ") ? error.substring("error: ".length()) : error);
+        if (!fix.isBlank()) body.put("fix", fix);
+        return new Result(2, body);
     }
 
     private static Result fail(int exit, String error) {

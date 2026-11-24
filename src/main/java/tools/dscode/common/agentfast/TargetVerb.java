@@ -75,7 +75,7 @@ public final class TargetVerb {
     private static final Set<String> ACT_KEYS = Set.of(
             "target", "kind", "query", "ref", "value", "snap", "run-id", "agent", "agent-id",
             "fixture", "timeout", "condition", "frame", "group", "sequence",
-            "format", "fields", "where", "limit", "budget", "pick", "session", "sessionId", "exposure", "purpose", "file"
+            "format", "fields", "where", "limit", "budget", "pick", "session", "sessionId", "exposure", "purpose", "file", "human"
     );
 
     /** CSS or text selector for a fresh {@code ref:}. Null when the ref is unknown or stale. */
@@ -1823,6 +1823,9 @@ public final class TargetVerb {
         if (disabled(control)) {
             if (inputOff) FallbackLog.note(project, runId, "act", "cdp", "js", "cdp input disabled");
             return Effect.refused(inputOff ? "js" : "cdp", inert(control) ? "inert" : "disabled");
+        }
+        if (inputOff && "on".equals(args.get("human"))) {
+            return Effect.refused("js", "human mode needs real input; CDP input is off");
         }
         String framed = cdpSessionOf(node);
         if ("click".equals(kind)) {

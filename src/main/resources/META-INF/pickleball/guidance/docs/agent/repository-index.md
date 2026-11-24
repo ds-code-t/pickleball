@@ -181,6 +181,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentcontrol/ChatHead.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ChatLog.java`
 - `src/main/java/tools/dscode/common/agentcontrol/EventCursor.java`
+- `src/main/java/tools/dscode/common/agentcontrol/HumanLock.java`
 - `src/main/java/tools/dscode/common/agentcontrol/HumanValue.java`
 - `src/main/java/tools/dscode/common/agentcontrol/LaunchTemplates.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ObserveEvents.java`
@@ -957,6 +958,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/GcRunsDryRunTest.java`
 - `src/test/java/tools/dscode/launcher/GuidanceCommandGoldenTest.java`
 - `src/test/java/tools/dscode/launcher/HousekeepingRoadmapTest.java`
+- `src/test/java/tools/dscode/launcher/HumanTierTest.java`
 - `src/test/java/tools/dscode/launcher/JsFallbackHonestyTest.java`
 - `src/test/java/tools/dscode/launcher/MaskQuietTest.java`
 - `src/test/java/tools/dscode/launcher/NavigateDataFileTest.java`
@@ -1316,6 +1318,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/WarmProcess.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/StoreHistoryReader.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/surface/NativeHighlightBox.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/VerbTiers.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/WindowDriver.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/WorkbenchFeatureIndex.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/Workspace.java`

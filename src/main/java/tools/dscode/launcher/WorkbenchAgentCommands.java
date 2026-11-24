@@ -58,6 +58,74 @@ public final class WorkbenchAgentCommands {
     private WorkbenchAgentCommands() {
     }
 
+    /** The CLI-side human-lock gate; AgentControl applies the same check to MCP and Workbench calls. */
+    private static String humanLockRefusal(WorkbenchCommandLine.Parsed parsed) {
+        String command = parsed.command();
+        if (command == null || "start".equals(command)) return null;
+        Map<String, String> args = new LinkedHashMap<>();
+        String kind = flag(parsed, "--kind");
+        if (kind != null) args.put("kind", kind);
+        String override = flag(parsed, "--human-override");
+        if (override != null) args.put("human-override", override);
+        return tools.dscode.common.agentcontrol.HumanLock.check(parsed.project(), parsed.coordination().runId(), command, args, agentIdOf(parsed));
+    }
+
+    private static boolean humanRequested(WorkbenchCommandLine.Parsed parsed) {
+        String[] tokens = parsed.forwarded();
+        if (tokens != null) {
+            for (String token : tokens) {
+                if ("--human".equals(token)) return true;
+                if (token != null && token.startsWith("--human=")) {
+                    String value = token.substring("--human=".length()).trim();
+                    return !"off".equalsIgnoreCase(value) && !"false".equalsIgnoreCase(value);
+                }
+            }
+        }
+        String mode = null;
+        if (parsed.runVars() != null) {
+            for (String assignment : parsed.runVars()) {
+                if (assignment != null && assignment.startsWith("pkb_human_mode=")) mode = assignment.substring("pkb_human_mode=".length());
+            }
+        }
+        if (mode == null) mode = System.getenv("pkb_human_mode");
+        return mode != null && ("on".equalsIgnoreCase(mode.trim()) || "true".equalsIgnoreCase(mode.trim()));
+    }
+
+    private static String agentIdOf(WorkbenchCommandLine.Parsed parsed) {
+        String id = parsed.coordination() == null ? null : parsed.coordination().agentId();
+        return id == null ? "" : id;
+    }
+
+    /** session-mode --human=on|off turns the human lock on an existing session on or off. */
+    private static int sessionMode(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        try {
+            return sessionModeOrThrow(parsed, out, err);
+        } catch (java.io.IOException failure) {
+            err.println(WorkbenchCliHelp.structured("session-mode failed: " + failure.getMessage(), "check .pickleball is writable").stripTrailing());
+            return 1;
+        }
+    }
+
+    private static int sessionModeOrThrow(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) throws java.io.IOException {
+        String human = flag(parsed, "--human");
+        String runId = parsed.coordination().runId();
+        if (human == null || human.isBlank()) {
+            boolean on = tools.dscode.common.agentcontrol.HumanLock.locked(parsed.project(), runId);
+            out.println("{\"ok\":true,\"op\":\"session-mode\",\"human\":\"" + (on ? "on" : "off") + "\"}");
+            return 0;
+        }
+        String value = human.trim().toLowerCase(java.util.Locale.ROOT);
+        if (!value.matches("on|off|true|false")) {
+            err.println(WorkbenchCliHelp.structured("session-mode --human must be on or off", "session-mode --human=on|off [--run-id=<id>]").stripTrailing());
+            return 2;
+        }
+        boolean on = "on".equals(value) || "true".equals(value);
+        if (on) tools.dscode.common.agentcontrol.HumanLock.lock(parsed.project(), runId, agentIdOf(parsed));
+        else tools.dscode.common.agentcontrol.HumanLock.unlock(parsed.project(), runId);
+        out.println("{\"ok\":true,\"op\":\"session-mode\",\"human\":\"" + (on ? "on" : "off") + "\"}");
+        return 0;
+    }
+
     public static int run(String[] args, PrintStream out, PrintStream err) {
         WorkbenchSpeed.enableDirect();
         try {
@@ -85,10 +153,29 @@ public final class WorkbenchAgentCommands {
         RunVarOverrides.publish(parsed.project(), parsed.runVars());
         PrintStream safeOut = OutputFormatter.wrap(out);
         PrintStream safeErr = OutputFormatter.wrap(err);
+        String humanRefusal = humanLockRefusal(parsed);
+        if (humanRefusal != null) {
+            safeErr.println(humanRefusal);
+            return 2;
+        }
         try {
             return switch (parsed.command()) {
+                case "session-mode" -> sessionMode(parsed, safeOut, safeErr);
                 case "export-guidance" -> exportGuidance(parsed, safeOut, safeErr);
-                case "start" -> ConsumerReadyCommands.start(parsed, safeOut, safeErr);
+                case "start" -> {
+                    int started = ConsumerReadyCommands.start(parsed, safeOut, safeErr);
+                    if (started == 0 && humanRequested(parsed)) {
+                        try {
+                            tools.dscode.common.agentcontrol.HumanLock.lock(parsed.project(), parsed.coordination().runId(), agentIdOf(parsed));
+                            safeOut.println("human=on");
+                        } catch (java.io.IOException failure) {
+                            safeErr.println(WorkbenchCliHelp.structured("could not record human mode: " + failure.getMessage(),
+                                    "session-mode --human=on").stripTrailing());
+                            yield 1;
+                        }
+                    }
+                    yield started;
+                }
                 case "call" -> CompositeCommands.call(parsed, safeOut, safeErr);
                 case "execute-steps" -> CompositeCommands.executeSteps(parsed, safeOut, safeErr);
                 case "doctor" -> ConsumerReadyCommands.doctor(parsed, safeOut, safeErr);
@@ -2069,6 +2156,7 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "mark-read");
         copyFlag(args, parsed, "min-show");
         copyFlag(args, parsed, "collapsed");
+        copyFlag(args, parsed, "human-override");
         copyFlag(args, parsed, "fields");
         copyFlag(args, parsed, "group");
         copyFlag(args, parsed, "priority");
