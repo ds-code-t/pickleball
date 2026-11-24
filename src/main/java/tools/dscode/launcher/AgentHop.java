@@ -21,7 +21,7 @@ final class AgentHop {
             "guide", "guide-next", "guide-back", "guide-done", "ask",
             "ui-apply", "ui-poll", "ui-catalog", "ui-verify",
             "capture-scenario", "capture-steps", "record", "screenshot", "selftest",
-            "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame", "upload",
+            "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame", "upload", "navigate",
             "ask-and-wait", "answer-wait", "pin", "toast", "checklist", "ui", "ref",
             "start", "call", "execute-steps", "doctor"
     );

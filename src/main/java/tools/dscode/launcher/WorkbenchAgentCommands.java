@@ -160,7 +160,7 @@ public final class WorkbenchAgentCommands {
                      "capture-steps",
                      "record",
                      "screenshot", "selftest",
-                     "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame", "upload",
+                     "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame", "upload", "navigate",
                      "ask-and-wait", "answer-wait", "pin", "toast", "checklist", "ui", "ref",
                      "chat-turn", "ui-verify" ->
                         agentControl(parsed, safeOut, safeErr);
@@ -2100,6 +2100,15 @@ public final class WorkbenchAgentCommands {
         if ("arrow".equals(parsed.command())) {
             if (parsed.coordination().inboxFrom() != null) args.put("from", parsed.coordination().inboxFrom());
             if (parsed.coordination().inboxTo() != null) args.put("to", parsed.coordination().inboxTo());
+        }
+        if ("navigate".equals(command)) {
+            // The Gherkin navigate rules: a URL.* config key, a literal http(s)/file/data/about URL, or fixture:<name>.
+            String url = args.get("url");
+            if ((url == null || url.isBlank()) && flag(parsed, "--url-key") != null) url = flag(parsed, "--url-key");
+            String resolved = url == null ? null : UrlKeys.resolve(parsed.project(), url);
+            if (resolved != null && !resolved.isBlank()) args.put("url", resolved);
+            else if (url != null) args.put("url", url);
+            if (!args.containsKey("target")) args.put("target", "browser:auto");
         }
         if ("chat-poll".equals(command) && parsed.coordination().inboxFrom() != null) {
             args.put("from", parsed.coordination().inboxFrom());

@@ -227,6 +227,7 @@ public final class AgentControl {
                 case "ui-catalog" -> uiCatalog(project, runId, values, agentId);
                 case "screenshot" -> screenshot(project, values);
                 case "selftest" -> selftest(project, values);
+                case "navigate" -> navigate(project, runId, values, extraArgs, agentId);
                 case "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame", "upload" -> {
                     tools.dscode.common.agentfast.TargetVerb.Outcome outcome =
                             tools.dscode.common.agentfast.TargetVerb.run(project, runId, op, values);
@@ -428,6 +429,33 @@ public final class AgentControl {
         row.put("text", message.text());
         row.put("at", message.at());
         return row;
+    }
+
+    /** navigate keeps the session and, when the panel was open, opens it again on the new page with its tab. */
+    @SuppressWarnings("unchecked")
+    private static Result navigate(Path project, String runId, Map<String, String> values, List<String> extraArgs, String agentId) throws Exception {
+        String before = null;
+        try {
+            before = PageSurfaces.runtimeCall("panelState", null, false);
+        } catch (Exception ignored) {
+            // No page yet: nothing to keep.
+        }
+        tools.dscode.common.agentfast.TargetVerb.Outcome outcome =
+                tools.dscode.common.agentfast.TargetVerb.run(project, runId, "navigate", values);
+        if (outcome.exit() != 0) return new Result(outcome.exit(), outcome.body());
+        tools.dscode.common.recording.RecordControl.noteAgent(project, runId, "navigate", values, outcome.body());
+        Map<String, Object> body = outcome.body() instanceof Map<?, ?> map
+                ? new LinkedHashMap<>((Map<String, Object>) map) : new LinkedHashMap<>();
+        if (before != null && !before.isBlank() && !"null".equals(before.trim())) {
+            Map<String, Object> state = AgentStore.JSON.readValue(before, Map.class);
+            Map<String, String> open = new LinkedHashMap<>();
+            Object tab = state.get("tab");
+            if (tab != null && !String.valueOf(tab).isBlank()) open.put("tab", String.valueOf(tab));
+            if (Boolean.TRUE.equals(state.get("min"))) open.put("collapsed", "true");
+            Result reopened = panelOpen(project, runId, open, extraArgs, agentId);
+            body.put("panel", reopened.exit() == 0 ? "kept" : "pending");
+        }
+        return new Result(0, body);
     }
 
     private static Result panelOpen(Path project, String runId, Map<String, String> args, List<String> extraArgs, String agentId) throws Exception {

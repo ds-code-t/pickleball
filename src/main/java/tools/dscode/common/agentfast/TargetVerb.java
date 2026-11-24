@@ -297,6 +297,7 @@ public final class TargetVerb {
                 case "find" -> find(project, runId, target, values);
                 case "act" -> withPick(act(project, runId, target, values));
                 case "upload" -> withPick(act(project, runId, target, uploadArgs(values)));
+                case "navigate" -> navigate(project, runId, target, values);
                 case "form-fill" -> formFill(project, runId, target, values);
                 case "wait", "wait-for" -> wait(project, runId, target, values);
                 case "watch" -> watch(project, runId, target, values);
@@ -324,7 +325,7 @@ public final class TargetVerb {
     /** Page verbs with no selector use the browser this process already has open. */
     private static boolean needsLiveTarget(String verb) {
         return switch (verb == null ? "" : verb) {
-            case "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "eval", "upload" -> true;
+            case "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "eval", "upload", "navigate" -> true;
             default -> false;
         };
     }
@@ -425,6 +426,55 @@ public final class TargetVerb {
         markBudget(body, args);
         stampDesktop(body, session);
         return ok(body);
+    }
+
+    /**
+     * {@code navigate --url=}: one {@code Page.navigate} on the held page, then a wait for the load. The CLI already
+     * resolved a config key or {@code fixture:} name with the Gherkin navigate rules. The session, preloads, panel,
+     * and guide state stay; the page-state restore re-injects them into the new document.
+     */
+    private static Outcome navigate(Path project, String runId, TargetSelector.Parsed target, Map<String, String> args) {
+        String url = blank(args.get("url"));
+        if (url.isBlank()) return fail("navigate", "navigate needs --url=<url|fixture:name|URL.key>");
+        if (FixturePages.isFixture(url)) url = FixturePages.resolve(url);
+        String lower = url.toLowerCase(Locale.ROOT);
+        if (!(lower.startsWith("http://") || lower.startsWith("https://") || lower.startsWith("file:")
+                || lower.startsWith("data:") || lower.startsWith("about:"))) {
+            return fail("navigate", "url did not resolve: " + args.get("url"));
+        }
+        if ("desktop".equals(target.kind())) return fail("navigate", "navigate is browser only");
+        Held page = openBrowser(resolved(target, args));
+        try {
+            CdpConnection cdp = page.session.connection();
+            String before = href(cdp, "");
+            ObjectNode params = Jsons.object();
+            params.put("url", url);
+            JsonNode sent = cdp.call("Page.navigate", params, Duration.ofSeconds(30));
+            String error = sent.path("errorText").asText("");
+            if (!error.isBlank()) {
+                Outcome failed = fail("navigate", error);
+                failed.body().put("url", url.length() > 200 ? url.substring(0, 200) : url);
+                return failed;
+            }
+            long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(Math.max(1000, timeoutMs(args)));
+            String state = "";
+            while (System.nanoTime() < deadline) {
+                state = evalText(cdp, "", "document.readyState + '|' + location.href");
+                if (state.startsWith("complete|") && !(state.substring(9).equals(before) && !url.equals(before))) break;
+                sleep(50);
+            }
+            Map<String, Object> body = base("navigate", "cdp", "browser", target);
+            body.put("applied", state.startsWith("complete|"));
+            String now = href(cdp, "");
+            body.put("url", now.length() > 200 ? now.substring(0, 200) : now);
+            body.put("title", title(cdp));
+            body.put("docVersion", docVersion(cdp));
+            stamp(body, cdp, null);
+            putEntered(body, runId, cdp);
+            return ok(body);
+        } finally {
+            page.release();
+        }
     }
 
     /** {@code upload --ref= --file=}: the same act, kind attach. */

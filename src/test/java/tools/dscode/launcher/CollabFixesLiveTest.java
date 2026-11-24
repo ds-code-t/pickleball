@@ -314,6 +314,35 @@ class CollabFixesLiveTest {
                 "the guide is re-injected after navigation");
     }
 
+    @Test
+    @Timeout(value = 120, unit = TimeUnit.SECONDS)
+    void covers_command_navigate() throws Exception {
+        Path second = page("c8b.html", "<h1>Second</h1><button id=\"b\">Beta</button>");
+        Path configs = Files.createDirectories(temp.resolve("src/test/resources/configs"));
+        Files.writeString(configs.resolve("urls.properties"), "URL.second=" + second.toUri() + "\n");
+        start(page("c8.html", "<button id=\"a\">Alpha</button>"), "c8");
+        assertEquals(0, run("panel-open", "--tab=chat", "--run-id=c8").code);
+        assertEquals(0, run("chat-send", "--text=before navigate", "--run-id=c8").code);
+
+        Capture fixture = run("navigate", "--url=fixture:form", "--run-id=c8");
+        assertEquals(0, fixture.code, fixture.err + fixture.out);
+        JsonNode body = JSON.readTree(fixture.out);
+        assertEquals("true", body.path("applied").asText(), fixture.out);
+        assertEquals("Form", body.path("title").asText(), fixture.out);
+
+        Capture keyed = run("navigate", "--url=URL.second", "--run-id=c8");
+        assertEquals(0, keyed.code, keyed.err + keyed.out);
+        assertTrue(JSON.readTree(keyed.out).path("url").asText().endsWith("c8b.html"), keyed.out);
+        Thread.sleep(800);
+        Capture snap = run("snap", "--target=browser:auto", "--run-id=c8");
+        assertTrue(snap.out.contains("Beta"), snap.out);
+        assertTrue(snap.out.contains("chat-tab"), "the panel stays after navigate: " + snap.out);
+
+        Capture bad = run("navigate", "--url=URL.missing", "--run-id=c8");
+        assertNotEquals(0, bad.code, bad.out);
+        assertTrue(bad.out.contains("did not resolve"), bad.out);
+    }
+
     static String pane() {
         return "document.querySelector('pkb-layer').shadowRoot";
     }
