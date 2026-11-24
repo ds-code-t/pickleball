@@ -180,6 +180,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/browser/proto/BrowserEventHub.java`
 - `src/main/java/tools/dscode/browser/proto/CdpSession.java`
 - `src/main/java/tools/dscode/browser/proto/DomCommands.java`
+- `src/main/java/tools/dscode/browser/proto/EmulateCommands.java`
 - `src/main/java/tools/dscode/browser/proto/ErrorCommands.java`
 - `src/main/java/tools/dscode/browser/proto/EventCommands.java`
 - `src/main/java/tools/dscode/browser/proto/HarWriter.java`
@@ -1001,6 +1002,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/DomLogCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/DomPushLiveTest.java`
 - `src/test/java/tools/dscode/launcher/ElementSnapDiffTest.java`
+- `src/test/java/tools/dscode/launcher/EmulateLiveTest.java`
 - `src/test/java/tools/dscode/launcher/EngineCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/ErrorsLiveTest.java`
 - `src/test/java/tools/dscode/launcher/FallbackLoggedTest.java`

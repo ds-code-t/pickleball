@@ -41,7 +41,7 @@ final class WorkbenchCommandLine {
             "popup-open", "popup-status", "popup-close",
             "ui-apply", "ui-poll", "ui-catalog", "ui-verify",
             "guide", "guide-next", "guide-back", "guide-done", "ask",
-            "panel-open", "panel-close", "panel-state", "session-mode", "setup", "relaunch-with-debug", "pw", "cdp", "browser-events", "errors", "logpoint", "net", "net-body", "har", "net-route", "net-unroute", "net-block", "net-headers", "net-auth", "ws-route", "net-cache", "security", "csp", "emulate",
+            "panel-open", "panel-close", "panel-state", "session-mode", "setup", "relaunch-with-debug", "pw", "cdp", "browser-events", "errors", "logpoint", "net", "net-body", "har", "net-route", "net-unroute", "net-block", "net-headers", "net-auth", "ws-route", "net-cache", "security", "csp", "emulate", "clock", "permissions",
             "capture-scenario",
             "capture-steps",
             "record",

@@ -135,11 +135,6 @@ final class RouteCommands {
         ProtoHost.register("security", RouteCommands::security);
         ProtoHost.register("csp", RouteCommands::csp);
         ProtoHost.register("net-routes", (host, f) -> list(host));
-        // E5 owns emulate --network; E6 adds the other emulate options to the same host command.
-        ProtoHost.register("emulate", (host, f) -> {
-            if (f.containsKey("network")) return conditions(host, f);
-            throw new IllegalArgumentException("error: emulate needs an option\nfix: emulate --network=offline|slow-3g|fast-3g|<down,up,latency>");
-        });
     }
 
     /** {@code glob} matches the whole URL ({@code *} any run, {@code ?} one character); {@code re:} is a regex find; text without wildcards is a substring. */
@@ -289,10 +284,11 @@ final class RouteCommands {
             }
             s.credential = new String[]{value.substring(0, colon), value.substring(colon + 1)};
         }
-        BrowserProtocols.Served<String> served = host.protocols().serve("net-auth", f.get("via"), backend -> {
+        String via = skip(host, "net-auth", f.get("via"), BrowserProtocols.Backend.PLAYWRIGHT);
+        BrowserProtocols.Served<String> served = host.protocols().serve("net-auth", via, backend -> {
             if (backend == BrowserProtocols.Backend.PLAYWRIGHT) {
-                // Playwright sets HTTP credentials only when a context is created; a live context falls through.
-                throw new UnsupportedProtocolOperation("net-auth", backend.id(), null);
+                // Playwright sets HTTP credentials only when a context is created.
+                throw new IllegalStateException("error: unsupported: net-auth on a live Playwright context\nfix: use --via=bidi or --via=cdp");
             }
             hook(host, s, backend);
             return backend.id();
@@ -401,17 +397,18 @@ final class RouteCommands {
             }
         }
         boolean throttled = down >= 0;
-        BrowserProtocols.Served<String> served = host.protocols().serve("net-conditions", f.get("via"), backend -> {
+        String via = throttled ? skip(host, "net-conditions", f.get("via"), BrowserProtocols.Backend.PLAYWRIGHT, BrowserProtocols.Backend.BIDI) : f.get("via");
+        BrowserProtocols.Served<String> served = host.protocols().serve("net-conditions", via, backend -> {
             switch (backend) {
                 case PLAYWRIGHT -> {
-                    if (throttled) throw new UnsupportedProtocolOperation("net-conditions", backend.id(), null);
+                    if (throttled) throw new IllegalStateException("error: unsupported: throttling on playwright (offline only)\nfix: use --via=cdp");
                     host.pw().call(c -> {
                         for (BrowserContext context : c.browser().contexts()) context.setOffline(offline);
                         return null;
                     });
                 }
                 case BIDI -> {
-                    if (throttled) throw new UnsupportedProtocolOperation("net-conditions", backend.id(), null);
+                    if (throttled) throw new IllegalStateException("error: unsupported: throttling on bidi (offline only)\nfix: use --via=cdp");
                     host.bidiModules().setNetworkConditions(null, offline);
                 }
                 case CDP -> {
@@ -711,6 +708,18 @@ final class RouteCommands {
         cdp.channel().listen(listener);
         host.stateMap().put("route.cdp.listener", listener);
         cdp.onTarget(t -> enableFetch(host, s, t));
+    }
+
+    /**
+     * For a request one backend cannot serve this time (not ever): with --via unset, the first other backend in order,
+     * so the fallback does not mark the skipped backend unavailable for the whole capability.
+     */
+    static String skip(ProtoHost host, String capability, String via, BrowserProtocols.Backend... skipped) {
+        if (via != null && !via.isBlank() && !"auto".equalsIgnoreCase(via)) return via;
+        for (BrowserProtocols.Backend backend : host.protocols().order(capability, null)) {
+            if (!List.of(skipped).contains(backend)) return backend.id();
+        }
+        return via;
     }
 
     /** Attached page targets, waiting briefly for the first one on a host that just connected. */

@@ -144,6 +144,8 @@ class WorkbenchMcpServerTest {
             "workbench_security",
             "workbench_csp",
             "workbench_emulate",
+            "workbench_clock",
+            "workbench_permissions",
             "workbench_chat_turn",
             "workbench_execute_steps",
             "workbench_ui_verify",

@@ -691,6 +691,20 @@ final class WorkbenchMcpTools {
                         "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
                 )),
                 args -> forwardReady(protoArgs("emulate", args)));
+        add("workbench_clock",
+                "E6: page clock (install, pause-at, fast-forward, run-for, set-fixed, resume).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for clock; see help clock."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("clock", args)));
+        add("workbench_permissions",
+                "E6: grant, deny or reset browser permissions.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for permissions; see help permissions."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("permissions", args)));
         add("workbench_chat_turn",
                 "Send one agent line, then wait for a human message, an answer, or a click.",
                 schema(view),

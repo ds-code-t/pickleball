@@ -22,7 +22,7 @@ import java.util.Set;
 final class ProtoVerbs {
     /** CLI verbs that forward to a host command of the same name. */
     static final Set<String> VERBS = Set.of("browser-events", "errors", "logpoint", "net", "net-body", "har",
-            "net-route", "net-unroute", "net-block", "net-headers", "net-auth", "ws-route", "net-cache", "security", "csp", "emulate");
+            "net-route", "net-unroute", "net-block", "net-headers", "net-auth", "ws-route", "net-cache", "security", "csp", "emulate", "clock", "permissions");
 
     private ProtoVerbs() {
     }
