@@ -1,5 +1,6 @@
 package dev.domengine.query;
 
+import dev.domengine.cdp.CdpException;
 import dev.domengine.image.TemplateMatch;
 import dev.domengine.tree.DomNode;
 
@@ -8,7 +9,9 @@ import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -148,9 +151,11 @@ public final class OcrHook {
     /**
      * Arms the per-view OCR gate for this query. The active view is {@code human}
      * when {@code exposure=human} and the mask is on, otherwise {@code full}.
-     * {@code ocr-views} is a comma list of {@code human} and {@code full}. Blank means both.
-     * A view that is not listed is not recognized: the OCR stage returns zero hits and
-     * does not read the runtime. The shared hash cache is left as it is.
+     * {@code ocr-views} is a comma list of {@code human} and {@code full}. Blank, or a
+     * value with no tokens, means both. A token other than those two throws
+     * {@code invalid ocr-views: <token>}. A view that is not listed is not recognized:
+     * the OCR stage returns zero hits and does not read the runtime. The shared hash
+     * cache is left as it is.
      */
     public static void armViews(Map<String, String> flags) {
         if (flags == null) {
@@ -160,6 +165,15 @@ public final class OcrHook {
         }
         VIEWS.set(parseViews(flags.get("ocr-views")));
         VIEW.set(ViewMask.active(flags) ? "human" : "full");
+    }
+
+    /**
+     * Rejects an unknown {@code ocr-views} token before the query installs viewport
+     * or mask state. Blank and a token-less list are both views.
+     */
+    static void requireViews(Map<String, String> flags) {
+        if (flags == null) return;
+        parseViews(flags.get("ocr-views"));
     }
 
     /** False when this query armed a view list that omits the active view. Unarmed queries allow both. */
@@ -177,10 +191,17 @@ public final class OcrHook {
     private static Set<String> parseViews(String raw) {
         if (raw == null || raw.isBlank()) return Set.of("human", "full");
         Set<String> views = new LinkedHashSet<>();
-        for (String part : raw.split(",")) {
-            String name = part.trim().toLowerCase(Locale.ROOT);
-            if ("human".equals(name) || "full".equals(name)) views.add(name);
+        List<String> bad = new ArrayList<>();
+        for (String part : raw.split(",", -1)) {
+            String token = part.trim().toLowerCase(Locale.ROOT);
+            if (token.isEmpty()) continue;
+            if ("human".equals(token) || "full".equals(token)) views.add(token);
+            else bad.add(token);
         }
+        if (!bad.isEmpty()) {
+            throw new CdpException("invalid ocr-views: " + String.join(", ", bad));
+        }
+        if (views.isEmpty()) return Set.of("human", "full");
         return Set.copyOf(views);
     }
 

@@ -235,6 +235,45 @@ class OcrHookTest {
     }
 
     @Test
+    void unknownOcrViewsIsInvalidAndDoesNotReadTheRuntime() throws Exception {
+        Path viewport = write("view.pgm", PGM);
+        Path page = write("seen.html", SEEN);
+
+        CliResult unknown = query(page, viewport, "image=ocr:mark", "full", "foo");
+        assertEquals(1, unknown.exit(), unknown.stderr());
+        JsonNode error = Jsons.MAPPER.readTree(unknown.stderr());
+        assertEquals("invalid", error.path("code").asText(), error.toString());
+        assertEquals("invalid ocr-views: foo", error.path("error").asText());
+        assertEquals(0, OcrHook.runtimeReads());
+
+        CliResult mixed = query(page, viewport, "image=ocr:mark", "full", "human,foo");
+        assertEquals(1, mixed.exit(), mixed.stderr());
+        JsonNode mixedError = Jsons.MAPPER.readTree(mixed.stderr());
+        assertEquals("invalid", mixedError.path("code").asText(), mixedError.toString());
+        assertEquals("invalid ocr-views: foo", mixedError.path("error").asText());
+
+        CliResult spaced = query(page, viewport, "image=ocr:mark", "full", " Foo ");
+        assertEquals(1, spaced.exit(), spaced.stderr());
+        assertEquals("invalid ocr-views: foo", Jsons.MAPPER.readTree(spaced.stderr()).path("error").asText());
+        assertEquals(0, OcrHook.runtimeReads());
+
+        CliResult cased = query(page, viewport, "image=ocr:mark", "full", " Human , FULL ");
+        assertEquals(1, cased.exit(), cased.stderr());
+        JsonNode missing = Jsons.MAPPER.readTree(cased.stderr());
+        assertEquals("ocr_runtime_missing", missing.path("code").asText(), missing.toString());
+        assertFalse(missing.path("error").asText().contains("invalid ocr-views"));
+
+        CliResult blankTokens = query(page, viewport, "image=ocr:mark", "full", ",,");
+        assertEquals(1, blankTokens.exit(), blankTokens.stderr());
+        assertEquals("ocr_runtime_missing", Jsons.MAPPER.readTree(blankTokens.stderr()).path("code").asText());
+
+        CliResult after = query(page, viewport, "image=ocr:mark", "full");
+        assertEquals(1, after.exit(), after.stderr());
+        assertEquals("ocr_runtime_missing", Jsons.MAPPER.readTree(after.stderr()).path("code").asText());
+        assertEquals(0, OcrHook.runtimeReads());
+    }
+
+    @Test
     void ocrViewsSkipsTheInactiveViewAndKeepsTheCache() throws Exception {
         Path viewport = write("view.pgm", PGM);
         String hash = OcrHook.cacheKey(TemplateMatch.parse(PGM));

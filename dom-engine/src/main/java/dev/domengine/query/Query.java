@@ -44,6 +44,7 @@ public final class Query {
 
     public static ObjectNode run(DomNode root, Map<String, String> flags) {
         if (root == null) throw new CdpException("query has no document");
+        OcrHook.requireViews(flags);
         String viewport = flags.get("viewport");
         boolean armed = viewport != null && !viewport.isBlank();
         boolean human = "human".equalsIgnoreCase(flags.get("exposure"));
