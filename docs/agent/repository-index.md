@@ -122,6 +122,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-locked-groups-plan.md`
 - `docs/maintainer/3.0.0-overlay-polish-audit.md`
 - `docs/maintainer/3.0.0-polish-full-standard-scoreboard.md`
+- `docs/maintainer/3.0.0-protocols-research.md`
 - `docs/maintainer/3.0.0-query-visual-design.md`
 - `docs/maintainer/3.0.0-regression-scoreboard.md`
 - `docs/maintainer/3.0.0-remaining-live-issues.md`
@@ -186,6 +187,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/roadmaps/3.0.0-locked-R4-dalton-rust-docs.md`
 - `docs/roadmaps/3.0.0-locked-R5-final-regression.md`
 - `docs/roadmaps/3.0.0-overlay-polish-roadmap.md`
+- `docs/roadmaps/3.0.0-protocols-roadmap.md`
 - `docs/roadmaps/3.0.0-query-visual-roadmap.md`
 - `docs/roadmaps/3.0.0-regression-fixback-e5bffaef.md`
 - `docs/roadmaps/3.0.0-visual-components-roadmap.md`
