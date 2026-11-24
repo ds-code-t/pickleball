@@ -82,7 +82,7 @@ public final class NativeDesktop {
     /** Verbs this backend implements today. Click and type are wired. The rest are not. */
     public static List<String> verbs(String backend) {
         return switch (backend == null ? "" : backend) {
-            case "uia", "ax", "atspi" -> List.of("click", "type");
+            case "uia", "ax", "atspi", "grid" -> List.of("click", "type");
             default -> List.of();
         };
     }
@@ -90,6 +90,16 @@ public final class NativeDesktop {
     public static DomNode capture(String windowName) {
         String platform = platformId();
         EngineLog.info("desktop", "live capture " + platform);
+        GridDrivers.Choice grid = gridChoice();
+        if (grid.grid()) {
+            try {
+                DomNode viaDriver = GridDrivers.capture(grid, windowName);
+                stamp(viaDriver, platform);
+                return selectWindow(viaDriver, windowName);
+            } catch (RuntimeException failure) {
+                GridDrivers.warnOnce("capture:" + grid.driver(), grid.driver() + " capture failed (" + failure.getMessage() + "); using the native desktop backend");
+            }
+        }
         DomNode root = switch (family()) {
             case "windows" -> WindowsUia.capture(windowName);
             case "macos" -> MacAccessibility.capture(windowName);
@@ -100,11 +110,22 @@ public final class NativeDesktop {
         return selectWindow(root, windowName);
     }
 
+    /** The Grid driver for this run; unset {@code pkb_desktop_driver} is native and probes nothing. */
+    static GridDrivers.Choice gridChoice() {
+        try {
+            return GridDrivers.select(System.getenv(), family(), GridDrivers.httpProbe());
+        } catch (IllegalArgumentException invalid) {
+            GridDrivers.warnOnce("invalid", invalid.getMessage().replace('\n', ' '));
+            return new GridDrivers.Choice("native", "", "invalid");
+        }
+    }
+
     public static void click(DomNode node) {
         if (node == null) throw new CdpException("click failed: no node");
         String backend = node.attributes.getOrDefault("desktop-backend", "");
         EngineLog.info("desktop", "live click " + backend + " " + node.accessibleName);
         switch (backend) {
+            case "grid" -> GridDrivers.act(node, "click", null, false);
             case "uia" -> WindowsUia.click(node);
             case "ax" -> MacAccessibility.click(node);
             case "atspi" -> AtSpi.click(node);
@@ -117,6 +138,7 @@ public final class NativeDesktop {
         String backend = node.attributes.getOrDefault("desktop-backend", "");
         EngineLog.info("desktop", "live type " + backend + " " + node.accessibleName);
         switch (backend) {
+            case "grid" -> GridDrivers.act(node, "type", text, append);
             case "uia" -> WindowsUia.type(node, text, append);
             case "ax" -> MacAccessibility.type(node, text, append);
             case "atspi" -> AtSpi.type(node, text, append);

@@ -20,6 +20,7 @@ docs/dashboard.md
 docs/data-element-query-runtime.md
 docs/data-values-and-elements.md
 docs/date-time-utilities.md
+docs/desktop-drivers.md
 docs/diagnostic-lineage-metadata.md
 docs/diagnostic-query.md
 docs/diagnostic-reporting.md

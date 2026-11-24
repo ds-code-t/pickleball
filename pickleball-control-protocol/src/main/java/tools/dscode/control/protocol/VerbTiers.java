@@ -35,7 +35,7 @@ public final class VerbTiers {
             "open-scenario", "open-window", "overlay", "overlay-poll", "overlay-remove", "panel-close", "panel-open",
             "panel-state", "pause", "pin", "plan", "play", "popup-close", "popup-open", "popup-status", "post",
             "presence", "query", "record", "ref", "refresh", "resolve-runvars", "save", "selftest", "session",
-            "session-hold", "session-info", "session-list", "session-mode", "session-release", "session-start",
+            "session-hold", "session-info", "session-list", "session-mode", "session-release", "session-start", "setup",
             "session-sync", "short-log", "show-run", "spotlight", "start", "status", "step-badge", "stop", "sync",
             "tabs", "toast", "ui", "ui-apply", "ui-catalog", "ui-poll", "ui-verify", "unarrow", "unborder",
             "unhighlight", "unlabel", "unmagnifier", "unspotlight", "unstep-badge", "update-step", "upload",

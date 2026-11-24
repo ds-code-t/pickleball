@@ -126,6 +126,11 @@ Lineage and coordination metadata survive controlled execution but are excluded 
 
 Linux desktop control is AT-SPI plus `xdotool` on X11 or Xvfb only. Wayland is unsupported: a Wayland-only session (`WAYLAND_DISPLAY` set and `DISPLAY` unset, or `XDG_SESSION_TYPE=wayland` without `DISPLAY`) fails `desktop attach --live` with `error: Wayland session detected; desktop control needs X11 or Xvfb (set DISPLAY)` and a `fix:` line. Xwayland with `DISPLAY` set is allowed. `grim` screenshots are not a supported desktop-control path.
 
+
+### Desktop drivers (opt-in)
+
+`pkb_desktop_driver=native|auto|flaui|novawindows|winappdriver|mac2` routes desktop capture, click, and type through an opt-in WebDriver desktop driver. The default is `native`, which probes nothing. `pkb_desktop_driver_url` is the driver or Grid URL, and defaults to `http://127.0.0.1:4723`. With `auto` and no driver running, the native backend is used after one warning. `setup desktop-driver --driver=<name> --confirm` installs a pinned, checksum-verified driver. `doctor --desktop` reports each driver. See [Desktop drivers](desktop-drivers.md).
+
 ## Agent coordination
 
 Different consumer agents can run different tests at the same time. The shared files under the consumer `.pickleball` directory are a bulletin board. Run data stays private to each run.
