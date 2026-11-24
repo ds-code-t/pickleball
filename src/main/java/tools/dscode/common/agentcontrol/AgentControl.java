@@ -438,7 +438,7 @@ public final class AgentControl {
             spec.put(key.equals("width") ? "w" : key.equals("height") ? "h" : key, value);
         }
         String tab = args.get("tab");
-        if (present(tab) && !tab.trim().matches("chat|steps")) return fail(2, "panel-open --tab must be chat or steps");
+        if (present(tab) && !tab.trim().matches("chat|steps|guide|record|recorder")) return fail(2, "panel-open --tab must be chat, guide (steps), or recorder (record)");
         if (present(tab)) spec.put("tab", tab.trim());
         String theme = args.get("theme");
         if (present(theme) && !theme.trim().matches("auto|light|dark")) return fail(2, "panel-open --theme must be auto, light, or dark");

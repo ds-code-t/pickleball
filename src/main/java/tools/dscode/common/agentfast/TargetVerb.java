@@ -295,7 +295,7 @@ public final class TargetVerb {
                 case "attach" -> attach(project, runId, target, values);
                 case "snap" -> snap(project, runId, target, values);
                 case "find" -> find(project, runId, target, values);
-                case "act" -> act(project, runId, target, values);
+                case "act" -> withPick(act(project, runId, target, values));
                 case "form-fill" -> formFill(project, runId, target, values);
                 case "wait", "wait-for" -> wait(project, runId, target, values);
                 case "watch" -> watch(project, runId, target, values);
@@ -362,7 +362,7 @@ public final class TargetVerb {
     }
 
     private static Outcome find(Path project, String runId, TargetSelector.Parsed target, Map<String, String> args) {
-        String query = blank(args.get("query"));
+        String query = withPurpose(blank(args.get("query")), args.get("purpose"));
         if ("desktop".equals(target.kind()) || ("ref".equals(target.kind()) && desktopHit(args.get("ref")))) {
             return findDesktop(runId, target, args, query);
         }
@@ -388,6 +388,11 @@ public final class TargetVerb {
             }
             String version = docVersion(page.session.connection());
             List<Map<String, Object>> rows = publish(runId, "browser", page.session.id, version, hits, query, page.session.connection());
+            String exposure = exposureOf(args);
+            if (exposure == null) return fail("find", "exposure is human or full");
+            if ("human".equals(exposure)) rows.removeIf(row -> Boolean.FALSE.equals(row.get("visible")));
+            if (rows.isEmpty()) return fail("find", "not found");
+            CollabRows.narrow(rows, blank(args.get("include")));
             remember(runId, page.session);
             Map<String, Object> body = base("find", "cdp", "browser", target);
             body.put("docVersion", version);
@@ -421,7 +426,44 @@ public final class TargetVerb {
         return ok(body);
     }
 
+    /** Candidates and the pick reason for the act running on this thread, added to its reply. */
+    private static final ThreadLocal<Map<String, Object>> PICKED = new ThreadLocal<>();
+
+    private static Outcome withPick(Outcome outcome) {
+        Map<String, Object> note = PICKED.get();
+        PICKED.remove();
+        if (note != null && outcome != null && outcome.body() != null) outcome.body().putAll(note);
+        return outcome;
+    }
+
+    private static void notePick(List<DomNode> hits, DomNode chosen, String pick) {
+        if (hits == null || hits.size() < 2 || chosen == null) return;
+        List<Map<String, Object>> candidates = new ArrayList<>();
+        for (int i = 0; i < hits.size() && i < 12; i++) {
+            DomNode node = hits.get(i);
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("index", i + 1);
+            row.put("role", role(node));
+            row.put("name", name(node));
+            String purpose = attr(node, "data-pkb-purpose");
+            if (!purpose.isBlank()) row.put("purpose", String.join(",", purpose.trim().split("\\s+")));
+            candidates.add(row);
+        }
+        Map<String, Object> picked = new LinkedHashMap<>();
+        picked.put("index", hits.indexOf(chosen) + 1);
+        picked.put("role", role(chosen));
+        picked.put("name", name(chosen));
+        String token = pick == null ? "" : pick.trim();
+        picked.put("why", token.matches("\\d+") ? "--pick=" + token + " is position " + token + " of " + hits.size()
+                : "--pick=" + token + " matched its id, name, or role");
+        Map<String, Object> note = new LinkedHashMap<>();
+        note.put("candidates", candidates);
+        note.put("picked", picked);
+        PICKED.set(note);
+    }
+
     private static Outcome act(Path project, String runId, TargetSelector.Parsed target, Map<String, String> args) {
+        PICKED.remove();
         for (String key : args.keySet()) {
             if (key != null && !key.isBlank() && !ACT_KEYS.contains(key)) {
                 return fail("act", "act does not use --" + key);
@@ -437,7 +479,7 @@ public final class TargetVerb {
         try {
             DomNode root = tree(page.session);
             DomNode node;
-            String query = blank(args.get("query"));
+            String query = withPurpose(blank(args.get("query")), args.get("purpose"));
             if (hit != null) {
                 node = freshNode(hit, page.session.connection(), root);
                 if (node == null) {
@@ -468,6 +510,7 @@ public final class TargetVerb {
                         putShadow(missed.body(), hits.get(0));
                         return missed;
                     }
+                    notePick(hits, chosen, args.get("pick"));
                     node = chosen;
                 } else {
                     node = hits.get(0);
@@ -2828,7 +2871,59 @@ public final class TargetVerb {
         return false;
     }
 
+    private static final java.util.regex.Pattern PURPOSE = java.util.regex.Pattern.compile("(?:^|\\s)purpose=([A-Za-z0-9_-]+)");
+
+    /** {@code --purpose=<token>} joins the query as {@code purpose=<token>}. */
+    static String withPurpose(String query, String purpose) {
+        String token = purpose == null ? "" : purpose.trim();
+        if (token.isBlank()) return query == null ? "" : query;
+        return ((query == null ? "" : query.trim()) + " purpose=" + token).trim();
+    }
+
+    /**
+     * {@code purpose=<token>} selects controls whose {@code data-pkb-purpose} has that token. An exact accessible
+     * name (case and spacing ignored) wins over substring hits: when one exists, the substrings are dropped.
+     */
     private static List<DomNode> locate(DomNode root, String query, Map<String, String> extra) {
+        String text = query == null ? "" : query;
+        java.util.regex.Matcher purposeMatch = PURPOSE.matcher(text);
+        String purpose = "";
+        if (purposeMatch.find()) {
+            purpose = purposeMatch.group(1);
+            text = (text.substring(0, purposeMatch.start()) + " " + text.substring(purposeMatch.end())).trim();
+        }
+        if (!purpose.isBlank() && text.isBlank()) {
+            if (root != null) root.linkParents();
+            List<DomNode> tagged = new ArrayList<>();
+            String want = purpose;
+            walk(root, node -> { if (hasPurpose(node, want)) addHit(tagged, node); });
+            return tagged;
+        }
+        List<DomNode> hits = locateText(root, text, extra);
+        if (!purpose.isBlank()) {
+            String want = purpose;
+            hits = new ArrayList<>(hits.stream().filter(node -> hasPurpose(node, want)).toList());
+        }
+        if (!text.isBlank() && hits.size() > 1) {
+            String wanted = text.replaceAll("\\s+", " ").trim();
+            List<DomNode> exact = new ArrayList<>();
+            for (DomNode node : hits) {
+                String shown = name(node).replaceAll("\\s+", " ").trim();
+                if (shown.equalsIgnoreCase(wanted)) exact.add(node);
+            }
+            if (!exact.isEmpty() && exact.size() < hits.size()) return exact;
+        }
+        return hits;
+    }
+
+    private static boolean hasPurpose(DomNode node, String token) {
+        String tokens = attr(node, "data-pkb-purpose");
+        if (tokens.isBlank()) return false;
+        for (String one : tokens.trim().split("\\s+")) if (one.equals(token)) return true;
+        return false;
+    }
+
+    private static List<DomNode> locateText(DomNode root, String query, Map<String, String> extra) {
         if (root != null) root.linkParents();
         Map<String, String> flags = new LinkedHashMap<>();
         if (extra != null) flags.putAll(extra);

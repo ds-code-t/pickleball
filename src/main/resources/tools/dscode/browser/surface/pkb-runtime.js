@@ -2282,7 +2282,8 @@
     stepsList();
     try { document.documentElement.setAttribute('data-pkb-panel-want', 'open'); } catch (ignored) { /* attribute refused */ }
     st.closed = false;
-    panelTab(opts.tab === 'steps' ? 'steps' : (opts.tab === 'record' ? 'record' : (opts.tab === 'chat' ? 'chat' : st.tab || 'chat')));
+    var wantTab = opts.tab === 'guide' ? 'steps' : (opts.tab === 'recorder' ? 'record' : opts.tab);
+    panelTab(wantTab === 'steps' ? 'steps' : (wantTab === 'record' ? 'record' : (wantTab === 'chat' ? 'chat' : st.tab || 'chat')));
     paintRecordPane();
     raiseLayer();
     if (opts.focus !== false && !st.min && st.tab === 'chat') {

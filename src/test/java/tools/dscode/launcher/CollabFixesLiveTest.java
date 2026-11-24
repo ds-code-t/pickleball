@@ -142,6 +142,57 @@ class CollabFixesLiveTest {
         assertTrue(JSON.readTree(waited.out).path("control").asText().contains("Ship it"), waited.out);
     }
 
+    @Test
+    @Timeout(value = 120, unit = TimeUnit.SECONDS)
+    void c4_exactNameBeatsSubstringPurposeSelectsAndTabsSwitchPanes() throws Exception {
+        start(page("c4.html", """
+                <button id="save">Save</button><button id="draft">Save draft</button>
+                <button id="go1">Go</button><button id="go2">Go</button>
+                """), "c4");
+        assertEquals(0, run("panel-open", "--tab=guide", "--run-id=c4").code);
+        assertEquals(0, run("chat-send", "--text=new message while on Guide", "--run-id=c4").code);
+        Thread.sleep(300);
+        assertEquals("1 unread", eval(tab("chat") + ".getAttribute('aria-description')", "c4"));
+
+        Capture chat = run("find", "--target=browser:auto", "--query=Chat", "--run-id=c4");
+        assertEquals(0, chat.code, chat.err + chat.out);
+        JsonNode hits = JSON.readTree(chat.out).path("items");
+        assertEquals(1, hits.size(), "a substring (Pop out chat) must not join an exact name: " + chat.out);
+        assertTrue(hits.get(0).toString().contains("chat-tab"), chat.out);
+
+        Capture purpose = run("find", "--target=browser:auto", "--purpose=popout", "--run-id=c4");
+        assertEquals(0, purpose.code, purpose.err + purpose.out);
+        assertTrue(purpose.out.contains("Pop out chat"), purpose.out);
+        Capture inQuery = run("find", "--target=browser:auto", "--query=purpose=guide-tab", "--run-id=c4");
+        assertTrue(inQuery.out.contains("Guide"), inQuery.out);
+
+        Capture save = run("act", "--target=browser:auto", "--query=Save", "--kind=click", "--run-id=c4");
+        assertFalse(save.out.contains("ambiguous"), "exact Save should not be ambiguous with Save draft: " + save.out);
+
+        Capture click = run("act", "--target=browser:auto", "--purpose=chat-tab", "--kind=click", "--run-id=c4");
+        assertEquals(0, click.code, click.err + click.out);
+        assertEquals("true", JSON.readTree(click.out).path("applied").asText(), click.out);
+        assertEquals("true", eval(tab("chat") + ".getAttribute('aria-selected')", "c4"));
+        assertEquals("false", eval(pane() + ".querySelector('.pkb-chat').hidden + ''", "c4"));
+
+        assertEquals(0, run("panel-open", "--tab=guide", "--run-id=c4").code);
+        assertEquals("true", eval(tab("steps") + ".getAttribute('aria-selected')", "c4"));
+
+        Capture picked = run("act", "--target=browser:auto", "--query=Go", "--kind=click", "--pick=2", "--run-id=c4");
+        JsonNode pickedBody = JSON.readTree(picked.out);
+        assertEquals(2, pickedBody.path("candidates").size(), picked.out);
+        assertEquals(2, pickedBody.path("picked").path("index").asInt(), picked.out);
+        assertTrue(pickedBody.path("picked").path("why").asText().contains("--pick=2"), picked.out);
+    }
+
+    static String pane() {
+        return "document.querySelector('pkb-layer').shadowRoot";
+    }
+
+    static String tab(String name) {
+        return pane() + ".querySelector('[data-tab=" + name + "]')";
+    }
+
     List<String> interactionRows(String id) throws Exception {
         Path events = temp.resolve(".pickleball").resolve("agent-events.jsonl");
         if (!Files.exists(events)) return List.of();
