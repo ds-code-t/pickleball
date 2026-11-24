@@ -785,6 +785,12 @@ public final class WorkbenchRunReports {
         }
         body.put("scenarioCount", scenarioCount);
         body.put("stepCount", stepCount);
+        // E9: the Browser section from the run's browser-events spill (vitals, slowest and failed requests, JS errors).
+        Map<String, Object> browser = tools.dscode.browser.BrowserReport.summarize(runFolder, 10);
+        if (!browser.isEmpty()) {
+            body.put("browser", browser);
+            Files.writeString(workbench.resolve("browser.html"), tools.dscode.browser.BrowserReport.html(browser));
+        }
         JSON.writeValue(workbench.resolve("summary.json").toFile(), body);
         List<Map<String, Object>> spans = new ArrayList<>();
         for (int index = 0; index < traces.size(); index++) {

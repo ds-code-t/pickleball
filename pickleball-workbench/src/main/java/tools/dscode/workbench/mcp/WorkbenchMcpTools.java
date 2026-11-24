@@ -579,6 +579,314 @@ final class WorkbenchMcpTools {
                         "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
                 ), "method"),
                 args -> forwardReady(pwArgs("cdp", args)));
+        add("workbench_browser_events",
+                "Forward browser-events: read the unified browser event stream (net, console, error, nav, dialog, ...) with a seq cursor; --start, --follow, --stop. Control tier.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for browser-events; see help browser-events."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("browser-events", args)));
+        add("workbench_errors",
+                "Page errors and unhandled rejections with stacks and source-mapped locations (browser-events --kinds=error).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for errors; see help errors."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("errors", args)));
+        add("workbench_logpoint",
+                "Set, list or clear CDP logpoints that log an expression when a line runs, without pausing.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for logpoint; see help logpoint."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("logpoint", args)));
+        add("workbench_net",
+                "Turn response-body capture on or off for later requests (none, api, all) with a size cap.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for net; see help net."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("net", args)));
+        add("workbench_net_body",
+                "Read or save one captured response body by request id.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for net-body; see help net-body."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("net-body", args)));
+        add("workbench_har",
+                "Start or stop a HAR 1.2 recording of the session's network traffic.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for har; see help har."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("har", args)));
+        add("workbench_net_route",
+                "E5 network control: net-route (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for net-route; see help net-route."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("net-route", args)));
+        add("workbench_net_unroute",
+                "E5 network control: net-unroute (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for net-unroute; see help net-unroute."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("net-unroute", args)));
+        add("workbench_net_block",
+                "E5 network control: net-block (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for net-block; see help net-block."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("net-block", args)));
+        add("workbench_net_headers",
+                "E5 network control: net-headers (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for net-headers; see help net-headers."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("net-headers", args)));
+        add("workbench_net_auth",
+                "E5 network control: net-auth (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for net-auth; see help net-auth."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("net-auth", args)));
+        add("workbench_ws_route",
+                "E5 network control: ws-route (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for ws-route; see help ws-route."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("ws-route", args)));
+        add("workbench_net_cache",
+                "E5 network control: net-cache (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for net-cache; see help net-cache."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("net-cache", args)));
+        add("workbench_security",
+                "E5 network control: security (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for security; see help security."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("security", args)));
+        add("workbench_csp",
+                "E5 network control: csp (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for csp; see help csp."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("csp", args)));
+        add("workbench_emulate",
+                "E5 network control: emulate (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for emulate; see help emulate."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("emulate", args)));
+        add("workbench_clock",
+                "E6: page clock (install, pause-at, fast-forward, run-for, set-fixed, resume).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for clock; see help clock."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("clock", args)));
+        add("workbench_permissions",
+                "E6: grant, deny or reset browser permissions.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for permissions; see help permissions."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("permissions", args)));
+        add("workbench_context_new",
+                "E7: context-new (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for context-new; see help context-new."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("context-new", args)));
+        add("workbench_context_list",
+                "E7: context-list (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for context-list; see help context-list."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("context-list", args)));
+        add("workbench_context_close",
+                "E7: context-close (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for context-close; see help context-close."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("context-close", args)));
+        add("workbench_tab_new",
+                "E7: tab-new (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for tab-new; see help tab-new."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("tab-new", args)));
+        add("workbench_tab_activate",
+                "E7: tab-activate (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for tab-activate; see help tab-activate."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("tab-activate", args)));
+        add("workbench_page_history",
+                "E7: page-history (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for page-history; see help page-history."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("page-history", args)));
+        add("workbench_print",
+                "E7: print (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for print; see help print."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("print", args)));
+        add("workbench_storage",
+                "E7: storage (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for storage; see help storage."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("storage", args)));
+        add("workbench_storage_state",
+                "E7: storage-state (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for storage-state; see help storage-state."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("storage-state", args)));
+        add("workbench_downloads",
+                "E7: downloads (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for downloads; see help downloads."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("downloads", args)));
+        add("workbench_dialogs",
+                "E7: dialogs (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for dialogs; see help dialogs."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("dialogs", args)));
+        add("workbench_drop",
+                "E7: drop (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for drop; see help drop."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("drop", args)));
+        add("workbench_input",
+                "Run a W3C action chain (keys, mouse, pen, touch, wheel) on the live page.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for input; see help input."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("input", args)));
+        add("workbench_aria_snap",
+                "Playwright aria snapshot of the page; --mode=ai adds refs for act --aria-ref.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for aria-snap; see help aria-snap."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("aria-snap", args)));
+        add("workbench_webauthn",
+                "Virtual WebAuthn authenticator and credentials for passkey tests; keys never printed.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for webauthn; see help webauthn."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("webauthn", args)));
+        add("workbench_extension",
+                "Install, uninstall or list unpacked browser extensions.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for extension; see help extension."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("extension", args)));
+        add("workbench_webmcp",
+                "List or call the WebMCP tools a page registers.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for webmcp; see help webmcp."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("webmcp", args)));
+        add("workbench_perf",
+                "Page metrics, Core Web Vitals, Chrome or Playwright traces, and the run's Browser report section.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for perf; see help perf."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("perf", args)));
+        add("workbench_memory",
+                "Collect garbage or write a capped heap snapshot of the live page.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for memory; see help memory."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("memory", args)));
+        add("workbench_audits",
+                "List DevTools issues (mixed content, CORS, CSP, cookies, forms) or check forms on the page.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for audits; see help audits."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("audits", args)));
+        add("workbench_sw",
+                "List, unregister or bypass service workers on the live session.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for sw; see help sw."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("sw", args)));
+        add("workbench_screencast",
+                "Record the page as a webm (Playwright) or JPEG frames (Playwright, BiDi, CDP); start and stop.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for screencast; see help screencast."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("screencast", args)));
+        add("workbench_share_browser",
+                "Share the Playwright-attached browser with another local Playwright client or MCP (Browser.bind); localhost only.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for share-browser; see help share-browser."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("share-browser", args)));
+        add("workbench_optional_list",
+                "List opt-in add-ons (axe, lighthouse, devtools-mcp): installed or not, license.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for optional-list; see help optional-list."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("optional-list", args)));
+        add("workbench_audit",
+                "Accessibility audit with the installed axe-core (--axe) or a Lighthouse report (--lighthouse).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for audit; see help audit."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("audit", args)));
+        add("workbench_bridge",
+                "Print the MCP config for the installed chrome-devtools-mcp attached to this session (localhost).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for bridge; see help bridge."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("bridge", args)));
         add("workbench_chat_turn",
                 "Send one agent line, then wait for a human message, an answer, or a click.",
                 schema(view),
@@ -722,6 +1030,17 @@ final class WorkbenchMcpTools {
     }
 
     /** pw/cdp MCP arguments to CLI tokens: area, action, then --flags. */
+    /** Protocol verbs (E1-E12): the verb, then space-separated --name=value flags, then an optional target. */
+    static List<String> protoArgs(String verb, Map<String, Object> args) {
+        List<String> out = new ArrayList<>();
+        out.add(verb);
+        String flags = optionalScalar(args, "flags");
+        for (String token : flags.trim().split("\\s+(?=--)")) if (!token.isBlank()) out.add(token.trim());
+        String target = optionalScalar(args, "target");
+        if (!target.isBlank()) out.add("--target=" + target);
+        return out;
+    }
+
     static List<String> pwArgs(String verb, Map<String, Object> args) {
         List<String> out = new ArrayList<>();
         out.add(verb);

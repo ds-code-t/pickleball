@@ -95,6 +95,10 @@ public final class HumanLock {
                             + "(leave it with session-mode --human=off)";
                 }
             }
+            if ("input".equals(verb) && args != null && !inputIsHuman(project, args.get("actions"))) {
+                return "error: input with an element-anchored or unreadable action chain is not human input and this session is human-locked\n"
+                        + "fix: use viewport or pointer coordinates and key actions only, or leave human mode with session-mode --human=off";
+            }
             if (args != null) {
                 args.put("human", "on");
                 if (("snap".equals(verb) || "find".equals(verb)) && (args.get("exposure") == null || args.get("exposure").isBlank())) {
@@ -107,5 +111,22 @@ public final class HumanLock {
                 ? " File attachment and OS-level actions are unavailable in human mode." : "";
         return "error: " + verb + " is a control-tier verb and this session is human-locked." + extra + "\n"
                 + "fix: use human-tier verbs (snap, find, act, wait, capture, chat-read, doctor), or leave human mode with session-mode --human=off";
+    }
+
+    /** A W3C action chain is human input when it is only key, pointer, wheel and pause actions at coordinates. */
+    public static boolean inputIsHuman(Path project, String actions) {
+        if (actions == null || actions.isBlank() || "true".equals(actions)) return true;
+        try {
+            String raw = actions.startsWith("@") ? Files.readString((project == null ? Path.of(".") : project).resolve(actions.substring(1)).normalize()) : actions;
+            com.fasterxml.jackson.databind.JsonNode chain = JSON.readTree(raw);
+            if (chain.isObject() && chain.has("actions")) chain = chain.get("actions");
+            for (com.fasterxml.jackson.databind.JsonNode source : chain) {
+                if (!Set.of("key", "pointer", "wheel", "none").contains(source.path("type").asText())) return false;
+                for (com.fasterxml.jackson.databind.JsonNode a : source.path("actions")) if (a.path("origin").isObject()) return false;
+            }
+            return true;
+        } catch (Exception unreadable) {
+            return false;
+        }
     }
 }

@@ -56,6 +56,7 @@ final class ChatLog {
                 if (!message.pageId().isBlank()) stored.put("pageId", message.pageId());
                 AgentStore.appendCapped(chat, AgentStore.JSON.writeValueAsString(stored));
                 CompositeLog.info("chat", "send source=" + useSource + " channel=" + useChannel + " agent=" + message.agent() + " id=" + message.id());
+                tools.dscode.common.agentfast.PushWake.signal();
                 return message;
             }
         }

@@ -235,6 +235,7 @@ final class UiBatch {
         boolean wantAnswer = wantId != null && !wantId.isBlank();
         long deadline = System.nanoTime() + waitMillis * 1_000_000L;
         while (true) {
+            long wakeSeen = tools.dscode.common.agentfast.PushWake.generation();
             Map<String, String> eventArgs = new LinkedHashMap<>();
             eventArgs.put("after", after);
             AgentControl.Result events;
@@ -297,7 +298,7 @@ final class UiBatch {
                 }
                 return new AgentControl.Result(0, body);
             }
-            Thread.sleep(250);
+            tools.dscode.common.agentfast.PushWake.await(wakeSeen, 250, deadline);
         }
     }
 

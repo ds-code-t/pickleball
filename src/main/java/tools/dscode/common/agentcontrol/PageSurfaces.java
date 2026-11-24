@@ -313,11 +313,27 @@ final class PageSurfaces {
     }
 
     static WebDriver driver() {
+        pruneQuit();
         return driver;
     }
 
     static List<Managed> managed() {
+        pruneQuit();
         return List.copyOf(MANAGED);
+    }
+
+    /** A driver someone quit (session id gone) is no longer a surface; the newest live one becomes current. */
+    private static void pruneQuit() {
+        MANAGED.removeIf(managed -> quit(managed.driver));
+        if (quit(driver)) {
+            driver = MANAGED.isEmpty() ? null : MANAGED.get(MANAGED.size() - 1).driver;
+            focusedTab = null;
+            THREAD_FOCUS.remove();
+        }
+    }
+
+    private static boolean quit(WebDriver webDriver) {
+        return webDriver instanceof RemoteWebDriver remote && remote.getSessionId() == null;
     }
 
     static void clearDriver() {
@@ -700,6 +716,7 @@ final class PageSurfaces {
         AgentStore.appendCapped(file, AgentStore.JSON.writeValueAsString(row));
         CompositeLog.info("overlay", "input type=" + event.getOrDefault("type", ""));
         ChatLog.send(project, runId, "overlay", "system", "", "overlay input " + event.getOrDefault("type", "") + " " + event.getOrDefault("id", ""));
+        tools.dscode.common.agentfast.PushWake.signal();
     }
 
     /** A binding delivery and a queue drain are one event. The second copy is dropped. */
@@ -1784,12 +1801,18 @@ final class PageSurfaces {
         if (facade instanceof CdpAdapter cdp) {
             cdp.addBinding("pkbSurface", (name, payload) -> {
                 Map<String, String> event = bindingEvent(name, payload);
-                if (event != null && !event.isEmpty()) PUSHED.add(event);
+                if (event != null && !event.isEmpty()) {
+                    PUSHED.add(event);
+                    tools.dscode.common.agentfast.PushWake.signal();
+                }
             }, "pkb-surface");
         } else {
             facade.addBinding("pkbSurface", (name, payload) -> {
                 Map<String, String> event = bindingEvent(name, payload);
-                if (event != null && !event.isEmpty()) PUSHED.add(event);
+                if (event != null && !event.isEmpty()) {
+                    PUSHED.add(event);
+                    tools.dscode.common.agentfast.PushWake.signal();
+                }
             });
         }
     }

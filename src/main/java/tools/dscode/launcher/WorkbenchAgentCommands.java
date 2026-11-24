@@ -176,12 +176,38 @@ public final class WorkbenchAgentCommands {
                 return 2;
             }
         }
+        // E8: find --role, act --aria-ref and snap --aria go to the protocol host (accessibility locators, Playwright refs).
+        String routed = "find".equals(parsed.command()) && hasFlagOrValue(args, "--role") ? "find-role"
+                : "act".equals(parsed.command()) && hasFlagOrValue(args, "--aria-ref") ? "aria-act"
+                : "snap".equals(parsed.command()) && hasFlagOrValue(args, "--aria") ? "aria-snap" : null;
+        if (routed != null) {
+            String[] hop = args.clone();
+            for (int i = 0; i < hop.length; i++) {
+                if (hop[i].equals(parsed.command())) {
+                    hop[i] = routed;
+                    break;
+                }
+            }
+            if (!hop[0].equals(routed)) {
+                String[] front = new String[hop.length + 1];
+                front[0] = routed;
+                System.arraycopy(hop, 0, front, 1, hop.length);
+                hop = front;
+            }
+            return ProtoVerbs.run(hop, parsed.project(), safeOut, safeErr);
+        }
+        // E7: upload with --via or --on-dialog goes to the protocol host (BiDi input.setFiles, Playwright setInputFiles, CDP).
+        if ("upload".equals(parsed.command()) && java.util.Arrays.stream(args).anyMatch(a -> a.startsWith("--via=") || a.equals("--on-dialog"))) {
+            return ProtoVerbs.run(args, parsed.project(), safeOut, safeErr);
+        }
         try {
             return switch (parsed.command()) {
                 case "session-mode" -> sessionMode(parsed, safeOut, safeErr);
                 case "setup" -> SetupCommand.run(parsed, safeOut, safeErr);
                 case "relaunch-with-debug" -> RelaunchWithDebug.run(parsed, safeOut, safeErr);
                 case "pw", "cdp" -> PwCommand.run(args, parsed.project(), safeOut, safeErr);
+                // proto verbs
+                case "browser-events", "errors", "logpoint", "net", "net-body", "har", "net-route", "net-unroute", "net-block", "net-headers", "net-auth", "ws-route", "net-cache", "security", "csp", "emulate", "clock", "permissions", "context-new", "context-list", "context-close", "tab-new", "tab-activate", "page-history", "print", "storage", "storage-state", "downloads", "dialogs", "drop", "input", "aria-snap", "webauthn", "extension", "webmcp", "perf", "memory", "audits", "sw", "screencast", "share-browser", "optional-install", "optional-uninstall", "optional-list", "audit", "bridge"  -> ProtoVerbs.run(args, parsed.project(), safeOut, safeErr);
                 case "export-guidance" -> exportGuidance(parsed, safeOut, safeErr);
                 case "start" -> {
                     int started = ConsumerReadyCommands.start(parsed, safeOut, safeErr);
@@ -1811,6 +1837,11 @@ public final class WorkbenchAgentCommands {
         return liveQuery(parsed, null, null, out, err);
     }
 
+    static boolean hasFlagOrValue(String[] args, String name) {
+        for (String a : args) if (a.equals(name) || a.startsWith(name + "=")) return true;
+        return false;
+    }
+
     private static int findElement(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
         if (selectorTarget(flag(parsed, "--target"))) return agentControl(parsed, "find", out, err);
         long startedNs = System.nanoTime();
@@ -2091,6 +2122,7 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "since");
         copyFlag(args, parsed, "until");
         copyFlag(args, parsed, "events");
+        copyFlag(args, parsed, "har");
         copyFlag(args, parsed, "file");
         // upload --file=a --file=b is one list; a single --file stays as it was.
         String files = joinedFlag(parsed, "--file");
@@ -2187,6 +2219,13 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "items");
         copyFlag(args, parsed, "check");
         copyFlag(args, parsed, "pick");
+        // E2b DOM change listener: watch/wait --selector --kinds=childList,attributes,text --debounce --attributes --contains --own --until-change.
+        copyFlag(args, parsed, "selector");
+        copyFlag(args, parsed, "debounce");
+        copyFlag(args, parsed, "attributes");
+        copyFlag(args, parsed, "contains");
+        if (hasFlag(parsed, "--own")) args.put("own", "true");
+        if (hasFlag(parsed, "--until-change")) args.put("until-change", "true");
         if (hasFlag(parsed, "--async")) args.put("async", asyncValue(parsed));
         if (hasFlag(parsed, "--cpu")) args.put("cpu", "true");
         if (hasFlag(parsed, "--list")) args.put("list", "true");
@@ -2426,7 +2465,7 @@ public final class WorkbenchAgentCommands {
     private static boolean failFastWithoutBrowser(String command, Map<String, String> args) {
         if (command == null || !LIVE_PAGE_VERBS.contains(command)) return false;
         if (args.containsKey("html") || args.containsKey("page")) return false;
-        if (("observe".equals(command) || "capture-scenario".equals(command)) && args.containsKey("events")) return false;
+        if (("observe".equals(command) || "capture-scenario".equals(command)) && (args.containsKey("events") || args.containsKey("har"))) return false;
         if ("screenshot".equals(command) && !args.containsKey("out")) return false;
         if (("highlight".equals(command) || "unhighlight".equals(command)) && !args.containsKey("handle")) return false;
         if (("overlay".equals(command) || "label".equals(command)) && !args.containsKey("text")) return false;

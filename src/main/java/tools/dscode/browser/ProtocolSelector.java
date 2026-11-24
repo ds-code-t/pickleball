@@ -22,7 +22,12 @@ import java.util.Locale;
  * driver's own browser over CDP ({@code pkb_cdp_endpoint} first, then the driver's {@code se:cdp} or
  * {@code debuggerAddress}) and never launches or downloads a browser. When it cannot attach, the selector logs one
  * WARN per reason and falls back quietly to the CDP, BiDi, or Selenium choice above. The default, with no setting,
- * is unchanged.
+ * is unchanged. Since D12 Playwright is a normal (unshaded) dependency, so this choice needs no extra jar.
+ *
+ * <p>{@link #both(WebDriver)} (E1) keeps a BiDi and a CDP socket together for Chromium when the session publishes
+ * both: Selenium sessions ask for {@code webSocketUrl=true} by default ({@code pkb_bidi=false} turns it off).
+ * {@link #protocols(WebDriver)} returns the per-session {@link BrowserProtocols} registry that resolves each
+ * capability to Playwright, BiDi, CDP, or classic Selenium in that fallback order.
  */
 public final class ProtocolSelector {
     public enum Preference {
@@ -125,6 +130,48 @@ public final class ProtocolSelector {
         }
         BrowserLog.info("selector", "library selenium family=" + family);
         return new SeleniumAdapter(driver);
+    }
+
+    /** The primary facade from {@link #forDriver} plus a BiDi adapter when the session also publishes BiDi. */
+    public record Sockets(BrowserFacade primary, BidiAdapter bidi) {
+    }
+
+    /** Chromium: CDP (or Playwright) primary and BiDi beside it when both exist. Firefox: BiDi for both. */
+    public static Sockets both(WebDriver driver) {
+        BrowserFacade primary = forDriver(driver);
+        if (primary instanceof BidiAdapter bidiOnly) return new Sockets(primary, bidiOnly);
+        BidiAdapter bidi = null;
+        URI uri = endpoints.bidi(driver);
+        if (uri != null && classify(driver.getClass().getName(), browserName(driver)) == Family.CHROMIUM) {
+            try {
+                bidi = new BidiAdapter(ProtocolSockets.open(uri));
+                BrowserLog.info("selector", "bidi beside " + primary.protocol() + " " + uri);
+            } catch (RuntimeException failure) {
+                BrowserLog.warnOnce("bidi-beside", "BiDi socket failed: " + firstLine(failure.getMessage()) + "; CDP only");
+            }
+        }
+        return new Sockets(primary, bidi);
+    }
+
+    /** The capability registry for this session, from the endpoints this selector sees. */
+    public static BrowserProtocols protocols(WebDriver driver) {
+        String name = browserName(driver);
+        String version = "";
+        if (driver instanceof HasCapabilities has) version = has.getCapabilities().getBrowserVersion();
+        Family family = classify(driver.getClass().getName(), name);
+        BrowserProtocols protocols = new BrowserProtocols(family == Family.FIREFOX ? "firefox" : name, version,
+                "playwright".equals(configuredProtocol()));
+        protocols.live(BrowserProtocols.Backend.CLASSIC, "selenium", null);
+        URI bidi = endpoints.bidi(driver);
+        if (bidi != null) protocols.live(BrowserProtocols.Backend.BIDI, "webSocketUrl", bidi.toString());
+        if (family == Family.CHROMIUM) {
+            URI cdp = endpoints.cdp(driver);
+            if (cdp != null) {
+                protocols.live(BrowserProtocols.Backend.CDP, version, cdp.toString());
+                protocols.live(BrowserProtocols.Backend.PLAYWRIGHT, BrowserProtocols.playwrightVersion(), cdp.toString());
+            }
+        }
+        return protocols;
     }
 
     private static BrowserFacade playwright(WebDriver driver, Family family) {

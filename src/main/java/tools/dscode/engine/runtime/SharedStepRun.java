@@ -256,6 +256,8 @@ public final class SharedStepRun {
             }
             Object value = invoke(step);
             step.nativeReturned = value;
+            // E3 pkb_fail_on_js_error: a page error thrown during this step fails (or warns on) this step.
+            tools.dscode.browser.JsErrorGate.afterStep(step.webDriverUsed, step.getStepText());
             Result result = new Result(Status.PASSED, Duration.between(start, Instant.now()), null);
             step.result = result;
             return result;

@@ -1316,10 +1316,14 @@ public final class TargetVerb {
             String since = blank(args.get("since"));
             Map<String, Object> sinceDiff = since.isBlank() ? null : SnapSince.since(since, rows);
             if (!since.isBlank() && sinceDiff == null) return fail("snap", "unknown cursor; snap again without --since");
+            Map<String, Object> pushDelta = since.isBlank() ? null : SnapPush.delta(since, page.session.connection());
             String snapCursor = SnapSince.record(runId, rows);
+            SnapPush.ensure(page.session.connection(), !page.closeAfter());
+            SnapPush.mark(snapCursor, page.session.connection());
             String picture = picture(page.session.connection(), rows);
             Map<String, Object> body = base("snap", "cdp", "browser", target);
             body.put("snapCursor", snapCursor);
+            if (pushDelta != null) body.put("delta", pushDelta);
             if (!exposure.isBlank()) body.put("exposure", exposure);
             if (sinceDiff != null) {
                 body.putAll(sinceDiff);
@@ -1474,9 +1478,18 @@ public final class TargetVerb {
             if (ref.isBlank() && "ref".equals(target.kind())) ref = target.raw();
             boolean met;
             String newControl = null;
-            if ("new-control".equals(condition)) {
-                newControl = waitNewControl(page.session.connection(), timeout);
+            String wake = null;
+            Map<String, Object> change = null;
+            if ("true".equals(args.get("until-change"))) {
+                change = waitUntilChange(page.session.connection(), args, ref, timeout);
+                met = change != null;
+                wake = "push";
+                mode = "push";
+            } else if ("new-control".equals(condition)) {
+                String[] woke = new String[1];
+                newControl = waitNewControl(page.session.connection(), timeout, woke);
                 met = newControl != null;
+                wake = woke[0];
             } else if (!ref.isBlank()) {
                 met = waitOnRef(page.session.connection(), requireHit(ref), condition, timeout);
             } else if ("event".equals(mode)) {
@@ -1501,6 +1514,8 @@ public final class TargetVerb {
             body.put("mode", mode);
             body.put("condition", condition);
             if (newControl != null) body.put("control", newControl);
+            if (wake != null) body.put("wake", wake);
+            if (change != null) body.put("change", change);
             body.put("docVersion", after);
             body.put("title", titleAfter);
             List<SnapRow> rowsAfter = wantDiff
@@ -1519,11 +1534,36 @@ public final class TargetVerb {
      * {@code wait --condition=new-control}: the first control (role and name, page or pkb surface) that was not
      * there when the wait began. Null on timeout.
      */
-    private static String waitNewControl(CdpConnection cdp, long timeout) {
+    private static String waitNewControl(CdpConnection cdp, long timeout, String[] wake) {
         java.util.Set<String> before = controlKeys(cdp);
         long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(Math.max(0, timeout));
+        // E2b: wake on a pushed DOM change instead of a 100 ms poll; poll only when the page refuses the binding.
+        tools.dscode.browser.DomMutations.CdpWatch watch = null;
+        try {
+            watch = tools.dscode.browser.DomMutations.CdpWatch.start(cdp,
+                    new tools.dscode.browser.DomMutations.Options("", List.of("childList", "attributes"), List.of(), "", 30, true));
+        } catch (RuntimeException unsupported) {
+            watch = null;
+        }
+        if (wake != null) wake[0] = watch == null ? "poll" : "push";
+        try {
+            return newControlLoop(cdp, before, deadline, watch);
+        } finally {
+            if (watch != null) watch.close();
+        }
+    }
+
+    private static String newControlLoop(CdpConnection cdp, java.util.Set<String> before, long deadline,
+                                         tools.dscode.browser.DomMutations.CdpWatch watch) {
         while (System.nanoTime() < deadline) {
-            sleep(100);
+            if (watch == null) {
+                sleep(100);
+            } else {
+                long left = TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime());
+                // A long backstop re-check covers changes no mutation reports (a CSS-only reveal).
+                if (watch.next(Math.max(1, Math.min(left, 1000))) == null && System.nanoTime() >= deadline) break;
+                watch.drain();
+            }
             java.util.Set<String> now;
             try {
                 now = controlKeys(cdp);
@@ -1546,6 +1586,98 @@ public final class TargetVerb {
         return keys;
     }
 
+    /** {@code --selector=} wins; else the {@code --ref=} element; else the whole document. */
+    private static tools.dscode.browser.DomMutations.Options domOptions(Map<String, String> args, String ref) {
+        Map<String, String> flags = new LinkedHashMap<>();
+        String selector = blank(args.get("selector"));
+        if (selector.isBlank() && ref != null && !ref.isBlank()) selector = selectorOfRef(ref);
+        flags.put("selector", selector);
+        String kinds = blank(args.get("kinds"));
+        flags.put("kinds", tools.dscode.browser.DomMutations.domKinds(kinds) ? kinds : "");
+        flags.put("attributes", blank(args.get("attributes")));
+        flags.put("contains", "");
+        flags.put("text", blank(args.get("contains")));
+        flags.put("debounce", blank(args.get("debounce")));
+        if ("true".equals(args.get("own"))) flags.put("own", "true");
+        return tools.dscode.browser.DomMutations.Options.of(flags);
+    }
+
+    /** {@code wait --until-change}: the first pushed DOM change batch in scope, or null on timeout. */
+    private static Map<String, Object> waitUntilChange(CdpConnection cdp, Map<String, String> args, String ref, long timeout) {
+        tools.dscode.browser.DomMutations.Options options = domOptions(args, ref);
+        long started = System.nanoTime();
+        try (tools.dscode.browser.DomMutations.CdpWatch watch = tools.dscode.browser.DomMutations.CdpWatch.start(cdp, options)) {
+            ObjectNode batch = watch.next(Math.max(1, timeout));
+            if (batch == null) return null;
+            Map<String, Object> view = tools.dscode.browser.DomMutations.view(batch);
+            view.put("waitedMs", TimeUnit.NANOSECONDS.toMillis(batch.path("receivedNanos").asLong(System.nanoTime()) - started));
+            if (!options.selector().isBlank()) view.put("selector", options.selector());
+            return view;
+        }
+    }
+
+    /** {@code watch --selector=|--ref= --kinds=childList,attributes,text --debounce= [--until=]}: pushed DOM batches. */
+    private static Outcome domWatch(Path project, String runId, TargetSelector.Parsed target, Map<String, String> args,
+                                    Held page, long duration) {
+        String ref = blank(args.get("ref"));
+        String until = blank(args.get("until"));
+        tools.dscode.browser.DomMutations.Options options;
+        try {
+            options = domOptions(args, ref);
+        } catch (IllegalArgumentException bad) {
+            return fail("watch", bad.getMessage());
+        }
+        String before = docVersion(page.session.connection());
+        List<Map<String, Object>> rows = new ArrayList<>();
+        boolean met = until.isBlank();
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(Math.max(duration, 1L));
+        try (tools.dscode.browser.DomMutations.CdpWatch watch = tools.dscode.browser.DomMutations.CdpWatch.start(page.session.connection(), options)) {
+            while (System.nanoTime() < deadline && rows.size() < 200) {
+                long left = TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime());
+                ObjectNode batch = watch.next(Math.max(1, left));
+                if (batch == null) break;
+                rows.add(tools.dscode.browser.DomMutations.view(batch));
+                if (!until.isBlank()) {
+                    String lower = until.toLowerCase(Locale.ROOT);
+                    if ("change".equals(lower) || "mutation".equals(lower) || untilMet(page.session, until, ref, before)) {
+                        met = true;
+                        break;
+                    }
+                }
+            }
+        } catch (IllegalArgumentException bad) {
+            return fail("watch", bad.getMessage());
+        }
+        if (!met) {
+            Outcome failed = fail("watch", "timeout");
+            failed.body().put("until", until);
+            failed.body().put("mode", "push");
+            failed.body().put("events", rows);
+            stamp(failed.body(), page.session.connection(), null);
+            return failed;
+        }
+        Map<String, Object> body = base("watch", "cdp", "browser", target);
+        body.put("mode", "push");
+        body.put("source", "dom");
+        if (!options.selector().isBlank()) body.put("selector", options.selector());
+        body.put("kinds", String.join(",", options.kinds()));
+        body.put("debounceMs", options.debounceMs());
+        if (!until.isBlank()) {
+            body.put("until", until);
+            body.put("met", true);
+        }
+        body.put("events", rows);
+        body.put("docVersion", docVersion(page.session.connection()));
+        stamp(body, page.session.connection(), null);
+        putEntered(body, runId, page.session.connection());
+        return ok(body);
+    }
+
+    private static boolean domWatchAsked(Map<String, String> args) {
+        return !blank(args.get("selector")).isBlank() || tools.dscode.browser.DomMutations.domKinds(blank(args.get("kinds")))
+                || "dom".equals(blank(args.get("kinds")));
+    }
+
     private static Outcome watch(Path project, String runId, TargetSelector.Parsed target, Map<String, String> args) {
         if ("desktop".equals(target.kind())) return fail("watch", "watch is browser only");
         Held page = openBrowser(resolved(target, args));
@@ -1558,15 +1690,22 @@ public final class TargetVerb {
                     return fail("watch", "duration is milliseconds");
                 }
             }
+            if (domWatchAsked(args)) {
+                Map<String, String> dom = new LinkedHashMap<>(args);
+                if ("dom".equals(blank(dom.get("kinds")))) dom.remove("kinds");
+                return domWatch(project, runId, target, dom, page, duration);
+            }
             String until = blank(args.get("until"));
             String ref = blank(args.get("ref"));
             if (!until.isBlank()) {
                 String before = docVersion(page.session.connection());
                 long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(Math.max(duration, 1L));
                 boolean met = false;
+                long metAt = 0;
                 while (System.nanoTime() < deadline) {
                     if (untilMet(page.session, until, ref, before)) {
                         met = true;
+                        metAt = System.currentTimeMillis();
                         break;
                     }
                     sleep(40);
@@ -1583,6 +1722,7 @@ public final class TargetVerb {
                 body.put("mode", "until");
                 body.put("until", until);
                 body.put("met", true);
+                body.put("metAt", metAt);
                 if (!ref.isBlank()) body.put("ref", ref);
                 body.put("docVersion", docVersion(page.session.connection()));
                 stamp(body, page.session.connection(), null);

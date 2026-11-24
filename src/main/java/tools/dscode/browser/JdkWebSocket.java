@@ -43,7 +43,7 @@ final class JdkWebSocket implements ProtocolSocket {
     }
 
     @Override
-    public void sendText(String text) {
+    public synchronized void sendText(String text) { // the JDK socket allows one outstanding send
         socket.sendText(text == null ? "" : text, true).join();
     }
 

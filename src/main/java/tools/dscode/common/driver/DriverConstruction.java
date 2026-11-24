@@ -278,6 +278,30 @@ public final class DriverConstruction {
             Map<String, Object> service,
             ByteArrayOutputStream capture
     ) {
+        try {
+            return newChromiumDriverOnce(browserName, driverConfig, fullConfiguration, clientConfig, service, capture);
+        } catch (RuntimeException failure) {
+            if (BIDI_REJECTED.get() || !tools.dscode.browser.BrowserProtocols.bidiEnabled() || !bidiRejected(failure)) throw failure;
+            if (BIDI_WARNED.compareAndSet(false, true)) {
+                System.err.println("WARN driver rejected webSocketUrl=true; BiDi is off for this session (pkb_bidi=false hides this)");
+            }
+            BIDI_REJECTED.set(true);
+            try {
+                return newChromiumDriverOnce(browserName, driverConfig, fullConfiguration, clientConfig, service, capture);
+            } finally {
+                BIDI_REJECTED.set(false);
+            }
+        }
+    }
+
+    private static RemoteWebDriver newChromiumDriverOnce(
+            String browserName,
+            ObjectNode driverConfig,
+            ObjectNode fullConfiguration,
+            ClientConfig clientConfig,
+            Map<String, Object> service,
+            ByteArrayOutputStream capture
+    ) {
         if ("edge".equals(browserName)) {
             EdgeOptions options = buildEdgeOptions(driverConfig, fullConfiguration, true);
             EdgeDriverService built = buildEdgeService(service, capture);
@@ -360,6 +384,7 @@ public final class DriverConstruction {
 
         ObjectNode capabilities = getObject(driverConfig, "capabilities");
         leaveJavaScriptDialogsOpen(options);
+        askForBidi(options);
 
         applyCapabilitiesExcept(options, capabilities, Set.of(CHROME_OPTIONS_CAPABILITY));
         applyChromiumOptions(
@@ -382,6 +407,7 @@ public final class DriverConstruction {
 
         ObjectNode capabilities = getObject(driverConfig, "capabilities");
         leaveJavaScriptDialogsOpen(options);
+        askForBidi(options);
 
         applyCapabilitiesExcept(options, capabilities, Set.of(EDGE_OPTIONS_CAPABILITY));
         applyChromiumOptions(
@@ -404,6 +430,29 @@ public final class DriverConstruction {
      * Set before {@code driver.capabilities} so a project value replaces this default.
      */
     public static final String UNHANDLED_PROMPT = "unhandledPromptBehavior";
+
+    /** W3C capability that asks the driver for a WebDriver BiDi socket. */
+    public static final String WEB_SOCKET_URL = "webSocketUrl";
+    private static final ThreadLocal<Boolean> BIDI_REJECTED = ThreadLocal.withInitial(() -> false);
+    private static final java.util.concurrent.atomic.AtomicBoolean BIDI_WARNED = new java.util.concurrent.atomic.AtomicBoolean();
+
+    /**
+     * E1: Chrome, Edge, and Firefox sessions ask for {@code webSocketUrl=true} so BiDi is on by default.
+     * {@code pkb_bidi=false} (property, then env) turns it off. Set before {@code driver.capabilities}, so a project
+     * value replaces it. A driver that rejects it is retried once without it (one WARN per run).
+     */
+    static void askForBidi(MutableCapabilities options) {
+        if (BIDI_REJECTED.get() || !tools.dscode.browser.BrowserProtocols.bidiEnabled()) return;
+        options.setCapability(WEB_SOCKET_URL, true);
+    }
+
+    private static boolean bidiRejected(RuntimeException failure) {
+        for (Throwable t = failure; t != null; t = t.getCause()) {
+            String message = t.getMessage();
+            if (message != null && message.contains(WEB_SOCKET_URL)) return true;
+        }
+        return false;
+    }
 
     private static void leaveJavaScriptDialogsOpen(MutableCapabilities options) {
         options.setCapability(UNHANDLED_PROMPT, "ignore");

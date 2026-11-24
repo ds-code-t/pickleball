@@ -143,6 +143,31 @@ Playwright for Java 1.65.1 (Apache-2.0) and its `driver-bundle` (Apache-2.0, wit
 
 Consumer download size: the three Playwright artifacts on the runtime classpath are 232,943,839 bytes (about 233 MB: `playwright` 687,401, `driver` 3,309,493, `driver-bundle` 228,946,945). The `driver-bundle` jar carries Node for every platform. Pickleball's own jar did not grow from the dependency.
 
+### Browser protocols
+
+Pickleball reaches a browser through four backends and picks one per capability: Playwright (when the session is Playwright-attached), WebDriver BiDi, the Chrome DevTools Protocol, then Selenium classic. See [Browser protocols](browser-protocols.md) for the fallback order, `--via`, and what each browser supports.
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `pkb_bidi` | on | Selenium Chrome, Edge, and Firefox sessions ask for `webSocketUrl=true`, so a BiDi socket is open beside CDP. `false`, `off`, `no`, or `0` turns it off. A driver that rejects the capability is retried once without it (one WARN per run). A project `driver.capabilities.webSocketUrl` value wins. |
+| `pkb_bidi_endpoint` | unset | An existing BiDi WebSocket (`ws://.../session/<id>`) for `doctor --protocols` and protocol verbs. |
+| `pkb_cdp_endpoint` | unset | An existing CDP endpoint (see the Playwright backend). |
+| `pkb_protocol` | unset | `playwright` puts Playwright first in the fallback order. |
+| `pkb_browser_events` | on | `off` keeps no browser event rows and writes no spill file. See [Browser events](browser-events.md). |
+| `pkb_browser_events_kinds` | all | Comma list of event kinds the protocol host keeps. |
+| `pkb_browser_events_max_kb` | 8192 | Spill cap per file; the full file rotates once to `.1`. |
+| `pkb_browser_events_ring` | 5000 | Rows kept in memory for `--since`. |
+| `pkb_proto_log` | on | `.pickleball/logs/proto-YYYY-MM-DD.log`; `off` turns it off. |
+| `pkb_proto_host_idle_min` | 240 | The protocol host stops itself after this many idle minutes. |
+| `pkb_push_wake` | on | Collaboration waits wake on pushed panel and chat events. `off` restores their fixed poll sleeps. |
+| `pkb_fail_on_js_error` | off | `warn` logs, and `fail` fails, the step during which an uncaught page error or unhandled rejection happened (collected over WebDriver BiDi). The message names the error and its stack. |
+| `pkb_js_error_ignore` | unset | Regex; page errors whose message matches are allowed under `pkb_fail_on_js_error`. Example: `pkb_js_error_ignore=ResizeObserver loop\|third-party-widget`. |
+| `pkb_scenario_events` | off | `on` streams a scenario's own Selenium session console, page-error and network rows into browser-events through Selenium's BiDi modules (`transport=selenium`). See [Browser events](browser-events.md). |
+| `pkb_optional_dir` | user cache dir | Where `optional-install` puts axe, Lighthouse and chrome-devtools-mcp. See [Optional installs](optional-installs.md). |
+| `pkb_optional_npm` | unset | npm (or `npm-cli.js`) for add-ons with npm dependencies (Lighthouse); Playwright's bundle has none. |
+
+Each key is read as a system property, then `pkb_runvars.<key>`, then the upper-case environment variable, then the environment variable as written. `doctor` prints `protocols=<browser>:<backends>`; `doctor --protocols [--cdp-endpoint=] [--bidi-endpoint=]` prints one `protocol.backend.*` line per backend and one `protocol.capability.*` line per capability.
+
 ## Agent coordination
 
 Different consumer agents can run different tests at the same time. The shared files under the consumer `.pickleball` directory are a bulletin board. Run data stays private to each run.

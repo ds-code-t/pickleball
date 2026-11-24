@@ -141,6 +141,31 @@ class ProtocolSelectorTest {
         assertTrue(files.stream().anyMatch(path -> path.getFileName().toString().contains(".1.log")), files.toString());
     }
 
+    @Test
+    void bothKeepsBidiBesideCdpForChromiumAndRegistryListsThem() {
+        ProtocolSockets.useFactoryForTests(uri -> new ScriptedSocket());
+        ProtocolSelector.useEndpointsForTests(new ProtocolSelector.Endpoints() {
+            @Override
+            public URI cdp(WebDriver driver) {
+                return URI.create("ws://127.0.0.1:9/devtools/browser/x");
+            }
+
+            @Override
+            public URI bidi(WebDriver driver) {
+                return URI.create("ws://127.0.0.1:9/session/s1");
+            }
+        });
+        ProtocolSelector.Sockets sockets = ProtocolSelector.both(named("chrome", "chrome"));
+        assertInstanceOf(CdpAdapter.class, sockets.primary());
+        assertInstanceOf(BidiAdapter.class, sockets.bidi());
+        BrowserProtocols protocols = ProtocolSelector.protocols(named("chrome", "chrome"));
+        assertTrue(protocols.isLive(BrowserProtocols.Backend.BIDI));
+        assertTrue(protocols.isLive(BrowserProtocols.Backend.CDP));
+        assertEquals(BrowserProtocols.Backend.BIDI, protocols.resolve("events", "auto"));
+        BrowserProtocols firefox = ProtocolSelector.protocols(named("firefox", "firefox"));
+        assertTrue(!firefox.isLive(BrowserProtocols.Backend.CDP), "Firefox never gets a CDP backend");
+    }
+
     private static WebDriver named(String label, String browserName) {
         MutableCapabilities caps = new MutableCapabilities();
         caps.setCapability("browserName", browserName);

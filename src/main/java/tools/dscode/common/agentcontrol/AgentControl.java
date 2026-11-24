@@ -804,6 +804,9 @@ public final class AgentControl {
         body.put("value", value);
         body.put("choice", value);
         body.put("applied", !value.isBlank());
+        body.put("wake", tools.dscode.common.agentfast.PushWake.mode());
+        long signalled = tools.dscode.common.agentfast.PushWake.lastSignalNanos();
+        if (signalled > 0) body.put("wakeMs", Math.max(0, (System.nanoTime() - signalled) / 1_000_000L));
         return new Result(0, body);
     }
 
@@ -819,6 +822,7 @@ public final class AgentControl {
     ) throws Exception {
         long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(Math.max(0, timeout));
         while (true) {
+            long wakeSeen = tools.dscode.common.agentfast.PushWake.generation();
             try {
                 for (Map<String, Object> event : PageSurfaces.pollInput(project, runId, before)) {
                     String picked = acceptedChoice(event, id, choices);
@@ -834,7 +838,7 @@ public final class AgentControl {
                 if (stored != null && !stored.getOrDefault("value", "").isBlank()) return stored.get("value");
                 return null;
             }
-            Thread.sleep(50);
+            tools.dscode.common.agentfast.PushWake.await(wakeSeen, 50, deadline);
         }
     }
 
@@ -1056,6 +1060,7 @@ public final class AgentControl {
         int eventNext = eventCursor;
         String lastRawId = null;
         while (true) {
+            long wakeSeen = tools.dscode.common.agentfast.PushWake.generation();
             messages.clear();
             lastRawId = null;
             PageSurfaces.drainPanelChat(project, runId);
@@ -1069,7 +1074,7 @@ public final class AgentControl {
             agentEvents = slice.events();
             eventNext = slice.next();
             if (!messages.isEmpty() || !agentEvents.isEmpty() || System.nanoTime() >= deadline) break;
-            Thread.sleep(200);
+            tools.dscode.common.agentfast.PushWake.await(wakeSeen, 200, deadline);
         }
         boolean explicit = present(args.get("after")) || present(args.get("id"));
         boolean peek = "true".equalsIgnoreCase(args.get("peek"));
@@ -1142,6 +1147,7 @@ public final class AgentControl {
         if (present(args.get("channel"))) poll.put("channel", args.get("channel"));
         long deadline = System.nanoTime() + timeoutMs * 1_000_000L;
         while (true) {
+            long wakeSeen = tools.dscode.common.agentfast.PushWake.generation();
             if ("human".equals(until) || "answer".equals(until)) {
                 java.util.Set<String> already = new java.util.LinkedHashSet<>(ReadMarks.ids(project, runId));
                 already.addAll(PageSurfaces.readIds());
@@ -1204,7 +1210,7 @@ public final class AgentControl {
                 failed.body().put("fix", "chat-send --source=human, then chat-turn again");
                 return failed;
             }
-            Thread.sleep(50L);
+            tools.dscode.common.agentfast.PushWake.await(wakeSeen, 50L, deadline);
         }
     }
 
