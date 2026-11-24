@@ -722,6 +722,9 @@ final class PwCommand {
 
     private static String firstLine(String text) {
         if (text == null) return "";
+        // Playwright errors start with "Error {" and carry the useful text in message='...'.
+        java.util.regex.Matcher pw = java.util.regex.Pattern.compile("message='([^\\n']*)").matcher(text);
+        if (text.startsWith("Error {") && pw.find()) return pw.group(1);
         int nl = text.indexOf('\n');
         return nl < 0 ? text : text.substring(0, nl);
     }

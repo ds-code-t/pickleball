@@ -27,6 +27,7 @@ final class EventCommands {
             out.put("spill", host.hub().spillFile().toString());
             Object dom = host.stateMap().get("dom.via");
             out.put("dom", dom == null ? "off" : String.valueOf(dom));
+            out.put("routes", RouteCommands.state(host).rules.size());
             return out;
         });
         ProtoHost.register("host.stop", (host, f) -> {

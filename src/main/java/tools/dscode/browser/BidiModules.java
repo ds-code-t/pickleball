@@ -37,6 +37,13 @@ public final class BidiModules {
         return map;
     }
 
+    /** Like {@link #p} but {@code key} is always present, as JSON null when {@code value} is null (a BiDi reset). */
+    public static Map<String, Object> pn(String key, Object value, Object... pairs) {
+        Map<String, Object> map = p(pairs);
+        map.put(key, value);
+        return map;
+    }
+
     public JsonNode send(String method, Map<String, ?> params) {
         try {
             return caller.call(method, params == null ? Map.of() : params);
@@ -119,7 +126,7 @@ public final class BidiModules {
     public JsonNode setScreenSettingsOverride(List<String> contexts, Integer width, Integer height) { return send("emulation.setScreenSettingsOverride", p("contexts", contexts, "screenArea", width == null ? null : p("width", width, "height", height))); }
     public JsonNode setUserAgentOverride(List<String> contexts, String userAgent) { return send("emulation.setUserAgentOverride", p("contexts", contexts, "userAgent", userAgent)); }
     public JsonNode setForcedColorsModeThemeOverride(List<String> contexts, String theme) { return send("emulation.setForcedColorsModeThemeOverride", p("contexts", contexts, "theme", theme)); }
-    public JsonNode setNetworkConditions(List<String> contexts, boolean offline) { return send("emulation.setNetworkConditions", p("contexts", contexts, "networkConditions", offline ? p("type", "offline") : null)); }
+    public JsonNode setNetworkConditions(List<String> contexts, boolean offline) { return send("emulation.setNetworkConditions", pn("networkConditions", offline ? p("type", "offline") : null, "contexts", contexts)); }
     public JsonNode setScriptingEnabled(List<String> contexts, Boolean enabled) { return send("emulation.setScriptingEnabled", p("contexts", contexts, "enabled", enabled)); }
     public JsonNode setTouchOverride(List<String> contexts, Integer maxTouchPoints) { return send("emulation.setTouchOverride", p("contexts", contexts, "maxTouchPoints", maxTouchPoints)); }
 

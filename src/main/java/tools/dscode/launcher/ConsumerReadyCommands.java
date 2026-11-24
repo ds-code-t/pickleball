@@ -463,6 +463,23 @@ final class ConsumerReadyCommands {
         tools.dscode.browser.BrowserProtocols protocols = tools.dscode.browser.BrowserProtocols.probe(cdp, bidi);
         out.println("protocols=" + protocols.summary() + (full ? "" : " (doctor --protocols for the capability table)"));
         if (full) protocols.table().forEach(line -> out.println("protocol." + line));
+        if (full) hostRoutes(project, out);
+    }
+
+    /** E5: routes, mocks and overrides held by this project's protocol host (none when no host runs). */
+    static void hostRoutes(Path project, java.io.PrintStream out) {
+        if (tools.dscode.browser.proto.ProtoClient.running(project) == null) {
+            out.println("routes=0 (no protocol host)");
+            return;
+        }
+        com.fasterxml.jackson.databind.JsonNode reply = tools.dscode.browser.proto.ProtoClient.call(project, null, null, null, "net-routes", java.util.Map.of());
+        com.fasterxml.jackson.databind.JsonNode routes = reply.path("routes");
+        out.println("routes=" + routes.size() + " extraHeaders=" + reply.path("extraHeaders").size() + " auth=" + reply.path("auth").asBoolean()
+                + " wsRoutes=" + reply.path("wsRoutes").asInt());
+        for (com.fasterxml.jackson.databind.JsonNode r : routes) {
+            out.println("route." + r.path("id").asText() + "=" + r.path("action").asText() + " " + r.path("match").asText() + " via="
+                    + r.path("via").asText() + " hits=" + r.path("hits").asInt() + " timesLeft=" + r.path("timesLeft").asInt());
+        }
     }
 
     private static String tokenValue(java.util.List<String> tokens, String prefix) {

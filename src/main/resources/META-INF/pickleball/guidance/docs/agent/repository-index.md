@@ -190,6 +190,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/browser/proto/ProtoJson.java`
 - `src/main/java/tools/dscode/browser/proto/ProtoRedact.java`
 - `src/main/java/tools/dscode/browser/proto/PwBridge.java`
+- `src/main/java/tools/dscode/browser/proto/RouteCommands.java`
 - `src/main/java/tools/dscode/browser/proto/SourceMaps.java`
 - `src/main/java/tools/dscode/browser/ProtocolSelector.java`
 - `src/main/java/tools/dscode/browser/ProtocolSocket.java`
@@ -1032,6 +1033,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/RefLifetimeTest.java`
 - `src/test/java/tools/dscode/launcher/RefWaitTest.java`
 - `src/test/java/tools/dscode/launcher/Release218RecommendationsTest.java`
+- `src/test/java/tools/dscode/launcher/RouteLiveTest.java`
 - `src/test/java/tools/dscode/launcher/SecretRedactionTest.java`
 - `src/test/java/tools/dscode/launcher/SessionHealthWaitTest.java`
 - `src/test/java/tools/dscode/launcher/SharedSessionCliTest.java`

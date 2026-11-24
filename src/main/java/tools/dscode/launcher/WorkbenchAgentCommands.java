@@ -183,7 +183,7 @@ public final class WorkbenchAgentCommands {
                 case "relaunch-with-debug" -> RelaunchWithDebug.run(parsed, safeOut, safeErr);
                 case "pw", "cdp" -> PwCommand.run(args, parsed.project(), safeOut, safeErr);
                 // proto verbs
-                case "browser-events", "errors", "logpoint", "net", "net-body", "har"  -> ProtoVerbs.run(args, parsed.project(), safeOut, safeErr);
+                case "browser-events", "errors", "logpoint", "net", "net-body", "har", "net-route", "net-unroute", "net-block", "net-headers", "net-auth", "ws-route", "net-cache", "security", "csp", "emulate"  -> ProtoVerbs.run(args, parsed.project(), safeOut, safeErr);
                 case "export-guidance" -> exportGuidance(parsed, safeOut, safeErr);
                 case "start" -> {
                     int started = ConsumerReadyCommands.start(parsed, safeOut, safeErr);

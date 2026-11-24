@@ -621,6 +621,76 @@ final class WorkbenchMcpTools {
                         "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
                 )),
                 args -> forwardReady(protoArgs("har", args)));
+        add("workbench_net_route",
+                "E5 network control: net-route (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for net-route; see help net-route."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("net-route", args)));
+        add("workbench_net_unroute",
+                "E5 network control: net-unroute (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for net-unroute; see help net-unroute."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("net-unroute", args)));
+        add("workbench_net_block",
+                "E5 network control: net-block (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for net-block; see help net-block."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("net-block", args)));
+        add("workbench_net_headers",
+                "E5 network control: net-headers (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for net-headers; see help net-headers."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("net-headers", args)));
+        add("workbench_net_auth",
+                "E5 network control: net-auth (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for net-auth; see help net-auth."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("net-auth", args)));
+        add("workbench_ws_route",
+                "E5 network control: ws-route (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for ws-route; see help ws-route."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("ws-route", args)));
+        add("workbench_net_cache",
+                "E5 network control: net-cache (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for net-cache; see help net-cache."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("net-cache", args)));
+        add("workbench_security",
+                "E5 network control: security (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for security; see help security."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("security", args)));
+        add("workbench_csp",
+                "E5 network control: csp (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for csp; see help csp."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("csp", args)));
+        add("workbench_emulate",
+                "E5 network control: emulate (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for emulate; see help emulate."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("emulate", args)));
         add("workbench_chat_turn",
                 "Send one agent line, then wait for a human message, an answer, or a click.",
                 schema(view),

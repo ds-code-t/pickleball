@@ -21,7 +21,8 @@ import java.util.Set;
  */
 final class ProtoVerbs {
     /** CLI verbs that forward to a host command of the same name. */
-    static final Set<String> VERBS = Set.of("browser-events", "errors", "logpoint", "net", "net-body", "har");
+    static final Set<String> VERBS = Set.of("browser-events", "errors", "logpoint", "net", "net-body", "har",
+            "net-route", "net-unroute", "net-block", "net-headers", "net-auth", "ws-route", "net-cache", "security", "csp", "emulate");
 
     private ProtoVerbs() {
     }
@@ -42,10 +43,35 @@ final class ProtoVerbs {
                 flags.put("kinds", "error");
                 return events(project, flags, out, err);
             }
+            if ("net-auth".equals(command) && !flags.containsKey("clear")) {
+                // E5: the secret ref is resolved here and sent only to the token-guarded loopback host; never printed.
+                Map<String, String> payload = new LinkedHashMap<>(flags);
+                payload.put("_credential", credential(flags.get("credential")));
+                return print(call(project, flags, command, payload), out, err);
+            }
             return print(call(project, flags, command, flags), out, err);
         } catch (IllegalStateException | IllegalArgumentException failure) {
             return fail(err, failure.getMessage());
         }
+    }
+
+    /**
+     * {@code --credential=env:NAME} (environment), {@code prop:NAME} (JVM system property), or {@code NAME} (a pkb
+     * setting: system property, {@code pkb_runvars.NAME}, then environment). The value is {@code user:password}.
+     */
+    static String credential(String ref) {
+        if (ref == null || ref.isBlank() || "true".equals(ref)) {
+            throw new IllegalArgumentException("error: net-auth needs --credential=<secret-ref>\nfix: net-auth --credential=env:SITE_LOGIN (SITE_LOGIN=user:password)");
+        }
+        String value;
+        if (ref.startsWith("env:")) value = System.getenv(ref.substring(4));
+        else if (ref.startsWith("prop:")) value = System.getProperty(ref.substring(5));
+        else value = BrowserProtocols.setting(ref);
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("error: secret ref " + ref + " is not set\nfix: set it in the environment or as a JVM property (value user:password); it is never printed");
+        }
+        SecretRedactor.note("password", value);
+        return value;
     }
 
     static ObjectNode call(Path project, Map<String, String> flags, String verb, Map<String, String> payload) {
