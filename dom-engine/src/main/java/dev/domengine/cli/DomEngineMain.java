@@ -468,6 +468,7 @@ public final class DomEngineMain {
             } catch (java.io.IOException failure) {
                 return error(1, "failed", "query file: " + failure.getMessage());
             }
+            if (flags.containsKey("identity")) return replayIdentity(root, flags.get("identity"));
             if (flags.get("wait-for") != null && !flags.get("wait-for").isBlank()) {
                 return CliResult.ok(Jsons.pretty(dev.domengine.action.Observe.waitFor(root, flags)));
             }
@@ -480,6 +481,7 @@ public final class DomEngineMain {
             root.linkParents();
             LiveXPath.use(session.connection());
             try {
+                if (flags.containsKey("identity")) return replayIdentity(root, flags.get("identity"));
                 ObjectNode ran = flags.get("wait-for") == null || flags.get("wait-for").isBlank()
                         ? dev.domengine.query.Query.run(root, flags)
                         : dev.domengine.action.Observe.waitSession(session, flags);
@@ -489,6 +491,11 @@ public final class DomEngineMain {
             }
         }
         return error(2, "usage", "query requires --file or --session");
+    }
+
+    /** Prints the identity replay object. A malformed chain is an error, not zero hits. */
+    private static CliResult replayIdentity(dev.domengine.tree.DomNode root, String source) {
+        return CliResult.ok(Jsons.pretty(dev.domengine.snapshot.IdentityChain.replay(root, source)));
     }
 
     private static CliResult action(String verb, Map<String, String> flags) {
@@ -817,13 +824,14 @@ public final class DomEngineMain {
                 attach --cdp URL --i-accept-local-attach
                 snapshot --session ID | --cdp URL --i-accept-local-attach [--full-page] [--out-dir DIR]
                 premap --file page.html [--screenshot shot.png] [--out-dir DIR]
-                query --file page.html --css SELECTOR [--selector EXPR] [--pipeline EXPR] [--geometry] [--explain] [--viewport file.pgm]
+                query --file page.html --css SELECTOR [--selector EXPR] [--pipeline EXPR] [--geometry] [--explain] [--viewport file.pgm] [--identity FILE|JSON]
                   EXPR accepts engine=value stages joined by >> and boolean AND, OR, and NOT
                   live xpath is XPath 1.0 via document.evaluate. An invalid expression is an error, not zero hits.
                   relatives: near below above left-of right-of inside after before (left and right are aliases); filter form <relation>(<anchor query>)
                   negatives: not-<relation> or NOT <relation>; weights <relation>@<w>
                   look: look=color=red or look=opacity>0.5,background-color=#fff (comma AND, pipe OR)
                   example: (css=button AND text="Submit") >> near=50
+                  --identity replays a recorded chain (a chain array, {chain}, or a v2 node {identity:{chain}}) and prints handle, backend_node_id, matched, locator, and index. It does not run the selector. A malformed chain is an error.
                 click|type|scroll|submit|key|dblclick|contextclick|drag|eval --session ID
                 screenshot --session ID [--out file.png]
                 observe|wait --file page.html|--session ID --css SELECTOR [--timeout-ms N]
@@ -837,6 +845,7 @@ public final class DomEngineMain {
                   snapshot --id ID [--screenshot file.png] [--out-dir DIR]
                   a fixture snapshot needs --screenshot
                   query and resolve use the same --pipeline, --css, --xpath, and --text as browser query
+                  query --identity FILE|JSON replays that chain against the attached tree and prints handle, backend_node_id, matched, locator, and index
                   frame, shadow, and pierce are browser-only and are rejected on desktop
                   live click and type act on the OS control; a missing bus, permission, or input tool fails
                   click, type, and resolve list candidates when more than one node matches

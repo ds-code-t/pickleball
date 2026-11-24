@@ -3,6 +3,8 @@ package tools.dscode.common.composite;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.domcomposite.Client;
+import dev.domengine.snapshot.IdentityChain;
+import dev.domengine.tree.DomNode;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.domoperations.PositionSelection;
@@ -381,6 +383,20 @@ public final class DomCompositeAdapter {
         }
         CompositeLog.info("snapshot", "schema");
         return open.snapshot(options == null ? com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode() : options);
+    }
+
+    /**
+     * Re-resolves a recorded v2 node against the current tree.
+     * Forwards to {@link IdentityChain#replay}. Logs the matched locator kind.
+     * A node with no identity chain returns the unmatched result and does not log,
+     * so a caller that always passes the current node leaves existing flows unchanged.
+     */
+    public ObjectNode replayIdentity(DomNode root, JsonNode recorded) {
+        JsonNode chain = IdentityChain.chainOf(recorded);
+        if (chain == null) return IdentityChain.replay(root, (JsonNode) null);
+        ObjectNode result = IdentityChain.replay(root, chain);
+        CompositeLog.info("identity", "replay matched=" + result.path("matched").asText(""));
+        return result;
     }
 
     private static boolean snapshotSchema(Client open) {

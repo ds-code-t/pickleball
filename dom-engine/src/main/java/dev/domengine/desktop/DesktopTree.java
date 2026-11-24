@@ -11,6 +11,7 @@ import dev.domengine.premap.Candidate;
 import dev.domengine.premap.OneMatch;
 import dev.domengine.premap.OneMatchException;
 import dev.domengine.query.Query;
+import dev.domengine.snapshot.IdentityChain;
 import dev.domengine.tree.DomNode;
 
 import java.io.IOException;
@@ -283,6 +284,12 @@ public final class DesktopTree {
     public static ObjectNode query(String id, Map<String, String> flags) {
         rejectBrowserOnly(flags);
         Session session = require(id);
+        if (flags != null && flags.containsKey("identity")) {
+            ObjectNode found = IdentityChain.replay(session.root, flags.get("identity"));
+            found.put("backend", session.backend);
+            EngineLog.info("desktop", "query " + id + " identity " + found.path("matched").asText(""));
+            return found;
+        }
         ObjectNode found = Query.run(session.root, withSession(session, flags));
         found.put("backend", session.backend);
         EngineLog.info("desktop", "query " + id);

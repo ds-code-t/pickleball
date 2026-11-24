@@ -23,7 +23,7 @@ import tools.dscode.common.reporting.logging.LogForwarder;
  * CLI-first log for the DOM engine adapter. Off unless
  * {@code pkb_composite_log} names an entity ({@code location}, {@code adapter},
  * {@code session}, {@code element}, {@code fallback}, {@code batch}, {@code state},
- * {@code position}, {@code geometry}, {@code query}, {@code exposure})
+ * {@code position}, {@code geometry}, {@code query}, {@code exposure}, {@code identity})
  * or {@code all}.
  * {@code snapshot} writes page-snapshot lines. A Selenium page fallback is not gated
  * on that entity: {@link #snapshotFallback(String)} prints one
@@ -35,6 +35,8 @@ import tools.dscode.common.reporting.logging.LogForwarder;
  * the five-space view, and {@code INFO geometry real} or {@code INFO geometry fallback}.
  * {@code adapter} writes the same choice as {@code INFO adapter geometry real}
  * or {@code INFO adapter geometry fallback}.
+ * {@code identity} writes {@code INFO identity replay matched=<kind>} when a v2
+ * node that carries an identity chain is re-resolved. A node with no chain does not log.
  * {@code batch} writes one TRACE line per describe:
  * {@code TRACE batch mode=<composite|selenium-batch|selenium-legacy> selector=<by> nodes=<count> durationMs=<n>}.
  * There is no per-element line. {@code position} writes

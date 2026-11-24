@@ -3,12 +3,16 @@ package dev.domengine.snapshot;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import dev.domengine.cdp.CdpException;
 import dev.domengine.image.TemplateMatch;
 import dev.domengine.json.Jsons;
 import dev.domengine.query.HtmlTree;
 import dev.domengine.query.Query;
 import dev.domengine.tree.DomNode;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -67,6 +71,58 @@ public final class IdentityChain {
             index++;
         }
         return result;
+    }
+
+    /**
+     * Replays a chain loaded from inline JSON or a file path.
+     * Accepts a chain array, an identity object {@code {chain}}, or a v2 node {@code {identity:{chain}}}.
+     * Malformed JSON, a missing file, or a value with no chain array is {@code invalid identity chain}.
+     */
+    public static ObjectNode replay(DomNode root, String source) {
+        return replay(root, load(source));
+    }
+
+    /** The chain array inside a recorded step list, identity object, or v2 node. Null when none of those shapes. */
+    public static JsonNode chainOf(JsonNode node) {
+        if (node == null || node.isNull()) return null;
+        if (node.isArray()) return node;
+        if (!node.isObject()) return null;
+        JsonNode chain = node.get("chain");
+        if (chain != null && chain.isArray()) return chain;
+        JsonNode identity = node.get("identity");
+        if (identity != null && identity.isObject()) {
+            JsonNode nested = identity.get("chain");
+            if (nested != null && nested.isArray()) return nested;
+        }
+        return null;
+    }
+
+    public static JsonNode load(String source) {
+        if (source == null || source.isBlank()) throw new CdpException("invalid identity chain");
+        String text = source.trim();
+        JsonNode parsed;
+        if (text.startsWith("[") || text.startsWith("{")) {
+            parsed = parseJson(text);
+        } else {
+            Path path = Path.of(text);
+            if (!Files.isRegularFile(path)) throw new CdpException("invalid identity chain");
+            try {
+                parsed = parseJson(Files.readString(path));
+            } catch (IOException failure) {
+                throw new CdpException("invalid identity chain");
+            }
+        }
+        JsonNode chain = chainOf(parsed);
+        if (chain == null) throw new CdpException("invalid identity chain");
+        return chain;
+    }
+
+    private static JsonNode parseJson(String text) {
+        try {
+            return Jsons.MAPPER.readTree(text);
+        } catch (RuntimeException | IOException failure) {
+            throw new CdpException("invalid identity chain");
+        }
     }
 
     private static ObjectNode identity(
