@@ -45,7 +45,7 @@ final class WorkbenchCliFlags {
             "act", List.of(
                     "--target", "--kind", "--query", "--ref", "--value", "--snap", "--pick",
                     "--run-id", "--agent", "--agent-id", "--fixture", "--timeout", "--condition", "--frame",
-                    "--group", "--sequence"
+                    "--group", "--sequence", "--exposure", "--purpose", "--file"
             ),
             "gc-runs", List.of("--dry-run")
     );

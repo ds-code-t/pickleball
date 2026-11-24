@@ -2058,6 +2058,14 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "enter");
         copyFlag(args, parsed, "kinds");
         copyFlag(args, parsed, "fixture");
+        // Collaboration flags: snap --include/--exposure, find --purpose, chat-read --last/--mark-read, ask --min-show, panel-open --collapsed.
+        copyFlag(args, parsed, "include");
+        copyFlag(args, parsed, "exposure");
+        copyFlag(args, parsed, "purpose");
+        copyFlag(args, parsed, "last");
+        copyFlag(args, parsed, "mark-read");
+        copyFlag(args, parsed, "min-show");
+        copyFlag(args, parsed, "collapsed");
         copyFlag(args, parsed, "fields");
         copyFlag(args, parsed, "group");
         copyFlag(args, parsed, "priority");

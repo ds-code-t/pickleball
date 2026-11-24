@@ -80,6 +80,68 @@ class CollabFixesLiveTest {
         for (String row : rows) assertFalse(row.contains("\"source\":\"human\""), "agent form-fill tagged human: " + row);
     }
 
+    @Test
+    @Timeout(value = 150, unit = TimeUnit.SECONDS)
+    void c3_snapShowsCollabStateAndSinceReturnsOnlyChanges() throws Exception {
+        start(page("c3.html", """
+                <label>Email <input id="email" name="email"></label>
+                <label>Secret <input id="secret" type="password"></label>
+                <label><input id="agree" type="checkbox"> Agree</label>
+                <button id="go">Go</button>
+                """), "c3");
+        assertEquals(0, run("form-fill", "--target=browser:auto", "--fields=email=ann@example.com", "--run-id=c3").code);
+        assertEquals(0, run("form-fill", "--target=browser:auto", "--fields=secret=hunter2", "--run-id=c3").code);
+        assertEquals(0, run("panel-open", "--run-id=c3").code);
+        assertEquals(0, run("chat-send", "--text=hello human", "--run-id=c3").code);
+        Capture paint = run("highlight", "--handle=#go", "--preset=outline-red", "--run-id=c3");
+        assertEquals(0, paint.code, paint.err + paint.out);
+        Capture guided = run("guide", "--steps=[{\"t\":\"#agree\",\"say\":\"Tick agree\",\"do\":\"check\"}]", "--id=g1", "--run-id=c3");
+        assertEquals(0, guided.code, guided.err + guided.out);
+        assertEquals(0, run("ask", "--say=Pick one", "--choices=Alpha,Beta", "--run-id=c3").code);
+        Thread.sleep(400);
+
+        Capture snap = run("snap", "--target=browser:auto", "--run-id=c3");
+        assertEquals(0, snap.code, snap.err + snap.out);
+        JsonNode body = JSON.readTree(snap.out);
+        String lines = body.path("items").toString();
+        assertTrue(lines.contains("value=ann@example.com"), "email value missing: " + lines);
+        assertTrue(lines.contains("value=redacted"), "password not redacted: " + lines);
+        assertFalse(lines.contains("hunter2"), "password leaked: " + lines);
+        assertTrue(lines.contains("checked=false"), "checkbox state missing: " + lines);
+        assertTrue(lines.contains("highlight=outline-red"), "highlight missing: " + lines);
+        assertTrue(lines.contains("guide=") && lines.contains("g1 step 1/1"), "guide step missing: " + lines);
+        assertTrue(lines.contains("card=") && lines.contains("ask-q1") && lines.contains("open"), "card missing: " + lines);
+        assertTrue(lines.contains("chat-tab"), "panel purpose missing: " + lines);
+        assertTrue(lines.contains("msg="), "chat msg attributes missing: " + lines);
+        assertFalse(body.path("cursors").path("chat").asText().isBlank(), "cursors.chat did not advance: " + snap.out);
+        assertEquals("open", body.path("panel").asText(), snap.out);
+        String cursor = body.path("snapCursor").asText();
+        assertFalse(cursor.isBlank(), snap.out);
+
+        Capture narrowed = run("snap", "--target=browser:auto", "--include=values", "--run-id=c3");
+        String narrowLines = JSON.readTree(narrowed.out).path("items").toString();
+        assertTrue(narrowLines.contains("value=ann@example.com"), narrowLines);
+        assertFalse(narrowLines.contains("highlight="), "--include=values kept highlight: " + narrowLines);
+
+        assertEquals(0, run("form-fill", "--target=browser:auto", "--fields=email=bob@example.com", "--run-id=c3").code);
+        Capture since = run("snap", "--target=browser:auto", "--since=" + cursor, "--run-id=c3");
+        assertEquals(0, since.code, since.err + since.out);
+        JsonNode delta = JSON.readTree(since.out);
+        assertTrue(delta.path("changed").toString().contains("bob@example.com"), "changed row missing: " + since.out);
+        assertTrue(delta.path("added").isEmpty(), "nothing was added: " + since.out);
+        assertFalse(delta.path("items").toString().contains("\"Go\""), "--since printed an unchanged row: " + since.out);
+        Capture stale = run("snap", "--target=browser:auto", "--since=s.nope.1", "--run-id=c3");
+        assertNotEquals(0, stale.code, stale.out);
+
+        java.util.concurrent.CompletableFuture<Capture> waiting = java.util.concurrent.CompletableFuture.supplyAsync(
+                () -> run("wait", "--target=browser:auto", "--condition=new-control", "--timeout=8000", "--run-id=c3"));
+        Thread.sleep(1200);
+        assertEquals(0, run("ask", "--say=Ready?", "--choices=Ship it", "--id=q2", "--run-id=c3").code);
+        Capture waited = waiting.get(20, TimeUnit.SECONDS);
+        assertEquals(0, waited.code, waited.err + waited.out);
+        assertTrue(JSON.readTree(waited.out).path("control").asText().contains("Ship it"), waited.out);
+    }
+
     List<String> interactionRows(String id) throws Exception {
         Path events = temp.resolve(".pickleball").resolve("agent-events.jsonl");
         if (!Files.exists(events)) return List.of();

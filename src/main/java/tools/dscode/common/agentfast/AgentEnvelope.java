@@ -60,6 +60,10 @@ public final class AgentEnvelope {
                 copy.put("chatNext", String.valueOf(last.get("id")));
             }
         }
+        if (copy.get("chatNext") == null && copy.get("chatHead") == null) {
+            String head = tools.dscode.common.agentcontrol.ChatHead.latest(project, runId);
+            if (!head.isBlank()) copy.put("chatHead", head);
+        }
         copy.put("items", leanItems(takeItems(copy)));
         Object priorNext = copy.get("next");
         if (priorNext instanceof Number number) copy.put("seq", number.intValue());

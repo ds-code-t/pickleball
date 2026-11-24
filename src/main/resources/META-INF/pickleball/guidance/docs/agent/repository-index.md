@@ -178,6 +178,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentcontrol/AgentStore.java`
 - `src/main/java/tools/dscode/common/agentcontrol/AnswerRecovery.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ChatCursor.java`
+- `src/main/java/tools/dscode/common/agentcontrol/ChatHead.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ChatLog.java`
 - `src/main/java/tools/dscode/common/agentcontrol/EventCursor.java`
 - `src/main/java/tools/dscode/common/agentcontrol/HumanValue.java`
@@ -198,6 +199,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentfast/AgentCursor.java`
 - `src/main/java/tools/dscode/common/agentfast/AgentEnvelope.java`
 - `src/main/java/tools/dscode/common/agentfast/AgentForward.java`
+- `src/main/java/tools/dscode/common/agentfast/CollabRows.java`
 - `src/main/java/tools/dscode/common/agentfast/CompactReply.java`
 - `src/main/java/tools/dscode/common/agentfast/FallbackLog.java`
 - `src/main/java/tools/dscode/common/agentfast/FixturePages.java`
@@ -211,6 +213,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentfast/ScreenshotReply.java`
 - `src/main/java/tools/dscode/common/agentfast/SelftestUi.java`
 - `src/main/java/tools/dscode/common/agentfast/SessionIds.java`
+- `src/main/java/tools/dscode/common/agentfast/SnapSince.java`
 - `src/main/java/tools/dscode/common/agentfast/SnapView.java`
 - `src/main/java/tools/dscode/common/agentfast/StandardView.java`
 - `src/main/java/tools/dscode/common/agentfast/StepTiming.java`

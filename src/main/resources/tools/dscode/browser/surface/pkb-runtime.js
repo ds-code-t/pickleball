@@ -147,6 +147,7 @@
     if (!node || !node.setAttribute) return;
     node.setAttribute('data-state', state);
     node.setAttribute('data-pkb-feedback', state);
+    if (node.hasAttribute && node.hasAttribute('data-pkb-msg-id')) node.setAttribute('data-pkb-msg-status', state === 'pending' ? 'sending' : (state === 'sent' ? 'delivered' : state));
     var note = node.querySelector ? node.querySelector(':scope > .pkb-feedback') : null;
     if (!note && node.classList && node.classList.contains('pkb-msg')) {
       note = document.createElement('span');
@@ -1230,6 +1231,9 @@
       step.badge.textContent = step.done ? '\u2713' : String(step.n);
       step.ring.className = 'ring ' + state + (i === g.current && g.pulse && step.anchor ? ' pulse' : '');
       step.state = state;
+      if (step.anchor && step.anchor.setAttribute) {
+        try { step.anchor.setAttribute('data-pkb-guide-step', g.id + ' step ' + step.n + '/' + g.steps.length + ' ' + state); } catch (ignored) { /* detached */ }
+      }
     });
     g.pulse = false;
     if (!g.tip) {
@@ -1476,6 +1480,7 @@
       if (step.timer) { clearTimeout(step.timer); step.timer = 0; }
       if (step.badge) { step.badge.remove(); step.badge = null; }
       if (step.ring) { step.ring.remove(); step.ring = null; }
+      if (step.anchor && step.anchor.removeAttribute) { try { step.anchor.removeAttribute('data-pkb-guide-step'); } catch (ignored) { /* gone */ } }
     });
     if (g.tip) { g.tip.remove(); g.tip = null; }
   }
@@ -1565,13 +1570,16 @@
       if (spec.sensitive) { delete ev.value; delete ev.choice; ev.filled = true; }
       var bound = pushEvent(ev);
       if (btn) setFeedback(btn, bound ? 'delivered' : 'sending');
-      setTimeout(function () { askClose(id); }, ANSWER_CONFIRM_MS);
+      node.setAttribute('data-pkb-card-state', 'answered');
+      cardTrail(id, spec.say, 'answered', spec.sensitive ? '' : picked);
+      setTimeout(function () { askClose(id, 'answered'); }, ANSWER_CONFIRM_MS);
     }
     if (choices.length) {
       choices.forEach(function (choice, i) {
         var btn = el('button', i === 0 ? '' : 'secondary', choice);
         btn.type = 'button';
         btn.setAttribute('data-choice', choice);
+        tagMeta(btn, 'card-option');
         btn.addEventListener('click', function (event) {
           event.preventDefault();
           event.stopPropagation();
@@ -1593,7 +1601,11 @@
     node.appendChild(row);
     node.setAttribute('data-pkb-id', 'ask-' + id);
     node.setAttribute('data-pkb-card', 'ask');
-    tagMeta(node, 'callout');
+    node.setAttribute('data-pkb-card-id', 'ask-' + id);
+    node.setAttribute('data-pkb-card-title', String(spec.say || '').slice(0, 80));
+    node.setAttribute('data-pkb-card-state', 'open');
+    tagMeta(node, 'callout card');
+    cardTrail(id, spec.say, 'open', '');
     isolateKeys(node);
     root.appendChild(node);
     asks.set(id, {id: id, node: node, t: spec.t, anchor: spec.t ? findTarget(spec.t) : null, scrollers: []});
@@ -1602,9 +1614,29 @@
     return {id: id, choices: choices.length};
   }
 
-  function askClose(id) {
+  // The last few cards stay readable after they close: one JSON attribute on <html>, from any world.
+  function cardTrail(id, title, state, choice) {
+    try {
+      var root = document.documentElement;
+      var trail = JSON.parse(root.getAttribute('data-pkb-card-trail') || '[]');
+      if (!Array.isArray(trail)) trail = [];
+      var key = 'ask-' + id;
+      var row = null;
+      trail.forEach(function (r) { if (r && r.id === key) row = r; });
+      if (!row) { row = {id: key, title: String(title || '').slice(0, 80), at: Date.now()}; trail.push(row); }
+      if (row.state === 'answered' && state === 'closed') return;
+      row.state = state;
+      if (choice) row.choice = String(choice).slice(0, 80);
+      row.changed = Date.now();
+      if (trail.length > 8) trail = trail.slice(-8);
+      root.setAttribute('data-pkb-card-trail', JSON.stringify(trail));
+    } catch (ignored) { /* attribute refused */ }
+  }
+
+  function askClose(id, reason) {
     var a = asks.get(String(id));
     if (!a) return false;
+    cardTrail(String(id), a.node.getAttribute('data-pkb-card-title'), reason === 'timeout' ? 'timed-out' : (reason || 'closed'), '');
     a.node.remove();
     asks.delete(String(id));
     if (idle() && layer && layer.isConnected) layer.remove();
@@ -1803,6 +1835,7 @@
     if (panel.recordPane) panel.recordPane.hidden = name !== 'record';
     panel.composer.hidden = name !== 'chat';
     if (name === 'chat') panel.chatPane.scrollTop = panel.chatPane.scrollHeight;
+    if (name === 'steps') stepsList();
     panelPlace();
   }
 
@@ -1816,6 +1849,9 @@
     var node = el('div', 'pkb-msg');
     node.setAttribute('data-from', from);
     if (row.id) node.setAttribute('data-id', row.id);
+    node.setAttribute('data-pkb-msg-id', String(row.id || ''));
+    node.setAttribute('data-pkb-msg-author', from);
+    node.setAttribute('data-pkb-msg-status', String(row.state === 'pending' ? 'sending' : (row.state === 'sent' ? 'delivered' : (row.state || 'shown'))));
     var who = from === 'human' ? 'You' : (from === 'system' ? 'System' : ('Agent' + (row.agent ? ' ' + row.agent : '')));
     var meta = el('span', 'pkb-meta', who + ' \u00b7 ' + clock(row.at));
     node.appendChild(meta);
@@ -1839,22 +1875,53 @@
       if (!row || row.text == null) return;
       var key = row.id ? String(row.id) : '';
       if (key && panel.seen[key]) return;
+      var from = row.from || row.source || 'agent';
+      // The same message can arrive twice: the composer's local id, then the stored chat id. One bubble.
+      var twin = chatTwin(from, String(row.text), row.at);
+      if (twin) {
+        if (key) {
+          panel.seen[key] = true;
+          var shown = pane.querySelector('.pkb-msg[data-id="' + CSS.escape(String(twin.id)) + '"]');
+          if (shown) shown.setAttribute('data-alt-id', key);
+          twin.alt = key;
+        }
+        return;
+      }
       if (key) panel.seen[key] = true;
       if (panel.empty) { panel.empty.remove(); panel.empty = null; }
       pane.appendChild(bubble(row));
       added++;
       chatMirror.push({
         id: key,
-        from: row.from || row.source || 'agent',
+        from: from,
         text: String(row.text),
         state: row.state || '',
-        at: row.at || ''
+        at: row.at || '',
+        seen: !!replaying,
+        ms: Date.now()
       });
       if ((row.from || row.source) !== 'human' && row.state !== 'read') panelUnread();
     });
     if (stick) pane.scrollTop = pane.scrollHeight;
     syncPop('chat');
     return added;
+  }
+
+  var replaying = false;
+  var TWIN_MS = 20000;
+
+  function chatTwin(from, text, at) {
+    var when = at ? Date.parse(at) : NaN;
+    for (var i = chatMirror.length - 1; i >= 0 && i >= chatMirror.length - 50; i--) {
+      var row = chatMirror[i];
+      if (!row || row.text !== text) continue;
+      var a = row.from === 'human' ? 'human' : row.from;
+      var b = from === 'human' ? 'human' : from;
+      if (a !== b) continue;
+      var then = row.at ? Date.parse(row.at) : NaN;
+      if (isNaN(when) || isNaN(then) || Math.abs(when - then) <= TWIN_MS || Date.now() - row.ms <= TWIN_MS) return row;
+    }
+    return null;
   }
 
   function chatSent(ids) {
@@ -1882,8 +1949,7 @@
       var key = CSS.escape(String(id));
       var nodes = [];
       if (panel) {
-        var bubble = panel.chatPane.querySelector('.pkb-msg[data-id="' + key + '"]');
-        if (bubble) nodes.push(bubble);
+        panel.chatPane.querySelectorAll('.pkb-msg[data-id="' + key + '"],.pkb-msg[data-alt-id="' + key + '"]').forEach(function (bubble) { nodes.push(bubble); });
       }
       document.querySelectorAll('[data-pkb-id="' + key + '"],[data-feedback-id="' + key + '"]').forEach(function (node) { nodes.push(node); });
       if (layer && layer.shadowRoot) {
@@ -1891,7 +1957,7 @@
       }
       nodes.forEach(function (node) { setFeedback(node, 'read'); n++; });
       chatMirror.forEach(function (row) {
-        if (String(row.id) === String(id)) row.state = 'read';
+        if (String(row.id) === String(id) || String(row.alt || '') === String(id)) row.state = 'read';
       });
     });
     syncPop('chat');
@@ -2016,12 +2082,17 @@
     var title = el('strong', 'pkb-title', 'Agent');
     var tabs = el('nav', 'pkb-tabs');
     tabs.setAttribute('role', 'tablist');
-    var tabButtons = [['chat', 'Chat'], ['steps', 'Guide'], ['record', 'Recorder']].map(function (t) {
+    var tabButtons = [['chat', 'Chat', 'chat-tab'], ['steps', 'Guide', 'guide-tab'], ['record', 'Recorder', 'recorder-tab']].map(function (t) {
       var b = el('button', '', t[1]);
       b.type = 'button';
       b.setAttribute('role', 'tab');
       b.setAttribute('data-tab', t[0]);
-      b.appendChild(el('span', 'pkb-badge'));
+      b.setAttribute('aria-label', t[1]);
+      tagMeta(b, t[2]);
+      var tabBadge = el('span', 'pkb-badge');
+      tabBadge.setAttribute('aria-hidden', 'true');
+      tabBadge.setAttribute('data-pkb-badge', '');
+      b.appendChild(tabBadge);
       b.addEventListener('click', function () { panelTab(t[0]); });
       tabs.appendChild(b);
       return b;
@@ -2030,14 +2101,17 @@
     pop.type = 'button';
     pop.setAttribute('aria-label', 'Pop out chat');
     pop.setAttribute('data-action', 'popout');
+    tagMeta(pop, 'popout');
     var minimize = el('button', 'pkb-icon', '\u2013');
     minimize.type = 'button';
     minimize.setAttribute('aria-label', 'Minimize');
     minimize.setAttribute('data-action', 'minimize');
+    tagMeta(minimize, 'collapse');
     var close = el('button', 'pkb-icon', '\u00d7');
     close.type = 'button';
     close.setAttribute('aria-label', 'Close');
     close.setAttribute('data-action', 'close');
+    tagMeta(close, 'close');
     head.appendChild(dot);
     head.appendChild(title);
     head.appendChild(tabs);
@@ -2047,12 +2121,15 @@
     var chatPane = el('div', 'pkb-pane pkb-chat');
     chatPane.setAttribute('role', 'log');
     chatPane.setAttribute('aria-live', 'polite');
+    tagMeta(chatPane, 'chat-log');
     var empty = el('div', 'pkb-empty', 'Messages from the agent appear here.');
     chatPane.appendChild(empty);
     var stepsPane = el('div', 'pkb-pane');
+    tagMeta(stepsPane, 'guide-pane');
     stepsPane.hidden = true;
     stepsPane.appendChild(el('div', 'pkb-empty', 'No guide yet.'));
     var recordPane = el('div', 'pkb-pane');
+    tagMeta(recordPane, 'recorder-pane');
     recordPane.hidden = true;
     recordPane.appendChild(el('div', 'pkb-empty', 'Not recording.'));
     var composer = el('form', 'pkb-composer');
@@ -2061,7 +2138,9 @@
     input.rows = 1;
     input.placeholder = 'Message the agent (Enter to send, Shift+Enter for a new line)';
     input.setAttribute('aria-label', 'Message');
+    tagMeta(input, 'message');
     var send = el('button', '', 'Send');
+    tagMeta(send, 'send');
     send.type = 'submit';
     send.disabled = true;
     composer.appendChild(input);
@@ -2080,12 +2159,16 @@
     pill.type = 'button';
     pill.hidden = true;
     pill.setAttribute('aria-label', 'Open agent panel');
+    tagMeta(pill, 'reopen');
     var pillDot = el('span', 'pkb-dot');
     pillDot.setAttribute('data-state', 'live');
     pill.appendChild(pillDot);
     var pillLabel = el('span', 'pkb-pill-label', 'Agent');
     pill.appendChild(pillLabel);
-    pill.appendChild(el('span', 'pkb-unread'));
+    var pillUnread = el('span', 'pkb-unread');
+    pillUnread.setAttribute('aria-hidden', 'true');
+    pillUnread.setAttribute('data-pkb-badge', '');
+    pill.appendChild(pillUnread);
     root.appendChild(card);
     root.appendChild(pill);
     isolateKeys(card);
@@ -2195,8 +2278,9 @@
     if (opts.title) panel.title.textContent = String(opts.title).slice(0, 80);
     if (opts.theme === 'light' || opts.theme === 'dark') { panel.card.setAttribute('data-theme', opts.theme); panel.pill.setAttribute('data-theme', opts.theme); }
     else if (opts.theme === 'auto') { panel.card.removeAttribute('data-theme'); panel.pill.removeAttribute('data-theme'); }
-    if (Array.isArray(opts.history)) chat(opts.history);
+    if (Array.isArray(opts.history)) { replaying = true; try { chat(opts.history); } finally { replaying = false; } }
     stepsList();
+    try { document.documentElement.setAttribute('data-pkb-panel-want', 'open'); } catch (ignored) { /* attribute refused */ }
     st.closed = false;
     panelTab(opts.tab === 'steps' ? 'steps' : (opts.tab === 'record' ? 'record' : (opts.tab === 'chat' ? 'chat' : st.tab || 'chat')));
     paintRecordPane();
@@ -2214,6 +2298,7 @@
     panel.state.min = false;
     panel.state.pop = false;
     window.__pkbPanelState = null;
+    try { document.documentElement.removeAttribute('data-pkb-panel-want'); } catch (ignored) { /* attribute refused */ }
     panelPlace();
     if (items.size === 0 && !editor && guides.size === 0 && asks.size === 0 && layer && layer.isConnected) {
       layer.removeAttribute('data-pkb-layer');
@@ -2323,6 +2408,9 @@
   function restoreWhenReady(st) {
     restoreState = st;
     restoreApplied = false;
+    try {
+      if (st && st.snap && st.snap.panel && inScope(st)) document.documentElement.setAttribute('data-pkb-panel-want', 'open');
+    } catch (ignored) { /* attribute refused */ }
     if (st && st.pageState) {
       try { sessionStorage.setItem('pkb-ui', JSON.stringify(st)); } catch (ignored) { /* storage blocked */ }
     }
@@ -2996,22 +3084,28 @@
   function recountUnread() {
     if (!panel || !panel.tabs || !panel.tabs.length) return;
     var n = 0;
+    var looking = !panel.state.min && !panel.state.pop && !panel.state.closed && panel.state.tab === 'chat' && panel.card.isConnected;
     chatMirror.forEach(function (row) {
       var from = row.from || 'agent';
-      if (from !== 'human' && row.state !== 'read') n++;
+      if (from === 'human' || row.state === 'read') return;
+      // A message shown while the person looks at the chat pane, or replayed after a navigation, is seen.
+      if (looking) row.seen = true;
+      if (!row.seen) n++;
     });
     panel.unread = n;
-    var looking = !panel.state.min && !panel.state.pop && !panel.state.closed && panel.state.tab === 'chat' && panel.card.isConnected;
     var chatTab = panel.tabs[0];
     var badge = chatTab.querySelector('.pkb-badge');
     var show = !looking && n;
-    if (badge) badge.textContent = show ? String(n) : '';
+    if (badge) { badge.textContent = show ? String(n) : ''; badge.setAttribute('data-pkb-badge', show ? String(n) : ''); }
     if (show) chatTab.setAttribute('data-unread', String(n));
     else chatTab.removeAttribute('data-unread');
-    chatTab.setAttribute('aria-label', show ? 'Chat, ' + n + ' unread' : 'Chat');
+    // The accessible name stays "Chat" so a ref or query keeps matching; the count is a description.
+    chatTab.setAttribute('aria-label', 'Chat');
+    if (show) chatTab.setAttribute('aria-description', n + ' unread');
+    else chatTab.removeAttribute('aria-description');
     var pill = panel.pill && panel.pill.querySelector('.pkb-unread');
     var showPill = (panel.state.min || panel.state.pop || panel.state.closed || !panel.card.isConnected) && n;
-    if (pill) pill.textContent = showPill ? String(n) : '';
+    if (pill) { pill.textContent = showPill ? String(n) : ''; pill.setAttribute('data-pkb-badge', showPill ? String(n) : ''); }
   }
 
   function syncPop(kind) {

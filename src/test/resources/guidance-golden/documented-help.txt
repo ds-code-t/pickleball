@@ -305,8 +305,8 @@ Usage: short-log [--limit=<n>]
 Usage: show-run --run-id=<id>
 
 # help snap
-Usage: snap [--target=browser:auto|browser:<id>|browser:cdp=<url>|desktop:<pid>|desktop:app~<name>|ref:<doc>:<handle>] [--session=<id>] [--within=<id>] [--depth=<n>] [--group=role|type] [--priority=on] [--format=lines|json] [--fields=<a,b>] [--where=<role=button>] [--limit=<n>] [--budget=<bytes>]
---within is a ref, short id, backend id, or element id. --session is the start or isolate session id. Omit it to use the current live session. --fields prints only those keys. --budget is the whole reply in bytes (at most 16 KB). Default lines use a short id and omit a long ref. A document, shadow root, html, body, and head do not consume a depth level.
+Usage: snap [--target=browser:auto|browser:<id>|browser:cdp=<url>|desktop:<pid>|desktop:app~<name>|ref:<doc>:<handle>] [--session=<id>] [--within=<id>] [--depth=<n>] [--group=role|type] [--priority=on] [--format=lines|json] [--fields=<a,b>] [--where=<role=button>] [--limit=<n>] [--budget=<bytes>] [--include=values,highlights,cards,guide,placements,chat] [--exposure=human|full] [--since=<snapCursor>]
+Rows carry value (passwords redacted), checked, purpose, badge, highlight, guide, card, and msg when present; --include narrows them. --since prints only rows added or changed since that snap and lists removed rows. --within is a ref, short id, backend id, or element id. --session is the start or isolate session id. Omit it to use the current live session. --fields prints only those keys. --budget is the whole reply in bytes (at most 16 KB). Default lines use a short id and omit a long ref. A document, shadow root, html, body, and head do not consume a depth level.
 
 # help spotlight
 Usage: spotlight [--dim=<0-1>] [--handle=<id>] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>] [--target=auto|page|popup|native] [--block=true] [--html=<page>]

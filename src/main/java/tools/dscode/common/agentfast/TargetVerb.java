@@ -75,7 +75,7 @@ public final class TargetVerb {
     private static final Set<String> ACT_KEYS = Set.of(
             "target", "kind", "query", "ref", "value", "snap", "run-id", "agent", "agent-id",
             "fixture", "timeout", "condition", "frame", "group", "sequence",
-            "format", "fields", "where", "limit", "budget", "pick", "session", "sessionId"
+            "format", "fields", "where", "limit", "budget", "pick", "session", "sessionId", "exposure", "purpose", "file"
     );
 
     /** CSS or text selector for a fresh {@code ref:}. Null when the ref is unknown or stale. */
@@ -176,6 +176,7 @@ public final class TargetVerb {
                     + "el.setAttribute('data-pkb-style','style_modified');"
                     + "el.setAttribute('data-pkb-sentence', sentence);"
                     + "el.setAttribute('data-pkb-css', css);"
+                    + "el.setAttribute('data-pkb-highlight', " + jsString(CollabRows.presetOf(css)) + ");"
                     + "return {ok:true,style:el.getAttribute('data-pkb-style'),css:el.getAttribute('data-pkb-css')};"
                     + "})()";
             ObjectNode params = Jsons.object();
@@ -1060,8 +1061,25 @@ public final class TargetVerb {
             String version = docVersion(page.session.connection());
             List<DomNode> shown = interactive(shownRoot, depth);
             List<Map<String, Object>> rows = publish(runId, "browser", page.session.id, version, shown, "", page.session.connection());
+            String exposure = exposureOf(args);
+            if (exposure == null) return fail("snap", "exposure is human or full");
+            if ("human".equals(exposure)) rows.removeIf(row -> Boolean.FALSE.equals(row.get("visible")));
+            rows.addAll(CollabRows.messages(shownRoot, 5));
+            CollabRows.narrow(rows, blank(args.get("include")));
+            String since = blank(args.get("since"));
+            Map<String, Object> sinceDiff = since.isBlank() ? null : SnapSince.since(since, rows);
+            if (!since.isBlank() && sinceDiff == null) return fail("snap", "unknown cursor; snap again without --since");
+            String snapCursor = SnapSince.record(runId, rows);
             String picture = picture(page.session.connection(), rows);
             Map<String, Object> body = base("snap", "cdp", "browser", target);
+            body.put("snapCursor", snapCursor);
+            if (!exposure.isBlank()) body.put("exposure", exposure);
+            if (sinceDiff != null) {
+                body.putAll(sinceDiff);
+                rows = changedRows(rows, sinceDiff);
+            }
+            String panelState = panelPending(page.session.connection());
+            if (!panelState.isBlank()) body.put("panel", panelState);
             body.put("mode", mode);
             body.put("docVersion", version);
             body.put("doc_version", version);
@@ -1076,6 +1094,51 @@ public final class TargetVerb {
             return ok(body);
         } finally {
             page.release();
+        }
+    }
+
+    /** {@code --exposure}: blank keeps every row, {@code human} drops hidden rows, {@code full}/{@code full-access} keep all. */
+    static String exposureOf(Map<String, String> args) {
+        String raw = blank(args == null ? null : args.get("exposure")).toLowerCase(java.util.Locale.ROOT);
+        return switch (raw) {
+            case "" -> "";
+            case "human" -> "human";
+            case "full", "full-access" -> "full-access";
+            default -> null;
+        };
+    }
+
+    /** With {@code --since}, the printed lines are only the added and changed rows. */
+    private static List<Map<String, Object>> changedRows(List<Map<String, Object>> rows, Map<String, Object> diff) {
+        java.util.Set<String> ids = new java.util.HashSet<>();
+        for (String bucket : List.of("added", "changed")) {
+            Object list = diff.get(bucket);
+            if (!(list instanceof List<?> items)) continue;
+            for (Object item : items) {
+                String text = String.valueOf(item);
+                if (text.startsWith("id=")) ids.add(text.substring(3, text.indexOf(' ') < 0 ? text.length() : text.indexOf(' ')));
+            }
+        }
+        List<Map<String, Object>> kept = new ArrayList<>();
+        for (Map<String, Object> row : rows) if (ids.contains(String.valueOf(row.get("id")))) kept.add(row);
+        return kept;
+    }
+
+    /**
+     * {@code pending} when the panel is configured open on this page but its layer is not in the DOM yet,
+     * {@code open} when it is there, blank when no panel is configured.
+     */
+    private static String panelPending(CdpConnection cdp) {
+        try {
+            ObjectNode params = Jsons.object();
+            params.put("expression", "(function(){var l=document.querySelector('pkb-layer[data-pkb-layer]');"
+                    + "var r=l&&l.shadowRoot;var p=r&&r.querySelector('.pkb-panel');"
+                    + "var want=document.documentElement.getAttribute('data-pkb-panel-want');"
+                    + "if(p) return 'open'; return want==='open'?'pending':'';})()");
+            params.put("returnByValue", true);
+            return cdp.call("Runtime.evaluate", params, Duration.ofSeconds(3)).path("result").path("value").asText("");
+        } catch (RuntimeException failure) {
+            return "";
         }
     }
 
@@ -1161,7 +1224,11 @@ public final class TargetVerb {
             String ref = blank(args.get("ref"));
             if (ref.isBlank() && "ref".equals(target.kind())) ref = target.raw();
             boolean met;
-            if (!ref.isBlank()) {
+            String newControl = null;
+            if ("new-control".equals(condition)) {
+                newControl = waitNewControl(page.session.connection(), timeout);
+                met = newControl != null;
+            } else if (!ref.isBlank()) {
                 met = waitOnRef(page.session.connection(), requireHit(ref), condition, timeout);
             } else if ("event".equals(mode)) {
                 met = waitEvent(project, runId, page.session.connection(), condition, timeout, session);
@@ -1184,6 +1251,7 @@ public final class TargetVerb {
             Map<String, Object> body = base("wait", "cdp", "browser", target);
             body.put("mode", mode);
             body.put("condition", condition);
+            if (newControl != null) body.put("control", newControl);
             body.put("docVersion", after);
             body.put("title", titleAfter);
             List<SnapRow> rowsAfter = wantDiff
@@ -1196,6 +1264,37 @@ public final class TargetVerb {
         } finally {
             page.release();
         }
+    }
+
+    /**
+     * {@code wait --condition=new-control}: the first control (role and name, page or pkb surface) that was not
+     * there when the wait began. Null on timeout.
+     */
+    private static String waitNewControl(CdpConnection cdp, long timeout) {
+        java.util.Set<String> before = controlKeys(cdp);
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(Math.max(0, timeout));
+        while (System.nanoTime() < deadline) {
+            sleep(100);
+            java.util.Set<String> now;
+            try {
+                now = controlKeys(cdp);
+            } catch (RuntimeException failure) {
+                continue;
+            }
+            for (String key : now) if (!before.contains(key)) return key;
+        }
+        return null;
+    }
+
+    private static java.util.Set<String> controlKeys(CdpConnection cdp) {
+        java.util.Set<String> keys = new java.util.LinkedHashSet<>();
+        java.util.Map<String, Integer> counts = new java.util.HashMap<>();
+        for (DomNode node : interactive(tree(cdp), Integer.MAX_VALUE)) {
+            String base = role(node) + " \"" + name(node) + "\"";
+            int n = counts.merge(base, 1, Integer::sum);
+            keys.add(n == 1 ? base : base + " #" + n);
+        }
+        return keys;
     }
 
     private static Outcome watch(Path project, String runId, TargetSelector.Parsed target, Map<String, String> args) {
@@ -3081,6 +3180,7 @@ public final class TargetVerb {
 
     private static List<Map<String, Object>> publish(String runId, String kind, String sessionId, String version, List<DomNode> nodes, String query, CdpConnection cdp) {
         Map<String, String[]> frames = cdp == null ? Map.of() : frameIndex(cdp);
+        Map<Long, JsonNode> live = cdp == null ? Map.of() : CollabRows.values(cdp, nodes);
         List<Map<String, Object>> rows = new ArrayList<>();
         for (DomNode node : nodes) {
             String legacy = "ref:" + version + ":" + node.backendNodeId;
@@ -3120,6 +3220,7 @@ public final class TargetVerb {
             if (!shadowPath.isBlank()) {
                 row.put("shadow_path", shadowPath);
             }
+            CollabRows.put(row, node, live);
             rows.add(row);
         }
         return rows;
@@ -3282,6 +3383,11 @@ public final class TargetVerb {
         if (row.get("interactive") != null) line.append(" interactive=").append(row.get("interactive"));
         Object frame = row.get("frame");
         line.append(" frame=").append(frame == null || String.valueOf(frame).isBlank() ? "top" : LineView.token(String.valueOf(frame)));
+        for (String key : CollabRows.KEYS) {
+            Object extra = row.get(key);
+            if (extra == null) continue;
+            line.append(' ').append(key).append('=').append(LineView.token(String.valueOf(extra)));
+        }
         if (priority) line.append(" priority=").append(priorityRank(row));
         return line.toString();
     }
