@@ -590,10 +590,10 @@ public final class TargetVerb {
                     return failed;
                 }
                 Map<String, Object> body = base("act", effect.used(), "browser", target);
-                body.put("applied", false);
+                body.put("applied", effect.unknownApplied() ? "unknown" : false);
                 body.put("dispatched", true);
                 body.put("visible", elementVisible(node, page.session.connection()));
-                body.put("reason", effect.reason());
+                body.put("reason", effect.unknownApplied() ? "no before/after read" : effect.reason());
                 body.put("kind", kind.isBlank() ? "click" : kind);
                 body.put("docVersion", after);
                 putSnapDiff(body, args, titleBefore, titleAfter, before, after, rowsBefore, rowsAfter);
@@ -608,7 +608,8 @@ public final class TargetVerb {
             if (!effect.applied()) {
                 Outcome failed = fail("act", "not applied");
                 failed.body().put("used", effect.used());
-                failed.body().put("dispatched", false);
+                // A key was sent to the focused node. Only a click or hover that never reached the page is undispatched.
+                failed.body().put("dispatched", "press".equals(kind));
                 stamp(failed.body(), page.session.connection(), node);
                 putEntered(failed.body(), runId, page.session.connection());
                 putShadow(failed.body(), node);
@@ -673,6 +674,7 @@ public final class TargetVerb {
             }
             List<Map<String, Object>> filled = new ArrayList<>();
             boolean all = true;
+            markAgentActing(page.session.connection(), 5000);
             for (int i = 0; i < pairs.size(); i++) {
                 String[] pair = pairs.get(i);
                 DomNode node = nodes.get(i);
@@ -680,6 +682,7 @@ public final class TargetVerb {
                 if (!Boolean.TRUE.equals(row.get("applied"))) all = false;
                 filled.add(row);
             }
+            markAgentActing(page.session.connection(), AGENT_ACTING_TAIL_MS);
             if (!all) {
                 Outcome failed = fail("form-fill", "not applied");
                 failed.body().put("applied", false);
@@ -773,6 +776,19 @@ public final class TargetVerb {
         row.put("value", read);
         row.put("applied", stuck);
         return row;
+    }
+
+    /** Debounced input rows are sensed this long after the last agent keystroke and still count as the agent's. */
+    static final long AGENT_ACTING_TAIL_MS = 1500;
+
+    /**
+     * Marks the next {@code ms} as agent input so the page runtime tags interaction rows {@code source=agent}.
+     * The mark is a {@code data-pkb-} attribute on the root, which the page watchers already ignore.
+     */
+    static void markAgentActing(CdpConnection cdp, long ms) {
+        if (cdp == null) return;
+        evalText(cdp, "", "(function(){try{document.documentElement.setAttribute('data-pkb-agent-acting',String(Date.now()+"
+                + Math.max(0, ms) + "));return '1';}catch(e){return '';}})()");
     }
 
     private static String readField(CdpConnection cdp, DomNode node) {
@@ -1543,19 +1559,34 @@ public final class TargetVerb {
             }
             String before = pageMark(session.connection());
             String signature = "click".equals(kind) ? nodeSignature(session.connection(), "", node) : "";
+            String probe = "click".equals(kind) ? collabProbe(session.connection(), "", acted, true) : "";
+            String keySignature = "press".equals(kind) ? nodeSignature(session.connection(), "", node) : "";
             LiveXPath.use(session.connection());
             try {
                 PageActions.act(session, verb, flags);
             } finally {
                 LiveXPath.use(null);
             }
+            if ("click".equals(kind) && probeMoved(probe, collabProbe(session.connection(), "", acted, false))) {
+                return Effect.changed("cdp");
+            }
             if ("select".equals(kind)) return new Effect("cdp", valueMatches(value, controlValue(session.connection(), selectOf(acted))));
             if ("type".equals(kind)) return new Effect("cdp", valueMatches(value, controlValue(session.connection(), node)));
             if ("click".equals(kind)) {
-                return clickReadBack(signature, nodeSignature(session.connection(), "", node), clickSettled(session.connection(), "", before, "cdp"));
+                Effect read = clickReadBack(signature, nodeSignature(session.connection(), "", node), clickSettled(session.connection(), "", before, "cdp"));
+                if (read != null && read.quiet()) {
+                    String after = collabProbe(session.connection(), "", acted, false);
+                    if (probeMoved(probe, after)) return Effect.changed("cdp");
+                    if (probe == null || probe.isBlank()) return Effect.unknown("cdp");
+                }
+                return read;
             }
             if ("hover".equals(kind)) return Effect.changed("cdp");
             if (!before.equals(pageMark(session.connection()))) return Effect.changed("cdp");
+            if ("press".equals(kind) && pressMoved(keySignature, nodeSignature(session.connection(), "", node),
+                    collabProbe(session.connection(), "", node, false))) {
+                return Effect.changed("cdp");
+            }
             return new Effect("cdp", false);
         } catch (CdpException failure) {
             String message = failure.getMessage() == null ? "" : failure.getMessage();
@@ -1969,6 +2000,60 @@ public final class TargetVerb {
     static boolean signatureApplied(String before, String after) {
         if (before == null || before.isBlank() || after == null || after.isBlank()) return false;
         return !before.equals(after);
+    }
+
+    /**
+     * A collaboration probe on the clicked node: connected, rendered, the mutation count of the node's own
+     * surface root (a shadow root or a pickleball surface), and where focus went. Arming installs one observer.
+     * The page-wide watcher ignores pickleball surfaces, so a card or panel button that removes its card or
+     * switches its pane is read here instead of reported as "no visible change".
+     */
+    static String collabProbe(CdpConnection cdp, String sessionId, DomNode node, boolean arm) {
+        String raw = callOnNode(cdp, sessionId, node, ""
+                + "function(){ var g=globalThis; var arm=" + arm + ";"
+                + " var root=this.getRootNode?this.getRootNode():document;"
+                + " var surface=(this.closest&&this.closest('[data-pkb-agent],[data-pkb-layer],[data-pkb-record],[data-pkb-meta=\"true\"],[data-pkb-purpose]'))||null;"
+                + " var shadow=root&&root.nodeType===11;"
+                + " if(arm){ var watch=shadow?root:surface; g.__pkbProbe={count:0,root:root,watched:!!watch};"
+                + "  try{ if(g.__pkbProbeObs) g.__pkbProbeObs.disconnect(); }catch(e){}"
+                + "  if(watch){ try{ g.__pkbProbeObs=new MutationObserver(function(r){ g.__pkbProbe.count+=r.length; });"
+                + "   g.__pkbProbeObs.observe(watch,{subtree:true,childList:true,attributes:true,characterData:true}); }catch(e){} } }"
+                + " var p=g.__pkbProbe||{count:0,root:root,watched:false};"
+                + " var focusRoot=(p.root&&p.root.activeElement!==undefined)?p.root:document;"
+                + " var ae=focusRoot.activeElement||document.activeElement;"
+                + " var focus=!ae||ae===document.body?'':((ae===this||(this.contains&&this.contains(ae))||(ae.contains&&ae.contains(this)))?'self':(ae.tagName+'#'+(ae.id||'')+'.'+(ae.getAttribute&&ae.getAttribute('data-pkb-purpose')||'')));"
+                + " var shown=(this.isConnected&&this.getClientRects&&this.getClientRects().length>0)?'1':'0';"
+                + " return [this.isConnected?'1':'0', shown, p.watched?String(p.count):'-', focus].join('|'); }");
+        return raw == null ? "" : raw;
+    }
+
+    /**
+     * True when the probe proves the click did something: the node was removed or hidden, its surface mutated,
+     * or focus moved to another control. A before read with no after read means the node is gone.
+     */
+    static boolean probeMoved(String before, String after) {
+        if (before == null || before.isBlank()) return false;
+        String[] b = before.split("\\|", -1);
+        if (b.length < 4) return false;
+        if (after == null || after.isBlank()) return "1".equals(b[0]);
+        String[] a = after.split("\\|", -1);
+        if (a.length < 4) return false;
+        if ("1".equals(b[0]) && "0".equals(a[0])) return true;
+        if ("1".equals(b[1]) && "0".equals(a[1])) return true;
+        if (!"-".equals(b[2]) && !"-".equals(a[2]) && !b[2].equals(a[2])) return true;
+        return !a[3].isBlank() && !"self".equals(a[3]) && !a[3].equals(b[3]);
+    }
+
+    /**
+     * A key was sent to the node after it was focused. It landed when focus left the node (Tab, Escape),
+     * or the node's value, selection, or state moved (Enter, arrows).
+     */
+    static boolean pressMoved(String signatureBefore, String signatureAfter, String probeAfter) {
+        if (signatureApplied(signatureBefore, signatureAfter)) return true;
+        if (probeAfter == null || probeAfter.isBlank()) return false;
+        String[] a = probeAfter.split("\\|", -1);
+        if (a.length < 4) return false;
+        return !"self".equals(a[3]);
     }
 
     private static Effect clickReadBack(String before, String after, Effect settled) {
@@ -4620,6 +4705,15 @@ public final class TargetVerb {
 
         static Effect quiet(String used) {
             return new Effect(used, false, "dispatched", "no visible change");
+        }
+
+        /** The click was sent and no before/after pair could be read. Never reported as a false {@code false}. */
+        static Effect unknown(String used) {
+            return new Effect(used, false, "dispatched", "unknown");
+        }
+
+        boolean unknownApplied() {
+            return "unknown".equals(reason);
         }
 
         static Effect refused(String used, String reason) {

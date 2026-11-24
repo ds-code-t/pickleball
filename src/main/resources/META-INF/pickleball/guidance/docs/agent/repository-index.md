@@ -932,6 +932,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/ClickOnceTest.java`
 - `src/test/java/tools/dscode/launcher/CliForwardToWorkerTest.java`
 - `src/test/java/tools/dscode/launcher/ClosedShadowResolveTest.java`
+- `src/test/java/tools/dscode/launcher/CollabFixesLiveTest.java`
 - `src/test/java/tools/dscode/launcher/CompactSnapshotTest.java`
 - `src/test/java/tools/dscode/launcher/CompositeVerbsCliTest.java`
 - `src/test/java/tools/dscode/launcher/ConfirmTest.java`

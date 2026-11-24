@@ -395,6 +395,14 @@
     if (!node || !node.closest) return node;
     return node.closest('button,a,input,select,textarea,summary,label,[role],[data-choice],[data-pkb-action]') || node;
   }
+  /** Agent input (form-fill) stamps data-pkb-agent-acting on the root with an expiry in ms; rows sensed before it expires are source=agent. */
+  function actingSource() {
+    try {
+      var until = Number(document.documentElement.getAttribute('data-pkb-agent-acting') || 0);
+      if (until && Date.now() < until) return 'agent';
+    } catch (ignored) { /* no root */ }
+    return 'human';
+  }
   function sense(kind, node, extra) {
     var el = controlOf(node);
     if (!el || el.nodeType !== 1) return false;
@@ -414,7 +422,7 @@
       event: 'interaction',
       type: kind,
       kind: kind,
-      source: (extra && extra.source) || 'human',
+      source: (extra && extra.source) || actingSource(),
       id: (extra && extra.id) || el.id || '',
       role: (extra && extra.role) || roleOf(el),
       name: extra && extra.name != null ? String(extra.name) : name,
