@@ -40,6 +40,7 @@ public class BrowserSteps {
             webDriver = (RemoteWebDriver) getNewObjectFromParsingMap(browserName);
         }
         getRunningStep().webDriverUsed = webDriver;
+        tools.dscode.browser.JsErrorGate.watch(webDriver);
         return webDriver;
     }
 

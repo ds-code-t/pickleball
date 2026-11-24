@@ -303,12 +303,14 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/browser/DriverEndpoints.java`
 - `src/main/java/tools/dscode/browser/FrameNode.java`
 - `src/main/java/tools/dscode/browser/JdkWebSocket.java`
+- `src/main/java/tools/dscode/browser/JsErrorGate.java`
 - `src/main/java/tools/dscode/browser/JsonRpc.java`
 - `src/main/java/tools/dscode/browser/PlaywrightAdapter.java`
 - `src/main/java/tools/dscode/browser/PlaywrightConnection.java`
 - `src/main/java/tools/dscode/browser/proto/BrowserEventHub.java`
 - `src/main/java/tools/dscode/browser/proto/CdpSession.java`
 - `src/main/java/tools/dscode/browser/proto/DomCommands.java`
+- `src/main/java/tools/dscode/browser/proto/ErrorCommands.java`
 - `src/main/java/tools/dscode/browser/proto/EventCommands.java`
 - `src/main/java/tools/dscode/browser/proto/Projectors.java`
 - `src/main/java/tools/dscode/browser/proto/ProtoClient.java`
@@ -316,6 +318,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/browser/proto/ProtoJson.java`
 - `src/main/java/tools/dscode/browser/proto/ProtoRedact.java`
 - `src/main/java/tools/dscode/browser/proto/PwBridge.java`
+- `src/main/java/tools/dscode/browser/proto/SourceMaps.java`
 - `src/main/java/tools/dscode/browser/ProtocolSelector.java`
 - `src/main/java/tools/dscode/browser/ProtocolSocket.java`
 - `src/main/java/tools/dscode/browser/ProtocolSockets.java`
@@ -911,8 +914,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/browser/CdpAdapterTest.java`
 - `src/test/java/tools/dscode/browser/DomMutationsTest.java`
 - `src/test/java/tools/dscode/browser/FacadeContractTest.java`
+- `src/test/java/tools/dscode/browser/JsErrorGateLiveTest.java`
 - `src/test/java/tools/dscode/browser/PlaywrightAdapterTest.java`
 - `src/test/java/tools/dscode/browser/PlaywrightCdpLiveTest.java`
+- `src/test/java/tools/dscode/browser/proto/SourceMapsTest.java`
 - `src/test/java/tools/dscode/browser/ProtocolSelectorPlaywrightTest.java`
 - `src/test/java/tools/dscode/browser/ProtocolSelectorTest.java`
 - `src/test/java/tools/dscode/browser/ScriptedSocket.java`
@@ -1076,6 +1081,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/engine/convert/NeutralDataTest.java`
 - `src/test/java/tools/dscode/engine/EngineConfigTest.java`
 - `src/test/java/tools/dscode/engine/framerestore/FramePageGlue.java`
+- `src/test/java/tools/dscode/engine/jserror/JsErrorPageGlue.java`
 - `src/test/java/tools/dscode/engine/maskquiet/MaskPageGlue.java`
 - `src/test/java/tools/dscode/engine/match/StepRegistryTest.java`
 - `src/test/java/tools/dscode/engine/NativeDataExecutionTest.java`
@@ -1123,6 +1129,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/DomPushLiveTest.java`
 - `src/test/java/tools/dscode/launcher/ElementSnapDiffTest.java`
 - `src/test/java/tools/dscode/launcher/EngineCliLaunchTest.java`
+- `src/test/java/tools/dscode/launcher/ErrorsLiveTest.java`
 - `src/test/java/tools/dscode/launcher/FallbackLoggedTest.java`
 - `src/test/java/tools/dscode/launcher/FieldReportRegressionTest.java`
 - `src/test/java/tools/dscode/launcher/FormFillKindTest.java`

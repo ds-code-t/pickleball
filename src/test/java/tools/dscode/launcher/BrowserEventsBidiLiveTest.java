@@ -101,6 +101,18 @@ class BrowserEventsBidiLiveTest {
     }
 
     @Test
+    void bidiErrorRowsCarryTheStack() throws Exception {
+        Path project = temp.resolve("bidi");
+        long cursor = BrowserEventsLiveTest.ok(project, "browser-events", "--start", "--cdp-endpoint=" + cdp, "--bidi-endpoint=" + bidi)
+                .path("cursor").asLong();
+        driver.get(base + "/");
+        driver.executeScript("setTimeout(function bidiThrower(){ throw new Error('bidi-boom'); }, 0)");
+        List<JsonNode> rows = BrowserEventsLiveTest.collect(project, Long.toString(cursor), Set.of("error"), "--kinds=error");
+        assertTrue(rows.stream().anyMatch(r -> "bidi".equals(r.path("source").asText()) && r.path("text").asText().contains("bidi-boom")
+                && r.path("stack").size() >= 1), rows.toString());
+    }
+
+    @Test
     void firefoxBidiWhenPresent() {
         boolean present = ConsumerReadyCommands.onPath("firefox") || System.getenv("FIREFOX_BIN") != null;
         Assumptions.assumeTrue(present, "skipped: no Firefox binary on this machine");

@@ -586,6 +586,20 @@ final class WorkbenchMcpTools {
                         "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
                 )),
                 args -> forwardReady(protoArgs("browser-events", args)));
+        add("workbench_errors",
+                "Page errors and unhandled rejections with stacks and source-mapped locations (browser-events --kinds=error).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for errors; see help errors."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("errors", args)));
+        add("workbench_logpoint",
+                "Set, list or clear CDP logpoints that log an expression when a line runs, without pausing.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for logpoint; see help logpoint."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("logpoint", args)));
         add("workbench_chat_turn",
                 "Send one agent line, then wait for a human message, an answer, or a click.",
                 schema(view),

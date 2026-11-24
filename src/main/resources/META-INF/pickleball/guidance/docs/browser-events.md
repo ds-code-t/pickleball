@@ -48,6 +48,14 @@ Rows spill to `.pickleball/runs/<run>/browser-events-YYYY-MM-DD.ndjson`.
 
 Before a row reaches the ring, the file, or a reply: `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie` and token-like headers, cookie values, query parameters and JSON fields whose names are secret (password, token, secret, api key, plus `pkb_store_secret_fields`), and `Bearer`/`Basic` credentials or `token=`-style pairs in text become `[redacted]`, and the row lists what was redacted. `--reveal` (control tier, where a verb offers it) shows a value in that reply only; it is never logged.
 
+## Errors and logpoints
+
+`errors [--since] [--follow]` is `browser-events --kinds=error`. Each uncaught exception (`subkind=exception`) and unhandled rejection (`subkind=unhandled-rejection`) carries `text` (the first line of the message), `url`, `line`, `column`, a `stack` of up to 20 `function (url:line:col)` frames, `worker` when it came from a worker target, and `original` (`source`, `line`, `column`, `name`) when the script names a source map the page can fetch. Sources: CDP `Runtime.exceptionThrown`, BiDi `log.entryAdded` type `javascript`, Playwright `pageError` (message only). The map is fetched through the page's own network with a page `fetch()`, and decoded by repo code following the Source Map v3 format ([ECMA-426](https://tc39.es/ecma426/)); when it cannot be fetched or decoded the generated location stays. Console rows keep `level`, `text` (arguments joined), `url` and `line`; `Log.entryAdded` rows keep their source as `subkind` (`log.violation`, `log.intervention`, `log.network`, ...).
+
+`logpoint --at=<url|path>:<line>[:<col>] --expr=<js>` logs the expression each time that line runs, without pausing. It is a CDP `Debugger.setBreakpointByUrl` whose condition calls `console.log('[logpoint <id>]', value)` and returns false, so its output arrives as console rows. `--list` and `--clear` manage them. Chromium only.
+
+`pkb_fail_on_js_error=warn|fail` checks scenarios: at the end of each step, page errors that happened during it (collected over WebDriver BiDi through Selenium's `LogInspector`) are logged (`warn`) or fail the step (`fail`) with the message and stack. `pkb_js_error_ignore=<regex>` allows errors whose message matches. A driver without BiDi (`pkb_bidi=false`) prints one WARN and is not checked.
+
 ## DOM changes (push)
 
 Pickleball listens for DOM changes instead of polling the page. One page script runs a `MutationObserver` and reports debounced, batched, scoped deltas through the backend's push channel:

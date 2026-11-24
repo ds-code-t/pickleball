@@ -153,6 +153,15 @@ Pickleball reaches a browser through four backends and picks one per capability:
 | `pkb_bidi_endpoint` | unset | An existing BiDi WebSocket (`ws://.../session/<id>`) for `doctor --protocols` and protocol verbs. |
 | `pkb_cdp_endpoint` | unset | An existing CDP endpoint (see the Playwright backend). |
 | `pkb_protocol` | unset | `playwright` puts Playwright first in the fallback order. |
+| `pkb_browser_events` | on | `off` keeps no browser event rows and writes no spill file. See [Browser events](browser-events.md). |
+| `pkb_browser_events_kinds` | all | Comma list of event kinds the protocol host keeps. |
+| `pkb_browser_events_max_kb` | 8192 | Spill cap per file; the full file rotates once to `.1`. |
+| `pkb_browser_events_ring` | 5000 | Rows kept in memory for `--since`. |
+| `pkb_proto_log` | on | `.pickleball/logs/proto-YYYY-MM-DD.log`; `off` turns it off. |
+| `pkb_proto_host_idle_min` | 240 | The protocol host stops itself after this many idle minutes. |
+| `pkb_push_wake` | on | Collaboration waits wake on pushed panel and chat events. `off` restores their fixed poll sleeps. |
+| `pkb_fail_on_js_error` | off | `warn` logs, and `fail` fails, the step during which an uncaught page error or unhandled rejection happened (collected over WebDriver BiDi). The message names the error and its stack. |
+| `pkb_js_error_ignore` | unset | Regex; page errors whose message matches are allowed under `pkb_fail_on_js_error`. Example: `pkb_js_error_ignore=ResizeObserver loop\|third-party-widget`. |
 
 Each key is read as a system property, then `pkb_runvars.<key>`, then the upper-case environment variable, then the environment variable as written. `doctor` prints `protocols=<browser>:<backends>`; `doctor --protocols [--cdp-endpoint=] [--bidi-endpoint=]` prints one `protocol.backend.*` line per backend and one `protocol.capability.*` line per capability.
 

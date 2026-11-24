@@ -21,7 +21,7 @@ import java.util.Set;
  */
 final class ProtoVerbs {
     /** CLI verbs that forward to a host command of the same name. */
-    static final Set<String> VERBS = Set.of("browser-events");
+    static final Set<String> VERBS = Set.of("browser-events", "errors", "logpoint");
 
     private ProtoVerbs() {
     }
@@ -37,6 +37,11 @@ final class ProtoVerbs {
         if (!positional.isEmpty()) flags.put("_args", String.join(" ", positional));
         try {
             if ("browser-events".equals(command)) return events(project, flags, out, err);
+            if ("errors".equals(command)) {
+                // E3: errors [--since] [--follow] is browser-events --kinds=error.
+                flags.put("kinds", "error");
+                return events(project, flags, out, err);
+            }
             return print(call(project, flags, command, flags), out, err);
         } catch (IllegalStateException | IllegalArgumentException failure) {
             return fail(err, failure.getMessage());
