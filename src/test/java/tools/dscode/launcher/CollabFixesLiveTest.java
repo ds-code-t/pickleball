@@ -343,6 +343,64 @@ class CollabFixesLiveTest {
         assertTrue(bad.out.contains("did not resolve"), bad.out);
     }
 
+    @Test
+    @Timeout(value = 150, unit = TimeUnit.SECONDS)
+    void covers_command_panel_state() throws Exception {
+        Path second = page("c9b.html", "<input id=\"q\" aria-label=\"Query\">");
+        start(page("c9.html", "<input id=\"name\" aria-label=\"Name\">"), "c9");
+        assertEquals(0, run("panel-open", "--tab=chat", "--run-id=c9").code);
+        Capture state = run("panel-state", "--run-id=c9");
+        assertEquals(0, state.code, state.err + state.out);
+        JsonNode dock = JSON.readTree(state.out).path("dock");
+        assertEquals("panel:chat", dock.path("open").asText(), state.out);
+        assertEquals("false", dock.path("collapsed").asText(), state.out);
+        assertEquals("1", eval(pane() + ".querySelectorAll('.pkb-dock').length + ''", "c9"));
+        assertEquals("0", eval(pane() + ".querySelectorAll(':scope > .pkb-pill').length + ''", "c9"),
+                "no free-floating pill outside the dock");
+
+        assertEquals(0, run("panel-open", "--collapsed=true", "--run-id=c9").code);
+        JsonNode collapsed = JSON.readTree(run("panel-state", "--run-id=c9").out).path("dock");
+        assertTrue(collapsed.path("buttons").toString().contains("Open agent panel"), collapsed.toString());
+        Capture snap = run("snap", "--target=browser:auto", "--run-id=c9");
+        assertTrue(snap.out.contains("reopen") && snap.out.contains("toolbar-handle"), snap.out);
+        eval(pane() + ".querySelector('.pkb-dock .pkb-pill').click()", "c9");
+        assertEquals("false", eval(pane() + ".querySelector('.pkb-panel').hidden + ''", "c9"), "the toolbar button reopens the panel");
+
+        eval("(function(){var i=" + pane() + ".querySelector('[data-pkb-purpose~=message]');i.value='half typed';"
+                + "i.dispatchEvent(new Event('input',{bubbles:true}));})()", "c9");
+        eval(pane() + ".querySelector('[data-action=close]').click()", "c9");
+        assertTrue(eval(pane() + ".querySelector('.pkb-confirm').textContent", "c9").contains("unsent text"));
+        eval(pane() + ".querySelector('[data-pkb-purpose~=cancel-close]').click()", "c9");
+        assertEquals("true", eval("!!" + pane() + ".querySelector('.pkb-panel').isConnected + ''", "c9"), "Keep open keeps the panel");
+        eval(pane() + ".querySelector('[data-action=close]').click()", "c9");
+        eval(pane() + ".querySelector('[data-pkb-purpose~=confirm-close]').click()", "c9");
+        assertTrue(JSON.readTree(run("panel-state", "--run-id=c9").out).path("panel").isNull(), "confirmed close ends the panel");
+        Path events = temp.resolve(".pickleball").resolve("agent-events.jsonl");
+        long until = System.currentTimeMillis() + 5000;
+        while (System.currentTimeMillis() < until
+                && !(Files.exists(events) && Files.readString(events).contains("close-cancel") && Files.readString(events).contains("unsent text"))) {
+            run("ui-poll", "--run-id=c9");
+            Thread.sleep(200);
+        }
+        String logged = Files.readString(events);
+        assertTrue(logged.contains("close-cancel") && logged.contains("unsent text"), "the close and what it discarded are events: " + logged);
+
+        assertEquals(0, run("panel-open", "--collapsed=toolbar", "--run-id=c9").code);
+        assertEquals("true", eval(pane() + ".querySelector('.pkb-dock-slots').hidden + ''", "c9"));
+        eval("(function(){var h=" + pane() + ".querySelector('.pkb-dock-handle');"
+                + "function f(t,x,y){h.dispatchEvent(new PointerEvent(t,{bubbles:true,composed:true,pointerId:7,button:0,clientX:x,clientY:y}));}"
+                + "f('pointerdown',300,300);f('pointermove',-900,-900);f('pointerup',-900,-900);})()", "c9");
+        JsonNode dragged = JSON.readTree(run("panel-state", "--run-id=c9").out).path("dock");
+        assertTrue(dragged.path("x").asInt() >= 0 && dragged.path("y").asInt() >= 0, "dragging keeps the toolbar on screen: " + dragged);
+        assertEquals("true", dragged.path("collapsed").asText(), dragged.toString());
+
+        assertEquals(0, run("navigate", "--url=" + second.toUri(), "--run-id=c9").code);
+        Thread.sleep(500);
+        JsonNode after = JSON.readTree(run("panel-state", "--run-id=c9").out).path("dock");
+        assertEquals("true", after.path("collapsed").asText(), "collapsed survives navigation: " + after);
+        assertEquals(dragged.path("x").asInt(), after.path("x").asInt(), "position survives navigation: " + after);
+    }
+
     static String pane() {
         return "document.querySelector('pkb-layer').shadowRoot";
     }

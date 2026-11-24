@@ -155,7 +155,7 @@ public final class WorkbenchAgentCommands {
                      "popup-open", "popup-status", "popup-close",
                      "ui-apply", "ui-poll", "ui-catalog",
                      "guide", "guide-next", "guide-back", "guide-done", "ask",
-                     "panel-open", "panel-close",
+                     "panel-open", "panel-close", "panel-state",
                      "capture-scenario",
                      "capture-steps",
                      "record",

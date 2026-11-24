@@ -81,6 +81,7 @@
       "overlay-remove",
       "panel-close",
       "panel-open",
+      "panel-state",
       "pin",
       "plan",
       "popup-close",

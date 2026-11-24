@@ -213,6 +213,7 @@ public final class AgentControl {
                 case "chat-turn" -> chatTurn(project, runId, values, agentId);
                 case "ui-verify" -> uiVerify(project, runId);
                 case "panel-open" -> panelOpen(project, runId, values, extraArgs, agentId);
+                case "panel-state" -> panelStateRead();
                 case "panel-close" -> panelClose(project, runId, values, extraArgs, agentId);
                 case "guide" -> guide(project, runId, values);
                 case "guide-next" -> guideMove(project, runId, values, 1);
@@ -431,6 +432,23 @@ public final class AgentControl {
         return row;
     }
 
+    /** panel-state reads the toolbar dock (position, collapsed, its buttons), the panel, the step editor, and recording. */
+    @SuppressWarnings("unchecked")
+    private static Result panelStateRead() throws Exception {
+        if (!PageSurfaces.hasLivePage()) return fail(1, "no live browser");
+        String reply = PageSurfaces.runtimeCall("dockState", null, false);
+        Map<String, Object> body = ok("Toolbar and panel state.");
+        body.put("op", "panel-state");
+        if (reply == null || reply.isBlank() || "null".equals(reply.trim())) {
+            body.put("dock", null);
+            body.put("panel", null);
+            body.put("recording", "off");
+            return new Result(0, body);
+        }
+        body.putAll(AgentStore.JSON.readValue(reply, Map.class));
+        return new Result(0, body);
+    }
+
     /** navigate keeps the session and, when the panel was open, opens it again on the new page with its tab. */
     @SuppressWarnings("unchecked")
     private static Result navigate(Path project, String runId, Map<String, String> values, List<String> extraArgs, String agentId) throws Exception {
@@ -451,7 +469,7 @@ public final class AgentControl {
             Map<String, String> open = new LinkedHashMap<>();
             Object tab = state.get("tab");
             if (tab != null && !String.valueOf(tab).isBlank()) open.put("tab", String.valueOf(tab));
-            if (Boolean.TRUE.equals(state.get("min"))) open.put("collapsed", "true");
+            if (Boolean.TRUE.equals(state.get("min"))) open.put("minimized", "true");
             Result reopened = panelOpen(project, runId, open, extraArgs, agentId);
             body.put("panel", reopened.exit() == 0 ? "kept" : "pending");
         }
@@ -476,6 +494,16 @@ public final class AgentControl {
         if (present(theme)) spec.put("theme", theme.trim());
         if (present(args.get("title"))) spec.put("title", args.get("title").trim());
         if (present(args.get("minimized"))) spec.put("min", Boolean.parseBoolean(args.get("minimized").trim()));
+        if (present(args.get("collapsed"))) {
+            // --collapsed=true (or panel) puts the panel on its toolbar button; toolbar folds the whole dock to its handle.
+            String collapsed = args.get("collapsed").trim().toLowerCase(java.util.Locale.ROOT);
+            switch (collapsed) {
+                case "true", "panel" -> spec.put("min", true);
+                case "toolbar" -> spec.put("dockCollapsed", true);
+                case "false" -> { spec.put("min", false); spec.put("dockCollapsed", false); }
+                default -> { return fail(2, "panel-open --collapsed must be true, panel, toolbar, or false"); }
+            }
+        }
         boolean live = PageSurfaces.hasLivePage();
         if (!live && ("page".equals(target) || "auto".equals(target))) {
             return fail(1, "no live browser");

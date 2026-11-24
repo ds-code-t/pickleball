@@ -1833,19 +1833,13 @@
     card.style.height = Math.round(st.h) + 'px';
     card.hidden = !!st.min || !!st.pop || closed;
     panel.pill.hidden = !st.min && !st.pop && !closed;
-    if (st.min || st.pop || closed) {
-      var vp = viewport();
-      var pw = panel.pill.offsetWidth || 120;
-      var ph = panel.pill.offsetHeight || 32;
-      var x = Math.max(8, vp.w - pw - 16);
-      var y = Math.max(8, vp.h - ph - 16);
-      panel.pill.style.transform = 'translate3d(' + Math.round(x) + 'px,' + Math.round(y) + 'px,0)';
-    }
     var label = panel.pill.querySelector('.pkb-pill-label');
     if (label) label.textContent = st.pop ? 'Chat window' : 'Agent';
     panel.pill.setAttribute('aria-label', st.pop ? 'Pop chat back in' : 'Open agent panel');
     window.__pkbPanelState = closed ? null : {x: Math.round(st.x), y: Math.round(st.y), w: Math.round(st.w), h: Math.round(st.h), min: !!st.min, tab: st.tab, pop: !!st.pop};
     recountUnread();
+    dockPlace();
+    dockSave();
   }
 
   function panelTab(name) {
@@ -2096,6 +2090,195 @@
     handle.addEventListener('pointercancel', end);
   }
 
+  // ---- Unified toolbar (C9) ----
+  // One dock holds a button per tool (agent panel, step editor, recording). A collapsed or closed tool
+  // lives on its button; the handle collapses the whole dock and drags it. Position, the collapsed
+  // flag, and the open panel are kept per origin in localStorage under pkb-dock.
+  var dock = null;
+  var DOCK_KEY = 'pkb-dock';
+  function dockLoad() {
+    try { return JSON.parse(localStorage.getItem(DOCK_KEY) || 'null') || {}; } catch (ignored) { return {}; }
+  }
+  function dockSave() {
+    if (!dock) return;
+    var keep = {collapsed: !!dock.state.collapsed, open: dockOpenTool()};
+    if (dock.state.x != null) { keep.x = Math.round(dock.state.x); keep.y = Math.round(dock.state.y); }
+    try { localStorage.setItem(DOCK_KEY, JSON.stringify(keep)); } catch (ignored) { /* storage blocked */ }
+  }
+  function dockOpenTool() {
+    if (panel && panel.card.isConnected && !panel.state.closed && !panel.state.min && !panel.state.pop) return 'panel:' + (panel.state.tab || 'chat');
+    if (editor && editor.card.isConnected && !editorDismissed && !editor.state.min && !editor.state.pop) return 'editor';
+    return '';
+  }
+  function ensureDock(root) {
+    if (dock) {
+      if (!dock.bar.isConnected) root.appendChild(dock.bar);
+      return dock;
+    }
+    var bar = el('div', 'pkb-dock');
+    bar.setAttribute('role', 'toolbar');
+    bar.setAttribute('aria-label', 'Pickleball tools');
+    bar.setAttribute('data-pkb-dock', '');
+    tagMeta(bar, 'toolbar');
+    var handle = el('button', 'pkb-dock-handle', '\u22ee');
+    handle.type = 'button';
+    handle.setAttribute('aria-label', 'Tools');
+    tagMeta(handle, 'toolbar-handle');
+    var slots = el('div', 'pkb-dock-slots');
+    tagMeta(slots, 'toolbar');
+    bar.appendChild(handle);
+    bar.appendChild(slots);
+    root.appendChild(bar);
+    isolateKeys(bar);
+    var saved = dockLoad();
+    dock = {bar: bar, handle: handle, slots: slots, moved: false,
+      state: {x: isFinite(+saved.x) && saved.x != null ? +saved.x : null, y: isFinite(+saved.y) && saved.y != null ? +saved.y : null, collapsed: !!saved.collapsed}};
+    handle.addEventListener('click', function () {
+      if (dock.moved) { dock.moved = false; return; }
+      dockCollapse(!dock.state.collapsed);
+      pushEvent({type: 'panel', action: dock.state.collapsed ? 'toolbar-collapse' : 'toolbar-expand'});
+    });
+    var from = null;
+    dragger(handle, function () {
+      var r = bar.getBoundingClientRect();
+      from = {x: r.left, y: r.top};
+      dock.moved = false;
+    }, function (dx, dy) {
+      if (Math.abs(dx) + Math.abs(dy) > 4) dock.moved = true;
+      dock.state.x = from.x + dx;
+      dock.state.y = from.y + dy;
+      dockPlace();
+    }, function () {
+      dockPlace();
+      dockSave();
+    });
+    window.addEventListener('resize', function () { dockPlace(); }, true);
+    document.addEventListener('focusin', function () { dockPlace(); }, true);
+    return dock;
+  }
+  function dockAdd(button, root) {
+    var d = ensureDock(root || ensureLayer());
+    if (button.parentNode !== d.slots) d.slots.appendChild(button);
+    button.style.transform = '';
+    dockPlace();
+  }
+  function dockCollapse(on) {
+    if (!dock) ensureDock(ensureLayer());
+    dock.state.collapsed = !!on;
+    dockPlace();
+    dockSave();
+  }
+  function dockOverlap(x, y, w, h, r) {
+    return x < r.right && x + w > r.left && y < r.bottom && y + h > r.top;
+  }
+  function dockPlace() {
+    if (!dock) return;
+    var bar = dock.bar;
+    var tools = Array.prototype.filter.call(dock.slots.children, function (b) { return !b.hidden; });
+    var present = !!(panel || editor || recordBar);
+    bar.hidden = !present;
+    dock.slots.hidden = !!dock.state.collapsed;
+    bar.setAttribute('data-collapsed', dock.state.collapsed ? 'true' : 'false');
+    dock.handle.setAttribute('aria-expanded', dock.state.collapsed ? 'false' : 'true');
+    dock.handle.setAttribute('data-pkb-badge', tools.length ? String(tools.length) : '');
+    var vp = viewport();
+    var w = bar.offsetWidth || 48;
+    var h = bar.offsetHeight || 36;
+    var x = dock.state.x == null ? vp.w - w - 16 : dock.state.x;
+    var y = dock.state.y == null ? vp.h - h - 16 : dock.state.y;
+    x = clamp(x, 0, Math.max(0, vp.w - w));
+    y = clamp(y, 0, Math.max(0, vp.h - h));
+    var active = document.activeElement;
+    if (active && active !== document.body && active !== document.documentElement && active !== layer && active.getBoundingClientRect) {
+      var r = active.getBoundingClientRect();
+      if (dockOverlap(x, y, w, h, r)) {
+        if (r.top - h - 8 >= 0) y = r.top - h - 8;
+        else if (r.bottom + 8 + h <= vp.h) y = r.bottom + 8;
+      }
+    }
+    bar.style.transform = 'translate3d(' + Math.round(x) + 'px,' + Math.round(y) + 'px,0)';
+    window.__pkbDockState = present ? {
+      x: Math.round(x), y: Math.round(y), collapsed: !!dock.state.collapsed, open: dockOpenTool(),
+      buttons: tools.map(function (b) { return b.getAttribute('aria-label') || b.textContent; })
+    } : null;
+  }
+  function dockState() {
+    if (dock) dockPlace();
+    return {dock: window.__pkbDockState || null, panel: panel ? window.__pkbPanelState || null : null,
+      editor: window.__pkbEditorState || null, recording: recordBar ? (recordBar.getAttribute('data-state') || 'recording') : 'off'};
+  }
+  var recordButton = null;
+  function recordDock() {
+    if (!recordBar) {
+      if (recordButton && recordButton.parentNode) recordButton.parentNode.removeChild(recordButton);
+      dockPlace();
+      return;
+    }
+    if (!recordButton) {
+      recordButton = el('button', 'pkb-card pkb-pill pkb-dock-record');
+      recordButton.type = 'button';
+      tagMeta(recordButton, 'recorder-toggle');
+      recordButton.appendChild(el('span', 'pkb-dot'));
+      recordButton.appendChild(el('span', 'pkb-pill-label', 'Recording'));
+      recordButton.addEventListener('click', function () {
+        if (!recordBar) return;
+        var hide = recordBar.style.display !== 'none';
+        recordBar.style.display = hide ? 'none' : '';
+        recordButton.setAttribute('aria-pressed', hide ? 'false' : 'true');
+        recordButton.setAttribute('aria-label', hide ? 'Show recording controls' : 'Collapse recording controls');
+      });
+    }
+    var shown = recordBar.style.display !== 'none';
+    recordButton.setAttribute('aria-pressed', shown ? 'true' : 'false');
+    recordButton.setAttribute('aria-label', shown ? 'Collapse recording controls' : 'Show recording controls');
+    var paused = recordBar.getAttribute('data-state') === 'paused';
+    recordButton.querySelector('.pkb-dot').setAttribute('data-state', paused ? 'idle' : 'live');
+    var root = ensureLayer();
+    panelSheet(root);
+    dockAdd(recordButton, root);
+  }
+
+  // Close asks first when it would discard unsent chat text, an open guide, or a recording.
+  function closeLosses() {
+    var lose = [];
+    if (panel && panel.input && panel.input.value.trim()) lose.push('unsent text');
+    if (guides.size > 0) lose.push('the open guide');
+    if (window.__pkbRecord === true) lose.push('the recording');
+    return lose;
+  }
+  function closeAsk() {
+    var lose = closeLosses();
+    if (!lose.length) { pushEvent({type: 'panel', action: 'close'}); panelClose(); return; }
+    if (panel.confirm && panel.confirm.isConnected) return;
+    var bar = el('div', 'pkb-confirm');
+    bar.setAttribute('role', 'alertdialog');
+    bar.setAttribute('aria-label', 'Confirm close');
+    tagMeta(bar, 'close-confirm');
+    bar.appendChild(el('span', 'pkb-confirm-text', 'Close and discard ' + lose.join(', ') + '?'));
+    var yes = el('button', '', 'Discard and close');
+    yes.type = 'button';
+    tagMeta(yes, 'confirm-close');
+    var no = el('button', '', 'Keep open');
+    no.type = 'button';
+    tagMeta(no, 'cancel-close');
+    bar.appendChild(yes);
+    bar.appendChild(no);
+    yes.addEventListener('click', function () {
+      bar.remove();
+      if (panel.input) { panel.input.value = ''; panel.send.disabled = true; }
+      Array.from(guides.keys()).forEach(function (id) { guideClose(id); });
+      pushEvent({type: 'panel', action: 'close', discarded: lose});
+      panelClose();
+    });
+    no.addEventListener('click', function () {
+      bar.remove();
+      pushEvent({type: 'panel', action: 'close-cancel'});
+    });
+    panel.confirm = bar;
+    panel.card.insertBefore(bar, panel.head.nextSibling);
+    try { yes.focus({preventScroll: true}); } catch (ignored) { /* focus refused */ }
+  }
+
   function buildPanel(root) {
     metaPurpose = 'panel';
     var card = el('section', 'pkb-card pkb-panel');
@@ -2196,7 +2379,6 @@
     pillUnread.setAttribute('data-pkb-badge', '');
     pill.appendChild(pillUnread);
     root.appendChild(card);
-    root.appendChild(pill);
     isolateKeys(card);
     isolateKeys(pill);
     var p = {card: card, pill: pill, head: head, title: title, tabs: tabButtons, chatPane: chatPane, stepsPane: stepsPane,
@@ -2211,10 +2393,7 @@
     composer.addEventListener('submit', function (event) { event.preventDefault(); panelSend(); });
     minimize.addEventListener('click', function () { p.state.min = true; p.state.pop = false; panelPlace(); });
     pop.addEventListener('click', function () { popOut('chat'); });
-    close.addEventListener('click', function () {
-      pushEvent({type: 'panel', action: 'close'});
-      panelClose();
-    });
+    close.addEventListener('click', function () { closeAsk(); });
     pill.addEventListener('click', function () {
       if (p.state.pop) { popIn('chat'); return; }
       if (p.state.closed || !p.card.isConnected) {
@@ -2281,7 +2460,7 @@
     root.__pkbPanelSheet = true;
     try {
       var sheet = new CSSStyleSheet();
-      sheet.replaceSync(PANEL_CSS + '\n.pkb-panel,.pkb-pill{pointer-events:auto;}');
+      sheet.replaceSync(PANEL_CSS + '\n.pkb-panel,.pkb-pill,.pkb-dock{pointer-events:auto;}');
       root.adoptedStyleSheets = Array.from(root.adoptedStyleSheets || []).concat([sheet]);
     } catch (unsupported) {
       var style = document.createElement('style');
@@ -2297,10 +2476,12 @@
     var root = ensureLayer();
     panelSheet(root);
     if (!panel) panel = buildPanel(root);
-    if (!panel.card.isConnected) { root.appendChild(panel.card); root.appendChild(panel.pill); }
+    if (!panel.card.isConnected) root.appendChild(panel.card);
+    dockAdd(panel.pill, root);
     var st = panel.state;
     ['x', 'y', 'w', 'h'].forEach(function (k) { if (opts[k] != null && opts[k] !== '' && isFinite(+opts[k])) st[k] = +opts[k]; });
     if (opts.min != null) st.min = opts.min === true || opts.min === 'true';
+    if (opts.dockCollapsed != null) dockCollapse(opts.dockCollapsed === true || opts.dockCollapsed === 'true');
     if (opts.title) panel.title.textContent = String(opts.title).slice(0, 80);
     if (opts.theme === 'light' || opts.theme === 'dark') { panel.card.setAttribute('data-theme', opts.theme); panel.pill.setAttribute('data-theme', opts.theme); }
     else if (opts.theme === 'auto') { panel.card.removeAttribute('data-theme'); panel.pill.removeAttribute('data-theme'); }
@@ -2498,6 +2679,7 @@
     if (status === 'stopped' && !spec.script && !(Array.isArray(spec.steps) && spec.steps.length)) {
       if (recordBar && recordBar.parentNode) recordBar.parentNode.removeChild(recordBar);
       recordBar = null;
+      recordDock();
       editorSync(spec);
       return {on: !!window.__pkbRecord, status: status, editor: window.__pkbEditorState || null};
     }
@@ -2560,6 +2742,7 @@
     recordBar.appendChild(button(pausedNow ? 'Resume' : 'Pause', pausedNow ? 'resume' : 'pause'));
     recordBar.appendChild(button('Keep step', 'accept'));
     recordBar.appendChild(button('Drop step', 'reject'));
+    recordDock();
     paintRecordPane();
     editorSync(spec);
     return {on: !!window.__pkbRecord, status: status, script: spec.script || '', editor: window.__pkbEditorState || null};
@@ -2649,13 +2832,6 @@
     editor.card.style.transform = 'translate3d(' + Math.round(st.x) + 'px,' + Math.round(st.y) + 'px,0)';
     editor.card.style.width = Math.round(st.w) + 'px';
     editor.card.style.height = Math.round(st.h) + 'px';
-    if (st.min || st.pop || closed) {
-      var vp = viewport();
-      var ph = editor.pill.offsetHeight || 32;
-      var x = 16;
-      var y = Math.max(8, vp.h - ph - 16);
-      editor.pill.style.transform = 'translate3d(' + x + 'px,' + Math.round(y) + 'px,0)';
-    }
     var label = editor.pill.querySelector('.pkb-pill-label');
     if (label) label.textContent = st.pop ? 'Steps window' : 'Steps';
     editor.pill.setAttribute('aria-label', st.pop ? 'Pop steps back in' : 'Open step editor');
@@ -2663,6 +2839,7 @@
       x: Math.round(st.x), y: Math.round(st.y), w: Math.round(st.w), h: Math.round(st.h),
       min: !!st.min, pop: !!st.pop, count: (editor.steps || []).length
     };
+    dockPlace();
   }
 
   function editorApplyIncoming(steps) {
@@ -2795,10 +2972,8 @@
     var root = ensureLayer();
     panelSheet(root);
     if (!editor) editor = buildEditor(root);
-    if (!editor.card.isConnected) {
-      root.appendChild(editor.card);
-      root.appendChild(editor.pill);
-    }
+    if (!editor.card.isConnected) root.appendChild(editor.card);
+    dockAdd(editor.pill, root);
     if (Array.isArray(opts.steps)) editorApplyIncoming(opts.steps);
     else editorRender();
     raiseLayer();
@@ -2867,7 +3042,6 @@
     pill.querySelector('.pkb-dot').setAttribute('data-state', 'live');
     pill.appendChild(el('span', 'pkb-pill-label', 'Steps'));
     root.appendChild(card);
-    root.appendChild(pill);
     isolateKeys(card);
     isolateKeys(pill);
     var state = editorDefaults();
@@ -3284,6 +3458,8 @@
     panelOpen: panelOpen,
     panelClose: panelClose,
     panelState: panelState,
+    dockState: dockState,
+    dockCollapse: function (on) { dockCollapse(on !== false && on !== 'false'); return dockState(); },
     panelTab: panelTab,
     chat: chat,
     chatSent: chatSent,
