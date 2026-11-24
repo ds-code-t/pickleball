@@ -1680,6 +1680,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/desktop/DesktopAnnotations.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/DesktopScreenshot.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/DesktopTree.java`
+- `dom-engine/src/main/java/dev/domengine/desktop/DesktopXPathAccel.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/GridDrivers.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/MacAccessibility.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/NativeDesktop.java`
@@ -1766,6 +1767,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/desktop/DesktopOneMatchTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/DesktopScreenshotTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/DesktopSnapshotTest.java`
+- `dom-engine/src/test/java/dev/domengine/desktop/DesktopXPathAccelTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/GridDriversTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/LiveDesktopSnapshotTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/LiveDesktopTest.java`

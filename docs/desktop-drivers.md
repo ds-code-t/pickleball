@@ -33,3 +33,16 @@ Nothing installs implicitly. `setup desktop-driver --driver=<name>` prints the l
 ## Checking
 
 `doctor --desktop` prints `desktopDriver=<selected>` and a `desktop=` JSON object. It lists each driver for this OS with its version, license, URL, `running`, `missing` (node, appium, xcode, macos-accessibility, windows-developer-mode), and a `fix` line. Plain `doctor` does not probe drivers.
+
+## Driver XPath and page source (verified 2026-11-24)
+
+| Driver | Page source | XPath | Source |
+|--------|-------------|-------|--------|
+| FlaUI.WebDriver | **not supported** (`GET /session/{id}/source` is listed as N/A) | yes, `xpath` locator | https://github.com/FlaUI/FlaUI.WebDriver README, "Supported WebDriver commands" and "Selectors" |
+| NovaWindows | yes (`driver.page_source`) | yes, XPath 1.0 over inspect.exe attributes | https://github.com/AutomateThePlanet/appium-novawindows-driver README |
+| WinAppDriver | yes (`GET /session/:sessionId/source`) | yes (`FindElementByXPath`) | https://github.com/microsoft/WinAppDriver Docs/SupportedAPIs.md and AuthoringTestScripts.md |
+| Appium Mac2 | yes | yes (XPath 2.0 since 1.20.0); it is evaluated over the page source, so the docs say it can be much slower than predicate or class-chain locators | https://github.com/appium/appium-mac2-driver docs/reference/locator-strategies.md |
+
+Because FlaUI.WebDriver has no page source, a FlaUI capture fails and falls back to the native UI Automation capture, with one warning. A page source, where the driver has one, is used only as input for building the canonical tree.
+
+`pkb_desktop_xpath_accel=on|off` (default `off`) turns on `DesktopXPathAccel`. It asks the driver for candidates by accessible name (`//*[@Name=...]`, or `@title`/`@label` on Mac2), maps each returned driver XPath back to the canonical node that carries it, and confirms role and name on the canonical tree. If the driver misses a match, fails, or returns nothing, the canonical result is returned, so results are identical with the flag on or off. The default stays off because the speedup is unverified: no driver was available to measure it here, and Mac2's own docs say its XPath is slow. Live desktop queries do not call the accelerator yet. It is covered by recorded-source parity tests, and the canonical query language is the only one exposed.
