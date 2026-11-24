@@ -268,3 +268,33 @@ Add `--project=` when the working directory is not the consumer project. The bro
 When a failure looks intermittent, `dashboard overlap` is the time grouping. Run it, then xref for the element. A failure line appears only when at least two runs in the group share it.
 
 Finish with `live-stop`. Do not add this section to `@all`.
+
+## Two-actor recipe
+
+A repeatable test with two actors on one `start` session. `TwoActorRecipeLiveTest` runs scenarios 1, 2, and 5 of this recipe as a scripted version.
+
+- **Helper (human tier).** Runs under its own run id, locked with `session-mode --human=on --run-id=<helper>`. It uses only human-tier verbs: `snap`, `find`, `act`, `wait`, `capture`, `chat-read`, `doctor`, `explain`, and `help`. It talks to the agent only through what is on the page: cards, the panel composer, highlights, and guides. A control verb exits 2 with `error: <verb> is a control-tier verb`.
+- **Agent (full access).** Runs under its own run id with control verbs. It waits without blocking the start host's lane: `ask-and-wait --async` with `answer-wait --id`, and `chat-turn`.
+
+Start and attach in this order. This avoids the start race and the notes-file deadlock seen on 2026-11-23.
+
+1. The agent runs `start` alone, and runs `doctor` until it shows `health=ok`.
+2. Only then does the helper attach: `session-mode --human=on`, then a first `snap`.
+3. Each side writes its notes to its own file. Neither side waits on the other's notes file.
+4. Neither side starts a second `start` while the first one is still running.
+
+Polling cadence:
+
+- The helper runs `snap` or `find` every 250 to 1000 ms while it waits for a card or a chat line.
+- The agent never polls in a loop that holds the lane. It runs `answer-wait --id --timeout` or `chat-turn --timeout` (these accept `s` and `ms`), then retries.
+
+| # | Scenario | Agent | Helper | Pass when |
+|---|----------|-------|--------|-----------|
+| 1 | Choose card | `ask-and-wait --say=… --choices=Alpha,Beta --async`, then `answer-wait --id=<id> --timeout=10s` | `snap`, then `act --kind=click --query=Alpha` | `answer-wait` value is `Alpha` |
+| 2 | Chat hand-off | `panel-open --tab=chat`, then `chat-turn --text=… --timeout=30s` | `snap` until the agent's line is listed, `act --kind=type --query=Email --value=…`, type in the composer (`--purpose=message`), click Send (`--purpose=send`) | `chat-turn` returns the helper's text and the field holds the value |
+| 3 | Highlight and type | `highlight --query=Email`, then `chat-send` with the instruction | `find` the highlighted field, then `act --kind=type` | the agent reads the value back |
+| 4 | File hand-off | on the `upload-request` event, `upload --file=` (or `act --kind=attach`) | clicks the file control, then "Ask agent to attach a file" (posts `upload-request`) | the input lists the file |
+| 5 | Timeout and retry | `answer-wait --id=<id> --timeout=300` exits 1 with `timeout`. Ask again with the same `--id`, then wait again | clicks the retried card | the second wait returns the choice |
+| 6 | Guide | `guide` with steps | follows each step with `act` | a guide event with `by=human` arrives for each step |
+
+Timings: each side records the wall-clock time per verb. It also records the envelope's `ms`, `timing.totalMs`, and `timing.workerMs`. Expect warm `snap` and `find` in tens of milliseconds and a click in under 1 s. A verb that takes more than 2 s while the other side waits is a lane problem: record it as a failure. Pass criteria come from answer and chat events, not from `applied`, as in the plan. The run passes when all six scenarios pass and no verb from either side reports `unreachable`.

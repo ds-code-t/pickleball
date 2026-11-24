@@ -96,6 +96,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-collab-test/helper-brief.md`
 - `docs/maintainer/3.0.0-collab-test/human-notes.md`
 - `docs/maintainer/3.0.0-collab-test/plan.md`
+- `docs/maintainer/3.0.0-collab-test/recipe.md`
 - `docs/maintainer/3.0.0-composite-v2-design.md`
 - `docs/maintainer/3.0.0-composite-verbs-scoreboard.md`
 - `docs/maintainer/3.0.0-consumer-ready-handoff.md`
@@ -1116,6 +1117,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/StoreCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/TargetAgnosticApiTest.java`
 - `src/test/java/tools/dscode/launcher/TargetCoverageTest.java`
+- `src/test/java/tools/dscode/launcher/TwoActorRecipeLiveTest.java`
 - `src/test/java/tools/dscode/launcher/VersionSwitchTest.java`
 - `src/test/java/tools/dscode/launcher/VirtualizedScrollTest.java`
 - `src/test/java/tools/dscode/launcher/VisibleFlagTest.java`

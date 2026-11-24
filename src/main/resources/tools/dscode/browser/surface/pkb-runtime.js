@@ -2188,6 +2188,16 @@
     var y = dock.state.y == null ? vp.h - h - 16 : dock.state.y;
     x = clamp(x, 0, Math.max(0, vp.w - w));
     y = clamp(y, 0, Math.max(0, vp.h - h));
+    // Keep the dock off the open panel and step editor so it never covers their controls (Send, close).
+    [panel && panel.card, editor && editor.card].forEach(function (card) {
+      if (!card || !card.isConnected || card.hidden || !card.getBoundingClientRect) return;
+      var c = card.getBoundingClientRect();
+      if (!c.width || !c.height || !dockOverlap(x, y, w, h, c)) return;
+      if (c.left - w - 8 >= 0) x = c.left - w - 8;
+      else if (c.top - h - 8 >= 0) y = c.top - h - 8;
+      else if (c.right + 8 + w <= vp.w) x = c.right + 8;
+      else if (c.bottom + 8 + h <= vp.h) y = c.bottom + 8;
+    });
     var active = document.activeElement;
     if (active && active !== document.body && active !== document.documentElement && active !== layer && active.getBoundingClientRect) {
       var r = active.getBoundingClientRect();
