@@ -5,6 +5,7 @@ import dev.domengine.cli.CliResult;
 import dev.domengine.cli.DomEngineMain;
 import dev.domengine.image.TemplateMatch;
 import dev.domengine.json.Jsons;
+import dev.domengine.tree.DomNode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -171,6 +172,66 @@ class OcrHookTest {
         JsonNode nodes = Jsons.MAPPER.readTree(result.stdout()).path("nodes");
         assertEquals(List.of("mark", "graphic", "icon", "picture"), ids(nodes));
         assertEquals(1, OcrHook.runtimeReads());
+    }
+
+    @Test
+    void iconFontsSvgUseAndDesktopIconRolesAreRecognized() throws Exception {
+        Path viewport = write("view.pgm", PGM);
+        String hash = OcrHook.cacheKey(TemplateMatch.parse(PGM));
+        Path stub = write("runtime.txt", "pkb-ocr 1\n" + hash + " mark\n");
+        System.setProperty(OcrHook.PROPERTY, stub.toString());
+        Path page = write("icon-fonts.html", """
+                <html data-viewport-w="2" data-viewport-h="2"><body>
+                <i id="fa" class="fas fa-save" data-x="0" data-y="0" data-w="2" data-h="2"></i>
+                <span id="bi" class="bi bi-alarm" data-x="0" data-y="0" data-w="2" data-h="2"></span>
+                <span id="material" class="material-icons" data-x="0" data-y="0" data-w="2" data-h="2"></span>
+                <span id="symbols" class="material-symbols-outlined" data-x="0" data-y="0" data-w="2" data-h="2"></span>
+                <i id="glyph" class="glyphicon glyphicon-search" data-x="0" data-y="0" data-w="2" data-h="2"></i>
+                <span id="named" class="icon" data-x="0" data-y="0" data-w="2" data-h="2"></span>
+                <i id="home" class="icon-home" data-x="0" data-y="0" data-w="2" data-h="2"></i>
+                <span id="app" class="app-icon" data-x="0" data-y="0" data-w="2" data-h="2"></span>
+                <span id="symbol" role="graphics-symbol" data-x="0" data-y="0" data-w="2" data-h="2"></span>
+                <div id="gdoc" role="graphics-document" data-x="0" data-y="0" data-w="2" data-h="2"></div>
+                <svg id="sprite" data-x="0" data-y="0" data-w="2" data-h="2"><use id="glyph-use" href="#g" data-x="0" data-y="0" data-w="2" data-h="2"></use></svg>
+                <div id="atspi" role="icon" data-x="0" data-y="0" data-w="2" data-h="2"></div>
+                <div id="ax" data-platform-role="AXImage" data-x="0" data-y="0" data-w="2" data-h="2"></div>
+                <div id="uia" data-platform-role="Image" data-x="0" data-y="0" data-w="2" data-h="2"></div>
+                <span id="plain" data-x="0" data-y="0" data-w="2" data-h="2">plain</span>
+                <div id="font-on-div" class="fa-save" data-x="0" data-y="0" data-w="2" data-h="2">no</div>
+                <span id="bio" class="biography" data-x="0" data-y="0" data-w="2" data-h="2">bio</span>
+                <div id="text" data-x="0" data-y="0" data-w="2" data-h="2">words</div>
+                </body></html>
+                """);
+        CliResult result = query(page, viewport, "image=ocr:mark", "full");
+        assertEquals(0, result.exit(), result.stderr());
+        assertEquals(List.of(
+                "fa", "bi", "material", "symbols", "glyph", "named", "home", "app",
+                "symbol", "gdoc", "sprite", "atspi", "ax", "uia"
+        ), ids(Jsons.MAPPER.readTree(result.stdout()).path("nodes")));
+        assertEquals(1, OcrHook.runtimeReads());
+
+        DomNode axImage = desktop("AXImage", "AXImage");
+        DomNode uiaImage = desktop("Image", "Image");
+        DomNode atspiIcon = desktop("icon", "icon");
+        DomNode mapped = desktop("img", "AXImage");
+        assertTrue(OcrHook.target(axImage));
+        assertTrue(OcrHook.target(uiaImage));
+        assertTrue(OcrHook.target(atspiIcon));
+        assertTrue(OcrHook.target(mapped));
+        DomNode plain = new DomNode();
+        plain.nodeType = 1;
+        plain.localName = "span";
+        plain.nodeValue = "plain";
+        assertFalse(OcrHook.target(plain));
+    }
+
+    private static DomNode desktop(String role, String platformRole) {
+        DomNode node = new DomNode();
+        node.nodeType = 1;
+        node.localName = "desktop";
+        node.role = role;
+        node.attributes.put("platform-role", platformRole);
+        return node;
     }
 
     @Test

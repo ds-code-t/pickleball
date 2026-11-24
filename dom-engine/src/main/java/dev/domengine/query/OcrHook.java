@@ -40,13 +40,63 @@ public final class OcrHook {
         }
     }
 
-    /** Tag {@code img}, tag {@code svg}, role {@code img}, or role {@code image}. */
+    /**
+     * Image-like elements: tag {@code img} or {@code svg}, role {@code img}, {@code image},
+     * {@code graphics-symbol}, {@code graphics-document}, or {@code icon}, an icon-font
+     * {@code i} or {@code span}, and a desktop icon after {@code NativeDesktop.mapRole}
+     * (role {@code icon} or {@code img}, platform role {@code AXImage}, {@code Image}, or {@code icon}).
+     * A {@code use} inside an {@code svg} is not a second target; the svg is.
+     */
     public static boolean target(DomNode node) {
         if (node == null || node.nodeType != 1) return false;
-        String tag = node.localName == null ? "" : node.localName.toLowerCase(Locale.ROOT);
+        String tag = tag(node);
+        if ("use".equals(tag) && insideSvg(node)) return false;
         if ("img".equals(tag) || "svg".equals(tag)) return true;
-        String role = Query.roleOf(node);
-        return "img".equals(role) || "image".equals(role);
+        if (iconRole(Query.roleOf(node)) || iconRole(attr(node, "platform-role")) || iconRole(attr(node, "data-platform-role"))) {
+            return true;
+        }
+        return ("i".equals(tag) || "span".equals(tag)) && iconClass(attr(node, "class"));
+    }
+
+    private static boolean iconRole(String role) {
+        if (role == null || role.isBlank()) return false;
+        return switch (role.trim().toLowerCase(Locale.ROOT)) {
+            case "img", "image", "icon", "graphics-symbol", "graphics-document", "aximage" -> true;
+            default -> false;
+        };
+    }
+
+    /** Icon-font class tokens. A plain word such as {@code biography} does not match. */
+    private static boolean iconClass(String className) {
+        if (className == null || className.isBlank()) return false;
+        for (String token : className.trim().split("\\s+")) {
+            if (token.isEmpty()) continue;
+            String value = token.toLowerCase(Locale.ROOT);
+            if (value.startsWith("fa-") || "fa".equals(value) || "fas".equals(value) || "far".equals(value) || "fab".equals(value)) {
+                return true;
+            }
+            if ("bi".equals(value) || value.startsWith("bi-")) return true;
+            if (value.startsWith("material-icons") || value.startsWith("material-symbols")) return true;
+            if (value.startsWith("glyphicon")) return true;
+            if ("icon".equals(value) || value.startsWith("icon-") || value.endsWith("-icon")) return true;
+        }
+        return false;
+    }
+
+    private static boolean insideSvg(DomNode node) {
+        for (DomNode parent = node.parent; parent != null; parent = parent.parent) {
+            if (parent.nodeType == 1 && "svg".equals(tag(parent))) return true;
+        }
+        return false;
+    }
+
+    private static String tag(DomNode node) {
+        return node.localName == null ? "" : node.localName.toLowerCase(Locale.ROOT);
+    }
+
+    private static String attr(DomNode node, String name) {
+        String value = node.attributes.get(name);
+        return value == null ? "" : value;
     }
 
     /**
