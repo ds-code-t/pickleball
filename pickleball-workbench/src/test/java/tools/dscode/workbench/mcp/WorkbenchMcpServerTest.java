@@ -126,6 +126,8 @@ class WorkbenchMcpServerTest {
             "workbench_form_fill",
             "workbench_watch",
             "workbench_navigate",
+            "workbench_pw",
+            "workbench_cdp",
             "workbench_chat_turn",
             "workbench_execute_steps",
             "workbench_ui_verify",

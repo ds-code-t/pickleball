@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<XCUIElementTypeApplication title="TextEdit" label="TextEdit" identifier="" x="0" y="0" width="1440" height="900" enabled="true">
+  <XCUIElementTypeWindow title="Untitled" identifier="win" x="100" y="100" width="600" height="400" enabled="true">
+    <XCUIElementTypeTextView value="hello" identifier="text" x="110" y="140" width="580" height="340" enabled="true"/>
+    <XCUIElementTypeButton title="Save" identifier="save" x="120" y="460" width="60" height="22" enabled="true"/>
+  </XCUIElementTypeWindow>
+</XCUIElementTypeApplication>

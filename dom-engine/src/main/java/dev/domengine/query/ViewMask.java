@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public final class ViewMask {
     private static final ThreadLocal<Set<String>> ALLOW = new ThreadLocal<>();
+    private static final ThreadLocal<Map<String, String>> STAGES = new ThreadLocal<>();
     /** Most recent mask last. Each entry is one root object plus one version key. */
     static final int CACHE_LIMIT = 32;
     private static final Object CACHE_LOCK = new Object();
@@ -32,6 +33,7 @@ public final class ViewMask {
 
     public static void install(DomNode root, Map<String, String> flags) {
         ALLOW.remove();
+        STAGES.remove();
         if (!active(flags) || root == null) return;
         String versionKey = versionKey(root, flags.get("doc-version"));
         synchronized (CACHE_LOCK) {
@@ -41,19 +43,30 @@ public final class ViewMask {
                     CACHE.remove(i);
                     CACHE.add(entry);
                     ALLOW.set(entry.ids);
+                    STAGES.set(entry.stages);
                     return;
                 }
             }
             EVALUATIONS.incrementAndGet();
-            Set<String> ids = Set.copyOf(compute(root));
-            CACHE.add(new CacheEntry(root, versionKey, ids));
+            Map<String, String> stages = new java.util.HashMap<>();
+            Set<String> ids = Set.copyOf(compute(root, stages));
+            CacheEntry entry = new CacheEntry(root, versionKey, ids, Map.copyOf(stages));
+            CACHE.add(entry);
             while (CACHE.size() > CACHE_LIMIT) CACHE.remove(0);
             ALLOW.set(ids);
+            STAGES.set(entry.stages);
         }
     }
 
     public static void clear() {
         ALLOW.remove();
+        STAGES.remove();
+    }
+
+    /** The perception stage that decided this node under the installed human mask, or null outside human mode. */
+    public static String stage(DomNode node) {
+        Map<String, String> stages = STAGES.get();
+        return stages == null || node == null ? null : stages.get(node.id());
     }
 
     /** Entries currently held. The list is bounded by {@link #CACHE_LIMIT}. */
@@ -143,11 +156,13 @@ public final class ViewMask {
         final DomNode root;
         final String versionKey;
         final Set<String> ids;
+        final Map<String, String> stages;
 
-        CacheEntry(DomNode root, String versionKey, Set<String> ids) {
+        CacheEntry(DomNode root, String versionKey, Set<String> ids, Map<String, String> stages) {
             this.root = root;
             this.versionKey = versionKey;
             this.ids = ids;
+            this.stages = stages;
         }
     }
 
@@ -159,7 +174,7 @@ public final class ViewMask {
         return "human".equalsIgnoreCase(exposure);
     }
 
-    private static Set<String> compute(DomNode root) {
+    private static Set<String> compute(DomNode root, Map<String, String> stages) {
         Viewport viewport = viewport(root);
         List<DomNode> elements = new ArrayList<>();
         walk(root, elements);
@@ -173,7 +188,7 @@ public final class ViewMask {
         IdentityHashMap<DomNode, Boolean> seen = new IdentityHashMap<>();
         IdentityHashMap<DomNode, Boolean> scrolled = new IdentityHashMap<>();
         for (DomNode node : elements) {
-            if (seen(node, root, viewport, paint, elements)) seen.put(node, Boolean.TRUE);
+            if (seen(node, root, viewport, paint, elements, stages)) seen.put(node, Boolean.TRUE);
         }
         for (DomNode node : elements) {
             if (scrollReachable(node, root, viewport)) scrolled.put(node, Boolean.TRUE);
@@ -187,10 +202,33 @@ public final class ViewMask {
         return ids;
     }
 
-    private static boolean seen(DomNode node, DomNode root, Viewport viewport, boolean paint, List<DomNode> elements) {
-        if (!inViewport(node, viewport) || !displayed(node) || blocked(node, root)) return false;
-        if (!paint) return true;
-        return !occluded(node, elements);
+    private static boolean seen(DomNode node, DomNode root, Viewport viewport, boolean paint, List<DomNode> elements,
+                                Map<String, String> stages) {
+        if (!inViewport(node, viewport)) {
+            stages.put(node.id(), Perception.VIEWPORT);
+            return false;
+        }
+        if (!displayed(node) || blocked(node, root)) {
+            stages.put(node.id(), "displayed");
+            return false;
+        }
+        if (!paint) {
+            stages.put(node.id(), Perception.VIEWPORT);
+            return true;
+        }
+        if (!node.hasBox) return !occluded(node, elements);
+        // Live paint data: escalate cheapest first (multi-point hit test, clip/size/contrast, OCR when a crop exists).
+        Perception.Decision decision = Perception.decide(node, elements, null, CROPS.get());
+        stages.put(node.id(), decision.stage());
+        return decision.perceived();
+    }
+
+    private static final ThreadLocal<Perception.Crops> CROPS = new ThreadLocal<>();
+
+    /** Crops for the OCR stage while the next mask is computed (live screenshot callers); null clears it. */
+    public static void crops(Perception.Crops crops) {
+        if (crops == null) CROPS.remove();
+        else CROPS.set(crops);
     }
 
     private static boolean inViewport(DomNode node, Viewport viewport) {

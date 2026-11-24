@@ -28,6 +28,7 @@ public final class CompositeWebElement implements WebElement {
     private final String text;
     private final String name;
     private final Map<String, String> attributes;
+    private final String liveValue;
     private final boolean displayed;
     private final boolean enabled;
     private final boolean selected;
@@ -72,6 +73,7 @@ public final class CompositeWebElement implements WebElement {
         this.text = text(value, "text", text(value, "name", ""));
         this.name = text(value, "name", this.text);
         this.attributes = attributes(value);
+        this.liveValue = value != null && value.path("value").isTextual() ? value.path("value").asText() : null;
         this.displayed = !state(value, "hidden");
         this.enabled = !state(value, "disabled");
         this.selected = state(value, "checked") || state(value, "selected");
@@ -275,6 +277,7 @@ public final class CompositeWebElement implements WebElement {
 
     @Override
     public String getDomProperty(String name) {
+        if ("value".equals(name) && liveValue != null) return liveValue;
         return attribute(name);
     }
 
@@ -285,6 +288,8 @@ public final class CompositeWebElement implements WebElement {
 
     @Override
     public String getAttribute(String name) {
+        // Selenium's getAttribute("value") reads the live property; the engine row carries it as "value".
+        if ("value".equals(name) && liveValue != null) return liveValue;
         return attribute(name);
     }
 

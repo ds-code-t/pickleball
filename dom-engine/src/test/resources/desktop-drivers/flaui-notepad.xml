@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window Name="Untitled - Notepad" AutomationId="" ClassName="Notepad" RuntimeId="42.1" x="10" y="20" width="800" height="600" IsEnabled="True" IsOffscreen="False">
+  <Document Name="Text editor" AutomationId="15" ClassName="Edit" RuntimeId="42.1.15" x="12" y="60" width="780" height="500" IsEnabled="True"/>
+  <Button Name="Save" AutomationId="save" RuntimeId="42.1.16" BoundingRectangle="[30,570][90,590]" x="30" y="570" width="60" height="20" IsEnabled="True"/>
+  <Button Name="Close" AutomationId="close" RuntimeId="42.1.17" x="100" y="570" width="60" height="20" IsEnabled="False"/>
+</Window>

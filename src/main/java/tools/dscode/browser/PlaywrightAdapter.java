@@ -7,9 +7,11 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Optional scripted library. Gradle constraint {@code [1.40.0, 2.0.0)}.
- * {@link ProtocolSelector#forDriver} does not pick this adapter. Call
- * {@link #open(Object)} with a {@code com.microsoft.playwright.Page}, or pass a {@link Session}.
+ * Playwright backend (D12). Playwright for Java is a normal dependency, pinned 1.65.1 inside the Gradle constraint
+ * {@code [1.40.0, 2.0.0)}. {@link ProtocolSelector} picks this adapter for {@code pkb_protocol=playwright} or
+ * {@link ProtocolSelector.Preference#PLAYWRIGHT}, attached with {@link PlaywrightConnection} over CDP only.
+ * Call {@link #open(Object)} with a {@code com.microsoft.playwright.Page} (a typed session: find, click, fill,
+ * CDP send, frames), or pass a {@link Session}.
  * The class reference to {@link Playwright} is what makes a missing or out-of-range
  * library fail compilation of this adapter.
  */
@@ -63,6 +65,7 @@ public final class PlaywrightAdapter implements BrowserFacade {
                     "error: Playwright page is missing.\n"
                             + "fix: Pass a com.microsoft.playwright.Page.");
         }
+        if (page instanceof com.microsoft.playwright.Page typed) return new PlaywrightAdapter(PlaywrightConnection.session(typed));
         return new PlaywrightAdapter(new ReflectiveSession(page));
     }
 

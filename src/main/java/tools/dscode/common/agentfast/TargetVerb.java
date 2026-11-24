@@ -75,7 +75,7 @@ public final class TargetVerb {
     private static final Set<String> ACT_KEYS = Set.of(
             "target", "kind", "query", "ref", "value", "snap", "run-id", "agent", "agent-id",
             "fixture", "timeout", "condition", "frame", "group", "sequence",
-            "format", "fields", "where", "limit", "budget", "pick", "session", "sessionId", "exposure", "purpose", "file", "human"
+            "format", "fields", "where", "limit", "budget", "pick", "session", "sessionId", "exposure", "purpose", "file", "human", "refind", "identity"
     );
 
     /** CSS or text selector for a fresh {@code ref:}. Null when the ref is unknown or stale. */
@@ -581,6 +581,43 @@ public final class TargetVerb {
         return outcome;
     }
 
+    /** {@code --refind=chain} (or pkb_ref_refresh=chain) lets a stale ref be re-found through its identity chain. */
+    private static boolean refindRequested(Map<String, String> args) {
+        String flag = blank(args.get("refind"));
+        if (flag.isBlank()) flag = blank(System.getProperty("pkb_ref_refresh", System.getenv("pkb_ref_refresh") == null ? "" : System.getenv("pkb_ref_refresh")));
+        return "chain".equalsIgnoreCase(flag) || "identity".equalsIgnoreCase(flag);
+    }
+
+    private static String refKey(String ref) {
+        String expanded = SessionIds.expand(ref);
+        if (expanded != null) return expanded;
+        return ref != null && ref.startsWith("ref:") ? ref : "ref:" + (ref == null ? "" : ref);
+    }
+
+    /**
+     * Replays an identity chain on the live tree: stable attribute, native path, fingerprint, then positional XPath.
+     * Returns matched, locator, index, and why, plus the backend id (removed before the reply), or null on no match.
+     */
+    private static Map<String, Object> replayChain(DomNode root, JsonNode chain, String why) {
+        if (chain == null || !chain.isArray()) return null;
+        com.fasterxml.jackson.databind.node.ObjectNode result = dev.domengine.snapshot.IdentityChain.replay(root, chain);
+        String matched = result.path("matched").asText("none");
+        long backend = result.path("backend_node_id").asLong(0);
+        tools.dscode.common.composite.CompositeLog.info("identity", "replay " + why + " matched=" + matched
+                + " index=" + result.path("index").asInt(-1) + " locator=" + result.path("locator").asText(""));
+        if ("none".equals(matched) || backend <= 0) return null;
+        Map<String, Object> refound = new LinkedHashMap<>();
+        refound.put("matched", matched);
+        refound.put("locator", result.path("locator").asText(""));
+        refound.put("index", result.path("index").asInt(-1));
+        refound.put("why", why);
+        refound.put("backend", backend);
+        Map<String, Object> note = PICKED.get() == null ? new LinkedHashMap<>() : PICKED.get();
+        note.put("refound", refound);
+        PICKED.set(note);
+        return refound;
+    }
+
     private static void notePick(List<DomNode> hits, DomNode chosen, String pick) {
         if (hits == null || hits.size() < 2 || chosen == null) return;
         List<Map<String, Object>> candidates = new ArrayList<>();
@@ -625,8 +662,30 @@ public final class TargetVerb {
             DomNode root = tree(page.session);
             DomNode node;
             String query = withPurpose(blank(args.get("query")), args.get("purpose"));
-            if (hit != null) {
+            Map<String, Object> refound = null;
+            if (!blank(args.get("identity")).isBlank() && hit == null) {
+                // Recorded-element replay: the chain is the locator (stable, native path, fingerprint, positional XPath last).
+                JsonNode chain = dev.domengine.snapshot.IdentityChain.load(args.get("identity"));
+                refound = replayChain(root, chain, "identity");
+                node = refound == null ? null : findNode(root, "", ((Number) refound.get("backend")).longValue());
+                if (node == null) {
+                    Outcome missed = fail("act", "not found");
+                    missed.body().put("fix", "the recorded identity chain matched nothing on this page; snap and act by ref");
+                    return missed;
+                }
+                refound.remove("backend");
+                query = blank(args.get("query"));
+            } else if (hit != null) {
                 node = freshNode(hit, page.session.connection(), root);
+                if (node == null && refindRequested(args)) {
+                    JsonNode chain = CHAINS.get(refKey(ref));
+                    if (chain == null) chain = CHAINS.get(ref);
+                    refound = chain == null ? null : replayChain(root, chain, "stale-ref");
+                    if (refound != null) {
+                        node = findNode(root, "", ((Number) refound.get("backend")).longValue());
+                        refound.remove("backend");
+                    }
+                }
                 if (node == null) {
                     Outcome missed = staleRef("act");
                     stamp(missed.body(), page.session.connection(), null);
@@ -3426,8 +3485,28 @@ public final class TargetVerb {
         return publish(runId, kind, sessionId, version, nodes, query, null);
     }
 
+    /** Identity chains for minted refs, so {@code act --refind=chain} can re-find a stale ref (bounded). */
+    private static final Map<String, JsonNode> CHAINS = java.util.Collections.synchronizedMap(new LinkedHashMap<>(256, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, JsonNode> eldest) {
+            return size() > 4096;
+        }
+    });
+
+    private static Map<DomNode, JsonNode> chainsOf(List<DomNode> nodes) {
+        if (nodes == null || nodes.isEmpty()) return Map.of();
+        DomNode top = nodes.get(0);
+        while (top != null && top.parent != null) top = top.parent;
+        try {
+            return dev.domengine.snapshot.IdentityChain.chains(top, nodes);
+        } catch (RuntimeException unreadable) {
+            return Map.of();
+        }
+    }
+
     private static List<Map<String, Object>> publish(String runId, String kind, String sessionId, String version, List<DomNode> nodes, String query, CdpConnection cdp) {
         Map<String, String[]> frames = cdp == null ? Map.of() : frameIndex(cdp);
+        Map<DomNode, JsonNode> chains = "desktop".equals(kind) ? Map.of() : chainsOf(nodes);
         Map<Long, JsonNode> live = cdp == null ? Map.of() : CollabRows.values(cdp, nodes);
         List<Map<String, Object>> rows = new ArrayList<>();
         for (DomNode node : nodes) {
@@ -3443,6 +3522,12 @@ public final class TargetVerb {
             HITS.put(legacy, hit);
             if (!legacy.equals(ref)) HITS.put(ref, hit);
             HITS.put(shortId, hit);
+            JsonNode chain = chains.get(node);
+            if (chain != null && chain.size() > 0) {
+                CHAINS.put(legacy, chain);
+                CHAINS.put(ref, chain);
+                CHAINS.put(shortId, chain);
+            }
             boolean visible = node.displayed && !node.states.contains("hidden");
             boolean enabled = !node.states.contains("disabled") && !node.attributes.containsKey("disabled");
             String roleName = role(node);
@@ -4183,7 +4268,16 @@ public final class TargetVerb {
         collectSnap(root, false, nodes);
         Map<String, String[]> frames = frameIndex(cdp);
         List<SnapRow> rows = new ArrayList<>();
-        for (DomNode node : nodes) rows.add(snapRow(cdp, sessionId, version, node, frames));
+        Map<DomNode, JsonNode> chains = chainsOf(nodes);
+        for (DomNode node : nodes) {
+            SnapRow row = snapRow(cdp, sessionId, version, node, frames);
+            rows.add(row);
+            JsonNode chain = chains.get(node);
+            if (chain != null && chain.size() > 0) {
+                CHAINS.put("ref:" + version + ":" + node.backendNodeId, chain);
+                CHAINS.put(publishedRef(version, node.backendNodeId), chain);
+            }
+        }
         return rows;
     }
 

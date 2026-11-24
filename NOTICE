@@ -30,6 +30,8 @@ This product bundles or depends on the following major components:
 
 Apache License 2.0:
 - Selenium
+- Playwright for Java and its driver-bundle (depends on; not bundled. The driver-bundle
+  includes Node.js under the Node.js license)
 - Google Guava
 - Jackson Databind
 - Apache POI

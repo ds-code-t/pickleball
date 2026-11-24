@@ -41,7 +41,9 @@ public final class RowStates {
                   required: el.required === true || el.hasAttribute('required'),
                   expanded: expanded === 'true',
                   collapsed: expanded === 'false',
-                  focused: el === active
+                  focused: el === active,
+                  value: (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.tagName === 'OPTION')
+                      && typeof el.value === 'string' ? el.value : null
                 });
               }
               return out;

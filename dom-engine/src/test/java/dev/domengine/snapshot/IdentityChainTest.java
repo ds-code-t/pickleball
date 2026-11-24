@@ -103,6 +103,42 @@ class IdentityChainTest {
         assertTrue(none.path("backend_node_id").isMissingNode() || none.path("backend_node_id").isNull());
     }
 
+    @Test
+    void chainsForLiveRefsMatchTheSnapshotChainAndXPathComesLast() {
+        DomNode root = tree("""
+                <html data-w="200" data-h="100"><body>
+                  <button id="save">Save</button>
+                  <button>Go</button>
+                  <button>Go</button>
+                </body></html>
+                """);
+        java.util.List<DomNode> buttons = new java.util.ArrayList<>();
+        collect(root, "button", buttons);
+        Map<DomNode, JsonNode> chains = IdentityChain.chains(root, buttons);
+        assertEquals(3, chains.size());
+        JsonNode nodes = snapshot(root).path("nodes");
+        assertEquals(chain(nodes, "save"), chains.get(buttons.get(0)), "the live-ref chain is the snapshot chain");
+        JsonNode second = chains.get(buttons.get(2));
+        assertEquals("xpath", second.get(second.size() - 1).path("kind").asText(), second.toString());
+        for (int i = 0; i < second.size() - 1; i++) assertFalse("xpath".equals(second.get(i).path("kind").asText()), second.toString());
+        DomNode reordered = tree("""
+                <html data-w="200" data-h="100"><body>
+                  <button>Go</button>
+                  <button id="save">Save</button>
+                </body></html>
+                """);
+        ObjectNode replay = IdentityChain.replay(reordered, chains.get(buttons.get(0)));
+        assertEquals("stable", replay.path("matched").asText(), "a stable id wins over the positional XPath");
+        assertHandle(replay, reordered, "save");
+        assertTrue(IdentityChain.chains(null, buttons).isEmpty());
+    }
+
+    private static void collect(DomNode node, String tag, java.util.List<DomNode> into) {
+        if (node == null) return;
+        if (tag.equals(node.tag())) into.add(node);
+        for (DomNode child : node.children) collect(child, tag, into);
+    }
+
     private static JsonNode snapshot(DomNode root) {
         return CompositeSnapshots.offline(root, SnapshotOptions.fromFlags(Map.of()));
     }

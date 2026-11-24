@@ -20,7 +20,7 @@ final class WorkbenchCliFlags {
     );
 
     static final List<String> AGENT = List.of(
-            "--json", "--human", "--human-override", "--expect", "--config", "--reseed", "--from-run",
+            "--json", "--human", "--human-override", "--refind", "--identity", "--expect", "--config", "--reseed", "--from-run",
             "--html", "--category", "--status",
             "--kind", "--scenario", "--cursor", "--fields",
             "--query", "--exposure", "--explain", "--promote-visual"
@@ -45,7 +45,7 @@ final class WorkbenchCliFlags {
             "act", List.of(
                     "--target", "--kind", "--query", "--ref", "--value", "--snap", "--pick",
                     "--run-id", "--agent", "--agent-id", "--fixture", "--timeout", "--condition", "--frame",
-                    "--group", "--sequence", "--exposure", "--purpose", "--file", "--human-override"
+                    "--group", "--sequence", "--exposure", "--purpose", "--file", "--human-override", "--refind", "--identity"
             ),
             "gc-runs", List.of("--dry-run")
     );

@@ -48,6 +48,39 @@ public final class IdentityChain {
         }
     }
 
+    /**
+     * The identity chain of each node, with uniqueness tallied over {@code root} the same way {@link #attach} does.
+     * Used when a live ref is minted so a stale ref can be re-found and a recorded element replayed.
+     */
+    public static Map<DomNode, JsonNode> chains(DomNode root, java.util.Collection<DomNode> nodes) {
+        Map<DomNode, JsonNode> out = new java.util.IdentityHashMap<>();
+        if (root == null || nodes == null || nodes.isEmpty()) return out;
+        for (DomNode node : nodes) {
+            if (node != null && (node.xpath == null || node.xpath.isBlank())) {
+                XPathIndex.assign(root);
+                break;
+            }
+        }
+        List<DomNode> elements = new ArrayList<>();
+        walk(root, elements);
+        Map<String, Integer> ids = new LinkedHashMap<>();
+        Map<String, Integer> testids = new LinkedHashMap<>();
+        Map<String, Integer> automation = new LinkedHashMap<>();
+        Map<String, Integer> roles = new LinkedHashMap<>();
+        for (DomNode node : elements) {
+            tally(ids, attr(node, "id"));
+            tally(testids, attr(node, "data-testid"));
+            String auto = attr(node, "data-uia-automation-id");
+            if (!auto.isBlank() && !auto.equals(attr(node, "id"))) tally(automation, auto);
+            tally(roles, roleKey(node));
+        }
+        for (DomNode node : nodes) {
+            if (node == null) continue;
+            out.put(node, identity(node, ids, testids, automation, roles, null, root).get("chain"));
+        }
+        return out;
+    }
+
     public static ObjectNode replay(DomNode root, JsonNode chain) {
         ObjectNode result = Jsons.object();
         result.put("matched", "none");

@@ -410,8 +410,42 @@ final class ConsumerReadyCommands {
         out.println("placed=" + placed);
         int waits = healthBody == null ? 0 : healthBody.path("waits").asInt(0);
         out.println("waits=" + waits);
+        String desktopFamily = dev.domengine.desktop.NativeDesktop.family();
+        String[] tokens = parsed.forwarded();
+        boolean desktop = tokens != null && java.util.Arrays.asList(tokens).contains("--desktop");
+        if (desktop) {
+            // doctor --desktop: each opt-in Grid desktop driver for this OS, running or not, and what is missing.
+            com.fasterxml.jackson.databind.node.ObjectNode drivers = dev.domengine.desktop.GridDrivers.report(System.getenv(), desktopFamily,
+                    dev.domengine.desktop.GridDrivers.httpProbe(), ConsumerReadyCommands::onPath);
+            out.println("desktopDriver=" + drivers.path("selected").asText("native"));
+            out.println("desktop=" + drivers);
+        }
+        // D11: the opt-in ONNX OCR runtime and model (setup ocr --runtime=onnx --confirm); nothing is loaded here.
+        java.nio.file.Path ocrDir = dev.domengine.query.OnnxOcrRuntime.dir();
+        java.util.List<String> ocrMissing = dev.domengine.query.OnnxOcrRuntime.missing(ocrDir);
+        out.println("ocrRuntime=" + (ocrMissing.isEmpty() ? "onnx installed (" + ocrDir + ")"
+                : "not installed (missing " + String.join(",", ocrMissing) + " in " + ocrDir + "; fix: setup ocr --runtime=onnx --confirm)"));
+        // D13: which attach routes are available right now. Plain doctor reads files only; --attach also probes 127.0.0.1.
+        boolean attach = tokens != null && java.util.Arrays.asList(tokens).contains("--attach");
+        com.fasterxml.jackson.databind.JsonNode routes = BrowserAttach.routesJson(attach);
+        StringBuilder summary = new StringBuilder();
+        BrowserAttach.summary(routes).forEach((route, ok) -> summary.append(summary.length() == 0 ? "" : ",").append(route).append(':').append(ok));
+        out.println("attachRoutes=" + summary + (attach ? "" : " (doctor --attach for discovery and fixes)"));
+        if (attach) out.println("attach=" + routes);
         log(project, session, "doctor health=" + health.status());
         return 0;
+    }
+
+    /** True when an executable of that name is on PATH (no process is started). */
+    static boolean onPath(String name) {
+        String path = System.getenv("PATH");
+        if (path == null) return false;
+        for (String dir : path.split(java.io.File.pathSeparator)) {
+            for (String suffix : new String[]{"", ".cmd", ".exe"}) {
+                if (Files.isExecutable(Path.of(dir, name + suffix))) return true;
+            }
+        }
+        return false;
     }
 
     /** Chrome or Chromium processes whose command line names this project and is not the live host. */

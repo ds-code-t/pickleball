@@ -44,6 +44,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/data-element-query-runtime.md`
 - `docs/data-values-and-elements.md`
 - `docs/date-time-utilities.md`
+- `docs/desktop-drivers.md`
 - `docs/diagnostic-lineage-metadata.md`
 - `docs/diagnostic-query.md`
 - `docs/diagnostic-reporting.md`
@@ -96,6 +97,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-collab-test/helper-brief.md`
 - `docs/maintainer/3.0.0-collab-test/human-notes.md`
 - `docs/maintainer/3.0.0-collab-test/plan.md`
+- `docs/maintainer/3.0.0-collab-test/recipe.md`
 - `docs/maintainer/3.0.0-composite-v2-design.md`
 - `docs/maintainer/3.0.0-composite-verbs-scoreboard.md`
 - `docs/maintainer/3.0.0-consumer-ready-handoff.md`
@@ -152,6 +154,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/object-registration.md`
 - `docs/pickleball-workbench-player.md`
 - `docs/pickleball-workbench.md`
+- `docs/playwright.md`
 - `docs/README.md`
 - `docs/release-notes.md`
 - `docs/reserved-element-names.md`
@@ -284,6 +287,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/io/cucumber/java/en/ReturnStep.java`
 - `src/main/java/io/cucumber/messages/types/InlinePickleArgument.java`
 - `src/main/java/tools/dscode/browser/AgentProtocolController.java`
+- `src/main/java/tools/dscode/browser/BackendHandoff.java`
 - `src/main/java/tools/dscode/browser/BidiAdapter.java`
 - `src/main/java/tools/dscode/browser/BindingListener.java`
 - `src/main/java/tools/dscode/browser/BrowserFacade.java`
@@ -294,6 +298,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/browser/JdkWebSocket.java`
 - `src/main/java/tools/dscode/browser/JsonRpc.java`
 - `src/main/java/tools/dscode/browser/PlaywrightAdapter.java`
+- `src/main/java/tools/dscode/browser/PlaywrightConnection.java`
 - `src/main/java/tools/dscode/browser/ProtocolSelector.java`
 - `src/main/java/tools/dscode/browser/ProtocolSocket.java`
 - `src/main/java/tools/dscode/browser/ProtocolSockets.java`
@@ -710,14 +715,20 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/internal/ValuesSupport.java`
 - `src/main/java/tools/dscode/launcher/AgentController.java`
 - `src/main/java/tools/dscode/launcher/AgentHop.java`
+- `src/main/java/tools/dscode/launcher/BrowserAttach.java`
 - `src/main/java/tools/dscode/launcher/CompositeCommands.java`
 - `src/main/java/tools/dscode/launcher/ConsumerReadyCommands.java`
 - `src/main/java/tools/dscode/launcher/LeaseHold.java`
+- `src/main/java/tools/dscode/launcher/OcrSetup.java`
 - `src/main/java/tools/dscode/launcher/PickleballWorkbenchLauncher.java`
 - `src/main/java/tools/dscode/launcher/PkbMain.java`
+- `src/main/java/tools/dscode/launcher/PlaywrightNode.java`
+- `src/main/java/tools/dscode/launcher/PwCommand.java`
 - `src/main/java/tools/dscode/launcher/QuietWarnings.java`
+- `src/main/java/tools/dscode/launcher/RelaunchWithDebug.java`
 - `src/main/java/tools/dscode/launcher/RunVarOverrides.java`
 - `src/main/java/tools/dscode/launcher/SessionHealthWait.java`
+- `src/main/java/tools/dscode/launcher/SetupCommand.java`
 - `src/main/java/tools/dscode/launcher/UrlKeys.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchAgentCommands.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchCliErrors.java`
@@ -875,6 +886,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/browser/CdpAdapterTest.java`
 - `src/test/java/tools/dscode/browser/FacadeContractTest.java`
 - `src/test/java/tools/dscode/browser/PlaywrightAdapterTest.java`
+- `src/test/java/tools/dscode/browser/PlaywrightCdpLiveTest.java`
+- `src/test/java/tools/dscode/browser/ProtocolSelectorPlaywrightTest.java`
 - `src/test/java/tools/dscode/browser/ProtocolSelectorTest.java`
 - `src/test/java/tools/dscode/browser/ScriptedSocket.java`
 - `src/test/java/tools/dscode/browser/SurfaceAssetsTest.java`
@@ -961,6 +974,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/composite/GeometryViewTest.java`
 - `src/test/java/tools/dscode/common/composite/IdentityReplayAdapterTest.java`
 - `src/test/java/tools/dscode/common/composite/LeanWaitNestLiveTest.java`
+- `src/test/java/tools/dscode/common/composite/live/CompositeSeleniumParityLiveTest.java`
 - `src/test/java/tools/dscode/common/composite/live/JavaEngineAdapterLiveTest.java`
 - `src/test/java/tools/dscode/common/composite/live/JavaEngineFlagsLiveTest.java`
 - `src/test/java/tools/dscode/common/composite/live/JavaEngineXPathLiveTest.java`
@@ -1058,6 +1072,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/AgentFastCliTest.java`
 - `src/test/java/tools/dscode/launcher/AskIdTest.java`
 - `src/test/java/tools/dscode/launcher/AutoSnapshotTest.java`
+- `src/test/java/tools/dscode/launcher/BackendHandoffLiveTest.java`
+- `src/test/java/tools/dscode/launcher/BrowserAttachTest.java`
 - `src/test/java/tools/dscode/launcher/BrowserLostRunIdTest.java`
 - `src/test/java/tools/dscode/launcher/BrowserStateTest.java`
 - `src/test/java/tools/dscode/launcher/ClickOnceTest.java`
@@ -1086,6 +1102,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/GuidanceCommandGoldenTest.java`
 - `src/test/java/tools/dscode/launcher/HousekeepingRoadmapTest.java`
 - `src/test/java/tools/dscode/launcher/HumanTierTest.java`
+- `src/test/java/tools/dscode/launcher/IdentityRefindTest.java`
 - `src/test/java/tools/dscode/launcher/JsFallbackHonestyTest.java`
 - `src/test/java/tools/dscode/launcher/MaskQuietTest.java`
 - `src/test/java/tools/dscode/launcher/NavigateDataFileTest.java`
@@ -1093,11 +1110,13 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/OffsetFrameClickTest.java`
 - `src/test/java/tools/dscode/launcher/OneCallActTest.java`
 - `src/test/java/tools/dscode/launcher/OopifAutoAttachTest.java`
+- `src/test/java/tools/dscode/launcher/OptInSetupTest.java`
 - `src/test/java/tools/dscode/launcher/OverlapTest.java`
 - `src/test/java/tools/dscode/launcher/PickleballWorkbenchLauncherTest.java`
 - `src/test/java/tools/dscode/launcher/PlacementNowTest.java`
 - `src/test/java/tools/dscode/launcher/PolishRoadmapTest.java`
 - `src/test/java/tools/dscode/launcher/PopupVerbCoverageTest.java`
+- `src/test/java/tools/dscode/launcher/PwCommandLiveTest.java`
 - `src/test/java/tools/dscode/launcher/RedirectedFrameTest.java`
 - `src/test/java/tools/dscode/launcher/RefLifetimeTest.java`
 - `src/test/java/tools/dscode/launcher/RefWaitTest.java`
@@ -1114,6 +1133,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/StoreCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/TargetAgnosticApiTest.java`
 - `src/test/java/tools/dscode/launcher/TargetCoverageTest.java`
+- `src/test/java/tools/dscode/launcher/TwoActorRecipeLiveTest.java`
 - `src/test/java/tools/dscode/launcher/VersionSwitchTest.java`
 - `src/test/java/tools/dscode/launcher/VirtualizedScrollTest.java`
 - `src/test/java/tools/dscode/launcher/VisibleFlagTest.java`
@@ -1672,8 +1692,11 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/desktop/DesktopAnnotations.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/DesktopScreenshot.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/DesktopTree.java`
+- `dom-engine/src/main/java/dev/domengine/desktop/DesktopXPathAccel.java`
+- `dom-engine/src/main/java/dev/domengine/desktop/GridDrivers.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/MacAccessibility.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/NativeDesktop.java`
+- `dom-engine/src/main/java/dev/domengine/desktop/PageSourceTree.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/WindowsUia.java`
 - `dom-engine/src/main/java/dev/domengine/EngineInfo.java`
 - `dom-engine/src/main/java/dev/domengine/image/TemplateMatch.java`
@@ -1707,6 +1730,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/query/OcrRuntime.java`
 - `dom-engine/src/main/java/dev/domengine/query/OnnxOcrRuntime.java`
 - `dom-engine/src/main/java/dev/domengine/query/package-info.java`
+- `dom-engine/src/main/java/dev/domengine/query/Perception.java`
 - `dom-engine/src/main/java/dev/domengine/query/Query.java`
 - `dom-engine/src/main/java/dev/domengine/query/QueryHooks.java`
 - `dom-engine/src/main/java/dev/domengine/query/Relations.java`
@@ -1755,6 +1779,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/desktop/DesktopOneMatchTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/DesktopScreenshotTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/DesktopSnapshotTest.java`
+- `dom-engine/src/test/java/dev/domengine/desktop/DesktopXPathAccelTest.java`
+- `dom-engine/src/test/java/dev/domengine/desktop/GridDriversTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/LiveDesktopSnapshotTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/LiveDesktopTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/MacAccessibilityScriptTest.java`
@@ -1795,6 +1821,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/query/HumanViewTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/NegativeRelationTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/OcrHookTest.java`
+- `dom-engine/src/test/java/dev/domengine/query/OnnxOcrRuntimeTest.java`
+- `dom-engine/src/test/java/dev/domengine/query/PerceptionTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/QueryLayerBoundaryTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/RelationTermParseTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/RelationTermTest.java`
@@ -2115,6 +2143,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/resources/conformance/site/variant/dpi.html`
 - `dom-engine/src/test/resources/conformance/site/variant/mobile.html`
 - `dom-engine/src/test/resources/conformance/site/variant/print.html`
+- `dom-engine/src/test/resources/desktop-drivers/flaui-notepad.xml`
+- `dom-engine/src/test/resources/desktop-drivers/mac2-textedit.xml`
 - `dom-engine/src/test/resources/fixtures/affinity-form.html`
 - `dom-engine/src/test/resources/fixtures/page.html`
 

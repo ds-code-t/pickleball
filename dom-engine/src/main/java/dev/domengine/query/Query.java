@@ -183,6 +183,15 @@ public final class Query {
                     one.put("weight", term.weight());
                 }
             }
+            ArrayNode perceived = null;
+            for (DomNode node : current) {
+                String decided = ViewMask.stage(node);
+                if (decided == null) continue;
+                if (perceived == null) perceived = result.putArray("perceived");
+                ObjectNode one = perceived.addObject();
+                one.put("id", node.id());
+                one.put("perceived", decided);
+            }
             result.set("rank", QueryHooks.explainRank(flags));
             result.put("premap", QueryHooks.premapStatus());
         }
@@ -493,6 +502,8 @@ public final class Query {
     static ObjectNode compositeJson(DomNode node, boolean geometry) {
         ObjectNode json = Jsons.object();
         json.put("id", node.id());
+        if (node.nodeName != null && !node.nodeName.isBlank()) json.put("node_name", node.nodeName.toLowerCase(java.util.Locale.ROOT));
+        if (node.liveState != null && node.liveState.path("value").isTextual()) json.put("value", node.liveState.path("value").asText());
         if (node.hasBox) json.set("bounds", box(node.x, node.y, node.width, node.height));
         String role = roleOf(node);
         if (!role.isEmpty()) json.put("role", role);
