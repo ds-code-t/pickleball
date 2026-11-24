@@ -1,6 +1,6 @@
 # Snapshot and pre-map
 
-`domengine premap --file page.html` writes a composite snapshot (`schema` `pickleball.composite-snapshot`, `version` 1, `transport` `fixture`). The builder always runs the pre-map. `domengine desktop snapshot` writes the same artifact for a desktop session. `domengine snapshot --session ID` (or `--cdp URL --i-accept-local-attach`) writes it for Chrome, Chromium, and Edge. The browser JSON adds `ok: true` and `document`, the pierced tree from `DomNode.toJson` (that object still contains `shadow_root`).
+`domengine premap --file page.html` writes a composite snapshot (`schema` `pickleball.composite-snapshot`, `version` 2, `transport` `fixture`). The builder always runs the pre-map. `domengine desktop snapshot` writes the same artifact for a desktop session. `domengine snapshot --session ID` (or `--cdp URL --i-accept-local-attach`) writes it for Chrome, Chromium, and Edge. The browser JSON adds `ok: true` and `document`, the pierced tree from `DomNode.toJson` (that object still contains `shadow_root`). Early 3.x still accepts a version 1 document that has no canonical tree. Producers emit version 2. `capabilities.snapshot_schema` stays 1.
 
 Logging uses `dev.domengine.log.EngineLog`. The entities are `snapshot`, `premap`, `affinity`, and `desktop-shot` (`DOMENGINE_LOG` or `COMPOSITE_LOG`). A protocol or tool fallback logs one WARN per run and reason through `SnapshotWarnings.once(reason)`.
 
@@ -25,13 +25,44 @@ The machine-readable schema is `dom-engine/src/main/resources/dev/domengine/snap
 
 Each `nodes[]` entry has `handle`, `parent`, `tag`, `role`, `name`, `text` (at most 200 characters), `value`, `attributes`, `states`, `frame_id`, `frame_path`, `shadow_path`, `xpath`, `path`, `boxes`, `in_viewport`, `interactable`, `capped`, `cap_reason`, `section_path`, and `paint`.
 
-`xpath` is absolute and index-qualified inside one frame document, for example `/html[1]/body[1]/form[1]/input[2]`. Inside a shadow tree it is the path from the shadow root, and `shadow_path` is the host XPath chain joined by ` >> `. `path` is the `backend_node_id`. The offline query engine rejects numeric index predicates, so `XPathIndex.resolve` is the resolver that honors them. The engine still finds the node when those indexes are removed.
+`xpath` is absolute and index-qualified inside one frame document, for example `/html[1]/body[1]/form[1]/input[2]`. Inside a shadow tree it is the path from the shadow root, and `shadow_path` is the host XPath chain joined by ` >> `. Browser `path` is the `backend_node_id`. Desktop `path` is `uia-runtime-id`, `ax-path`, or `atspi-path` when the capture wrote one. A version 2 node also carries `identity`. An absolute path whose every step is `tag[n]` is answered by `XPathIndex`, and a miss is zero hits. Other XPath 1.0 expressions evaluate on the canonical tree. An invalid expression is an error.
 
 Coordinate spaces are separate. Offline HTML fills `document_css_px` from `data-x`, `data-y`, `data-w`, and `data-h`. `layout_viewport`, `visual_viewport`, and `frame_document` stay null on that path. They are not copies of `document_css_px`. The CDP producer fills all four from one `DOMSnapshot.captureSnapshot` and `Page.getLayoutMetrics`. A desktop snapshot leaves `document_css_px` null and fills `screen_px` from the accessibility box.
 
 `image_px = (visual_viewport box) × image_scale`. `image_scale` is screenshot width divided by `viewport.css_width` (1 when there is no screenshot). When a screenshot is present and `visual_viewport` is null, offline HTML uses `document_css_px` and logs one warning, `snapshot fallback image_px used document_css_px`. Desktop snapshots are in screen space: `image_px` is the `screen_px` box minus the window origin, times `image_scale`, and that warning is not logged. The window origin is `viewport.screen`.
 
 Offline viewport size is the `html` or `body` box when that element has one, otherwise 1280 by 800. A desktop window with a box is the viewport when the tree has no `html` or `body` box. `--out-dir` writes `snapshot.json` and, when a screenshot was captured or `--screenshot` is set, `screenshot.png`. Without `--out-dir` the screenshot is inlined as `base64` and `path` names the file that was read.
+
+## Version 2
+
+Version 1 stays `$id` `urn:pickleball:composite-snapshot:1` and schema `dom-engine/src/main/resources/dev/domengine/snapshot/composite-snapshot.schema.json`. Version 2 is `$id` `urn:pickleball:composite-snapshot:2`, schema `composite-snapshot-v2.schema.json`, family name `pickleball.composite-snapshot`, and `version` 2. Version 2 adds `canonical`. `canonical.kind` `html` is browser HTML. `canonical.kind` `html-ish` is the desktop synthesis and requires `canonical.side`. `html` with `side` is an error. A version 1 document does not carry `canonical` or `identity`.
+
+Browser canonical HTML is one document per frame. An open or closed shadow root is `<template data-pkb-shadow="open|closed">`. An iframe stays in the parent and carries `data-pkb-frame`. The iframe document is a separate canonical frame. `CanonicalProjection` links that attribute and overlays live boxes, roles, names, and states onto the parsed tree, because raw HTML does not carry accessibility geometry.
+
+Desktop canonical HTML is synthesized from the UIA, AX, or AT-SPI tree. The role-to-tag map is `NativeDesktop.mapRole`. A capture root whose projected role is `desktop` is not emitted. Its children are the body. UIA `AutomationId` becomes `id` only when it matches `^[A-Za-z][A-Za-z0-9_:-]*$`, and it is always `data-uia-automation-id` for backend `uia`. UIA `ClassName` becomes `class` and `data-uia-class` for that backend only. Help text becomes `title`. Geometry is `data-x`, `data-y`, `data-w`, and `data-h`. `canonical.side.a11y_xml` is the same string as `source.text`. The native path stays on that side data. FlaUI.WebDriver is not added. An `input` or `img` that has children is written with an end tag, and the parser keeps those children. A void tag with no matching end tag stays empty, so the next sibling is not swallowed. A stray end tag does not stop the parse.
+
+`nodes[]` and `premap` are a projection of the canonical tree. They are not a second stored tree. Two builds of the same canonical HTML produce the same `nodes[]` and `premap`.
+
+### Replay identity
+
+Each version 2 `nodes[]` entry may carry `identity.chain`. The steps are tried in order. A missing source is omitted. Replay stops at the first hit and reports `matched` (`stable`, `native-path`, `fingerprint`, `xpath`, or `none`), the locator, and the zero-based chain index. `none` uses locator `""` and index `-1`. A step that now matches more than one node is not a hit.
+
+| Order | `kind` | Locator |
+|---|---|---|
+| 1 | `stable` | The first unique value among `id=<id>`, `data-testid=<value>`, `data-uia-automation-id=<value>` when that value was not copied to `id`, then `role=<role>[name="<name>"][section="<section>"]`. The name is the accessible name. A blank or non-unique value is skipped. Only one stable step is recorded. |
+| 2 | `native-path` | `uia-runtime-id`, `ax-path`, or `atspi-path` when the value is not all digits. A bare numeric id and a browser `backend_node_id` are not chain steps. |
+| 3 | `fingerprint` | `dhash=<unsigned>;text=<text>;rel=<x>,<y>,<w>,<h>`. dHash uses `TemplateMatch.prefilter` at 10 bits. Text is exact after trim. Each relative component must be within 0.05. A missing part is omitted. Missing dHash matches on text plus relative bounds. |
+| 4 | `xpath` | `xpath=<path>;shadow=<shadow>;frame=<frame>`, resolved by `XPathIndex.resolve`. |
+
+### Human and full-access masks
+
+The masks are applied before DSL, XPath, and CSS evaluation. They are cached per tree and document version. `exposure=human` keeps a node that is seen, scroll-reachable, or expand-reachable. Seen means the box intersects a known viewport, the node is displayed, and no later opaque box covers it when `data-paint-order` was stored. Scroll-reachable and expand-reachable are computed from stored boxes, scrollport sizes, and collapsed regions. The engine does not scroll or expand. A collapsed control with no stored region and no box is not reachable. `exposure=full` and `exposure=full-access` keep every node. A query with no exposure stays unfiltered so fixture queries keep their structural results. Real-use callers pass `exposure=human`. An action lookup sets `mask=off`, so a click or type still finds a target outside the human view. Human mode governs mouse and keyboard input only.
+
+### OCR
+
+`image=ocr` and `image=ocr:<text>` run `OcrHook` only for tag `img`, tag `svg`, role `img`, or role `image`. The cache key is the SHA-256 hex of the crop width, height, and pixels. One process cache is shared by both views. A hit returns the stored text and does not open the runtime. An element outside the human mask is not recognized and is not a cache miss. A full-access call can fill the cache. A later human call for the same hash uses that entry when the element is in the mask. `image=ocr` keeps non-blank text. `image=ocr:<text>` keeps an exact match. A query with no eligible element does not call the runtime.
+
+Runtime resolution is the `pkb_ocr_runtime` property, then env `PKB_OCR_RUNTIME`. A blank property falls through. A set property that is not an existing file does not. A directory is not a file. Unset, blank, or missing returns `ok` false, error `OCR runtime not installed`, code `ocr_runtime_missing`. This build does not download or execute a runtime. A text file whose first line is `pkb-ocr 1` maps a crop hash to the rest of that line. A hash with no line stores an empty string. Any other existing file returns `OCR runtime cannot be invoked`, code `ocr_runtime_unsupported`. Failures are not cached. The Microsoft-signed ONNX Runtime and a light model are flagged and not bundled.
 
 ## Label affinity
 

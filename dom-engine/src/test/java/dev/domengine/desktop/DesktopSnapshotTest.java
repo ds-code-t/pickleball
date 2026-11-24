@@ -5,20 +5,25 @@ import dev.domengine.cdp.CdpException;
 import dev.domengine.cli.CliResult;
 import dev.domengine.cli.DomEngineMain;
 import dev.domengine.json.Jsons;
+import dev.domengine.query.HtmlTree;
 import dev.domengine.snapshot.DesktopSnapshotProducer;
 import dev.domengine.snapshot.SnapshotDocuments;
 import dev.domengine.snapshot.SnapshotSchemas;
+import dev.domengine.tree.DomNode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DesktopSnapshotTest {
@@ -164,6 +169,60 @@ class DesktopSnapshotTest {
         assertEquals(10, go.path("boxes").path("screen_px").path("width").asDouble(), 0);
         assertTrue(go.path("boxes").path("document_css_px").isNull());
         assertTrue(go.path("xpath").asText().contains("["));
+    }
+
+    @Test
+    void textboxChildStaysInsideTheControlAndAStrayCloseReturns() throws Exception {
+        Path fixture = Files.createTempFile("desktop-void", ".json");
+        Files.writeString(fixture, """
+                {"role":"window","name":"W","x":0,"y":0,"width":100,"height":40,"children":[
+                  {"role":"textbox","name":"Name","value":"Ada","x":1,"y":1,"width":40,"height":12,"children":[
+                    {"role":"button","name":"Inner","x":2,"y":2,"width":8,"height":8}
+                  ]},
+                  {"role":"button","name":"After","x":50,"y":1,"width":8,"height":8}
+                ]}
+                """);
+        DesktopTree.Session attached = DesktopTree.attach("syn-void", fixture);
+        DesktopTree.Session named = new DesktopTree.Session(
+                attached.id(), attached.backend(), attached.root(), false, "windows", "", attached.sequence());
+        Path png = Files.createTempFile("syn-void-shot", ".png");
+        Files.write(png, Base64.getDecoder().decode(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="));
+        JsonNode json = DesktopSnapshotProducer.produce(named, java.util.Map.of("screenshot", png.toString()));
+        String html = frameHtml(json);
+        assertTrue(html.contains("</input>"), html);
+        assertTrue(html.contains(">After<"), html);
+        JsonNode inner = null;
+        JsonNode after = null;
+        for (JsonNode node : json.path("nodes")) {
+            if ("Inner".equals(node.path("name").asText())) inner = node;
+            if ("After".equals(node.path("name").asText())) after = node;
+        }
+        assertNotNull(inner, json.path("nodes").toString());
+        assertNotNull(after, json.path("nodes").toString());
+        assertTrue(inner.path("xpath").asText().contains("input"), inner.path("xpath").asText());
+        assertFalse(after.path("xpath").asText().contains("input"), after.path("xpath").asText());
+
+        DomNode parsed = assertTimeoutPreemptively(Duration.ofSeconds(2), () -> HtmlTree.parse(
+                "<html><body></div><p id=\"kept\">ok</p>"
+                        + "<input><button id=\"in\">In</button></input>"
+                        + "<button id=\"sib\">Sib</button></body></html>"));
+        assertNotNull(elementById(parsed, "kept"));
+        DomNode in = elementById(parsed, "in");
+        DomNode sib = elementById(parsed, "sib");
+        assertEquals("input", in.parent.localName);
+        assertFalse("input".equals(sib.parent.localName));
+        DomNode bare = HtmlTree.parse("<html><body><input type=\"text\"><button id=\"next\">N</button></body></html>");
+        assertEquals("body", elementById(bare, "next").parent.localName);
+    }
+
+    private static DomNode elementById(DomNode node, String id) {
+        if (node.nodeType == 1 && id.equals(node.attributes.get("id"))) return node;
+        for (DomNode child : node.children) {
+            DomNode found = elementById(child, id);
+            if (found != null) return found;
+        }
+        return null;
     }
 
     private static void assertDesktopRootIsNotEmitted() throws Exception {

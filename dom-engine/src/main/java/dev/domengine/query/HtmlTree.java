@@ -3,6 +3,7 @@ package dev.domengine.query;
 import dev.domengine.tree.ContextWalker;
 import dev.domengine.tree.DomNode;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -42,8 +43,14 @@ public final class HtmlTree {
         root.backendNodeId = nextId++;
         root.nodeId = root.backendNodeId;
         while (index < html.length()) {
+            if (startsWith("</")) {
+                skipEnd();
+                continue;
+            }
+            int mark = index;
             DomNode child = readNode();
             if (child != null) root.children.add(child);
+            else if (index == mark) index++;
         }
         return root;
     }
@@ -78,7 +85,7 @@ public final class HtmlTree {
         boolean selfClose = index < html.length() && html.charAt(index) == '/';
         if (selfClose) index++;
         if (index < html.length() && html.charAt(index) == '>') index++;
-        if (selfClose || VOID.contains(node.localName)) {
+        if (selfClose || (VOID.contains(node.localName) && !explicitEnd(node.localName))) {
             if ("iframe".equals(node.localName)) adoptSrcdoc(node);
             return node;
         }
@@ -189,6 +196,81 @@ public final class HtmlTree {
             else break;
         }
         return html.substring(start, index);
+    }
+
+    private void skipEnd() {
+        index += 2;
+        readName();
+        int end = html.indexOf('>', index);
+        index = end < 0 ? html.length() : end + 1;
+    }
+
+    /**
+     * A void tag with a matching end tag is a container. Desktop HTML-ish writes
+     * {@code <input>} and {@code <img>} that way when the control has children.
+     * A void tag with no matching end tag stays empty, so a following sibling is not swallowed.
+     */
+    private boolean explicitEnd(String name) {
+        int i = index;
+        ArrayDeque<String> stack = new ArrayDeque<>();
+        while (i < html.length()) {
+            int lt = html.indexOf('<', i);
+            if (lt < 0) return false;
+            if (region(lt, "<!--")) {
+                int end = html.indexOf("-->", lt + 4);
+                i = end < 0 ? html.length() : end + 3;
+                continue;
+            }
+            if (region(lt, "</")) {
+                int nameStart = lt + 2;
+                int nameEnd = nameStart;
+                while (nameEnd < html.length() && isName(html.charAt(nameEnd))) nameEnd++;
+                String close = html.substring(nameStart, nameEnd);
+                int gt = html.indexOf('>', nameEnd);
+                i = gt < 0 ? html.length() : gt + 1;
+                if (stack.isEmpty()) return close.equalsIgnoreCase(name);
+                while (!stack.isEmpty() && !stack.removeFirst().equalsIgnoreCase(close)) {
+                    // drop unmatched open tags until the close lines up
+                }
+                continue;
+            }
+            if (region(lt, "<!")) {
+                int gt = html.indexOf('>', lt + 2);
+                i = gt < 0 ? html.length() : gt + 1;
+                continue;
+            }
+            int nameStart = lt + 1;
+            int nameEnd = nameStart;
+            while (nameEnd < html.length() && isName(html.charAt(nameEnd))) nameEnd++;
+            String open = html.substring(nameStart, nameEnd);
+            int j = nameEnd;
+            boolean self = false;
+            while (j < html.length()) {
+                char c = html.charAt(j);
+                if (c == '"' || c == '\'') {
+                    int quote = html.indexOf(c, j + 1);
+                    j = quote < 0 ? html.length() : quote + 1;
+                    continue;
+                }
+                if (c == '>') {
+                    self = j > nameEnd && html.charAt(j - 1) == '/';
+                    j++;
+                    break;
+                }
+                j++;
+            }
+            i = j;
+            if (!open.isEmpty() && !self) stack.addFirst(open);
+        }
+        return false;
+    }
+
+    private boolean region(int at, String token) {
+        return html.regionMatches(true, at, token, 0, token.length());
+    }
+
+    private static boolean isName(char c) {
+        return Character.isLetterOrDigit(c) || c == '-' || c == ':' || c == '_';
     }
 
     private void skipSpace() {
