@@ -858,6 +858,10 @@ public final class TargetVerb {
                 failed.body().put("used", effect.used());
                 // A key was sent to the focused node. Only a click or hover that never reached the page is undispatched.
                 failed.body().put("dispatched", "press".equals(kind));
+                if (hiddenByAncestor(node) || !node.displayed) {
+                    failed.body().put("visible", false);
+                    failed.body().put("reason", "hidden: the control is inside a collapsed or hidden container");
+                }
                 stamp(failed.body(), page.session.connection(), node);
                 putEntered(failed.body(), runId, page.session.connection());
                 putShadow(failed.body(), node);
@@ -1385,9 +1389,10 @@ public final class TargetVerb {
         try {
             ObjectNode params = Jsons.object();
             params.put("expression", "(function(){var l=document.querySelector('pkb-layer[data-pkb-layer]');"
-                    + "var r=l&&l.shadowRoot;var p=r&&r.querySelector('.pkb-panel');"
+                    + "var r=l&&l.shadowRoot;var p=r&&(r.querySelector('section[data-pkb-panel]')||r.querySelector('.pkb-panel'));"
                     + "var want=document.documentElement.getAttribute('data-pkb-panel-want');"
-                    + "if(p) return 'open'; return want==='open'?'pending':'';})()");
+                    + "if(p) return (p.hidden||getComputedStyle(p).display==='none')?'collapsed':'open';"
+                    + "return want==='open'?'pending':'';})()");
             params.put("returnByValue", true);
             return cdp.call("Runtime.evaluate", params, Duration.ofSeconds(3)).path("result").path("value").asText("");
         } catch (RuntimeException failure) {
@@ -2191,8 +2196,9 @@ public final class TargetVerb {
                 + "function(){"
                 + "function chain(outer,node){var cursor=node,hops=0;"
                 + "while(cursor&&hops++<30){if(cursor===outer)return true;"
+                + "if(cursor.parentElement){cursor=cursor.parentElement;continue;}"
                 + "var root=cursor.getRootNode?cursor.getRootNode():null;"
-                + "if(root&&root.host)cursor=root.host;else cursor=cursor.parentElement;}"
+                + "cursor=root&&root.host?root.host:null;}"
                 + "return false;}"
                 + "try{var el=this;if(!el||!el.getBoundingClientRect)return '';"
                 + "var r=el.getBoundingClientRect();if(r.width<1||r.height<1)return '';"
@@ -3668,7 +3674,7 @@ public final class TargetVerb {
                 CHAINS.put(ref, chain);
                 CHAINS.put(shortId, chain);
             }
-            boolean visible = node.displayed && !node.states.contains("hidden");
+            boolean visible = node.displayed && !node.states.contains("hidden") && !hiddenByAncestor(node);
             boolean enabled = !node.states.contains("disabled") && !node.attributes.containsKey("disabled");
             String roleName = role(node);
             String tag = node.tag();
@@ -3975,6 +3981,19 @@ public final class TargetVerb {
      * The same shown-or-not answer {@code explain} puts on {@code report.visible}.
      * A covering mask is not shown. A node with no box yet keeps {@code displayed}.
      */
+    /**
+     * A node under a {@code display:none}, {@code hidden}, or otherwise undisplayed ancestor (through shadow hosts)
+     * is not visible even though its own computed style is. A minimized panel hides its card this way.
+     */
+    static boolean hiddenByAncestor(DomNode node) {
+        int hops = 0;
+        for (DomNode up = node == null ? null : node.parent; up != null && hops++ < 200; up = up.parent) {
+            if (!up.displayed) return true;
+            if (up.attributes != null && up.attributes.containsKey("hidden")) return true;
+        }
+        return false;
+    }
+
     static boolean sameVisibility(DomNode node, boolean covered) {
         if (node == null || covered) return false;
         if (node.states.contains("hidden")) return false;

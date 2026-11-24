@@ -1190,6 +1190,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/RefLifetimeTest.java`
 - `src/test/java/tools/dscode/launcher/RefWaitTest.java`
 - `src/test/java/tools/dscode/launcher/Release218RecommendationsTest.java`
+- `src/test/java/tools/dscode/launcher/RetestFixesLiveTest.java`
 - `src/test/java/tools/dscode/launcher/RouteLiveTest.java`
 - `src/test/java/tools/dscode/launcher/ScreencastLiveTest.java`
 - `src/test/java/tools/dscode/launcher/SecretRedactionTest.java`

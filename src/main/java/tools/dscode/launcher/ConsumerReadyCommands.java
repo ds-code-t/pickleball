@@ -459,7 +459,7 @@ final class ConsumerReadyCommands {
         if (cdp == null) cdp = PwCommand.liveEndpoint(project);
         if (bidi == null) bidi = tools.dscode.browser.BrowserProtocols.setting("pkb_bidi_endpoint");
         if (cdp == null && bidi == null) {
-            out.println("protocols=none (no live browser; fix: start or attach a browser, or pass --cdp-endpoint= / --bidi-endpoint=)");
+            out.println("protocols=none (no browser attached; fix: start or attach a browser, or pass --cdp-endpoint= / --bidi-endpoint=)");
             return;
         }
         tools.dscode.browser.BrowserProtocols protocols = tools.dscode.browser.BrowserProtocols.probe(cdp, bidi);
