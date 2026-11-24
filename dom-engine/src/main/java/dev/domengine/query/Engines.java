@@ -219,7 +219,7 @@ public final class Engines {
 
     private static void collectIndex(DomNode scope, String expr, List<DomNode> hits) {
         DomNode found = XPathIndex.resolve(scope, expr, "");
-        if (found != null) hits.add(found);
+        if (found != null && ViewMask.allows(found)) hits.add(found);
     }
 
     /**
@@ -252,7 +252,7 @@ public final class Engines {
                 Node node = list.item(i);
                 if (!(node instanceof Element element)) continue;
                 Object data = element.getUserData(XML_NODE);
-                if (data instanceof DomNode dom) hits.add(dom);
+                if (data instanceof DomNode dom && ViewMask.allows(dom)) hits.add(dom);
             }
             return hits;
         } catch (XPathExpressionException | ParserConfigurationException failure) {
@@ -1063,7 +1063,7 @@ public final class Engines {
     private static void collectLight(DomNode scope, List<DomNode> into, boolean descend) {
         for (DomNode child : scope.children) {
             if (child.nodeType != 1 || child.shadowRoot) continue;
-            into.add(child);
+            if (ViewMask.allows(child)) into.add(child);
             if (descend && !child.iframe) collectLight(child, into, true);
             else if (scope.iframe && descend) collectLight(child, into, true);
         }

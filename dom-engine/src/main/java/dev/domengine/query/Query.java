@@ -52,9 +52,11 @@ public final class Query {
         DomNode scoped = Frames.scope(root, flags);
         String withinId = flags.get("within");
         if (withinId != null && !withinId.isBlank()) LiveXPath.within(findId(scoped, withinId));
+        ViewMask.install(scoped, flags);
         try {
             return runArmed(scoped, flags);
         } finally {
+            ViewMask.clear();
             LiveXPath.within(null);
             if (armed) Engines.useViewport(null);
             if (human) Engines.useSpace(null);
@@ -134,6 +136,7 @@ public final class Query {
         current = nth(current, flags.get("nth"), flags.get("every"));
         if (point) current = hitAt(root, flags.get("point"));
         current = limit(current, flags.get("limit"));
+        current = ViewMask.retain(current);
         boolean geometry = "true".equals(flags.get("geometry"));
         boolean explain = "true".equals(flags.get("explain"));
         boolean countOnly = "true".equals(flags.get("count-only"));
