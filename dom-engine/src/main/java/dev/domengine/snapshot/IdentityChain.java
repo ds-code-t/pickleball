@@ -47,6 +47,7 @@ public final class IdentityChain {
     public static ObjectNode replay(DomNode root, JsonNode chain) {
         ObjectNode result = Jsons.object();
         result.put("matched", "none");
+        result.putNull("handle");
         result.put("locator", "");
         result.put("index", -1);
         if (root == null || chain == null || !chain.isArray()) return result;
@@ -57,6 +58,8 @@ public final class IdentityChain {
             DomNode hit = match(root, elements, step);
             if (hit != null) {
                 result.put("matched", step.path("kind").asText(""));
+                result.put("handle", hit.id());
+                if (hit.backendNodeId > 0) result.put("backend_node_id", hit.backendNodeId);
                 result.put("locator", step.path("locator").asText(""));
                 result.put("index", index);
                 return result;

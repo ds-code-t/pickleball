@@ -30,12 +30,14 @@ class IdentityChainTest {
         assertEquals("data-testid=next", step(nodes, "next", 0));
         assertEquals("data-uia-automation-id=9no", step(nodes, "9no", 0));
         assertEquals("data-testid=one", step(nodes, "one", 0));
-        ObjectNode replay = IdentityChain.replay(tree("""
+        DomNode live = tree("""
                 <html data-w="200" data-h="100"><body><button id="save">Save</button></body></html>
-                """), chain(nodes, "save"));
+                """);
+        ObjectNode replay = IdentityChain.replay(live, chain(nodes, "save"));
         assertEquals("stable", replay.path("matched").asText());
         assertEquals("id=save", replay.path("locator").asText());
         assertEquals(0, replay.path("index").asInt());
+        assertHandle(replay, live, "save");
     }
 
     @Test
@@ -66,6 +68,7 @@ class IdentityChainTest {
         ObjectNode nativeHit = IdentityChain.replay(same, nativeChain);
         assertEquals("native-path", nativeHit.path("matched").asText());
         assertEquals(0, nativeHit.path("index").asInt());
+        assertHandle(nativeHit, same, "r.1");
 
         JsonNode fingerChain = chain(nodes, "Stop");
         assertEquals("fingerprint", fingerChain.get(0).path("kind").asText(), fingerChain.toString());
@@ -79,6 +82,7 @@ class IdentityChainTest {
         paint(moved, "Stop", 0xF7L);
         ObjectNode fingerHit = IdentityChain.replay(moved, fingerChain);
         assertEquals("fingerprint", fingerHit.path("matched").asText(), fingerHit.toString());
+        assertHandle(fingerHit, moved, "Stop");
 
         DomNode renamed = tree("""
                 <html data-w="200" data-h="100"><body>
@@ -90,10 +94,13 @@ class IdentityChainTest {
         ObjectNode xpathHit = IdentityChain.replay(renamed, fingerChain);
         assertEquals("xpath", xpathHit.path("matched").asText(), xpathHit.toString());
         assertTrue(xpathHit.path("index").asInt() > 0);
+        assertHandle(xpathHit, renamed, "Other");
 
         ObjectNode none = IdentityChain.replay(tree("<html><body></body></html>"), fingerChain);
         assertEquals("none", none.path("matched").asText());
         assertEquals(-1, none.path("index").asInt());
+        assertTrue(none.path("handle").isNull());
+        assertTrue(none.path("backend_node_id").isMissingNode() || none.path("backend_node_id").isNull());
     }
 
     private static JsonNode snapshot(DomNode root) {
@@ -120,6 +127,42 @@ class IdentityChainTest {
 
     private static String step(JsonNode nodes, String marker, int index) {
         return chain(nodes, marker).get(index).path("locator").asText();
+    }
+
+    /** The handle is the same id written on nodes[].handle. backend_node_id is present only when positive. */
+    private static void assertHandle(ObjectNode replay, DomNode root, String marker) {
+        DomNode node = element(root, marker);
+        assertEquals(node.id(), replay.path("handle").asText(), replay.toString());
+        if (node.backendNodeId > 0) assertEquals(node.backendNodeId, replay.path("backend_node_id").asLong());
+        else assertTrue(replay.path("backend_node_id").isMissingNode() || replay.path("backend_node_id").isNull());
+    }
+
+    private static DomNode element(DomNode node, String marker) {
+        if (node != null && node.nodeType == 1) {
+            String runtime = node.attributes.get("uia-runtime-id");
+            if (marker.equals(node.attributes.get("id"))
+                    || marker.equals(node.attributes.get("data-testid"))
+                    || marker.equals(node.attributes.get("data-uia-automation-id"))
+                    || marker.equals(runtime)
+                    || marker.equals(HtmlTree.textOf(node).trim())) {
+                boolean own = marker.equals(node.attributes.get("id"))
+                        || marker.equals(node.attributes.get("data-testid"))
+                        || marker.equals(node.attributes.get("data-uia-automation-id"))
+                        || marker.equals(runtime);
+                if (own || !hasElementChild(node)) return node;
+            }
+        }
+        if (node == null) return null;
+        for (DomNode child : node.children) {
+            DomNode found = element(child, marker);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    private static boolean hasElementChild(DomNode node) {
+        for (DomNode child : node.children) if (child.nodeType == 1) return true;
+        return false;
     }
 
     private static void paint(DomNode node, String marker, long dhash) {
