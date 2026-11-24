@@ -94,6 +94,29 @@ class RetestFixesLiveTest {
         assertTrue(polled.path("items").toString().contains("#upload-file"), polled.toString());
     }
 
+    /** R5: guide steps the human-locked run completes say by=human, events name that run, and the pane shows done. */
+    @Test
+    void humanGuideStepsAreAttributedToTheHumanRun() throws Exception {
+        String cursor = JSON.readTree(agent("ui-poll", "--after=0").out).path("next").asText();
+        Path steps = temp.resolve("steps.json");
+        Files.writeString(steps, "[{\"t\":\"#go\",\"say\":\"Click Go\",\"do\":\"click\"}]");
+        assertEquals(0, agent("guide", "--steps=@" + steps, "--id=gh").code);
+        assertEquals(0, human("act", "--target=browser:auto", "--kind=click", "--query=Go").code);
+        JsonNode step = null;
+        for (int i = 0; i < 10 && step == null; i++) {
+            JsonNode polled = JSON.readTree(agent("ui-poll", "--after=" + cursor, "--wait=2").out);
+            cursor = polled.path("next").asText(cursor);
+            for (JsonNode item : polled.path("items")) if ("step".equals(item.path("type").asText())) step = item;
+        }
+        assertTrue(step != null, "a step event arrives");
+        assertEquals("human", step.path("by").asText(), step.toString());
+        assertEquals("human", step.path("run").asText(), step.toString());
+        assertEquals(0, agent("panel-open", "--tab=guide").code);
+        JsonNode pane = JSON.readTree(agent("find", "--target=browser:auto", "--query=No guide yet", "--exposure=full").out);
+        assertFalse(pane.path("ok").asBoolean(false), "a finished guide shows its done state: " + pane);
+        assertEquals(0, agent("panel-open", "--tab=chat").code);
+    }
+
     static JsonNode row(JsonNode snap, String name) {
         for (JsonNode item : snap.path("items")) if (name.equals(item.path("name").asText())) return item;
         return JSON.createObjectNode();

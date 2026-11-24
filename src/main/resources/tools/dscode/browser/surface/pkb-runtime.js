@@ -1287,12 +1287,28 @@
     badge.setAttribute('data-pkb-badge', show);
   }
 
+  var finishedGuide = null;
   function stepsList() {
     metaPurpose = 'guide';
     if (!panel) return;
     guideBadge();
     var pane = panel.stepsPane;
     pane.textContent = '';
+    if (!guides.size && finishedGuide) {
+      var done = el('div', 'pkb-guide-done', 'Guide done: ' + finishedGuide.says.length + ' of ' + finishedGuide.says.length + ' steps completed.');
+      done.setAttribute('data-pkb-guide-done', finishedGuide.id);
+      pane.appendChild(done);
+      var doneList = el('ol', 'pkb-steps');
+      finishedGuide.says.forEach(function (say, i) {
+        var row = el('li', 'pkb-step');
+        row.setAttribute('data-state', 'done');
+        row.appendChild(el('span', 'pkb-num', '\u2713'));
+        row.appendChild(el('span', 'pkb-say', say || ('Step ' + (i + 1))));
+        doneList.appendChild(row);
+      });
+      pane.appendChild(doneList);
+      return;
+    }
     if (!guides.size) { pane.appendChild(el('div', 'pkb-empty', 'No guide yet.')); return; }
     guides.forEach(function (g) {
       var list = el('ol', 'pkb-steps');
@@ -1380,6 +1396,7 @@
     g.pulse = true;
     if (g.current >= g.steps.length) {
       pushEvent({type: 'guide', g: g.id, done: true, by: ev.by});
+      finishedGuide = {id: g.id, by: ev.by, says: g.steps.map(function (st) { return st.say || st.t || ''; })};
       guideClose(g.id);
       return;
     }
