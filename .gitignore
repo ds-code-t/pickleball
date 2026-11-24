@@ -58,3 +58,6 @@ maven-consumer-project/reports/
 ### A normal consumer test still writes reports/ inside that project.
 /reports/
 
+
+__pycache__/
+*.pyc
