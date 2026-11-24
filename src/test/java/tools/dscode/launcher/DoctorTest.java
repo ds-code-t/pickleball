@@ -42,6 +42,7 @@ class DoctorTest {
         assertTrue(out.contains("orphans="), out);
         assertTrue(out.contains("frame="), out);
         assertTrue(out.contains("placed="), out);
+        assertTrue(out.contains("waits=0"), out);
     }
 
     @Test

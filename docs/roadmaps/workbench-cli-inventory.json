@@ -14,6 +14,7 @@
     ],
     "agentCore": [
       "act",
+      "answer-wait",
       "arrow",
       "ask",
       "ask-and-wait",

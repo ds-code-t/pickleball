@@ -231,6 +231,8 @@ final class UiBatch {
             after = Integer.toString(stored);
         }
         String chatAfter = args.get("chat-after");
+        String wantId = args.get("id");
+        boolean wantAnswer = wantId != null && !wantId.isBlank();
         long deadline = System.nanoTime() + waitMillis * 1_000_000L;
         while (true) {
             Map<String, String> eventArgs = new LinkedHashMap<>();
@@ -262,13 +264,30 @@ final class UiBatch {
             chatRows.removeIf(row -> "agent".equals(row.get("source")));
             chatRows.removeIf(UiBatch::overlayEcho);
             List<Map<String, String>> agentEvents = eventRows(chat.exit() == 0 ? chat.body().get("agentEvents") : null);
-            if (!eventRows.isEmpty() || !chatRows.isEmpty() || !agentEvents.isEmpty() || System.nanoTime() >= deadline) {
+            String matched = wantAnswer ? choiceFor(eventRows, wantId) : null;
+            if (matched == null && wantAnswer) {
+                Map<String, String> stored = AnswerRecovery.find(project, runId, 0L, wantId, List.of());
+                if (stored != null && stored.get("value") != null && !stored.get("value").isBlank()) {
+                    matched = stored.get("value");
+                }
+            }
+            boolean due = System.nanoTime() >= deadline;
+            boolean ready = wantAnswer
+                    ? matched != null || due
+                    : !eventRows.isEmpty() || !chatRows.isEmpty() || !agentEvents.isEmpty() || due;
+            if (ready) {
                 UiState.sync(project, runId, args);
                 Map<String, Object> body = new LinkedHashMap<>();
                 body.put("ok", true);
                 body.put("events", eventRows);
                 if (!chatRows.isEmpty()) body.put("chat", chatRows);
                 if (!agentEvents.isEmpty()) body.put("agentEvents", agentEvents);
+                if (matched != null) {
+                    body.put("id", wantId);
+                    body.put("value", matched);
+                    body.put("choice", matched);
+                    body.put("applied", true);
+                }
                 body.put("next", events.body().get("next"));
                 List<?> raw = chat.exit() == 0 && chat.body().get("messages") instanceof List<?> list ? list : List.of();
                 if (!raw.isEmpty() && raw.get(raw.size() - 1) instanceof Map<?, ?> last && last.get("id") != null) {
@@ -280,6 +299,22 @@ final class UiBatch {
             }
             Thread.sleep(250);
         }
+    }
+
+    /** The clicked label for this question id, or null when this batch is a different event. */
+    private static String choiceFor(List<Map<String, Object>> rows, String id) {
+        if (rows == null || id == null || id.isBlank()) return null;
+        for (Map<String, Object> row : rows) {
+            if (row == null || !id.equals(String.valueOf(row.get("id")))) continue;
+            String type = String.valueOf(row.get("type"));
+            String event = String.valueOf(row.get("event"));
+            if (!"answer".equals(type) && !"answer".equals(event)) continue;
+            Object choice = row.get("choice");
+            if (choice == null) choice = row.get("value");
+            if (choice == null || String.valueOf(choice).isBlank()) continue;
+            return String.valueOf(choice);
+        }
+        return null;
     }
 
     /** Overlay drain fails once Chrome's page socket is gone. The poll still returns agent events. */

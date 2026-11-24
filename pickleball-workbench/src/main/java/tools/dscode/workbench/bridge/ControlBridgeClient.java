@@ -418,6 +418,7 @@ public final class ControlBridgeClient {
 
     private static boolean waits(String op) {
         return "chat-turn".equals(op) || "chat_wait".equals(op) || "ask-and-wait".equals(op)
+                || "answer-wait".equals(op) || "ui-poll".equals(op)
                 || "watch".equals(op) || "wait".equals(op) || "wait-for".equals(op);
     }
 

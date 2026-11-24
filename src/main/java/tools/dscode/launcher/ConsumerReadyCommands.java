@@ -408,6 +408,8 @@ final class ConsumerReadyCommands {
         int placed = healthBody == null ? 0 : healthBody.path("placed").asInt(0);
         out.println("frame=" + frame);
         out.println("placed=" + placed);
+        int waits = healthBody == null ? 0 : healthBody.path("waits").asInt(0);
+        out.println("waits=" + waits);
         log(project, session, "doctor health=" + health.status());
         return 0;
     }
