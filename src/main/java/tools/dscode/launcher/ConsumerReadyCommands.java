@@ -510,6 +510,8 @@ final class ConsumerReadyCommands {
         if (project == null || !Files.isDirectory(proc)) return "none";
         String needle = project.toAbsolutePath().normalize().toString();
         List<String> found = new ArrayList<>();
+        java.util.Set<Long> live = new java.util.HashSet<>();
+        if (chromePid > 0) ProcessHandle.of(chromePid).ifPresent(main -> main.descendants().forEach(one -> live.add(one.pid())));
         try (var children = Files.list(proc)) {
             for (Path child : children.toList()) {
                 String name = child.getFileName().toString();
@@ -520,7 +522,7 @@ final class ConsumerReadyCommands {
                 } catch (NumberFormatException ignored) {
                     continue;
                 }
-                if (pid == chromePid || pid == ProcessHandle.current().pid()) continue;
+                if (pid == chromePid || pid == ProcessHandle.current().pid() || live.contains(pid)) continue;
                 String command;
                 try {
                     command = Files.readString(child.resolve("cmdline")).replace('\0', ' ');
@@ -530,6 +532,8 @@ final class ConsumerReadyCommands {
                 String lower = command.toLowerCase(Locale.ROOT);
                 if (!lower.contains("chrome") && !lower.contains("chromium")) continue;
                 if (!command.contains(needle) || !lower.contains("pickleball")) continue;
+                // Renderer, GPU, and utility children (--type=) belong to their browser; the browser is the orphan.
+                if (command.contains(" --type=")) continue;
                 found.add(Long.toString(pid));
             }
         } catch (IOException ignored) {

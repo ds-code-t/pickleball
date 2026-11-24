@@ -1639,6 +1639,7 @@
     } else {
       field = el('input');
       field.type = spec.sensitive ? 'password' : 'text';
+      field.name = 'pkb-answer';
       field.setAttribute('aria-label', String(spec.say || 'Answer'));
       if (spec.placeholder) field.placeholder = String(spec.placeholder);
       node.appendChild(field);
@@ -1675,6 +1676,8 @@
       trail.forEach(function (r) { if (r && r.id === key) row = r; });
       if (!row) { row = {id: key, title: String(title || '').slice(0, 80), at: Date.now()}; trail.push(row); }
       if (row.state === 'answered' && state === 'closed') return;
+      // A re-ask under the same id is a new card: its title is current and the old choice is gone.
+      if (state === 'open') { if (title) row.title = String(title).slice(0, 80); delete row.choice; row.at = Date.now(); }
       row.state = state;
       if (choice) row.choice = String(choice).slice(0, 80);
       row.changed = Date.now();
@@ -2388,6 +2391,8 @@
     var composer = el('form', 'pkb-composer');
     composer.setAttribute('autocomplete', 'off');
     var input = el('textarea');
+    // A name keeps DevTools from filing the panel's own field as a form issue on the host page.
+    input.name = 'pkb-message';
     input.rows = 1;
     input.placeholder = 'Message the agent (Enter to send, Shift+Enter for a new line)';
     input.setAttribute('aria-label', 'Message');
@@ -3409,7 +3414,7 @@
       + '</style></head><body><header><strong>' + title + '</strong>'
       + '<button type="button" id="pkb-popin" data-pkb-meta="true" data-pkb-purpose="' + purpose + '" data-action="popin">Pop in</button></header>'
       + '<div id="pkb-list" data-pkb-meta="true" data-pkb-purpose="' + purpose + '"></div>'
-      + (kind === 'chat' ? '<form id="pkb-composer" data-pkb-meta="true" data-pkb-purpose="' + purpose + '"><textarea aria-label="Message"></textarea><button type="submit" data-pkb-meta="true">Send</button></form>' : '<div data-pkb-meta="true"><button type="button" id="pkb-add" data-pkb-meta="true" data-pkb-purpose="' + purpose + '" data-action="add">Add step</button></div>')
+      + (kind === 'chat' ? '<form id="pkb-composer" data-pkb-meta="true" data-pkb-purpose="' + purpose + '"><textarea name="pkb-message" aria-label="Message"></textarea><button type="submit" data-pkb-meta="true">Send</button></form>' : '<div data-pkb-meta="true"><button type="button" id="pkb-add" data-pkb-meta="true" data-pkb-purpose="' + purpose + '" data-action="add">Add step</button></div>')
       + '<script>' + popScript(kind) + '<\/script></body></html>';
   }
 

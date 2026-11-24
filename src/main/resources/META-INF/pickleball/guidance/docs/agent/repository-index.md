@@ -635,6 +635,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/launcher/PlaywrightNode.java`
 - `src/main/java/tools/dscode/launcher/ProtoVerbs.java`
 - `src/main/java/tools/dscode/launcher/PwCommand.java`
+- `src/main/java/tools/dscode/launcher/QuietSlf4j.java`
 - `src/main/java/tools/dscode/launcher/QuietWarnings.java`
 - `src/main/java/tools/dscode/launcher/RelaunchWithDebug.java`
 - `src/main/java/tools/dscode/launcher/RunVarOverrides.java`
@@ -804,6 +805,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/browser/JsErrorGateLiveTest.java`
 - `src/test/java/tools/dscode/browser/PlaywrightAdapterTest.java`
 - `src/test/java/tools/dscode/browser/PlaywrightCdpLiveTest.java`
+- `src/test/java/tools/dscode/browser/proto/OwnStorageFilterTest.java`
 - `src/test/java/tools/dscode/browser/proto/SourceMapsTest.java`
 - `src/test/java/tools/dscode/browser/ProtocolSelectorPlaywrightTest.java`
 - `src/test/java/tools/dscode/browser/ProtocolSelectorTest.java`
@@ -1050,6 +1052,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/PolishRoadmapTest.java`
 - `src/test/java/tools/dscode/launcher/PopupVerbCoverageTest.java`
 - `src/test/java/tools/dscode/launcher/PwCommandLiveTest.java`
+- `src/test/java/tools/dscode/launcher/QuietSlf4jTest.java`
 - `src/test/java/tools/dscode/launcher/RedirectedFrameTest.java`
 - `src/test/java/tools/dscode/launcher/RefLifetimeTest.java`
 - `src/test/java/tools/dscode/launcher/RefWaitTest.java`

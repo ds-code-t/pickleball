@@ -100,7 +100,13 @@ public final class MonitorCommands {
         return hub.row("cdp", "target", "page-attached").put("url", url).put("context", targetId);
     }
 
+    static boolean ownStorageKey(String key) {
+        return key != null && (key.startsWith("pkb-") || key.startsWith("pkb_"));
+    }
+
     static boolean cdp(ProtoHost host, State state, String method, JsonNode params, String sessionId, BrowserEventHub hub) {
+        // Pickleball's own panel state (pkb-dock, pkb-ui, pkb-pop-*) is not the page's storage: no row.
+        if (method.startsWith("DOMStorage.domStorageItem") && ownStorageKey(params.path("key").asText(""))) return true;
         CdpSession.Target target = host.cdp().target(sessionId);
         String context = target == null ? null : target.targetId;
         ObjectNode row;

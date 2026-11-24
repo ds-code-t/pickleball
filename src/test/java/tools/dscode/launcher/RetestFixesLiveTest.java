@@ -160,6 +160,31 @@ class RetestFixesLiveTest {
         assertEquals("yellow", email.path("highlight").asText(), email.toString());
     }
 
+    /** R8: wait --condition=new-message wakes on the person's panel message; a re-ask shows its current title in recent[]. */
+    @Test
+    void newMessageWaitWakesAndReAskKeepsTheCurrentTitle() throws Exception {
+        java.util.concurrent.CompletableFuture<Capture> waiting = java.util.concurrent.CompletableFuture.supplyAsync(
+                () -> agent("wait", "--target=browser:auto", "--condition=new-message", "--timeout=20000"));
+        Thread.sleep(1500);
+        Capture typed = human("act", "--target=browser:auto", "--kind=type", "--purpose=message", "--query=Message", "--value=r8 hello from the person");
+        assertEquals(0, typed.code, typed.out + typed.err);
+        Capture sent = human("act", "--target=browser:auto", "--kind=click", "--purpose=send", "--query=Send");
+        assertEquals(0, sent.code, sent.out + sent.err);
+        Capture woke = waiting.get(30, TimeUnit.SECONDS);
+        assertEquals(0, woke.code, woke.out + woke.err);
+        JsonNode body = JSON.readTree(woke.out);
+        assertTrue(body.toString().contains("r8 hello from the person"), body.toString());
+        assertEquals("new-message", body.path("condition").asText(), body.toString());
+
+        assertEquals(0, agent("ask-and-wait", "--say=Old-card", "--choices=Later,Now", "--id=r8", "--async").code);
+        assertEquals(0, agent("ask-and-wait", "--say=New-card", "--choices=Alpha,Beta", "--id=r8", "--async").code);
+        JsonNode snap = JSON.readTree(agent("snap", "--target=browser:auto", "--exposure=full").out);
+        String trail = snap.path("recent").toString();
+        assertTrue(trail.contains("New-card"), trail);
+        assertFalse(trail.contains("Old-card"), trail);
+        agent("answer-wait", "--id=r8", "--timeout=1");
+    }
+
     static JsonNode row(JsonNode snap, String name) {
         for (JsonNode item : snap.path("items")) if (name.equals(item.path("name").asText())) return item;
         return JSON.createObjectNode();
