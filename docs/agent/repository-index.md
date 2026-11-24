@@ -105,6 +105,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-collab-test/retest-2026-11-24/helper-brief.md`
 - `docs/maintainer/3.0.0-collab-test/retest-2026-11-24/human-notes.md`
 - `docs/maintainer/3.0.0-collab-test/retest-2026-11-24/plan.md`
+- `docs/maintainer/3.0.0-collab-test/retest-2026-11-24/round2-helper-brief.md`
+- `docs/maintainer/3.0.0-collab-test/retest-2026-11-24/round2-plan.md`
 - `docs/maintainer/3.0.0-composite-v2-design.md`
 - `docs/maintainer/3.0.0-composite-verbs-scoreboard.md`
 - `docs/maintainer/3.0.0-consumer-ready-handoff.md`
