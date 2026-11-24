@@ -9,7 +9,7 @@ public final class EngineInfo {
     public static final String NAME = "domengine";
     public static final String VERSION = "3.0.0";
     /** Composite snapshot JSON schema version advertised by `capabilities`. */
-    public static final int SNAPSHOT_SCHEMA = 1;
+    public static final int SNAPSHOT_SCHEMA = 2;
     /** Pre-map command and artifact are part of this engine build. */
     public static final boolean PREMAP = true;
     /** CLI name accepted beside {@code domengine}. */

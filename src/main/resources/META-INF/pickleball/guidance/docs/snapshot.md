@@ -6,7 +6,7 @@ Logging uses `dev.domengine.log.EngineLog`. The entities are `snapshot`, `premap
 
 ## Schema
 
-The machine-readable schema is `dom-engine/src/main/resources/dev/domengine/snapshot/composite-snapshot.schema.json` (JSON Schema draft 2020-12). `capabilities` reports `snapshot_schema` 1 and `premap` true.
+The machine-readable schema is `dom-engine/src/main/resources/dev/domengine/snapshot/composite-snapshot.schema.json` (JSON Schema draft 2020-12). `capabilities` reports `snapshot_schema` 2 and `premap` true. Readers still accept version 1 documents.
 
 | Field | Contents |
 |---|---|
