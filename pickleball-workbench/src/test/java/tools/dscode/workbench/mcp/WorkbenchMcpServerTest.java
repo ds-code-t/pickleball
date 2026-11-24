@@ -167,6 +167,8 @@ class WorkbenchMcpServerTest {
             "workbench_memory",
             "workbench_audits",
             "workbench_sw",
+            "workbench_screencast",
+            "workbench_share_browser",
             "workbench_chat_turn",
             "workbench_execute_steps",
             "workbench_ui_verify",

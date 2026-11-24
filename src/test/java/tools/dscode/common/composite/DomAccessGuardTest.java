@@ -68,6 +68,7 @@ class DomAccessGuardTest {
             "src/main/java/io/cucumber/core/runner/util/CucumberQueryUtil.java",
             "src/main/java/io/cucumber/core/runner/util/KeyFunctions.java",
             "src/main/java/tools/dscode/browser/JsErrorGate.java",
+            "src/main/java/tools/dscode/browser/SeleniumBidiEvents.java",
             "src/main/java/tools/dscode/browser/SeleniumAdapter.java",
             "src/main/java/tools/dscode/common/agentcontrol/PageSurfaces.java",
             "src/main/java/tools/dscode/common/assertions/AssertionChain.java",

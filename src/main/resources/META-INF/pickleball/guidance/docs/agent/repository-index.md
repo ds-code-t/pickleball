@@ -199,6 +199,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/browser/proto/ProtoRedact.java`
 - `src/main/java/tools/dscode/browser/proto/PwBridge.java`
 - `src/main/java/tools/dscode/browser/proto/RouteCommands.java`
+- `src/main/java/tools/dscode/browser/proto/ScreencastCommands.java`
 - `src/main/java/tools/dscode/browser/proto/SourceMaps.java`
 - `src/main/java/tools/dscode/browser/proto/StorageCommands.java`
 - `src/main/java/tools/dscode/browser/ProtocolSelector.java`
@@ -206,6 +207,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/browser/ProtocolSockets.java`
 - `src/main/java/tools/dscode/browser/RpcChannel.java`
 - `src/main/java/tools/dscode/browser/SeleniumAdapter.java`
+- `src/main/java/tools/dscode/browser/SeleniumBidiEvents.java`
 - `src/main/java/tools/dscode/browser/SurfaceAssets.java`
 - `src/main/java/tools/dscode/browser/UnsupportedProtocolOperation.java`
 - `src/main/java/tools/dscode/common/agentcontrol/AgentControl.java`
@@ -803,6 +805,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/browser/ProtocolSelectorPlaywrightTest.java`
 - `src/test/java/tools/dscode/browser/ProtocolSelectorTest.java`
 - `src/test/java/tools/dscode/browser/ScriptedSocket.java`
+- `src/test/java/tools/dscode/browser/SeleniumBidiEventsLiveTest.java`
 - `src/test/java/tools/dscode/browser/SurfaceAssetsTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/AgentDataFoundationTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/AgentLiveFixTest.java`
@@ -1048,6 +1051,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/RefWaitTest.java`
 - `src/test/java/tools/dscode/launcher/Release218RecommendationsTest.java`
 - `src/test/java/tools/dscode/launcher/RouteLiveTest.java`
+- `src/test/java/tools/dscode/launcher/ScreencastLiveTest.java`
 - `src/test/java/tools/dscode/launcher/SecretRedactionTest.java`
 - `src/test/java/tools/dscode/launcher/SessionHealthWaitTest.java`
 - `src/test/java/tools/dscode/launcher/SharedSessionCliTest.java`

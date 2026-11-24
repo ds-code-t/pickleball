@@ -852,6 +852,20 @@ final class WorkbenchMcpTools {
                         "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
                 )),
                 args -> forwardReady(protoArgs("sw", args)));
+        add("workbench_screencast",
+                "Record the page as a webm (Playwright) or JPEG frames (Playwright, BiDi, CDP); start and stop.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for screencast; see help screencast."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("screencast", args)));
+        add("workbench_share_browser",
+                "Share the Playwright-attached browser with another local Playwright client or MCP (Browser.bind); localhost only.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for share-browser; see help share-browser."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("share-browser", args)));
         add("workbench_chat_turn",
                 "Send one agent line, then wait for a human message, an answer, or a click.",
                 schema(view),

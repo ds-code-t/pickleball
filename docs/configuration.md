@@ -162,6 +162,7 @@ Pickleball reaches a browser through four backends and picks one per capability:
 | `pkb_push_wake` | on | Collaboration waits wake on pushed panel and chat events. `off` restores their fixed poll sleeps. |
 | `pkb_fail_on_js_error` | off | `warn` logs, and `fail` fails, the step during which an uncaught page error or unhandled rejection happened (collected over WebDriver BiDi). The message names the error and its stack. |
 | `pkb_js_error_ignore` | unset | Regex; page errors whose message matches are allowed under `pkb_fail_on_js_error`. Example: `pkb_js_error_ignore=ResizeObserver loop\|third-party-widget`. |
+| `pkb_scenario_events` | off | `on` streams a scenario's own Selenium session console, page-error and network rows into browser-events through Selenium's BiDi modules (`transport=selenium`). See [Browser events](browser-events.md). |
 
 Each key is read as a system property, then `pkb_runvars.<key>`, then the upper-case environment variable, then the environment variable as written. `doctor` prints `protocols=<browser>:<backends>`; `doctor --protocols [--cdp-endpoint=] [--bidi-endpoint=]` prints one `protocol.backend.*` line per backend and one `protocol.capability.*` line per capability.
 

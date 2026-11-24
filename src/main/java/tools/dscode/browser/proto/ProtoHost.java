@@ -61,6 +61,7 @@ public final class ProtoHost {
         DeviceCommands.register();
         PerfCommands.register();
         MonitorCommands.register();
+        ScreencastCommands.register();
     }
 
     private final Path project;

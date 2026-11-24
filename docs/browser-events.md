@@ -122,6 +122,14 @@ With a CDP stream, pickleball attaches worker targets (dedicated, shared and ser
 - `kind=storage`: localStorage and sessionStorage item added, updated, removed and cleared (CDP `DOMStorage`). Rows carry the origin, `key` and `valueLength`; the value is `[redacted]`. `browser-events --reveal` (control tier) shows values, which the host holds only in memory: they are never written to the ring, the spill or a log.
 - `kind=nav` and `kind=target`: navigation started, committed, failed and aborted, history updates, `subkind=bfcache-not-used`, `subkind=window-open` (`Page.windowOpen`), `subkind=page-attached` for a page opened after the stream started (with its first real URL), and `subkind=crashed`. A crashed target is counted in `host --status` (`crashedTargets`) and `doctor` prints a warning.
 
+## Screencasts, sharing the browser and Selenium sessions
+
+`screencast --start --out=<file.webm>` records a webm through Playwright's screencast (it needs Playwright's own ffmpeg, which pickleball never downloads; without it the reply says how to install it or to use `--frames-dir`) (`--fps=`, `--show-actions` overlays the actions Playwright performs). `screencast --start --frames-dir=<dir>` writes JPEG frames instead: Playwright frames, BiDi `browsingContext.startScreencast` where a browser has it, or CDP `Page.startScreencast` (frames are acknowledged as they land; no encoder is bundled, so CDP and BiDi cannot make a webm). `screencast --stop` reports `form` (`webm` or `frames`), `path`, and `bytes` or `frames`.
+
+`share-browser --name=<name> [--port=<n>]` shares the Playwright-attached browser through Playwright `Browser.bind`: a local pipe by default, or a WebSocket on 127.0.0.1 with `--port`. The reply has the `endpoint`, the `playwright-cli attach <name>` command and a `@playwright/mcp --endpoint` config. Every bind and stop is logged (the endpoint id is not). Security: anything on this machine that can reach the endpoint can drive the browser, including its signed-in sessions; share only while needed and end it with `share-browser --stop`. Control tier.
+
+`pkb_scenario_events=on` (default off) gives a scenario's own Selenium session browser-event rows through Selenium's high-level BiDi modules (`LogInspector` for console and page errors, `Network` for requests, responses and failures), on the BiDi socket Selenium already holds. Rows are `source=bidi`, `transport=selenium`, are redacted like any other row and spill to the project's browser-events file.
+
 ## DOM changes (push)
 
 Pickleball listens for DOM changes instead of polling the page. One page script runs a `MutationObserver` and reports debounced, batched, scoped deltas through the backend's push channel:
