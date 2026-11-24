@@ -92,9 +92,7 @@ public final class Engines {
 
     static Query.Hit image(String expr, List<DomNode> scopes) {
         String raw = expr == null ? "" : expr.trim();
-        if (raw.toLowerCase(Locale.ROOT).startsWith("ocr")) {
-            throw new CdpException("ocr is not available in this build");
-        }
+        if (raw.toLowerCase(Locale.ROOT).startsWith("ocr")) return ocr(raw, scopes);
         TemplateMatch.Gray viewport = VIEWPORT.get();
         if (viewport == null) throw new CdpException("image engine needs a viewport screenshot");
         TemplateMatch.Gray template = raw.startsWith("P2") ? TemplateMatch.parse(raw) : TemplateMatch.read(Path.of(raw));
@@ -120,6 +118,48 @@ public final class Engines {
         image.put("template", raw);
         image.put("matched", hits.size());
         return new Query.Hit(Query.distinct(hits), TemplateMatch.why(best, raw), image);
+    }
+
+    private static Query.Hit ocr(String raw, List<DomNode> scopes) {
+        String lower = raw.toLowerCase(Locale.ROOT);
+        String needle = "ocr".equals(lower) ? null : raw.substring(lower.startsWith("ocr:") ? 4 : 3).trim();
+        TemplateMatch.Gray viewport = VIEWPORT.get();
+        if (viewport == null) throw new CdpException("image engine needs a viewport screenshot");
+        List<DomNode> hits = new ArrayList<>();
+        String text = "";
+        String hash = "";
+        boolean cached = false;
+        for (DomNode scope : scopes) {
+            for (DomNode node : lightElements(scope, true)) {
+                if (!OcrHook.target(node) || !node.hasBox) continue;
+                TemplateMatch.Gray crop = TemplateMatch.crop(
+                        viewport,
+                        (int) Math.round(node.x),
+                        (int) Math.round(node.y),
+                        (int) Math.round(node.width),
+                        (int) Math.round(node.height)
+                );
+                OcrHook.Result result = OcrHook.recognize(node, crop);
+                if (result == null) continue;
+                if (!result.ok()) throw new CdpException(result.error());
+                text = result.text();
+                hash = result.hash();
+                cached = result.fromCache();
+                if (needle == null) {
+                    if (!result.text().isBlank()) hits.add(node);
+                } else if (needle.equals(result.text())) {
+                    hits.add(node);
+                }
+            }
+        }
+        ObjectNode image = Jsons.object();
+        image.put("engine", "ocr");
+        image.put("text", text);
+        image.put("hash", hash);
+        image.put("cached", cached);
+        image.put("matched", hits.size());
+        if (needle != null) image.put("expect", needle);
+        return new Query.Hit(Query.distinct(hits), "ocr matched " + hits.size(), image);
     }
 
     static Query.Hit css(String expr, List<DomNode> scopes, boolean pierceShadows) {

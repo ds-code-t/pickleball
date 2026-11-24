@@ -784,6 +784,8 @@ public final class DomEngineMain {
 
     private static String codeFor(String message) {
         String text = message.toLowerCase(Locale.ROOT);
+        if (text.contains("ocr runtime not installed")) return "ocr_runtime_missing";
+        if (text.contains("ocr runtime cannot be invoked")) return "ocr_runtime_unsupported";
         if (text.contains("stale")) return "stale";
         if (text.contains("not found") || text.contains("no page target")) return "not_found";
         if (text.contains("ambiguous")) return "ambiguous";
