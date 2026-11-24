@@ -75,6 +75,52 @@ class OptInSetupTest {
         assertFalse(agent("doctor").out.contains("desktop="), "plain doctor does not probe desktop drivers");
     }
 
+    @Test
+    void setupOcrPrintsLicensesAndInstallsOnlyVerifiedFilesWithConfirm() throws Exception {
+        Path dir = temp.resolve("ocr");
+        Capture shown = agent("setup", "ocr", "--runtime=onnx", "--dir=" + dir);
+        assertEquals(0, shown.code, shown.err);
+        assertTrue(shown.out.startsWith("license: MIT (onnxruntime-1.32.0.jar, https://repo1.maven.org/"), shown.out);
+        assertTrue(shown.out.contains("license: Apache-2.0 (en_PP-OCRv3_rec_infer.onnx"), shown.out);
+        JsonNode body = JSON.readTree(after(shown.out));
+        assertFalse(body.path("installed").asBoolean(), body.toString());
+        assertEquals(3, body.path("files").size());
+        for (JsonNode file : body.path("files")) assertEquals(64, file.path("sha256").asText().length(), file.toString());
+        assertTrue(body.path("use").asText().contains("pkb_ocr_dir=" + dir), body.toString());
+        assertFalse(Files.exists(dir), "nothing downloads without --confirm");
+
+        Capture other = agent("setup", "ocr", "--runtime=tesseract");
+        assertEquals(2, other.code);
+        assertTrue(other.err.contains("error: setup ocr supports --runtime=onnx only"), other.err);
+
+        Path mirror = Files.createDirectories(temp.resolve("mirror"));
+        for (dev.domengine.query.OnnxOcrRuntime.Artifact artifact : dev.domengine.query.OnnxOcrRuntime.ARTIFACTS)
+            Files.writeString(mirror.resolve(artifact.name()), "tampered " + artifact.name());
+        System.setProperty(OcrSetup.MIRROR_PROPERTY, mirror.toString());
+        try {
+            Capture tampered = agent("setup", "ocr", "--runtime=onnx", "--dir=" + dir, "--confirm");
+            assertEquals(1, tampered.code, tampered.out);
+            assertTrue(tampered.err.contains("checksum mismatch"), tampered.err);
+            assertEquals(3, dev.domengine.query.OnnxOcrRuntime.missing(dir).size(), "no unverified file lands");
+        } finally {
+            System.clearProperty(OcrSetup.MIRROR_PROPERTY);
+        }
+    }
+
+    @Test
+    void doctorReportsOcrRuntimeStatusWithFix() {
+        Path dir = temp.resolve("no-ocr");
+        System.setProperty("pkb_ocr_dir", dir.toString());
+        try {
+            Capture doctor = agent("doctor");
+            assertEquals(0, doctor.code, doctor.err);
+            assertTrue(doctor.out.contains("ocrRuntime=not installed (missing onnxruntime-1.32.0.jar,en_PP-OCRv3_rec_infer.onnx,en_dict.txt in " + dir
+                    + "; fix: setup ocr --runtime=onnx --confirm)"), doctor.out);
+        } finally {
+            System.clearProperty("pkb_ocr_dir");
+        }
+    }
+
     private static String after(String out) {
         return out.substring(out.indexOf('{'));
     }

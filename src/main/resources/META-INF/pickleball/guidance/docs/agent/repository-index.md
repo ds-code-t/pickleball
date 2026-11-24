@@ -1681,6 +1681,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/query/HumanViewTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/NegativeRelationTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/OcrHookTest.java`
+- `dom-engine/src/test/java/dev/domengine/query/OnnxOcrRuntimeTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/PerceptionTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/QueryLayerBoundaryTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/RelationTermParseTest.java`

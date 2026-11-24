@@ -420,6 +420,11 @@ final class ConsumerReadyCommands {
             out.println("desktopDriver=" + drivers.path("selected").asText("native"));
             out.println("desktop=" + drivers);
         }
+        // D11: the opt-in ONNX OCR runtime and model (setup ocr --runtime=onnx --confirm); nothing is loaded here.
+        java.nio.file.Path ocrDir = dev.domengine.query.OnnxOcrRuntime.dir();
+        java.util.List<String> ocrMissing = dev.domengine.query.OnnxOcrRuntime.missing(ocrDir);
+        out.println("ocrRuntime=" + (ocrMissing.isEmpty() ? "onnx installed (" + ocrDir + ")"
+                : "not installed (missing " + String.join(",", ocrMissing) + " in " + ocrDir + "; fix: setup ocr --runtime=onnx --confirm)"));
         log(project, session, "doctor health=" + health.status());
         return 0;
     }
