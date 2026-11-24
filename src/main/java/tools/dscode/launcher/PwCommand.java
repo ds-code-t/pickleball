@@ -453,7 +453,13 @@ final class PwCommand {
     private static void trace(State s, String action, Map<String, String> f, ObjectNode out) {
         Tracing tracing = s.page.context().tracing();
         switch (action) {
-            case "start" -> tracing.start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true));
+            case "start" -> {
+                Tracing.StartOptions options = new Tracing.StartOptions().setScreenshots(true).setSnapshots(true);
+                // E9: Playwright 1.63+ trace options pass through.
+                if (f.containsKey("aria-snapshots")) options.setAriaSnapshots(true);
+                if (f.containsKey("screen-snapshots")) options.setScreenSnapshots(true);
+                tracing.start(options);
+            }
             case "stop" -> {
                 Path zip = Path.of(require(f, "out"));
                 tracing.stop(new Tracing.StopOptions().setPath(zip));

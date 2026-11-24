@@ -24,7 +24,7 @@ final class ProtoVerbs {
     static final Set<String> VERBS = Set.of("browser-events", "errors", "logpoint", "net", "net-body", "har",
             "net-route", "net-unroute", "net-block", "net-headers", "net-auth", "ws-route", "net-cache", "security", "csp", "emulate", "clock", "permissions",
             "context-new", "context-list", "context-close", "tab-new", "tab-activate", "page-history", "print", "storage", "storage-state",
-            "downloads", "dialogs", "drop", "upload", "input", "find-role", "aria-snap", "aria-act", "webauthn", "extension", "webmcp");
+            "downloads", "dialogs", "drop", "upload", "input", "find-role", "aria-snap", "aria-act", "webauthn", "extension", "webmcp", "perf", "memory");
 
     private ProtoVerbs() {
     }
@@ -51,6 +51,19 @@ final class ProtoVerbs {
                 payload.put("_credential", credential(flags.get("credential")));
                 return print(call(project, flags, command, payload), out, err);
             }
+            if ("perf".equals(command) && flags.containsKey("report")) {
+                // E9: the Browser report section, read from the run's NDJSON spill; no browser needed.
+                String run = flags.getOrDefault("run-id", flags.getOrDefault("run", "live"));
+                Path folder = project.resolve(".pickleball").resolve("runs").resolve(run);
+                Map<String, Object> summary = tools.dscode.browser.BrowserReport.summarize(folder, Integer.parseInt(flags.getOrDefault("slowest", "10")));
+                if (summary.isEmpty()) return fail(err, "error: no browser-events spill in .pickleball/runs/" + run + "\nfix: run browser-events (or a scenario) first, or pass --run-id=<run>");
+                java.nio.file.Files.createDirectories(folder.resolve("workbench"));
+                java.nio.file.Files.writeString(folder.resolve("workbench").resolve("browser.html"), tools.dscode.browser.BrowserReport.html(summary));
+                com.fasterxml.jackson.databind.node.ObjectNode reply = new com.fasterxml.jackson.databind.ObjectMapper().valueToTree(summary);
+                reply.put("ok", true).put("op", "perf").put("mode", "report").put("html", ".pickleball/runs/" + run + "/workbench/browser.html");
+                out.println(reply);
+                return 0;
+            }
             if ("webauthn".equals(command) && flags.get("private-key") != null) {
                 // E8: the private key ref is resolved here, sent only to the token-guarded loopback host, and never printed.
                 Map<String, String> payload = new LinkedHashMap<>(flags);
@@ -61,6 +74,8 @@ final class ProtoVerbs {
             return print(call(project, flags, command, flags), out, err);
         } catch (IllegalStateException | IllegalArgumentException failure) {
             return fail(err, failure.getMessage());
+        } catch (java.io.IOException failure) {
+            return fail(err, "error: " + failure.getMessage() + "\nfix: check the run folder");
         }
     }
 

@@ -59,6 +59,7 @@ public final class ProtoHost {
         DialogCommands.register();
         InputCommands.register();
         DeviceCommands.register();
+        PerfCommands.register();
     }
 
     private final Path project;

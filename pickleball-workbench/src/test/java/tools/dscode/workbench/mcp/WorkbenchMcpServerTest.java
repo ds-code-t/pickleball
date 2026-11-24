@@ -163,6 +163,8 @@ class WorkbenchMcpServerTest {
             "workbench_webauthn",
             "workbench_extension",
             "workbench_webmcp",
+            "workbench_perf",
+            "workbench_memory",
             "workbench_chat_turn",
             "workbench_execute_steps",
             "workbench_ui_verify",

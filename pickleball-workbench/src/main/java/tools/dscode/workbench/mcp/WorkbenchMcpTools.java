@@ -824,6 +824,20 @@ final class WorkbenchMcpTools {
                         "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
                 )),
                 args -> forwardReady(protoArgs("webmcp", args)));
+        add("workbench_perf",
+                "Page metrics, Core Web Vitals, Chrome or Playwright traces, and the run's Browser report section.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for perf; see help perf."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("perf", args)));
+        add("workbench_memory",
+                "Collect garbage or write a capped heap snapshot of the live page.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for memory; see help memory."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("memory", args)));
         add("workbench_chat_turn",
                 "Send one agent line, then wait for a human message, an answer, or a click.",
                 schema(view),

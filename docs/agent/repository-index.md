@@ -298,6 +298,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/browser/BrowserFacade.java`
 - `src/main/java/tools/dscode/browser/BrowserLog.java`
 - `src/main/java/tools/dscode/browser/BrowserProtocols.java`
+- `src/main/java/tools/dscode/browser/BrowserReport.java`
 - `src/main/java/tools/dscode/browser/CdpAdapter.java`
 - `src/main/java/tools/dscode/browser/DomMutations.java`
 - `src/main/java/tools/dscode/browser/DriverEndpoints.java`
@@ -319,6 +320,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/browser/proto/HarWriter.java`
 - `src/main/java/tools/dscode/browser/proto/InputCommands.java`
 - `src/main/java/tools/dscode/browser/proto/NetCommands.java`
+- `src/main/java/tools/dscode/browser/proto/PerfCommands.java`
 - `src/main/java/tools/dscode/browser/proto/Projectors.java`
 - `src/main/java/tools/dscode/browser/proto/ProtoClient.java`
 - `src/main/java/tools/dscode/browser/proto/ProtoHost.java`
@@ -1163,6 +1165,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/OopifAutoAttachTest.java`
 - `src/test/java/tools/dscode/launcher/OptInSetupTest.java`
 - `src/test/java/tools/dscode/launcher/OverlapTest.java`
+- `src/test/java/tools/dscode/launcher/PerfLiveTest.java`
 - `src/test/java/tools/dscode/launcher/PickleballWorkbenchLauncherTest.java`
 - `src/test/java/tools/dscode/launcher/PlacementNowTest.java`
 - `src/test/java/tools/dscode/launcher/PolishRoadmapTest.java`
