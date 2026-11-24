@@ -60,6 +60,7 @@ public final class ProtoHost {
         InputCommands.register();
         DeviceCommands.register();
         PerfCommands.register();
+        MonitorCommands.register();
     }
 
     private final Path project;

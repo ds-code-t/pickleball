@@ -480,6 +480,9 @@ final class ConsumerReadyCommands {
             out.println("route." + r.path("id").asText() + "=" + r.path("action").asText() + " " + r.path("match").asText() + " via="
                     + r.path("via").asText() + " hits=" + r.path("hits").asInt() + " timesLeft=" + r.path("timesLeft").asInt());
         }
+        // E10: a crashed page or worker target is a doctor warning.
+        int crashed = tools.dscode.browser.proto.ProtoClient.call(project, null, null, null, "host.status", java.util.Map.of()).path("crashedTargets").asInt();
+        if (crashed > 0) out.println("warning: " + crashed + " browser target(s) crashed this session; see browser-events --kinds=target");
     }
 
     private static String tokenValue(java.util.List<String> tokens, String prefix) {

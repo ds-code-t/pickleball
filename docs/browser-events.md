@@ -112,6 +112,16 @@ WebSocket rows (`kind=ws`): `created`, `handshake`, `frame-sent`, `frame-receive
 
 The run summary (`workbench/summary.json`) gains a `browser` section and `workbench/browser.html` when the run has a browser-events spill: vitals per navigation, the 10 slowest requests, failed requests and JS errors (URLs, timings and first lines only; no bodies or headers). `perf --report [--run-id=]` builds the same section on demand.
 
+## Security, audits, workers, service workers, storage and lifecycle
+
+With a CDP stream, pickleball attaches worker targets (dedicated, shared and service workers) and auto-attaches OOPIFs, so their console, errors and network join the stream with a `target` field (`worker`, `shared_worker`, `service_worker`). Workers are not paused at start, and the browser's own extension workers are not attached. On BiDi, `script.realmCreated`/`realmDestroyed` rows cover worker realms.
+
+- `kind=security`: `subkind=state` from CDP `Security.visibleSecurityStateChanged` (secure, insecure, neutral, with certificate protocol, issuer and subject), and `subkind=certificate-error` when a request fails with `ERR_CERT_*`/`ERR_SSL_*` (the failed `net` row still lands).
+- `kind=audit`: CDP `Audits.issueAdded` (mixed content, CORS, CSP, cookie, deprecation, low contrast, form issues). `subkind` is the issue code in kebab case and `method` the raw code. `audits --list [--since=]` reads them back; `audits --check-forms` runs `Audits.checkFormsIssues`.
+- `kind=sw`: registration, version status and worker errors (CDP `ServiceWorker`). `sw --list [--wait-ms=]` lists the page registrations and their versions; the browser's own extension workers appear only with `--all`. `sw --unregister=<scope>` and `sw --bypass[=false]` (`Network.setBypassServiceWorker`, switched off again when the stream stops).
+- `kind=storage`: localStorage and sessionStorage item added, updated, removed and cleared (CDP `DOMStorage`). Rows carry the origin, `key` and `valueLength`; the value is `[redacted]`. `browser-events --reveal` (control tier) shows values, which the host holds only in memory: they are never written to the ring, the spill or a log.
+- `kind=nav` and `kind=target`: navigation started, committed, failed and aborted, history updates, `subkind=bfcache-not-used`, `subkind=window-open` (`Page.windowOpen`), `subkind=page-attached` for a page opened after the stream started (with its first real URL), and `subkind=crashed`. A crashed target is counted in `host --status` (`crashedTargets`) and `doctor` prints a warning.
+
 ## DOM changes (push)
 
 Pickleball listens for DOM changes instead of polling the page. One page script runs a `MutationObserver` and reports debounced, batched, scoped deltas through the backend's push channel:

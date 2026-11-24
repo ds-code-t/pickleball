@@ -28,6 +28,7 @@ final class EventCommands {
             Object dom = host.stateMap().get("dom.via");
             out.put("dom", dom == null ? "off" : String.valueOf(dom));
             out.put("routes", RouteCommands.state(host).rules.size());
+            out.put("crashedTargets", MonitorCommands.crashed(host));
             return out;
         });
         ProtoHost.register("host.stop", (host, f) -> {
@@ -91,6 +92,8 @@ final class EventCommands {
         });
         host.stateMap().put("events.source", served.value());
         host.hub().primary(served.value());
+        // E10: security, audits, service workers, storage, lifecycle and worker targets.
+        MonitorCommands.attach(host, served.value());
         ObjectNode out = ProtoJson.obj().put("op", "browser-events").put("via", served.value()).put("started", true)
                 .put("cursor", host.hub().cursor()).put("spill", host.hub().spillFile().toString());
         Set<String> active = host.hub().kinds();
@@ -179,6 +182,10 @@ final class EventCommands {
         int limit = parseInt(f.get("limit"), 200);
         long waitMs = Math.min(120_000, parseInt(f.get("wait-ms"), 0));
         List<ObjectNode> rows = host.hub().read(f.get("since"), kinds(f), f.get("match"), f.get("level"), limit, waitMs);
+        if (f.containsKey("reveal")) {
+            rows = rows.stream().map(ObjectNode::deepCopy).toList();
+            MonitorCommands.reveal(host, rows);
+        }
         ObjectNode out = ProtoJson.obj().put("op", "browser-events").put("schema", BrowserEventHub.SCHEMA).put("via", via);
         ArrayNode array = out.putArray("rows");
         rows.forEach(array::add);

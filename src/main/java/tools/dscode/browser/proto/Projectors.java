@@ -166,6 +166,8 @@ public final class Projectors {
             };
             if (row != null) {
                 if (context != null && !row.has("context")) row.put("context", context);
+                // E10: rows from worker targets say which kind of target sent them.
+                if (target != null && !"page".equals(target.type) && !row.has("target")) row.put("target", target.type);
                 hub.add(row);
             }
         });

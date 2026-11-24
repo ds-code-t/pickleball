@@ -838,6 +838,20 @@ final class WorkbenchMcpTools {
                         "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
                 )),
                 args -> forwardReady(protoArgs("memory", args)));
+        add("workbench_audits",
+                "List DevTools issues (mixed content, CORS, CSP, cookies, forms) or check forms on the page.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for audits; see help audits."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("audits", args)));
+        add("workbench_sw",
+                "List, unregister or bypass service workers on the live session.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for sw; see help sw."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("sw", args)));
         add("workbench_chat_turn",
                 "Send one agent line, then wait for a human message, an answer, or a click.",
                 schema(view),

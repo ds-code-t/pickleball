@@ -165,6 +165,8 @@ class WorkbenchMcpServerTest {
             "workbench_webmcp",
             "workbench_perf",
             "workbench_memory",
+            "workbench_audits",
+            "workbench_sw",
             "workbench_chat_turn",
             "workbench_execute_steps",
             "workbench_ui_verify",

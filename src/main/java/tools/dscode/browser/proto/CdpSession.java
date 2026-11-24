@@ -43,6 +43,7 @@ public final class CdpSession implements AutoCloseable {
     private final List<Consumer<Target>> hooks = new CopyOnWriteArrayList<>();
     private final Map<String, Boolean> attaching = new ConcurrentHashMap<>();
     private volatile boolean autoAttachChildren;
+    private volatile boolean attachWorkers;
 
     private CdpSession(RpcChannel channel, String endpoint) {
         this.channel = channel;
@@ -77,7 +78,8 @@ public final class CdpSession implements AutoCloseable {
             switch (method) {
                 case "Target.targetCreated" -> {
                     JsonNode info = params.path("targetInfo");
-                    if ("page".equals(info.path("type").asText())) attach(info.path("targetId").asText());
+                    String type = info.path("type").asText();
+                    if ("page".equals(type) || (attachWorkers && worker(info))) attach(info.path("targetId").asText());
                 }
                 case "Target.attachedToTarget" -> onAttached(params, sessionId);
                 case "Target.detachedFromTarget" -> bySession.remove(params.path("sessionId").asText());
@@ -113,6 +115,12 @@ public final class CdpSession implements AutoCloseable {
         Target target = new Target(params.path("sessionId").asText(), info.path("targetId").asText(), type, info.path("url").asText(""));
         target.parentSession = parentSession;
         bySession.put(target.sessionId, target);
+        boolean waiting = params.path("waitingForDebugger").asBoolean(false);
+        if (waiting && WORKERS.contains(type)) {
+            // A paused worker answers domain enables only once it runs, so a hook would stall the event thread until timeout.
+            resume(target);
+            waiting = false;
+        }
         for (Consumer<Target> hook : hooks) {
             try {
                 hook.accept(target);
@@ -122,17 +130,19 @@ public final class CdpSession implements AutoCloseable {
         }
         if (autoAttachChildren && ("page".equals(type) || "iframe".equals(type))) {
             try {
-                channel.call("Target.setAutoAttach", Map.of("autoAttach", true, "waitForDebuggerOnStart", true, "flatten", true), target.sessionId);
+                channel.call("Target.setAutoAttach", Map.of("autoAttach", true, "waitForDebuggerOnStart", false, "flatten", true), target.sessionId);
             } catch (RuntimeException ignored) {
                 // Older targets without auto-attach.
             }
         }
-        if (params.path("waitingForDebugger").asBoolean(false)) {
-            try {
-                channel.call("Runtime.runIfWaitingForDebugger", Map.of(), target.sessionId);
-            } catch (RuntimeException ignored) {
-                // Already running.
-            }
+        if (waiting) resume(target);
+    }
+
+    private void resume(Target target) {
+        try {
+            channel.call("Runtime.runIfWaitingForDebugger", Map.of(), target.sessionId);
+        } catch (RuntimeException ignored) {
+            // Already running.
         }
     }
 
@@ -148,13 +158,33 @@ public final class CdpSession implements AutoCloseable {
         }
     }
 
+    static final java.util.Set<String> WORKERS = java.util.Set.of("service_worker", "shared_worker", "worker");
+
+    /** A worker of the page under test; the browser's own extension workers are not attached. */
+    static boolean worker(JsonNode info) {
+        return WORKERS.contains(info.path("type").asText()) && !info.path("url").asText("").startsWith("chrome-extension://");
+    }
+
+    /** E10: attach service and shared workers as they appear (and those already running). */
+    public void attachWorkers() {
+        if (attachWorkers) return;
+        attachWorkers = true;
+        try {
+            for (JsonNode info : channel.call("Target.getTargets", Map.of()).path("targetInfos")) {
+                if (worker(info)) attach(info.path("targetId").asText());
+            }
+        } catch (RuntimeException ignored) {
+            // Browser without target listing.
+        }
+    }
+
     /** E10: auto-attach workers, service workers and OOPIFs under every page. */
     public void autoAttachChildren() {
         if (autoAttachChildren) return;
         autoAttachChildren = true;
         for (Target target : pages()) {
             try {
-                channel.call("Target.setAutoAttach", Map.of("autoAttach", true, "waitForDebuggerOnStart", true, "flatten", true), target.sessionId);
+                channel.call("Target.setAutoAttach", Map.of("autoAttach", true, "waitForDebuggerOnStart", false, "flatten", true), target.sessionId);
             } catch (RuntimeException ignored) {
                 // Older targets without auto-attach.
             }
