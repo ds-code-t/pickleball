@@ -1,6 +1,7 @@
 package tools.dscode.common.composite;
 
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.openqa.selenium.By;
 import org.openqa.selenium.SearchContext;
@@ -16,8 +17,25 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class XPathFallbackTest {
+    private String priorComposite;
+
+    /**
+     * These cases describe the default ({@code auto}) mode. RunVars snapshots
+     * system properties once per JVM, so a test that ran earlier with
+     * {@code pkb_composite=on} can leave that value behind. A live system
+     * property is read first, so pin the default here and restore it after.
+     */
+    @BeforeEach
+    void pinDefaultMode() {
+        priorComposite = System.getProperty(CompositeMode.KEY);
+        System.setProperty(CompositeMode.KEY, "auto");
+        CompositeLog.resetForTests();
+    }
+
     @AfterEach
     void reset() {
+        if (priorComposite == null) System.clearProperty(CompositeMode.KEY);
+        else System.setProperty(CompositeMode.KEY, priorComposite);
         CompositeLog.resetForTests();
         CompositeRuntime.resetForTests();
     }
