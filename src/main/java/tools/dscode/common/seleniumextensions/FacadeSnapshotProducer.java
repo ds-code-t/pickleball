@@ -182,6 +182,10 @@ public final class FacadeSnapshotProducer {
             iframe.children.add(child);
             next++;
         }
+        List<String> childFrames = new ArrayList<>();
+        for (int i = 1; i < frames.size(); i++) childFrames.add(frames.get(i).id());
+        String top = frames.isEmpty() ? "main" : frames.get(0).id();
+        root.assignFrames(top, childFrames);
         place(root, 0, 0, walks.isEmpty() ? null : walks.get(0));
         return root;
     }
@@ -199,6 +203,14 @@ public final class FacadeSnapshotProducer {
     }
 
     private static DomNode element(JsonNode raw, long[] id, JsonNode walk) {
+        if ("text".equals(raw.path("type").asText(""))) {
+            DomNode text = new DomNode();
+            text.nodeType = 3;
+            text.nodeName = "#text";
+            text.nodeValue = raw.path("value").asText("");
+            text.backendNodeId = id[0]++;
+            return text;
+        }
         DomNode node = new DomNode();
         node.nodeType = 1;
         node.localName = raw.path("tag").asText("");
@@ -236,6 +248,19 @@ public final class FacadeSnapshotProducer {
         }
         if (raw.path("children").isArray()) {
             for (JsonNode child : raw.path("children")) node.children.add(element(child, id, walk));
+        }
+        JsonNode shadow = raw.path("shadow");
+        if (shadow.isObject()) {
+            DomNode root = new DomNode();
+            root.shadowRoot = true;
+            root.nodeType = 11;
+            root.nodeName = "#document-fragment";
+            root.shadowMode = shadow.path("mode").asText("open");
+            root.backendNodeId = id[0]++;
+            if (shadow.path("children").isArray()) {
+                for (JsonNode child : shadow.path("children")) root.children.add(element(child, id, walk));
+            }
+            node.shadowRoots.add(root);
         }
         return node;
     }
@@ -277,6 +302,7 @@ public final class FacadeSnapshotProducer {
             }
             place(child, nextX, nextY, top);
         }
+        for (DomNode shadow : node.shadowRoots) place(shadow, originX, originY, top);
     }
 
     /** BiDi returns object graphs as remote handles. A JSON string comes back by value. */

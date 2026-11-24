@@ -60,11 +60,15 @@ public final class CompositeSnapshotBuilder {
             }
         }
         dev.domengine.log.EngineLog.info("snapshot", "snapshot offline id=" + id + " nodes=" + nodes.size() + " ms=" + duration);
+        CanonicalDocument generated = canonical;
+        if (generated == null && "html".equals(ctx.sourceKind()) && !"fixture".equals(ctx.transport())) {
+            generated = CanonicalHtml.capture(root);
+        }
         int schemaVersion = CompositeSnapshot.VERSION;
         ObjectNode canonicalJson = null;
-        if (canonical != null) {
+        if (generated != null) {
             schemaVersion = CompositeSnapshot.VERSION_V2;
-            canonicalJson = canonical.toJson();
+            canonicalJson = generated.toJson();
         }
         return new CompositeSnapshot(
                 id,

@@ -96,9 +96,9 @@ class LiveEdgeSnapshotTest {
             ));
             assertEquals(0, snap.exit(), snap.stderr());
             JsonNode json = Jsons.MAPPER.readTree(snap.stdout());
-            JsonNode schema = Jsons.MAPPER.readTree(CompositeSnapshot.class.getResourceAsStream(
-                    "/dev/domengine/snapshot/composite-snapshot.schema.json"));
-            SnapshotSchemas.assertValid(schema, json);
+            SnapshotSchemas.assertValid(SnapshotDocuments.schema(json.path("version").asInt(1)), json);
+            assertEquals("html", json.path("source").path("kind").asText());
+            assertEquals(2, json.path("version").asInt());
             assertEquals("edge", json.path("platform").asText(), json.path("platform").asText());
             assertEquals("cdp", json.path("transport").asText());
             assertTrue(json.path("screenshot").path("width_px").asInt() > 0);

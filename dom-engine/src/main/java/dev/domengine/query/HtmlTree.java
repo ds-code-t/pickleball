@@ -98,10 +98,12 @@ public final class HtmlTree {
                 if (startsWith("</")) continue;
                 break;
             }
-            if ("template".equals(child.localName) && child.attributes.containsKey("shadowrootmode")) {
+            if ("template".equals(child.localName)
+                    && (child.attributes.containsKey("shadowrootmode") || child.attributes.containsKey("data-pkb-shadow"))) {
                 DomNode shadow = new DomNode();
                 shadow.shadowRoot = true;
-                shadow.shadowMode = child.attributes.getOrDefault("shadowrootmode", "open");
+                shadow.shadowMode = child.attributes.getOrDefault(
+                        "data-pkb-shadow", child.attributes.getOrDefault("shadowrootmode", "open"));
                 shadow.nodeType = 11;
                 shadow.nodeName = "#document-fragment";
                 shadow.backendNodeId = child.backendNodeId;

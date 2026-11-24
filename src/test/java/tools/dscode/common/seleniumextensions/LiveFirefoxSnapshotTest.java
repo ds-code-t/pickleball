@@ -61,9 +61,9 @@ class LiveFirefoxSnapshotTest {
             driver.get(url);
             ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("window.scrollTo(0, 140)");
             JsonNode json = SnapshotProducers.page(driver, SnapshotOptions.fromFlags(Map.of("out-dir", out.toString())));
-            JsonNode schema = Jsons.MAPPER.readTree(CompositeSnapshot.class.getResourceAsStream(
-                    "/dev/domengine/snapshot/composite-snapshot.schema.json"));
-            SnapshotSchemas.assertValid(schema, json);
+            SnapshotSchemas.assertValid(dev.domengine.snapshot.SnapshotDocuments.schema(json.path("version").asInt(1)), json);
+            assertEquals("html", json.path("source").path("kind").asText());
+            assertEquals(2, json.path("version").asInt());
             assertEquals("firefox", json.path("platform").asText());
             assertTrue(json.path("transport").asText().equals("bidi") || json.path("transport").asText().equals("selenium-fallback"),
                     json.path("transport").asText());
