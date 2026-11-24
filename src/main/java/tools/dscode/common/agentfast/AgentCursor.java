@@ -132,11 +132,14 @@ public final class AgentCursor {
         if (body != null) {
             Map<String, Object> cursors = new LinkedHashMap<>();
             cursors.put("channel", channel);
-            cursors.put("chat", chat);
+            Object head = body.get("chatHead");
+            // A reply that does not read chat shows the newest id; its token still does not skip unread chat.
+            cursors.put("chat", chat.isEmpty() && head != null ? String.valueOf(head) : chat);
             cursors.put("ui", overlay);
             cursors.put("events", events);
             cursors.put("token", token);
             body.put("cursors", cursors);
+            body.remove("chatHead");
         }
         return token;
     }

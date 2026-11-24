@@ -43,6 +43,27 @@ public final class NativeDesktop {
     }
 
     /** {@code linux-x64}, {@code linux-aarch64}, {@code windows-x64}, {@code macos-aarch64}, or {@code macos-x64}. */
+    /**
+     * Linux desktop control is AT-SPI plus xdotool on X11 or Xvfb. A Wayland-only session (WAYLAND_DISPLAY set and
+     * DISPLAY unset, or XDG_SESSION_TYPE=wayland without DISPLAY) is unsupported. Xwayland (DISPLAY set) is allowed.
+     */
+    public static boolean waylandOnly(java.util.Map<String, String> env) {
+        if (env == null) return false;
+        String display = env.get("DISPLAY");
+        if (display != null && !display.isBlank()) return false;
+        String wayland = env.get("WAYLAND_DISPLAY");
+        String type = env.get("XDG_SESSION_TYPE");
+        return (wayland != null && !wayland.isBlank()) || "wayland".equalsIgnoreCase(type == null ? "" : type.trim());
+    }
+
+    /** The attach refusal for a Wayland-only Linux session, or null when desktop control can run. */
+    public static String waylandRefusal(String family, java.util.Map<String, String> env) {
+        if (!"linux".equals(family) || !waylandOnly(env)) return null;
+        return "error: Wayland session detected; desktop control needs X11 or Xvfb (set DISPLAY)\n"
+                + "fix: log in to an X11 session, run under Xwayland with DISPLAY set, or start Xvfb (Xvfb :99 & export DISPLAY=:99). "
+                + "Wayland is unsupported for desktop control, and grim screenshots are not a desktop-control path.";
+    }
+
     public static String platformId() {
         String archRaw = System.getProperty("os.arch", "").toLowerCase(Locale.ROOT);
         String arch = switch (archRaw) {

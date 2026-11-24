@@ -45,7 +45,7 @@ class CliSurfaceTest {
         assertTrue(caps.path("commands").toString().contains("mcp"));
         assertTrue(caps.path("commands").toString().contains("resolve"));
         assertTrue(caps.path("commands").toString().contains("premap"));
-        assertEquals(1, caps.path("snapshot_schema").asInt());
+        assertEquals(2, caps.path("snapshot_schema").asInt(), "producers emit v2, so capabilities report 2");
         assertTrue(caps.path("premap").asBoolean());
     }
 }

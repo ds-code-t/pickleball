@@ -1754,12 +1754,14 @@ final class PageSurfaces {
     }
 
     /** Shows an agent chat message in the in-page panel when one is open. Never installs the runtime. */
-    static void pushChat(Map<String, Object> message) {
-        if (!hasLivePage()) return;
+    /** True when the page runtime took the row (drawn now, or already drawn under that id). */
+    static boolean pushChat(Map<String, Object> message) {
+        if (!hasLivePage()) return false;
         try {
-            runtimeCall("chat", List.of(message), false);
+            return runtimeCall("chat", List.of(message), false) != null;
         } catch (RuntimeException failure) {
             CompositeLog.info("chat", "panel push skipped " + failure.getMessage());
+            return false;
         }
     }
 

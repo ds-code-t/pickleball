@@ -1,0 +1,80 @@
+package tools.dscode.control.protocol;
+
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+
+/**
+ * The one tier registry for CLI verbs and MCP tools. {@code human} is perception through the human view (snap, find,
+ * screenshot, capture, explain), input a person could give (act click/type/press/hover/select through the real
+ * hit-test, wait), read-only chat-read, doctor, and help. Everything else is {@code control}: DOM and JS, injection,
+ * ui-apply, ask, guide, highlight, CDP, full maps, form-fill, attach and upload, navigate, start and stop.
+ * Help, the inventory, and MCP descriptions read this class; a gate test fails when a verb has no tier.
+ */
+public final class VerbTiers {
+    public static final String HUMAN = "human";
+    public static final String CONTROL = "control";
+
+    private static final Set<String> HUMAN_VERBS = Set.of(
+            "act", "capture", "chat-read", "doctor", "explain", "find", "help", "screenshot", "snap", "wait",
+            "wait-for"
+    );
+
+    private static final Set<String> CONTROL_VERBS = Set.of(
+            "answer-wait", "arrow", "ask", "ask-and-wait", "attach", "border", "bridge-health", "call",
+            "capture-scenario", "capture-steps", "chat-history", "chat-poll", "chat-send", "chat-turn", "chat_wait",
+            "checklist", "close-window", "confirm", "controller-ping", "controller-start", "controller-status",
+            "controller-stop", "diagnostic-run", "discover", "discover-hint", "entity-lookup", "eval", "events",
+            "example", "execute-step", "execute-steps", "export-guidance", "find-element", "finish", "form-fill",
+            "frame", "from-here", "gc-runs", "gc-versions", "guide", "guide-back", "guide-done", "guide-next",
+            "highlight", "hint", "history", "history-query", "history-summary", "html-cleanup", "html-insert",
+            "html-remove", "html-replace", "html-write", "inbox", "insert-step", "inspect-page", "isolate", "kill",
+            "label", "launch", "live-check", "magnifier", "mcp", "navigate", "note", "observe", "open-run",
+            "open-scenario", "open-window", "overlay", "overlay-poll", "overlay-remove", "panel-close", "panel-open",
+            "panel-state", "pause", "pin", "plan", "play", "popup-close", "popup-open", "popup-status", "post",
+            "presence", "query", "record", "ref", "refresh", "resolve-runvars", "save", "selftest", "session",
+            "session-hold", "session-info", "session-list", "session-mode", "session-release", "session-start",
+            "session-sync", "short-log", "show-run", "spotlight", "start", "status", "step-badge", "stop", "sync",
+            "tabs", "toast", "ui", "ui-apply", "ui-catalog", "ui-poll", "ui-verify", "unarrow", "unborder",
+            "unhighlight", "unlabel", "unmagnifier", "unspotlight", "unstep-badge", "update-step", "upload",
+            "use-version", "validate", "watch", "windows", "worker-check", "worker-restart", "worker-start",
+            "worker-stop", "workspace-edit", "workspace-seed", "workspace-show"
+    );
+
+    /** act kinds a human-locked session accepts. */
+    public static final Set<String> HUMAN_ACT_KINDS = Set.of("click", "type", "press", "hover", "select", "scroll");
+
+    private VerbTiers() {
+    }
+
+    /** human, control, or null when the verb is not registered. */
+    public static String tier(String verb) {
+        if (verb == null) return null;
+        String key = verb.trim();
+        if (HUMAN_VERBS.contains(key)) return HUMAN;
+        if (CONTROL_VERBS.contains(key)) return CONTROL;
+        return null;
+    }
+
+    public static Set<String> verbs() {
+        Set<String> all = new TreeSet<>(HUMAN_VERBS);
+        all.addAll(CONTROL_VERBS);
+        return Collections.unmodifiableSet(all);
+    }
+
+    public static Map<String, String> table() {
+        Map<String, String> table = new LinkedHashMap<>();
+        for (String verb : verbs()) table.put(verb, tier(verb));
+        return table;
+    }
+
+    /** The tier of an MCP tool, from the verb it forwards; tools without a human verb are control. */
+    public static String toolTier(String tool) {
+        if (tool == null) return CONTROL;
+        String verb = tool.startsWith("workbench_") ? tool.substring("workbench_".length()).replace('_', '-') : tool;
+        if ("browser-screenshot".equals(verb)) return HUMAN;
+        return HUMAN.equals(tier(verb)) ? HUMAN : CONTROL;
+    }
+}

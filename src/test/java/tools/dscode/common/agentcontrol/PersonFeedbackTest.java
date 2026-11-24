@@ -90,7 +90,7 @@ class PersonFeedbackTest {
         assertTrue(js.contains("function panelUnread()"));
         assertTrue(js.contains("function recountUnread()"));
         assertTrue(js.contains("row.state !== 'read'"));
-        assertTrue(js.contains("['chat', 'Chat'], ['steps', 'Guide'], ['record', 'Recorder']"));
+        assertTrue(js.contains("['chat', 'Chat', 'chat-tab'], ['steps', 'Guide', 'guide-tab'], ['record', 'Recorder', 'recorder-tab']"));
         assertTrue(js.contains("No guide yet."));
         assertTrue(js.contains("Keep step"));
         assertTrue(js.contains("Drop step"));
@@ -102,7 +102,9 @@ class PersonFeedbackTest {
         assertTrue(js.contains("function tagMeta"));
         assertTrue(js.contains("data-pkb-meta"));
         assertTrue(js.contains("[data-pkb-meta=\"true\"]"));
-        assertTrue(js.contains("Chat, "));
+        // The chat tab's accessible name stays "Chat"; the unread count is its description and data-pkb-badge.
+        assertTrue(js.contains("chatTab.setAttribute('aria-description', n + ' unread')"));
+        assertTrue(js.contains("chatTab.setAttribute('aria-label', 'Chat')"));
         assertTrue(js.contains("installId"));
         assertTrue(css.contains("[data-state=\"sending\"]"));
         assertTrue(css.contains("[data-state=\"delivered\"]"));

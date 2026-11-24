@@ -10,18 +10,18 @@ final class AgentHop {
     static final String INSIDE = "pkb.controller.inside";
     private static final Set<String> HOP = Set.of(
             "observe", "launch", "windows", "tabs",
-            "chat-send", "chat-history", "chat-poll", "chat_wait", "chat-turn",
+            "chat-send", "chat-history", "chat-poll", "chat_wait", "chat-turn", "chat-read",
             "highlight", "unhighlight",
             "overlay", "overlay-poll", "overlay-remove",
             "label", "unlabel", "border", "unborder", "arrow", "unarrow",
             "step-badge", "unstep-badge", "magnifier", "unmagnifier", "spotlight", "unspotlight",
             "html-write", "html-replace", "html-insert", "html-remove", "html-cleanup",
             "popup-open", "popup-status", "popup-close",
-            "panel-open", "panel-close",
+            "panel-open", "panel-close", "panel-state", "session-mode",
             "guide", "guide-next", "guide-back", "guide-done", "ask",
             "ui-apply", "ui-poll", "ui-catalog", "ui-verify",
             "capture-scenario", "capture-steps", "record", "screenshot", "selftest",
-            "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame",
+            "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame", "upload", "navigate",
             "ask-and-wait", "answer-wait", "pin", "toast", "checklist", "ui", "ref",
             "start", "call", "execute-steps", "doctor"
     );

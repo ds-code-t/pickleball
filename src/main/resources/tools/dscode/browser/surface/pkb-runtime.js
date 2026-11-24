@@ -147,6 +147,7 @@
     if (!node || !node.setAttribute) return;
     node.setAttribute('data-state', state);
     node.setAttribute('data-pkb-feedback', state);
+    if (node.hasAttribute && node.hasAttribute('data-pkb-msg-id')) node.setAttribute('data-pkb-msg-status', state === 'pending' ? 'sending' : (state === 'sent' ? 'delivered' : state));
     var note = node.querySelector ? node.querySelector(':scope > .pkb-feedback') : null;
     if (!note && node.classList && node.classList.contains('pkb-msg')) {
       note = document.createElement('span');
@@ -395,6 +396,14 @@
     if (!node || !node.closest) return node;
     return node.closest('button,a,input,select,textarea,summary,label,[role],[data-choice],[data-pkb-action]') || node;
   }
+  /** Agent input (form-fill) stamps data-pkb-agent-acting on the root with an expiry in ms; rows sensed before it expires are source=agent. */
+  function actingSource() {
+    try {
+      var until = Number(document.documentElement.getAttribute('data-pkb-agent-acting') || 0);
+      if (until && Date.now() < until) return 'agent';
+    } catch (ignored) { /* no root */ }
+    return 'human';
+  }
   function sense(kind, node, extra) {
     var el = controlOf(node);
     if (!el || el.nodeType !== 1) return false;
@@ -414,7 +423,7 @@
       event: 'interaction',
       type: kind,
       kind: kind,
-      source: (extra && extra.source) || 'human',
+      source: (extra && extra.source) || actingSource(),
       id: (extra && extra.id) || el.id || '',
       role: (extra && extra.role) || roleOf(el),
       name: extra && extra.name != null ? String(extra.name) : name,
@@ -1222,6 +1231,9 @@
       step.badge.textContent = step.done ? '\u2713' : String(step.n);
       step.ring.className = 'ring ' + state + (i === g.current && g.pulse && step.anchor ? ' pulse' : '');
       step.state = state;
+      if (step.anchor && step.anchor.setAttribute) {
+        try { step.anchor.setAttribute('data-pkb-guide-step', g.id + ' step ' + step.n + '/' + g.steps.length + ' ' + state); } catch (ignored) { /* detached */ }
+      }
     });
     g.pulse = false;
     if (!g.tip) {
@@ -1245,9 +1257,23 @@
     return out;
   }
 
+  function guideBadge() {
+    if (!panel || !panel.tabs) return;
+    var tab = null;
+    panel.tabs.forEach(function (b) { if (b.getAttribute('data-tab') === 'steps') tab = b; });
+    var badge = tab && tab.querySelector('.pkb-badge');
+    if (!badge) return;
+    var open = 0;
+    guides.forEach(function (g) { g.steps.forEach(function (st) { if (!st.done) open++; }); });
+    var show = open && panel.state.tab !== 'steps' ? String(open) : '';
+    badge.textContent = show;
+    badge.setAttribute('data-pkb-badge', show);
+  }
+
   function stepsList() {
     metaPurpose = 'guide';
     if (!panel) return;
+    guideBadge();
     var pane = panel.stepsPane;
     pane.textContent = '';
     if (!guides.size) { pane.appendChild(el('div', 'pkb-empty', 'No guide yet.')); return; }
@@ -1326,7 +1352,8 @@
     var step = g.steps[from];
     if (!step || step.done) return;
     step.done = true;
-    var ev = {type: 'step', g: g.id, s: step.n, done: true, how: how};
+    // by says who did it: a person's click, typing, or blur is human; agent acts mark the root first.
+    var ev = {type: 'step', g: g.id, s: step.n, done: true, how: how, by: how === 'agent' || actingSource() === 'agent' ? 'agent' : 'human'};
     if (how === 'input' || how === 'select' || how === 'check') ev.filled = true;
     if (value !== undefined) ev.value = value;
     pushEvent(ev);
@@ -1335,7 +1362,7 @@
     g.current = next;
     g.pulse = true;
     if (g.current >= g.steps.length) {
-      pushEvent({type: 'guide', g: g.id, done: true});
+      pushEvent({type: 'guide', g: g.id, done: true, by: ev.by});
       guideClose(g.id);
       return;
     }
@@ -1468,6 +1495,7 @@
       if (step.timer) { clearTimeout(step.timer); step.timer = 0; }
       if (step.badge) { step.badge.remove(); step.badge = null; }
       if (step.ring) { step.ring.remove(); step.ring = null; }
+      if (step.anchor && step.anchor.removeAttribute) { try { step.anchor.removeAttribute('data-pkb-guide-step'); } catch (ignored) { /* gone */ } }
     });
     if (g.tip) { g.tip.remove(); g.tip = null; }
   }
@@ -1531,7 +1559,7 @@
     metaPurpose = 'callout';
     spec = spec || {};
     var id = String(spec.id || 'q1');
-    askClose(id);
+    askClose(id, 'replace');
     listen();
     var root = ensureLayer();
     var node = el('form', 'ask');
@@ -1557,13 +1585,16 @@
       if (spec.sensitive) { delete ev.value; delete ev.choice; ev.filled = true; }
       var bound = pushEvent(ev);
       if (btn) setFeedback(btn, bound ? 'delivered' : 'sending');
-      setTimeout(function () { askClose(id); }, ANSWER_CONFIRM_MS);
+      node.setAttribute('data-pkb-card-state', 'answered');
+      cardTrail(id, spec.say, 'answered', spec.sensitive ? '' : picked);
+      setTimeout(function () { askClose(id, 'answered'); }, ANSWER_CONFIRM_MS);
     }
     if (choices.length) {
       choices.forEach(function (choice, i) {
         var btn = el('button', i === 0 ? '' : 'secondary', choice);
         btn.type = 'button';
         btn.setAttribute('data-choice', choice);
+        tagMeta(btn, 'card-option');
         btn.addEventListener('click', function (event) {
           event.preventDefault();
           event.stopPropagation();
@@ -1585,18 +1616,52 @@
     node.appendChild(row);
     node.setAttribute('data-pkb-id', 'ask-' + id);
     node.setAttribute('data-pkb-card', 'ask');
-    tagMeta(node, 'callout');
+    node.setAttribute('data-pkb-card-id', 'ask-' + id);
+    node.setAttribute('data-pkb-card-title', String(spec.say || '').slice(0, 80));
+    node.setAttribute('data-pkb-card-state', 'open');
+    tagMeta(node, 'callout card');
+    cardTrail(id, spec.say, 'open', '');
     isolateKeys(node);
     root.appendChild(node);
-    asks.set(id, {id: id, node: node, t: spec.t, anchor: spec.t ? findTarget(spec.t) : null, scrollers: []});
+    asks.set(id, {id: id, node: node, t: spec.t, anchor: spec.t ? findTarget(spec.t) : null, scrollers: [],
+      shownAt: Date.now(), minShow: Math.max(0, +spec.minShow || 0)});
     update();
     if (field) { try { field.focus({preventScroll: true}); } catch (ignored) { /* focus refused */ } }
     return {id: id, choices: choices.length};
   }
 
-  function askClose(id) {
+  // The last few cards stay readable after they close: one JSON attribute on <html>, from any world.
+  function cardTrail(id, title, state, choice) {
+    try {
+      var root = document.documentElement;
+      var trail = JSON.parse(root.getAttribute('data-pkb-card-trail') || '[]');
+      if (!Array.isArray(trail)) trail = [];
+      var key = 'ask-' + id;
+      var row = null;
+      trail.forEach(function (r) { if (r && r.id === key) row = r; });
+      if (!row) { row = {id: key, title: String(title || '').slice(0, 80), at: Date.now()}; trail.push(row); }
+      if (row.state === 'answered' && state === 'closed') return;
+      row.state = state;
+      if (choice) row.choice = String(choice).slice(0, 80);
+      row.changed = Date.now();
+      if (trail.length > 8) trail = trail.slice(-8);
+      root.setAttribute('data-pkb-card-trail', JSON.stringify(trail));
+    } catch (ignored) { /* attribute refused */ }
+  }
+
+  function askClose(id, reason) {
     var a = asks.get(String(id));
     if (!a) return false;
+    // ask --min-show holds an unanswered card on screen at least that long; an answer or a replacement closes it now.
+    var held = a.minShow - (Date.now() - a.shownAt);
+    if (held > 0 && reason !== 'answered' && reason !== 'replace') {
+      if (!a.closing) {
+        a.closing = true;
+        setTimeout(function () { if (asks.get(String(id)) === a) { a.minShow = 0; askClose(id, reason); } }, held);
+      }
+      return true;
+    }
+    cardTrail(String(id), a.node.getAttribute('data-pkb-card-title'), reason === 'timeout' ? 'timed-out' : (reason || 'closed'), '');
     a.node.remove();
     asks.delete(String(id));
     if (idle() && layer && layer.isConnected) layer.remove();
@@ -1768,19 +1833,13 @@
     card.style.height = Math.round(st.h) + 'px';
     card.hidden = !!st.min || !!st.pop || closed;
     panel.pill.hidden = !st.min && !st.pop && !closed;
-    if (st.min || st.pop || closed) {
-      var vp = viewport();
-      var pw = panel.pill.offsetWidth || 120;
-      var ph = panel.pill.offsetHeight || 32;
-      var x = Math.max(8, vp.w - pw - 16);
-      var y = Math.max(8, vp.h - ph - 16);
-      panel.pill.style.transform = 'translate3d(' + Math.round(x) + 'px,' + Math.round(y) + 'px,0)';
-    }
     var label = panel.pill.querySelector('.pkb-pill-label');
     if (label) label.textContent = st.pop ? 'Chat window' : 'Agent';
     panel.pill.setAttribute('aria-label', st.pop ? 'Pop chat back in' : 'Open agent panel');
     window.__pkbPanelState = closed ? null : {x: Math.round(st.x), y: Math.round(st.y), w: Math.round(st.w), h: Math.round(st.h), min: !!st.min, tab: st.tab, pop: !!st.pop};
     recountUnread();
+    dockPlace();
+    dockSave();
   }
 
   function panelTab(name) {
@@ -1795,6 +1854,8 @@
     if (panel.recordPane) panel.recordPane.hidden = name !== 'record';
     panel.composer.hidden = name !== 'chat';
     if (name === 'chat') panel.chatPane.scrollTop = panel.chatPane.scrollHeight;
+    if (name === 'steps') stepsList();
+    guideBadge();
     panelPlace();
   }
 
@@ -1808,6 +1869,9 @@
     var node = el('div', 'pkb-msg');
     node.setAttribute('data-from', from);
     if (row.id) node.setAttribute('data-id', row.id);
+    node.setAttribute('data-pkb-msg-id', String(row.id || ''));
+    node.setAttribute('data-pkb-msg-author', from);
+    node.setAttribute('data-pkb-msg-status', String(row.state === 'pending' ? 'sending' : (row.state === 'sent' ? 'delivered' : (row.state || 'shown'))));
     var who = from === 'human' ? 'You' : (from === 'system' ? 'System' : ('Agent' + (row.agent ? ' ' + row.agent : '')));
     var meta = el('span', 'pkb-meta', who + ' \u00b7 ' + clock(row.at));
     node.appendChild(meta);
@@ -1831,22 +1895,53 @@
       if (!row || row.text == null) return;
       var key = row.id ? String(row.id) : '';
       if (key && panel.seen[key]) return;
+      var from = row.from || row.source || 'agent';
+      // The same message can arrive twice: the composer's local id, then the stored chat id. One bubble.
+      var twin = chatTwin(from, String(row.text), row.at);
+      if (twin) {
+        if (key) {
+          panel.seen[key] = true;
+          var shown = pane.querySelector('.pkb-msg[data-id="' + CSS.escape(String(twin.id)) + '"]');
+          if (shown) shown.setAttribute('data-alt-id', key);
+          twin.alt = key;
+        }
+        return;
+      }
       if (key) panel.seen[key] = true;
       if (panel.empty) { panel.empty.remove(); panel.empty = null; }
       pane.appendChild(bubble(row));
       added++;
       chatMirror.push({
         id: key,
-        from: row.from || row.source || 'agent',
+        from: from,
         text: String(row.text),
         state: row.state || '',
-        at: row.at || ''
+        at: row.at || '',
+        seen: !!replaying,
+        ms: Date.now()
       });
       if ((row.from || row.source) !== 'human' && row.state !== 'read') panelUnread();
     });
     if (stick) pane.scrollTop = pane.scrollHeight;
     syncPop('chat');
     return added;
+  }
+
+  var replaying = false;
+  var TWIN_MS = 20000;
+
+  function chatTwin(from, text, at) {
+    var when = at ? Date.parse(at) : NaN;
+    for (var i = chatMirror.length - 1; i >= 0 && i >= chatMirror.length - 50; i--) {
+      var row = chatMirror[i];
+      if (!row || row.text !== text) continue;
+      var a = row.from === 'human' ? 'human' : row.from;
+      var b = from === 'human' ? 'human' : from;
+      if (a !== b) continue;
+      var then = row.at ? Date.parse(row.at) : NaN;
+      if (isNaN(when) || isNaN(then) || Math.abs(when - then) <= TWIN_MS || Date.now() - row.ms <= TWIN_MS) return row;
+    }
+    return null;
   }
 
   function chatSent(ids) {
@@ -1874,8 +1969,7 @@
       var key = CSS.escape(String(id));
       var nodes = [];
       if (panel) {
-        var bubble = panel.chatPane.querySelector('.pkb-msg[data-id="' + key + '"]');
-        if (bubble) nodes.push(bubble);
+        panel.chatPane.querySelectorAll('.pkb-msg[data-id="' + key + '"],.pkb-msg[data-alt-id="' + key + '"]').forEach(function (bubble) { nodes.push(bubble); });
       }
       document.querySelectorAll('[data-pkb-id="' + key + '"],[data-feedback-id="' + key + '"]').forEach(function (node) { nodes.push(node); });
       if (layer && layer.shadowRoot) {
@@ -1883,7 +1977,7 @@
       }
       nodes.forEach(function (node) { setFeedback(node, 'read'); n++; });
       chatMirror.forEach(function (row) {
-        if (String(row.id) === String(id)) row.state = 'read';
+        if (String(row.id) === String(id) || String(row.alt || '') === String(id)) row.state = 'read';
       });
     });
     syncPop('chat');
@@ -1996,6 +2090,195 @@
     handle.addEventListener('pointercancel', end);
   }
 
+  // ---- Unified toolbar (C9) ----
+  // One dock holds a button per tool (agent panel, step editor, recording). A collapsed or closed tool
+  // lives on its button; the handle collapses the whole dock and drags it. Position, the collapsed
+  // flag, and the open panel are kept per origin in localStorage under pkb-dock.
+  var dock = null;
+  var DOCK_KEY = 'pkb-dock';
+  function dockLoad() {
+    try { return JSON.parse(localStorage.getItem(DOCK_KEY) || 'null') || {}; } catch (ignored) { return {}; }
+  }
+  function dockSave() {
+    if (!dock) return;
+    var keep = {collapsed: !!dock.state.collapsed, open: dockOpenTool()};
+    if (dock.state.x != null) { keep.x = Math.round(dock.state.x); keep.y = Math.round(dock.state.y); }
+    try { localStorage.setItem(DOCK_KEY, JSON.stringify(keep)); } catch (ignored) { /* storage blocked */ }
+  }
+  function dockOpenTool() {
+    if (panel && panel.card.isConnected && !panel.state.closed && !panel.state.min && !panel.state.pop) return 'panel:' + (panel.state.tab || 'chat');
+    if (editor && editor.card.isConnected && !editorDismissed && !editor.state.min && !editor.state.pop) return 'editor';
+    return '';
+  }
+  function ensureDock(root) {
+    if (dock) {
+      if (!dock.bar.isConnected) root.appendChild(dock.bar);
+      return dock;
+    }
+    var bar = el('div', 'pkb-dock');
+    bar.setAttribute('role', 'toolbar');
+    bar.setAttribute('aria-label', 'Pickleball tools');
+    bar.setAttribute('data-pkb-dock', '');
+    tagMeta(bar, 'toolbar');
+    var handle = el('button', 'pkb-dock-handle', '\u22ee');
+    handle.type = 'button';
+    handle.setAttribute('aria-label', 'Tools');
+    tagMeta(handle, 'toolbar-handle');
+    var slots = el('div', 'pkb-dock-slots');
+    tagMeta(slots, 'toolbar');
+    bar.appendChild(handle);
+    bar.appendChild(slots);
+    root.appendChild(bar);
+    isolateKeys(bar);
+    var saved = dockLoad();
+    dock = {bar: bar, handle: handle, slots: slots, moved: false,
+      state: {x: isFinite(+saved.x) && saved.x != null ? +saved.x : null, y: isFinite(+saved.y) && saved.y != null ? +saved.y : null, collapsed: !!saved.collapsed}};
+    handle.addEventListener('click', function () {
+      if (dock.moved) { dock.moved = false; return; }
+      dockCollapse(!dock.state.collapsed);
+      pushEvent({type: 'panel', action: dock.state.collapsed ? 'toolbar-collapse' : 'toolbar-expand'});
+    });
+    var from = null;
+    dragger(handle, function () {
+      var r = bar.getBoundingClientRect();
+      from = {x: r.left, y: r.top};
+      dock.moved = false;
+    }, function (dx, dy) {
+      if (Math.abs(dx) + Math.abs(dy) > 4) dock.moved = true;
+      dock.state.x = from.x + dx;
+      dock.state.y = from.y + dy;
+      dockPlace();
+    }, function () {
+      dockPlace();
+      dockSave();
+    });
+    window.addEventListener('resize', function () { dockPlace(); }, true);
+    document.addEventListener('focusin', function () { dockPlace(); }, true);
+    return dock;
+  }
+  function dockAdd(button, root) {
+    var d = ensureDock(root || ensureLayer());
+    if (button.parentNode !== d.slots) d.slots.appendChild(button);
+    button.style.transform = '';
+    dockPlace();
+  }
+  function dockCollapse(on) {
+    if (!dock) ensureDock(ensureLayer());
+    dock.state.collapsed = !!on;
+    dockPlace();
+    dockSave();
+  }
+  function dockOverlap(x, y, w, h, r) {
+    return x < r.right && x + w > r.left && y < r.bottom && y + h > r.top;
+  }
+  function dockPlace() {
+    if (!dock) return;
+    var bar = dock.bar;
+    var tools = Array.prototype.filter.call(dock.slots.children, function (b) { return !b.hidden; });
+    var present = !!(panel || editor || recordBar);
+    bar.hidden = !present;
+    dock.slots.hidden = !!dock.state.collapsed;
+    bar.setAttribute('data-collapsed', dock.state.collapsed ? 'true' : 'false');
+    dock.handle.setAttribute('aria-expanded', dock.state.collapsed ? 'false' : 'true');
+    dock.handle.setAttribute('data-pkb-badge', tools.length ? String(tools.length) : '');
+    var vp = viewport();
+    var w = bar.offsetWidth || 48;
+    var h = bar.offsetHeight || 36;
+    var x = dock.state.x == null ? vp.w - w - 16 : dock.state.x;
+    var y = dock.state.y == null ? vp.h - h - 16 : dock.state.y;
+    x = clamp(x, 0, Math.max(0, vp.w - w));
+    y = clamp(y, 0, Math.max(0, vp.h - h));
+    var active = document.activeElement;
+    if (active && active !== document.body && active !== document.documentElement && active !== layer && active.getBoundingClientRect) {
+      var r = active.getBoundingClientRect();
+      if (dockOverlap(x, y, w, h, r)) {
+        if (r.top - h - 8 >= 0) y = r.top - h - 8;
+        else if (r.bottom + 8 + h <= vp.h) y = r.bottom + 8;
+      }
+    }
+    bar.style.transform = 'translate3d(' + Math.round(x) + 'px,' + Math.round(y) + 'px,0)';
+    window.__pkbDockState = present ? {
+      x: Math.round(x), y: Math.round(y), collapsed: !!dock.state.collapsed, open: dockOpenTool(),
+      buttons: tools.map(function (b) { return b.getAttribute('aria-label') || b.textContent; })
+    } : null;
+  }
+  function dockState() {
+    if (dock) dockPlace();
+    return {dock: window.__pkbDockState || null, panel: panel ? window.__pkbPanelState || null : null,
+      editor: window.__pkbEditorState || null, recording: recordBar ? (recordBar.getAttribute('data-state') || 'recording') : 'off'};
+  }
+  var recordButton = null;
+  function recordDock() {
+    if (!recordBar) {
+      if (recordButton && recordButton.parentNode) recordButton.parentNode.removeChild(recordButton);
+      dockPlace();
+      return;
+    }
+    if (!recordButton) {
+      recordButton = el('button', 'pkb-card pkb-pill pkb-dock-record');
+      recordButton.type = 'button';
+      tagMeta(recordButton, 'recorder-toggle');
+      recordButton.appendChild(el('span', 'pkb-dot'));
+      recordButton.appendChild(el('span', 'pkb-pill-label', 'Recording'));
+      recordButton.addEventListener('click', function () {
+        if (!recordBar) return;
+        var hide = recordBar.style.display !== 'none';
+        recordBar.style.display = hide ? 'none' : '';
+        recordButton.setAttribute('aria-pressed', hide ? 'false' : 'true');
+        recordButton.setAttribute('aria-label', hide ? 'Show recording controls' : 'Collapse recording controls');
+      });
+    }
+    var shown = recordBar.style.display !== 'none';
+    recordButton.setAttribute('aria-pressed', shown ? 'true' : 'false');
+    recordButton.setAttribute('aria-label', shown ? 'Collapse recording controls' : 'Show recording controls');
+    var paused = recordBar.getAttribute('data-state') === 'paused';
+    recordButton.querySelector('.pkb-dot').setAttribute('data-state', paused ? 'idle' : 'live');
+    var root = ensureLayer();
+    panelSheet(root);
+    dockAdd(recordButton, root);
+  }
+
+  // Close asks first when it would discard unsent chat text, an open guide, or a recording.
+  function closeLosses() {
+    var lose = [];
+    if (panel && panel.input && panel.input.value.trim()) lose.push('unsent text');
+    if (guides.size > 0) lose.push('the open guide');
+    if (window.__pkbRecord === true) lose.push('the recording');
+    return lose;
+  }
+  function closeAsk() {
+    var lose = closeLosses();
+    if (!lose.length) { pushEvent({type: 'panel', action: 'close'}); panelClose(); return; }
+    if (panel.confirm && panel.confirm.isConnected) return;
+    var bar = el('div', 'pkb-confirm');
+    bar.setAttribute('role', 'alertdialog');
+    bar.setAttribute('aria-label', 'Confirm close');
+    tagMeta(bar, 'close-confirm');
+    bar.appendChild(el('span', 'pkb-confirm-text', 'Close and discard ' + lose.join(', ') + '?'));
+    var yes = el('button', '', 'Discard and close');
+    yes.type = 'button';
+    tagMeta(yes, 'confirm-close');
+    var no = el('button', '', 'Keep open');
+    no.type = 'button';
+    tagMeta(no, 'cancel-close');
+    bar.appendChild(yes);
+    bar.appendChild(no);
+    yes.addEventListener('click', function () {
+      bar.remove();
+      if (panel.input) { panel.input.value = ''; panel.send.disabled = true; }
+      Array.from(guides.keys()).forEach(function (id) { guideClose(id); });
+      pushEvent({type: 'panel', action: 'close', discarded: lose});
+      panelClose();
+    });
+    no.addEventListener('click', function () {
+      bar.remove();
+      pushEvent({type: 'panel', action: 'close-cancel'});
+    });
+    panel.confirm = bar;
+    panel.card.insertBefore(bar, panel.head.nextSibling);
+    try { yes.focus({preventScroll: true}); } catch (ignored) { /* focus refused */ }
+  }
+
   function buildPanel(root) {
     metaPurpose = 'panel';
     var card = el('section', 'pkb-card pkb-panel');
@@ -2008,12 +2291,17 @@
     var title = el('strong', 'pkb-title', 'Agent');
     var tabs = el('nav', 'pkb-tabs');
     tabs.setAttribute('role', 'tablist');
-    var tabButtons = [['chat', 'Chat'], ['steps', 'Guide'], ['record', 'Recorder']].map(function (t) {
+    var tabButtons = [['chat', 'Chat', 'chat-tab'], ['steps', 'Guide', 'guide-tab'], ['record', 'Recorder', 'recorder-tab']].map(function (t) {
       var b = el('button', '', t[1]);
       b.type = 'button';
       b.setAttribute('role', 'tab');
       b.setAttribute('data-tab', t[0]);
-      b.appendChild(el('span', 'pkb-badge'));
+      b.setAttribute('aria-label', t[1]);
+      tagMeta(b, t[2]);
+      var tabBadge = el('span', 'pkb-badge');
+      tabBadge.setAttribute('aria-hidden', 'true');
+      tabBadge.setAttribute('data-pkb-badge', '');
+      b.appendChild(tabBadge);
       b.addEventListener('click', function () { panelTab(t[0]); });
       tabs.appendChild(b);
       return b;
@@ -2022,14 +2310,17 @@
     pop.type = 'button';
     pop.setAttribute('aria-label', 'Pop out chat');
     pop.setAttribute('data-action', 'popout');
+    tagMeta(pop, 'popout');
     var minimize = el('button', 'pkb-icon', '\u2013');
     minimize.type = 'button';
     minimize.setAttribute('aria-label', 'Minimize');
     minimize.setAttribute('data-action', 'minimize');
+    tagMeta(minimize, 'collapse');
     var close = el('button', 'pkb-icon', '\u00d7');
     close.type = 'button';
     close.setAttribute('aria-label', 'Close');
     close.setAttribute('data-action', 'close');
+    tagMeta(close, 'close');
     head.appendChild(dot);
     head.appendChild(title);
     head.appendChild(tabs);
@@ -2039,12 +2330,15 @@
     var chatPane = el('div', 'pkb-pane pkb-chat');
     chatPane.setAttribute('role', 'log');
     chatPane.setAttribute('aria-live', 'polite');
+    tagMeta(chatPane, 'chat-log');
     var empty = el('div', 'pkb-empty', 'Messages from the agent appear here.');
     chatPane.appendChild(empty);
     var stepsPane = el('div', 'pkb-pane');
+    tagMeta(stepsPane, 'guide-pane');
     stepsPane.hidden = true;
     stepsPane.appendChild(el('div', 'pkb-empty', 'No guide yet.'));
     var recordPane = el('div', 'pkb-pane');
+    tagMeta(recordPane, 'recorder-pane');
     recordPane.hidden = true;
     recordPane.appendChild(el('div', 'pkb-empty', 'Not recording.'));
     var composer = el('form', 'pkb-composer');
@@ -2053,7 +2347,9 @@
     input.rows = 1;
     input.placeholder = 'Message the agent (Enter to send, Shift+Enter for a new line)';
     input.setAttribute('aria-label', 'Message');
+    tagMeta(input, 'message');
     var send = el('button', '', 'Send');
+    tagMeta(send, 'send');
     send.type = 'submit';
     send.disabled = true;
     composer.appendChild(input);
@@ -2072,14 +2368,17 @@
     pill.type = 'button';
     pill.hidden = true;
     pill.setAttribute('aria-label', 'Open agent panel');
+    tagMeta(pill, 'reopen');
     var pillDot = el('span', 'pkb-dot');
     pillDot.setAttribute('data-state', 'live');
     pill.appendChild(pillDot);
     var pillLabel = el('span', 'pkb-pill-label', 'Agent');
     pill.appendChild(pillLabel);
-    pill.appendChild(el('span', 'pkb-unread'));
+    var pillUnread = el('span', 'pkb-unread');
+    pillUnread.setAttribute('aria-hidden', 'true');
+    pillUnread.setAttribute('data-pkb-badge', '');
+    pill.appendChild(pillUnread);
     root.appendChild(card);
-    root.appendChild(pill);
     isolateKeys(card);
     isolateKeys(pill);
     var p = {card: card, pill: pill, head: head, title: title, tabs: tabButtons, chatPane: chatPane, stepsPane: stepsPane,
@@ -2094,10 +2393,7 @@
     composer.addEventListener('submit', function (event) { event.preventDefault(); panelSend(); });
     minimize.addEventListener('click', function () { p.state.min = true; p.state.pop = false; panelPlace(); });
     pop.addEventListener('click', function () { popOut('chat'); });
-    close.addEventListener('click', function () {
-      pushEvent({type: 'panel', action: 'close'});
-      panelClose();
-    });
+    close.addEventListener('click', function () { closeAsk(); });
     pill.addEventListener('click', function () {
       if (p.state.pop) { popIn('chat'); return; }
       if (p.state.closed || !p.card.isConnected) {
@@ -2164,7 +2460,7 @@
     root.__pkbPanelSheet = true;
     try {
       var sheet = new CSSStyleSheet();
-      sheet.replaceSync(PANEL_CSS + '\n.pkb-panel,.pkb-pill{pointer-events:auto;}');
+      sheet.replaceSync(PANEL_CSS + '\n.pkb-panel,.pkb-pill,.pkb-dock{pointer-events:auto;}');
       root.adoptedStyleSheets = Array.from(root.adoptedStyleSheets || []).concat([sheet]);
     } catch (unsupported) {
       var style = document.createElement('style');
@@ -2180,17 +2476,21 @@
     var root = ensureLayer();
     panelSheet(root);
     if (!panel) panel = buildPanel(root);
-    if (!panel.card.isConnected) { root.appendChild(panel.card); root.appendChild(panel.pill); }
+    if (!panel.card.isConnected) root.appendChild(panel.card);
+    dockAdd(panel.pill, root);
     var st = panel.state;
     ['x', 'y', 'w', 'h'].forEach(function (k) { if (opts[k] != null && opts[k] !== '' && isFinite(+opts[k])) st[k] = +opts[k]; });
     if (opts.min != null) st.min = opts.min === true || opts.min === 'true';
+    if (opts.dockCollapsed != null) dockCollapse(opts.dockCollapsed === true || opts.dockCollapsed === 'true');
     if (opts.title) panel.title.textContent = String(opts.title).slice(0, 80);
     if (opts.theme === 'light' || opts.theme === 'dark') { panel.card.setAttribute('data-theme', opts.theme); panel.pill.setAttribute('data-theme', opts.theme); }
     else if (opts.theme === 'auto') { panel.card.removeAttribute('data-theme'); panel.pill.removeAttribute('data-theme'); }
-    if (Array.isArray(opts.history)) chat(opts.history);
+    if (Array.isArray(opts.history)) { replaying = true; try { chat(opts.history); } finally { replaying = false; } }
     stepsList();
+    try { document.documentElement.setAttribute('data-pkb-panel-want', 'open'); } catch (ignored) { /* attribute refused */ }
     st.closed = false;
-    panelTab(opts.tab === 'steps' ? 'steps' : (opts.tab === 'record' ? 'record' : (opts.tab === 'chat' ? 'chat' : st.tab || 'chat')));
+    var wantTab = opts.tab === 'guide' ? 'steps' : (opts.tab === 'recorder' ? 'record' : opts.tab);
+    panelTab(wantTab === 'steps' ? 'steps' : (wantTab === 'record' ? 'record' : (wantTab === 'chat' ? 'chat' : st.tab || 'chat')));
     paintRecordPane();
     raiseLayer();
     if (opts.focus !== false && !st.min && st.tab === 'chat') {
@@ -2206,6 +2506,7 @@
     panel.state.min = false;
     panel.state.pop = false;
     window.__pkbPanelState = null;
+    try { document.documentElement.removeAttribute('data-pkb-panel-want'); } catch (ignored) { /* attribute refused */ }
     panelPlace();
     if (items.size === 0 && !editor && guides.size === 0 && asks.size === 0 && layer && layer.isConnected) {
       layer.removeAttribute('data-pkb-layer');
@@ -2315,6 +2616,9 @@
   function restoreWhenReady(st) {
     restoreState = st;
     restoreApplied = false;
+    try {
+      if (st && st.snap && st.snap.panel && inScope(st)) document.documentElement.setAttribute('data-pkb-panel-want', 'open');
+    } catch (ignored) { /* attribute refused */ }
     if (st && st.pageState) {
       try { sessionStorage.setItem('pkb-ui', JSON.stringify(st)); } catch (ignored) { /* storage blocked */ }
     }
@@ -2375,6 +2679,7 @@
     if (status === 'stopped' && !spec.script && !(Array.isArray(spec.steps) && spec.steps.length)) {
       if (recordBar && recordBar.parentNode) recordBar.parentNode.removeChild(recordBar);
       recordBar = null;
+      recordDock();
       editorSync(spec);
       return {on: !!window.__pkbRecord, status: status, editor: window.__pkbEditorState || null};
     }
@@ -2437,6 +2742,7 @@
     recordBar.appendChild(button(pausedNow ? 'Resume' : 'Pause', pausedNow ? 'resume' : 'pause'));
     recordBar.appendChild(button('Keep step', 'accept'));
     recordBar.appendChild(button('Drop step', 'reject'));
+    recordDock();
     paintRecordPane();
     editorSync(spec);
     return {on: !!window.__pkbRecord, status: status, script: spec.script || '', editor: window.__pkbEditorState || null};
@@ -2526,13 +2832,6 @@
     editor.card.style.transform = 'translate3d(' + Math.round(st.x) + 'px,' + Math.round(st.y) + 'px,0)';
     editor.card.style.width = Math.round(st.w) + 'px';
     editor.card.style.height = Math.round(st.h) + 'px';
-    if (st.min || st.pop || closed) {
-      var vp = viewport();
-      var ph = editor.pill.offsetHeight || 32;
-      var x = 16;
-      var y = Math.max(8, vp.h - ph - 16);
-      editor.pill.style.transform = 'translate3d(' + x + 'px,' + Math.round(y) + 'px,0)';
-    }
     var label = editor.pill.querySelector('.pkb-pill-label');
     if (label) label.textContent = st.pop ? 'Steps window' : 'Steps';
     editor.pill.setAttribute('aria-label', st.pop ? 'Pop steps back in' : 'Open step editor');
@@ -2540,6 +2839,7 @@
       x: Math.round(st.x), y: Math.round(st.y), w: Math.round(st.w), h: Math.round(st.h),
       min: !!st.min, pop: !!st.pop, count: (editor.steps || []).length
     };
+    dockPlace();
   }
 
   function editorApplyIncoming(steps) {
@@ -2672,10 +2972,8 @@
     var root = ensureLayer();
     panelSheet(root);
     if (!editor) editor = buildEditor(root);
-    if (!editor.card.isConnected) {
-      root.appendChild(editor.card);
-      root.appendChild(editor.pill);
-    }
+    if (!editor.card.isConnected) root.appendChild(editor.card);
+    dockAdd(editor.pill, root);
     if (Array.isArray(opts.steps)) editorApplyIncoming(opts.steps);
     else editorRender();
     raiseLayer();
@@ -2744,7 +3042,6 @@
     pill.querySelector('.pkb-dot').setAttribute('data-state', 'live');
     pill.appendChild(el('span', 'pkb-pill-label', 'Steps'));
     root.appendChild(card);
-    root.appendChild(pill);
     isolateKeys(card);
     isolateKeys(pill);
     var state = editorDefaults();
@@ -2988,22 +3285,28 @@
   function recountUnread() {
     if (!panel || !panel.tabs || !panel.tabs.length) return;
     var n = 0;
+    var looking = !panel.state.min && !panel.state.pop && !panel.state.closed && panel.state.tab === 'chat' && panel.card.isConnected;
     chatMirror.forEach(function (row) {
       var from = row.from || 'agent';
-      if (from !== 'human' && row.state !== 'read') n++;
+      if (from === 'human' || row.state === 'read') return;
+      // A message shown while the person looks at the chat pane, or replayed after a navigation, is seen.
+      if (looking) row.seen = true;
+      if (!row.seen) n++;
     });
     panel.unread = n;
-    var looking = !panel.state.min && !panel.state.pop && !panel.state.closed && panel.state.tab === 'chat' && panel.card.isConnected;
     var chatTab = panel.tabs[0];
     var badge = chatTab.querySelector('.pkb-badge');
     var show = !looking && n;
-    if (badge) badge.textContent = show ? String(n) : '';
+    if (badge) { badge.textContent = show ? String(n) : ''; badge.setAttribute('data-pkb-badge', show ? String(n) : ''); }
     if (show) chatTab.setAttribute('data-unread', String(n));
     else chatTab.removeAttribute('data-unread');
-    chatTab.setAttribute('aria-label', show ? 'Chat, ' + n + ' unread' : 'Chat');
+    // The accessible name stays "Chat" so a ref or query keeps matching; the count is a description.
+    chatTab.setAttribute('aria-label', 'Chat');
+    if (show) chatTab.setAttribute('aria-description', n + ' unread');
+    else chatTab.removeAttribute('aria-description');
     var pill = panel.pill && panel.pill.querySelector('.pkb-unread');
     var showPill = (panel.state.min || panel.state.pop || panel.state.closed || !panel.card.isConnected) && n;
-    if (pill) pill.textContent = showPill ? String(n) : '';
+    if (pill) { pill.textContent = showPill ? String(n) : ''; pill.setAttribute('data-pkb-badge', showPill ? String(n) : ''); }
   }
 
   function syncPop(kind) {
@@ -3155,6 +3458,8 @@
     panelOpen: panelOpen,
     panelClose: panelClose,
     panelState: panelState,
+    dockState: dockState,
+    dockCollapse: function (on) { dockCollapse(on !== false && on !== 'false'); return dockState(); },
     panelTab: panelTab,
     chat: chat,
     chatSent: chatSent,
@@ -3168,6 +3473,10 @@
     guideState: guideState,
     ask: ask,
     askClose: askClose,
+    askTimeout: function (id) { return askClose(id, 'timeout'); },
+    cardTrailRead: function () {
+      try { return JSON.parse(document.documentElement.getAttribute('data-pkb-card-trail') || '[]'); } catch (bad) { return []; }
+    },
     snapshot: snapshot,
     restoreWhenReady: restoreWhenReady,
     forget: forget,
@@ -3185,6 +3494,73 @@
     popOut: function (kind) { return popOut(kind || 'editor'); },
     popIn: function (kind) { return popIn(kind || 'editor'); }
   };
+
+  // ---- Upload hand-off (C6) ----
+  // A person who clicks a file input, or an Upload/Attach control that stands for one, is offered
+  // "Ask agent to attach a file". That button posts upload-request with the input's ref and label;
+  // the agent answers with act --kind=attach or upload. The native picker still opens as usual.
+  var uploadOffer = null;
+  var uploadSeq = 0;
+  function uploadInputFor(node) {
+    if (!node || !node.closest) return null;
+    if (node.matches && node.matches('input[type=file]')) return {input: node, control: node};
+    var label = node.closest('label');
+    if (label) {
+      var c = label.control || (label.htmlFor ? document.getElementById(label.htmlFor) : null);
+      if (c && c.matches && c.matches('input[type=file]')) return {input: c, control: label};
+    }
+    var ctl = node.closest('button,[role="button"],a,label');
+    if (!ctl) return null;
+    var name = String(ctl.getAttribute('aria-label') || ctl.textContent || '').trim();
+    if (!/upload|attach/i.test(name)) return null;
+    var inner = ctl.querySelector ? ctl.querySelector('input[type=file]') : null;
+    if (inner) return {input: inner, control: ctl};
+    var all = document.querySelectorAll('input[type=file]');
+    return all.length === 1 ? {input: all[0], control: ctl} : null;
+  }
+  function uploadLabel(found) {
+    var input = found.input;
+    var text = (input.labels && input.labels[0] && input.labels[0].textContent) || input.getAttribute('aria-label')
+      || (found.control !== input ? found.control.getAttribute('aria-label') || found.control.textContent : '') || input.name || 'file';
+    return String(text).replace(/\s+/g, ' ').trim().slice(0, 80);
+  }
+  function offerUpload(event) {
+    var leaf = eventLeaf(event);
+    if (!leaf || ours(leaf) || (leaf.closest && leaf.closest(OWN))) return;
+    if (actingSource() === 'agent') return;
+    var found = uploadInputFor(leaf);
+    if (!found) return;
+    var input = found.input;
+    var ref = input.id ? '#' + input.id : (input.getAttribute('data-pkb-handle') || '');
+    if (!ref) {
+      ref = 'upload-' + (++uploadSeq);
+      input.setAttribute('data-pkb-handle', ref);
+    }
+    var label = uploadLabel(found);
+    var root = ensureLayer();
+    if (uploadOffer && uploadOffer.parentNode) uploadOffer.remove();
+    metaPurpose = 'callout';
+    var btn = el('button', 'pkb-upload-ask', 'Ask agent to attach a file');
+    btn.type = 'button';
+    tagMeta(btn, 'request-upload');
+    btn.setAttribute('data-pkb-upload-ref', ref);
+    var r = (found.control.getBoundingClientRect ? found.control : input).getBoundingClientRect();
+    btn.style.cssText = 'position:fixed;left:' + Math.round(Math.max(4, r.left)) + 'px;top:' + Math.round(r.bottom + 6)
+      + 'px;pointer-events:auto;z-index:2147483647;font:13px system-ui,sans-serif;padding:4px 10px;border-radius:6px;'
+      + 'border:1px solid #2563eb;background:#eff6ff;color:#1e3a8a;cursor:pointer;';
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      pushEvent({type: 'upload-request', ref: ref, label: label, name: input.name || '', multiple: !!input.multiple});
+      btn.textContent = 'Asked the agent to attach a file';
+      btn.disabled = true;
+      setTimeout(function () { if (btn.parentNode) btn.remove(); }, 8000);
+    });
+    isolateKeys(btn);
+    root.appendChild(btn);
+    uploadOffer = btn;
+  }
+  try { document.addEventListener('click', offerUpload, true); } catch (ignored) { /* no document */ }
 
   var docVersion = 0;
   var docWatchers = [];

@@ -9,6 +9,7 @@ A consumer normally needs the Pickleball test dependency and one runner extendin
 - Java 21
 - the project's wrapper: `mvnw` or `mvnw.cmd`, `gradlew` or `gradlew.bat`, or `java -jar` on the wrapper jar. Pick the script from the OS. Do not require a machine-wide Maven or Gradle install
 - a Selenium-supported browser for browser scenarios
+- for Linux desktop control: an X11 or Xvfb session with `DISPLAY` set, AT-SPI, and `xdotool`. Wayland-only sessions are unsupported for desktop control
 - nothing extra to install for element operations. Unset, `auto`, and `off` use `SeleniumAdapter` and do not start the in-repo Java DOM engine, which ships in the Pickleball jar. Only `pkb_composite=on` starts that engine. An explicit `pkb_composite_bin` points at a domengine launcher. `pkb_composite_engine` is not a selector: unset does nothing, `java` warns once, and any other value fails at engine start. See [Configuration](configuration.md).
 
 ## Maven dependency

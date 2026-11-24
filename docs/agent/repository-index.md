@@ -172,6 +172,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/roadmaps/3.0.0-engine-defects-roadmap.md`
 - `docs/roadmaps/3.0.0-java-dom-roadmap.md`
 - `docs/roadmaps/3.0.0-linked-tracking-roadmap.md`
+- `docs/roadmaps/3.0.0-locked-followons-roadmap.md`
 - `docs/roadmaps/3.0.0-locked-G1-protocol.md`
 - `docs/roadmaps/3.0.0-locked-G2-query.md`
 - `docs/roadmaps/3.0.0-locked-G3-snapshot.md`
@@ -304,8 +305,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentcontrol/AgentStore.java`
 - `src/main/java/tools/dscode/common/agentcontrol/AnswerRecovery.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ChatCursor.java`
+- `src/main/java/tools/dscode/common/agentcontrol/ChatHead.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ChatLog.java`
 - `src/main/java/tools/dscode/common/agentcontrol/EventCursor.java`
+- `src/main/java/tools/dscode/common/agentcontrol/HumanLock.java`
 - `src/main/java/tools/dscode/common/agentcontrol/HumanValue.java`
 - `src/main/java/tools/dscode/common/agentcontrol/LaunchTemplates.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ObserveEvents.java`
@@ -324,6 +327,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentfast/AgentCursor.java`
 - `src/main/java/tools/dscode/common/agentfast/AgentEnvelope.java`
 - `src/main/java/tools/dscode/common/agentfast/AgentForward.java`
+- `src/main/java/tools/dscode/common/agentfast/CollabRows.java`
 - `src/main/java/tools/dscode/common/agentfast/CompactReply.java`
 - `src/main/java/tools/dscode/common/agentfast/FallbackLog.java`
 - `src/main/java/tools/dscode/common/agentfast/FixturePages.java`
@@ -337,6 +341,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentfast/ScreenshotReply.java`
 - `src/main/java/tools/dscode/common/agentfast/SelftestUi.java`
 - `src/main/java/tools/dscode/common/agentfast/SessionIds.java`
+- `src/main/java/tools/dscode/common/agentfast/SnapSince.java`
 - `src/main/java/tools/dscode/common/agentfast/SnapView.java`
 - `src/main/java/tools/dscode/common/agentfast/StandardView.java`
 - `src/main/java/tools/dscode/common/agentfast/StepTiming.java`
@@ -1058,6 +1063,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/ClickOnceTest.java`
 - `src/test/java/tools/dscode/launcher/CliForwardToWorkerTest.java`
 - `src/test/java/tools/dscode/launcher/ClosedShadowResolveTest.java`
+- `src/test/java/tools/dscode/launcher/CollabFixesLiveTest.java`
 - `src/test/java/tools/dscode/launcher/CompactSnapshotTest.java`
 - `src/test/java/tools/dscode/launcher/CompositeVerbsCliTest.java`
 - `src/test/java/tools/dscode/launcher/ConfirmTest.java`
@@ -1079,6 +1085,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/GcRunsDryRunTest.java`
 - `src/test/java/tools/dscode/launcher/GuidanceCommandGoldenTest.java`
 - `src/test/java/tools/dscode/launcher/HousekeepingRoadmapTest.java`
+- `src/test/java/tools/dscode/launcher/HumanTierTest.java`
 - `src/test/java/tools/dscode/launcher/JsFallbackHonestyTest.java`
 - `src/test/java/tools/dscode/launcher/MaskQuietTest.java`
 - `src/test/java/tools/dscode/launcher/NavigateDataFileTest.java`
@@ -1438,6 +1445,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/WarmProcess.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/StoreHistoryReader.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/surface/NativeHighlightBox.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/VerbTiers.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/WindowDriver.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/WorkbenchFeatureIndex.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/Workspace.java`
@@ -1750,6 +1758,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/desktop/LiveDesktopSnapshotTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/LiveDesktopTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/MacAccessibilityScriptTest.java`
+- `dom-engine/src/test/java/dev/domengine/desktop/WaylandDetectionTest.java`
 - `dom-engine/src/test/java/dev/domengine/DocumentWalkFixtureTest.java`
 - `dom-engine/src/test/java/dev/domengine/EngineLogTest.java`
 - `dom-engine/src/test/java/dev/domengine/FakeCdp.java`

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.modelcontextprotocol.server.McpServerFeatures;
 import io.modelcontextprotocol.spec.McpSchema;
 import tools.dscode.control.protocol.AgentLog;
+import tools.dscode.control.protocol.VerbTiers;
 import tools.dscode.control.protocol.OutputFormatter;
 import tools.dscode.control.protocol.SecretRedactor;
 import tools.dscode.control.protocol.ControlBridgeMappingSnapshot;
@@ -556,6 +557,10 @@ final class WorkbenchMcpTools {
                 "Watch page events. fields and budget limit the reply.",
                 schema(view),
                 args -> viewCommand("watch", args));
+        add("workbench_navigate",
+                "Open a URL, URL.* config key, or fixture:<name> in the live start-host page. The session, panel, and guide stay.",
+                schema(view),
+                args -> viewCommand("navigate", args));
         add("workbench_chat_turn",
                 "Send one agent line, then wait for a human message, an answer, or a click.",
                 schema(view),
@@ -843,6 +848,12 @@ final class WorkbenchMcpTools {
         view.put("out", stringProperty("Optional capture path."));
         view.put("frame", stringProperty("Frame id."));
         view.put("condition", stringProperty("Wait or act condition."));
+        view.put("url", stringProperty("navigate address: URL, URL.* config key, or fixture:<name>."));
+        view.put("include", stringProperty("snap/find keys: values,highlights,cards,guide,placements,chat."));
+        view.put("exposure", stringProperty("human or full."));
+        view.put("since", stringProperty("snap --since cursor (snapCursor from an earlier snap)."));
+        view.put("purpose", stringProperty("data-pkb-purpose token, such as chat-tab."));
+        view.put("file", stringProperty("upload or attach path; several are comma-separated."));
         return view;
     }
 
@@ -935,7 +946,7 @@ final class WorkbenchMcpTools {
         for (String key : List.of(
                 "target", "session", "query", "ref", "fields", "budget", "format", "limit", "where", "within",
                 "depth", "group", "priority", "kind", "value", "text", "timeout", "until", "pick", "mode", "out",
-                "channel", "frame", "condition"
+                "channel", "frame", "condition", "url", "include", "exposure", "since", "purpose", "file"
         )) {
             String value = optionalAny(args, key);
             if (value != null && !value.isBlank()) forwarded.put(key, value);
@@ -952,7 +963,7 @@ final class WorkbenchMcpTools {
     private static final java.util.Set<String> VIEW_KEYS = java.util.Set.of(
             "target", "session", "sessionId", "query", "ref", "fields", "budget", "format", "limit", "where",
             "within", "depth", "group", "priority", "kind", "value", "text", "timeout", "until", "pick",
-            "runId", "mode", "out", "channel", "frame", "condition"
+            "runId", "mode", "out", "channel", "frame", "condition", "url", "include", "exposure", "since", "purpose", "file"
     );
 
     /** Rejects a value the CLI would not accept. Numbers and strings are both valid. */
@@ -1166,7 +1177,9 @@ final class WorkbenchMcpTools {
             Map<String, Object> inputSchema,
             Function<Map<String, Object>, Object> action
     ) {
-        tools.put(name, new ToolBinding(name, description, inputSchema, action));
+        // The tier comes from the one registry (VerbTiers): human tools use the human view and human input only.
+        String tiered = description + " Tier: " + VerbTiers.toolTier(name) + ".";
+        tools.put(name, new ToolBinding(name, tiered, inputSchema, action));
     }
 
     private McpServerFeatures.SyncToolSpecification specification(ToolBinding binding) {

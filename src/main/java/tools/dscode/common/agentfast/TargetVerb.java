@@ -75,7 +75,7 @@ public final class TargetVerb {
     private static final Set<String> ACT_KEYS = Set.of(
             "target", "kind", "query", "ref", "value", "snap", "run-id", "agent", "agent-id",
             "fixture", "timeout", "condition", "frame", "group", "sequence",
-            "format", "fields", "where", "limit", "budget", "pick", "session", "sessionId"
+            "format", "fields", "where", "limit", "budget", "pick", "session", "sessionId", "exposure", "purpose", "file", "human"
     );
 
     /** CSS or text selector for a fresh {@code ref:}. Null when the ref is unknown or stale. */
@@ -176,6 +176,7 @@ public final class TargetVerb {
                     + "el.setAttribute('data-pkb-style','style_modified');"
                     + "el.setAttribute('data-pkb-sentence', sentence);"
                     + "el.setAttribute('data-pkb-css', css);"
+                    + "el.setAttribute('data-pkb-highlight', " + jsString(CollabRows.presetOf(css)) + ");"
                     + "return {ok:true,style:el.getAttribute('data-pkb-style'),css:el.getAttribute('data-pkb-css')};"
                     + "})()";
             ObjectNode params = Jsons.object();
@@ -294,7 +295,9 @@ public final class TargetVerb {
                 case "attach" -> attach(project, runId, target, values);
                 case "snap" -> snap(project, runId, target, values);
                 case "find" -> find(project, runId, target, values);
-                case "act" -> act(project, runId, target, values);
+                case "act" -> withPick(act(project, runId, target, values));
+                case "upload" -> withPick(act(project, runId, target, uploadArgs(values)));
+                case "navigate" -> navigate(project, runId, target, values);
                 case "form-fill" -> formFill(project, runId, target, values);
                 case "wait", "wait-for" -> wait(project, runId, target, values);
                 case "watch" -> watch(project, runId, target, values);
@@ -322,7 +325,7 @@ public final class TargetVerb {
     /** Page verbs with no selector use the browser this process already has open. */
     private static boolean needsLiveTarget(String verb) {
         return switch (verb == null ? "" : verb) {
-            case "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "eval" -> true;
+            case "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "eval", "upload", "navigate" -> true;
             default -> false;
         };
     }
@@ -361,7 +364,7 @@ public final class TargetVerb {
     }
 
     private static Outcome find(Path project, String runId, TargetSelector.Parsed target, Map<String, String> args) {
-        String query = blank(args.get("query"));
+        String query = withPurpose(blank(args.get("query")), args.get("purpose"));
         if ("desktop".equals(target.kind()) || ("ref".equals(target.kind()) && desktopHit(args.get("ref")))) {
             return findDesktop(runId, target, args, query);
         }
@@ -387,6 +390,11 @@ public final class TargetVerb {
             }
             String version = docVersion(page.session.connection());
             List<Map<String, Object>> rows = publish(runId, "browser", page.session.id, version, hits, query, page.session.connection());
+            String exposure = exposureOf(args);
+            if (exposure == null) return fail("find", "exposure is human or full");
+            if ("human".equals(exposure)) rows.removeIf(row -> Boolean.FALSE.equals(row.get("visible")));
+            if (rows.isEmpty()) return fail("find", "not found");
+            CollabRows.narrow(rows, blank(args.get("include")));
             remember(runId, page.session);
             Map<String, Object> body = base("find", "cdp", "browser", target);
             body.put("docVersion", version);
@@ -420,7 +428,187 @@ public final class TargetVerb {
         return ok(body);
     }
 
+    /**
+     * {@code navigate --url=}: one {@code Page.navigate} on the held page, then a wait for the load. The CLI already
+     * resolved a config key or {@code fixture:} name with the Gherkin navigate rules. The session, preloads, panel,
+     * and guide state stay; the page-state restore re-injects them into the new document.
+     */
+    private static Outcome navigate(Path project, String runId, TargetSelector.Parsed target, Map<String, String> args) {
+        String url = blank(args.get("url"));
+        if (url.isBlank()) return fail("navigate", "navigate needs --url=<url|fixture:name|URL.key>");
+        if (FixturePages.isFixture(url)) url = FixturePages.resolve(url);
+        String lower = url.toLowerCase(Locale.ROOT);
+        if (!(lower.startsWith("http://") || lower.startsWith("https://") || lower.startsWith("file:")
+                || lower.startsWith("data:") || lower.startsWith("about:"))) {
+            return fail("navigate", "url did not resolve: " + args.get("url"));
+        }
+        if ("desktop".equals(target.kind())) return fail("navigate", "navigate is browser only");
+        Held page = openBrowser(resolved(target, args));
+        try {
+            CdpConnection cdp = page.session.connection();
+            String before = href(cdp, "");
+            ObjectNode params = Jsons.object();
+            params.put("url", url);
+            JsonNode sent = cdp.call("Page.navigate", params, Duration.ofSeconds(30));
+            String error = sent.path("errorText").asText("");
+            if (!error.isBlank()) {
+                Outcome failed = fail("navigate", error);
+                failed.body().put("url", url.length() > 200 ? url.substring(0, 200) : url);
+                return failed;
+            }
+            long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(Math.max(1000, timeoutMs(args)));
+            String state = "";
+            while (System.nanoTime() < deadline) {
+                state = evalText(cdp, "", "document.readyState + '|' + location.href");
+                if (state.startsWith("complete|") && !(state.substring(9).equals(before) && !url.equals(before))) break;
+                sleep(50);
+            }
+            Map<String, Object> body = base("navigate", "cdp", "browser", target);
+            body.put("applied", state.startsWith("complete|"));
+            String now = href(cdp, "");
+            body.put("url", now.length() > 200 ? now.substring(0, 200) : now);
+            body.put("title", title(cdp));
+            body.put("docVersion", docVersion(cdp));
+            stamp(body, cdp, null);
+            putEntered(body, runId, cdp);
+            return ok(body);
+        } finally {
+            page.release();
+        }
+    }
+
+    /** {@code upload --ref= --file=}: the same act, kind attach. */
+    private static Map<String, String> uploadArgs(Map<String, String> values) {
+        Map<String, String> args = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : values.entrySet()) {
+            if (ACT_KEYS.contains(entry.getKey())) args.put(entry.getKey(), entry.getValue());
+        }
+        args.put("kind", "attach");
+        if (blank(args.get("file")).isBlank()) throw new Miss("upload needs --file=<path>");
+        return args;
+    }
+
+    /**
+     * {@code act --kind=attach}: {@code DOM.setFileInputFiles} on the file input this control names (itself, its
+     * label's control, an input inside it, or the page's single file input for an Upload or Attach control).
+     * Every path must exist. Applied follows {@code input.files}.
+     */
+    private static Effect attachFiles(BrowserSession session, DomNode node, String raw) {
+        DomNode input = fileInputFor(node);
+        if (input == null) throw new Miss("no file input for this control");
+        List<String> paths = new ArrayList<>();
+        for (String part : (raw == null ? "" : raw).split("[,\\n]")) {
+            String path = part.trim();
+            if (path.isEmpty()) continue;
+            java.nio.file.Path file = java.nio.file.Path.of(path).toAbsolutePath().normalize();
+            if (!java.nio.file.Files.isRegularFile(file)) throw new Miss("file not found: " + path);
+            paths.add(file.toString());
+        }
+        if (paths.isEmpty()) throw new Miss("attach needs --value=<path> or --file=<path>");
+        if (paths.size() > 1 && !input.attributes.containsKey("multiple")) throw new Miss("this file input takes one file");
+        CdpConnection cdp = session.connection();
+        String sessionId = input.cdpSession == null ? "" : input.cdpSession;
+        ObjectNode params = Jsons.object();
+        com.fasterxml.jackson.databind.node.ArrayNode files = params.putArray("files");
+        for (String path : paths) files.add(path);
+        params.put("backendNodeId", input.backendNodeId);
+        if (sessionId.isBlank()) cdp.call("DOM.setFileInputFiles", params, Duration.ofSeconds(10));
+        else cdp.call("DOM.setFileInputFiles", params, sessionId, Duration.ofSeconds(10));
+        List<String> names = new ArrayList<>();
+        try {
+            ObjectNode resolve = Jsons.object();
+            resolve.put("backendNodeId", input.backendNodeId);
+            JsonNode resolved = sessionId.isBlank()
+                    ? cdp.call("DOM.resolveNode", resolve, Duration.ofSeconds(5))
+                    : cdp.call("DOM.resolveNode", resolve, sessionId, Duration.ofSeconds(5));
+            ObjectNode call = Jsons.object();
+            call.put("objectId", resolved.path("object").path("objectId").asText(""));
+            call.put("functionDeclaration", "function(){return Array.from(this.files||[]).map(function(f){return f.name;});}");
+            call.put("returnByValue", true);
+            JsonNode value = (sessionId.isBlank()
+                    ? cdp.call("Runtime.callFunctionOn", call, Duration.ofSeconds(5))
+                    : cdp.call("Runtime.callFunctionOn", call, sessionId, Duration.ofSeconds(5))).path("result").path("value");
+            if (value.isArray()) for (JsonNode name : value) names.add(name.asText(""));
+        } catch (RuntimeException ignored) {
+            // No read-back: the files were sent and applied stays unknown.
+            return Effect.unknown("cdp");
+        }
+        Map<String, Object> note = PICKED.get() == null ? new LinkedHashMap<>() : PICKED.get();
+        note.put("files", names);
+        note.put("input", inputLabel(input));
+        PICKED.set(note);
+        return names.size() == paths.size() ? Effect.changed("cdp") : Effect.quiet("cdp");
+    }
+
+    private static String inputLabel(DomNode input) {
+        String id = attr(input, "id");
+        if (!id.isBlank()) return "#" + id;
+        String name = attr(input, "name");
+        return name.isBlank() ? "input[type=file]" : "input[name=" + name + "]";
+    }
+
+    /** The file input a control stands for, or null. */
+    static DomNode fileInputFor(DomNode node) {
+        if (node == null) return null;
+        if (isFileInput(node)) return node;
+        DomNode root = node;
+        while (root.parent != null) root = root.parent;
+        List<DomNode> inside = new ArrayList<>();
+        walk(node, child -> { if (isFileInput(child)) inside.add(child); });
+        if (inside.size() == 1) return inside.get(0);
+        String forId = "label".equals(node.tag()) ? attr(node, "for") : "";
+        List<DomNode> all = new ArrayList<>();
+        walk(root, child -> { if (isFileInput(child)) all.add(child); });
+        if (!forId.isBlank()) {
+            for (DomNode candidate : all) if (forId.equals(attr(candidate, "id"))) return candidate;
+        }
+        String label = (name(node) + " " + attr(node, "aria-label")).toLowerCase(Locale.ROOT);
+        if ((label.contains("upload") || label.contains("attach")) && all.size() == 1) return all.get(0);
+        return null;
+    }
+
+    private static boolean isFileInput(DomNode node) {
+        return node != null && "input".equals(node.tag()) && "file".equalsIgnoreCase(attr(node, "type"));
+    }
+
+    /** Candidates and the pick reason for the act running on this thread, added to its reply. */
+    private static final ThreadLocal<Map<String, Object>> PICKED = new ThreadLocal<>();
+
+    private static Outcome withPick(Outcome outcome) {
+        Map<String, Object> note = PICKED.get();
+        PICKED.remove();
+        if (note != null && outcome != null && outcome.body() != null) outcome.body().putAll(note);
+        return outcome;
+    }
+
+    private static void notePick(List<DomNode> hits, DomNode chosen, String pick) {
+        if (hits == null || hits.size() < 2 || chosen == null) return;
+        List<Map<String, Object>> candidates = new ArrayList<>();
+        for (int i = 0; i < hits.size() && i < 12; i++) {
+            DomNode node = hits.get(i);
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("index", i + 1);
+            row.put("role", role(node));
+            row.put("name", name(node));
+            String purpose = attr(node, "data-pkb-purpose");
+            if (!purpose.isBlank()) row.put("purpose", String.join(",", purpose.trim().split("\\s+")));
+            candidates.add(row);
+        }
+        Map<String, Object> picked = new LinkedHashMap<>();
+        picked.put("index", hits.indexOf(chosen) + 1);
+        picked.put("role", role(chosen));
+        picked.put("name", name(chosen));
+        String token = pick == null ? "" : pick.trim();
+        picked.put("why", token.matches("\\d+") ? "--pick=" + token + " is position " + token + " of " + hits.size()
+                : "--pick=" + token + " matched its id, name, or role");
+        Map<String, Object> note = new LinkedHashMap<>();
+        note.put("candidates", candidates);
+        note.put("picked", picked);
+        PICKED.set(note);
+    }
+
     private static Outcome act(Path project, String runId, TargetSelector.Parsed target, Map<String, String> args) {
+        PICKED.remove();
         for (String key : args.keySet()) {
             if (key != null && !key.isBlank() && !ACT_KEYS.contains(key)) {
                 return fail("act", "act does not use --" + key);
@@ -436,7 +624,7 @@ public final class TargetVerb {
         try {
             DomNode root = tree(page.session);
             DomNode node;
-            String query = blank(args.get("query"));
+            String query = withPurpose(blank(args.get("query")), args.get("purpose"));
             if (hit != null) {
                 node = freshNode(hit, page.session.connection(), root);
                 if (node == null) {
@@ -467,6 +655,7 @@ public final class TargetVerb {
                         putShadow(missed.body(), hits.get(0));
                         return missed;
                     }
+                    notePick(hits, chosen, args.get("pick"));
                     node = chosen;
                 } else {
                     node = hits.get(0);
@@ -590,10 +779,10 @@ public final class TargetVerb {
                     return failed;
                 }
                 Map<String, Object> body = base("act", effect.used(), "browser", target);
-                body.put("applied", false);
+                body.put("applied", effect.unknownApplied() ? "unknown" : false);
                 body.put("dispatched", true);
                 body.put("visible", elementVisible(node, page.session.connection()));
-                body.put("reason", effect.reason());
+                body.put("reason", effect.unknownApplied() ? "no before/after read" : effect.reason());
                 body.put("kind", kind.isBlank() ? "click" : kind);
                 body.put("docVersion", after);
                 putSnapDiff(body, args, titleBefore, titleAfter, before, after, rowsBefore, rowsAfter);
@@ -608,7 +797,8 @@ public final class TargetVerb {
             if (!effect.applied()) {
                 Outcome failed = fail("act", "not applied");
                 failed.body().put("used", effect.used());
-                failed.body().put("dispatched", false);
+                // A key was sent to the focused node. Only a click or hover that never reached the page is undispatched.
+                failed.body().put("dispatched", "press".equals(kind));
                 stamp(failed.body(), page.session.connection(), node);
                 putEntered(failed.body(), runId, page.session.connection());
                 putShadow(failed.body(), node);
@@ -673,6 +863,7 @@ public final class TargetVerb {
             }
             List<Map<String, Object>> filled = new ArrayList<>();
             boolean all = true;
+            markAgentActing(page.session.connection(), 5000);
             for (int i = 0; i < pairs.size(); i++) {
                 String[] pair = pairs.get(i);
                 DomNode node = nodes.get(i);
@@ -680,6 +871,7 @@ public final class TargetVerb {
                 if (!Boolean.TRUE.equals(row.get("applied"))) all = false;
                 filled.add(row);
             }
+            markAgentActing(page.session.connection(), AGENT_ACTING_TAIL_MS);
             if (!all) {
                 Outcome failed = fail("form-fill", "not applied");
                 failed.body().put("applied", false);
@@ -773,6 +965,19 @@ public final class TargetVerb {
         row.put("value", read);
         row.put("applied", stuck);
         return row;
+    }
+
+    /** Debounced input rows are sensed this long after the last agent keystroke and still count as the agent's. */
+    static final long AGENT_ACTING_TAIL_MS = 1500;
+
+    /**
+     * Marks the next {@code ms} as agent input so the page runtime tags interaction rows {@code source=agent}.
+     * The mark is a {@code data-pkb-} attribute on the root, which the page watchers already ignore.
+     */
+    static void markAgentActing(CdpConnection cdp, long ms) {
+        if (cdp == null) return;
+        evalText(cdp, "", "(function(){try{document.documentElement.setAttribute('data-pkb-agent-acting',String(Date.now()+"
+                + Math.max(0, ms) + "));return '1';}catch(e){return '';}})()");
     }
 
     private static String readField(CdpConnection cdp, DomNode node) {
@@ -1044,8 +1249,27 @@ public final class TargetVerb {
             String version = docVersion(page.session.connection());
             List<DomNode> shown = interactive(shownRoot, depth);
             List<Map<String, Object>> rows = publish(runId, "browser", page.session.id, version, shown, "", page.session.connection());
+            String exposure = exposureOf(args);
+            if (exposure == null) return fail("snap", "exposure is human or full");
+            if ("human".equals(exposure)) rows.removeIf(row -> Boolean.FALSE.equals(row.get("visible")));
+            rows.addAll(CollabRows.messages(shownRoot, 5));
+            CollabRows.narrow(rows, blank(args.get("include")));
+            String since = blank(args.get("since"));
+            Map<String, Object> sinceDiff = since.isBlank() ? null : SnapSince.since(since, rows);
+            if (!since.isBlank() && sinceDiff == null) return fail("snap", "unknown cursor; snap again without --since");
+            String snapCursor = SnapSince.record(runId, rows);
             String picture = picture(page.session.connection(), rows);
             Map<String, Object> body = base("snap", "cdp", "browser", target);
+            body.put("snapCursor", snapCursor);
+            if (!exposure.isBlank()) body.put("exposure", exposure);
+            if (sinceDiff != null) {
+                body.putAll(sinceDiff);
+                rows = changedRows(rows, sinceDiff);
+            }
+            List<Object> recent = CollabRows.trail(root);
+            if (!recent.isEmpty()) body.put("recent", recent);
+            String panelState = panelPending(page.session.connection());
+            if (!panelState.isBlank()) body.put("panel", panelState);
             body.put("mode", mode);
             body.put("docVersion", version);
             body.put("doc_version", version);
@@ -1060,6 +1284,51 @@ public final class TargetVerb {
             return ok(body);
         } finally {
             page.release();
+        }
+    }
+
+    /** {@code --exposure}: blank keeps every row, {@code human} drops hidden rows, {@code full}/{@code full-access} keep all. */
+    static String exposureOf(Map<String, String> args) {
+        String raw = blank(args == null ? null : args.get("exposure")).toLowerCase(java.util.Locale.ROOT);
+        return switch (raw) {
+            case "" -> "";
+            case "human" -> "human";
+            case "full", "full-access" -> "full-access";
+            default -> null;
+        };
+    }
+
+    /** With {@code --since}, the printed lines are only the added and changed rows. */
+    private static List<Map<String, Object>> changedRows(List<Map<String, Object>> rows, Map<String, Object> diff) {
+        java.util.Set<String> ids = new java.util.HashSet<>();
+        for (String bucket : List.of("added", "changed")) {
+            Object list = diff.get(bucket);
+            if (!(list instanceof List<?> items)) continue;
+            for (Object item : items) {
+                String text = String.valueOf(item);
+                if (text.startsWith("id=")) ids.add(text.substring(3, text.indexOf(' ') < 0 ? text.length() : text.indexOf(' ')));
+            }
+        }
+        List<Map<String, Object>> kept = new ArrayList<>();
+        for (Map<String, Object> row : rows) if (ids.contains(String.valueOf(row.get("id")))) kept.add(row);
+        return kept;
+    }
+
+    /**
+     * {@code pending} when the panel is configured open on this page but its layer is not in the DOM yet,
+     * {@code open} when it is there, blank when no panel is configured.
+     */
+    private static String panelPending(CdpConnection cdp) {
+        try {
+            ObjectNode params = Jsons.object();
+            params.put("expression", "(function(){var l=document.querySelector('pkb-layer[data-pkb-layer]');"
+                    + "var r=l&&l.shadowRoot;var p=r&&r.querySelector('.pkb-panel');"
+                    + "var want=document.documentElement.getAttribute('data-pkb-panel-want');"
+                    + "if(p) return 'open'; return want==='open'?'pending':'';})()");
+            params.put("returnByValue", true);
+            return cdp.call("Runtime.evaluate", params, Duration.ofSeconds(3)).path("result").path("value").asText("");
+        } catch (RuntimeException failure) {
+            return "";
         }
     }
 
@@ -1145,7 +1414,11 @@ public final class TargetVerb {
             String ref = blank(args.get("ref"));
             if (ref.isBlank() && "ref".equals(target.kind())) ref = target.raw();
             boolean met;
-            if (!ref.isBlank()) {
+            String newControl = null;
+            if ("new-control".equals(condition)) {
+                newControl = waitNewControl(page.session.connection(), timeout);
+                met = newControl != null;
+            } else if (!ref.isBlank()) {
                 met = waitOnRef(page.session.connection(), requireHit(ref), condition, timeout);
             } else if ("event".equals(mode)) {
                 met = waitEvent(project, runId, page.session.connection(), condition, timeout, session);
@@ -1168,6 +1441,7 @@ public final class TargetVerb {
             Map<String, Object> body = base("wait", "cdp", "browser", target);
             body.put("mode", mode);
             body.put("condition", condition);
+            if (newControl != null) body.put("control", newControl);
             body.put("docVersion", after);
             body.put("title", titleAfter);
             List<SnapRow> rowsAfter = wantDiff
@@ -1180,6 +1454,37 @@ public final class TargetVerb {
         } finally {
             page.release();
         }
+    }
+
+    /**
+     * {@code wait --condition=new-control}: the first control (role and name, page or pkb surface) that was not
+     * there when the wait began. Null on timeout.
+     */
+    private static String waitNewControl(CdpConnection cdp, long timeout) {
+        java.util.Set<String> before = controlKeys(cdp);
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(Math.max(0, timeout));
+        while (System.nanoTime() < deadline) {
+            sleep(100);
+            java.util.Set<String> now;
+            try {
+                now = controlKeys(cdp);
+            } catch (RuntimeException failure) {
+                continue;
+            }
+            for (String key : now) if (!before.contains(key)) return key;
+        }
+        return null;
+    }
+
+    private static java.util.Set<String> controlKeys(CdpConnection cdp) {
+        java.util.Set<String> keys = new java.util.LinkedHashSet<>();
+        java.util.Map<String, Integer> counts = new java.util.HashMap<>();
+        for (DomNode node : interactive(tree(cdp), Integer.MAX_VALUE)) {
+            String base = role(node) + " \"" + name(node) + "\"";
+            int n = counts.merge(base, 1, Integer::sum);
+            keys.add(n == 1 ? base : base + " #" + n);
+        }
+        return keys;
     }
 
     private static Outcome watch(Path project, String runId, TargetSelector.Parsed target, Map<String, String> args) {
@@ -1494,6 +1799,7 @@ public final class TargetVerb {
         String kind = blank(args.get("kind"));
         if (kind.isBlank()) kind = "click";
         String value = blank(args.get("value"));
+        if ("attach".equals(kind)) return attachFiles(session, node, value.isBlank() ? blank(args.get("file")) : value);
         String verb = switch (kind) {
             case "type" -> "type";
             case "hover" -> "hover";
@@ -1517,6 +1823,9 @@ public final class TargetVerb {
         if (disabled(control)) {
             if (inputOff) FallbackLog.note(project, runId, "act", "cdp", "js", "cdp input disabled");
             return Effect.refused(inputOff ? "js" : "cdp", inert(control) ? "inert" : "disabled");
+        }
+        if (inputOff && "on".equals(args.get("human"))) {
+            return Effect.refused("js", "human mode needs real input; CDP input is off");
         }
         String framed = cdpSessionOf(node);
         if ("click".equals(kind)) {
@@ -1543,19 +1852,36 @@ public final class TargetVerb {
             }
             String before = pageMark(session.connection());
             String signature = "click".equals(kind) ? nodeSignature(session.connection(), "", node) : "";
+            // Rows this act causes are source=agent, and the upload offer stays for a person's click.
+            if (!"hover".equals(kind)) markAgentActing(session.connection(), AGENT_ACTING_TAIL_MS);
+            String probe = "click".equals(kind) ? collabProbe(session.connection(), "", acted, true) : "";
+            String keySignature = "press".equals(kind) ? nodeSignature(session.connection(), "", node) : "";
             LiveXPath.use(session.connection());
             try {
                 PageActions.act(session, verb, flags);
             } finally {
                 LiveXPath.use(null);
             }
+            if ("click".equals(kind) && probeMoved(probe, collabProbe(session.connection(), "", acted, false))) {
+                return Effect.changed("cdp");
+            }
             if ("select".equals(kind)) return new Effect("cdp", valueMatches(value, controlValue(session.connection(), selectOf(acted))));
             if ("type".equals(kind)) return new Effect("cdp", valueMatches(value, controlValue(session.connection(), node)));
             if ("click".equals(kind)) {
-                return clickReadBack(signature, nodeSignature(session.connection(), "", node), clickSettled(session.connection(), "", before, "cdp"));
+                Effect read = clickReadBack(signature, nodeSignature(session.connection(), "", node), clickSettled(session.connection(), "", before, "cdp"));
+                if (read != null && read.quiet()) {
+                    String after = collabProbe(session.connection(), "", acted, false);
+                    if (probeMoved(probe, after)) return Effect.changed("cdp");
+                    if (probe == null || probe.isBlank()) return Effect.unknown("cdp");
+                }
+                return read;
             }
             if ("hover".equals(kind)) return Effect.changed("cdp");
             if (!before.equals(pageMark(session.connection()))) return Effect.changed("cdp");
+            if ("press".equals(kind) && pressMoved(keySignature, nodeSignature(session.connection(), "", node),
+                    collabProbe(session.connection(), "", node, false))) {
+                return Effect.changed("cdp");
+            }
             return new Effect("cdp", false);
         } catch (CdpException failure) {
             String message = failure.getMessage() == null ? "" : failure.getMessage();
@@ -1969,6 +2295,60 @@ public final class TargetVerb {
     static boolean signatureApplied(String before, String after) {
         if (before == null || before.isBlank() || after == null || after.isBlank()) return false;
         return !before.equals(after);
+    }
+
+    /**
+     * A collaboration probe on the clicked node: connected, rendered, the mutation count of the node's own
+     * surface root (a shadow root or a pickleball surface), and where focus went. Arming installs one observer.
+     * The page-wide watcher ignores pickleball surfaces, so a card or panel button that removes its card or
+     * switches its pane is read here instead of reported as "no visible change".
+     */
+    static String collabProbe(CdpConnection cdp, String sessionId, DomNode node, boolean arm) {
+        String raw = callOnNode(cdp, sessionId, node, ""
+                + "function(){ var g=globalThis; var arm=" + arm + ";"
+                + " var root=this.getRootNode?this.getRootNode():document;"
+                + " var surface=(this.closest&&this.closest('[data-pkb-agent],[data-pkb-layer],[data-pkb-record],[data-pkb-meta=\"true\"],[data-pkb-purpose]'))||null;"
+                + " var shadow=root&&root.nodeType===11;"
+                + " if(arm){ var watch=shadow?root:surface; g.__pkbProbe={count:0,root:root,watched:!!watch};"
+                + "  try{ if(g.__pkbProbeObs) g.__pkbProbeObs.disconnect(); }catch(e){}"
+                + "  if(watch){ try{ g.__pkbProbeObs=new MutationObserver(function(r){ g.__pkbProbe.count+=r.length; });"
+                + "   g.__pkbProbeObs.observe(watch,{subtree:true,childList:true,attributes:true,characterData:true}); }catch(e){} } }"
+                + " var p=g.__pkbProbe||{count:0,root:root,watched:false};"
+                + " var focusRoot=(p.root&&p.root.activeElement!==undefined)?p.root:document;"
+                + " var ae=focusRoot.activeElement||document.activeElement;"
+                + " var focus=!ae||ae===document.body?'':((ae===this||(this.contains&&this.contains(ae))||(ae.contains&&ae.contains(this)))?'self':(ae.tagName+'#'+(ae.id||'')+'.'+(ae.getAttribute&&ae.getAttribute('data-pkb-purpose')||'')));"
+                + " var shown=(this.isConnected&&this.getClientRects&&this.getClientRects().length>0)?'1':'0';"
+                + " return [this.isConnected?'1':'0', shown, p.watched?String(p.count):'-', focus].join('|'); }");
+        return raw == null ? "" : raw;
+    }
+
+    /**
+     * True when the probe proves the click did something: the node was removed or hidden, its surface mutated,
+     * or focus moved to another control. A before read with no after read means the node is gone.
+     */
+    static boolean probeMoved(String before, String after) {
+        if (before == null || before.isBlank()) return false;
+        String[] b = before.split("\\|", -1);
+        if (b.length < 4) return false;
+        if (after == null || after.isBlank()) return "1".equals(b[0]);
+        String[] a = after.split("\\|", -1);
+        if (a.length < 4) return false;
+        if ("1".equals(b[0]) && "0".equals(a[0])) return true;
+        if ("1".equals(b[1]) && "0".equals(a[1])) return true;
+        if (!"-".equals(b[2]) && !"-".equals(a[2]) && !b[2].equals(a[2])) return true;
+        return !a[3].isBlank() && !"self".equals(a[3]) && !a[3].equals(b[3]);
+    }
+
+    /**
+     * A key was sent to the node after it was focused. It landed when focus left the node (Tab, Escape),
+     * or the node's value, selection, or state moved (Enter, arrows).
+     */
+    static boolean pressMoved(String signatureBefore, String signatureAfter, String probeAfter) {
+        if (signatureApplied(signatureBefore, signatureAfter)) return true;
+        if (probeAfter == null || probeAfter.isBlank()) return false;
+        String[] a = probeAfter.split("\\|", -1);
+        if (a.length < 4) return false;
+        return !"self".equals(a[3]);
     }
 
     private static Effect clickReadBack(String before, String after, Effect settled) {
@@ -2644,7 +3024,59 @@ public final class TargetVerb {
         return false;
     }
 
+    private static final java.util.regex.Pattern PURPOSE = java.util.regex.Pattern.compile("(?:^|\\s)purpose=([A-Za-z0-9_-]+)");
+
+    /** {@code --purpose=<token>} joins the query as {@code purpose=<token>}. */
+    static String withPurpose(String query, String purpose) {
+        String token = purpose == null ? "" : purpose.trim();
+        if (token.isBlank()) return query == null ? "" : query;
+        return ((query == null ? "" : query.trim()) + " purpose=" + token).trim();
+    }
+
+    /**
+     * {@code purpose=<token>} selects controls whose {@code data-pkb-purpose} has that token. An exact accessible
+     * name (case and spacing ignored) wins over substring hits: when one exists, the substrings are dropped.
+     */
     private static List<DomNode> locate(DomNode root, String query, Map<String, String> extra) {
+        String text = query == null ? "" : query;
+        java.util.regex.Matcher purposeMatch = PURPOSE.matcher(text);
+        String purpose = "";
+        if (purposeMatch.find()) {
+            purpose = purposeMatch.group(1);
+            text = (text.substring(0, purposeMatch.start()) + " " + text.substring(purposeMatch.end())).trim();
+        }
+        if (!purpose.isBlank() && text.isBlank()) {
+            if (root != null) root.linkParents();
+            List<DomNode> tagged = new ArrayList<>();
+            String want = purpose;
+            walk(root, node -> { if (hasPurpose(node, want)) addHit(tagged, node); });
+            return tagged;
+        }
+        List<DomNode> hits = locateText(root, text, extra);
+        if (!purpose.isBlank()) {
+            String want = purpose;
+            hits = new ArrayList<>(hits.stream().filter(node -> hasPurpose(node, want)).toList());
+        }
+        if (!text.isBlank() && hits.size() > 1) {
+            String wanted = text.replaceAll("\\s+", " ").trim();
+            List<DomNode> exact = new ArrayList<>();
+            for (DomNode node : hits) {
+                String shown = name(node).replaceAll("\\s+", " ").trim();
+                if (shown.equalsIgnoreCase(wanted)) exact.add(node);
+            }
+            if (!exact.isEmpty() && exact.size() < hits.size()) return exact;
+        }
+        return hits;
+    }
+
+    private static boolean hasPurpose(DomNode node, String token) {
+        String tokens = attr(node, "data-pkb-purpose");
+        if (tokens.isBlank()) return false;
+        for (String one : tokens.trim().split("\\s+")) if (one.equals(token)) return true;
+        return false;
+    }
+
+    private static List<DomNode> locateText(DomNode root, String query, Map<String, String> extra) {
         if (root != null) root.linkParents();
         Map<String, String> flags = new LinkedHashMap<>();
         if (extra != null) flags.putAll(extra);
@@ -2996,6 +3428,7 @@ public final class TargetVerb {
 
     private static List<Map<String, Object>> publish(String runId, String kind, String sessionId, String version, List<DomNode> nodes, String query, CdpConnection cdp) {
         Map<String, String[]> frames = cdp == null ? Map.of() : frameIndex(cdp);
+        Map<Long, JsonNode> live = cdp == null ? Map.of() : CollabRows.values(cdp, nodes);
         List<Map<String, Object>> rows = new ArrayList<>();
         for (DomNode node : nodes) {
             String legacy = "ref:" + version + ":" + node.backendNodeId;
@@ -3035,6 +3468,7 @@ public final class TargetVerb {
             if (!shadowPath.isBlank()) {
                 row.put("shadow_path", shadowPath);
             }
+            CollabRows.put(row, node, live);
             rows.add(row);
         }
         return rows;
@@ -3197,6 +3631,11 @@ public final class TargetVerb {
         if (row.get("interactive") != null) line.append(" interactive=").append(row.get("interactive"));
         Object frame = row.get("frame");
         line.append(" frame=").append(frame == null || String.valueOf(frame).isBlank() ? "top" : LineView.token(String.valueOf(frame)));
+        for (String key : CollabRows.KEYS) {
+            Object extra = row.get(key);
+            if (extra == null) continue;
+            line.append(' ').append(key).append('=').append(LineView.token(String.valueOf(extra)));
+        }
         if (priority) line.append(" priority=").append(priorityRank(row));
         return line.toString();
     }
@@ -4620,6 +5059,15 @@ public final class TargetVerb {
 
         static Effect quiet(String used) {
             return new Effect(used, false, "dispatched", "no visible change");
+        }
+
+        /** The click was sent and no before/after pair could be read. Never reported as a false {@code false}. */
+        static Effect unknown(String used) {
+            return new Effect(used, false, "dispatched", "unknown");
+        }
+
+        boolean unknownApplied() {
+            return "unknown".equals(reason);
         }
 
         static Effect refused(String used, String reason) {
