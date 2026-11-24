@@ -327,6 +327,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentfast/CompactReply.java`
 - `src/main/java/tools/dscode/common/agentfast/FallbackLog.java`
 - `src/main/java/tools/dscode/common/agentfast/FixturePages.java`
+- `src/main/java/tools/dscode/common/agentfast/HostLanes.java`
 - `src/main/java/tools/dscode/common/agentfast/LineView.java`
 - `src/main/java/tools/dscode/common/agentfast/LiveBrowserHost.java`
 - `src/main/java/tools/dscode/common/agentfast/LiveChromeDriver.java`
@@ -901,6 +902,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentfast/CompactReplyTest.java`
 - `src/test/java/tools/dscode/common/agentfast/FallbackRunCapTest.java`
 - `src/test/java/tools/dscode/common/agentfast/FormatViewTest.java`
+- `src/test/java/tools/dscode/common/agentfast/HostLanesTest.java`
 - `src/test/java/tools/dscode/common/agentfast/LeanReplyTest.java`
 - `src/test/java/tools/dscode/common/agentfast/LiveReplyRulesTest.java`
 - `src/test/java/tools/dscode/common/agentfast/PushAndViewTest.java`
@@ -1108,6 +1110,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/VersionSwitchTest.java`
 - `src/test/java/tools/dscode/launcher/VirtualizedScrollTest.java`
 - `src/test/java/tools/dscode/launcher/VisibleFlagTest.java`
+- `src/test/java/tools/dscode/launcher/WaitLaneLiveTest.java`
 - `src/test/java/tools/dscode/launcher/WarmJvmGlueTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchAgentCommandsTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchAgentUsabilityTest.java`

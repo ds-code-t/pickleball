@@ -161,7 +161,7 @@ public final class WorkbenchAgentCommands {
                      "record",
                      "screenshot", "selftest",
                      "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame",
-                     "ask-and-wait", "pin", "toast", "checklist", "ui", "ref",
+                     "ask-and-wait", "answer-wait", "pin", "toast", "checklist", "ui", "ref",
                      "chat-turn", "ui-verify" ->
                         agentControl(parsed, safeOut, safeErr);
                 case "help" -> help(args, safeOut, safeErr);
@@ -2065,6 +2065,7 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "items");
         copyFlag(args, parsed, "check");
         copyFlag(args, parsed, "pick");
+        if (hasFlag(parsed, "--async")) args.put("async", asyncValue(parsed));
         if (hasFlag(parsed, "--cpu")) args.put("cpu", "true");
         if (hasFlag(parsed, "--list")) args.put("list", "true");
         if (hasFlag(parsed, "--reset")) args.put("reset", "true");
@@ -2153,7 +2154,7 @@ public final class WorkbenchAgentCommands {
                     parsed.coordination().agentId()
             );
             if (posted.error() != null && !posted.error().isBlank()) {
-                Map<String, String> recovered = "ask-and-wait".equals(command)
+                Map<String, String> recovered = "ask-and-wait".equals(command) || "answer-wait".equals(command)
                         ? tools.dscode.common.agentcontrol.AnswerRecovery.find(
                         parsed.project(),
                         boundRunId(parsed),
@@ -2164,7 +2165,7 @@ public final class WorkbenchAgentCommands {
                 if (recovered != null) {
                     Map<String, Object> body = new java.util.LinkedHashMap<>();
                     body.put("ok", true);
-                    body.put("op", "ask-and-wait");
+                    body.put("op", command);
                     body.put("value", recovered.get("value"));
                     body.put("choice", recovered.get("value"));
                     body.put("id", recovered.getOrDefault("id", args.getOrDefault("id", "")));
@@ -2340,6 +2341,20 @@ public final class WorkbenchAgentCommands {
             if (name.equals(token) && index + 1 < args.length) return args[index + 1];
         }
         return null;
+    }
+
+    /** Bare {@code --async} is true. {@code --async=false} stays off. The next token is not the value. */
+    private static String asyncValue(WorkbenchCommandLine.Parsed parsed) {
+        String[] args = parsed.forwarded();
+        if (args == null) return "true";
+        for (String token : args) {
+            if (token != null && token.startsWith("--async=")) {
+                String value = token.substring("--async=".length()).trim();
+                if ("false".equalsIgnoreCase(value) || "0".equals(value)) return "false";
+                return "true";
+            }
+        }
+        return "true";
     }
 
     private static boolean hasFlag(WorkbenchCommandLine.Parsed parsed, String name) {

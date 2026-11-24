@@ -48,7 +48,7 @@ final class WorkbenchCommandLine {
             "screenshot",
             "selftest",
             "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame",
-            "ask-and-wait", "pin", "toast", "checklist", "ui",
+            "ask-and-wait", "answer-wait", "pin", "toast", "checklist", "ui",
             "ref", "controller-start", "controller-stop", "controller-status", "controller-ping",
             "help"
     );

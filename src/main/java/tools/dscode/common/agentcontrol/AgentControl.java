@@ -219,6 +219,7 @@ public final class AgentControl {
                 case "guide-done" -> guideDone(project, runId, values);
                 case "ask" -> ask(project, runId, values);
                 case "ask-and-wait" -> askAndWait(project, runId, values);
+                case "answer-wait" -> answerWait(project, runId, values);
                 case "pin", "toast", "checklist", "status" -> surfaceCard(project, runId, op, values);
                 case "ui", "ui-apply" -> UiBatch.apply(project, runId, values, agentId);
                 case "ui-poll" -> UiBatch.poll(project, runId, values, agentId);
@@ -645,65 +646,128 @@ public final class AgentControl {
     }
 
     private static Result askAndWait(Path project, String runId, Map<String, String> args) throws Exception {
+        if (asyncAsked(args)) {
+            Result shown = ask(project, runId, args);
+            if (shown.exit() != 0) return shown;
+            String id = String.valueOf(shown.body().getOrDefault("id", ""));
+            Map<String, Object> body = new LinkedHashMap<>(shown.body());
+            body.put("op", "ask-and-wait");
+            body.put("async", true);
+            body.put("id", id);
+            body.put("sentence", "Question shown. answer-wait --id=" + id + " reads the choice without holding the command lane.");
+            tools.dscode.control.protocol.AgentFastLog.log(project, "wait", "async id=" + id);
+            return new Result(0, body);
+        }
         int before = inputCount(project, runId);
         long started = System.currentTimeMillis();
         Result shown = ask(project, runId, args);
         if (shown.exit() != 0) return shown;
         String id = String.valueOf(shown.body().getOrDefault("id", ""));
         List<String> choices = choiceList(args.get("choices"));
-        long timeout = 3000L;
-        if (present(args.get("timeout"))) {
-            try {
-                timeout = Long.parseLong(args.get("timeout").trim());
-            } catch (NumberFormatException failure) {
-                PageSurfaces.runtimeCall("askClose", id, false);
-                return fail(2, "timeout is milliseconds");
-            }
+        long timeout;
+        try {
+            timeout = timeoutMillis(args, 3000L);
+        } catch (NumberFormatException failure) {
+            PageSurfaces.runtimeCall("askClose", id, false);
+            return fail(2, "timeout is milliseconds");
         }
-        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(Math.max(0, timeout));
-        Map<String, Object> answer = null;
-        String value = "";
-        while (true) {
-            try {
-                for (Map<String, Object> event : PageSurfaces.pollInput(project, runId, before)) {
-                    String picked = acceptedChoice(event, id, choices);
-                    if (picked == null) continue;
-                    answer = event;
-                    value = picked;
-                }
-            } catch (RuntimeException | java.io.IOException failure) {
-                CompositeLog.info("ui", "ask poll skipped " + failure.getMessage());
-            }
-            if (answer == null) {
-                Map<String, String> stored = AnswerRecovery.find(project, runId, started, id, choices);
-                if (stored != null) {
-                    answer = new LinkedHashMap<>(stored);
-                    value = stored.getOrDefault("value", "");
-                }
-            }
-            if (answer != null) break;
-            if (System.nanoTime() >= deadline) {
-                Map<String, String> stored = AnswerRecovery.find(project, runId, started, id, choices);
-                if (stored != null) {
-                    answer = new LinkedHashMap<>(stored);
-                    value = stored.getOrDefault("value", "");
-                    break;
-                }
-                PageSurfaces.runtimeCall("askClose", id, false);
-                Result failed = fail(1, "timeout");
-                failed.body().put("op", "ask-and-wait");
-                failed.body().put("id", id);
-                return failed;
-            }
-            Thread.sleep(50);
+        String value = pollAnswer(project, runId, before, started, id, choices, timeout);
+        if (value == null) {
+            PageSurfaces.runtimeCall("askClose", id, false);
+            Result failed = fail(1, "timeout");
+            failed.body().put("op", "ask-and-wait");
+            failed.body().put("id", id);
+            return failed;
         }
+        return answered("ask-and-wait", id, value);
+    }
+
+    /**
+     * Polls an ask that {@code ask} or {@code ask-and-wait --async} already placed.
+     * The same fields as a finished {@code ask-and-wait}: {@code id}, {@code value},
+     * {@code choice}, {@code applied}.
+     */
+    private static Result answerWait(Path project, String runId, Map<String, String> args) throws Exception {
+        if (!present(args.get("id"))) return fail(2, "answer-wait requires --id");
+        String id = args.get("id").trim();
+        List<String> choices = choiceList(args.get("choices"));
+        long timeout;
+        try {
+            timeout = timeoutMillis(args, 3000L);
+        } catch (NumberFormatException failure) {
+            return fail(2, "timeout is milliseconds");
+        }
+        int before = inputCount(project, runId);
+        long started = System.currentTimeMillis();
+        tools.dscode.control.protocol.AgentFastLog.log(project, "wait", "answer-wait id=" + id);
+        String value = pollAnswer(project, runId, before, started, id, choices, timeout);
+        if (value == null) {
+            PageSurfaces.runtimeCall("askClose", id, false);
+            Result failed = fail(1, "timeout");
+            failed.body().put("op", "answer-wait");
+            failed.body().put("id", id);
+            return failed;
+        }
+        return answered("answer-wait", id, value);
+    }
+
+    private static boolean asyncAsked(Map<String, String> args) {
+        if (args == null) return false;
+        String value = args.get("async");
+        return "true".equalsIgnoreCase(value) || "1".equals(value);
+    }
+
+    /** Milliseconds. A trailing {@code ms} or {@code s} is accepted. A bare number stays milliseconds. */
+    private static long timeoutMillis(Map<String, String> args, long fallback) {
+        if (!present(args.get("timeout"))) return fallback;
+        String raw = args.get("timeout").trim().toLowerCase(java.util.Locale.ROOT);
+        boolean seconds = raw.endsWith("s") && !raw.endsWith("ms");
+        if (raw.endsWith("ms")) raw = raw.substring(0, raw.length() - 2).trim();
+        else if (raw.endsWith("s")) raw = raw.substring(0, raw.length() - 1).trim();
+        double parsed = Double.parseDouble(raw);
+        long millis = seconds ? Math.round(parsed * 1000.0) : Math.round(parsed);
+        return Math.max(0L, millis);
+    }
+
+    private static Result answered(String op, String id, String value) {
         Map<String, Object> body = ok("Answer received.");
-        body.put("op", "ask-and-wait");
+        body.put("op", op);
         body.put("id", id);
         body.put("value", value);
         body.put("choice", value);
         body.put("applied", !value.isBlank());
         return new Result(0, body);
+    }
+
+    /** The clicked label, or null when the deadline passes with no answer for this id. */
+    private static String pollAnswer(
+            Path project,
+            String runId,
+            int before,
+            long started,
+            String id,
+            List<String> choices,
+            long timeout
+    ) throws Exception {
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(Math.max(0, timeout));
+        while (true) {
+            try {
+                for (Map<String, Object> event : PageSurfaces.pollInput(project, runId, before)) {
+                    String picked = acceptedChoice(event, id, choices);
+                    if (picked != null) return picked;
+                }
+            } catch (RuntimeException | java.io.IOException failure) {
+                CompositeLog.info("ui", "ask poll skipped " + failure.getMessage());
+            }
+            Map<String, String> stored = AnswerRecovery.find(project, runId, started, id, choices);
+            if (stored != null && !stored.getOrDefault("value", "").isBlank()) return stored.get("value");
+            if (System.nanoTime() >= deadline) {
+                stored = AnswerRecovery.find(project, runId, started, id, choices);
+                if (stored != null && !stored.getOrDefault("value", "").isBlank()) return stored.get("value");
+                return null;
+            }
+            Thread.sleep(50);
+        }
     }
 
     /** The one clicked label, or null when this event is not that answer. A joined label list is not a choice. */

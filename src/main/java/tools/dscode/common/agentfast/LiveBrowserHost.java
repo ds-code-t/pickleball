@@ -79,6 +79,11 @@ public final class LiveBrowserHost {
         return SESSION_ID == null ? "" : SESSION_ID;
     }
 
+    /** Project this host was started with. Empty outside the host process. */
+    public static Path project() {
+        return PROJECT;
+    }
+
     /** Target id of the page socket. Empty when this process has no page. */
     public static String pageTargetId() {
         BrowserSession session = chrome();
@@ -129,6 +134,7 @@ public final class LiveBrowserHost {
             send(exchange, 200, Map.of("stopped", true));
             stopped.countDown();
         });
+        server.setExecutor(HostLanes.httpExecutor());
         server.start();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> release(project, CHROME.get(), listening)));
         int code = 0;
@@ -328,11 +334,25 @@ public final class LiveBrowserHost {
         boolean chromeAlive = session != null && session.pid > 0
                 && ProcessHandle.of(session.pid).map(ProcessHandle::isAlive).orElse(false);
         boolean cdpOk = false;
+        boolean probed = false;
         String reason = "";
+        int waits = HostLanes.waits();
         if (!chromeAlive) {
+            cdpOk = false;
             reason = "browser_lost";
-        } else if (cdpAnswers(session)) {
+        } else if (waits > 0) {
+            // Doctor's client budget is 2s. A probe would sit on the CDP lock the wait holds.
             cdpOk = true;
+            reason = "wait";
+        } else if (cdpAnswers(session, Duration.ofMillis(HostLanes.commandBusy() ? 200 : 400))) {
+            cdpOk = true;
+            probed = true;
+        } else if (HostLanes.commandBusy()) {
+            cdpOk = true;
+            reason = "command";
+        } else if (cdpAnswers(session, Duration.ofSeconds(2))) {
+            cdpOk = true;
+            probed = true;
         } else {
             reason = "browser_lost";
         }
@@ -347,11 +367,13 @@ public final class LiveBrowserHost {
         body.put("page", ok ? "attached" : "absent");
         body.put("headed", headed);
         body.put("chromePid", session == null ? 0 : session.pid);
+        body.put("waits", waits);
         if (session != null && session.socket() != null && !session.socket().isBlank()) body.put("cdp", session.socket());
         if (!ok) body.put("reason", reason.isBlank() ? "browser_lost" : reason);
+        else if (waits > 0) body.put("reason", "wait");
         String frame = "top";
         int placed = 0;
-        if (ok && session != null) {
+        if (ok && probed && session != null) {
             try {
                 String id = TargetVerb.mainFrame(session.connection());
                 if (id != null && !id.isBlank()) frame = id;
@@ -360,7 +382,7 @@ public final class LiveBrowserHost {
             }
         }
         WebDriver page = PAGE.get();
-        if (page instanceof JavascriptExecutor) {
+        if (probed && page instanceof JavascriptExecutor) {
             try {
                 Object raw = tools.dscode.common.composite.ElementOperations.script(page, "return document.querySelectorAll('[data-pkb-id]').length");
                 if (raw instanceof Number number) placed = number.intValue();
@@ -392,20 +414,52 @@ public final class LiveBrowserHost {
 
     /** Browser domain on a browser socket, or a page-domain call when the socket is already the page. */
     private static boolean cdpAnswers(BrowserSession session) {
+        return cdpAnswers(session, Duration.ofSeconds(2));
+    }
+
+    private static boolean cdpAnswers(BrowserSession session, Duration timeout) {
+        if (session == null) return false;
+        Duration budget = timeout == null ? Duration.ofSeconds(2) : timeout;
         try {
-            session.connection().call("Browser.getVersion", Jsons.object(), Duration.ofSeconds(2));
+            session.connection().call("Browser.getVersion", Jsons.object(), budget);
             return true;
         } catch (RuntimeException browserDomain) {
             try {
                 var params = Jsons.object();
                 params.put("expression", "1");
                 params.put("returnByValue", true);
-                session.connection().call("Runtime.evaluate", params, Duration.ofSeconds(2));
+                session.connection().call("Runtime.evaluate", params, budget);
                 return true;
             } catch (RuntimeException ignored) {
                 return false;
             }
         }
+    }
+
+    /**
+     * These verbs park until a person answers or a timeout. They must not occupy
+     * the command lane, or doctor, snap, find, and act stall behind the sleep.
+     */
+    private static boolean blocksLane(String op, Map<String, String> args) {
+        if ("ask-and-wait".equals(op) && asyncAsked(args)) return false;
+        if ("ui-poll".equals(op)) {
+            String wait = args == null ? null : args.get("wait");
+            if (wait == null || wait.isBlank()) return false;
+            try {
+                return Double.parseDouble(wait.trim()) > 0;
+            } catch (NumberFormatException failure) {
+                return false;
+            }
+        }
+        return "ask-and-wait".equals(op) || "answer-wait".equals(op)
+                || "chat-turn".equals(op) || "chat_wait".equals(op)
+                || "wait".equals(op) || "wait-for".equals(op) || "watch".equals(op);
+    }
+
+    private static boolean asyncAsked(Map<String, String> args) {
+        if (args == null) return false;
+        String value = args.get("async");
+        return "true".equalsIgnoreCase(value) || "1".equals(value);
     }
 
     /**
@@ -443,14 +497,33 @@ public final class LiveBrowserHost {
         JsonNode rawExtra = request.get("extraArgs");
         if (rawExtra != null && rawExtra.isArray()) rawExtra.forEach(node -> extra.add(node.asText("")));
         FallbackLog.beginRun(request.path("runId").asText(""));
-        AgentControl.Result result = AgentControl.execute(
-                project,
-                request.path("runId").asText(""),
-                op,
-                args,
-                extra,
-                request.path("agentId").asText("")
-        );
+        boolean waiting = blocksLane(op, args);
+        if (waiting) HostLanes.enterWait();
+        AgentControl.Result result;
+        try {
+            if (waiting) {
+                result = AgentControl.execute(
+                        project,
+                        request.path("runId").asText(""),
+                        op,
+                        args,
+                        extra,
+                        request.path("agentId").asText("")
+                );
+            } else {
+                List<String> posted = extra;
+                result = HostLanes.onCommand(() -> AgentControl.execute(
+                        project,
+                        request.path("runId").asText(""),
+                        op,
+                        args,
+                        posted,
+                        request.path("agentId").asText("")
+                ));
+            }
+        } finally {
+            if (waiting) HostLanes.leaveWait();
+        }
         Map<String, Object> payload = new LinkedHashMap<>(result.body());
         Object error = payload.get("error");
         String errorText = error == null ? "" : String.valueOf(error);

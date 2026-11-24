@@ -22,7 +22,7 @@ final class AgentHop {
             "ui-apply", "ui-poll", "ui-catalog", "ui-verify",
             "capture-scenario", "capture-steps", "record", "screenshot", "selftest",
             "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame",
-            "ask-and-wait", "pin", "toast", "checklist", "ui", "ref",
+            "ask-and-wait", "answer-wait", "pin", "toast", "checklist", "ui", "ref",
             "start", "call", "execute-steps", "doctor"
     );
 
