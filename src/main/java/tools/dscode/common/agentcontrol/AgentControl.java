@@ -1302,7 +1302,21 @@ public final class AgentControl {
     }
 
     private static Result highlight(Path project, String runId, Map<String, String> args) throws Exception {
-        if (!present(args.get("handle"))) return fail(2, "highlight requires --handle");
+        if (!present(args.get("handle")) && present(args.get("query"))) {
+            String raw = present(args.get("target")) ? args.get("target").trim() : "browser:auto";
+            String rejected = tools.dscode.common.agentfast.TargetVerb.unavailable(raw);
+            if (rejected != null) {
+                Result failed = fail(1, rejected);
+                failed.body().put("applied", false);
+                return failed;
+            }
+            String preset = present(args.get("preset")) || present(args.get("style")) ? args.get("preset") : "yellow";
+            String css = PageSurfaces.presetCss(preset, args.get("style"));
+            tools.dscode.common.agentfast.TargetVerb.Outcome painted =
+                    tools.dscode.common.agentfast.TargetVerb.highlightQuery(raw, args.get("query").trim(), css, runId);
+            return new Result(painted.exit(), painted.body());
+        }
+        if (!present(args.get("handle"))) return fail(2, "highlight requires --handle or --query");
         String handle = expandHandle(args.get("handle"));
         String target = args.get("target");
         if (present(target)) {

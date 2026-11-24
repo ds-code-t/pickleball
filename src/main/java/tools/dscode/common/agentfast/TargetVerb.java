@@ -219,6 +219,72 @@ public final class TargetVerb {
         }
     }
 
+    /** Paints the first control {@code query} finds (same matching as find) on the selected browser page. */
+    public static Outcome highlightQuery(String targetRaw, String query, String css, String runId) {
+        TargetSelector.Parsed target = TargetSelector.parse(targetRaw);
+        if (target == null || "desktop".equals(target.kind()) || "none".equals(target.kind())) {
+            Outcome failed = fail("highlight", "unknown target");
+            failed.body().put("applied", false);
+            return failed;
+        }
+        Held page = openBrowser("ref".equals(target.kind()) ? TargetSelector.parse("browser:auto") : target);
+        CdpConnection cdp = page.session.connection();
+        try {
+            DomNode root = tree(page.session);
+            List<DomNode> hits = locate(root, query, scopedFrame(runId, target));
+            if (hits.isEmpty()) {
+                Outcome failed = fail("highlight", "not found");
+                failed.body().put("applied", false);
+                failed.body().put("query", query);
+                stamp(failed.body(), cdp, null);
+                putEntered(failed.body(), runId, cdp);
+                return failed;
+            }
+            DomNode node = hits.get(0);
+            String sentence = tools.dscode.browser.SurfaceAssets.sentence("highlight");
+            String read = callOnNode(cdp, cdpSessionOf(node), node, paintFunction(css, sentence));
+            if (!"style_modified".equals(read)) {
+                Outcome failed = fail("highlight", "highlight did not paint");
+                failed.body().put("applied", false);
+                failed.body().put("query", query);
+                stamp(failed.body(), cdp, node);
+                putEntered(failed.body(), runId, cdp);
+                return failed;
+            }
+            Map<String, Object> body = base("highlight", "cdp", "browser", target);
+            body.put("applied", true);
+            body.put("query", query);
+            body.put("name", name(node));
+            body.put("matches", hits.size());
+            body.put("cdp", "style");
+            body.put("labels", List.of("style_modified"));
+            stamp(body, cdp, node);
+            putEntered(body, runId, cdp);
+            return ok(body);
+        } catch (RuntimeException failure) {
+            Outcome failed = fail("highlight", failure.getMessage() == null ? "highlight did not paint" : failure.getMessage());
+            failed.body().put("applied", false);
+            failed.body().put("query", query);
+            return failed;
+        } finally {
+            page.release();
+        }
+    }
+
+    private static String paintFunction(String css, String sentence) {
+        return "function(){var css=" + jsString(css) + ",sentence=" + jsString(sentence) + ";"
+                + "if(!this||this.nodeType!==1) return '';"
+                + "if(!this.hasAttribute('data-pkb-original-style')) this.setAttribute('data-pkb-original-style', this.getAttribute('style')||'');"
+                + "var original=this.getAttribute('data-pkb-original-style')||'';"
+                + "var joined=original; if(joined&&css&&joined.trim().slice(-1)!==';') joined+=';';"
+                + "this.setAttribute('style', joined+css);"
+                + "this.setAttribute('data-pkb-style','style_modified');"
+                + "this.setAttribute('data-pkb-sentence', sentence);"
+                + "this.setAttribute('data-pkb-css', css);"
+                + "this.setAttribute('data-pkb-highlight', " + jsString(CollabRows.presetOf(css)) + ");"
+                + "return this.getAttribute('data-pkb-style');}";
+    }
+
     private static boolean ranked(String handle) {
         if (handle == null) return false;
         int colon = handle.lastIndexOf(':');
@@ -3338,6 +3404,7 @@ public final class TargetVerb {
             if (!message.contains("not found") && !message.contains("query requires")) throw failure;
         }
         if (query != null && !query.isBlank()) hits.addAll(named(search, query));
+        if (hits.isEmpty() && query != null && !query.isBlank()) hits.addAll(namedWords(search, query));
         return deepest(controlsFor(search, preferControls(preferBody(preferLinks(hits)))));
     }
 
@@ -3410,6 +3477,37 @@ public final class TargetVerb {
             else if (query.equals(attr(node, "placeholder")) || equalsIgnore(query, attr(node, "placeholder"))) addHit(hits, node);
         });
         return hits;
+    }
+
+    /**
+     * Fallback when no name, text, or label matched exactly: the query's words, with {@code -} and {@code _}
+     * read as spaces, appear as a run of whole words in the accessible name, aria-label, placeholder, or text.
+     * {@code Upload} and {@code Upload-File} find "Upload File".
+     */
+    private static List<DomNode> namedWords(DomNode root, String query) {
+        String wanted = wordsOf(query);
+        List<DomNode> hits = new ArrayList<>();
+        if (wanted.isBlank()) return hits;
+        walk(root, node -> {
+            if (node == null || node.nodeType != 1) return;
+            if (wordRun(node.accessibleName, wanted) || wordRun(attr(node, "aria-label"), wanted)
+                    || wordRun(attr(node, "placeholder"), wanted) || wordRun(HtmlTree.textOf(node), wanted)) {
+                addHit(hits, node);
+            }
+        });
+        return hits;
+    }
+
+    static String wordsOf(String text) {
+        if (text == null) return "";
+        return text.toLowerCase(java.util.Locale.ROOT).replaceAll("[-_]+", " ").replaceAll("[^\\p{L}\\p{N} ]+", " ")
+                .replaceAll("\\s+", " ").trim();
+    }
+
+    static boolean wordRun(String name, String wantedWords) {
+        String have = wordsOf(name);
+        if (have.isEmpty() || wantedWords.isEmpty()) return false;
+        return (" " + have + " ").contains(" " + wantedWords + " ");
     }
 
     /** Placeholder and aria-label text inside a control's shadow is the control's name, not a second hit. */

@@ -136,6 +136,30 @@ class RetestFixesLiveTest {
         assertTrue(pollMs >= 29_000L, "ui-poll --wait=30 waited " + pollMs + " ms");
     }
 
+    /** R7: find and upload match whole words of a name (Upload, Upload-File find Upload File); highlight --query paints. */
+    @Test
+    void queriesMatchNameWordsAndHighlightTakesAQuery() throws Exception {
+        for (String query : new String[] {"Upload", "Upload-File", "upload_file"}) {
+            JsonNode found = JSON.readTree(agent("find", "--target=browser:auto", "--query=" + query, "--exposure=full").out);
+            assertTrue(found.path("ok").asBoolean(false), query + " " + found);
+            assertEquals("Upload File", found.path("items").path(0).path("name").asText(), query + " " + found);
+        }
+        JsonNode partial = JSON.readTree(agent("find", "--target=browser:auto", "--query=Uplo", "--exposure=full").out);
+        assertFalse(partial.path("ok").asBoolean(false), "a word fragment is not a word: " + partial);
+
+        Path file = temp.resolve("customers.yaml");
+        Files.writeString(file, "customers: []\n");
+        Capture uploaded = agent("upload", "--target=browser:auto", "--query=Upload", "--file=" + file);
+        assertEquals(0, uploaded.code, uploaded.out + uploaded.err);
+        assertTrue(JSON.readTree(uploaded.out).path("applied").asBoolean(false), uploaded.out);
+
+        Capture painted = agent("highlight", "--query=Email");
+        assertEquals(0, painted.code, painted.out + painted.err);
+        assertTrue(JSON.readTree(painted.out).path("applied").asBoolean(false), painted.out);
+        JsonNode email = row(JSON.readTree(agent("find", "--target=browser:auto", "--query=Email", "--exposure=full").out), "Email");
+        assertEquals("yellow", email.path("highlight").asText(), email.toString());
+    }
+
     static JsonNode row(JsonNode snap, String name) {
         for (JsonNode item : snap.path("items")) if (name.equals(item.path("name").asText())) return item;
         return JSON.createObjectNode();
