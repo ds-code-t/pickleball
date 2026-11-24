@@ -20,7 +20,7 @@ public final class CompositeSnapshots {
         return offline(root, options, null);
     }
 
-    /** Version 1 when {@code canonical} is null. Version 2 when a canonical tree is supplied. */
+    /** Version 2. An explicit canonical tree is stored as given. HTML without one is captured. */
     public static ObjectNode offline(DomNode root, SnapshotOptions options, CanonicalDocument canonical) {
         long started = System.nanoTime();
         SnapshotOptions used = options == null ? new SnapshotOptions() : options;

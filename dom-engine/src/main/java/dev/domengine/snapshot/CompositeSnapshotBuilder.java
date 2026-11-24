@@ -42,10 +42,17 @@ public final class CompositeSnapshotBuilder {
     static CompositeSnapshot build(DomNode root, SnapshotContext context, long startedNanos, CanonicalDocument canonical) {
         SnapshotContext ctx = context == null ? SnapshotContext.empty() : context;
         if (root != null) root.linkParents();
-        XPathIndex.Result index = XPathIndex.assign(root);
-        PreMap premap = PreMapBuilder.build(root, ctx);
+        XPathIndex.assign(root);
+        CanonicalDocument generated = canonical;
+        if (generated == null && "html".equals(ctx.sourceKind())) {
+            generated = CanonicalHtml.capture(root);
+        }
+        DomNode projected = root;
+        if (generated != null) projected = CanonicalProjection.project(root, generated);
+        XPathIndex.Result index = XPathIndex.assign(projected);
+        PreMap premap = PreMapBuilder.build(projected, ctx);
         List<ObjectNode> nodes = new ArrayList<>();
-        collect(root, index, ctx, nodes);
+        collect(projected, index, ctx, nodes);
         long duration = Math.max(0, (System.nanoTime() - startedNanos) / 1_000_000L);
         PngImage image = ctx.screenshot();
         String id = ctx.id().isBlank() ? "snap-" + UUID.randomUUID() : ctx.id();
@@ -60,10 +67,6 @@ public final class CompositeSnapshotBuilder {
             }
         }
         dev.domengine.log.EngineLog.info("snapshot", "snapshot offline id=" + id + " nodes=" + nodes.size() + " ms=" + duration);
-        CanonicalDocument generated = canonical;
-        if (generated == null && "html".equals(ctx.sourceKind()) && !"fixture".equals(ctx.transport())) {
-            generated = CanonicalHtml.capture(root);
-        }
         int schemaVersion = CompositeSnapshot.VERSION;
         ObjectNode canonicalJson = null;
         if (generated != null) {
