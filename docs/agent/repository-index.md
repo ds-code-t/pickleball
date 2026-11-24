@@ -100,6 +100,11 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-collab-test/human-notes.md`
 - `docs/maintainer/3.0.0-collab-test/plan.md`
 - `docs/maintainer/3.0.0-collab-test/recipe.md`
+- `docs/maintainer/3.0.0-collab-test/retest-2026-11-24/agent-notes.md`
+- `docs/maintainer/3.0.0-collab-test/retest-2026-11-24/findings-2026-11-24.md`
+- `docs/maintainer/3.0.0-collab-test/retest-2026-11-24/helper-brief.md`
+- `docs/maintainer/3.0.0-collab-test/retest-2026-11-24/human-notes.md`
+- `docs/maintainer/3.0.0-collab-test/retest-2026-11-24/plan.md`
 - `docs/maintainer/3.0.0-composite-v2-design.md`
 - `docs/maintainer/3.0.0-composite-verbs-scoreboard.md`
 - `docs/maintainer/3.0.0-consumer-ready-handoff.md`
@@ -193,6 +198,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/roadmaps/3.0.0-protocols-roadmap.md`
 - `docs/roadmaps/3.0.0-query-visual-roadmap.md`
 - `docs/roadmaps/3.0.0-regression-fixback-e5bffaef.md`
+- `docs/roadmaps/3.0.0-retest-fixes-roadmap.md`
 - `docs/roadmaps/3.0.0-visual-components-roadmap.md`
 - `docs/roadmaps/3.0.0-workbench-edit-roadmap.md`
 - `docs/service-call-scenarios.md`
