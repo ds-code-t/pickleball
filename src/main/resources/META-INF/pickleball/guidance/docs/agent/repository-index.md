@@ -182,6 +182,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/browser/proto/DomCommands.java`
 - `src/main/java/tools/dscode/browser/proto/ErrorCommands.java`
 - `src/main/java/tools/dscode/browser/proto/EventCommands.java`
+- `src/main/java/tools/dscode/browser/proto/HarWriter.java`
+- `src/main/java/tools/dscode/browser/proto/NetCommands.java`
 - `src/main/java/tools/dscode/browser/proto/Projectors.java`
 - `src/main/java/tools/dscode/browser/proto/ProtoClient.java`
 - `src/main/java/tools/dscode/browser/proto/ProtoHost.java`
@@ -1014,6 +1016,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/JsFallbackHonestyTest.java`
 - `src/test/java/tools/dscode/launcher/MaskQuietTest.java`
 - `src/test/java/tools/dscode/launcher/NavigateDataFileTest.java`
+- `src/test/java/tools/dscode/launcher/NetLiveTest.java`
 - `src/test/java/tools/dscode/launcher/NoopGlueModeTest.java`
 - `src/test/java/tools/dscode/launcher/OffsetFrameClickTest.java`
 - `src/test/java/tools/dscode/launcher/OneCallActTest.java`

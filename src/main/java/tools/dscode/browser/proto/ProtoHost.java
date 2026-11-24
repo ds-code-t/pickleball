@@ -52,6 +52,7 @@ public final class ProtoHost {
         EventCommands.register();
         DomCommands.register();
         ErrorCommands.register();
+        NetCommands.register();
     }
 
     private final Path project;

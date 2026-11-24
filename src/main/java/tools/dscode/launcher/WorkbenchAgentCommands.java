@@ -183,7 +183,7 @@ public final class WorkbenchAgentCommands {
                 case "relaunch-with-debug" -> RelaunchWithDebug.run(parsed, safeOut, safeErr);
                 case "pw", "cdp" -> PwCommand.run(args, parsed.project(), safeOut, safeErr);
                 // proto verbs
-                case "browser-events", "errors", "logpoint"  -> ProtoVerbs.run(args, parsed.project(), safeOut, safeErr);
+                case "browser-events", "errors", "logpoint", "net", "net-body", "har"  -> ProtoVerbs.run(args, parsed.project(), safeOut, safeErr);
                 case "export-guidance" -> exportGuidance(parsed, safeOut, safeErr);
                 case "start" -> {
                     int started = ConsumerReadyCommands.start(parsed, safeOut, safeErr);
@@ -2093,6 +2093,7 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "since");
         copyFlag(args, parsed, "until");
         copyFlag(args, parsed, "events");
+        copyFlag(args, parsed, "har");
         copyFlag(args, parsed, "file");
         // upload --file=a --file=b is one list; a single --file stays as it was.
         String files = joinedFlag(parsed, "--file");
@@ -2435,7 +2436,7 @@ public final class WorkbenchAgentCommands {
     private static boolean failFastWithoutBrowser(String command, Map<String, String> args) {
         if (command == null || !LIVE_PAGE_VERBS.contains(command)) return false;
         if (args.containsKey("html") || args.containsKey("page")) return false;
-        if (("observe".equals(command) || "capture-scenario".equals(command)) && args.containsKey("events")) return false;
+        if (("observe".equals(command) || "capture-scenario".equals(command)) && (args.containsKey("events") || args.containsKey("har"))) return false;
         if ("screenshot".equals(command) && !args.containsKey("out")) return false;
         if (("highlight".equals(command) || "unhighlight".equals(command)) && !args.containsKey("handle")) return false;
         if (("overlay".equals(command) || "label".equals(command)) && !args.containsKey("text")) return false;

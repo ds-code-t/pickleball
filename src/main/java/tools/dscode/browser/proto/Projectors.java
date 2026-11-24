@@ -84,6 +84,10 @@ public final class Projectors {
                     r.put("requestId", id).put("url", params.path("request").path("url").asText(""))
                             .put("method", params.path("request").path("method").asText(""))
                             .put("text", params.path("type").asText(""));
+                    // E4: headers (redacted by the hub), wall time and initiator type.
+                    r.set("requestHeaders", params.path("request").path("headers"));
+                    if (params.path("request").hasNonNull("postData")) r.put("postBytes", params.path("request").path("postData").asText().length());
+                    if (params.has("wallTime")) r.put("startedAt", Math.round(params.path("wallTime").asDouble() * 1000));
                     yield r;
                 }
                 case "Network.responseReceived" -> {
@@ -91,6 +95,18 @@ public final class Projectors {
                     ObjectNode r = hub.row("cdp", "net", "response");
                     r.put("requestId", params.path("requestId").asText()).put("url", response.path("url").asText(""))
                             .put("status", response.path("status").asInt()).put("text", response.path("mimeType").asText(""));
+                    // E4: protocol, remote address, cache source, security and time to first byte.
+                    r.put("mime", response.path("mimeType").asText("")).put("statusText", response.path("statusText").asText(""));
+                    if (response.hasNonNull("protocol")) r.put("protocol", response.path("protocol").asText());
+                    if (response.hasNonNull("remoteIPAddress")) r.put("remote", response.path("remoteIPAddress").asText() + ":" + response.path("remotePort").asInt());
+                    String cache = response.path("fromServiceWorker").asBoolean() ? "service-worker"
+                            : response.path("fromDiskCache").asBoolean() ? "disk" : response.path("fromPrefetchCache").asBoolean() ? "prefetch" : "network";
+                    r.put("cache", cache);
+                    if (response.hasNonNull("securityState")) r.put("security", response.path("securityState").asText());
+                    JsonNode timing = response.path("timing");
+                    if (timing.has("receiveHeadersEnd")) r.put("ttfbMs", Math.round(timing.path("receiveHeadersEnd").asDouble() - Math.max(0, timing.path("sendEnd").asDouble())));
+                    if (timing.has("receiveHeadersEnd")) r.put("headersMs", Math.round(timing.path("receiveHeadersEnd").asDouble()));
+                    r.set("responseHeaders", response.path("headers"));
                     yield r;
                 }
                 case "Network.loadingFinished" -> {
@@ -173,6 +189,7 @@ public final class Projectors {
                     ObjectNode r = hub.row("bidi", "net", "request");
                     r.put("requestId", request.path("request").asText()).put("url", request.path("url").asText(""))
                             .put("method", request.path("method").asText(""));
+                    r.set("requestHeaders", request.path("headers"));
                     yield r;
                 }
                 case "network.responseCompleted" -> {
@@ -182,6 +199,11 @@ public final class Projectors {
                     r.put("requestId", request.path("request").asText()).put("url", response.path("url").asText(request.path("url").asText("")))
                             .put("status", response.path("status").asInt()).put("text", response.path("mimeType").asText(""))
                             .put("bytes", response.path("bytesReceived").asLong());
+                    r.put("mime", response.path("mimeType").asText("")).put("protocol", response.path("protocol").asText(""))
+                            .put("statusText", response.path("statusText").asText(""))
+                            .put("cache", response.path("fromCache").asBoolean() ? "disk" : "network");
+                    r.set("responseHeaders", response.path("headers"));
+                    r.set("requestHeaders", request.path("headers"));
                     JsonNode timings = request.path("timings");
                     if (timings.has("responseEnd") && timings.has("requestTime")) {
                         r.put("durationMs", Math.round(timings.path("responseEnd").asDouble() - timings.path("requestTime").asDouble()));

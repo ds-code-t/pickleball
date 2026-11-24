@@ -56,6 +56,18 @@ Before a row reaches the ring, the file, or a reply: `Authorization`, `Proxy-Aut
 
 `pkb_fail_on_js_error=warn|fail` checks scenarios: at the end of each step, page errors that happened during it (collected over WebDriver BiDi through Selenium's `LogInspector`) are logged (`warn`) or fail the step (`fail`) with the message and stack. `pkb_js_error_ignore=<regex>` allows errors whose message matches. A driver without BiDi (`pkb_bidi=false`) prints one WARN and is not checked.
 
+## Network
+
+Network rows (`kind=net`) carry `subkind` `request`, `response`, `finished` and `failed`, joined by `requestId`. Requests keep `httpMethod`, `type`, `initiator` and `requestHeaders`. Responses keep `status`, `statusText`, `mime`, `protocol`, `remote` (ip:port), `cache` (`memory`, `disk`, `service-worker`, `prefetch` or `network`), `security`, `ttfbMs`, `headersMs` and `responseHeaders`. `finished` keeps `encodedBytes`. Headers are redacted when they hold credentials or cookies (`Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key`, `X-Auth-Token`, `X-CSRF-Token`, `X-XSRF-Token`, and any name containing `token`, `secret` or `password`), and the row lists them in `redacted`. Chrome does not report `Set-Cookie` in `responseReceived`, so that header usually never reaches a row at all.
+
+`net --capture-bodies=none|api|all [--max-kb=<n>]` controls response bodies. `none` (the default) keeps none. `api` keeps JSON, XML, text and form bodies of `fetch`/XHR requests. `all` keeps every body. The host keeps the last 200 bodies, each cut at `--max-kb` (default 256). `net-body --request-id=<id> [--out=<file>]` returns one body. JSON bodies have secret-named keys (`password`, `token`, `secret`, `apikey`, ...) replaced with `[redacted]`; other text bodies have `key=value` secrets masked. A binary body is only written to `--out`, never printed. Sources: CDP `Network.getResponseBody` on `loadingFinished`; BiDi `network.addDataCollector` and `network.getData`; Playwright `Response.body()`.
+
+WebSocket rows (`kind=ws`): `created`, `handshake`, `frame-sent`, `frame-received`, `closed` and `error`, with `url`, `requestId`, `bytes`, `method` (`opcode-<n>` for frames) and `text` (the first 200 characters of the payload). EventSource messages are `subkind=eventsource-message`. CDP and Playwright report frames; BiDi has no WebSocket frame events yet, so a BiDi session shows only the handshake request.
+
+`har --start [--content=omit|embed] [--url-filter=<glob|re:regex>]`, `har --status` and `har --stop [--out=<file>]` record a HAR 1.2 file. When Playwright serves the session, Playwright's own HAR recorder writes it. Otherwise the host builds it from the network rows with the in-repo `HarWriter` (entries grouped by `requestId`, with timings, headers, query string, status, content size and, for `--content=embed`, the captured body). The default output is `.pickleball/runs/<run>/session.har`, written owner-only. Headers in the HAR are redacted the same way as rows.
+
+`capture-scenario --har=<file>` turns a HAR from `har --stop`, or from any browser's DevTools export, into a service-call scenario. It gives the same feature as `capture-scenario --events=<file>` for the same requests.
+
 ## DOM changes (push)
 
 Pickleball listens for DOM changes instead of polling the page. One page script runs a `MutationObserver` and reports debounced, batched, scoped deltas through the backend's push channel:

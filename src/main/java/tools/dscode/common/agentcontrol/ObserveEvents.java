@@ -42,7 +42,16 @@ public final class ObserveEvents {
     public static List<Event> read(Path project, String runId, Map<String, String> args) throws IOException {
         List<Event> events = new ArrayList<>();
         String file = args.get("events");
-        if (file != null && !file.isBlank()) {
+        String har = args.get("har");
+        if (har != null && !har.isBlank()) {
+            // E4: capture-scenario --har=<file> reads HAR 1.2 entries as request events.
+            Path path = Path.of(har);
+            if (!path.isAbsolute() && project != null) path = project.resolve(har);
+            events.addAll(fromHar(Files.readString(path, StandardCharsets.UTF_8)));
+        }
+        if (har != null && !har.isBlank() && (file == null || file.isBlank())) {
+            // HAR only.
+        } else if (file != null && !file.isBlank()) {
             Path path = Path.of(file);
             if (!path.isAbsolute() && project != null) path = project.resolve(file);
             events.addAll(parse(Files.readString(path, StandardCharsets.UTF_8)));
@@ -257,6 +266,27 @@ public final class ObserveEvents {
         return value != null && !value.isBlank();
     }
 
+    /** HAR 1.2 entries as {@code Network.requestWillBeSent} events, in entry order. */
+    public static List<Event> fromHar(String json) throws IOException {
+        JsonNode entries = AgentStore.JSON.readTree(json).path("log").path("entries");
+        List<Event> events = new ArrayList<>();
+        for (JsonNode entry : entries) {
+            JsonNode request = entry.path("request");
+            JsonNode response = entry.path("response");
+            Long at = null;
+            try {
+                at = java.time.Instant.parse(entry.path("startedDateTime").asText()).toEpochMilli();
+            } catch (RuntimeException ignored) {
+                at = null;
+            }
+            events.add(new Event("Network.requestWillBeSent", "network", request.path("url").asText(""), "", "", at,
+                    response.path("status").isNumber() ? response.path("status").asInt() : null,
+                    response.path("content").path("mimeType").asText(""), request.path("method").asText("GET"),
+                    entry.has("_error")));
+        }
+        return events;
+    }
+
     public static List<Event> parse(String json) throws IOException {
         JsonNode root = AgentStore.JSON.readTree(json == null || json.isBlank() ? "[]" : json);
         JsonNode array = root.isArray() ? root : root.path("events");
@@ -269,7 +299,7 @@ public final class ObserveEvents {
                     text(node.path("url").asText("")),
                     text(node.path("text").asText("")),
                     text(node.path("level").asText("")),
-                    node.path("at").isNumber() ? node.path("at").asLong() : longOrNull(node.path("at").asText(null)),
+                    node.path("at").isNumber() ? Long.valueOf(node.path("at").asLong()) : longOrNull(node.path("at").asText(null)),
                     node.path("status").isNumber() ? node.path("status").asInt() : null,
                     text(node.path("mime").asText("")),
                     text(node.path("httpMethod").asText(node.path("methodName").asText(""))),

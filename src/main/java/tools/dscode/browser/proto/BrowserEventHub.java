@@ -176,6 +176,12 @@ public final class BrowserEventHub {
             stored.put("text", scrubbed.length() > TEXT_MAX ? scrubbed.substring(0, TEXT_MAX) + "…" : scrubbed);
         }
         if (stored.hasNonNull("url")) stored.put("url", ProtoRedact.url(project, stored.get("url").asText(), redacted(stored)));
+        for (String headers : new String[]{"requestHeaders", "responseHeaders"}) {
+            JsonNode raw = stored.get(headers);
+            if (raw == null) continue;
+            if (raw.isMissingNode() || raw.isNull() || raw.isEmpty()) stored.remove(headers);
+            else stored.set(headers, ProtoRedact.headers(raw, redacted(stored), false));
+        }
         if (stored.has("redacted") && stored.get("redacted").isEmpty()) stored.remove("redacted");
         ring.addLast(stored);
         while (ring.size() > capacity) ring.removeFirst();

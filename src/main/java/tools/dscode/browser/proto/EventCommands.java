@@ -117,6 +117,7 @@ final class EventCommands {
     }
 
     static void listen(Page page, BrowserEventHub hub) {
+        NetCommands.playwrightWs(page, hub);
         page.onConsoleMessage(message -> {
             ObjectNode r = hub.row("playwright", "console", message.type());
             r.put("level", Projectors.level(message.type())).put("text", message.text()).put("url", message.location());

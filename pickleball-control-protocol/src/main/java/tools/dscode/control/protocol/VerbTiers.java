@@ -40,7 +40,7 @@ public final class VerbTiers {
             "tabs", "toast", "ui", "ui-apply", "ui-catalog", "ui-poll", "ui-verify", "unarrow", "unborder",
             "unhighlight", "unlabel", "unmagnifier", "unspotlight", "unstep-badge", "update-step", "upload",
             "use-version", "validate", "watch", "windows", "worker-check", "worker-restart", "worker-start",
-            "worker-stop", "workspace-edit", "workspace-seed", "workspace-show", "browser-events", "errors", "logpoint"
+            "worker-stop", "workspace-edit", "workspace-seed", "workspace-show", "browser-events", "errors", "logpoint", "net", "net-body", "har"
     );
 
     /** act kinds a human-locked session accepts. */

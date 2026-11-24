@@ -21,7 +21,7 @@ import java.util.Set;
  */
 final class ProtoVerbs {
     /** CLI verbs that forward to a host command of the same name. */
-    static final Set<String> VERBS = Set.of("browser-events", "errors", "logpoint");
+    static final Set<String> VERBS = Set.of("browser-events", "errors", "logpoint", "net", "net-body", "har");
 
     private ProtoVerbs() {
     }

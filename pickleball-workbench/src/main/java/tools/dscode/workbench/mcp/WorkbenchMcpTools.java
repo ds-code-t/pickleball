@@ -600,6 +600,27 @@ final class WorkbenchMcpTools {
                         "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
                 )),
                 args -> forwardReady(protoArgs("logpoint", args)));
+        add("workbench_net",
+                "Turn response-body capture on or off for later requests (none, api, all) with a size cap.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for net; see help net."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("net", args)));
+        add("workbench_net_body",
+                "Read or save one captured response body by request id.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for net-body; see help net-body."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("net-body", args)));
+        add("workbench_har",
+                "Start or stop a HAR 1.2 recording of the session's network traffic.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for har; see help har."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("har", args)));
         add("workbench_chat_turn",
                 "Send one agent line, then wait for a human message, an answer, or a click.",
                 schema(view),
