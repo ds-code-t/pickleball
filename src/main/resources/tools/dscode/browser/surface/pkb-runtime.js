@@ -201,9 +201,26 @@
     if (bound) noteDelivered(ev);
     return bound;
   }
+  // The run that acted (set by act for the next moments): page events name it, and say by=agent|human.
+  function actingRun() {
+    try {
+      var raw = document.documentElement.getAttribute('data-pkb-acting-run') || '';
+      var bar = raw.lastIndexOf('|');
+      if (bar > 0 && Date.now() < Number(raw.slice(bar + 1))) return raw.slice(0, bar);
+    } catch (ignored) { /* no root */ }
+    return '';
+  }
   function pushEvent(ev) {
     if (!ev) return false;
     if (!ev.eid) ev.eid = nextEid('e');
+    if (ev.type !== 'mutation') {
+      if (!ev.by) ev.by = actingSource();
+      var run = actingRun();
+      if (run) {
+        if (!ev.run) ev.run = run;
+        if (!ev.sessionId) ev.sessionId = run;
+      }
+    }
     if (ev.type === 'mutation') {
       if (mutationTimer) return false;
       mutationTimer = setTimeout(function () {

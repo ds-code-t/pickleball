@@ -80,6 +80,20 @@ class RetestFixesLiveTest {
         assertTrue(row(shown, "Message").path("visible").asBoolean(false), shown.toString());
     }
 
+    /** R4: a person's click on a file input (a human-locked act) offers "Ask agent to attach a file"; it posts upload-request. */
+    @Test
+    void personsFileInputClickOffersTheUploadHandOff() throws Exception {
+        String cursor = JSON.readTree(agent("ui-poll", "--after=0").out).path("next").asText();
+        human("act", "--target=browser:auto", "--kind=click", "--query=Upload File");
+        JsonNode offer = JSON.readTree(human("find", "--target=browser:auto", "--query=Ask agent to attach a file").out);
+        assertTrue(offer.path("ok").asBoolean(false), offer.toString());
+        Capture asked = human("act", "--target=browser:auto", "--kind=click", "--query=Ask agent to attach a file");
+        assertEquals(0, asked.code, asked.out + asked.err);
+        JsonNode polled = JSON.readTree(agent("ui-poll", "--after=" + cursor, "--wait=5").out);
+        assertTrue(polled.path("items").toString().contains("upload-request"), polled.toString());
+        assertTrue(polled.path("items").toString().contains("#upload-file"), polled.toString());
+    }
+
     static JsonNode row(JsonNode snap, String name) {
         for (JsonNode item : snap.path("items")) if (name.equals(item.path("name").asText())) return item;
         return JSON.createObjectNode();

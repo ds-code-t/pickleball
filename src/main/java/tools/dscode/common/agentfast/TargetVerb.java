@@ -926,7 +926,7 @@ public final class TargetVerb {
             }
             List<Map<String, Object>> filled = new ArrayList<>();
             boolean all = true;
-            markAgentActing(page.session.connection(), 5000);
+            markActing(page.session.connection(), 5000, runId, true);
             for (int i = 0; i < pairs.size(); i++) {
                 String[] pair = pairs.get(i);
                 DomNode node = nodes.get(i);
@@ -934,7 +934,7 @@ public final class TargetVerb {
                 if (!Boolean.TRUE.equals(row.get("applied"))) all = false;
                 filled.add(row);
             }
-            markAgentActing(page.session.connection(), AGENT_ACTING_TAIL_MS);
+            markActing(page.session.connection(), AGENT_ACTING_TAIL_MS, runId, true);
             if (!all) {
                 Outcome failed = fail("form-fill", "not applied");
                 failed.body().put("applied", false);
@@ -1038,9 +1038,31 @@ public final class TargetVerb {
      * The mark is a {@code data-pkb-} attribute on the root, which the page watchers already ignore.
      */
     static void markAgentActing(CdpConnection cdp, long ms) {
+        markActing(cdp, ms, "", true);
+    }
+
+    /**
+     * Marks the next {@code ms} as input from run {@code runId}. A human-locked run is the person at the page:
+     * its input is not agent input (guide steps say {@code by=human}, the upload offer appears) and any agent
+     * mark still pending is cleared. The run id rides along so page events name the run that acted.
+     */
+    static void markActing(CdpConnection cdp, long ms, String runId, boolean agent) {
         if (cdp == null) return;
-        evalText(cdp, "", "(function(){try{document.documentElement.setAttribute('data-pkb-agent-acting',String(Date.now()+"
-                + Math.max(0, ms) + "));return '1';}catch(e){return '';}})()");
+        String run = runId == null ? "" : runId.replaceAll("[^A-Za-z0-9._-]", "");
+        long until = Math.max(0, ms);
+        evalText(cdp, "", "(function(){try{var d=document.documentElement;"
+                + (agent ? "d.setAttribute('data-pkb-agent-acting',String(Date.now()+" + until + "));"
+                         : "d.removeAttribute('data-pkb-agent-acting');")
+                + (run.isEmpty() ? "" : "d.setAttribute('data-pkb-acting-run','" + run + "|'+String(Date.now()+" + until + "));")
+                + "return '1';}catch(e){return '';}})()");
+    }
+
+    static boolean humanRun(Path project, String runId) {
+        try {
+            return tools.dscode.common.agentcontrol.HumanLock.locked(project, runId);
+        } catch (RuntimeException unreadable) {
+            return false;
+        }
     }
 
     private static String readField(CdpConnection cdp, DomNode node) {
@@ -2057,7 +2079,7 @@ public final class TargetVerb {
             String before = pageMark(session.connection());
             String signature = "click".equals(kind) ? nodeSignature(session.connection(), "", node) : "";
             // Rows this act causes are source=agent, and the upload offer stays for a person's click.
-            if (!"hover".equals(kind)) markAgentActing(session.connection(), AGENT_ACTING_TAIL_MS);
+            if (!"hover".equals(kind)) markActing(session.connection(), AGENT_ACTING_TAIL_MS, runId, !humanRun(project, runId));
             String probe = "click".equals(kind) ? collabProbe(session.connection(), "", acted, true) : "";
             String keySignature = "press".equals(kind) ? nodeSignature(session.connection(), "", node) : "";
             LiveXPath.use(session.connection());
