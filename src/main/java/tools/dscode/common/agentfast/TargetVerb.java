@@ -1717,6 +1717,7 @@ public final class TargetVerb {
                     return fail("watch", "duration is milliseconds");
                 }
             }
+            duration = Math.min(tools.dscode.control.protocol.LiveSessionAttach.MAX_WAIT_MS, Math.max(0L, duration));
             if (domWatchAsked(args)) {
                 Map<String, String> dom = new LinkedHashMap<>(args);
                 if ("dom".equals(blank(dom.get("kinds")))) dom.remove("kinds");

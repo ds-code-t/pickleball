@@ -117,6 +117,25 @@ class RetestFixesLiveTest {
         assertEquals(0, agent("panel-open", "--tab=chat").code);
     }
 
+    /** R6: a chat-turn wait past 60 s and a ui-poll wait past 25 s run their full declared time through the CLI. */
+    @Test
+    void longWaitsRunTheirDeclaredTimeThroughTheCli() throws Exception {
+        long began = System.nanoTime();
+        Capture turn = agent("chat-turn", "--text=R6 nobody answers this", "--timeout=65s");
+        long turnMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - began);
+        assertEquals(1, turn.code, turn.out + turn.err);
+        JsonNode body = JSON.readTree(turn.out);
+        assertEquals("timeout", body.path("error").asText(body.path("err").path("code").asText()), turn.out);
+        assertFalse(turn.out.contains("timed out waiting for the live worker"), "the worker's own timeout, not the client cap: " + turn.out);
+        assertTrue(turnMs >= 64_000L, "chat-turn waited " + turnMs + " ms");
+
+        began = System.nanoTime();
+        Capture polled = agent("ui-poll", "--wait=30", "--id=r6-never-asked");
+        long pollMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - began);
+        assertEquals(0, polled.code, polled.out + polled.err);
+        assertTrue(pollMs >= 29_000L, "ui-poll --wait=30 waited " + pollMs + " ms");
+    }
+
     static JsonNode row(JsonNode snap, String name) {
         for (JsonNode item : snap.path("items")) if (name.equals(item.path("name").asText())) return item;
         return JSON.createObjectNode();

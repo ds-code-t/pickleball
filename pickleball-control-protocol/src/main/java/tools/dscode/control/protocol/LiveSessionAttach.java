@@ -79,21 +79,67 @@ public final class LiveSessionAttach {
     }
 
     public static Duration httpTimeout(String op, Map<String, String> args) {
-        long declared = 45;
+        long declaredMs = 45_000L;
         if (waits(op)) {
-            declared = 30;
-            String raw = args == null ? null : args.get("timeout");
-            if (raw != null && !raw.isBlank()) {
-                try {
-                    declared = Long.parseLong(raw.trim());
-                } catch (NumberFormatException ignored) {
-                    declared = 30;
-                }
+            try {
+                declaredMs = declaredWaitMs(op, args);
+            } catch (NumberFormatException ignored) {
+                declaredMs = 30_000L;
             }
-            if (declared < 0) declared = 0;
-            if (declared > 120) declared = 120;
         }
-        return Duration.ofSeconds(Math.min(180L, Math.max(60L, declared + 15L)));
+        long seconds = (declaredMs + 999L) / 1000L;
+        return Duration.ofSeconds(Math.min(180L, Math.max(60L, seconds + 15L)));
+    }
+
+    /** Longest documented wait for a waiting verb, in milliseconds. */
+    public static final long MAX_WAIT_MS = 120_000L;
+
+    /**
+     * The wait a waiting verb declared, in milliseconds, capped at {@link #MAX_WAIT_MS}.
+     * chat-turn and chat_wait take {@code --timeout} in seconds, ui-poll and chat-poll take
+     * {@code --wait} in seconds, watch takes {@code --duration} in milliseconds, and
+     * ask-and-wait, answer-wait, wait and wait-for take {@code --timeout} in milliseconds.
+     * A trailing {@code s} or {@code ms} wins over the verb's bare unit.
+     * Text that is not a number throws {@link NumberFormatException}.
+     */
+    public static long declaredWaitMs(String op, Map<String, String> args) {
+        String key;
+        boolean bareSeconds;
+        switch (op == null ? "" : op) {
+            case "chat-turn", "chat_wait" -> { key = "timeout"; bareSeconds = true; }
+            case "ui-poll", "chat-poll" -> { key = "wait"; bareSeconds = true; }
+            case "watch" -> { key = "duration"; bareSeconds = false; }
+            default -> { key = "timeout"; bareSeconds = false; }
+        }
+        String raw = args == null ? null : args.get(key);
+        if ((raw == null || raw.isBlank()) && "watch".equals(op) && args != null) raw = args.get("timeout");
+        long ms = 30_000L;
+        if (raw != null && !raw.isBlank()) {
+            String text = raw.trim().toLowerCase(java.util.Locale.ROOT);
+            if (text.endsWith("ms")) {
+                ms = Math.round(Double.parseDouble(text.substring(0, text.length() - 2).trim()));
+            } else if (text.endsWith("s")) {
+                ms = Math.round(Double.parseDouble(text.substring(0, text.length() - 1).trim()) * 1000.0);
+            } else {
+                double value = Double.parseDouble(text);
+                ms = Math.round(bareSeconds ? value * 1000.0 : value);
+            }
+        }
+        if (ms < 0) ms = 0;
+        return Math.min(MAX_WAIT_MS, ms);
+    }
+
+    /** The next step after a client-side timeout, per verb. */
+    static String timeoutFix(String op) {
+        return switch (op == null ? "" : op) {
+            case "chat-turn" -> "chat-read --last=5 shows a reply that arrived late; then chat-turn again (--timeout max 120)";
+            case "chat_wait" -> "chat-read --last=5, then chat_wait again (--timeout max 120)";
+            case "ask-and-wait", "answer-wait" -> "answer-wait --id=<question> reads a stored choice (--timeout max 120s)";
+            case "ui-poll" -> "ui-poll again with the returned cursor (--wait max 120)";
+            case "watch" -> "watch again (--duration max 120000 ms)";
+            case "wait", "wait-for" -> op + " again (--timeout max 120000 ms)";
+            default -> op + " again";
+        };
     }
 
     public static Posted post(
@@ -186,7 +232,7 @@ public final class LiveSessionAttach {
             body.put("op", op);
             body.put("error", "timeout");
             body.put("sentence", "timed out waiting for the live worker");
-            body.put("fix", "chat-send --source=human, then chat-turn again");
+            body.put("fix", timeoutFix(op));
             return new Posted(1, JsonLite.write(body), "");
         }
         String message = failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
@@ -195,7 +241,7 @@ public final class LiveSessionAttach {
 
     private static boolean waits(String op) {
         return "chat-turn".equals(op) || "chat_wait".equals(op) || "ask-and-wait".equals(op)
-                || "answer-wait".equals(op) || "ui-poll".equals(op)
+                || "answer-wait".equals(op) || "ui-poll".equals(op) || "chat-poll".equals(op)
                 || "watch".equals(op) || "wait".equals(op) || "wait-for".equals(op);
     }
 

@@ -208,6 +208,28 @@ class CliForwardToWorkerTest {
         }
     }
 
+    @Test
+    void waitBudgetsReadEachVerbsOwnUnitAndTimeoutsNameTheVerb() {
+        assertEquals(Duration.ofSeconds(105), AgentForward.httpTimeout("chat-turn", Map.of("timeout", "90s")));
+        assertEquals(Duration.ofSeconds(105), AgentForward.httpTimeout("chat-turn", Map.of("timeout", "90")));
+        assertEquals(Duration.ofSeconds(135), AgentForward.httpTimeout("watch", Map.of("duration", "120000")));
+        assertEquals(Duration.ofSeconds(135), AgentForward.httpTimeout("watch", Map.of("duration", "600000")));
+        assertEquals(Duration.ofSeconds(105), AgentForward.httpTimeout("wait", Map.of("timeout", "90000")));
+        assertEquals(Duration.ofSeconds(105), AgentForward.httpTimeout("ask-and-wait", Map.of("timeout", "90s")));
+        assertEquals(Duration.ofSeconds(115), AgentForward.httpTimeout("ui-poll", Map.of("wait", "100")));
+        assertEquals(Duration.ofSeconds(60), AgentForward.httpTimeout("ui-poll", Map.of("wait", "30")));
+        assertEquals(30_000L, tools.dscode.control.protocol.LiveSessionAttach.declaredWaitMs("ui-poll", Map.of("wait", "30")));
+        assertEquals(120_000L, tools.dscode.control.protocol.LiveSessionAttach.declaredWaitMs("ui-poll", Map.of("wait", "300")));
+
+        LiveBridgeFile.Bridge live = new LiveBridgeFile.Bridge("127.0.0.1", 9, "token-fix", ProcessHandle.current().pid(), "sess-fix");
+        for (String op : List.of("watch", "wait", "ui-poll", "answer-wait", "chat-turn")) {
+            AgentForward.Posted slow = AgentForward.post(live, op, Map.of(), List.of(), project, "fix", "agent", Duration.ofMillis(200));
+            assertTrue(slow.bodyJson().contains("\"error\":\"timeout\""), op + " " + slow.bodyJson() + slow.error());
+            String fix = slow.bodyJson().replaceAll(".*\"fix\":\"([^\"]*)\".*", "$1");
+            assertTrue(fix.startsWith(op.equals("answer-wait") ? "answer-wait" : op.equals("chat-turn") ? "chat-read" : op), op + " fix: " + fix);
+        }
+    }
+
     private Capture agent(String... args) {
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();

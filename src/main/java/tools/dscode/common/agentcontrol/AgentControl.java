@@ -1046,9 +1046,9 @@ public final class AgentControl {
         long waitMillis = 0;
         if (present(args.get("wait"))) {
             try {
-                waitMillis = Math.min(25_000L, Math.max(0L, (long) (Double.parseDouble(args.get("wait").trim()) * 1000)));
+                waitMillis = tools.dscode.control.protocol.LiveSessionAttach.declaredWaitMs("chat-poll", args);
             } catch (NumberFormatException failure) {
-                return fail(2, "chat-poll --wait is seconds, up to 25");
+                return fail(2, "chat-poll --wait is seconds, up to 120");
             }
         }
         String from = args.get("from");

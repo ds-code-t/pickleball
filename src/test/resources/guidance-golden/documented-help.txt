@@ -449,7 +449,7 @@ Without --ops, ui opens the Workbench controller. With --ops, ui applies a catal
 Tier: control.
 
 # help ui-poll
-Usage: ui-poll [--after=<n>] [--chat-after=<id>] [--cursor=<token>] [--wait=<seconds, up to 25>] [--id=<question>] [--channel=<name>] [--run-id=<id>] [--format=lines|json] [--fields=<a,b>] [--where=<k=v>] [--limit=<n>] [--budget=<bytes>] [--group=type|role] [--priority=on] [--echo=hide]
+Usage: ui-poll [--after=<n>] [--chat-after=<id>] [--cursor=<token>] [--wait=<seconds, up to 120>] [--id=<question>] [--channel=<name>] [--run-id=<id>] [--format=lines|json] [--fields=<a,b>] [--where=<k=v>] [--limit=<n>] [--budget=<bytes>] [--group=type|role] [--priority=on] [--echo=hide]
 The cursor channel is ui. With no --after and no --cursor the poll starts at now. The same token returns the same events and does not move the chat cursor. --id returns that question and ignores other events until the answer or the wait ends.
 Tier: control.
 
@@ -477,7 +477,7 @@ Reports undefined steps, ambiguous glue, and unresolved RUN SCENARIO targets. Ou
 Tier: control.
 
 # help watch
-Usage: watch --target=<selector> [--ref=<ref>] [--until=mutation|change|visible|hidden|text=<text>|click] [--kinds=<kinds>] [--duration=<ms>] [--selector=<css>] [--debounce=<ms>] [--attributes=a,b] [--contains=<text>] [--own]
+Usage: watch --target=<selector> [--ref=<ref>] [--until=mutation|change|visible|hidden|text=<text>|click] [--kinds=<kinds>] [--duration=<ms, up to 120000>] [--selector=<css>] [--debounce=<ms>] [--attributes=a,b] [--contains=<text>] [--own]
 With --selector or --kinds=childList,attributes,text the watch is push-based: a MutationObserver reports debounced, batched kind=dom subkind=mutation events (mode=push); pickleball overlays and panels (data-pkb-*) are left out unless --own. mutation and change include same-origin iframe documents and attached child frames. A replaced iframe document and a changed selected tab count even when that document's counter starts at zero.
 Tier: control.
 
