@@ -51,7 +51,15 @@ class CdpSnapshotProducerTest {
                 assertEquals("L1:4", json.path("doc_version").asText());
                 assertEquals(80, json.path("viewport").path("scroll_y").asDouble(), 1e-9);
                 assertTrue(json.path("screenshot").path("sha256").asText().length() > 10);
+                assertEquals("html", json.path("source").path("kind").asText());
                 assertTrue(json.path("source").path("text").asText().contains("framed"));
+                assertEquals(2, json.path("version").asInt());
+                assertEquals("html", json.path("canonical").path("kind").asText());
+                String mainHtml = frameHtml(json, "main");
+                assertTrue(mainHtml.contains("data-pkb-shadow=\"open\""), mainHtml);
+                assertTrue(mainHtml.contains("class=\"inner\""), mainHtml);
+                assertTrue(mainHtml.contains("data-pkb-frame=\"child\""), mainHtml);
+                assertTrue(frameHtml(json, "child").contains("id=\"framed\""), frameHtml(json, "child"));
                 assertTrue(json.path("premap").has("indexes"));
                 assertEquals("main", json.path("frames").get(0).path("id").asText());
                 assertEquals("child", json.path("frames").get(1).path("id").asText());
@@ -71,7 +79,7 @@ class CdpSnapshotProducerTest {
                 assertTrue(framed.path("frame_path").asText().contains("iframe"), framed.toString());
                 assertEquals(306, framed.path("boxes").path("document_css_px").path("y").asDouble(), 1e-9);
                 assertEquals(6, framed.path("boxes").path("frame_document").path("y").asDouble(), 1e-9);
-                SnapshotSchemas.assertValid(schema(), json);
+                SnapshotSchemas.assertValid(SnapshotDocuments.schema(json.path("version").asInt(1)), json);
             } finally {
                 connection.close();
             }
@@ -99,9 +107,11 @@ class CdpSnapshotProducerTest {
         }
     }
 
-    private static JsonNode schema() throws Exception {
-        return Jsons.MAPPER.readTree(CompositeSnapshot.class.getResourceAsStream(
-                "/dev/domengine/snapshot/composite-snapshot.schema.json"));
+    private static String frameHtml(JsonNode json, String id) {
+        for (JsonNode frame : json.path("canonical").path("frames")) {
+            if (id.equals(frame.path("id").asText())) return frame.path("html").asText();
+        }
+        throw new AssertionError("missing canonical frame " + id);
     }
 
     private static JsonNode node(JsonNode json, String id) {

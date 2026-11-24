@@ -42,7 +42,8 @@ class SharedSurfaceTest {
         Path fixture = Files.createTempFile("desktop", ".json");
         Files.writeString(fixture, """
                 {"role":"window","name":"Fixture","children":[
-                  {"role":"button","name":"Save","x":4,"y":6,"width":20,"height":10}
+                  {"role":"button","name":"Save","x":4,"y":6,"width":20,"height":10},
+                  {"role":"image","name":"Mark","x":0,"y":0,"width":1,"height":1}
                 ]}
                 """);
         assertEquals(0, DomEngineMain.dispatch(List.of(
@@ -70,18 +71,34 @@ class SharedSurfaceTest {
 
         Path viewport = Files.createTempFile("view", ".pgm");
         Files.writeString(viewport, "P2\n1 1\n255\n0\n");
-        CliResult browserOcr = DomEngineMain.dispatch(List.of(
-                "query", "--file", page.toString(), "--pipeline", "image=ocr:mark", "--viewport", viewport.toString()
-        ));
-        CliResult desktopOcr = DomEngineMain.dispatch(List.of(
-                "desktop", "query", "--id", "shared", "--pipeline", "image=ocr:mark", "--viewport", viewport.toString()
-        ));
-        assertEquals(1, browserOcr.exit(), browserOcr.stderr());
-        assertEquals(1, desktopOcr.exit(), desktopOcr.stderr());
-        String browserError = Jsons.MAPPER.readTree(browserOcr.stderr()).path("error").asText();
-        String desktopError = Jsons.MAPPER.readTree(desktopOcr.stderr()).path("error").asText();
-        assertTrue(browserError.contains("ocr is not available"), browserError);
-        assertEquals(browserError, desktopError);
+        Path ocrPage = Files.createTempFile("ocr-page", ".html");
+        Files.writeString(ocrPage, """
+                <html><body>
+                <img id="mark" alt="mark" data-x="0" data-y="0" data-w="1" data-h="1">
+                </body></html>
+                """);
+        String previous = System.setProperty("pkb_ocr_runtime", viewport.resolveSibling("missing-ocr-runtime").toString());
+        dev.domengine.query.OcrHook.resetForTests();
+        try {
+            CliResult browserOcr = DomEngineMain.dispatch(List.of(
+                    "query", "--file", ocrPage.toString(), "--pipeline", "image=ocr:mark", "--viewport", viewport.toString()
+            ));
+            CliResult desktopOcr = DomEngineMain.dispatch(List.of(
+                    "desktop", "query", "--id", "shared", "--pipeline", "image=ocr:mark", "--viewport", viewport.toString()
+            ));
+            assertEquals(1, browserOcr.exit(), browserOcr.stderr());
+            assertEquals(1, desktopOcr.exit(), desktopOcr.stderr());
+            String browserError = Jsons.MAPPER.readTree(browserOcr.stderr()).path("error").asText();
+            String desktopError = Jsons.MAPPER.readTree(desktopOcr.stderr()).path("error").asText();
+            assertEquals("OCR runtime not installed", browserError);
+            assertEquals(browserError, desktopError);
+            assertEquals("ocr_runtime_missing", Jsons.MAPPER.readTree(browserOcr.stderr()).path("code").asText());
+            assertEquals("ocr_runtime_missing", Jsons.MAPPER.readTree(desktopOcr.stderr()).path("code").asText());
+        } finally {
+            dev.domengine.query.OcrHook.resetForTests();
+            if (previous == null) System.clearProperty("pkb_ocr_runtime");
+            else System.setProperty("pkb_ocr_runtime", previous);
+        }
 
         CliResult pierced = DomEngineMain.dispatch(List.of(
                 "query", "--file", page.toString(), "--xpath", "//span[@id='inner']", "--pierce", "open"
@@ -96,6 +113,7 @@ class SharedSurfaceTest {
 
         Files.deleteIfExists(fixture);
         Files.deleteIfExists(viewport);
+        Files.deleteIfExists(ocrPage);
     }
 
     private static String role(CliResult result) throws Exception {

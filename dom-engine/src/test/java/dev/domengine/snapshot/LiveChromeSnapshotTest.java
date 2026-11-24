@@ -87,7 +87,9 @@ class LiveChromeSnapshotTest {
             ));
             assertEquals(0, snap.exit(), snap.stderr());
             JsonNode json = Jsons.MAPPER.readTree(snap.stdout());
-            SnapshotSchemas.assertValid(schema(), json);
+            SnapshotSchemas.assertValid(SnapshotDocuments.schema(json.path("version").asInt(1)), json);
+            assertEquals("html", json.path("source").path("kind").asText());
+            assertEquals(2, json.path("version").asInt());
             assertEquals("cdp", json.path("transport").asText());
             assertTrue(json.path("platform").asText().equals("chrome") || json.path("platform").asText().equals("chromium"),
                     json.path("platform").asText());

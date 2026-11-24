@@ -180,7 +180,8 @@ class WorkbenchMcpServerTest {
         Object value = tools.call("snapshot", Map.of("kind", "offline"));
         assertTrue(value instanceof Map<?, ?> map && "pickleball.composite-snapshot".equals(map.get("schema")));
         Map<?, ?> body = (Map<?, ?>) value;
-        assertEquals(1, ((Number) body.get("version")).intValue());
+        assertEquals(2, ((Number) body.get("version")).intValue());
+        assertEquals("html", ((Map<?, ?>) body.get("canonical")).get("kind"));
         assertTrue(body.containsKey("premap"), String.valueOf(body));
         assertTrue(body.containsKey("nodes"), String.valueOf(body));
         assertFalse(String.valueOf(body.get("warnings")).contains("g3-producers-absent"), String.valueOf(body));

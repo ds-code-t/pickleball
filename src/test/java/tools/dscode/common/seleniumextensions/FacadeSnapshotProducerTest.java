@@ -2,7 +2,7 @@ package tools.dscode.common.seleniumextensions;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.domengine.json.Jsons;
-import dev.domengine.snapshot.CompositeSnapshot;
+import dev.domengine.snapshot.SnapshotDocuments;
 import dev.domengine.snapshot.SnapshotOptions;
 import dev.domengine.snapshot.SnapshotSchemas;
 import org.junit.jupiter.api.AfterEach;
@@ -35,15 +35,20 @@ class FacadeSnapshotProducerTest {
     void facadeWalkBuildsDistinctBoxesSourceAndPremap() throws Exception {
         SnapshotProducers.useFacadeForTests(driver -> new ScriptedFacade());
         JsonNode json = SnapshotProducers.page(null, new SnapshotOptions());
-        JsonNode schema = Jsons.MAPPER.readTree(CompositeSnapshot.class.getResourceAsStream(
-                "/dev/domengine/snapshot/composite-snapshot.schema.json"));
-        SnapshotSchemas.assertValid(schema, json);
+        assertEquals(2, json.path("version").asInt());
+        SnapshotSchemas.assertValid(SnapshotDocuments.schema(json.path("version").asInt(1)), json);
         assertEquals("bidi", json.path("transport").asText());
         assertEquals("firefox", json.path("platform").asText());
         assertEquals("main:4", json.path("doc_version").asText());
+        assertEquals("html", json.path("source").path("kind").asText());
         assertTrue(json.path("source").path("text").asText().contains("<!-- frame:main -->"));
         assertTrue(json.path("source").path("text").asText().contains("<!-- frame:child -->"));
         assertTrue(json.path("source").path("text").asText().contains("framed"));
+        String mainHtml = frameHtml(json, "main");
+        assertTrue(mainHtml.contains("data-pkb-shadow=\"open\""), mainHtml);
+        assertTrue(mainHtml.contains(">Go<"), mainHtml);
+        assertTrue(mainHtml.contains("data-pkb-frame=\"child\""), mainHtml);
+        assertTrue(frameHtml(json, "child").contains("framed"), frameHtml(json, "child"));
         assertTrue(json.path("premap").has("indexes"));
         assertEquals("main", json.path("frames").get(0).path("id").asText());
         assertEquals("child", json.path("frames").get(1).path("id").asText());
@@ -68,6 +73,14 @@ class FacadeSnapshotProducerTest {
         assertFalse(producer.contains("executeCdpCommand"));
         assertFalse(page.contains("executeCdpCommand"));
         assertFalse(walk.contains("executeCdpCommand"));
+        assertTrue(walk.contains("shadowRoot"), walk);
+    }
+
+    private static String frameHtml(JsonNode json, String id) {
+        for (JsonNode frame : json.path("canonical").path("frames")) {
+            if (id.equals(frame.path("id").asText())) return frame.path("html").asText();
+        }
+        throw new AssertionError("missing canonical frame " + id);
     }
 
     private static JsonNode byId(JsonNode json, String id) {
@@ -127,9 +140,15 @@ class FacadeSnapshotProducerTest {
     }
 
     private static Map<String, Object> rootWalk() {
-        Map<String, Object> button = node("button", "go", Map.of("disabled", "true"), Map.of("x", 10, "y", 120, "width", 80, "height", 20), List.of());
+        Map<String, Object> buttonText = new LinkedHashMap<>();
+        buttonText.put("type", "text");
+        buttonText.put("value", "Go");
+        Map<String, Object> button = node("button", "go", Map.of("disabled", "true"), Map.of("x", 10, "y", 120, "width", 80, "height", 20), List.of(buttonText));
+        Map<String, Object> inner = node("span", "inner", Map.of("class", "inner"), Map.of("x", 1, "y", 1, "width", 4, "height", 4), List.of());
+        Map<String, Object> host = node("div", "host", Map.of(), Map.of("x", 0, "y", 0, "width", 10, "height", 10), List.of());
+        host.put("shadow", Map.of("mode", "open", "children", List.of(inner)));
         Map<String, Object> iframe = node("iframe", "child", Map.of(), Map.of("x", 0, "y", 220, "width", 200, "height", 150), List.of());
-        Map<String, Object> body = node("body", null, Map.of(), Map.of("x", 0, "y", 0, "width", 800, "height", 600), List.of(button, iframe));
+        Map<String, Object> body = node("body", null, Map.of(), Map.of("x", 0, "y", 0, "width", 800, "height", 600), List.of(host, button, iframe));
         Map<String, Object> html = node("html", null, Map.of(), Map.of("x", 0, "y", 0, "width", 800, "height", 600), List.of(body));
         Map<String, Object> walk = metrics(80, 10);
         walk.put("outerHTML", "<html><body><button id=\"go\" disabled>Go</button><iframe id=\"child\"></iframe></body></html>");
@@ -138,7 +157,10 @@ class FacadeSnapshotProducerTest {
     }
 
     private static Map<String, Object> childWalk() {
-        Map<String, Object> paragraph = node("p", "inside", Map.of(), Map.of("x", 4, "y", 6, "width", 40, "height", 12), List.of());
+        Map<String, Object> framed = new LinkedHashMap<>();
+        framed.put("type", "text");
+        framed.put("value", "framed");
+        Map<String, Object> paragraph = node("p", "inside", Map.of(), Map.of("x", 4, "y", 6, "width", 40, "height", 12), List.of(framed));
         Map<String, Object> body = node("body", null, Map.of(), Map.of("x", 0, "y", 0, "width", 200, "height", 150), List.of(paragraph));
         Map<String, Object> html = node("html", null, Map.of(), Map.of("x", 0, "y", 0, "width", 200, "height", 150), List.of(body));
         Map<String, Object> walk = metrics(0, 0);

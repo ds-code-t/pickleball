@@ -84,11 +84,27 @@ class ObserveParityTest {
         assertEquals(1, bare.exit(), bare.stderr());
         assertTrue(Jsons.MAPPER.readTree(bare.stderr()).path("error").asText().contains("viewport"));
 
-        CliResult ocr = DomEngineMain.dispatch(List.of(
-                "query", "--file", html.toString(), "--pipeline", "image=ocr:mark", "--viewport", viewport.toString()
-        ));
-        assertEquals(1, ocr.exit(), ocr.stderr());
-        assertTrue(Jsons.MAPPER.readTree(ocr.stderr()).path("error").asText().contains("ocr is not available"));
+        Path ocrHtml = dir.resolve("ocr.html");
+        Files.writeString(ocrHtml, """
+                <html><body>
+                <img id="mark" alt="mark" data-x="0" data-y="0" data-w="2" data-h="2">
+                </body></html>
+                """);
+        String previous = System.setProperty("pkb_ocr_runtime", dir.resolve("missing-ocr-runtime").toString());
+        dev.domengine.query.OcrHook.resetForTests();
+        try {
+            CliResult ocr = DomEngineMain.dispatch(List.of(
+                    "query", "--file", ocrHtml.toString(), "--pipeline", "image=ocr:mark", "--viewport", viewport.toString()
+            ));
+            assertEquals(1, ocr.exit(), ocr.stderr());
+            JsonNode failure = Jsons.MAPPER.readTree(ocr.stderr());
+            assertEquals("OCR runtime not installed", failure.path("error").asText());
+            assertEquals("ocr_runtime_missing", failure.path("code").asText());
+        } finally {
+            dev.domengine.query.OcrHook.resetForTests();
+            if (previous == null) System.clearProperty("pkb_ocr_runtime");
+            else System.setProperty("pkb_ocr_runtime", previous);
+        }
     }
 
     @Test

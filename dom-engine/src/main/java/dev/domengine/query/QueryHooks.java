@@ -77,6 +77,7 @@ final class QueryHooks {
 
     static List<DomNode> candidates(Expressions.Stage stage, List<DomNode> hits) {
         if (hits == null || stage == null) return hits;
+        hits = ViewMask.retain(hits);
         PreMapLookup lookup = LOOKUP.get();
         if (lookup == null) return hits;
         String kind = kind(stage);

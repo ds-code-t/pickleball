@@ -47,7 +47,8 @@ public final class DesktopSnapshotProducer {
                 transport,
                 "desktop:" + session.sequence()
         );
-        return CompositeSnapshotBuilder.build(session.root(), context, started).toJson();
+        CanonicalDocument canonical = CanonicalDocument.desktop(CanonicalDesktop.html(session.root(), platform), xml);
+        return CompositeSnapshotBuilder.build(session.root(), context, started, canonical).toJson();
     }
 
     private static java.nio.file.Path screenshotFile(java.util.Map<String, String> flags) throws java.io.IOException {

@@ -1,8 +1,8 @@
 package dev.domengine.premap;
 
 import dev.domengine.query.HtmlTree;
-import dev.domengine.snapshot.CompositeSnapshot;
 import dev.domengine.snapshot.CompositeSnapshots;
+import dev.domengine.snapshot.SnapshotDocuments;
 import dev.domengine.snapshot.SnapshotOptions;
 import dev.domengine.snapshot.SnapshotSchemas;
 import dev.domengine.tree.DomNode;
@@ -45,8 +45,8 @@ class PreMapTest {
                 """;
         DomNode root = HtmlTree.parse(html);
         var json = CompositeSnapshots.offline(root, new SnapshotOptions());
-        var schema = CompositeSnapshot.class.getResourceAsStream("/dev/domengine/snapshot/composite-snapshot.schema.json");
-        SnapshotSchemas.assertValid(new com.fasterxml.jackson.databind.ObjectMapper().readTree(schema), json);
+        SnapshotSchemas.assertValid(SnapshotDocuments.schema(json.path("version").asInt(1)), json);
+        assertEquals(2, json.path("version").asInt());
         assertEquals("button", json.path("premap").path("indexes").path("by_role").path("button").get(0).asText().isBlank() ? "" : "button");
         assertTrue(json.path("premap").path("indexes").path("by_id").has("go"));
         assertTrue(json.path("premap").path("indexes").path("by_class").has("primary"));

@@ -12,6 +12,7 @@ import dev.domengine.tree.DomNode;
 import dev.domengine.tree.LiveTree;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -170,7 +171,10 @@ public final class PageActions {
         DomNode pinned = byIdentity(tree, flags, cdp);
         if (pinned != null) return pinned;
         if ("true".equals(flags.get("refind")) || flags.get("node-id") == null || flags.get("node-id").isBlank()) {
-            JsonNode found = Query.run(tree.root, flags);
+            Map<String, String> lookup = new LinkedHashMap<>();
+            if (flags != null) lookup.putAll(flags);
+            lookup.put("mask", "off");
+            JsonNode found = Query.run(tree.root, lookup);
             JsonNode nodes = found.get("nodes");
             if (nodes == null || nodes.isEmpty()) throw new CdpException("not found");
             if (nodes.size() > 1) throw new CdpException("ambiguous");

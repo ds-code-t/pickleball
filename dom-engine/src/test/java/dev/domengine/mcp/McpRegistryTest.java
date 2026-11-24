@@ -44,7 +44,8 @@ class McpRegistryTest {
         assertTrue(text.contains("\"name\":\"query\""), text);
         JsonNode snapshot = content(text, "2");
         assertEquals("pickleball.composite-snapshot", snapshot.path("schema").asText());
-        assertEquals(1, snapshot.path("version").asInt());
+        assertEquals(2, snapshot.path("version").asInt());
+        assertEquals("html", snapshot.path("canonical").path("kind").asText());
         assertFalse(snapshot.path("warnings").toString().contains("g3-producers-absent"), snapshot.toString());
         assertTrue(snapshot.has("premap"));
         assertTrue(snapshot.has("nodes"));

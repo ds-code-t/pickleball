@@ -42,6 +42,12 @@ final class WindowsUia {
                   } catch {}
                   $id = ''
                   try { $id = (($el.GetRuntimeId() | ForEach-Object { $_.ToString() }) -join '.') } catch {}
+                  $auto = ''
+                  try { $auto = [string]$el.Current.AutomationId } catch {}
+                  $className = ''
+                  try { $className = [string]$el.Current.ClassName } catch {}
+                  $help = ''
+                  try { $help = [string]$el.Current.HelpText } catch {}
                   $states = @()
                   try { if (-not $el.Current.IsEnabled) { $states += 'disabled' } } catch {}
                   try { if ($el.Current.HasKeyboardFocus) { $states += 'focused' } } catch {}
@@ -61,6 +67,9 @@ final class WindowsUia {
                   } catch {}
                   Write-Output ("NODE`t{0}`t{1}`t{2}`t{3}`t{4}`t{5}`t{6}`t{7}" -f $depth, $role, $x, $y, $w, $h, $id, (Clean $name))
                   Write-Output ("STATE`t{0}`t{1}" -f $id, ($states -join ','))
+                  if ($auto) { Write-Output ("ATTR`t{0}`tautomation-id`t{1}" -f $id, (Clean $auto)) }
+                  if ($className) { Write-Output ("ATTR`t{0}`tclass-name`t{1}" -f $id, (Clean $className)) }
+                  if ($help) { Write-Output ("ATTR`t{0}`thelp-text`t{1}" -f $id, (Clean $help)) }
                   if ($labeled) { Write-Output ("REL`t{0}`tlabeled-by`t{1}" -f $id, $labeled) }
                   if ($depth -ge 12) { return }
                   $kids = @()

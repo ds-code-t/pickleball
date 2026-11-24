@@ -7,8 +7,19 @@ import dev.domengine.cdp.CdpException;
 import dev.domengine.image.TemplateMatch;
 import dev.domengine.json.Jsons;
 import dev.domengine.log.EngineLog;
+import dev.domengine.snapshot.XPathIndex;
 import dev.domengine.tree.DomNode;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 
+import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathExpressionException;
+import javax.xml.xpath.XPathFactory;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,8 +27,11 @@ import java.util.Locale;
 
 /** Built-in pipeline engines. Each stage receives the previous nodes and returns the next set. */
 public final class Engines {
+    private static final String XML_NODE = "pkb.dom-node";
     private static final ThreadLocal<TemplateMatch.Gray> VIEWPORT = new ThreadLocal<>();
     private static final ThreadLocal<String> SPACE = new ThreadLocal<>();
+    /** Selector currently being checked, so a pseudo error names the caller's expression. */
+    private static final ThreadLocal<String> CSS_EXPR = new ThreadLocal<>();
 
     private Engines() {
     }
@@ -80,9 +94,7 @@ public final class Engines {
 
     static Query.Hit image(String expr, List<DomNode> scopes) {
         String raw = expr == null ? "" : expr.trim();
-        if (raw.toLowerCase(Locale.ROOT).startsWith("ocr")) {
-            throw new CdpException("ocr is not available in this build");
-        }
+        if (raw.toLowerCase(Locale.ROOT).startsWith("ocr")) return ocr(raw, scopes);
         TemplateMatch.Gray viewport = VIEWPORT.get();
         if (viewport == null) throw new CdpException("image engine needs a viewport screenshot");
         TemplateMatch.Gray template = raw.startsWith("P2") ? TemplateMatch.parse(raw) : TemplateMatch.read(Path.of(raw));
@@ -110,7 +122,61 @@ public final class Engines {
         return new Query.Hit(Query.distinct(hits), TemplateMatch.why(best, raw), image);
     }
 
+    private static Query.Hit ocr(String raw, List<DomNode> scopes) {
+        String lower = raw.toLowerCase(Locale.ROOT);
+        String needle = "ocr".equals(lower) ? null : raw.substring(lower.startsWith("ocr:") ? 4 : 3).trim();
+        TemplateMatch.Gray viewport = VIEWPORT.get();
+        if (viewport == null) throw new CdpException("image engine needs a viewport screenshot");
+        if (!OcrHook.viewEnabled()) {
+            ObjectNode skipped = Jsons.object();
+            skipped.put("engine", "ocr");
+            skipped.put("text", "");
+            skipped.put("hash", "");
+            skipped.put("cached", false);
+            skipped.put("matched", 0);
+            skipped.put("skipped", "ocr-views");
+            skipped.put("view", OcrHook.activeView());
+            return new Query.Hit(List.of(), "ocr skipped ocr-views", skipped);
+        }
+        List<DomNode> hits = new ArrayList<>();
+        String text = "";
+        String hash = "";
+        boolean cached = false;
+        for (DomNode scope : scopes) {
+            for (DomNode node : lightElements(scope, true)) {
+                if (!OcrHook.target(node) || !node.hasBox) continue;
+                TemplateMatch.Gray crop = TemplateMatch.crop(
+                        viewport,
+                        (int) Math.round(node.x),
+                        (int) Math.round(node.y),
+                        (int) Math.round(node.width),
+                        (int) Math.round(node.height)
+                );
+                OcrHook.Result result = OcrHook.recognize(node, crop);
+                if (result == null) continue;
+                if (!result.ok()) throw new CdpException(result.error());
+                text = result.text();
+                hash = result.hash();
+                cached = result.fromCache();
+                if (needle == null) {
+                    if (!result.text().isBlank()) hits.add(node);
+                } else if (needle.equals(result.text())) {
+                    hits.add(node);
+                }
+            }
+        }
+        ObjectNode image = Jsons.object();
+        image.put("engine", "ocr");
+        image.put("text", text);
+        image.put("hash", hash);
+        image.put("cached", cached);
+        image.put("matched", hits.size());
+        if (needle != null) image.put("expect", needle);
+        return new Query.Hit(Query.distinct(hits), "ocr matched " + hits.size(), image);
+    }
+
     static Query.Hit css(String expr, List<DomNode> scopes, boolean pierceShadows) {
+        ensureCss(expr);
         List<DomNode> hits = new ArrayList<>();
         for (DomNode scope : scopes) {
             for (DomNode candidate : lightElements(scope, scope.iframe || scope.nodeType == 9 || scope.nodeType == 11 || scope.shadowRoot)) {
@@ -143,30 +209,169 @@ public final class Engines {
             return new Query.Hit(distinct, "xpath matched " + distinct.size());
         }
         String offline = stripWrapping(cleaned);
-        if (!offlineSupported(offline)) throw new CdpException("invalid xpath: " + cleaned);
         boolean intoShadow = pierce != null && (pierce.equals("open") || pierce.equals("all"));
-        List<DomNode> hits = new ArrayList<>();
-        for (DomNode scope : scopes) {
-            List<DomNode> pool = new ArrayList<>(lightElements(scope, true));
-            if (intoShadow) {
+        if (indexQualified(offline)) {
+            List<DomNode> hits = new ArrayList<>();
+            for (DomNode scope : scopes) {
+                collectIndex(scope, offline, hits);
+                if (!intoShadow) continue;
                 for (DomNode shadow : collectShadows(scope)) {
                     if ("open".equals(pierce) && "closed".equalsIgnoreCase(shadow.shadowMode)) continue;
-                    pool.addAll(lightElements(shadow, true));
+                    collectIndex(shadow, offline, hits);
                 }
             }
-            for (DomNode candidate : pool) {
-                if (xpathMatches(candidate, offline)) hits.add(candidate);
+            List<DomNode> distinct = Query.distinct(hits);
+            return new Query.Hit(distinct, "xpath matched " + distinct.size());
+        }
+        if (offlineSupported(offline)) {
+            List<DomNode> hits = new ArrayList<>();
+            for (DomNode scope : scopes) {
+                List<DomNode> pool = new ArrayList<>(lightElements(scope, true));
+                if (intoShadow) {
+                    for (DomNode shadow : collectShadows(scope)) {
+                        if ("open".equals(pierce) && "closed".equalsIgnoreCase(shadow.shadowMode)) continue;
+                        pool.addAll(lightElements(shadow, true));
+                    }
+                }
+                for (DomNode candidate : pool) {
+                    if (xpathMatches(candidate, offline)) hits.add(candidate);
+                }
+            }
+            List<DomNode> distinct = Query.distinct(hits);
+            return new Query.Hit(distinct, "xpath matched " + distinct.size());
+        }
+        List<DomNode> hits = new ArrayList<>();
+        for (DomNode scope : scopes) {
+            hits.addAll(evaluateXml(offline, scope));
+            if (!intoShadow) continue;
+            for (DomNode shadow : collectShadows(scope)) {
+                if ("open".equals(pierce) && "closed".equalsIgnoreCase(shadow.shadowMode)) continue;
+                hits.addAll(evaluateXml(offline, shadow));
             }
         }
         List<DomNode> distinct = Query.distinct(hits);
         return new Query.Hit(distinct, "xpath matched " + distinct.size());
     }
 
+    /** Every step is {@code tag[n]}. {@link XPathIndex} answers this without building an XML document. */
+    static boolean indexQualified(String expr) {
+        if (expr == null || !expr.startsWith("/") || expr.startsWith("//")) return false;
+        if (expr.indexOf('[') < 0 || expr.contains("@") || expr.contains("(") || expr.contains("::")) return false;
+        boolean any = false;
+        for (String raw : expr.split("/")) {
+            if (raw.isBlank()) continue;
+            any = true;
+            int bracket = raw.indexOf('[');
+            if (bracket <= 0 || raw.indexOf('[', bracket + 1) >= 0 || !raw.endsWith("]")) return false;
+            String inside = raw.substring(bracket + 1, raw.length() - 1).trim();
+            if (inside.isEmpty() || inside.charAt(0) == '0' || !inside.chars().allMatch(Character::isDigit)) return false;
+            String tag = raw.substring(0, bracket);
+            if (tag.isBlank() || tag.indexOf(' ') >= 0 || tag.indexOf(':') >= 0) return false;
+        }
+        return any;
+    }
+
+    private static void collectIndex(DomNode scope, String expr, List<DomNode> hits) {
+        DomNode found = XPathIndex.resolve(scope, expr, "");
+        if (found != null && ViewMask.allows(found)) hits.add(found);
+    }
+
+    /**
+     * XPath 1.0 on an XML document built from the scope's light tree.
+     * An expression the JDK rejects is an error, not zero hits.
+     */
+    private static List<DomNode> evaluateXml(String expr, DomNode scope) {
+        if (scope == null) return List.of();
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            factory.setNamespaceAware(false);
+            factory.setExpandEntityReferences(false);
+            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+            Document doc = factory.newDocumentBuilder().newDocument();
+            List<DomNode> tops = elementChildren(scope);
+            if (tops.isEmpty()) return List.of();
+            boolean document = scope.nodeType == 9 || scope.nodeType == 11 || scope.shadowRoot;
+            if (tops.size() == 1 && document) {
+                appendElement(doc, doc, tops.get(0));
+            } else {
+                Element wrap = doc.createElement("pkb-root");
+                doc.appendChild(wrap);
+                for (DomNode child : tops) appendElement(doc, wrap, child);
+            }
+            NodeList list = (NodeList) XPathFactory.newInstance().newXPath()
+                    .compile(expr)
+                    .evaluate(doc, XPathConstants.NODESET);
+            List<DomNode> hits = new ArrayList<>();
+            for (int i = 0; i < list.getLength(); i++) {
+                Node node = list.item(i);
+                if (!(node instanceof Element element)) continue;
+                Object data = element.getUserData(XML_NODE);
+                if (data instanceof DomNode dom && ViewMask.allows(dom)) hits.add(dom);
+            }
+            return hits;
+        } catch (XPathExpressionException | ParserConfigurationException failure) {
+            throw new CdpException("invalid xpath: " + expr);
+        }
+    }
+
+    private static List<DomNode> elementChildren(DomNode scope) {
+        List<DomNode> tops = new ArrayList<>();
+        if (scope == null) return tops;
+        for (DomNode child : scope.children) {
+            if (child != null && child.nodeType == 1 && !child.shadowRoot) tops.add(child);
+        }
+        return tops;
+    }
+
+    private static void appendElement(Document doc, Node parent, DomNode node) {
+        if (node == null || node.nodeType != 1 || node.shadowRoot) return;
+        Element element = doc.createElement(xmlName(node.localName == null || node.localName.isBlank() ? node.nodeName : node.localName));
+        element.setUserData(XML_NODE, node, null);
+        node.attributes.forEach((name, value) -> {
+            String attr = xmlAttr(name);
+            if (attr != null) element.setAttribute(attr, value == null ? "" : value);
+        });
+        parent.appendChild(element);
+        if (node.iframe) return;
+        for (DomNode child : node.children) {
+            if (child == null || child.shadowRoot) continue;
+            if (child.nodeType == 3) {
+                element.appendChild(doc.createTextNode(child.nodeValue == null ? "" : child.nodeValue));
+            } else if (child.nodeType == 1) {
+                appendElement(doc, element, child);
+            }
+        }
+    }
+
+    private static String xmlName(String raw) {
+        String name = raw == null ? "" : raw.trim().toLowerCase(Locale.ROOT);
+        if (name.startsWith("#")) name = name.substring(1);
+        return isXmlName(name) ? name : "node";
+    }
+
+    private static String xmlAttr(String raw) {
+        if (raw == null) return null;
+        String name = raw.trim().toLowerCase(Locale.ROOT);
+        return isXmlName(name) ? name : null;
+    }
+
+    private static boolean isXmlName(String name) {
+        if (name.isEmpty()) return false;
+        char first = name.charAt(0);
+        if (!Character.isLetter(first) && first != '_') return false;
+        for (int i = 1; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (Character.isLetterOrDigit(c) || c == '-' || c == '_' || c == '.') continue;
+            return false;
+        }
+        return true;
+    }
+
     private static boolean documentScope(DomNode scope) {
         return scope != null && (scope.nodeType == 9 || scope.parent == null);
     }
 
-    /** The parsed-tree matcher only understands this subset. Anything else is an error, not zero hits. */
+    /** Tag, attribute, and contains() scans. Anything else is XPath 1.0 on the canonical tree. */
     static boolean offlineSupported(String expr) {
         if (expr == null || expr.isBlank()) return false;
         if (expr.startsWith("//")) {
@@ -743,6 +948,7 @@ public final class Engines {
 
     static boolean matchesSelector(DomNode node, String selector) {
         if (selector == null || selector.isBlank() || "*".equals(selector)) return node.nodeType == 1;
+        ensureCss(selector);
         for (String group : splitTop(selector, ',')) {
             if (matchesChain(node, group.trim())) return true;
         }
@@ -750,22 +956,51 @@ public final class Engines {
     }
 
     private static boolean matchesChain(DomNode node, String selector) {
+        ChainSplit split = splitChain(selector);
+        if (split.compounds.isEmpty()) return false;
+        return matchFrom(node, split.compounds, split.combinators, split.compounds.size() - 1);
+    }
+
+    /**
+     * Splits one selector group on combinators. Parentheses stay intact so
+     * {@code :nth-child(2n + 1)} and {@code :not(.a)} are one compound.
+     */
+    private static ChainSplit splitChain(String selector) {
         List<String> compounds = new ArrayList<>();
         List<Character> combinators = new ArrayList<>();
         StringBuilder current = new StringBuilder();
+        int bracket = 0;
+        int paren = 0;
+        Character pending = null;
         for (int i = 0; i < selector.length(); i++) {
             char c = selector.charAt(i);
-            if (c == '>' || c == ' ') {
-                if (current.isEmpty()) continue;
+            if (c == '[') bracket++;
+            else if (c == ']' && bracket > 0) bracket--;
+            else if (c == '(') paren++;
+            else if (c == ')' && paren > 0) paren--;
+            boolean split = bracket == 0 && paren == 0 && (c == '>' || c == '+' || c == '~' || c == ' ');
+            if (!split) {
+                if (pending != null) {
+                    combinators.add(pending);
+                    pending = null;
+                }
+                current.append(c);
+                continue;
+            }
+            if (c == ' ' && current.isEmpty()) continue;
+            if (!current.isEmpty()) {
                 compounds.add(current.toString().trim());
                 current.setLength(0);
-                combinators.add(c == '>' ? '>' : ' ');
+                pending = c == ' ' ? ' ' : c;
+            } else if (c != ' ') {
+                pending = c;
+            }
+            if (c != ' ') {
                 while (i + 1 < selector.length() && selector.charAt(i + 1) == ' ') i++;
-            } else current.append(c);
+            }
         }
         if (!current.isEmpty()) compounds.add(current.toString().trim());
-        if (compounds.isEmpty()) return false;
-        return matchFrom(node, compounds, combinators, compounds.size() - 1);
+        return new ChainSplit(compounds, combinators);
     }
 
     private static boolean matchFrom(DomNode node, List<String> compounds, List<Character> combinators, int index) {
@@ -774,12 +1009,30 @@ public final class Engines {
         if (index == 0) return true;
         char combinator = combinators.get(index - 1);
         if (combinator == '>') return matchFrom(elementParent(node), compounds, combinators, index - 1);
+        if (combinator == '+') return matchFrom(previousElement(node), compounds, combinators, index - 1);
+        if (combinator == '~') {
+            for (DomNode prev = previousElement(node); prev != null; prev = previousElement(prev)) {
+                if (matchFrom(prev, compounds, combinators, index - 1)) return true;
+            }
+            return false;
+        }
         DomNode parent = elementParent(node);
         while (parent != null) {
             if (matchFrom(parent, compounds, combinators, index - 1)) return true;
             parent = elementParent(parent);
         }
         return false;
+    }
+
+    private static DomNode previousElement(DomNode node) {
+        DomNode parent = node.parent;
+        if (parent == null) return null;
+        DomNode previous = null;
+        for (DomNode child : parent.children) {
+            if (child == node) return previous;
+            if (child.nodeType == 1 && !child.shadowRoot) previous = child;
+        }
+        return null;
     }
 
     private static DomNode elementParent(DomNode node) {
@@ -790,6 +1043,14 @@ public final class Engines {
     }
 
     private static boolean matchesCompound(DomNode node, String compound) {
+        if (compound.isEmpty() || "*".equals(compound)) return true;
+        if (!hasPseudo(compound)) return matchesSimple(node, compound);
+        CompoundParts parts = parseCompound(compound, false);
+        return parts != null && matchesParts(node, parts);
+    }
+
+    /** Tag, id, class, and attribute compounds. No pseudo-class in {@code compound}. */
+    private static boolean matchesSimple(DomNode node, String compound) {
         if (compound.isEmpty() || "*".equals(compound)) return true;
         int i = 0;
         boolean saw = false;
@@ -815,7 +1076,8 @@ public final class Engines {
                 int end = nextStop(compound, i);
                 String tag = compound.substring(i, end);
                 if (!tag.isEmpty() && !tag.equalsIgnoreCase(node.localName) && !tag.equals("*")) return false;
-                i = end;
+                if (end == i) i++;
+                else i = end;
                 saw = true;
             }
         }
@@ -826,7 +1088,7 @@ public final class Engines {
         int i = start;
         while (i < text.length()) {
             char c = text.charAt(i);
-            if (c == '#' || c == '.' || c == '[') break;
+            if (c == '#' || c == '.' || c == '[' || c == ':') break;
             i++;
         }
         return i;
@@ -834,7 +1096,7 @@ public final class Engines {
 
     private static boolean matchAttr(DomNode node, String body) {
         String op = "=";
-        for (String candidate : List.of("*=", "^=", "$=", "=")) {
+        for (String candidate : List.of("~=", "|=", "*=", "^=", "$=", "=")) {
             if (body.contains(candidate)) {
                 op = candidate;
                 break;
@@ -850,8 +1112,15 @@ public final class Engines {
             case "*=" -> actual.contains(value);
             case "^=" -> actual.startsWith(value);
             case "$=" -> actual.endsWith(value);
+            case "~=" -> word(actual, value);
+            case "|=" -> actual.equals(value) || actual.startsWith(value + "-");
             default -> actual.equals(value);
         };
+    }
+
+    private static boolean word(String actual, String value) {
+        for (String part : actual.split("\\s+")) if (part.equals(value)) return true;
+        return false;
     }
 
     private static boolean hasClass(DomNode node, String className) {
@@ -859,6 +1128,488 @@ public final class Engines {
         if (raw == null) return false;
         for (String part : raw.split("\\s+")) if (part.equals(className)) return true;
         return false;
+    }
+
+    /**
+     * Selectors Level 3 pseudo-classes. An unsupported pseudo-class or any
+     * pseudo-element is {@code invalid css: <selector>}, not zero hits.
+     * Checked before the candidate walk so an empty tree still errors.
+     */
+    private static void ensureCss(String selector) {
+        if (selector == null || selector.isBlank() || "*".equals(selector) || !containsPseudo(selector)) return;
+        String previous = CSS_EXPR.get();
+        CSS_EXPR.set(selector);
+        try {
+            for (String group : splitTop(selector, ',')) {
+                for (String compound : splitChain(group.trim()).compounds) {
+                    if (!hasPseudo(compound)) continue;
+                    if (parseCompound(compound, false) == null) throw badCss();
+                }
+            }
+        } finally {
+            if (previous == null) CSS_EXPR.remove();
+            else CSS_EXPR.set(previous);
+        }
+    }
+
+    private static CdpException badCss() {
+        String selector = CSS_EXPR.get();
+        return new CdpException("invalid css: " + (selector == null ? "" : selector));
+    }
+
+    private static boolean containsPseudo(String selector) {
+        int bracket = 0;
+        int paren = 0;
+        boolean quote = false;
+        char q = 0;
+        for (int i = 0; i < selector.length(); i++) {
+            char c = selector.charAt(i);
+            if (quote) {
+                if (c == q) quote = false;
+                continue;
+            }
+            if (c == '"' || c == '\'') {
+                quote = true;
+                q = c;
+                continue;
+            }
+            if (c == '[') bracket++;
+            else if (c == ']' && bracket > 0) bracket--;
+            else if (c == '(') paren++;
+            else if (c == ')' && paren > 0) paren--;
+            else if (c == ':' && bracket == 0 && paren == 0) return true;
+        }
+        return false;
+    }
+
+    private static boolean hasPseudo(String compound) {
+        return containsPseudo(compound);
+    }
+
+    private static CompoundParts parseCompound(String compound, boolean inNot) {
+        CompoundParts parts = new CompoundParts();
+        int i = 0;
+        while (i < compound.length()) {
+            char c = compound.charAt(i);
+            if (c == '#') {
+                int end = nextStop(compound, i + 1);
+                parts.ids.add(compound.substring(i + 1, end));
+                i = end;
+                parts.saw = true;
+            } else if (c == '.') {
+                int end = nextStop(compound, i + 1);
+                parts.classes.add(compound.substring(i + 1, end));
+                i = end;
+                parts.saw = true;
+            } else if (c == '[') {
+                int end = closeBracket(compound, i);
+                if (end < 0) return null;
+                parts.attrs.add(compound.substring(i + 1, end));
+                i = end + 1;
+                parts.saw = true;
+            } else if (c == ':') {
+                i = parsePseudoInto(compound, i, parts, inNot);
+                parts.saw = true;
+            } else {
+                int end = nextStop(compound, i);
+                String tag = compound.substring(i, end);
+                if (!tag.isEmpty()) {
+                    parts.tag = tag;
+                    parts.sawTag = true;
+                }
+                if (end == i) i++;
+                else i = end;
+                parts.saw = true;
+            }
+        }
+        return parts.saw ? parts : null;
+    }
+
+    private static int parsePseudoInto(String compound, int i, CompoundParts parts, boolean inNot) {
+        if (i + 1 < compound.length() && compound.charAt(i + 1) == ':') throw badCss();
+        int start = i + 1;
+        if (start >= compound.length() || !isIdentStart(compound.charAt(start))) throw badCss();
+        int j = start + 1;
+        while (j < compound.length() && isIdentPart(compound.charAt(j))) j++;
+        String name = compound.substring(start, j).toLowerCase(Locale.ROOT);
+        String arg = null;
+        if (j < compound.length() && compound.charAt(j) == '(') {
+            int close = closeParen(compound, j);
+            if (close < 0) throw badCss();
+            arg = compound.substring(j + 1, close);
+            j = close + 1;
+        }
+        parts.pseudos.add(pseudo(name, arg, inNot));
+        return j;
+    }
+
+    private static PseudoPart pseudo(String name, String arg, boolean inNot) {
+        boolean functional = arg != null;
+        return switch (name) {
+            case "first-child", "last-child", "only-child",
+                    "first-of-type", "last-of-type", "only-of-type",
+                    "checked", "disabled", "enabled", "empty", "root" -> {
+                if (functional) throw badCss();
+                yield new PseudoPart(name, 0, 0, null);
+            }
+            case "before", "after", "first-line", "first-letter" -> throw badCss();
+            case "nth-child", "nth-last-child", "nth-of-type", "nth-last-of-type" -> {
+                if (!functional) throw badCss();
+                int[] ab = parseNth(arg);
+                yield new PseudoPart(name, ab[0], ab[1], null);
+            }
+            case "not" -> {
+                if (functional && inNot) throw badCss();
+                if (!functional) throw badCss();
+                yield new PseudoPart(name, 0, 0, parseNot(arg));
+            }
+            default -> throw badCss();
+        };
+    }
+
+    /** Level 3 {@code :not} takes one compound. A combinator or a nested {@code :not} is an error. */
+    private static CompoundParts parseNot(String arg) {
+        if (arg == null) throw badCss();
+        String trimmed = arg.trim();
+        if (trimmed.isEmpty() || complexArgument(trimmed)) throw badCss();
+        CompoundParts inner = parseCompound(trimmed, true);
+        if (inner == null) throw badCss();
+        return inner;
+    }
+
+    private static boolean complexArgument(String arg) {
+        int bracket = 0;
+        int paren = 0;
+        boolean quote = false;
+        char q = 0;
+        for (int i = 0; i < arg.length(); i++) {
+            char c = arg.charAt(i);
+            if (quote) {
+                if (c == q) quote = false;
+                continue;
+            }
+            if (c == '"' || c == '\'') {
+                quote = true;
+                q = c;
+                continue;
+            }
+            if (c == '[') bracket++;
+            else if (c == ']' && bracket > 0) bracket--;
+            else if (c == '(') paren++;
+            else if (c == ')' && paren > 0) paren--;
+            else if (bracket == 0 && paren == 0
+                    && (c == '>' || c == '+' || c == '~' || c == ',' || Character.isWhitespace(c))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean matchesParts(DomNode node, CompoundParts parts) {
+        if (node == null || node.nodeType != 1 || parts == null || !parts.saw) return false;
+        if (parts.sawTag && !parts.tag.isEmpty() && !"*".equals(parts.tag) && !parts.tag.equalsIgnoreCase(node.localName)) {
+            return false;
+        }
+        for (String id : parts.ids) {
+            if (!id.equals(node.attributes.get("id"))) return false;
+        }
+        for (String className : parts.classes) {
+            if (!hasClass(node, className)) return false;
+        }
+        for (String attr : parts.attrs) {
+            if (!matchAttr(node, attr)) return false;
+        }
+        for (PseudoPart pseudo : parts.pseudos) {
+            if (!matchPseudo(node, pseudo)) return false;
+        }
+        return true;
+    }
+
+    private static boolean matchPseudo(DomNode node, PseudoPart pseudo) {
+        return switch (pseudo.name) {
+            case "first-child" -> siblingPosition(node, false, false) == 1;
+            case "last-child" -> siblingPosition(node, false, true) == 1;
+            case "only-child" -> elementSiblings(node, false).size() == 1;
+            case "first-of-type" -> siblingPosition(node, true, false) == 1;
+            case "last-of-type" -> siblingPosition(node, true, true) == 1;
+            case "only-of-type" -> elementSiblings(node, true).size() == 1;
+            case "nth-child" -> anPlusB(siblingPosition(node, false, false), pseudo.a, pseudo.b);
+            case "nth-last-child" -> anPlusB(siblingPosition(node, false, true), pseudo.a, pseudo.b);
+            case "nth-of-type" -> anPlusB(siblingPosition(node, true, false), pseudo.a, pseudo.b);
+            case "nth-last-of-type" -> anPlusB(siblingPosition(node, true, true), pseudo.a, pseudo.b);
+            case "checked" -> isChecked(node);
+            case "disabled" -> isFormDisabled(node);
+            case "enabled" -> canDisable(node) && !isFormDisabled(node);
+            case "empty" -> isEmptyElement(node);
+            case "root" -> isRootElement(node);
+            case "not" -> !matchesParts(node, pseudo.inner);
+            default -> throw badCss();
+        };
+    }
+
+    /** Element siblings in this light tree, shadow root, or frame. Text nodes do not count. */
+    private static List<DomNode> elementSiblings(DomNode node, boolean ofType) {
+        List<DomNode> siblings = new ArrayList<>();
+        List<DomNode> pool = node.parent == null ? List.of(node) : node.parent.children;
+        for (DomNode child : pool) {
+            if (child == null || child.nodeType != 1 || child.shadowRoot) continue;
+            if (ofType && !sameTag(child, node)) continue;
+            siblings.add(child);
+        }
+        return siblings;
+    }
+
+    private static int siblingPosition(DomNode node, boolean ofType, boolean fromEnd) {
+        List<DomNode> siblings = elementSiblings(node, ofType);
+        int index = -1;
+        for (int i = 0; i < siblings.size(); i++) {
+            if (siblings.get(i) == node) {
+                index = i;
+                break;
+            }
+        }
+        if (index < 0) return 0;
+        return fromEnd ? siblings.size() - index : index + 1;
+    }
+
+    private static boolean sameTag(DomNode left, DomNode right) {
+        String a = left.localName == null ? "" : left.localName;
+        String b = right.localName == null ? "" : right.localName;
+        return a.equalsIgnoreCase(b);
+    }
+
+    private static boolean anPlusB(int position, int a, int b) {
+        if (position <= 0) return false;
+        if (a == 0) return position == b;
+        int diff = position - b;
+        if (Math.floorMod(diff, a) != 0) return false;
+        return diff / a >= 0;
+    }
+
+    /** {@code odd}, {@code even}, or {@code An+B}. Spaces are allowed only around the {@code b} sign. */
+    private static int[] parseNth(String raw) {
+        if (raw == null) throw badCss();
+        int i = 0;
+        int n = raw.length();
+        while (i < n && raw.charAt(i) == ' ') i++;
+        int end = n;
+        while (end > i && raw.charAt(end - 1) == ' ') end--;
+        if (i >= end) throw badCss();
+        String body = raw.substring(i, end).toLowerCase(Locale.ROOT);
+        if ("odd".equals(body)) return new int[]{2, 1};
+        if ("even".equals(body)) return new int[]{2, 0};
+        return parseAnPlusB(body);
+    }
+
+    private static int[] parseAnPlusB(String s) {
+        int i = 0;
+        int len = s.length();
+        int sign = 1;
+        if (s.charAt(0) == '+') i = 1;
+        else if (s.charAt(0) == '-') {
+            sign = -1;
+            i = 1;
+        }
+        int num = 0;
+        boolean digits = false;
+        int mark = i;
+        while (i < len && Character.isDigit(s.charAt(i))) {
+            digits = true;
+            int digit = s.charAt(i) - '0';
+            if (num > (Integer.MAX_VALUE - digit) / 10) throw badCss();
+            num = num * 10 + digit;
+            i++;
+        }
+        if (i < len && s.charAt(i) == 'n') {
+            if (!digits && i != mark) throw badCss();
+            int a = sign * (digits ? num : 1);
+            i++;
+            int j = i;
+            while (j < len && s.charAt(j) == ' ') j++;
+            if (j >= len) return new int[]{a, 0};
+            char op = s.charAt(j);
+            if (op != '+' && op != '-') throw badCss();
+            j++;
+            while (j < len && s.charAt(j) == ' ') j++;
+            if (j >= len || !Character.isDigit(s.charAt(j))) throw badCss();
+            int b = 0;
+            while (j < len && Character.isDigit(s.charAt(j))) {
+                int digit = s.charAt(j) - '0';
+                if (b > (Integer.MAX_VALUE - digit) / 10) throw badCss();
+                b = b * 10 + digit;
+                j++;
+            }
+            while (j < len && s.charAt(j) == ' ') j++;
+            if (j != len) throw badCss();
+            if (op == '-') b = -b;
+            return new int[]{a, b};
+        }
+        if (!digits || i != len) throw badCss();
+        return new int[]{0, sign * num};
+    }
+
+    private static boolean isChecked(DomNode node) {
+        String tag = node.localName == null ? "" : node.localName.toLowerCase(Locale.ROOT);
+        if ("option".equals(tag)) {
+            return node.states.contains("selected")
+                    || node.states.contains("checked")
+                    || node.attributes.containsKey("selected")
+                    || "true".equalsIgnoreCase(node.attributes.get("aria-selected"));
+        }
+        if (!"input".equals(tag)) return false;
+        String type = node.attributes.getOrDefault("type", "text").toLowerCase(Locale.ROOT);
+        if (!"checkbox".equals(type) && !"radio".equals(type)) return false;
+        return node.states.contains("checked")
+                || node.attributes.containsKey("checked")
+                || "true".equalsIgnoreCase(node.attributes.get("aria-checked"));
+    }
+
+    private static boolean canDisable(DomNode node) {
+        String tag = node.localName == null ? "" : node.localName.toLowerCase(Locale.ROOT);
+        return switch (tag) {
+            case "button", "input", "select", "textarea", "optgroup", "option", "fieldset" -> true;
+            default -> false;
+        };
+    }
+
+    private static boolean isFormDisabled(DomNode node) {
+        if (!canDisable(node)) return false;
+        if (node.states.contains("disabled") || node.attributes.containsKey("disabled")) return true;
+        for (DomNode parent = node.parent; parent != null; parent = parent.parent) {
+            if (parent.iframe || parent.shadowRoot || parent.nodeType == 9) break;
+            if (!"fieldset".equalsIgnoreCase(parent.localName)) continue;
+            if (!parent.attributes.containsKey("disabled") && !parent.states.contains("disabled")) continue;
+            return !inFirstLegend(node, parent);
+        }
+        return false;
+    }
+
+    private static boolean inFirstLegend(DomNode node, DomNode fieldset) {
+        DomNode legend = null;
+        for (DomNode child : fieldset.children) {
+            if (child != null && child.nodeType == 1 && "legend".equalsIgnoreCase(child.localName)) {
+                legend = child;
+                break;
+            }
+        }
+        if (legend == null) return false;
+        for (DomNode cursor = node; cursor != null && cursor != fieldset; cursor = cursor.parent) {
+            if (cursor == legend) return true;
+        }
+        return false;
+    }
+
+    private static boolean isEmptyElement(DomNode node) {
+        for (DomNode child : node.children) {
+            if (child == null || child.shadowRoot) continue;
+            if (node.iframe) {
+                if (child.nodeType == 3 || child.nodeType == 4) {
+                    if (child.nodeValue != null && !child.nodeValue.isEmpty()) return false;
+                }
+                continue;
+            }
+            if (child.nodeType == 1) return false;
+            if ((child.nodeType == 3 || child.nodeType == 4) && child.nodeValue != null && !child.nodeValue.isEmpty()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isRootElement(DomNode node) {
+        if (node == null || node.nodeType != 1) return false;
+        DomNode parent = node.parent;
+        if (parent == null) return true;
+        if (parent.nodeType != 9 && !parent.iframe) return false;
+        for (DomNode child : parent.children) {
+            if (child != null && child.nodeType == 1 && !child.shadowRoot) return child == node;
+        }
+        return false;
+    }
+
+    private static int closeBracket(String text, int open) {
+        boolean quote = false;
+        char q = 0;
+        for (int i = open + 1; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (quote) {
+                if (c == q) quote = false;
+                continue;
+            }
+            if (c == '"' || c == '\'') {
+                quote = true;
+                q = c;
+                continue;
+            }
+            if (c == ']') return i;
+        }
+        return -1;
+    }
+
+    private static int closeParen(String text, int open) {
+        int depth = 0;
+        boolean quote = false;
+        char q = 0;
+        for (int i = open; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (quote) {
+                if (c == q) quote = false;
+                continue;
+            }
+            if (c == '"' || c == '\'') {
+                quote = true;
+                q = c;
+                continue;
+            }
+            if (c == '(') depth++;
+            else if (c == ')') {
+                depth--;
+                if (depth == 0) return i;
+            }
+        }
+        return -1;
+    }
+
+    private static boolean isIdentStart(char c) {
+        return Character.isLetter(c) || c == '_' || c == '-';
+    }
+
+    private static boolean isIdentPart(char c) {
+        return Character.isLetterOrDigit(c) || c == '_' || c == '-';
+    }
+
+    private static final class ChainSplit {
+        final List<String> compounds;
+        final List<Character> combinators;
+
+        ChainSplit(List<String> compounds, List<Character> combinators) {
+            this.compounds = compounds;
+            this.combinators = combinators;
+        }
+    }
+
+    private static final class CompoundParts {
+        String tag = "";
+        boolean sawTag;
+        boolean saw;
+        final List<String> ids = new ArrayList<>();
+        final List<String> classes = new ArrayList<>();
+        final List<String> attrs = new ArrayList<>();
+        final List<PseudoPart> pseudos = new ArrayList<>();
+    }
+
+    private static final class PseudoPart {
+        final String name;
+        final int a;
+        final int b;
+        final CompoundParts inner;
+
+        PseudoPart(String name, int a, int b, CompoundParts inner) {
+            this.name = name;
+            this.a = a;
+            this.b = b;
+            this.inner = inner;
+        }
     }
 
     static List<DomNode> lightElements(DomNode scope, boolean descend) {
@@ -870,7 +1621,7 @@ public final class Engines {
     private static void collectLight(DomNode scope, List<DomNode> into, boolean descend) {
         for (DomNode child : scope.children) {
             if (child.nodeType != 1 || child.shadowRoot) continue;
-            into.add(child);
+            if (ViewMask.allows(child)) into.add(child);
             if (descend && !child.iframe) collectLight(child, into, true);
             else if (scope.iframe && descend) collectLight(child, into, true);
         }
@@ -892,12 +1643,15 @@ public final class Engines {
     private static List<String> splitTop(String text, char comma) {
         List<String> parts = new ArrayList<>();
         StringBuilder current = new StringBuilder();
-        int depth = 0;
+        int bracket = 0;
+        int paren = 0;
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
-            if (c == '[') depth++;
-            else if (c == ']' && depth > 0) depth--;
-            if (c == comma && depth == 0) {
+            if (c == '[') bracket++;
+            else if (c == ']' && bracket > 0) bracket--;
+            else if (c == '(') paren++;
+            else if (c == ')' && paren > 0) paren--;
+            if (c == comma && bracket == 0 && paren == 0) {
                 parts.add(current.toString());
                 current.setLength(0);
             } else current.append(c);

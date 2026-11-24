@@ -22,7 +22,8 @@ class CompositeSnapshotModelTest {
         JsonNode json = CompositeSnapshots.offline(root, SnapshotOptions.fromFlags(java.util.Map.of(
                 "file", "src/test/resources/fixtures/affinity-form.html")));
         assertEquals("pickleball.composite-snapshot", json.path("schema").asText());
-        assertEquals(1, json.path("version").asInt());
+        assertEquals(2, json.path("version").asInt());
+        assertEquals("html", json.path("canonical").path("kind").asText());
         assertEquals("fixture", json.path("transport").asText());
         assertTrue(json.path("premap").path("sections").size() > 0);
         assertTrue(json.path("premap").path("labels").size() > 0, json.path("premap").path("labels").toString());
@@ -51,5 +52,18 @@ class CompositeSnapshotModelTest {
         assertEquals(0.2, button.path("boxes").path("image_px").path("width").asDouble(), 1e-9);
         assertTrue(button.path("boxes").path("visual_viewport").isNull());
         assertTrue(button.path("boxes").path("document_css_px").isObject());
+    }
+
+    @Test
+    void projectionIsStableAsideFromCaptureMetadata() throws Exception {
+        String html = Files.readString(Path.of("src/test/resources/fixtures/affinity-form.html"));
+        SnapshotOptions options = SnapshotOptions.fromFlags(java.util.Map.of(
+                "file", "src/test/resources/fixtures/affinity-form.html"));
+        JsonNode first = CompositeSnapshots.offline(HtmlTree.parse(html), options);
+        JsonNode second = CompositeSnapshots.offline(HtmlTree.parse(html), options);
+        assertEquals(first.path("nodes"), second.path("nodes"));
+        assertEquals(first.path("premap"), second.path("premap"));
+        assertEquals(first.path("canonical"), second.path("canonical"));
+        assertEquals(first.path("frames"), second.path("frames"));
     }
 }

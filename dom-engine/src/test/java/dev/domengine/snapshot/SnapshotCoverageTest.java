@@ -116,6 +116,10 @@ class SnapshotCoverageTest {
             try {
                 JsonNode json = CdpSnapshotProducer.produce(connection, platform, Map.of());
                 assertParts(json, platform, "cdp");
+                assertEquals("html", json.path("source").path("kind").asText());
+                assertEquals(2, json.path("version").asInt());
+                assertTrue(frameHtml(json, "main").contains("data-pkb-shadow=\"open\""));
+                assertTrue(frameHtml(json, "child").contains("id=\"framed\""));
             } finally {
                 connection.close();
             }
@@ -150,6 +154,13 @@ class SnapshotCoverageTest {
         JsonNode json = DesktopSnapshotProducer.produce(named, Map.of("screenshot", png.toString()));
         assertParts(json, platform, "fixture");
         assertEquals("a11y-xml", json.path("source").path("kind").asText());
+        assertEquals(2, json.path("version").asInt());
+        assertEquals("html-ish", json.path("canonical").path("kind").asText());
+        assertEquals(json.path("source").path("text").asText(), json.path("canonical").path("side").path("a11y_xml").asText());
+        assertEquals("data-pkb-native-path", json.path("canonical").path("side").path("native_path_attr").asText());
+        String html = json.path("canonical").path("frames").path(0).path("html").asText();
+        assertTrue(html.contains("role=\"window\""), html);
+        assertTrue(html.contains(">Save<"), html);
     }
 
     private static void liveCdp(String binary, String platform, String also, String marker) throws Exception {
@@ -190,7 +201,9 @@ class SnapshotCoverageTest {
             String seen = json.path("platform").asText();
             assertTrue(seen.equals(platform) || seen.equals(also), seen);
             assertParts(json, seen, "cdp");
+            assertEquals("html", json.path("source").path("kind").asText());
             assertTrue(json.path("source").path("text").asText().contains(marker));
+            assertTrue(canonicalHtml(json).contains(marker), json.path("canonical").toString());
             assertTrue(Files.exists(out.resolve("screenshot.png")));
         } finally {
             server.stop(0);
@@ -200,8 +213,21 @@ class SnapshotCoverageTest {
         }
     }
 
+    private static String frameHtml(JsonNode json, String id) {
+        for (JsonNode frame : json.path("canonical").path("frames")) {
+            if (id.equals(frame.path("id").asText())) return frame.path("html").asText();
+        }
+        return "";
+    }
+
+    private static String canonicalHtml(JsonNode json) {
+        StringBuilder html = new StringBuilder();
+        for (JsonNode frame : json.path("canonical").path("frames")) html.append(frame.path("html").asText());
+        return html.toString();
+    }
+
     private static void assertParts(JsonNode json, String platform, String transport) throws Exception {
-        SnapshotSchemas.assertValid(schema(), json);
+        SnapshotSchemas.assertValid(SnapshotDocuments.schema(json.path("version").asInt(1)), json);
         assertEquals(platform, json.path("platform").asText(), json.path("platform").asText());
         assertEquals(transport, json.path("transport").asText());
         assertTrue(json.path("screenshot").path("width_px").asInt() > 0, json.path("screenshot").toString());

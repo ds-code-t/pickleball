@@ -51,10 +51,26 @@ function () {
     var list = el.getClientRects();
     for (var i = 0; i < list.length; i++) clients.push(rectOf(list[i]));
     var children = [];
-    var nodes = el.children || [];
-    for (var c = 0; c < nodes.length; c++) children.push(walk(nodes[c]));
+    var nodes = el.childNodes || [];
+    for (var c = 0; c < nodes.length; c++) {
+      var child = nodes[c];
+      if (child.nodeType === 3) children.push({type: "text", value: child.nodeValue || ""});
+      else if (child.nodeType === 1) children.push(walk(child));
+    }
+    var shadow = null;
+    if (el.shadowRoot) {
+      var shadowChildren = [];
+      var shadowNodes = el.shadowRoot.childNodes || [];
+      for (var s = 0; s < shadowNodes.length; s++) {
+        var shadowChild = shadowNodes[s];
+        if (shadowChild.nodeType === 3) shadowChildren.push({type: "text", value: shadowChild.nodeValue || ""});
+        else if (shadowChild.nodeType === 1) shadowChildren.push(walk(shadowChild));
+      }
+      shadow = {mode: el.shadowRoot.mode || "open", children: shadowChildren};
+    }
     return {
       tag: el.localName || "",
+      shadow: shadow,
       attributes: attrs(el),
       role: el.getAttribute("role") || "",
       name: el.getAttribute("aria-label") || "",

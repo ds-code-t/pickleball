@@ -13,7 +13,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Parsed-tree XPath stays the small subset. Anything else is an error, not zero hits. */
+/** Offline XPath 1.0 evaluates on the canonical tree. An invalid expression is an error, not zero hits. */
 class OfflineXPathTest {
     @Test
     void attributeXpathStillMatches() throws Exception {
@@ -23,13 +23,10 @@ class OfflineXPathTest {
     }
 
     @Test
-    void descendantPathIsInvalidInsteadOfZeroHits() throws Exception {
+    void descendantPathMatchesOnTheCanonicalTree() throws Exception {
         Path page = page("<ul><li><a id='inner'>x</a></li></ul>");
-        CliResult result = DomEngineMain.dispatch(List.of("query", "--file", page.toString(), "--xpath", "//li/a"));
-        assertEquals(1, result.exit(), result.stderr());
-        assertTrue(result.stderr().contains("invalid"), result.stderr());
-        JsonNode error = Jsons.MAPPER.readTree(result.stderr());
-        assertEquals("invalid", error.path("code").asText());
+        JsonNode found = query(page, "//li/a");
+        assertEquals("inner", found.path("nodes").get(0).path("attributes").path("id").asText());
     }
 
     @Test

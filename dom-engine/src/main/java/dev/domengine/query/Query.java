@@ -26,7 +26,7 @@ public final class Query {
     );
     public static final List<String> QUERY_FLAGS = List.of(
             "within", "nesting", "nth", "every", "count-only", "geometry", "pierce", "point", "viewport", "exposure",
-            "filter", "limit", "rank", "doc-version"
+            "filter", "limit", "rank", "doc-version", "ocr-views"
     );
 
     private static final Set<String> XPATH_FALLBACKS = new LinkedHashSet<>();
@@ -44,6 +44,7 @@ public final class Query {
 
     public static ObjectNode run(DomNode root, Map<String, String> flags) {
         if (root == null) throw new CdpException("query has no document");
+        OcrHook.requireViews(flags);
         String viewport = flags.get("viewport");
         boolean armed = viewport != null && !viewport.isBlank();
         boolean human = "human".equalsIgnoreCase(flags.get("exposure"));
@@ -52,9 +53,13 @@ public final class Query {
         DomNode scoped = Frames.scope(root, flags);
         String withinId = flags.get("within");
         if (withinId != null && !withinId.isBlank()) LiveXPath.within(findId(scoped, withinId));
+        ViewMask.install(scoped, flags);
+        OcrHook.armViews(flags);
         try {
             return runArmed(scoped, flags);
         } finally {
+            OcrHook.armViews(null);
+            ViewMask.clear();
             LiveXPath.within(null);
             if (armed) Engines.useViewport(null);
             if (human) Engines.useSpace(null);
@@ -134,6 +139,7 @@ public final class Query {
         current = nth(current, flags.get("nth"), flags.get("every"));
         if (point) current = hitAt(root, flags.get("point"));
         current = limit(current, flags.get("limit"));
+        current = ViewMask.retain(current);
         boolean geometry = "true".equals(flags.get("geometry"));
         boolean explain = "true".equals(flags.get("explain"));
         boolean countOnly = "true".equals(flags.get("count-only"));

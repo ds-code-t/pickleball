@@ -28,16 +28,31 @@ public final class CompositeSnapshotBuilder {
     }
 
     public static CompositeSnapshot build(DomNode root, SnapshotContext context) {
-        return build(root, context, System.nanoTime());
+        return build(root, context, System.nanoTime(), null);
+    }
+
+    public static CompositeSnapshot build(DomNode root, SnapshotContext context, CanonicalDocument canonical) {
+        return build(root, context, System.nanoTime(), canonical);
     }
 
     static CompositeSnapshot build(DomNode root, SnapshotContext context, long startedNanos) {
+        return build(root, context, startedNanos, null);
+    }
+
+    static CompositeSnapshot build(DomNode root, SnapshotContext context, long startedNanos, CanonicalDocument canonical) {
         SnapshotContext ctx = context == null ? SnapshotContext.empty() : context;
         if (root != null) root.linkParents();
-        XPathIndex.Result index = XPathIndex.assign(root);
-        PreMap premap = PreMapBuilder.build(root, ctx);
+        XPathIndex.assign(root);
+        CanonicalDocument generated = canonical;
+        if (generated == null && "html".equals(ctx.sourceKind())) {
+            generated = CanonicalHtml.capture(root);
+        }
+        DomNode projected = root;
+        if (generated != null) projected = CanonicalProjection.project(root, generated);
+        XPathIndex.Result index = XPathIndex.assign(projected);
+        PreMap premap = PreMapBuilder.build(projected, ctx);
         List<ObjectNode> nodes = new ArrayList<>();
-        collect(root, index, ctx, nodes);
+        collect(projected, index, ctx, nodes);
         long duration = Math.max(0, (System.nanoTime() - startedNanos) / 1_000_000L);
         PngImage image = ctx.screenshot();
         String id = ctx.id().isBlank() ? "snap-" + UUID.randomUUID() : ctx.id();
@@ -52,6 +67,13 @@ public final class CompositeSnapshotBuilder {
             }
         }
         dev.domengine.log.EngineLog.info("snapshot", "snapshot offline id=" + id + " nodes=" + nodes.size() + " ms=" + duration);
+        int schemaVersion = CompositeSnapshot.VERSION;
+        ObjectNode canonicalJson = null;
+        if (generated != null) {
+            schemaVersion = CompositeSnapshot.VERSION_V2;
+            canonicalJson = generated.toJson();
+            IdentityChain.attach(projected, nodes, ctx);
+        }
         return new CompositeSnapshot(
                 id,
                 ctx.sessionId(),
@@ -83,7 +105,9 @@ public final class CompositeSnapshotBuilder {
                 index.frames(),
                 nodes,
                 premap,
-                List.copyOf(ctx.warnings())
+                List.copyOf(ctx.warnings()),
+                schemaVersion,
+                canonicalJson
         );
     }
 
