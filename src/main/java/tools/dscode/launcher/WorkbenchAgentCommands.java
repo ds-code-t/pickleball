@@ -158,6 +158,10 @@ public final class WorkbenchAgentCommands {
             safeErr.println(humanRefusal);
             return 2;
         }
+        if ("attach".equals(parsed.command()) && BrowserAttach.handles(args)) {
+            // D13: --cdp-endpoint, --extension, --endpoint, --selenium, --discover; CDP routes end in attach --target=browser:cdp=.
+            return BrowserAttach.run(args, parsed.project(), safeOut, safeErr, next -> run(next, out, err, maven));
+        }
         String refind = flag(parsed, "--refind");
         if (refind != null && !List.of("chain", "identity", "off").contains(refind.trim().toLowerCase(java.util.Locale.ROOT))) {
             safeErr.println("error: --refind must be chain or off\nfix: pass --refind=chain to re-find a stale ref through its identity chain");
@@ -176,6 +180,7 @@ public final class WorkbenchAgentCommands {
             return switch (parsed.command()) {
                 case "session-mode" -> sessionMode(parsed, safeOut, safeErr);
                 case "setup" -> SetupCommand.run(parsed, safeOut, safeErr);
+                case "relaunch-with-debug" -> RelaunchWithDebug.run(parsed, safeOut, safeErr);
                 case "export-guidance" -> exportGuidance(parsed, safeOut, safeErr);
                 case "start" -> {
                     int started = ConsumerReadyCommands.start(parsed, safeOut, safeErr);

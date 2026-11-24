@@ -425,6 +425,13 @@ final class ConsumerReadyCommands {
         java.util.List<String> ocrMissing = dev.domengine.query.OnnxOcrRuntime.missing(ocrDir);
         out.println("ocrRuntime=" + (ocrMissing.isEmpty() ? "onnx installed (" + ocrDir + ")"
                 : "not installed (missing " + String.join(",", ocrMissing) + " in " + ocrDir + "; fix: setup ocr --runtime=onnx --confirm)"));
+        // D13: which attach routes are available right now. Plain doctor reads files only; --attach also probes 127.0.0.1.
+        boolean attach = tokens != null && java.util.Arrays.asList(tokens).contains("--attach");
+        com.fasterxml.jackson.databind.JsonNode routes = BrowserAttach.routesJson(attach);
+        StringBuilder summary = new StringBuilder();
+        BrowserAttach.summary(routes).forEach((route, ok) -> summary.append(summary.length() == 0 ? "" : ",").append(route).append(':').append(ok));
+        out.println("attachRoutes=" + summary + (attach ? "" : " (doctor --attach for discovery and fixes)"));
+        if (attach) out.println("attach=" + routes);
         log(project, session, "doctor health=" + health.status());
         return 0;
     }

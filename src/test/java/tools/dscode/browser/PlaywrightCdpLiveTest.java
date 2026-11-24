@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * D12 live: Chrome is started the existing way (DOMENGINE_CHROME, then PATH) with a debugging port, and Playwright
  * attaches with connectOverCDP. Nothing is downloaded. Skips visibly only when this machine has no Chrome.
  */
-class PlaywrightCdpLiveTest {
+public class PlaywrightCdpLiveTest {
     static final String PAGE = "<!doctype html><title>pw</title><input id=name><button id=go onclick=\"setTimeout(()=>{document.getElementById('out').textContent='hello '+document.getElementById('name').value},150)\">Go</button><p id=out></p>";
 
     @TempDir
@@ -39,7 +39,7 @@ class PlaywrightCdpLiveTest {
         if (server != null) server.stop(0);
     }
 
-    static void stopChrome(Process process) {
+    public static void stopChrome(Process process) {
         process.descendants().forEach(ProcessHandle::destroyForcibly);
         process.destroyForcibly();
         try {
@@ -51,7 +51,7 @@ class PlaywrightCdpLiveTest {
     }
 
     /** Starts Chrome with --remote-debugging-port=0 and returns its http endpoint from DevToolsActivePort. */
-    static String startChrome(Path profile, List<Process> started) throws Exception {
+    public static String startChrome(Path profile, List<Process> started) throws Exception {
         String binary = BrowserSession.findChrome();
         Assumptions.assumeTrue(binary != null, "skipped: no Chrome binary on this machine");
         Process process = new ProcessBuilder(binary, "--headless=new", "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage",

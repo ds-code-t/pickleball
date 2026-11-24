@@ -59,6 +59,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/object-registration.md`
 - `docs/pickleball-workbench-player.md`
 - `docs/pickleball-workbench.md`
+- `docs/playwright.md`
 - `docs/README.md`
 - `docs/release-notes.md`
 - `docs/reserved-element-names.md`
@@ -158,6 +159,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/io/cucumber/java/en/ReturnStep.java`
 - `src/main/java/io/cucumber/messages/types/InlinePickleArgument.java`
 - `src/main/java/tools/dscode/browser/AgentProtocolController.java`
+- `src/main/java/tools/dscode/browser/BackendHandoff.java`
 - `src/main/java/tools/dscode/browser/BidiAdapter.java`
 - `src/main/java/tools/dscode/browser/BindingListener.java`
 - `src/main/java/tools/dscode/browser/BrowserFacade.java`
@@ -585,13 +587,16 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/internal/ValuesSupport.java`
 - `src/main/java/tools/dscode/launcher/AgentController.java`
 - `src/main/java/tools/dscode/launcher/AgentHop.java`
+- `src/main/java/tools/dscode/launcher/BrowserAttach.java`
 - `src/main/java/tools/dscode/launcher/CompositeCommands.java`
 - `src/main/java/tools/dscode/launcher/ConsumerReadyCommands.java`
 - `src/main/java/tools/dscode/launcher/LeaseHold.java`
 - `src/main/java/tools/dscode/launcher/OcrSetup.java`
 - `src/main/java/tools/dscode/launcher/PickleballWorkbenchLauncher.java`
 - `src/main/java/tools/dscode/launcher/PkbMain.java`
+- `src/main/java/tools/dscode/launcher/PlaywrightNode.java`
 - `src/main/java/tools/dscode/launcher/QuietWarnings.java`
+- `src/main/java/tools/dscode/launcher/RelaunchWithDebug.java`
 - `src/main/java/tools/dscode/launcher/RunVarOverrides.java`
 - `src/main/java/tools/dscode/launcher/SessionHealthWait.java`
 - `src/main/java/tools/dscode/launcher/SetupCommand.java`
@@ -938,6 +943,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/AgentFastCliTest.java`
 - `src/test/java/tools/dscode/launcher/AskIdTest.java`
 - `src/test/java/tools/dscode/launcher/AutoSnapshotTest.java`
+- `src/test/java/tools/dscode/launcher/BackendHandoffLiveTest.java`
+- `src/test/java/tools/dscode/launcher/BrowserAttachTest.java`
 - `src/test/java/tools/dscode/launcher/BrowserLostRunIdTest.java`
 - `src/test/java/tools/dscode/launcher/BrowserStateTest.java`
 - `src/test/java/tools/dscode/launcher/ClickOnceTest.java`

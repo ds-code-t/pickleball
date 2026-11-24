@@ -139,6 +139,7 @@ Playwright for Java 1.65.1 (Apache-2.0) and its `driver-bundle` (Apache-2.0, wit
 - `pkb_cdp_endpoint` (property, then env `PKB_CDP_ENDPOINT`) is an existing CDP endpoint (`http://127.0.0.1:<port>` or a `ws://` browser URL). It wins over the launched driver's own endpoint.
 - With no endpoint, the Playwright connection fails with `error: no CDP endpoint for Playwright ...` and a `fix:` line. No browser is launched.
 - Playwright attaches to Chromium-family browsers (Chrome, Edge, Chromium, Electron) only.
+- Attaching to a browser you already run (channel, Playwright Extension, endpoints, discovery, relaunch) and the Selenium/Playwright hand-off are in [Playwright](playwright.md).
 
 Consumer download size: the three Playwright artifacts on the runtime classpath are 232,943,839 bytes (about 233 MB: `playwright` 687,401, `driver` 3,309,493, `driver-bundle` 228,946,945). The `driver-bundle` jar carries Node for every platform. Pickleball's own jar did not grow from the dependency.
 

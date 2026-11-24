@@ -37,6 +37,7 @@ docs/nested-steps.md
 docs/object-registration.md
 docs/pickleball-workbench-player.md
 docs/pickleball-workbench.md
+docs/playwright.md
 docs/release-notes.md
 docs/reserved-element-names.md
 docs/service-call-scenarios.md

@@ -41,7 +41,7 @@ final class WorkbenchCommandLine {
             "popup-open", "popup-status", "popup-close",
             "ui-apply", "ui-poll", "ui-catalog", "ui-verify",
             "guide", "guide-next", "guide-back", "guide-done", "ask",
-            "panel-open", "panel-close", "panel-state", "session-mode", "setup",
+            "panel-open", "panel-close", "panel-state", "session-mode", "setup", "relaunch-with-debug",
             "capture-scenario",
             "capture-steps",
             "record",
