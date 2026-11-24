@@ -158,6 +158,20 @@ public final class WorkbenchAgentCommands {
             safeErr.println(humanRefusal);
             return 2;
         }
+        String refind = flag(parsed, "--refind");
+        if (refind != null && !List.of("chain", "identity", "off").contains(refind.trim().toLowerCase(java.util.Locale.ROOT))) {
+            safeErr.println("error: --refind must be chain or off\nfix: pass --refind=chain to re-find a stale ref through its identity chain");
+            return 2;
+        }
+        String identity = flag(parsed, "--identity");
+        if (identity != null) {
+            try {
+                dev.domengine.snapshot.IdentityChain.load(identity);
+            } catch (RuntimeException invalid) {
+                safeErr.println("error: --identity is not an identity chain\nfix: pass a recorded chain array, an {chain} object, or a file holding one");
+                return 2;
+            }
+        }
         try {
             return switch (parsed.command()) {
                 case "session-mode" -> sessionMode(parsed, safeOut, safeErr);
@@ -2157,6 +2171,8 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "min-show");
         copyFlag(args, parsed, "collapsed");
         copyFlag(args, parsed, "human-override");
+        copyFlag(args, parsed, "refind");
+        copyFlag(args, parsed, "identity");
         copyFlag(args, parsed, "fields");
         copyFlag(args, parsed, "group");
         copyFlag(args, parsed, "priority");

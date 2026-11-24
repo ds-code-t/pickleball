@@ -216,6 +216,8 @@
     "--json",
     "--human",
     "--human-override",
+    "--refind",
+    "--identity",
     "--expect",
     "--config",
     "--reseed",

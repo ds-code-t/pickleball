@@ -389,8 +389,8 @@ public final class DomCompositeAdapter {
      * Forwards a recorded v2 node to {@link IdentityChain#replay}.
      * Logs the matched locator kind when a chain is present.
      * A node with no identity chain returns the unmatched result and does not log.
-     * No production path calls this. Query, act, stale refresh, and recorded
-     * Gherkin replay do not re-resolve with the chain. Kept for a future recorder.
+     * The CLI {@code act --identity} and {@code act --refind=chain} paths replay through
+     * {@link IdentityChain#replay} directly in {@code TargetVerb}; this forwarder serves adapter callers.
      */
     public ObjectNode replayIdentity(DomNode root, JsonNode recorded) {
         JsonNode chain = IdentityChain.chainOf(recorded);
