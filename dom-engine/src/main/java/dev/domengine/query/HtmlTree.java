@@ -3,7 +3,6 @@ package dev.domengine.query;
 import dev.domengine.tree.ContextWalker;
 import dev.domengine.tree.DomNode;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -19,8 +18,8 @@ public final class HtmlTree {
     private final String html;
     private int index;
     private long nextId = 1;
-    /** Void names that have at least one explicit end tag. Computed once per parse. */
-    private Set<String> voidEndNames;
+    /** Offsets of `<` for void starts that a matching end tag closes. Computed once per parse. */
+    private Set<Integer> voidClosed;
 
     private HtmlTree(String html) {
         this.html = html == null ? "" : html;
@@ -76,6 +75,7 @@ public final class HtmlTree {
         if (startsWith("</")) {
             return null;
         }
+        int startAt = index;
         index++;
         String name = readName();
         DomNode node = new DomNode();
@@ -89,7 +89,7 @@ public final class HtmlTree {
         boolean selfClose = index < html.length() && html.charAt(index) == '/';
         if (selfClose) index++;
         if (index < html.length() && html.charAt(index) == '>') index++;
-        if (selfClose || (VOID.contains(node.localName) && !explicitEnd(node.localName))) {
+        if (selfClose || (VOID.contains(node.localName) && !explicitEnd(startAt))) {
             if ("iframe".equals(node.localName)) adoptSrcdoc(node);
             return node;
         }
@@ -213,10 +213,12 @@ public final class HtmlTree {
      * A void tag with a matching end tag is a container. Desktop HTML-ish writes
      * {@code <input>} and {@code <img>} that way when the control has children.
      * A void tag with no matching end tag stays empty, so a following sibling is not swallowed.
-     * End-tag names are collected once, so a page of bare void tags does not rescan the document.
+     * One stack pass records that answer for every void start. {@link #explicitEnd} is a lookup.
      */
     private void prepareVoidEnds() {
-        Set<String> names = new HashSet<>();
+        List<String> opens = new ArrayList<>();
+        List<VoidStart> pending = new ArrayList<>();
+        Set<Integer> closed = new HashSet<>();
         int i = 0;
         while (i < html.length()) {
             int lt = html.indexOf('<', i);
@@ -226,50 +228,14 @@ public final class HtmlTree {
                 i = end < 0 ? html.length() : end + 3;
                 continue;
             }
-            if (region(lt, "<!")) {
-                int gt = html.indexOf('>', lt + 2);
-                i = gt < 0 ? html.length() : gt + 1;
-                continue;
-            }
             if (region(lt, "</")) {
                 int nameStart = lt + 2;
                 int nameEnd = nameStart;
                 while (nameEnd < html.length() && isName(html.charAt(nameEnd))) nameEnd++;
-                if (nameEnd > nameStart) {
-                    String close = html.substring(nameStart, nameEnd).toLowerCase(Locale.ROOT);
-                    if (VOID.contains(close)) names.add(close);
-                }
-                i = nameEnd;
-                continue;
-            }
-            i = lt + 1;
-        }
-        voidEndNames = names;
-    }
-
-    private boolean explicitEnd(String name) {
-        if (voidEndNames != null && !voidEndNames.contains(name)) return false;
-        int i = index;
-        ArrayDeque<String> stack = new ArrayDeque<>();
-        while (i < html.length()) {
-            int lt = html.indexOf('<', i);
-            if (lt < 0) return false;
-            if (region(lt, "<!--")) {
-                int end = html.indexOf("-->", lt + 4);
-                i = end < 0 ? html.length() : end + 3;
-                continue;
-            }
-            if (region(lt, "</")) {
-                int nameStart = lt + 2;
-                int nameEnd = nameStart;
-                while (nameEnd < html.length() && isName(html.charAt(nameEnd))) nameEnd++;
-                String close = html.substring(nameStart, nameEnd);
+                String close = html.substring(nameStart, nameEnd).toLowerCase(Locale.ROOT);
                 int gt = html.indexOf('>', nameEnd);
                 i = gt < 0 ? html.length() : gt + 1;
-                if (stack.isEmpty()) return close.equalsIgnoreCase(name);
-                while (!stack.isEmpty() && !stack.removeFirst().equalsIgnoreCase(close)) {
-                    // drop unmatched open tags until the close lines up
-                }
+                closeVoid(opens, pending, closed, close);
                 continue;
             }
             if (region(lt, "<!")) {
@@ -280,7 +246,7 @@ public final class HtmlTree {
             int nameStart = lt + 1;
             int nameEnd = nameStart;
             while (nameEnd < html.length() && isName(html.charAt(nameEnd))) nameEnd++;
-            String open = html.substring(nameStart, nameEnd);
+            String open = html.substring(nameStart, nameEnd).toLowerCase(Locale.ROOT);
             int j = nameEnd;
             boolean self = false;
             while (j < html.length()) {
@@ -298,9 +264,47 @@ public final class HtmlTree {
                 j++;
             }
             i = j;
-            if (!open.isEmpty() && !self) stack.addFirst(open);
+            if (open.isEmpty() || self) continue;
+            opens.add(open);
+            if (VOID.contains(open)) pending.add(new VoidStart(open, opens.size(), lt));
         }
-        return false;
+        voidClosed = closed;
+    }
+
+    /**
+     * The same answer as a forward scan that starts empty at this void tag.
+     * An end tag seen while that scan's stack is empty decides the tag.
+     * An end tag seen while the stack is not empty pops until a name matches, or drops the close.
+     */
+    private static void closeVoid(List<String> opens, List<VoidStart> pending, Set<Integer> closed, String close) {
+        int depth = opens.size();
+        for (int q = pending.size() - 1; q >= 0; q--) {
+            VoidStart start = pending.get(q);
+            if (start.base != depth) continue;
+            if (start.name.equals(close)) closed.add(start.offset);
+            pending.remove(q);
+        }
+        for (int q = pending.size() - 1; q >= 0; q--) {
+            int base = pending.get(q).base;
+            if (opens.size() <= base) continue;
+            boolean matched = false;
+            while (opens.size() > base) {
+                String top = opens.remove(opens.size() - 1);
+                if (top.equals(close)) {
+                    matched = true;
+                    break;
+                }
+            }
+            if (matched) break;
+        }
+    }
+
+    private boolean explicitEnd(int startAt) {
+        return voidClosed != null && voidClosed.contains(startAt);
+    }
+
+    /** A void start waiting for the end tag that its own forward scan would see first. */
+    private record VoidStart(String name, int base, int offset) {
     }
 
     private boolean region(int at, String token) {

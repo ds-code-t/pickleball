@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Void tags stay linear, and an explicit end tag still makes input or img a container. */
+/** Void starts stay linear even when an explicit end tag is present, and that end tag still makes a container. */
 class HtmlTreeParseTest {
     @Test
     void fiveThousandInputsParseInLinearTime() {
@@ -20,6 +20,26 @@ class HtmlTreeParseTest {
         assertEquals(5000, count(root, "input"));
         DomNode body = element(root, "body");
         assertEquals(5000, body.children.size());
+    }
+
+    @Test
+    void fiveThousandBareInputsPlusOneContainerStayLinear() {
+        StringBuilder html = new StringBuilder("<html><body>");
+        for (int i = 0; i < 5000; i++) html.append("<input id=\"i").append(i).append("\">");
+        html.append("<input id=\"box\"><span id=\"child\">c</span></input>");
+        html.append("<input id=\"after\">");
+        html.append("</body></html>");
+        DomNode root = assertTimeoutPreemptively(ofSeconds(2), () -> HtmlTree.parse(html.toString()));
+        assertEquals(5002, count(root, "input"));
+        DomNode body = element(root, "body");
+        assertEquals(5002, body.children.size());
+        DomNode box = byId(root, "box");
+        assertEquals("input", byId(root, "child").parent.localName);
+        assertEquals(box, byId(root, "child").parent);
+        assertEquals(1, box.children.size());
+        assertEquals("body", byId(root, "after").parent.localName);
+        assertEquals("body", byId(root, "i0").parent.localName);
+        assertEquals("body", byId(root, "i4999").parent.localName);
     }
 
     @Test
