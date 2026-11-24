@@ -235,6 +235,31 @@ class OcrHookTest {
     }
 
     @Test
+    void onnxSlotReportsNotInstalledAndLoadsNothing() throws Exception {
+        System.setProperty(OcrHook.PROPERTY, "onnx");
+        Path viewport = write("view.pgm", PGM);
+        Path page = write("seen.html", SEEN);
+        CliResult result = query(page, viewport, "image=ocr:mark", "full");
+        assertEquals(1, result.exit(), result.stderr());
+        JsonNode error = Jsons.MAPPER.readTree(result.stderr());
+        assertEquals("ocr_runtime_missing", error.path("code").asText(), error.toString());
+        String message = error.path("error").asText();
+        assertTrue(message.startsWith("OCR runtime not installed"), message);
+        assertTrue(message.contains("Microsoft-signed ONNX Runtime"), message);
+        assertTrue(message.contains("not bundled"), message);
+        assertEquals(0, OcrHook.runtimeReads());
+        assertTrue(OcrHook.select("onnx", "ignored") instanceof OnnxOcrRuntime);
+        assertFalse(OcrHook.select("onnx", "ignored").opensRuntime());
+        OcrHook.Result direct = new OnnxOcrRuntime().recognize(TemplateMatch.parse(PGM), "abc");
+        assertFalse(direct.ok());
+        assertEquals("ocr_runtime_missing", direct.code());
+        assertEquals(OnnxOcrRuntime.MESSAGE, direct.error());
+        assertTrue(OcrHook.select(null, null) == null);
+        Path stub = write("stub.txt", "pkb-ocr 1\n");
+        assertTrue(OcrHook.select(stub.toString(), "onnx") instanceof StubOcrRuntime);
+    }
+
+    @Test
     void runtimePathUsesThePropertyBeforeTheEnvironment() throws Exception {
         Path stub = write("stub.txt", "pkb-ocr 1\n");
         Path other = write("other.txt", "pkb-ocr 1\n");

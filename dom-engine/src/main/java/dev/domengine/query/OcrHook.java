@@ -3,12 +3,8 @@ package dev.domengine.query;
 import dev.domengine.image.TemplateMatch;
 import dev.domengine.tree.DomNode;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -23,7 +19,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public final class OcrHook {
     static final String PROPERTY = "pkb_ocr_runtime";
-    private static final String HEADER = "pkb-ocr 1";
+    /** Property or env value that selects {@link OnnxOcrRuntime}. It is not a file path. */
+    static final String ONNX_SLOT = "onnx";
     private static final ConcurrentHashMap<String, String> CACHE = new ConcurrentHashMap<>();
     private static final AtomicInteger READS = new AtomicInteger();
 
@@ -110,13 +107,13 @@ public final class OcrHook {
         String hash = cacheKey(crop);
         String cached = CACHE.get(hash);
         if (cached != null) return Result.hit(cached, hash, true);
-        Path runtime = runtime(System.getProperty(PROPERTY), System.getenv("PKB_OCR_RUNTIME"));
+        OcrRuntime runtime = select(System.getProperty(PROPERTY), System.getenv("PKB_OCR_RUNTIME"));
         if (runtime == null) return Result.fail("OCR runtime not installed", "ocr_runtime_missing", hash);
-        READS.incrementAndGet();
-        Answer answer = lookup(runtime, hash);
-        if (!answer.ok) return Result.fail(answer.error, answer.code, hash);
-        CACHE.put(hash, answer.text);
-        return Result.hit(answer.text, hash, false);
+        if (runtime.opensRuntime()) READS.incrementAndGet();
+        Result result = runtime.recognize(crop, hash);
+        if (!result.ok()) return result;
+        CACHE.put(hash, result.text());
+        return Result.hit(result.text(), hash, false);
     }
 
     /** SHA-256 hex of the crop width, height, and pixels. */
@@ -142,6 +139,19 @@ public final class OcrHook {
     }
 
     /**
+     * Property, then environment. {@code onnx} selects {@link OnnxOcrRuntime} and does not
+     * open a file. A blank property falls through. A set property that is not an existing
+     * file does not fall through. A directory is not a file. Null means no runtime is installed.
+     */
+    static OcrRuntime select(String property, String environment) {
+        String chosen = blank(property) ? environment : property;
+        if (blank(chosen)) return null;
+        if (ONNX_SLOT.equalsIgnoreCase(chosen.trim())) return OnnxOcrRuntime.INSTANCE;
+        Path path = runtime(property, environment);
+        return path == null ? null : new StubOcrRuntime(path);
+    }
+
+    /**
      * Property, then environment. A blank property falls through. A set property that is
      * not an existing file does not fall through. A directory is not a file.
      */
@@ -160,54 +170,7 @@ public final class OcrHook {
         return buffer.array();
     }
 
-    private static Answer lookup(Path path, String hash) {
-        byte[] head = new byte[16];
-        int read;
-        try (InputStream in = Files.newInputStream(path)) {
-            read = in.read(head);
-        } catch (IOException failure) {
-            return Answer.fail("OCR runtime cannot be invoked", "ocr_runtime_unsupported");
-        }
-        String prefix = new String(head, 0, Math.max(0, read), StandardCharsets.UTF_8);
-        if (!prefix.startsWith(HEADER)) {
-            return Answer.fail("OCR runtime cannot be invoked", "ocr_runtime_unsupported");
-        }
-        try (BufferedReader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
-            reader.readLine();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                String trimmed = line.trim();
-                if (trimmed.isEmpty() || trimmed.startsWith("#")) continue;
-                int space = indexOfWhitespace(trimmed);
-                String key = (space < 0 ? trimmed : trimmed.substring(0, space)).toLowerCase(Locale.ROOT);
-                if (!key.equals(hash)) continue;
-                String text = space < 0 ? "" : trimmed.substring(space).trim();
-                return Answer.ok(text);
-            }
-        } catch (IOException failure) {
-            return Answer.fail("OCR runtime cannot be invoked", "ocr_runtime_unsupported");
-        }
-        return Answer.ok("");
-    }
-
-    private static int indexOfWhitespace(String text) {
-        for (int i = 0; i < text.length(); i++) {
-            if (Character.isWhitespace(text.charAt(i))) return i;
-        }
-        return -1;
-    }
-
     private static boolean blank(String value) {
         return value == null || value.isBlank();
-    }
-
-    private record Answer(boolean ok, String text, String error, String code) {
-        static Answer ok(String text) {
-            return new Answer(true, text == null ? "" : text, "", "");
-        }
-
-        static Answer fail(String error, String code) {
-            return new Answer(false, "", error, code);
-        }
     }
 }
