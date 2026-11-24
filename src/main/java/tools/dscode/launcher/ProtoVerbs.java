@@ -62,6 +62,8 @@ final class ProtoVerbs {
             return 0;
         }
         if (flags.containsKey("status")) return print(call(project, flags, "host.status", flags), out, err);
+        // E2b: --dom feeds pushed DOM change batches (kind=dom) into the stream; scope with --selector/--kinds/--debounce.
+        if (flags.containsKey("dom")) return print(call(project, flags, "dom.watch", flags), out, err);
         if (flags.containsKey("start")) return print(call(project, flags, "events.start", flags), out, err);
         if (flags.containsKey("step") || flags.containsKey("scenario")) return print(call(project, flags, "events.context", flags), out, err);
         if (!flags.containsKey("follow")) return print(call(project, flags, "events.read", flags), out, err);

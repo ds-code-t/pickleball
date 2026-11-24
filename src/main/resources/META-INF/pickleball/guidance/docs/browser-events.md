@@ -48,6 +48,32 @@ Rows spill to `.pickleball/runs/<run>/browser-events-YYYY-MM-DD.ndjson`.
 
 Before a row reaches the ring, the file, or a reply: `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie` and token-like headers, cookie values, query parameters and JSON fields whose names are secret (password, token, secret, api key, plus `pkb_store_secret_fields`), and `Bearer`/`Basic` credentials or `token=`-style pairs in text become `[redacted]`, and the row lists what was redacted. `--reveal` (control tier, where a verb offers it) shows a value in that reply only; it is never logged.
 
+## DOM changes (push)
+
+Pickleball listens for DOM changes instead of polling the page. One page script runs a `MutationObserver` and reports debounced, batched, scoped deltas through the backend's push channel:
+
+| Backend | Channel |
+|---------|---------|
+| Playwright | `BrowserContext.exposeBinding` plus `addInitScript` for later documents |
+| BiDi (Chrome, Firefox) | `script.addPreloadScript` with a `channel` argument; batches arrive as `script.message` |
+| CDP | `Runtime.addBinding` plus `Page.addScriptToEvaluateOnNewDocument`; batches arrive as `Runtime.bindingCalled` |
+
+Selenium's own DOM-mutation handler (`HasLogEvents.onLogEvent(domMutation(...))`) is not used: it lives in the test JVM's WebDriver and is tied to one CDP version module, while the protocol host and the agent verbs need the same listener on every backend. The CDP DOM domain events (`DOM.childNodeInserted` and the rest) are not used either: they need `DOM.getDocument` and node bookkeeping on every change, which costs more than one observer callback.
+
+Each batch is one row with `kind=dom`, `subkind=mutation`, `text` (a short summary), and a `dom` object: `childList`, `attributes`, `text` counts, `added`, `removed`, `records`, up to ten `targets` (`tag#id` or `tag.class`), and `attributeNames`. `durationMs` is the time from the first change to the batch being sent. Pickleball's own overlay, toolbar and panel (any element with a `data-pkb-*` attribute, a `pkb-` id, or a `pkb-*` tag, and `data-pkb-*` attribute changes) are left out unless `--own` is given; a person's actions in those surfaces arrive as their own typed overlay events (card answered, field typed, chat sent).
+
+| Use | Command |
+|-----|---------|
+| Stream | `browser-events --dom [--selector=<css>] [--kinds=childList,attributes,text] [--debounce=<ms>]`, then read `--kinds=dom` |
+| Watch | `watch --selector=<css>\|--ref=<ref> --kinds=childList,attributes,text [--attributes=a,b] [--contains=<text>] [--debounce=<ms>] [--until=change\|<condition>] [--duration=<ms>]` |
+| Wait | `wait --until-change [--selector=<css>\|--ref=<ref>] [--timeout=<ms>]` |
+| New control | `wait --condition=new-control` wakes on a pushed change (`wake=push`), or polls every 100 ms when the page refuses the binding (`wake=poll`) |
+| Snapshot delta | `snap --since=<snapCursor>` adds `delta`: `mode=push` with `batches`, `mutations`, `targets` and `unchanged` when the page socket stays open in the start-host worker; `mode=poll` otherwise |
+
+The collaboration waits (`answer-wait`, `ask-and-wait`, `ui-poll --wait`, `chat-poll --wait`, `chat-turn`) wake when the panel binding delivers an event, a stored overlay input lands, or a chat message is sent, instead of sleeping out their poll interval. Their replies say `wake=push` and `wakeMs`. A 250 ms backstop re-check stays for pages whose surface events only arrive through the queue drain. `pkb_push_wake=off` restores the old fixed sleeps (`wake=poll`).
+
+Measured on the build box (headless Chrome 156, start-host session, three rounds each), the time from a page click handler running to the agent receiving the event was 1, 2 and 1 ms pushed (`watch --selector --kinds=childList,text`) against 36, 41 and 31 ms polled (`watch --until=text=`, which re-reads the page every 40 ms). These are wall-clock times on one machine: `Date.now()` in the click handler against the agent's receipt time.
+
 ## Protocol host
 
 The host is one process per project. It listens on 127.0.0.1 only, on a random port, behind a random token stored in `.pickleball/proto/host.json` (owner-only where the OS allows), and holds the CDP, BiDi, and Playwright connections, the event ring, and every route or override a protocol verb installs. `browser-events --stop` stops it and removes those routes. Its output goes to `.pickleball/proto/host.log`.

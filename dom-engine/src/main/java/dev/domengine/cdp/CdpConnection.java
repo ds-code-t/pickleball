@@ -112,6 +112,11 @@ public final class CdpConnection implements AutoCloseable {
         if (listener != null) eventListeners.add(listener);
     }
 
+    /** Stops delivering events to a listener added with {@link #addEventListener}. */
+    public void removeEventListener(Consumer<JsonNode> listener) {
+        if (listener != null) eventListeners.remove(listener);
+    }
+
     @Override
     public void close() {
         if (closed) return;

@@ -700,6 +700,7 @@ final class PageSurfaces {
         AgentStore.appendCapped(file, AgentStore.JSON.writeValueAsString(row));
         CompositeLog.info("overlay", "input type=" + event.getOrDefault("type", ""));
         ChatLog.send(project, runId, "overlay", "system", "", "overlay input " + event.getOrDefault("type", "") + " " + event.getOrDefault("id", ""));
+        tools.dscode.common.agentfast.PushWake.signal();
     }
 
     /** A binding delivery and a queue drain are one event. The second copy is dropped. */
@@ -1784,12 +1785,18 @@ final class PageSurfaces {
         if (facade instanceof CdpAdapter cdp) {
             cdp.addBinding("pkbSurface", (name, payload) -> {
                 Map<String, String> event = bindingEvent(name, payload);
-                if (event != null && !event.isEmpty()) PUSHED.add(event);
+                if (event != null && !event.isEmpty()) {
+                    PUSHED.add(event);
+                    tools.dscode.common.agentfast.PushWake.signal();
+                }
             }, "pkb-surface");
         } else {
             facade.addBinding("pkbSurface", (name, payload) -> {
                 Map<String, String> event = bindingEvent(name, payload);
-                if (event != null && !event.isEmpty()) PUSHED.add(event);
+                if (event != null && !event.isEmpty()) {
+                    PUSHED.add(event);
+                    tools.dscode.common.agentfast.PushWake.signal();
+                }
             });
         }
     }

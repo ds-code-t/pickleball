@@ -25,6 +25,8 @@ final class EventCommands {
             Object source = host.stateMap().get("events.source");
             out.put("events", source == null ? "off" : String.valueOf(source));
             out.put("spill", host.hub().spillFile().toString());
+            Object dom = host.stateMap().get("dom.via");
+            out.put("dom", dom == null ? "off" : String.valueOf(dom));
             return out;
         });
         ProtoHost.register("host.stop", (host, f) -> {
@@ -164,7 +166,13 @@ final class EventCommands {
 
     static ObjectNode read(ProtoHost host, Map<String, String> f) throws Exception {
         String via = "none";
-        if (!host.stateMap().containsKey("events.source")) via = start(host, f).path("via").asText();
+        if (!host.stateMap().containsKey("events.source")) {
+            // An implicit start from a read subscribes to every kind; --kinds on a read only filters what is returned.
+            Map<String, String> plain = new java.util.LinkedHashMap<>(f);
+            plain.remove("kinds");
+            plain.remove("kind");
+            via = start(host, plain).path("via").asText();
+        }
         else via = String.valueOf(host.stateMap().get("events.source"));
         int limit = parseInt(f.get("limit"), 200);
         long waitMs = Math.min(120_000, parseInt(f.get("wait-ms"), 0));

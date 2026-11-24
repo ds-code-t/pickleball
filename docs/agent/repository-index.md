@@ -299,6 +299,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/browser/BrowserLog.java`
 - `src/main/java/tools/dscode/browser/BrowserProtocols.java`
 - `src/main/java/tools/dscode/browser/CdpAdapter.java`
+- `src/main/java/tools/dscode/browser/DomMutations.java`
 - `src/main/java/tools/dscode/browser/DriverEndpoints.java`
 - `src/main/java/tools/dscode/browser/FrameNode.java`
 - `src/main/java/tools/dscode/browser/JdkWebSocket.java`
@@ -307,6 +308,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/browser/PlaywrightConnection.java`
 - `src/main/java/tools/dscode/browser/proto/BrowserEventHub.java`
 - `src/main/java/tools/dscode/browser/proto/CdpSession.java`
+- `src/main/java/tools/dscode/browser/proto/DomCommands.java`
 - `src/main/java/tools/dscode/browser/proto/EventCommands.java`
 - `src/main/java/tools/dscode/browser/proto/Projectors.java`
 - `src/main/java/tools/dscode/browser/proto/ProtoClient.java`
@@ -358,11 +360,13 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentfast/LiveBrowserHost.java`
 - `src/main/java/tools/dscode/common/agentfast/LiveChromeDriver.java`
 - `src/main/java/tools/dscode/common/agentfast/PushChannel.java`
+- `src/main/java/tools/dscode/common/agentfast/PushWake.java`
 - `src/main/java/tools/dscode/common/agentfast/ReplyFields.java`
 - `src/main/java/tools/dscode/common/agentfast/RuntimeInstall.java`
 - `src/main/java/tools/dscode/common/agentfast/ScreenshotReply.java`
 - `src/main/java/tools/dscode/common/agentfast/SelftestUi.java`
 - `src/main/java/tools/dscode/common/agentfast/SessionIds.java`
+- `src/main/java/tools/dscode/common/agentfast/SnapPush.java`
 - `src/main/java/tools/dscode/common/agentfast/SnapSince.java`
 - `src/main/java/tools/dscode/common/agentfast/SnapView.java`
 - `src/main/java/tools/dscode/common/agentfast/StandardView.java`
@@ -858,6 +862,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/resources/META-INF/pickleball/configs/CHROME_HEADLESS.yaml`
 - `src/main/resources/META-INF/services/org.junit.platform.engine.TestEngine`
 - `src/main/resources/META-INF/services/org.junit.platform.launcher.LauncherSessionListener`
+- `src/main/resources/tools/dscode/browser/dom-mutations.js`
 - `src/main/resources/tools/dscode/browser/surface/arrow.css`
 - `src/main/resources/tools/dscode/browser/surface/arrow.html`
 - `src/main/resources/tools/dscode/browser/surface/border.css`
@@ -904,6 +909,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/browser/BidiModulesTest.java`
 - `src/test/java/tools/dscode/browser/BrowserProtocolsTest.java`
 - `src/test/java/tools/dscode/browser/CdpAdapterTest.java`
+- `src/test/java/tools/dscode/browser/DomMutationsTest.java`
 - `src/test/java/tools/dscode/browser/FacadeContractTest.java`
 - `src/test/java/tools/dscode/browser/PlaywrightAdapterTest.java`
 - `src/test/java/tools/dscode/browser/PlaywrightCdpLiveTest.java`
@@ -944,6 +950,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentfast/LeanReplyTest.java`
 - `src/test/java/tools/dscode/common/agentfast/LiveReplyRulesTest.java`
 - `src/test/java/tools/dscode/common/agentfast/PushAndViewTest.java`
+- `src/test/java/tools/dscode/common/agentfast/PushWakeTest.java`
 - `src/test/java/tools/dscode/common/agentfast/ScreenshotFlushTest.java`
 - `src/test/java/tools/dscode/common/agentfast/SelftestCpuBenchTest.java`
 - `src/test/java/tools/dscode/common/agentfast/SnapNameTest.java`
@@ -1113,6 +1120,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/DoctorTest.java`
 - `src/test/java/tools/dscode/launcher/DomEngineCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/DomLogCliLaunchTest.java`
+- `src/test/java/tools/dscode/launcher/DomPushLiveTest.java`
 - `src/test/java/tools/dscode/launcher/ElementSnapDiffTest.java`
 - `src/test/java/tools/dscode/launcher/EngineCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/FallbackLoggedTest.java`

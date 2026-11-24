@@ -50,6 +50,7 @@ public final class ProtoHost {
 
     static {
         EventCommands.register();
+        DomCommands.register();
     }
 
     private final Path project;

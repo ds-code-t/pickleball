@@ -190,4 +190,37 @@ class BrowserEventsLiveTest {
         assertTrue(Files.isRegularFile(spill.resolveSibling(spill.getFileName() + ".1")), "rotated once");
         assertTrue(Files.size(spill) <= 1024 + 600, "capped: " + Files.size(spill));
     }
+
+    /** E2b: --dom feeds pushed DOM batches as kind=dom rows on the backend asked for; pickleball surfaces stay out. */
+    void domFeed(String name, String via) throws Exception {
+        Path project = project(name);
+        visit(project, "/");
+        JsonNode watching = ok(project, "browser-events", "--dom", "--via=" + via, "--debounce=20", "--target=browser:cdp=" + endpoint);
+        assertEquals(via, watching.path("via").asText(), watching.toString());
+        assertEquals("push", watching.path("mode").asText(), watching.toString());
+        long cursor = watching.path("cursor").asLong();
+        ok(project, "pw", "page", "eval", "--expr=(()=>{const d=document.createElement('div');d.setAttribute('data-pkb-ui','');document.body.appendChild(d);return 1})()",
+                "--target=browser:cdp=" + endpoint);
+        ok(project, "pw", "page", "eval", "--expr=(()=>{const b=document.createElement('b');b.id='pushed';b.textContent='pushed';document.body.appendChild(b);return 1})()",
+                "--target=browser:cdp=" + endpoint);
+        List<JsonNode> rows = collect(project, Long.toString(cursor), Set.of("dom"), "--kinds=dom");
+        assertFalse(rows.isEmpty(), "a dom row arrived");
+        JsonNode row = rows.get(rows.size() - 1);
+        assertEquals("mutation", row.path("subkind").asText(), rows.toString());
+        assertEquals(via, row.path("source").asText(), rows.toString());
+        assertTrue(rows.stream().anyMatch(r -> r.path("dom").path("targets").toString().contains("body") && r.path("dom").path("added").asInt() >= 1), rows.toString());
+        assertTrue(rows.stream().noneMatch(r -> r.path("text").asText().contains("data-pkb")), rows.toString());
+        JsonNode status = ok(project, "browser-events", "--status");
+        assertEquals(via, status.path("dom").asText(), status.toString());
+    }
+
+    @Test
+    void domMutationsArePushedOverCdp() throws Exception {
+        domFeed("dom-cdp", "cdp");
+    }
+
+    @Test
+    void domMutationsArePushedOverPlaywright() throws Exception {
+        domFeed("dom-pw", "playwright");
+    }
 }

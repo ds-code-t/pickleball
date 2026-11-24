@@ -2189,6 +2189,13 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "items");
         copyFlag(args, parsed, "check");
         copyFlag(args, parsed, "pick");
+        // E2b DOM change listener: watch/wait --selector --kinds=childList,attributes,text --debounce --attributes --contains --own --until-change.
+        copyFlag(args, parsed, "selector");
+        copyFlag(args, parsed, "debounce");
+        copyFlag(args, parsed, "attributes");
+        copyFlag(args, parsed, "contains");
+        if (hasFlag(parsed, "--own")) args.put("own", "true");
+        if (hasFlag(parsed, "--until-change")) args.put("until-change", "true");
         if (hasFlag(parsed, "--async")) args.put("async", asyncValue(parsed));
         if (hasFlag(parsed, "--cpu")) args.put("cpu", "true");
         if (hasFlag(parsed, "--list")) args.put("list", "true");

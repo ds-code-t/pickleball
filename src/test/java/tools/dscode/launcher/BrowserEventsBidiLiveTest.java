@@ -87,6 +87,20 @@ class BrowserEventsBidiLiveTest {
     }
 
     @Test
+    void bidiPushesDomMutationsOverScriptMessage() throws Exception {
+        Path project = temp.resolve("bidi");
+        driver.get(base + "/");
+        JsonNode watching = BrowserEventsLiveTest.ok(project, "browser-events", "--dom", "--via=bidi", "--debounce=20",
+                "--cdp-endpoint=" + cdp, "--bidi-endpoint=" + bidi);
+        assertEquals("bidi", watching.path("via").asText(), watching.toString());
+        long cursor = watching.path("cursor").asLong();
+        driver.executeScript("var d=document.createElement('section');d.id='bidi-pushed';document.body.appendChild(d);");
+        List<JsonNode> rows = BrowserEventsLiveTest.collect(project, Long.toString(cursor), Set.of("dom"), "--kinds=dom");
+        assertTrue(rows.stream().anyMatch(r -> "bidi".equals(r.path("source").asText()) && "mutation".equals(r.path("subkind").asText())
+                && r.path("dom").path("added").asInt() >= 1), rows.toString());
+    }
+
+    @Test
     void firefoxBidiWhenPresent() {
         boolean present = ConsumerReadyCommands.onPath("firefox") || System.getenv("FIREFOX_BIN") != null;
         Assumptions.assumeTrue(present, "skipped: no Firefox binary on this machine");
