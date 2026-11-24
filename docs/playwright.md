@@ -20,3 +20,33 @@ Safety: no injection into other processes. Discovery reads only `DevToolsActiveP
 ## Selenium and Playwright on the same browser
 
 `BackendHandoff.toPlaywright(driver)` returns the Playwright `Page` for the WebDriver's current URL over the driver's own CDP endpoint. `BackendHandoff.toSelenium(connection, page)` attaches a ChromeDriver with `debuggerAddress` and switches to that page's window; `BackendHandoff.release(driver)` ends it and the browser keeps running. Nothing restarts. Carried over: the browser process, tabs and pages, cookies, storage, and the default context. Not carried over: Playwright route handlers, init scripts, bindings, and listeners (they live in the Playwright client), and Selenium implicit waits, timeouts, and window-handle bookkeeping (they live in the WebDriver session).
+
+## Playwright verbs
+
+`pw <area> <action> [--flags]` runs one Playwright step on the current page of the browser it attaches to: `--target=browser:cdp=<ws>`, `--cdp-endpoint=<channel|url>`, `pkb_cdp_endpoint`, or else this project's live browser (its own profile's `DevToolsActivePort`). With none, the reply is `error: no CDP endpoint for Playwright ...` with a `fix:`. `cdp --method=<Domain.method> [--params=<json>]` sends one raw CDP command to that page. Both are control-tier verbs. The MCP forwarders are `workbench_pw` (area, action, flags, steps, target) and `workbench_cdp` (method, params, target). Replies are JSON with `ok`, `op`, `area`, `action`, and the page `url`; failures are `error:` and `fix:`. Each call is logged to `.pickleball/logs/playwright.log` with the endpoint redacted.
+
+State that lives in the Playwright client (routes, tracing, the dialog policy, a new context with emulation, HAR replay) lasts for one call. `pw run --steps=<file or JSON array>` runs several steps on one connection, for example `[{"area":"trace","action":"start"},{"area":"page","action":"goto","url":"..."},{"area":"trace","action":"stop","out":"trace.zip"}]`. Selectors are Playwright selectors (`css=`, `xpath=`, `text=`, `role=button[name="Save"]`, `>> nth=0`). The `xpath` on a snap row works as `--selector=xpath=<xpath>`; refs from `snap` are not accepted directly by `pw`.
+
+| Area | Actions and flags |
+|---|---|
+| page | `list`, `new [--url=]`, `goto --url=`, `close`, `front`, `reload`, `title`, `eval --expr=`; `--page-url=<part>` picks the page |
+| context | `list`, `new [emulation flags] [--url=]`, `close` (not the default context) |
+| storage | `save --path=<json>`, `load --path=<json> [--url=]` (a new context with that storage state) |
+| route | `fulfill --pattern=<glob> [--body= --code= --content-type=]`, `abort --pattern= [--error=]`, `continue --pattern= [--header=name:value]`, `clear --pattern=`; `--url=` navigates after routing |
+| har | `record --path=<har> --url=` (a new context records it), `replay --path=<har> [--url=]` |
+| wait | `--for=load\|domcontentloaded\|networkidle\|url\|response\|request\|selector --match=<value> [--wait-ms=] [--click=<selector>\|--url=]` |
+| locator | `count`, `click`, `fill --text=`, `text`, `value`, `hover`, `check`, `select --text=` with `--selector=` (auto-waiting Playwright locators) |
+| trace | `start`, `stop --out=<zip>` (in one `pw run`) |
+| video | `--dir= --url=` |
+| screenshot | `--out=<png> [--full-page=true] [--selector=]` |
+| download | `--click=<selector> --dir=<dir>` |
+| upload | `--selector=<input> --path=<file[,file]>` |
+| dialog | `accept [--prompt-text=]`, `dismiss`, with `--click=<selector>` to open it; the reply lists `dialogs` |
+| emulate | `--viewport=WxH`, `--device=<Playwright device name>`, `--geolocation=lat,lon`, `--locale=`, `--timezone=`, `--color-scheme=dark\|light\|no-preference`, `--offline`, `--user-agent=`, `--permissions=a,b`, `--url=`; the reply has `observed` values read from the page |
+| tabs | `list`, `switch --index=<n>` |
+| frames | `list`, `switch --frame-name=<name or URL part> [--selector=]` |
+| keyboard | `press --keys=Control+A`, `type --text=`, `down`, `up`, with optional `--selector=` to focus first |
+| mouse | `move --x --y`, `down`, `up`, `click --x --y`, `wheel --dx --dy`, `drag --from=<selector> --to=<selector>` or `--x --y --x2 --y2` |
+| run | `--steps=<file or JSON array>` |
+
+Limits over `connectOverCDP`: emulation, storage state, and HAR recording apply to a new context that pickleball creates in the attached browser, not to the page you already had open, and that context closes when the call ends. Video recording needs Playwright's ffmpeg build, which pickleball never downloads, so `pw video` returns `error: video recording is not available over connectOverCDP here ...` with a fix pointing to `pw trace` and `pw screenshot`. Device names come from the playwright-core inside the driver-bundle, read with its bundled Node.

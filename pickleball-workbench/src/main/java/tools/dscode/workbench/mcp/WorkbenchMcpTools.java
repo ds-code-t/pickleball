@@ -561,6 +561,24 @@ final class WorkbenchMcpTools {
                 "Open a URL, URL.* config key, or fixture:<name> in the live start-host page. The session, panel, and guide stay.",
                 schema(view),
                 args -> viewCommand("navigate", args));
+        add("workbench_pw",
+                "Forward pw: one Playwright step (area and action, e.g. route fulfill, trace start, screenshot, emulate) or steps on one connection. Attaches over CDP to the live or named browser; never launches or downloads one.",
+                schema(Map.of(
+                        "area", stringProperty("page, context, storage, route, har, wait, locator, trace, video, screenshot, download, upload, dialog, emulate, tabs, frames, keyboard, mouse, or run."),
+                        "action", stringProperty("The area's action, e.g. list, fulfill, start, press."),
+                        "flags", stringProperty("Space-separated --name=value flags, e.g. --pattern=**/api --body=ok."),
+                        "steps", stringProperty("For area run: a JSON array of {area, action, ...flags}."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                ), "area"),
+                args -> forwardReady(pwArgs("pw", args)));
+        add("workbench_cdp",
+                "Forward cdp: one raw Chrome DevTools Protocol command on the current page (control tier).",
+                schema(Map.of(
+                        "method", stringProperty("Domain.method, e.g. Runtime.evaluate."),
+                        "params", stringProperty("JSON object of parameters."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                ), "method"),
+                args -> forwardReady(pwArgs("cdp", args)));
         add("workbench_chat_turn",
                 "Send one agent line, then wait for a human message, an answer, or a click.",
                 schema(view),
@@ -701,6 +719,30 @@ final class WorkbenchMcpTools {
         }
         Object value = services.agentCommand("record", forwarded);
         return value == null ? Map.of("status", "UNAVAILABLE", "op", "record") : value;
+    }
+
+    /** pw/cdp MCP arguments to CLI tokens: area, action, then --flags. */
+    static List<String> pwArgs(String verb, Map<String, Object> args) {
+        List<String> out = new ArrayList<>();
+        out.add(verb);
+        if ("pw".equals(verb)) {
+            String area = optionalScalar(args, "area");
+            if (!area.isBlank()) out.add(area);
+            String action = optionalScalar(args, "action");
+            if (!action.isBlank()) out.add(action);
+            String steps = optionalScalar(args, "steps");
+            if (!steps.isBlank()) out.add("--steps=" + steps);
+            String flags = optionalScalar(args, "flags");
+            for (String token : flags.trim().split("\\s+(?=--)")) if (!token.isBlank()) out.add(token.trim());
+        } else {
+            String method = optionalScalar(args, "method");
+            if (!method.isBlank()) out.add("--method=" + method);
+            String params = optionalScalar(args, "params");
+            if (!params.isBlank()) out.add("--params=" + params);
+        }
+        String target = optionalScalar(args, "target");
+        if (!target.isBlank()) out.add("--target=" + target);
+        return out;
     }
 
     private Object forwardReady(List<String> verbArgs) {

@@ -25,7 +25,7 @@ public final class VerbTiers {
     private static final Set<String> CONTROL_VERBS = Set.of(
             "answer-wait", "arrow", "ask", "ask-and-wait", "attach", "border", "bridge-health", "call",
             "capture-scenario", "capture-steps", "chat-history", "chat-poll", "chat-send", "chat-turn", "chat_wait",
-            "checklist", "close-window", "confirm", "controller-ping", "controller-start", "controller-status",
+            "cdp", "checklist", "close-window", "confirm", "controller-ping", "controller-start", "controller-status",
             "controller-stop", "diagnostic-run", "discover", "discover-hint", "entity-lookup", "eval", "events",
             "example", "execute-step", "execute-steps", "export-guidance", "find-element", "finish", "form-fill",
             "frame", "from-here", "gc-runs", "gc-versions", "guide", "guide-back", "guide-done", "guide-next",
@@ -33,7 +33,7 @@ public final class VerbTiers {
             "html-remove", "html-replace", "html-write", "inbox", "insert-step", "inspect-page", "isolate", "kill",
             "label", "launch", "live-check", "magnifier", "mcp", "navigate", "note", "observe", "open-run",
             "open-scenario", "open-window", "overlay", "overlay-poll", "overlay-remove", "panel-close", "panel-open",
-            "panel-state", "pause", "pin", "plan", "play", "popup-close", "popup-open", "popup-status", "post",
+            "panel-state", "pause", "pin", "plan", "play", "popup-close", "popup-open", "popup-status", "post", "pw",
             "presence", "query", "record", "ref", "refresh", "relaunch-with-debug", "resolve-runvars", "save", "selftest", "session",
             "session-hold", "session-info", "session-list", "session-mode", "session-release", "session-start", "setup",
             "session-sync", "short-log", "show-run", "spotlight", "start", "status", "step-badge", "stop", "sync",

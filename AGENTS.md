@@ -456,6 +456,8 @@ A composite snapshot is the page-level artifact: screenshot, source, structure, 
 
 Chrome, Chromium, and Edge use the CDP snapshot producer. Firefox uses BiDi, or a logged Selenium fallback. Windows UI Automation, macOS Accessibility, and Linux AT-SPI use the desktop producer. Live hit-testing, focus order, top layer, screenshots, Playwright-only queries, and scripted shadow roots that the producer cannot fill are skipped, not failed. The canonical field list is `docs/snapshot.md`.
 
+To join a browser that is already running, use `attach --cdp-endpoint=chrome|msedge|<url>`, `attach --extension`, `attach --selenium=<debuggerAddress>`, or `attach --discover [--candidate=<n>]`; CDP routes end in the `attach --target=browser:cdp=<ws>` join, so the other verbs work on it. `relaunch-with-debug --confirm` is the last resort. `pw <area> <action>` and `cdp --method=` run Playwright features and raw CDP over that browser (Playwright attaches over CDP and never downloads a browser). `doctor --attach` lists the routes and fixes. See docs/playwright.md.
+
 ## Composite snapshot v2
 
 Early 3.x accepts snapshot versions 1 and 2. Producers emit version 2. `capabilities.snapshot_schema` stays 1. Version 1 is `$id` `urn:pickleball:composite-snapshot:1`. Version 2 is `$id` `urn:pickleball:composite-snapshot:2`. The family name stays `pickleball.composite-snapshot`. The guide is `docs/snapshot.md`. Design `docs/maintainer/3.0.0-composite-v2-design.md`.

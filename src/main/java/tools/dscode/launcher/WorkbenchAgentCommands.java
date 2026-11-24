@@ -181,6 +181,7 @@ public final class WorkbenchAgentCommands {
                 case "session-mode" -> sessionMode(parsed, safeOut, safeErr);
                 case "setup" -> SetupCommand.run(parsed, safeOut, safeErr);
                 case "relaunch-with-debug" -> RelaunchWithDebug.run(parsed, safeOut, safeErr);
+                case "pw", "cdp" -> PwCommand.run(args, parsed.project(), safeOut, safeErr);
                 case "export-guidance" -> exportGuidance(parsed, safeOut, safeErr);
                 case "start" -> {
                     int started = ConsumerReadyCommands.start(parsed, safeOut, safeErr);

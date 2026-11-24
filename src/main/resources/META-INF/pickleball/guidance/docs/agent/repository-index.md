@@ -595,6 +595,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/launcher/PickleballWorkbenchLauncher.java`
 - `src/main/java/tools/dscode/launcher/PkbMain.java`
 - `src/main/java/tools/dscode/launcher/PlaywrightNode.java`
+- `src/main/java/tools/dscode/launcher/PwCommand.java`
 - `src/main/java/tools/dscode/launcher/QuietWarnings.java`
 - `src/main/java/tools/dscode/launcher/RelaunchWithDebug.java`
 - `src/main/java/tools/dscode/launcher/RunVarOverrides.java`
@@ -987,6 +988,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/PlacementNowTest.java`
 - `src/test/java/tools/dscode/launcher/PolishRoadmapTest.java`
 - `src/test/java/tools/dscode/launcher/PopupVerbCoverageTest.java`
+- `src/test/java/tools/dscode/launcher/PwCommandLiveTest.java`
 - `src/test/java/tools/dscode/launcher/RedirectedFrameTest.java`
 - `src/test/java/tools/dscode/launcher/RefLifetimeTest.java`
 - `src/test/java/tools/dscode/launcher/RefWaitTest.java`
