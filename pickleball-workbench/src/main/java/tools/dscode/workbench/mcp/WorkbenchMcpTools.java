@@ -866,6 +866,27 @@ final class WorkbenchMcpTools {
                         "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
                 )),
                 args -> forwardReady(protoArgs("share-browser", args)));
+        add("workbench_optional_list",
+                "List opt-in add-ons (axe, lighthouse, devtools-mcp): installed or not, license.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for optional-list; see help optional-list."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("optional-list", args)));
+        add("workbench_audit",
+                "Accessibility audit with the installed axe-core (--axe) or a Lighthouse report (--lighthouse).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for audit; see help audit."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("audit", args)));
+        add("workbench_bridge",
+                "Print the MCP config for the installed chrome-devtools-mcp attached to this session (localhost).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for bridge; see help bridge."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("bridge", args)));
         add("workbench_chat_turn",
                 "Send one agent line, then wait for a human message, an answer, or a click.",
                 schema(view),

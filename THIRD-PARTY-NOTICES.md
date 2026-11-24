@@ -138,3 +138,14 @@ components, modified via AspectJ compile-time and binary weaving:
 Modifications are applied at build time using AspectJ weaving (see
 src/main/aspectj). These modifications do not imply upstream approval
 or endorsement.
+
+---
+
+## Optional, user-installed, not distributed with pickleball
+
+These are downloaded only by the explicit `optional-install <name> --confirm` command into the user's cache
+directory. They are not part of the pickleball jar or its dependencies. See docs/optional-installs.md.
+
+- axe-core 4.14.1 — Mozilla Public License 2.0 (weak copyleft). Used unmodified as a separate file; never shaded. Source: https://github.com/dequelabs/axe-core
+- Lighthouse 13.6.0 — Apache License 2.0. Source: https://github.com/GoogleChrome/lighthouse
+- chrome-devtools-mcp 1.13.0 — Apache License 2.0. Source: https://github.com/ChromeDevTools/chrome-devtools-mcp

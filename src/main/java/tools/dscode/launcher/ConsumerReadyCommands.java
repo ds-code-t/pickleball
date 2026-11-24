@@ -420,6 +420,8 @@ final class ConsumerReadyCommands {
             out.println("desktopDriver=" + drivers.path("selected").asText("native"));
             out.println("desktop=" + drivers);
         }
+        // E12: opt-in OSS add-ons (axe, lighthouse, devtools-mcp): installed or not; installing downloads, nothing here does.
+        out.println(tools.dscode.optional.OptionalAddons.doctorLine());
         // D11: the opt-in ONNX OCR runtime and model (setup ocr --runtime=onnx --confirm); nothing is loaded here.
         java.nio.file.Path ocrDir = dev.domengine.query.OnnxOcrRuntime.dir();
         java.util.List<String> ocrMissing = dev.domengine.query.OnnxOcrRuntime.missing(ocrDir);

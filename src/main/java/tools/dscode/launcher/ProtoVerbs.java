@@ -64,6 +64,14 @@ final class ProtoVerbs {
                 out.println(reply);
                 return 0;
             }
+            if (command.startsWith("optional-") || "bridge".equals(command) || ("audit".equals(command) && flags.containsKey("lighthouse"))) {
+                return optional(project, command, flags, positional, out, err);
+            }
+            if ("audit".equals(command)) {
+                // E12: say how to install before starting a host.
+                if (!flags.containsKey("axe")) return fail(err, "error: audit needs --axe or --lighthouse\nfix: audit --axe");
+                tools.dscode.optional.OptionalAddons.require("axe");
+            }
             if ("webauthn".equals(command) && flags.get("private-key") != null) {
                 // E8: the private key ref is resolved here, sent only to the token-guarded loopback host, and never printed.
                 Map<String, String> payload = new LinkedHashMap<>(flags);
@@ -77,6 +85,85 @@ final class ProtoVerbs {
         } catch (java.io.IOException failure) {
             return fail(err, "error: " + failure.getMessage() + "\nfix: check the run folder");
         }
+    }
+
+    /** E12: optional-install/-uninstall/-list, audit --lighthouse and bridge --devtools-mcp run in this process. */
+    static int optional(Path project, String command, Map<String, String> flags, List<String> positional, PrintStream out, PrintStream err) throws java.io.IOException {
+        String name = flags.getOrDefault("name", positional.isEmpty() ? null : positional.getFirst());
+        switch (command) {
+            case "optional-list" -> {
+                out.println(tools.dscode.optional.OptionalAddons.list());
+                return 0;
+            }
+            case "optional-install" -> {
+                if (name == null) return fail(err, "error: optional-install needs a name\nfix: optional-install axe|lighthouse|devtools-mcp");
+                ObjectNode reply = tools.dscode.optional.OptionalAddons.install(name, flags.get("version"), flags.get("integrity"), flags.containsKey("confirm"));
+                out.println(reply);
+                return 0;
+            }
+            case "optional-uninstall" -> {
+                if (name == null) return fail(err, "error: optional-uninstall needs a name\nfix: optional-uninstall axe");
+                out.println(tools.dscode.optional.OptionalAddons.uninstall(name));
+                return 0;
+            }
+            case "bridge" -> {
+                if (!flags.containsKey("devtools-mcp")) return fail(err, "error: bridge needs --devtools-mcp\nfix: bridge --devtools-mcp");
+                if (flags.containsKey("stop")) {
+                    out.println("{\"ok\":true,\"op\":\"bridge\",\"mode\":\"stop\",\"note\":\"the MCP client owns the chrome-devtools-mcp process; remove it from the client config or close the client\"}");
+                    return 0;
+                }
+                java.nio.file.Path entry = tools.dscode.optional.OptionalAddons.require("devtools-mcp");
+                String endpoint = flags.containsKey("endpoint") ? flags.get("endpoint") : PwCommand.endpoint(project, flags);
+                if (!tools.dscode.optional.OptionalAddons.loopback(endpoint)) {
+                    return fail(err, "error: bridge --devtools-mcp is localhost only\nfix: use a 127.0.0.1 or localhost endpoint");
+                }
+                List<String> args = tools.dscode.optional.OptionalAddons.devtoolsMcpArgs(tools.dscode.optional.OptionalAddons.node(), entry, endpoint);
+                ObjectNode reply = new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode().put("ok", true).put("op", "bridge").put("mode", "devtools-mcp")
+                        .put("version", tools.dscode.optional.OptionalAddons.installed("devtools-mcp"));
+                ObjectNode server = reply.putObject("mcpConfig").putObject("mcpServers").putObject("chrome-devtools");
+                server.put("command", args.getFirst());
+                com.fasterxml.jackson.databind.node.ArrayNode list = server.putArray("args");
+                args.subList(1, args.size()).forEach(list::add);
+                server.putObject("env").put("CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS", "1");
+                reply.put("note", "the MCP client starts it over stdio with this config; CrUX lookups and usage statistics are off");
+                out.println(SecretRedactor.scrub(reply.toString()));
+                return 0;
+            }
+            default -> {
+                return lighthouse(project, flags, out, err);
+            }
+        }
+    }
+
+    /** {@code audit --lighthouse}: the installed Lighthouse against this session's CDP port (Chromium only). */
+    static int lighthouse(Path project, Map<String, String> flags, PrintStream out, PrintStream err) throws java.io.IOException {
+        java.nio.file.Path cli = tools.dscode.optional.OptionalAddons.require("lighthouse");
+        String endpoint = PwCommand.endpoint(project, flags);
+        java.net.URI uri = java.net.URI.create(endpoint);
+        if (!tools.dscode.optional.OptionalAddons.loopback(endpoint)) return fail(err, "error: audit --lighthouse is localhost only\nfix: use a local Chromium session");
+        String url = flags.get("url");
+        if (url == null) {
+            JsonNode tabs = call(project, flags, "context-list", Map.of()).path("contexts").path(0).path("tabs");
+            url = tabs.path(0).path("url").asText(null);
+        }
+        if (url == null || url.isBlank()) return fail(err, "error: no page to audit\nfix: audit --lighthouse --url=<page url>");
+        java.nio.file.Path dir = project.resolve(flags.getOrDefault("out", ".pickleball/audit/lighthouse-" + System.currentTimeMillis()));
+        java.nio.file.Files.createDirectories(dir);
+        List<String> command = new java.util.ArrayList<>(List.of(tools.dscode.optional.OptionalAddons.node().toString(), cli.toString(), url,
+                "--port=" + uri.getPort(), "--output=json", "--output=html", "--output-path=" + dir.resolve("lighthouse"), "--quiet",
+                "--only-categories=" + flags.getOrDefault("categories", "performance,accessibility,best-practices,seo")));
+        Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
+        String log = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        try {
+            if (process.waitFor() != 0) return fail(err, "error: lighthouse failed: " + log.strip().lines().findFirst().orElse("") + "\nfix: check the page loads, then retry");
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            return fail(err, "error: interrupted\nfix: retry");
+        }
+        ObjectNode reply = new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode().put("ok", true).put("op", "audit").put("mode", "lighthouse")
+                .put("via", "cdp").put("url", url).put("out", dir.toString());
+        out.println(SecretRedactor.scrub(reply.toString()));
+        return 0;
     }
 
     /**

@@ -163,6 +163,8 @@ Pickleball reaches a browser through four backends and picks one per capability:
 | `pkb_fail_on_js_error` | off | `warn` logs, and `fail` fails, the step during which an uncaught page error or unhandled rejection happened (collected over WebDriver BiDi). The message names the error and its stack. |
 | `pkb_js_error_ignore` | unset | Regex; page errors whose message matches are allowed under `pkb_fail_on_js_error`. Example: `pkb_js_error_ignore=ResizeObserver loop\|third-party-widget`. |
 | `pkb_scenario_events` | off | `on` streams a scenario's own Selenium session console, page-error and network rows into browser-events through Selenium's BiDi modules (`transport=selenium`). See [Browser events](browser-events.md). |
+| `pkb_optional_dir` | user cache dir | Where `optional-install` puts axe, Lighthouse and chrome-devtools-mcp. See [Optional installs](optional-installs.md). |
+| `pkb_optional_npm` | unset | npm (or `npm-cli.js`) for add-ons with npm dependencies (Lighthouse); Playwright's bundle has none. |
 
 Each key is read as a system property, then `pkb_runvars.<key>`, then the upper-case environment variable, then the environment variable as written. `doctor` prints `protocols=<browser>:<backends>`; `doctor --protocols [--cdp-endpoint=] [--bidi-endpoint=]` prints one `protocol.backend.*` line per backend and one `protocol.capability.*` line per capability.
 

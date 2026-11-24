@@ -62,6 +62,7 @@ public final class ProtoHost {
         PerfCommands.register();
         MonitorCommands.register();
         ScreencastCommands.register();
+        AuditCommands.register();
     }
 
     private final Path project;

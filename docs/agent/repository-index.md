@@ -155,6 +155,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/mapping-and-templating.md`
 - `docs/nested-steps.md`
 - `docs/object-registration.md`
+- `docs/optional-installs.md`
 - `docs/pickleball-workbench-player.md`
 - `docs/pickleball-workbench.md`
 - `docs/playwright.md`
@@ -308,6 +309,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/browser/JsonRpc.java`
 - `src/main/java/tools/dscode/browser/PlaywrightAdapter.java`
 - `src/main/java/tools/dscode/browser/PlaywrightConnection.java`
+- `src/main/java/tools/dscode/browser/proto/AuditCommands.java`
 - `src/main/java/tools/dscode/browser/proto/BrowserEventHub.java`
 - `src/main/java/tools/dscode/browser/proto/CdpSession.java`
 - `src/main/java/tools/dscode/browser/proto/ContextCommands.java`
@@ -789,6 +791,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/launcher/WorkbenchWarmMain.java`
 - `src/main/java/tools/dscode/launcher/WorkspaceLaunch.java`
 - `src/main/java/tools/dscode/misc/DummySteps.java`
+- `src/main/java/tools/dscode/optional/OptionalAddons.java`
 - `src/main/java/tools/dscode/parallelutilities/ParallelCountEstimator.java`
 - `src/main/java/tools/dscode/parallelutilities/Stagger.java`
 - `src/main/java/tools/dscode/pickleruntime/CucumberOptionResolver.java`
@@ -1169,6 +1172,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/OneCallActTest.java`
 - `src/test/java/tools/dscode/launcher/OopifAutoAttachTest.java`
 - `src/test/java/tools/dscode/launcher/OptInSetupTest.java`
+- `src/test/java/tools/dscode/launcher/OptionalAddonsLiveTest.java`
 - `src/test/java/tools/dscode/launcher/OverlapTest.java`
 - `src/test/java/tools/dscode/launcher/PerfLiveTest.java`
 - `src/test/java/tools/dscode/launcher/PickleballWorkbenchLauncherTest.java`
@@ -1225,6 +1229,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/WorkbenchWarmFallbackTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchWarmLifecycleTest.java`
 - `src/test/java/tools/dscode/launcher/WorkspaceLaunchForkTest.java`
+- `src/test/java/tools/dscode/optional/OptionalAddonsTest.java`
 - `src/test/java/tools/dscode/parallelutilities/ParallelCountEstimatorTest.java`
 - `src/test/java/tools/dscode/release/Release217ReportedBugsTest.java`
 - `src/test/java/tools/dscode/release/WorkingTreeDiffHashTest.java`

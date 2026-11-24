@@ -37,6 +37,7 @@ docs/log-and-assert-steps.md
 docs/mapping-and-templating.md
 docs/nested-steps.md
 docs/object-registration.md
+docs/optional-installs.md
 docs/pickleball-workbench-player.md
 docs/pickleball-workbench.md
 docs/playwright.md

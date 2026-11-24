@@ -103,6 +103,7 @@ public final class BrowserProtocols {
         CAPABILITIES.put("nav", P_B_C);
         CAPABILITIES.put("screencast", P_B_C);
         CAPABILITIES.put("share-browser", List.of(Backend.PLAYWRIGHT));
+        CAPABILITIES.put("audit", List.of(Backend.CDP, Backend.PLAYWRIGHT));
     }
 
     private final String browser;
