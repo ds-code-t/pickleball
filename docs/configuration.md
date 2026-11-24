@@ -122,6 +122,10 @@ pkb_run_why
 
 Lineage and coordination metadata survive controlled execution but are excluded from `pkb_run_profile` and `runProfileFingerprint`. Do not put `pkb_run_id`, the run directory, `pkb_diagnostic_output`, or a browser profile path inside `pkb_runvars`. A confirm replay must not reuse another run's directory or browser profile.
 
+### Linux desktop control
+
+Linux desktop control is AT-SPI plus `xdotool` on X11 or Xvfb only. Wayland is unsupported: a Wayland-only session (`WAYLAND_DISPLAY` set and `DISPLAY` unset, or `XDG_SESSION_TYPE=wayland` without `DISPLAY`) fails `desktop attach --live` with `error: Wayland session detected; desktop control needs X11 or Xvfb (set DISPLAY)` and a `fix:` line. Xwayland with `DISPLAY` set is allowed. `grim` screenshots are not a supported desktop-control path.
+
 ## Agent coordination
 
 Different consumer agents can run different tests at the same time. The shared files under the consumer `.pickleball` directory are a bulletin board. Run data stays private to each run.

@@ -124,6 +124,16 @@ public final class DesktopTree {
 
     /** Live attach. {@code windowName} is empty for the whole desktop, or a window/application/dialog name. */
     public static Session attachLive(String id, String windowName) {
+        return attachLive(id, windowName, System.getenv());
+    }
+
+    /** Live attach with an explicit environment, so the Wayland refusal is testable without a Wayland session. */
+    public static Session attachLive(String id, String windowName, java.util.Map<String, String> env) {
+        String refusal = NativeDesktop.waylandRefusal(NativeDesktop.family(), env);
+        if (refusal != null) {
+            EngineLog.info("desktop", "attach refused " + id + " wayland-only session");
+            throw new CdpException(refusal);
+        }
         String name = windowName == null ? "" : windowName;
         dev.domengine.premap.PreMapLookup.forget(id);
         String platform = NativeDesktop.platformId();

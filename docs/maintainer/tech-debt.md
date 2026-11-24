@@ -34,3 +34,9 @@ Items #5–#10 stay deferred. Do not implement them in 2.1.18.
 - Expected: startup well under the default timeout; on timeout, a clear `error:`/`fix:` message and full teardown of the session (no orphans).
 - To reproduce: start a live session from a consumer project (e.g. myq-release-testing on Windows, mvnw.cmd), time the startup, then check for leftover processes after the exit.
 - Fix direction: profile the slow startup phase, make timeout teardown kill the whole session tree through one shared shutdown path, and add a test that injects a startup timeout and asserts that no process survives.
+
+## Wayland desktop control (unsupported)
+
+- Linux desktop control is AT-SPI plus `xdotool` on X11 or Xvfb. A Wayland-only session is refused at live attach (`NativeDesktop.waylandRefusal`).
+- `grim` screenshots exist in `DesktopScreenshot` for Wayland capture only; they are not a desktop-control path.
+- Fix direction if Wayland support is ever wanted: a portal-based input path (libei or the RemoteDesktop portal), which needs user consent per session.
