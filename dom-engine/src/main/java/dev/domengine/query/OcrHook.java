@@ -8,7 +8,10 @@ import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
+import java.util.LinkedHashSet;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -23,6 +26,8 @@ public final class OcrHook {
     static final String ONNX_SLOT = "onnx";
     private static final ConcurrentHashMap<String, String> CACHE = new ConcurrentHashMap<>();
     private static final AtomicInteger READS = new AtomicInteger();
+    private static final ThreadLocal<Set<String>> VIEWS = new ThreadLocal<>();
+    private static final ThreadLocal<String> VIEW = new ThreadLocal<>();
 
     private OcrHook() {
     }
@@ -136,6 +141,47 @@ public final class OcrHook {
     public static void resetForTests() {
         CACHE.clear();
         READS.set(0);
+        VIEWS.remove();
+        VIEW.remove();
+    }
+
+    /**
+     * Arms the per-view OCR gate for this query. The active view is {@code human}
+     * when {@code exposure=human} and the mask is on, otherwise {@code full}.
+     * {@code ocr-views} is a comma list of {@code human} and {@code full}. Blank means both.
+     * A view that is not listed is not recognized: the OCR stage returns zero hits and
+     * does not read the runtime. The shared hash cache is left as it is.
+     */
+    public static void armViews(Map<String, String> flags) {
+        if (flags == null) {
+            VIEWS.remove();
+            VIEW.remove();
+            return;
+        }
+        VIEWS.set(parseViews(flags.get("ocr-views")));
+        VIEW.set(ViewMask.active(flags) ? "human" : "full");
+    }
+
+    /** False when this query armed a view list that omits the active view. Unarmed queries allow both. */
+    public static boolean viewEnabled() {
+        Set<String> views = VIEWS.get();
+        if (views == null) return true;
+        return views.contains(activeView());
+    }
+
+    public static String activeView() {
+        String view = VIEW.get();
+        return view == null || view.isBlank() ? "full" : view;
+    }
+
+    private static Set<String> parseViews(String raw) {
+        if (raw == null || raw.isBlank()) return Set.of("human", "full");
+        Set<String> views = new LinkedHashSet<>();
+        for (String part : raw.split(",")) {
+            String name = part.trim().toLowerCase(Locale.ROOT);
+            if ("human".equals(name) || "full".equals(name)) views.add(name);
+        }
+        return Set.copyOf(views);
     }
 
     /**

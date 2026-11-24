@@ -26,7 +26,7 @@ public final class Query {
     );
     public static final List<String> QUERY_FLAGS = List.of(
             "within", "nesting", "nth", "every", "count-only", "geometry", "pierce", "point", "viewport", "exposure",
-            "filter", "limit", "rank", "doc-version"
+            "filter", "limit", "rank", "doc-version", "ocr-views"
     );
 
     private static final Set<String> XPATH_FALLBACKS = new LinkedHashSet<>();
@@ -53,9 +53,11 @@ public final class Query {
         String withinId = flags.get("within");
         if (withinId != null && !withinId.isBlank()) LiveXPath.within(findId(scoped, withinId));
         ViewMask.install(scoped, flags);
+        OcrHook.armViews(flags);
         try {
             return runArmed(scoped, flags);
         } finally {
+            OcrHook.armViews(null);
             ViewMask.clear();
             LiveXPath.within(null);
             if (armed) Engines.useViewport(null);

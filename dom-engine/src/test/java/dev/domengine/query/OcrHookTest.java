@@ -235,6 +235,37 @@ class OcrHookTest {
     }
 
     @Test
+    void ocrViewsSkipsTheInactiveViewAndKeepsTheCache() throws Exception {
+        Path viewport = write("view.pgm", PGM);
+        String hash = OcrHook.cacheKey(TemplateMatch.parse(PGM));
+        Path stub = write("runtime.txt", "pkb-ocr 1\n" + hash + " mark\n");
+        System.setProperty(OcrHook.PROPERTY, stub.toString());
+        Path page = write("seen.html", SEEN);
+
+        CliResult full = query(page, viewport, "image=ocr:mark", "full", null);
+        assertEquals(0, full.exit(), full.stderr());
+        JsonNode first = Jsons.MAPPER.readTree(full.stdout());
+        assertEquals(1, first.path("nodes").size());
+        assertFalse(first.path("image").path("cached").asBoolean());
+        assertEquals(1, OcrHook.runtimeReads());
+
+        CliResult off = query(page, viewport, "image=ocr:mark", "human", "full");
+        assertEquals(0, off.exit(), off.stderr());
+        JsonNode skipped = Jsons.MAPPER.readTree(off.stdout());
+        assertEquals(0, skipped.path("nodes").size());
+        assertEquals("ocr-views", skipped.path("image").path("skipped").asText(), skipped.toString());
+        assertEquals("human", skipped.path("image").path("view").asText());
+        assertEquals(1, OcrHook.runtimeReads());
+
+        CliResult again = query(page, viewport, "image=ocr:mark", "human", "human");
+        assertEquals(0, again.exit(), again.stderr());
+        JsonNode hit = Jsons.MAPPER.readTree(again.stdout());
+        assertEquals(1, hit.path("nodes").size());
+        assertTrue(hit.path("image").path("cached").asBoolean(), hit.toString());
+        assertEquals(1, OcrHook.runtimeReads());
+    }
+
+    @Test
     void onnxSlotReportsNotInstalledAndLoadsNothing() throws Exception {
         System.setProperty(OcrHook.PROPERTY, "onnx");
         Path viewport = write("view.pgm", PGM);
@@ -285,6 +316,10 @@ class OcrHookTest {
     }
 
     private CliResult query(Path html, Path viewport, String pipeline, String exposure) {
+        return query(html, viewport, pipeline, exposure, null);
+    }
+
+    private CliResult query(Path html, Path viewport, String pipeline, String exposure, String ocrViews) {
         List<String> args = new ArrayList<>();
         args.add("query");
         args.add("--file");
@@ -296,6 +331,10 @@ class OcrHookTest {
         if (exposure != null) {
             args.add("--exposure");
             args.add(exposure);
+        }
+        if (ocrViews != null) {
+            args.add("--ocr-views");
+            args.add(ocrViews);
         }
         return DomEngineMain.dispatch(args);
     }

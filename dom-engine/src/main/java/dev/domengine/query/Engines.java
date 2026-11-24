@@ -127,6 +127,17 @@ public final class Engines {
         String needle = "ocr".equals(lower) ? null : raw.substring(lower.startsWith("ocr:") ? 4 : 3).trim();
         TemplateMatch.Gray viewport = VIEWPORT.get();
         if (viewport == null) throw new CdpException("image engine needs a viewport screenshot");
+        if (!OcrHook.viewEnabled()) {
+            ObjectNode skipped = Jsons.object();
+            skipped.put("engine", "ocr");
+            skipped.put("text", "");
+            skipped.put("hash", "");
+            skipped.put("cached", false);
+            skipped.put("matched", 0);
+            skipped.put("skipped", "ocr-views");
+            skipped.put("view", OcrHook.activeView());
+            return new Query.Hit(List.of(), "ocr skipped ocr-views", skipped);
+        }
         List<DomNode> hits = new ArrayList<>();
         String text = "";
         String hash = "";
