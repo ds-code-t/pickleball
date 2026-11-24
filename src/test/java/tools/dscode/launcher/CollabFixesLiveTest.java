@@ -280,6 +280,40 @@ class CollabFixesLiveTest {
         assertTrue(polled.out.contains("upload-request") && polled.out.contains("#doc"), polled.out);
     }
 
+    @Test
+    @Timeout(value = 150, unit = TimeUnit.SECONDS)
+    void c7_guideFillsTheGuidePaneAdvancesOnAHumanAndSurvivesReload() throws Exception {
+        start(page("c7.html", """
+                <label>Name <input id="name"></label><button id="next">Next</button>
+                """), "c7");
+        assertEquals(0, run("panel-open", "--tab=chat", "--run-id=c7").code);
+        Capture guided = run("guide", "--steps=[{\"t\":\"#name\",\"say\":\"Type your name\",\"do\":\"input\"},{\"t\":\"#next\",\"say\":\"Click Next\",\"do\":\"click\"}]", "--id=g1", "--run-id=c7");
+        assertEquals(0, guided.code, guided.err + guided.out);
+        assertEquals("true", eval(tab("steps") + ".getAttribute('aria-selected')", "c7"), "guide selects the Guide tab");
+        String steps = eval(pane() + ".querySelector('[data-pkb-purpose~=guide-pane]').textContent", "c7");
+        assertTrue(steps.contains("Type your name") && !steps.contains("No guide yet"), steps);
+        assertEquals("g1 step 1/2 current", eval("document.getElementById('name').getAttribute('data-pkb-guide-step')", "c7"));
+        assertEquals(0, run("panel-open", "--tab=chat", "--run-id=c7").code);
+        assertEquals("2", eval(tab("steps") + ".querySelector('[data-pkb-badge]').getAttribute('data-pkb-badge')", "c7"));
+
+        java.util.concurrent.CompletableFuture<Capture> polled = java.util.concurrent.CompletableFuture.supplyAsync(
+                () -> run("ui-poll", "--wait=10", "--run-id=c7"));
+        Thread.sleep(800);
+        // The person types and presses Enter (main-world events, no agent mark).
+        eval("(function(){var n=document.getElementById('name');n.value='Ann';"
+                + "n.dispatchEvent(new Event('input',{bubbles:true}));"
+                + "n.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));return 'ok';})()", "c7");
+        Capture event = polled.get(20, TimeUnit.SECONDS);
+        assertEquals(0, event.code, event.err + event.out);
+        assertTrue(event.out.contains("\"by\":\"human\"") && event.out.contains("\"s\":\"1\""), event.out);
+        assertEquals("g1 step 2/2 current", eval("document.getElementById('next').getAttribute('data-pkb-guide-step')", "c7"));
+
+        eval("location.reload(), 'ok'", "c7");
+        Thread.sleep(2500);
+        assertEquals("g1 step 2/2 current", eval("(document.getElementById('next').getAttribute('data-pkb-guide-step')||'') + ''", "c7"),
+                "the guide is re-injected after navigation");
+    }
+
     static String pane() {
         return "document.querySelector('pkb-layer').shadowRoot";
     }

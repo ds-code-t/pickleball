@@ -1257,9 +1257,23 @@
     return out;
   }
 
+  function guideBadge() {
+    if (!panel || !panel.tabs) return;
+    var tab = null;
+    panel.tabs.forEach(function (b) { if (b.getAttribute('data-tab') === 'steps') tab = b; });
+    var badge = tab && tab.querySelector('.pkb-badge');
+    if (!badge) return;
+    var open = 0;
+    guides.forEach(function (g) { g.steps.forEach(function (st) { if (!st.done) open++; }); });
+    var show = open && panel.state.tab !== 'steps' ? String(open) : '';
+    badge.textContent = show;
+    badge.setAttribute('data-pkb-badge', show);
+  }
+
   function stepsList() {
     metaPurpose = 'guide';
     if (!panel) return;
+    guideBadge();
     var pane = panel.stepsPane;
     pane.textContent = '';
     if (!guides.size) { pane.appendChild(el('div', 'pkb-empty', 'No guide yet.')); return; }
@@ -1338,7 +1352,8 @@
     var step = g.steps[from];
     if (!step || step.done) return;
     step.done = true;
-    var ev = {type: 'step', g: g.id, s: step.n, done: true, how: how};
+    // by says who did it: a person's click, typing, or blur is human; agent acts mark the root first.
+    var ev = {type: 'step', g: g.id, s: step.n, done: true, how: how, by: how === 'agent' || actingSource() === 'agent' ? 'agent' : 'human'};
     if (how === 'input' || how === 'select' || how === 'check') ev.filled = true;
     if (value !== undefined) ev.value = value;
     pushEvent(ev);
@@ -1347,7 +1362,7 @@
     g.current = next;
     g.pulse = true;
     if (g.current >= g.steps.length) {
-      pushEvent({type: 'guide', g: g.id, done: true});
+      pushEvent({type: 'guide', g: g.id, done: true, by: ev.by});
       guideClose(g.id);
       return;
     }
@@ -1846,6 +1861,7 @@
     panel.composer.hidden = name !== 'chat';
     if (name === 'chat') panel.chatPane.scrollTop = panel.chatPane.scrollHeight;
     if (name === 'steps') stepsList();
+    guideBadge();
     panelPlace();
   }
 
