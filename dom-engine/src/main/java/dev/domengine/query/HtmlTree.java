@@ -5,6 +5,7 @@ import dev.domengine.tree.DomNode;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -18,6 +19,8 @@ public final class HtmlTree {
     private final String html;
     private int index;
     private long nextId = 1;
+    /** Void names that have at least one explicit end tag. Computed once per parse. */
+    private Set<String> voidEndNames;
 
     private HtmlTree(String html) {
         this.html = html == null ? "" : html;
@@ -37,6 +40,7 @@ public final class HtmlTree {
     }
 
     private DomNode document() {
+        prepareVoidEnds();
         DomNode root = new DomNode();
         root.nodeType = 9;
         root.nodeName = "#document";
@@ -209,8 +213,42 @@ public final class HtmlTree {
      * A void tag with a matching end tag is a container. Desktop HTML-ish writes
      * {@code <input>} and {@code <img>} that way when the control has children.
      * A void tag with no matching end tag stays empty, so a following sibling is not swallowed.
+     * End-tag names are collected once, so a page of bare void tags does not rescan the document.
      */
+    private void prepareVoidEnds() {
+        Set<String> names = new HashSet<>();
+        int i = 0;
+        while (i < html.length()) {
+            int lt = html.indexOf('<', i);
+            if (lt < 0) break;
+            if (region(lt, "<!--")) {
+                int end = html.indexOf("-->", lt + 4);
+                i = end < 0 ? html.length() : end + 3;
+                continue;
+            }
+            if (region(lt, "<!")) {
+                int gt = html.indexOf('>', lt + 2);
+                i = gt < 0 ? html.length() : gt + 1;
+                continue;
+            }
+            if (region(lt, "</")) {
+                int nameStart = lt + 2;
+                int nameEnd = nameStart;
+                while (nameEnd < html.length() && isName(html.charAt(nameEnd))) nameEnd++;
+                if (nameEnd > nameStart) {
+                    String close = html.substring(nameStart, nameEnd).toLowerCase(Locale.ROOT);
+                    if (VOID.contains(close)) names.add(close);
+                }
+                i = nameEnd;
+                continue;
+            }
+            i = lt + 1;
+        }
+        voidEndNames = names;
+    }
+
     private boolean explicitEnd(String name) {
+        if (voidEndNames != null && !voidEndNames.contains(name)) return false;
         int i = index;
         ArrayDeque<String> stack = new ArrayDeque<>();
         while (i < html.length()) {
