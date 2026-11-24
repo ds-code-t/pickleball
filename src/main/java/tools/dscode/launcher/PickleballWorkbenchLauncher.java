@@ -54,6 +54,7 @@ public final class PickleballWorkbenchLauncher {
     }
 
     public static void main(String[] args) {
+        QuietSlf4j.init();
         int engine = dispatchEngineIfAny(args, System.out, System.err);
         if (engine >= 0) {
             if (engine != 0) exitProcess(engine);

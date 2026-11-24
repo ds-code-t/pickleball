@@ -219,6 +219,72 @@ public final class TargetVerb {
         }
     }
 
+    /** Paints the first control {@code query} finds (same matching as find) on the selected browser page. */
+    public static Outcome highlightQuery(String targetRaw, String query, String css, String runId) {
+        TargetSelector.Parsed target = TargetSelector.parse(targetRaw);
+        if (target == null || "desktop".equals(target.kind()) || "none".equals(target.kind())) {
+            Outcome failed = fail("highlight", "unknown target");
+            failed.body().put("applied", false);
+            return failed;
+        }
+        Held page = openBrowser("ref".equals(target.kind()) ? TargetSelector.parse("browser:auto") : target);
+        CdpConnection cdp = page.session.connection();
+        try {
+            DomNode root = tree(page.session);
+            List<DomNode> hits = locate(root, query, scopedFrame(runId, target));
+            if (hits.isEmpty()) {
+                Outcome failed = fail("highlight", "not found");
+                failed.body().put("applied", false);
+                failed.body().put("query", query);
+                stamp(failed.body(), cdp, null);
+                putEntered(failed.body(), runId, cdp);
+                return failed;
+            }
+            DomNode node = hits.get(0);
+            String sentence = tools.dscode.browser.SurfaceAssets.sentence("highlight");
+            String read = callOnNode(cdp, cdpSessionOf(node), node, paintFunction(css, sentence));
+            if (!"style_modified".equals(read)) {
+                Outcome failed = fail("highlight", "highlight did not paint");
+                failed.body().put("applied", false);
+                failed.body().put("query", query);
+                stamp(failed.body(), cdp, node);
+                putEntered(failed.body(), runId, cdp);
+                return failed;
+            }
+            Map<String, Object> body = base("highlight", "cdp", "browser", target);
+            body.put("applied", true);
+            body.put("query", query);
+            body.put("name", name(node));
+            body.put("matches", hits.size());
+            body.put("cdp", "style");
+            body.put("labels", List.of("style_modified"));
+            stamp(body, cdp, node);
+            putEntered(body, runId, cdp);
+            return ok(body);
+        } catch (RuntimeException failure) {
+            Outcome failed = fail("highlight", failure.getMessage() == null ? "highlight did not paint" : failure.getMessage());
+            failed.body().put("applied", false);
+            failed.body().put("query", query);
+            return failed;
+        } finally {
+            page.release();
+        }
+    }
+
+    private static String paintFunction(String css, String sentence) {
+        return "function(){var css=" + jsString(css) + ",sentence=" + jsString(sentence) + ";"
+                + "if(!this||this.nodeType!==1) return '';"
+                + "if(!this.hasAttribute('data-pkb-original-style')) this.setAttribute('data-pkb-original-style', this.getAttribute('style')||'');"
+                + "var original=this.getAttribute('data-pkb-original-style')||'';"
+                + "var joined=original; if(joined&&css&&joined.trim().slice(-1)!==';') joined+=';';"
+                + "this.setAttribute('style', joined+css);"
+                + "this.setAttribute('data-pkb-style','style_modified');"
+                + "this.setAttribute('data-pkb-sentence', sentence);"
+                + "this.setAttribute('data-pkb-css', css);"
+                + "this.setAttribute('data-pkb-highlight', " + jsString(CollabRows.presetOf(css)) + ");"
+                + "return this.getAttribute('data-pkb-style');}";
+    }
+
     private static boolean ranked(String handle) {
         if (handle == null) return false;
         int colon = handle.lastIndexOf(':');
@@ -858,6 +924,10 @@ public final class TargetVerb {
                 failed.body().put("used", effect.used());
                 // A key was sent to the focused node. Only a click or hover that never reached the page is undispatched.
                 failed.body().put("dispatched", "press".equals(kind));
+                if (hiddenByAncestor(node) || !node.displayed) {
+                    failed.body().put("visible", false);
+                    failed.body().put("reason", "hidden: the control is inside a collapsed or hidden container");
+                }
                 stamp(failed.body(), page.session.connection(), node);
                 putEntered(failed.body(), runId, page.session.connection());
                 putShadow(failed.body(), node);
@@ -922,7 +992,7 @@ public final class TargetVerb {
             }
             List<Map<String, Object>> filled = new ArrayList<>();
             boolean all = true;
-            markAgentActing(page.session.connection(), 5000);
+            markActing(page.session.connection(), 5000, runId, true);
             for (int i = 0; i < pairs.size(); i++) {
                 String[] pair = pairs.get(i);
                 DomNode node = nodes.get(i);
@@ -930,7 +1000,7 @@ public final class TargetVerb {
                 if (!Boolean.TRUE.equals(row.get("applied"))) all = false;
                 filled.add(row);
             }
-            markAgentActing(page.session.connection(), AGENT_ACTING_TAIL_MS);
+            markActing(page.session.connection(), AGENT_ACTING_TAIL_MS, runId, true);
             if (!all) {
                 Outcome failed = fail("form-fill", "not applied");
                 failed.body().put("applied", false);
@@ -1034,9 +1104,31 @@ public final class TargetVerb {
      * The mark is a {@code data-pkb-} attribute on the root, which the page watchers already ignore.
      */
     static void markAgentActing(CdpConnection cdp, long ms) {
+        markActing(cdp, ms, "", true);
+    }
+
+    /**
+     * Marks the next {@code ms} as input from run {@code runId}. A human-locked run is the person at the page:
+     * its input is not agent input (guide steps say {@code by=human}, the upload offer appears) and any agent
+     * mark still pending is cleared. The run id rides along so page events name the run that acted.
+     */
+    static void markActing(CdpConnection cdp, long ms, String runId, boolean agent) {
         if (cdp == null) return;
-        evalText(cdp, "", "(function(){try{document.documentElement.setAttribute('data-pkb-agent-acting',String(Date.now()+"
-                + Math.max(0, ms) + "));return '1';}catch(e){return '';}})()");
+        String run = runId == null ? "" : runId.replaceAll("[^A-Za-z0-9._-]", "");
+        long until = Math.max(0, ms);
+        evalText(cdp, "", "(function(){try{var d=document.documentElement;"
+                + (agent ? "d.setAttribute('data-pkb-agent-acting',String(Date.now()+" + until + "));"
+                         : "d.removeAttribute('data-pkb-agent-acting');")
+                + (run.isEmpty() ? "" : "d.setAttribute('data-pkb-acting-run','" + run + "|'+String(Date.now()+" + until + "));")
+                + "return '1';}catch(e){return '';}})()");
+    }
+
+    static boolean humanRun(Path project, String runId) {
+        try {
+            return tools.dscode.common.agentcontrol.HumanLock.locked(project, runId);
+        } catch (RuntimeException unreadable) {
+            return false;
+        }
     }
 
     private static String readField(CdpConnection cdp, DomNode node) {
@@ -1385,9 +1477,10 @@ public final class TargetVerb {
         try {
             ObjectNode params = Jsons.object();
             params.put("expression", "(function(){var l=document.querySelector('pkb-layer[data-pkb-layer]');"
-                    + "var r=l&&l.shadowRoot;var p=r&&r.querySelector('.pkb-panel');"
+                    + "var r=l&&l.shadowRoot;var p=r&&(r.querySelector('section[data-pkb-panel]')||r.querySelector('.pkb-panel'));"
                     + "var want=document.documentElement.getAttribute('data-pkb-panel-want');"
-                    + "if(p) return 'open'; return want==='open'?'pending':'';})()");
+                    + "if(p) return (p.hidden||getComputedStyle(p).display==='none')?'collapsed':'open';"
+                    + "return want==='open'?'pending':'';})()");
             params.put("returnByValue", true);
             return cdp.call("Runtime.evaluate", params, Duration.ofSeconds(3)).path("result").path("value").asText("");
         } catch (RuntimeException failure) {
@@ -1690,6 +1783,7 @@ public final class TargetVerb {
                     return fail("watch", "duration is milliseconds");
                 }
             }
+            duration = Math.min(tools.dscode.control.protocol.LiveSessionAttach.MAX_WAIT_MS, Math.max(0L, duration));
             if (domWatchAsked(args)) {
                 Map<String, String> dom = new LinkedHashMap<>(args);
                 if ("dom".equals(blank(dom.get("kinds")))) dom.remove("kinds");
@@ -2052,7 +2146,7 @@ public final class TargetVerb {
             String before = pageMark(session.connection());
             String signature = "click".equals(kind) ? nodeSignature(session.connection(), "", node) : "";
             // Rows this act causes are source=agent, and the upload offer stays for a person's click.
-            if (!"hover".equals(kind)) markAgentActing(session.connection(), AGENT_ACTING_TAIL_MS);
+            if (!"hover".equals(kind)) markActing(session.connection(), AGENT_ACTING_TAIL_MS, runId, !humanRun(project, runId));
             String probe = "click".equals(kind) ? collabProbe(session.connection(), "", acted, true) : "";
             String keySignature = "press".equals(kind) ? nodeSignature(session.connection(), "", node) : "";
             LiveXPath.use(session.connection());
@@ -2191,8 +2285,9 @@ public final class TargetVerb {
                 + "function(){"
                 + "function chain(outer,node){var cursor=node,hops=0;"
                 + "while(cursor&&hops++<30){if(cursor===outer)return true;"
+                + "if(cursor.parentElement){cursor=cursor.parentElement;continue;}"
                 + "var root=cursor.getRootNode?cursor.getRootNode():null;"
-                + "if(root&&root.host)cursor=root.host;else cursor=cursor.parentElement;}"
+                + "cursor=root&&root.host?root.host:null;}"
                 + "return false;}"
                 + "try{var el=this;if(!el||!el.getBoundingClientRect)return '';"
                 + "var r=el.getBoundingClientRect();if(r.width<1||r.height<1)return '';"
@@ -3309,6 +3404,7 @@ public final class TargetVerb {
             if (!message.contains("not found") && !message.contains("query requires")) throw failure;
         }
         if (query != null && !query.isBlank()) hits.addAll(named(search, query));
+        if (hits.isEmpty() && query != null && !query.isBlank()) hits.addAll(namedWords(search, query));
         return deepest(controlsFor(search, preferControls(preferBody(preferLinks(hits)))));
     }
 
@@ -3381,6 +3477,37 @@ public final class TargetVerb {
             else if (query.equals(attr(node, "placeholder")) || equalsIgnore(query, attr(node, "placeholder"))) addHit(hits, node);
         });
         return hits;
+    }
+
+    /**
+     * Fallback when no name, text, or label matched exactly: the query's words, with {@code -} and {@code _}
+     * read as spaces, appear as a run of whole words in the accessible name, aria-label, placeholder, or text.
+     * {@code Upload} and {@code Upload-File} find "Upload File".
+     */
+    private static List<DomNode> namedWords(DomNode root, String query) {
+        String wanted = wordsOf(query);
+        List<DomNode> hits = new ArrayList<>();
+        if (wanted.isBlank()) return hits;
+        walk(root, node -> {
+            if (node == null || node.nodeType != 1) return;
+            if (wordRun(node.accessibleName, wanted) || wordRun(attr(node, "aria-label"), wanted)
+                    || wordRun(attr(node, "placeholder"), wanted) || wordRun(HtmlTree.textOf(node), wanted)) {
+                addHit(hits, node);
+            }
+        });
+        return hits;
+    }
+
+    static String wordsOf(String text) {
+        if (text == null) return "";
+        return text.toLowerCase(java.util.Locale.ROOT).replaceAll("[-_]+", " ").replaceAll("[^\\p{L}\\p{N} ]+", " ")
+                .replaceAll("\\s+", " ").trim();
+    }
+
+    static boolean wordRun(String name, String wantedWords) {
+        String have = wordsOf(name);
+        if (have.isEmpty() || wantedWords.isEmpty()) return false;
+        return (" " + have + " ").contains(" " + wantedWords + " ");
     }
 
     /** Placeholder and aria-label text inside a control's shadow is the control's name, not a second hit. */
@@ -3668,7 +3795,7 @@ public final class TargetVerb {
                 CHAINS.put(ref, chain);
                 CHAINS.put(shortId, chain);
             }
-            boolean visible = node.displayed && !node.states.contains("hidden");
+            boolean visible = node.displayed && !node.states.contains("hidden") && !hiddenByAncestor(node);
             boolean enabled = !node.states.contains("disabled") && !node.attributes.containsKey("disabled");
             String roleName = role(node);
             String tag = node.tag();
@@ -3975,6 +4102,19 @@ public final class TargetVerb {
      * The same shown-or-not answer {@code explain} puts on {@code report.visible}.
      * A covering mask is not shown. A node with no box yet keeps {@code displayed}.
      */
+    /**
+     * A node under a {@code display:none}, {@code hidden}, or otherwise undisplayed ancestor (through shadow hosts)
+     * is not visible even though its own computed style is. A minimized panel hides its card this way.
+     */
+    static boolean hiddenByAncestor(DomNode node) {
+        int hops = 0;
+        for (DomNode up = node == null ? null : node.parent; up != null && hops++ < 200; up = up.parent) {
+            if (!up.displayed) return true;
+            if (up.attributes != null && up.attributes.containsKey("hidden")) return true;
+        }
+        return false;
+    }
+
     static boolean sameVisibility(DomNode node, boolean covered) {
         if (node == null || covered) return false;
         if (node.states.contains("hidden")) return false;

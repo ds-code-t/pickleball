@@ -1,6 +1,6 @@
 // pickleball DOM change listener (E2b). Called as (send, cfg). send(json) is the push channel:
 // a CDP Runtime binding, a BiDi script.message channel, or a Playwright exposed binding.
-// Pickleball's own surfaces (any element carrying a data-pkb-* attribute, or an id starting with pkb-)
+// Pickleball's own surfaces (any element below <body> carrying a data-pkb-* attribute, or an id starting with pkb-)
 // are left out unless cfg.own is true; their human events arrive as typed collab events instead.
 (function (send, cfg) {
   var key = '__pkbDomWatch_' + cfg.id;
@@ -12,6 +12,9 @@
   function own(node) {
     if (cfg.own) return false;
     for (var e = node && node.nodeType === 1 ? node : node && node.parentElement; e; e = e.parentElement) {
+      // <html> and <body> carry page-wide pickleball markers (data-pkb-sense, data-pkb-panel-want,
+      // data-pkb-agent-acting) on any page pickleball touched; they do not make the whole page own UI.
+      if (e === document.documentElement || e === document.body) break;
       if (e.id && e.id.indexOf('pkb-') === 0) return true;
       if (e.tagName && e.tagName.toLowerCase().indexOf('pkb-') === 0) return true;
       var a = e.attributes;

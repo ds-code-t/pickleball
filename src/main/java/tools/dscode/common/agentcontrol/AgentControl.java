@@ -231,7 +231,18 @@ public final class AgentControl {
                 case "screenshot" -> screenshot(project, values);
                 case "selftest" -> selftest(project, values);
                 case "navigate" -> navigate(project, runId, values, extraArgs, agentId);
-                case "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame", "upload" -> {
+                case "wait" -> {
+                    if (!"new-message".equals(values.get("condition") == null ? "" : values.get("condition").trim())) {
+                        tools.dscode.common.agentfast.TargetVerb.Outcome outcome =
+                                tools.dscode.common.agentfast.TargetVerb.run(project, runId, op, values);
+                        if (outcome.exit() == 0) {
+                            tools.dscode.common.recording.RecordControl.noteAgent(project, runId, op, values, outcome.body());
+                        }
+                        yield new Result(outcome.exit(), outcome.body());
+                    }
+                    yield waitNewMessage(project, runId, values);
+                }
+                case "snap", "find", "act", "form-fill", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame", "upload" -> {
                     tools.dscode.common.agentfast.TargetVerb.Outcome outcome =
                             tools.dscode.common.agentfast.TargetVerb.run(project, runId, op, values);
                     if (outcome.exit() == 0) {
@@ -1046,9 +1057,9 @@ public final class AgentControl {
         long waitMillis = 0;
         if (present(args.get("wait"))) {
             try {
-                waitMillis = Math.min(25_000L, Math.max(0L, (long) (Double.parseDouble(args.get("wait").trim()) * 1000)));
+                waitMillis = tools.dscode.control.protocol.LiveSessionAttach.declaredWaitMs("chat-poll", args);
             } catch (NumberFormatException failure) {
-                return fail(2, "chat-poll --wait is seconds, up to 25");
+                return fail(2, "chat-poll --wait is seconds, up to 120");
             }
         }
         String from = args.get("from");
@@ -1214,6 +1225,57 @@ public final class AgentControl {
         }
     }
 
+    /**
+     * {@code wait --condition=new-message}: the first panel or chat message stored after the wait began from
+     * {@code --from} (default human; any for every non-agent source). Wakes on the push signal the chat store
+     * raises. Does not move the chat cursor; chat-read still lists the message.
+     */
+    private static Result waitNewMessage(Path project, String runId, Map<String, String> args) throws Exception {
+        long timeoutMs;
+        try {
+            timeoutMs = tools.dscode.control.protocol.LiveSessionAttach.declaredWaitMs("wait", args);
+        } catch (NumberFormatException failure) {
+            return fail(2, "wait --timeout is milliseconds (a trailing s is seconds), up to 120000");
+        }
+        String channel = args.get("channel");
+        String from = present(args.get("from")) ? args.get("from").trim() : "human";
+        boolean any = "any".equalsIgnoreCase(from) || "all".equalsIgnoreCase(from);
+        PageSurfaces.drainPanelChat(project, runId);
+        String newest = "0";
+        for (ChatLog.Message message : ChatLog.poll(project, runId, channel, "0")) newest = message.id();
+        long began = System.nanoTime();
+        long deadline = began + timeoutMs * 1_000_000L;
+        while (true) {
+            long wakeSeen = tools.dscode.common.agentfast.PushWake.generation();
+            PageSurfaces.drainPanelChat(project, runId);
+            List<Map<String, Object>> fresh = new ArrayList<>();
+            for (ChatLog.Message message : ChatLog.poll(project, runId, channel, newest)) {
+                if ("agent".equalsIgnoreCase(message.source())) continue;
+                if (!any && (message.source() == null || !from.equalsIgnoreCase(message.source()))) continue;
+                fresh.add(ChatLog.toMap(message));
+            }
+            if (!fresh.isEmpty()) {
+                Map<String, Object> body = ok("new message");
+                body.put("op", "wait");
+                body.put("condition", "new-message");
+                body.put("wake", "push");
+                body.put("message", fresh.get(0));
+                body.put("messages", fresh);
+                body.put("count", fresh.size());
+                body.put("waitedMs", java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - began));
+                return new Result(0, body);
+            }
+            if (System.nanoTime() >= deadline) {
+                Result failed = fail(1, "timeout");
+                failed.body().put("op", "wait");
+                failed.body().put("condition", "new-message");
+                failed.body().put("fix", "wait --condition=new-message again, or chat-read --last=5");
+                return failed;
+            }
+            tools.dscode.common.agentfast.PushWake.await(wakeSeen, 200L, deadline);
+        }
+    }
+
     /** Seconds; a trailing {@code ms} or {@code s} is accepted. Returns milliseconds. */
     static long secondsOrSuffixed(String text) {
         String raw = text.trim().toLowerCase(java.util.Locale.ROOT);
@@ -1302,7 +1364,21 @@ public final class AgentControl {
     }
 
     private static Result highlight(Path project, String runId, Map<String, String> args) throws Exception {
-        if (!present(args.get("handle"))) return fail(2, "highlight requires --handle");
+        if (!present(args.get("handle")) && present(args.get("query"))) {
+            String raw = present(args.get("target")) ? args.get("target").trim() : "browser:auto";
+            String rejected = tools.dscode.common.agentfast.TargetVerb.unavailable(raw);
+            if (rejected != null) {
+                Result failed = fail(1, rejected);
+                failed.body().put("applied", false);
+                return failed;
+            }
+            String preset = present(args.get("preset")) || present(args.get("style")) ? args.get("preset") : "yellow";
+            String css = PageSurfaces.presetCss(preset, args.get("style"));
+            tools.dscode.common.agentfast.TargetVerb.Outcome painted =
+                    tools.dscode.common.agentfast.TargetVerb.highlightQuery(raw, args.get("query").trim(), css, runId);
+            return new Result(painted.exit(), painted.body());
+        }
+        if (!present(args.get("handle"))) return fail(2, "highlight requires --handle or --query");
         String handle = expandHandle(args.get("handle"));
         String target = args.get("target");
         if (present(target)) {

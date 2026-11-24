@@ -135,6 +135,48 @@ class DomPushLiveTest {
         assertTrue(body.path("change").path("targets").toString().contains("ul#list"), done.out);
     }
 
+    /**
+     * Retest R1 (2026-11-24): with the panel open, pickleball marks {@code <html>} (data-pkb-panel-want,
+     * data-pkb-sense, data-pkb-agent-acting). Those page-wide markers must not make every page node own UI:
+     * a real click that changes page text wakes watch, wait --until-change and the browser-events dom stream.
+     */
+    @Test
+    void pageWideMarkersOnHtmlDoNotHideRealMutations() throws Exception {
+        ok("panel-open", "--tab=chat", RUN);
+        eval("(function(){document.documentElement.setAttribute('data-pkb-sense','1');return 'ok';})()");
+        assertEquals("true", eval("String(document.documentElement.hasAttribute('data-pkb-panel-want'))"));
+
+        Future<Capture> watch = pool.submit(() -> run("watch", "--target=browser:auto", "--selector=#counter",
+                "--duration=8000", "--until=change", RUN));
+        Thread.sleep(800);
+        ok("act", "--target=browser:auto", "--kind=click", "--query=Bump", RUN);
+        Capture watched = watch.get(15, TimeUnit.SECONDS);
+        assertEquals(0, watched.code, watched.err + watched.out);
+        assertEquals("push", JSON.readTree(watched.out).path("mode").asText(), watched.out);
+
+        Future<Capture> wait = pool.submit(() -> run("wait", "--target=browser:auto", "--until-change", "--selector=#counter",
+                "--timeout=8000", RUN));
+        Thread.sleep(800);
+        ok("act", "--target=browser:auto", "--kind=click", "--query=Bump", RUN);
+        Capture waited = wait.get(15, TimeUnit.SECONDS);
+        assertEquals(0, waited.code, waited.err + waited.out);
+        assertEquals("push", JSON.readTree(waited.out).path("wake").asText(), waited.out);
+
+        JsonNode started = JSON.readTree(ok("browser-events", "--start", "--dom", "--selector=#counter", RUN).out);
+        long cursor = started.path("cursor").asLong();
+        try {
+            ok("act", "--target=browser:auto", "--kind=click", "--query=Bump", RUN);
+            boolean seen = false;
+            for (int i = 0; i < 10 && !seen; i++) {
+                JsonNode rows = JSON.readTree(ok("browser-events", "--since=" + cursor, "--kinds=dom", "--wait-ms=1000", RUN).out).path("rows");
+                for (JsonNode row : rows) seen |= "mutation".equals(row.path("subkind").asText());
+            }
+            assertTrue(seen, "a real click streams a kind=dom row");
+        } finally {
+            run("browser-events", "--stop", RUN);
+        }
+    }
+
     @Test
     void newControlWaitWakesOnPush() throws Exception {
         Future<Capture> wait = pool.submit(() -> run("wait", "--target=browser:auto", "--condition=new-control", "--timeout=8000", RUN));

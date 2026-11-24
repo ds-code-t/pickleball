@@ -201,9 +201,26 @@
     if (bound) noteDelivered(ev);
     return bound;
   }
+  // The run that acted (set by act for the next moments): page events name it, and say by=agent|human.
+  function actingRun() {
+    try {
+      var raw = document.documentElement.getAttribute('data-pkb-acting-run') || '';
+      var bar = raw.lastIndexOf('|');
+      if (bar > 0 && Date.now() < Number(raw.slice(bar + 1))) return raw.slice(0, bar);
+    } catch (ignored) { /* no root */ }
+    return '';
+  }
   function pushEvent(ev) {
     if (!ev) return false;
     if (!ev.eid) ev.eid = nextEid('e');
+    if (ev.type !== 'mutation') {
+      if (!ev.by) ev.by = actingSource();
+      var run = actingRun();
+      if (run) {
+        if (!ev.run) ev.run = run;
+        if (!ev.sessionId) ev.sessionId = run;
+      }
+    }
     if (ev.type === 'mutation') {
       if (mutationTimer) return false;
       mutationTimer = setTimeout(function () {
@@ -1270,12 +1287,28 @@
     badge.setAttribute('data-pkb-badge', show);
   }
 
+  var finishedGuide = null;
   function stepsList() {
     metaPurpose = 'guide';
     if (!panel) return;
     guideBadge();
     var pane = panel.stepsPane;
     pane.textContent = '';
+    if (!guides.size && finishedGuide) {
+      var done = el('div', 'pkb-guide-done', 'Guide done: ' + finishedGuide.says.length + ' of ' + finishedGuide.says.length + ' steps completed.');
+      done.setAttribute('data-pkb-guide-done', finishedGuide.id);
+      pane.appendChild(done);
+      var doneList = el('ol', 'pkb-steps');
+      finishedGuide.says.forEach(function (say, i) {
+        var row = el('li', 'pkb-step');
+        row.setAttribute('data-state', 'done');
+        row.appendChild(el('span', 'pkb-num', '\u2713'));
+        row.appendChild(el('span', 'pkb-say', say || ('Step ' + (i + 1))));
+        doneList.appendChild(row);
+      });
+      pane.appendChild(doneList);
+      return;
+    }
     if (!guides.size) { pane.appendChild(el('div', 'pkb-empty', 'No guide yet.')); return; }
     guides.forEach(function (g) {
       var list = el('ol', 'pkb-steps');
@@ -1363,6 +1396,7 @@
     g.pulse = true;
     if (g.current >= g.steps.length) {
       pushEvent({type: 'guide', g: g.id, done: true, by: ev.by});
+      finishedGuide = {id: g.id, by: ev.by, says: g.steps.map(function (st) { return st.say || st.t || ''; })};
       guideClose(g.id);
       return;
     }
@@ -1605,6 +1639,7 @@
     } else {
       field = el('input');
       field.type = spec.sensitive ? 'password' : 'text';
+      field.name = 'pkb-answer';
       field.setAttribute('aria-label', String(spec.say || 'Answer'));
       if (spec.placeholder) field.placeholder = String(spec.placeholder);
       node.appendChild(field);
@@ -1641,6 +1676,8 @@
       trail.forEach(function (r) { if (r && r.id === key) row = r; });
       if (!row) { row = {id: key, title: String(title || '').slice(0, 80), at: Date.now()}; trail.push(row); }
       if (row.state === 'answered' && state === 'closed') return;
+      // A re-ask under the same id is a new card: its title is current and the old choice is gone.
+      if (state === 'open') { if (title) row.title = String(title).slice(0, 80); delete row.choice; row.at = Date.now(); }
       row.state = state;
       if (choice) row.choice = String(choice).slice(0, 80);
       row.changed = Date.now();
@@ -2354,6 +2391,8 @@
     var composer = el('form', 'pkb-composer');
     composer.setAttribute('autocomplete', 'off');
     var input = el('textarea');
+    // A name keeps DevTools from filing the panel's own field as a form issue on the host page.
+    input.name = 'pkb-message';
     input.rows = 1;
     input.placeholder = 'Message the agent (Enter to send, Shift+Enter for a new line)';
     input.setAttribute('aria-label', 'Message');
@@ -3375,7 +3414,7 @@
       + '</style></head><body><header><strong>' + title + '</strong>'
       + '<button type="button" id="pkb-popin" data-pkb-meta="true" data-pkb-purpose="' + purpose + '" data-action="popin">Pop in</button></header>'
       + '<div id="pkb-list" data-pkb-meta="true" data-pkb-purpose="' + purpose + '"></div>'
-      + (kind === 'chat' ? '<form id="pkb-composer" data-pkb-meta="true" data-pkb-purpose="' + purpose + '"><textarea aria-label="Message"></textarea><button type="submit" data-pkb-meta="true">Send</button></form>' : '<div data-pkb-meta="true"><button type="button" id="pkb-add" data-pkb-meta="true" data-pkb-purpose="' + purpose + '" data-action="add">Add step</button></div>')
+      + (kind === 'chat' ? '<form id="pkb-composer" data-pkb-meta="true" data-pkb-purpose="' + purpose + '"><textarea name="pkb-message" aria-label="Message"></textarea><button type="submit" data-pkb-meta="true">Send</button></form>' : '<div data-pkb-meta="true"><button type="button" id="pkb-add" data-pkb-meta="true" data-pkb-purpose="' + purpose + '" data-action="add">Add step</button></div>')
       + '<script>' + popScript(kind) + '<\/script></body></html>';
   }
 

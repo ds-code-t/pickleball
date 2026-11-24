@@ -43,6 +43,6 @@ final class ReadMarks {
     }
 
     private static Path file(Path project, String runId) {
-        return AgentStore.root(project, runId).resolve("chat").resolve("read.json");
+        return AgentStore.root(project, ChatLog.scope(project, runId)).resolve("chat").resolve("read.json");
     }
 }

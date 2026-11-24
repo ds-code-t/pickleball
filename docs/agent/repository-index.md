@@ -100,6 +100,13 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-collab-test/human-notes.md`
 - `docs/maintainer/3.0.0-collab-test/plan.md`
 - `docs/maintainer/3.0.0-collab-test/recipe.md`
+- `docs/maintainer/3.0.0-collab-test/retest-2026-11-24/agent-notes.md`
+- `docs/maintainer/3.0.0-collab-test/retest-2026-11-24/findings-2026-11-24.md`
+- `docs/maintainer/3.0.0-collab-test/retest-2026-11-24/helper-brief.md`
+- `docs/maintainer/3.0.0-collab-test/retest-2026-11-24/human-notes.md`
+- `docs/maintainer/3.0.0-collab-test/retest-2026-11-24/plan.md`
+- `docs/maintainer/3.0.0-collab-test/retest-2026-11-24/round2-helper-brief.md`
+- `docs/maintainer/3.0.0-collab-test/retest-2026-11-24/round2-plan.md`
 - `docs/maintainer/3.0.0-composite-v2-design.md`
 - `docs/maintainer/3.0.0-composite-verbs-scoreboard.md`
 - `docs/maintainer/3.0.0-consumer-ready-handoff.md`
@@ -193,6 +200,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/roadmaps/3.0.0-protocols-roadmap.md`
 - `docs/roadmaps/3.0.0-query-visual-roadmap.md`
 - `docs/roadmaps/3.0.0-regression-fixback-e5bffaef.md`
+- `docs/roadmaps/3.0.0-retest-fixes-roadmap.md`
 - `docs/roadmaps/3.0.0-visual-components-roadmap.md`
 - `docs/roadmaps/3.0.0-workbench-edit-roadmap.md`
 - `docs/service-call-scenarios.md`
@@ -765,6 +773,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/launcher/PlaywrightNode.java`
 - `src/main/java/tools/dscode/launcher/ProtoVerbs.java`
 - `src/main/java/tools/dscode/launcher/PwCommand.java`
+- `src/main/java/tools/dscode/launcher/QuietSlf4j.java`
 - `src/main/java/tools/dscode/launcher/QuietWarnings.java`
 - `src/main/java/tools/dscode/launcher/RelaunchWithDebug.java`
 - `src/main/java/tools/dscode/launcher/RunVarOverrides.java`
@@ -934,6 +943,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/browser/JsErrorGateLiveTest.java`
 - `src/test/java/tools/dscode/browser/PlaywrightAdapterTest.java`
 - `src/test/java/tools/dscode/browser/PlaywrightCdpLiveTest.java`
+- `src/test/java/tools/dscode/browser/proto/OwnStorageFilterTest.java`
 - `src/test/java/tools/dscode/browser/proto/SourceMapsTest.java`
 - `src/test/java/tools/dscode/browser/ProtocolSelectorPlaywrightTest.java`
 - `src/test/java/tools/dscode/browser/ProtocolSelectorTest.java`
@@ -1180,10 +1190,12 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/PolishRoadmapTest.java`
 - `src/test/java/tools/dscode/launcher/PopupVerbCoverageTest.java`
 - `src/test/java/tools/dscode/launcher/PwCommandLiveTest.java`
+- `src/test/java/tools/dscode/launcher/QuietSlf4jTest.java`
 - `src/test/java/tools/dscode/launcher/RedirectedFrameTest.java`
 - `src/test/java/tools/dscode/launcher/RefLifetimeTest.java`
 - `src/test/java/tools/dscode/launcher/RefWaitTest.java`
 - `src/test/java/tools/dscode/launcher/Release218RecommendationsTest.java`
+- `src/test/java/tools/dscode/launcher/RetestFixesLiveTest.java`
 - `src/test/java/tools/dscode/launcher/RouteLiveTest.java`
 - `src/test/java/tools/dscode/launcher/ScreencastLiveTest.java`
 - `src/test/java/tools/dscode/launcher/SecretRedactionTest.java`

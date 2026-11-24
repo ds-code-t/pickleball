@@ -12,7 +12,7 @@ public final class ChatHead {
     public static String latest(Path project, String runId) {
         if (project == null || runId == null || runId.isBlank()) return "";
         try {
-            if (!Files.isDirectory(AgentStore.root(project, runId))) return "";
+            if (!Files.isDirectory(AgentStore.root(project, ChatLog.scope(project, runId)))) return "";
             String id = ChatLog.latestId(project, runId, "run");
             return "0".equals(id) ? "" : id;
         } catch (Exception failure) {

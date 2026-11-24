@@ -132,7 +132,25 @@ final class ChatLog {
 
     private static Path file(Path project, String runId, String channel) {
         String safe = channel.replaceAll("[^A-Za-z0-9._-]", "_");
-        return AgentStore.root(project, runId).resolve("chat").resolve(safe + ".jsonl");
+        return AgentStore.root(project, scope(project, runId)).resolve("chat").resolve(safe + ".jsonl");
+    }
+
+    /**
+     * The run whose chat log a caller reads and writes. On a live {@code start} session the panel is one
+     * conversation shared by every run id on it (the agent and a human-locked helper each have their own run id),
+     * so chat is kept under the session id. Without a live session chat stays per run.
+     */
+    static String scope(Path project, String runId) {
+        Path root = project == null ? Path.of("").toAbsolutePath() : project.toAbsolutePath().normalize();
+        Path file = root.resolve(".pickleball").resolve("consumer-session.json");
+        if (!java.nio.file.Files.isRegularFile(file)) return runId;
+        try {
+            JsonNode session = AgentStore.JSON.readTree(java.nio.file.Files.readString(file));
+            String id = session.path("id").asText("");
+            return session.path("live").asBoolean(false) && !id.isBlank() ? id : runId;
+        } catch (IOException | RuntimeException unreadable) {
+            return runId;
+        }
     }
 
     static Map<String, Object> toMap(Message message) {

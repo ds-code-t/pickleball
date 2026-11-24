@@ -89,6 +89,11 @@ class TwoActorRecipeLiveTest {
         System.out.println("chat-turn reply: " + replied.out);
         assertEquals(0, replied.code, replied.err + replied.out);
         assertTrue(replied.out.contains("done"), replied.out);
+        // Retest R2: the helper's own run id reads the same panel conversation and its chat cursor moves.
+        JsonNode read = JSON.readTree(helper("chat-read", "--last=5").out);
+        assertTrue(read.path("items").toString().contains("Type your email"), read.toString());
+        assertTrue(read.path("items").toString().contains("\"done\""), read.toString());
+        assertFalse(read.path("cursors").path("chat").asText().isBlank(), read.toString());
         JsonNode email = JSON.readTree(agent("eval", "--target=browser:auto", "--world=main", "--expr=document.getElementById('email').value").out);
         assertEquals("ann@example.com", email.path("value").asText(), email.toString());
 

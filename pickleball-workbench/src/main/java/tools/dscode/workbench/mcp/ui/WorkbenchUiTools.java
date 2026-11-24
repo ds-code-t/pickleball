@@ -98,7 +98,7 @@ public final class WorkbenchUiTools implements McpCommandContributor {
                 "anyOf", List.of(Map.of("type", "integer"), Map.of("type", "number"), Map.of("type", "string"))
         ));
         properties.put("wait", Map.of(
-                "description", "Seconds to wait for something, up to 25. A number or a string.",
+                "description", "Seconds to wait for something, up to 120. A number or a string.",
                 "anyOf", List.of(Map.of("type", "integer"), Map.of("type", "number"), Map.of("type", "string"))
         ));
         properties.put("chatAfter", Map.of("type", "string", "description", "Chat cursor: chatNext from the last ui_poll."));

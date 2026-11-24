@@ -210,9 +210,9 @@ final class UiBatch {
         long waitMillis = 0;
         if (args.get("wait") != null && !args.get("wait").isBlank()) {
             try {
-                waitMillis = Math.min(25_000L, Math.max(0L, (long) (Double.parseDouble(args.get("wait").trim()) * 1000)));
+                waitMillis = tools.dscode.control.protocol.LiveSessionAttach.declaredWaitMs("ui-poll", args);
             } catch (NumberFormatException failure) {
-                return AgentControl.failure(2, "ui-poll --wait is seconds, up to 25");
+                return AgentControl.failure(2, "ui-poll --wait is seconds, up to 120");
             }
         }
         boolean cursor = args.get("cursor") != null && !args.get("cursor").isBlank();
