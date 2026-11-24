@@ -99,6 +99,51 @@ class HumanViewTest {
         assertEquals(2, ViewMask.evaluations());
     }
 
+    @Test
+    void cacheStaysBoundedAcrossDistinctTrees() {
+        List<DomNode> roots = new ArrayList<>();
+        Map<String, String> flags = human("#b", "same");
+        for (int i = 0; i < 40; i++) {
+            DomNode root = HtmlTree.parse("""
+                    <html data-viewport-w="100" data-viewport-h="100">
+                      <body><button id="b" data-x="10" data-y="10" data-w="20" data-h="20">B%d</button></body>
+                    </html>
+                    """.formatted(i));
+            roots.add(root);
+            Query.run(root, flags);
+        }
+        assertEquals(40, ViewMask.evaluations());
+        assertEquals(ViewMask.CACHE_LIMIT, ViewMask.cachedEntries());
+        Query.run(roots.get(roots.size() - 1), flags);
+        assertEquals(40, ViewMask.evaluations());
+        Query.run(roots.get(0), flags);
+        assertEquals(41, ViewMask.evaluations());
+        assertEquals(ViewMask.CACHE_LIMIT, ViewMask.cachedEntries());
+    }
+
+    @Test
+    void blankDocVersionRecomputesAfterAnInPlaceMutation() {
+        DomNode root = HtmlTree.parse("""
+                <html data-viewport-w="100" data-viewport-h="100">
+                  <body>
+                    <button id="seen" data-x="10" data-y="10" data-w="20" data-h="20">Seen</button>
+                    <button id="below" data-x="10" data-y="200" data-w="20" data-h="20">Below</button>
+                  </body>
+                </html>
+                """);
+        Map<String, String> flags = new LinkedHashMap<>();
+        flags.put("css", "#below");
+        flags.put("exposure", "human");
+        assertEquals(List.of(), ids(Query.run(root, flags)));
+        int once = ViewMask.evaluations();
+        assertEquals(1, once);
+        assertEquals(List.of(), ids(Query.run(root, flags)));
+        assertEquals(once, ViewMask.evaluations());
+        find(root, "below").y = 10;
+        assertEquals(List.of("below"), ids(Query.run(root, flags)));
+        assertEquals(once + 1, ViewMask.evaluations());
+    }
+
     private static Map<String, String> human(String selector, String version) {
         Map<String, String> flags = new LinkedHashMap<>();
         flags.put("css", selector);

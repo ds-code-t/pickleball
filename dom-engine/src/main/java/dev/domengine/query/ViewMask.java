@@ -9,16 +9,22 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Lazy human and full-access views. The human set is computed once per tree and
- * document version. It is not a second stored tree. Full-access leaves the set unset.
+ * Lazy human and full-access views. The human set is computed once per root
+ * object and document version. The cache holds at most {@link #CACHE_LIMIT}
+ * entries and is keyed by the root object, not its identity hash. A blank
+ * document version is stamped from element count and node id and geometry, so
+ * an in-place edit is recomputed. It is not a second stored tree. Full-access
+ * leaves the set unset.
  */
 public final class ViewMask {
     private static final ThreadLocal<Set<String>> ALLOW = new ThreadLocal<>();
-    private static final ConcurrentHashMap<String, Set<String>> CACHE = new ConcurrentHashMap<>();
+    /** Most recent mask last. Each entry is one root object plus one version key. */
+    static final int CACHE_LIMIT = 32;
+    private static final Object CACHE_LOCK = new Object();
+    private static final List<CacheEntry> CACHE = new ArrayList<>();
     private static final AtomicInteger EVALUATIONS = new AtomicInteger();
 
     private ViewMask() {
@@ -27,21 +33,40 @@ public final class ViewMask {
     public static void install(DomNode root, Map<String, String> flags) {
         ALLOW.remove();
         if (!active(flags) || root == null) return;
-        String version = flags.get("doc-version");
-        String key = System.identityHashCode(root) + "\0" + (version == null ? "" : version);
-        Set<String> ids = CACHE.computeIfAbsent(key, ignored -> {
+        String versionKey = versionKey(root, flags.get("doc-version"));
+        synchronized (CACHE_LOCK) {
+            for (int i = 0; i < CACHE.size(); i++) {
+                CacheEntry entry = CACHE.get(i);
+                if (entry.root == root && entry.versionKey.equals(versionKey)) {
+                    CACHE.remove(i);
+                    CACHE.add(entry);
+                    ALLOW.set(entry.ids);
+                    return;
+                }
+            }
             EVALUATIONS.incrementAndGet();
-            return Set.copyOf(compute(root));
-        });
-        ALLOW.set(ids);
+            Set<String> ids = Set.copyOf(compute(root));
+            CACHE.add(new CacheEntry(root, versionKey, ids));
+            while (CACHE.size() > CACHE_LIMIT) CACHE.remove(0);
+            ALLOW.set(ids);
+        }
     }
 
     public static void clear() {
         ALLOW.remove();
     }
 
+    /** Entries currently held. The list is bounded by {@link #CACHE_LIMIT}. */
+    public static int cachedEntries() {
+        synchronized (CACHE_LOCK) {
+            return CACHE.size();
+        }
+    }
+
     public static void resetForTests() {
-        CACHE.clear();
+        synchronized (CACHE_LOCK) {
+            CACHE.clear();
+        }
         ALLOW.remove();
         EVALUATIONS.set(0);
     }
@@ -64,6 +89,66 @@ public final class ViewMask {
             if (hit != null && ids.contains(hit.id())) kept.add(hit);
         }
         return kept;
+    }
+
+    /**
+     * A set document version is the key. A blank version is a stamp of element
+     * count, node ids, and geometry, so a later in-place edit misses the cache.
+     */
+    private static String versionKey(DomNode root, String version) {
+        if (version != null && !version.isBlank()) return "v\0" + version;
+        return "s\0" + stamp(root);
+    }
+
+    private static String stamp(DomNode root) {
+        int[] count = new int[1];
+        long[] hash = new long[1];
+        stampWalk(root, count, hash);
+        return count[0] + ":" + Long.toUnsignedString(hash[0]);
+    }
+
+    private static void stampWalk(DomNode node, int[] count, long[] hash) {
+        if (node == null) return;
+        if (node.nodeType == 1 && !node.shadowRoot) {
+            count[0]++;
+            mix(hash, node.id());
+            mix(hash, node.hasBox ? 1 : 0);
+            mix(hash, node.x);
+            mix(hash, node.y);
+            mix(hash, node.width);
+            mix(hash, node.height);
+            mix(hash, node.hasVisual ? 1 : 0);
+            mix(hash, node.visualX);
+            mix(hash, node.visualY);
+            mix(hash, node.visualWidth);
+            mix(hash, node.visualHeight);
+        }
+        for (DomNode child : node.children) stampWalk(child, count, hash);
+        for (DomNode shadow : node.shadowRoots) stampWalk(shadow, count, hash);
+    }
+
+    private static void mix(long[] hash, String value) {
+        hash[0] = hash[0] * 0x9E3779B97F4A7C15L + (value == null ? 0L : value.hashCode());
+    }
+
+    private static void mix(long[] hash, double value) {
+        hash[0] = hash[0] * 0x9E3779B97F4A7C15L + Double.doubleToLongBits(value);
+    }
+
+    private static void mix(long[] hash, int value) {
+        hash[0] = hash[0] * 0x9E3779B97F4A7C15L + value;
+    }
+
+    private static final class CacheEntry {
+        final DomNode root;
+        final String versionKey;
+        final Set<String> ids;
+
+        CacheEntry(DomNode root, String versionKey, Set<String> ids) {
+            this.root = root;
+            this.versionKey = versionKey;
+            this.ids = ids;
+        }
     }
 
     static boolean active(Map<String, String> flags) {
