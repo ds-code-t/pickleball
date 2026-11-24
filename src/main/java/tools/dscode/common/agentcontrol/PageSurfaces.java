@@ -313,11 +313,27 @@ final class PageSurfaces {
     }
 
     static WebDriver driver() {
+        pruneQuit();
         return driver;
     }
 
     static List<Managed> managed() {
+        pruneQuit();
         return List.copyOf(MANAGED);
+    }
+
+    /** A driver someone quit (session id gone) is no longer a surface; the newest live one becomes current. */
+    private static void pruneQuit() {
+        MANAGED.removeIf(managed -> quit(managed.driver));
+        if (quit(driver)) {
+            driver = MANAGED.isEmpty() ? null : MANAGED.get(MANAGED.size() - 1).driver;
+            focusedTab = null;
+            THREAD_FOCUS.remove();
+        }
+    }
+
+    private static boolean quit(WebDriver webDriver) {
+        return webDriver instanceof RemoteWebDriver remote && remote.getSessionId() == null;
     }
 
     static void clearDriver() {

@@ -220,6 +220,22 @@ Worker-side compilation requires `javax.tools.JavaCompiler`. Workbench sends a J
 
 The control API and bridge intentionally remain independent of MCP, Spring, GUI frameworks, generic project IDE behavior, and build orchestration. Pickleball owns live execution semantics. Workbench is the external controller/adaptation layer and its artifact contains no Pickleball core, behavioral control API, Cucumber, Selenium, or service runtime. The only shared code is the dependency-neutral wire protocol.
 
+## Browser protocol verbs
+
+The protocol host (`tools.dscode.browser.proto.ProtoHost`) serves these verbs for one browser session through Playwright, WebDriver BiDi, CDP or Selenium classic (order and support: [Browser protocols](browser-protocols.md); rows: [Browser events](browser-events.md)). Each is a CLI verb and an MCP `workbench_<verb>` tool, and each reply says `via`.
+
+| Area | Verbs |
+|------|-------|
+| Events | `browser-events`, `errors`, `logpoint`, `observe` (unchanged) |
+| Network | `net`, `net-body`, `har`, `net-route`, `net-unroute`, `net-block`, `net-headers`, `net-auth`, `ws-route`, `net-cache` |
+| Page environment | `security`, `csp`, `emulate`, `clock`, `permissions` |
+| Contexts and pages | `context-new`, `context-list`, `context-close`, `tab-new`, `tab-activate`, `page-history`, `print`, `storage`, `storage-state`, `downloads`, `dialogs`, `drop`, `upload` |
+| Input and locators | `input`, `find-role` (`find --role`), `aria-snap` (`snap --aria`), `aria-act` (`act --aria-ref`), `webauthn`, `extension`, `webmcp` |
+| Performance | `perf`, `memory` |
+| Monitoring | `audits`, `sw` |
+| Recording and sharing | `screencast`, `share-browser` |
+| Opt-in add-ons | `optional-install`, `optional-uninstall`, `optional-list`, `audit`, `bridge` ([Optional installs](optional-installs.md)) |
+
 ## Agent browser control
 
 `POST /v1/agent/command` forwards one agent command to `AgentControl`. The CLI posts page verbs to that same route on the live worker when `.pickleball/workbench/live-bridge.json` names a process that is still alive. `LiveSessionAttach` is that choice for the CLI and for MCP. `--session` on the CLI, or `session` / `sessionId` on an MCP tool, selects the isolate worker or the `start` host with that id. The CLI ignores an id that is neither and uses the current live session. MCP does not. With no live browser the CLI prints one `error: no live browser` and `fix: run start --url= --browser=`. `ui-catalog` and the chat ledger still run in the CLI JVM when no worker is up. The same `AgentControl` class runs inside the worker. Workbench, MCP `workbench_agent_command`, and the bridge do not keep a second implementation. The worker capability is `agent_command`. No active scenario is required. `POST /v1/browser/release` quits the worker's WebDriver before the controller kills the process tree and appends `browser_lost` to `.pickleball/agent-events.jsonl`. That line is host-level: `ui-poll`, `ui-catalog`, and `chat-poll` each return it once per cursor, including when `--run-id` is not the host session and when the poll has no run. A second poll on the same cursor returns none. `session_ended` is returned only to the session that ended.

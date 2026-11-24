@@ -77,6 +77,12 @@ class BrowserEventsBidiLiveTest {
         assertEquals("bidi", started.path("via").asText(), started.toString());
         driver.get(base + "/");
         List<JsonNode> rows = BrowserEventsLiveTest.collect(project, started.path("cursor").asText(), Set.of("nav", "console", "net"));
+        // The page's fetch can land after the first net row under load; keep reading the same stream for it.
+        long deadline = System.currentTimeMillis() + 15_000;
+        while (System.currentTimeMillis() < deadline && rows.stream().noneMatch(r -> r.path("url").asText().endsWith("/api/data"))) {
+            String last = rows.isEmpty() ? started.path("cursor").asText() : rows.get(rows.size() - 1).path("seq").asText();
+            rows.addAll(BrowserEventsLiveTest.collect(project, last, Set.of("net")));
+        }
         assertTrue(rows.stream().anyMatch(r -> "console".equals(r.path("kind").asText()) && r.path("text").asText().contains("hello from page")), rows.toString());
         assertTrue(rows.stream().anyMatch(r -> "net".equals(r.path("kind").asText()) && r.path("url").asText().endsWith("/api/data")), rows.toString());
         assertTrue(rows.stream().anyMatch(r -> "nav".equals(r.path("kind").asText())), rows.toString());

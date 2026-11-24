@@ -12,7 +12,8 @@ Workbench is the one front door. Do not open the GUI for your own testing. While
 
 only change `exec.args`: `-Dexec.args=discover`, `-Dexec.args=isolate`, `execute-step`, `confirm`.
 
-`start --url-key=URL.app --browser=chrome --headed --panel` opens Chrome. Then `chat-turn --text=hi --until=human --timeout=120`, `act --query=Save --pick=1`, `ui-verify`, `doctor`. `call chat-send --args-file=args.json` uses `.pickleball/agent-controller.json`. `execute-steps --file=steps.json --stop-on-fail`. `watch --ref=s1.h1 --until=visible`. `chat_wait` ignores own messages unless `--from=any`. Else `error: no live browser`. `live-stop` leaves a worker. `export-guidance --warm`. `events --follow --until=text=`.
+`start --url-key=URL.app --browser=chrome --headed --panel` opens Chrome. Then `chat-turn --text=hi --until=human --timeout=120`, `act --query=Save --pick=1`, `ui-verify`, `doctor`. `call chat-send --args-file=args.json` uses `.pickleball/agent-controller.json`. `execute-steps --file=steps.json --stop-on-fail`. `watch --ref=s1.h1 --until=visible`. `chat_wait` ignores own messages unless `--from=any`. Else `error: no live browser`. `live-stop` leaves a worker. `export-guidance --warm`. `events --follow --until=text=`. Protocols: `docs/browser-protocols.md`.
+
 
 ### Live isolation loop
 

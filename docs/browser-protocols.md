@@ -1,6 +1,7 @@
 # Browser protocols
 
-Pickleball controls and listens to a browser through four backends:
+Pickleball controls and listens to a browser through four backends. The event stream is in [Browser events](browser-events.md), Playwright attach in [Playwright](playwright.md), and the opt-in axe, Lighthouse and chrome-devtools-mcp add-ons in [Optional installs](optional-installs.md).
+
 
 | Backend | What it is | Browsers |
 |---------|------------|----------|
@@ -33,6 +34,29 @@ doctor --protocols [--cdp-endpoint=<http/ws url|chrome|msedge>] [--bidi-endpoint
 
 prints `protocols=chrome:playwright,bidi,cdp,classic`, then `protocol.backend.<id>=yes <version>|no` and `protocol.capability.<name>=<backend> (also ...)`, `via <backend> only`, or `unsupported`. Plain `doctor` prints the `protocols=` line only. With no flag, doctor uses `pkb_cdp_endpoint` / `pkb_bidi_endpoint`, then this project's live browser. It probes 127.0.0.1 endpoints only.
 
+## Support by browser
+
+As observed by the `doctor --protocols` probes and the live tests on this release's CI box (Chrome 156, Playwright 1.65.1, Selenium 4.54). Firefox is not installed there, so its column comes from the BiDi paths and the rules below, not a live probe.
+
+| Capability | Chrome / Edge | Firefox | Safari |
+|------------|---------------|---------|--------|
+| Event stream (net, console, error, nav, dialog) | Playwright, BiDi, CDP | BiDi | no |
+| Network control, HAR, route, auth | Playwright, BiDi, CDP | BiDi | no |
+| Emulation, clock, permissions | Playwright, BiDi, CDP | BiDi (subset) | no |
+| Contexts, tabs, storage, downloads, uploads, dialogs | Playwright, BiDi, CDP | BiDi | no |
+| Input chains, `find --role` | Playwright, BiDi, CDP | BiDi | no |
+| `aria-snap`, `aria-act` | Playwright | no | no |
+| WebAuthn | Playwright, CDP | no | no |
+| Extensions | BiDi, CDP (needs `--enable-unsafe-extension-debugging`) | BiDi | no |
+| WebMCP | Playwright where the page has it | no | no |
+| Vitals, metrics | Playwright, BiDi, CDP | BiDi | no |
+| Traces, heap snapshot | Playwright, CDP | no | no |
+| Security, audits, service workers, DOM storage rows | CDP | no | no |
+| Screencast | Playwright (webm needs its ffmpeg), CDP frames | BiDi where implemented | no |
+| `share-browser` | Playwright | no | no |
+| `audit --axe` | CDP isolated world, Playwright | no | no |
+| `audit --lighthouse`, `bridge --devtools-mcp` | CDP port, localhost | no | no |
+
 ## Browser rules
 
 - **Chrome 136 and later** ignore `--remote-debugging-port` on the default profile. Use a separate `--user-data-dir`, or the Chrome 144+ route: enable "Allow remote debugging for this browser instance" at `chrome://inspect/#remote-debugging` and attach with `attach --cdp-endpoint=chrome` (see [Playwright](playwright.md)).
@@ -42,4 +66,4 @@ prints `protocols=chrome:playwright,bidi,cdp,classic`, then `protocol.backend.<i
 
 ## Security
 
-A debugging endpoint gives full control of the browser: anything that can reach it can read cookies and drive pages. Pickleball only discovers endpoints on 127.0.0.1, never opens one to the network, logs every attach with tokens redacted, and refuses `relaunch-with-debug` without `--confirm`. Do not expose `--remote-debugging-port` or a BiDi socket beyond localhost.
+A debugging endpoint gives full control of the browser: anything that can reach it can read cookies and drive pages. Pickleball only discovers endpoints on 127.0.0.1, never opens one to the network, logs every attach with tokens redacted, and refuses `relaunch-with-debug` without `--confirm`. Do not expose `--remote-debugging-port` or a BiDi socket beyond localhost. `share-browser` binds Playwright's server to a local pipe or 127.0.0.1 only, and anything on the machine that can reach it can drive the browser. `bridge --devtools-mcp` and `audit --lighthouse` refuse non-loopback endpoints. Secrets (auth credentials, WebAuthn keys, storage values) are redacted in replies, logs and rows; `browser-events --reveal` (control tier) shows storage values from host memory only. Optional add-ons download only from `optional-install <name> --confirm`, from registry.npmjs.org, against pinned SHA-512 integrity.
