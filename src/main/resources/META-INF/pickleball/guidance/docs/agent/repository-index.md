@@ -1580,6 +1580,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/query/OcrRuntime.java`
 - `dom-engine/src/main/java/dev/domengine/query/OnnxOcrRuntime.java`
 - `dom-engine/src/main/java/dev/domengine/query/package-info.java`
+- `dom-engine/src/main/java/dev/domengine/query/Perception.java`
 - `dom-engine/src/main/java/dev/domengine/query/Query.java`
 - `dom-engine/src/main/java/dev/domengine/query/QueryHooks.java`
 - `dom-engine/src/main/java/dev/domengine/query/Relations.java`
@@ -1668,6 +1669,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/query/HumanViewTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/NegativeRelationTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/OcrHookTest.java`
+- `dom-engine/src/test/java/dev/domengine/query/PerceptionTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/QueryLayerBoundaryTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/RelationTermParseTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/RelationTermTest.java`

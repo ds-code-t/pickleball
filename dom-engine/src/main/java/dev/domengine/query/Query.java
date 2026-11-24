@@ -183,6 +183,15 @@ public final class Query {
                     one.put("weight", term.weight());
                 }
             }
+            ArrayNode perceived = null;
+            for (DomNode node : current) {
+                String decided = ViewMask.stage(node);
+                if (decided == null) continue;
+                if (perceived == null) perceived = result.putArray("perceived");
+                ObjectNode one = perceived.addObject();
+                one.put("id", node.id());
+                one.put("perceived", decided);
+            }
             result.set("rank", QueryHooks.explainRank(flags));
             result.put("premap", QueryHooks.premapStatus());
         }
