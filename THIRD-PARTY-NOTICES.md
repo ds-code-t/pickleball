@@ -27,6 +27,9 @@ The following components are licensed under the Apache License 2.0:
 - com.epam.reportportal:client-java:5.4.8
 
 - org.seleniumhq.selenium:selenium-java:[4.44,5.0)
+- com.microsoft.playwright:playwright:1.65.1, com.microsoft.playwright:driver:1.65.1, com.microsoft.playwright:driver-bundle:1.65.1
+  (normal POM dependencies, not shaded into the pickleball jar; driver-bundle carries a Node.js binary under the
+  Node.js license, https://github.com/nodejs/node/blob/main/LICENSE, with Node's own bundled third-party notices)
 - org.apache.poi:poi-ooxml:5.5.1
 
 - com.googlecode.aviator:aviator:5.4.3

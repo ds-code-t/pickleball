@@ -168,6 +168,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/browser/JdkWebSocket.java`
 - `src/main/java/tools/dscode/browser/JsonRpc.java`
 - `src/main/java/tools/dscode/browser/PlaywrightAdapter.java`
+- `src/main/java/tools/dscode/browser/PlaywrightConnection.java`
 - `src/main/java/tools/dscode/browser/ProtocolSelector.java`
 - `src/main/java/tools/dscode/browser/ProtocolSocket.java`
 - `src/main/java/tools/dscode/browser/ProtocolSockets.java`
@@ -751,6 +752,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/browser/CdpAdapterTest.java`
 - `src/test/java/tools/dscode/browser/FacadeContractTest.java`
 - `src/test/java/tools/dscode/browser/PlaywrightAdapterTest.java`
+- `src/test/java/tools/dscode/browser/PlaywrightCdpLiveTest.java`
+- `src/test/java/tools/dscode/browser/ProtocolSelectorPlaywrightTest.java`
 - `src/test/java/tools/dscode/browser/ProtocolSelectorTest.java`
 - `src/test/java/tools/dscode/browser/ScriptedSocket.java`
 - `src/test/java/tools/dscode/browser/SurfaceAssetsTest.java`

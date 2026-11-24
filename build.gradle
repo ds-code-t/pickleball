@@ -190,14 +190,11 @@ dependencies {
     }
     testImplementation('org.seleniumhq.selenium:htmlunit3-driver:4.44.0')
 
-    // Optional scripted library. Not selected by ProtocolSelector.forDriver.
-    // compileOnly so a Selenium-only runtime does not download Playwright.
-    // The wide range is the locked G1 constraint.
-    compileOnly('com.microsoft.playwright:playwright') {
-        version { strictly '[1.40.0, 2.0.0)' }
-    }
-    testImplementation('com.microsoft.playwright:playwright') {
-        version { strictly '[1.40.0, 2.0.0)' }
+    // D12: Playwright for Java (+ driver-bundle with its bundled Node) is a normal implementation dependency,
+    // listed in the published POM and never shaded into pickleball's jar (verifyPlaywrightPackaging).
+    // Pinned inside the locked G1 range. Pickleball never downloads Playwright browsers.
+    implementation('com.microsoft.playwright:playwright') {
+        version { strictly '[1.40.0, 2.0.0)'; prefer '1.65.1' }
     }
 
     implementation files('libs/xpathy-3.0.0.jar')
@@ -683,7 +680,36 @@ tasks.register('verifySqlitePackaging') {
     }
 }
 
+tasks.register('verifyPlaywrightPackaging') {
+    group = 'verification'
+    description = 'Playwright is a POM dependency and is not inside the consumer shadow JAR (D12).'
+    dependsOn tasks.named('generatePomFileForMavenPublication'), tasks.named('shadowJar')
+    doLast {
+        def pomFile = layout.buildDirectory.file('publications/maven/pom-default.xml').get().asFile
+        def pom = pomFile.text
+        ['playwright', 'driver-bundle', 'driver'].each { artifact ->
+            if (!(pom =~ /<groupId>com\.microsoft\.playwright<\/groupId>\s*<artifactId>${artifact}<\/artifactId>/)) {
+                throw new GradleException('Published Pickleball POM must list com.microsoft.playwright:' + artifact)
+            }
+        }
+        def jar = tasks.named('shadowJar').get().archiveFile.get().asFile
+        def zip = new java.util.zip.ZipFile(jar)
+        try {
+            def hit = zip.entries().find { entry ->
+                entry.name.startsWith('com/microsoft/playwright/') || entry.name.startsWith('driver/')
+                        || entry.name.contains('playwright-driver') || entry.name.contains('driver-bundle')
+            }
+            if (hit != null) {
+                throw new GradleException('Consumer shadow JAR must not ship Playwright or its driver bundle: ' + hit.name)
+            }
+        } finally {
+            zip.close()
+        }
+    }
+}
+
 tasks.named('test') {
+    dependsOn tasks.named('verifyPlaywrightPackaging')
     testLogging {
         events 'failed'
         exceptionFormat 'full'
