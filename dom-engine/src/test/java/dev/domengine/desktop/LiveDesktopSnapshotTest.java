@@ -41,6 +41,9 @@ class LiveDesktopSnapshotTest {
         assertTrue(WindowsUia.captureScript().contains("UIAutomationClient"));
         assertTrue(WindowsUia.captureScript().contains("LabeledBy"));
         assertTrue(WindowsUia.captureScript().contains("IsOffscreen"));
+        assertTrue(WindowsUia.captureScript().contains("AutomationId"));
+        assertTrue(WindowsUia.captureScript().contains("ClassName"));
+        assertTrue(WindowsUia.captureScript().contains("HelpText"));
         assertTrue(MacAccessibility.captureScript().contains("System Events"));
         assertTrue(MacAccessibility.captureScript().contains("AXTitleUIElement"));
         assertTrue(MacAccessibility.captureScript().contains("focused"));

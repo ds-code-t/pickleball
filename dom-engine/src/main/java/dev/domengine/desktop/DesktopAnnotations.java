@@ -24,6 +24,15 @@ final class DesktopAnnotations {
                 DomNode node = byId.get(parts[1]);
                 if (node == null) continue;
                 for (String state : parts[2].split(",")) add(node, state.trim());
+            } else if (line.startsWith("ATTR\t")) {
+                String[] parts = line.split("\t", 4);
+                if (parts.length < 4) continue;
+                DomNode node = byId.get(parts[1]);
+                if (node == null) continue;
+                String key = parts[2].trim().toLowerCase(Locale.ROOT);
+                String value = parts[3].trim();
+                if (key.isBlank() || value.isBlank()) continue;
+                node.attributes.put(key, value);
             } else if (line.startsWith("REL\t")) {
                 String[] parts = line.split("\t", 4);
                 if (parts.length < 4) continue;

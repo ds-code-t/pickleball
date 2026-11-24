@@ -154,6 +154,13 @@ class SnapshotCoverageTest {
         JsonNode json = DesktopSnapshotProducer.produce(named, Map.of("screenshot", png.toString()));
         assertParts(json, platform, "fixture");
         assertEquals("a11y-xml", json.path("source").path("kind").asText());
+        assertEquals(2, json.path("version").asInt());
+        assertEquals("html-ish", json.path("canonical").path("kind").asText());
+        assertEquals(json.path("source").path("text").asText(), json.path("canonical").path("side").path("a11y_xml").asText());
+        assertEquals("data-pkb-native-path", json.path("canonical").path("side").path("native_path_attr").asText());
+        String html = json.path("canonical").path("frames").path(0).path("html").asText();
+        assertTrue(html.contains("role=\"window\""), html);
+        assertTrue(html.contains(">Save<"), html);
     }
 
     private static void liveCdp(String binary, String platform, String also, String marker) throws Exception {

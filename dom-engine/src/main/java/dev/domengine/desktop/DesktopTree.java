@@ -180,6 +180,32 @@ public final class DesktopTree {
             node.height = json.path("height").asDouble();
             node.hasBox = node.width > 0 && node.height > 0;
         }
+        copyFixture(json, node, "automationId", "automation-id");
+        copyFixture(json, node, "automation-id", "automation-id");
+        copyFixture(json, node, "className", "class-name");
+        copyFixture(json, node, "class-name", "class-name");
+        copyFixture(json, node, "helpText", "help-text");
+        copyFixture(json, node, "help-text", "help-text");
+        copyFixture(json, node, "platformRole", "platform-role");
+        copyFixture(json, node, "platform-role", "platform-role");
+        copyFixture(json, node, "text", "text");
+        copyFixture(json, node, "uia-runtime-id", "uia-runtime-id");
+        copyFixture(json, node, "ax-path", "ax-path");
+        copyFixture(json, node, "atspi-path", "atspi-path");
+        copyFixture(json, node, "backend", "desktop-backend");
+        JsonNode extra = json.get("attributes");
+        if (extra != null && extra.isObject()) {
+            extra.fields().forEachRemaining(entry -> node.attributes.put(entry.getKey(), entry.getValue().asText("")));
+        }
+        JsonNode states = json.get("states");
+        if (states != null && states.isArray()) {
+            for (JsonNode state : states) {
+                String name = state.asText("");
+                if (name.isBlank() || node.states.contains(name)) continue;
+                node.states.add(name);
+                if ("offscreen".equals(name) || "hidden".equals(name)) node.displayed = false;
+            }
+        }
         node.backendNodeId = json.path("id").asLong(0);
         JsonNode children = json.get("children");
         if (children != null && children.isArray()) {
@@ -190,6 +216,12 @@ public final class DesktopTree {
             renumber(node, new long[] {1});
         }
         return node;
+    }
+
+    private static void copyFixture(JsonNode json, DomNode node, String from, String to) {
+        if (!json.has(from) || json.get(from).isNull()) return;
+        String value = json.get(from).asText("");
+        if (!value.isBlank()) node.attributes.put(to, value);
     }
 
     private static void renumber(DomNode node, long[] next) {
