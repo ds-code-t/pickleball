@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Adapter re-resolve forwards a v2 identity chain and leaves a chain-less node alone. */
+/** The forwarder logs a v2 identity chain and leaves a chain-less node alone. Nothing else calls it. */
 class IdentityReplayAdapterTest {
     @TempDir
     Path temp;

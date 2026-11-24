@@ -35,8 +35,9 @@ import tools.dscode.common.reporting.logging.LogForwarder;
  * the five-space view, and {@code INFO geometry real} or {@code INFO geometry fallback}.
  * {@code adapter} writes the same choice as {@code INFO adapter geometry real}
  * or {@code INFO adapter geometry fallback}.
- * {@code identity} writes {@code INFO identity replay matched=<kind>} when a v2
- * node that carries an identity chain is re-resolved. A node with no chain does not log.
+ * {@code identity} writes {@code INFO identity replay matched=<kind>} when
+ * {@code DomCompositeAdapter.replayIdentity} is called with a chain. No
+ * production path calls it. A node with no chain does not log.
  * {@code batch} writes one TRACE line per describe:
  * {@code TRACE batch mode=<composite|selenium-batch|selenium-legacy> selector=<by> nodes=<count> durationMs=<n>}.
  * There is no per-element line. {@code position} writes
