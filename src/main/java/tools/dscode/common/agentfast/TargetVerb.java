@@ -296,6 +296,7 @@ public final class TargetVerb {
                 case "snap" -> snap(project, runId, target, values);
                 case "find" -> find(project, runId, target, values);
                 case "act" -> withPick(act(project, runId, target, values));
+                case "upload" -> withPick(act(project, runId, target, uploadArgs(values)));
                 case "form-fill" -> formFill(project, runId, target, values);
                 case "wait", "wait-for" -> wait(project, runId, target, values);
                 case "watch" -> watch(project, runId, target, values);
@@ -323,7 +324,7 @@ public final class TargetVerb {
     /** Page verbs with no selector use the browser this process already has open. */
     private static boolean needsLiveTarget(String verb) {
         return switch (verb == null ? "" : verb) {
-            case "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "eval" -> true;
+            case "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "eval", "upload" -> true;
             default -> false;
         };
     }
@@ -424,6 +425,100 @@ public final class TargetVerb {
         markBudget(body, args);
         stampDesktop(body, session);
         return ok(body);
+    }
+
+    /** {@code upload --ref= --file=}: the same act, kind attach. */
+    private static Map<String, String> uploadArgs(Map<String, String> values) {
+        Map<String, String> args = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : values.entrySet()) {
+            if (ACT_KEYS.contains(entry.getKey())) args.put(entry.getKey(), entry.getValue());
+        }
+        args.put("kind", "attach");
+        if (blank(args.get("file")).isBlank()) throw new Miss("upload needs --file=<path>");
+        return args;
+    }
+
+    /**
+     * {@code act --kind=attach}: {@code DOM.setFileInputFiles} on the file input this control names (itself, its
+     * label's control, an input inside it, or the page's single file input for an Upload or Attach control).
+     * Every path must exist. Applied follows {@code input.files}.
+     */
+    private static Effect attachFiles(BrowserSession session, DomNode node, String raw) {
+        DomNode input = fileInputFor(node);
+        if (input == null) throw new Miss("no file input for this control");
+        List<String> paths = new ArrayList<>();
+        for (String part : (raw == null ? "" : raw).split("[,\\n]")) {
+            String path = part.trim();
+            if (path.isEmpty()) continue;
+            java.nio.file.Path file = java.nio.file.Path.of(path).toAbsolutePath().normalize();
+            if (!java.nio.file.Files.isRegularFile(file)) throw new Miss("file not found: " + path);
+            paths.add(file.toString());
+        }
+        if (paths.isEmpty()) throw new Miss("attach needs --value=<path> or --file=<path>");
+        if (paths.size() > 1 && !input.attributes.containsKey("multiple")) throw new Miss("this file input takes one file");
+        CdpConnection cdp = session.connection();
+        String sessionId = input.cdpSession == null ? "" : input.cdpSession;
+        ObjectNode params = Jsons.object();
+        com.fasterxml.jackson.databind.node.ArrayNode files = params.putArray("files");
+        for (String path : paths) files.add(path);
+        params.put("backendNodeId", input.backendNodeId);
+        if (sessionId.isBlank()) cdp.call("DOM.setFileInputFiles", params, Duration.ofSeconds(10));
+        else cdp.call("DOM.setFileInputFiles", params, sessionId, Duration.ofSeconds(10));
+        List<String> names = new ArrayList<>();
+        try {
+            ObjectNode resolve = Jsons.object();
+            resolve.put("backendNodeId", input.backendNodeId);
+            JsonNode resolved = sessionId.isBlank()
+                    ? cdp.call("DOM.resolveNode", resolve, Duration.ofSeconds(5))
+                    : cdp.call("DOM.resolveNode", resolve, sessionId, Duration.ofSeconds(5));
+            ObjectNode call = Jsons.object();
+            call.put("objectId", resolved.path("object").path("objectId").asText(""));
+            call.put("functionDeclaration", "function(){return Array.from(this.files||[]).map(function(f){return f.name;});}");
+            call.put("returnByValue", true);
+            JsonNode value = (sessionId.isBlank()
+                    ? cdp.call("Runtime.callFunctionOn", call, Duration.ofSeconds(5))
+                    : cdp.call("Runtime.callFunctionOn", call, sessionId, Duration.ofSeconds(5))).path("result").path("value");
+            if (value.isArray()) for (JsonNode name : value) names.add(name.asText(""));
+        } catch (RuntimeException ignored) {
+            // No read-back: the files were sent and applied stays unknown.
+            return Effect.unknown("cdp");
+        }
+        Map<String, Object> note = PICKED.get() == null ? new LinkedHashMap<>() : PICKED.get();
+        note.put("files", names);
+        note.put("input", inputLabel(input));
+        PICKED.set(note);
+        return names.size() == paths.size() ? Effect.changed("cdp") : Effect.quiet("cdp");
+    }
+
+    private static String inputLabel(DomNode input) {
+        String id = attr(input, "id");
+        if (!id.isBlank()) return "#" + id;
+        String name = attr(input, "name");
+        return name.isBlank() ? "input[type=file]" : "input[name=" + name + "]";
+    }
+
+    /** The file input a control stands for, or null. */
+    static DomNode fileInputFor(DomNode node) {
+        if (node == null) return null;
+        if (isFileInput(node)) return node;
+        DomNode root = node;
+        while (root.parent != null) root = root.parent;
+        List<DomNode> inside = new ArrayList<>();
+        walk(node, child -> { if (isFileInput(child)) inside.add(child); });
+        if (inside.size() == 1) return inside.get(0);
+        String forId = "label".equals(node.tag()) ? attr(node, "for") : "";
+        List<DomNode> all = new ArrayList<>();
+        walk(root, child -> { if (isFileInput(child)) all.add(child); });
+        if (!forId.isBlank()) {
+            for (DomNode candidate : all) if (forId.equals(attr(candidate, "id"))) return candidate;
+        }
+        String label = (name(node) + " " + attr(node, "aria-label")).toLowerCase(Locale.ROOT);
+        if ((label.contains("upload") || label.contains("attach")) && all.size() == 1) return all.get(0);
+        return null;
+    }
+
+    private static boolean isFileInput(DomNode node) {
+        return node != null && "input".equals(node.tag()) && "file".equalsIgnoreCase(attr(node, "type"));
     }
 
     /** Candidates and the pick reason for the act running on this thread, added to its reply. */
@@ -1654,6 +1749,7 @@ public final class TargetVerb {
         String kind = blank(args.get("kind"));
         if (kind.isBlank()) kind = "click";
         String value = blank(args.get("value"));
+        if ("attach".equals(kind)) return attachFiles(session, node, value.isBlank() ? blank(args.get("file")) : value);
         String verb = switch (kind) {
             case "type" -> "type";
             case "hover" -> "hover";
@@ -1703,6 +1799,8 @@ public final class TargetVerb {
             }
             String before = pageMark(session.connection());
             String signature = "click".equals(kind) ? nodeSignature(session.connection(), "", node) : "";
+            // Rows this act causes are source=agent, and the upload offer stays for a person's click.
+            if (!"hover".equals(kind)) markAgentActing(session.connection(), AGENT_ACTING_TAIL_MS);
             String probe = "click".equals(kind) ? collabProbe(session.connection(), "", acted, true) : "";
             String keySignature = "press".equals(kind) ? nodeSignature(session.connection(), "", node) : "";
             LiveXPath.use(session.connection());

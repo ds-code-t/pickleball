@@ -244,6 +244,42 @@ class CollabFixesLiveTest {
         assertTrue(snap.path("recent").toString().contains("ask-m1"), snap.toString());
     }
 
+    @Test
+    @Timeout(value = 120, unit = TimeUnit.SECONDS)
+    void covers_command_upload() throws Exception {
+        start(page("c6.html", """
+                <button id="up" type="button">Upload File</button>
+                <input id="doc" type="file" multiple style="display:none">
+                """), "c6");
+        Path a = Files.writeString(temp.resolve("a.txt"), "alpha");
+        Path b = Files.writeString(temp.resolve("b.txt"), "beta");
+
+        Capture attached = run("act", "--target=browser:auto", "--query=Upload File", "--kind=attach", "--value=" + a, "--run-id=c6");
+        assertEquals(0, attached.code, attached.err + attached.out);
+        JsonNode body = JSON.readTree(attached.out);
+        assertEquals("true", body.path("applied").asText(), attached.out);
+        assertEquals("a.txt", body.path("files").get(0).asText(), attached.out);
+        assertEquals("a.txt", eval("document.getElementById('doc').files[0].name", "c6"));
+
+        Capture both = run("upload", "--target=browser:auto", "--query=Upload File", "--file=" + a, "--file=" + b, "--run-id=c6");
+        assertEquals(0, both.code, both.err + both.out);
+        assertEquals("2", eval("document.getElementById('doc').files.length + ''", "c6"));
+
+        Capture missing = run("upload", "--target=browser:auto", "--query=Upload File", "--file=" + temp.resolve("nope.txt"), "--run-id=c6");
+        assertNotEquals(0, missing.code, missing.out);
+        assertTrue(missing.out.contains("file not found"), missing.out);
+
+        // A person's click on the Upload File control offers the hand-off; its click posts upload-request.
+        eval("document.getElementById('up').click(), 'ok'", "c6");
+        Thread.sleep(300);
+        Capture offer = run("find", "--target=browser:auto", "--purpose=request-upload", "--run-id=c6");
+        assertEquals(0, offer.code, offer.err + offer.out);
+        assertTrue(offer.out.contains("Ask agent to attach a file"), offer.out);
+        assertEquals(0, run("act", "--target=browser:auto", "--purpose=request-upload", "--kind=click", "--run-id=c6").code);
+        Capture polled = run("ui-poll", "--after=0", "--run-id=c6");
+        assertTrue(polled.out.contains("upload-request") && polled.out.contains("#doc"), polled.out);
+    }
+
     static String pane() {
         return "document.querySelector('pkb-layer').shadowRoot";
     }

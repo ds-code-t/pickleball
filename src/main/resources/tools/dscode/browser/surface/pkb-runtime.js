@@ -3303,6 +3303,73 @@
     popIn: function (kind) { return popIn(kind || 'editor'); }
   };
 
+  // ---- Upload hand-off (C6) ----
+  // A person who clicks a file input, or an Upload/Attach control that stands for one, is offered
+  // "Ask agent to attach a file". That button posts upload-request with the input's ref and label;
+  // the agent answers with act --kind=attach or upload. The native picker still opens as usual.
+  var uploadOffer = null;
+  var uploadSeq = 0;
+  function uploadInputFor(node) {
+    if (!node || !node.closest) return null;
+    if (node.matches && node.matches('input[type=file]')) return {input: node, control: node};
+    var label = node.closest('label');
+    if (label) {
+      var c = label.control || (label.htmlFor ? document.getElementById(label.htmlFor) : null);
+      if (c && c.matches && c.matches('input[type=file]')) return {input: c, control: label};
+    }
+    var ctl = node.closest('button,[role="button"],a,label');
+    if (!ctl) return null;
+    var name = String(ctl.getAttribute('aria-label') || ctl.textContent || '').trim();
+    if (!/upload|attach/i.test(name)) return null;
+    var inner = ctl.querySelector ? ctl.querySelector('input[type=file]') : null;
+    if (inner) return {input: inner, control: ctl};
+    var all = document.querySelectorAll('input[type=file]');
+    return all.length === 1 ? {input: all[0], control: ctl} : null;
+  }
+  function uploadLabel(found) {
+    var input = found.input;
+    var text = (input.labels && input.labels[0] && input.labels[0].textContent) || input.getAttribute('aria-label')
+      || (found.control !== input ? found.control.getAttribute('aria-label') || found.control.textContent : '') || input.name || 'file';
+    return String(text).replace(/\s+/g, ' ').trim().slice(0, 80);
+  }
+  function offerUpload(event) {
+    var leaf = eventLeaf(event);
+    if (!leaf || ours(leaf) || (leaf.closest && leaf.closest(OWN))) return;
+    if (actingSource() === 'agent') return;
+    var found = uploadInputFor(leaf);
+    if (!found) return;
+    var input = found.input;
+    var ref = input.id ? '#' + input.id : (input.getAttribute('data-pkb-handle') || '');
+    if (!ref) {
+      ref = 'upload-' + (++uploadSeq);
+      input.setAttribute('data-pkb-handle', ref);
+    }
+    var label = uploadLabel(found);
+    var root = ensureLayer();
+    if (uploadOffer && uploadOffer.parentNode) uploadOffer.remove();
+    metaPurpose = 'callout';
+    var btn = el('button', 'pkb-upload-ask', 'Ask agent to attach a file');
+    btn.type = 'button';
+    tagMeta(btn, 'request-upload');
+    btn.setAttribute('data-pkb-upload-ref', ref);
+    var r = (found.control.getBoundingClientRect ? found.control : input).getBoundingClientRect();
+    btn.style.cssText = 'position:fixed;left:' + Math.round(Math.max(4, r.left)) + 'px;top:' + Math.round(r.bottom + 6)
+      + 'px;pointer-events:auto;z-index:2147483647;font:13px system-ui,sans-serif;padding:4px 10px;border-radius:6px;'
+      + 'border:1px solid #2563eb;background:#eff6ff;color:#1e3a8a;cursor:pointer;';
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      pushEvent({type: 'upload-request', ref: ref, label: label, name: input.name || '', multiple: !!input.multiple});
+      btn.textContent = 'Asked the agent to attach a file';
+      btn.disabled = true;
+      setTimeout(function () { if (btn.parentNode) btn.remove(); }, 8000);
+    });
+    isolateKeys(btn);
+    root.appendChild(btn);
+    uploadOffer = btn;
+  }
+  try { document.addEventListener('click', offerUpload, true); } catch (ignored) { /* no document */ }
+
   var docVersion = 0;
   var docWatchers = [];
   function bumpDoc() {

@@ -160,7 +160,7 @@ public final class WorkbenchAgentCommands {
                      "capture-steps",
                      "record",
                      "screenshot", "selftest",
-                     "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame",
+                     "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame", "upload",
                      "ask-and-wait", "answer-wait", "pin", "toast", "checklist", "ui", "ref",
                      "chat-turn", "ui-verify" ->
                         agentControl(parsed, safeOut, safeErr);
@@ -1984,6 +1984,9 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "until");
         copyFlag(args, parsed, "events");
         copyFlag(args, parsed, "file");
+        // upload --file=a --file=b is one list; a single --file stays as it was.
+        String files = joinedFlag(parsed, "--file");
+        if (files != null && files.contains(",")) args.put("file", files);
         copyFlag(args, parsed, "cdp");
         copyFlag(args, parsed, "session");
         copyFlag(args, parsed, "wait-ms");
@@ -2349,6 +2352,20 @@ public final class WorkbenchAgentCommands {
             if (name.equals(token) && index + 1 < args.length) return args[index + 1];
         }
         return null;
+    }
+
+    /** Every value of a repeated flag, comma-joined; null when the flag is absent. */
+    private static String joinedFlag(WorkbenchCommandLine.Parsed parsed, String name) {
+        String[] args = parsed.forwarded();
+        if (args == null) return null;
+        List<String> values = new ArrayList<>();
+        for (int index = 0; index < args.length; index++) {
+            String token = args[index];
+            if (token == null) continue;
+            if (token.startsWith(name + "=")) values.add(token.substring(name.length() + 1));
+            else if (name.equals(token) && index + 1 < args.length) values.add(args[index + 1]);
+        }
+        return values.isEmpty() ? null : String.join(",", values);
     }
 
     /** Bare {@code --async} is true. {@code --async=false} stays off. The next token is not the value. */

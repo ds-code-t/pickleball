@@ -227,7 +227,7 @@ public final class AgentControl {
                 case "ui-catalog" -> uiCatalog(project, runId, values, agentId);
                 case "screenshot" -> screenshot(project, values);
                 case "selftest" -> selftest(project, values);
-                case "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame" -> {
+                case "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame", "upload" -> {
                     tools.dscode.common.agentfast.TargetVerb.Outcome outcome =
                             tools.dscode.common.agentfast.TargetVerb.run(project, runId, op, values);
                     if (outcome.exit() == 0) {
