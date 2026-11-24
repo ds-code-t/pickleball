@@ -834,6 +834,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/composite/GeometryViewTest.java`
 - `src/test/java/tools/dscode/common/composite/IdentityReplayAdapterTest.java`
 - `src/test/java/tools/dscode/common/composite/LeanWaitNestLiveTest.java`
+- `src/test/java/tools/dscode/common/composite/live/CompositeSeleniumParityLiveTest.java`
 - `src/test/java/tools/dscode/common/composite/live/JavaEngineAdapterLiveTest.java`
 - `src/test/java/tools/dscode/common/composite/live/JavaEngineFlagsLiveTest.java`
 - `src/test/java/tools/dscode/common/composite/live/JavaEngineXPathLiveTest.java`

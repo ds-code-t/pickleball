@@ -502,6 +502,8 @@ public final class Query {
     static ObjectNode compositeJson(DomNode node, boolean geometry) {
         ObjectNode json = Jsons.object();
         json.put("id", node.id());
+        if (node.nodeName != null && !node.nodeName.isBlank()) json.put("node_name", node.nodeName.toLowerCase(java.util.Locale.ROOT));
+        if (node.liveState != null && node.liveState.path("value").isTextual()) json.put("value", node.liveState.path("value").asText());
         if (node.hasBox) json.set("bounds", box(node.x, node.y, node.width, node.height));
         String role = roleOf(node);
         if (!role.isEmpty()) json.put("role", role);
