@@ -7,6 +7,7 @@ docs/agent/prompt-examples.md
 docs/agent/repository-index.md
 docs/ai-run-configuration.md
 docs/block-conditionals.md
+docs/browser-protocols.md
 docs/collaborative-recording.md
 docs/collaborative-self-test.md
 docs/component-scenarios.md

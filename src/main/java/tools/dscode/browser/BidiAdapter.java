@@ -13,6 +13,8 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Firefox path. WebDriver BiDi over our own socket:
  * {@code script.addPreloadScript}, sandboxed {@code script.callFunction}, and channels.
+ * {@link #modules()} exposes the full module set (browsingContext, network, script, input, storage, browser,
+ * emulation, permissions, webExtension) as thin typed wrappers.
  */
 public final class BidiAdapter implements BrowserFacade {
     private final JsonRpc rpc;
@@ -53,6 +55,11 @@ public final class BidiAdapter implements BrowserFacade {
     @Override
     public String protocol() {
         return "bidi";
+    }
+
+    /** Every BiDi module over this adapter's socket (E1). Unknown commands raise {@link UnsupportedProtocolOperation}. */
+    public BidiModules modules() {
+        return new BidiModules(rpc::call);
     }
 
     @Override

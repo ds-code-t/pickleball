@@ -143,6 +143,19 @@ Playwright for Java 1.65.1 (Apache-2.0) and its `driver-bundle` (Apache-2.0, wit
 
 Consumer download size: the three Playwright artifacts on the runtime classpath are 232,943,839 bytes (about 233 MB: `playwright` 687,401, `driver` 3,309,493, `driver-bundle` 228,946,945). The `driver-bundle` jar carries Node for every platform. Pickleball's own jar did not grow from the dependency.
 
+### Browser protocols
+
+Pickleball reaches a browser through four backends and picks one per capability: Playwright (when the session is Playwright-attached), WebDriver BiDi, the Chrome DevTools Protocol, then Selenium classic. See [Browser protocols](browser-protocols.md) for the fallback order, `--via`, and what each browser supports.
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `pkb_bidi` | on | Selenium Chrome, Edge, and Firefox sessions ask for `webSocketUrl=true`, so a BiDi socket is open beside CDP. `false`, `off`, `no`, or `0` turns it off. A driver that rejects the capability is retried once without it (one WARN per run). A project `driver.capabilities.webSocketUrl` value wins. |
+| `pkb_bidi_endpoint` | unset | An existing BiDi WebSocket (`ws://.../session/<id>`) for `doctor --protocols` and protocol verbs. |
+| `pkb_cdp_endpoint` | unset | An existing CDP endpoint (see the Playwright backend). |
+| `pkb_protocol` | unset | `playwright` puts Playwright first in the fallback order. |
+
+Each key is read as a system property, then `pkb_runvars.<key>`, then the upper-case environment variable, then the environment variable as written. `doctor` prints `protocols=<browser>:<backends>`; `doctor --protocols [--cdp-endpoint=] [--bidi-endpoint=]` prints one `protocol.backend.*` line per backend and one `protocol.capability.*` line per capability.
+
 ## Agent coordination
 
 Different consumer agents can run different tests at the same time. The shared files under the consumer `.pickleball` directory are a bulletin board. Run data stays private to each run.

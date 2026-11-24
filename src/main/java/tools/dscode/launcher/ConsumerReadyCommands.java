@@ -432,8 +432,42 @@ final class ConsumerReadyCommands {
         BrowserAttach.summary(routes).forEach((route, ok) -> summary.append(summary.length() == 0 ? "" : ",").append(route).append(':').append(ok));
         out.println("attachRoutes=" + summary + (attach ? "" : " (doctor --attach for discovery and fixes)"));
         if (attach) out.println("attach=" + routes);
+        // E1: live protocol backends (Playwright, BiDi, CDP, classic) and which one serves each capability.
+        protocolsReport(project, tokens, out);
         log(project, session, "doctor health=" + health.status());
         return 0;
+    }
+
+    /**
+     * {@code protocols=<browser>:<backends>} always; {@code doctor --protocols} adds one line per backend and per
+     * capability. Endpoints: {@code --cdp-endpoint=}/{@code --bidi-endpoint=}, then {@code pkb_cdp_endpoint}/
+     * {@code pkb_bidi_endpoint}, then this project's live browser. Localhost probes only, never a download.
+     */
+    static void protocolsReport(Path project, String[] tokens, java.io.PrintStream out) {
+        java.util.List<String> list = tokens == null ? java.util.List.of() : java.util.Arrays.asList(tokens);
+        boolean full = list.contains("--protocols");
+        String cdp = tokenValue(list, "--cdp-endpoint=");
+        String bidi = tokenValue(list, "--bidi-endpoint=");
+        try {
+            if (cdp != null) cdp = PwCommand.endpoint(project, java.util.Map.of("cdp-endpoint", cdp));
+        } catch (RuntimeException ignored) {
+            cdp = null;
+        }
+        if (cdp == null) cdp = tools.dscode.browser.BrowserProtocols.setting("pkb_cdp_endpoint");
+        if (cdp == null) cdp = PwCommand.liveEndpoint(project);
+        if (bidi == null) bidi = tools.dscode.browser.BrowserProtocols.setting("pkb_bidi_endpoint");
+        if (cdp == null && bidi == null) {
+            out.println("protocols=none (no live browser; fix: start or attach a browser, or pass --cdp-endpoint= / --bidi-endpoint=)");
+            return;
+        }
+        tools.dscode.browser.BrowserProtocols protocols = tools.dscode.browser.BrowserProtocols.probe(cdp, bidi);
+        out.println("protocols=" + protocols.summary() + (full ? "" : " (doctor --protocols for the capability table)"));
+        if (full) protocols.table().forEach(line -> out.println("protocol." + line));
+    }
+
+    private static String tokenValue(java.util.List<String> tokens, String prefix) {
+        for (String token : tokens) if (token != null && token.startsWith(prefix)) return token.substring(prefix.length());
+        return null;
     }
 
     /** True when an executable of that name is on PATH (no process is started). */
