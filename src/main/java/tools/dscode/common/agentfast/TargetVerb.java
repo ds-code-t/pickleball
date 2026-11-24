@@ -1121,6 +1121,8 @@ public final class TargetVerb {
                 body.putAll(sinceDiff);
                 rows = changedRows(rows, sinceDiff);
             }
+            List<Object> recent = CollabRows.trail(root);
+            if (!recent.isEmpty()) body.put("recent", recent);
             String panelState = panelPending(page.session.connection());
             if (!panelState.isBlank()) body.put("panel", panelState);
             body.put("mode", mode);

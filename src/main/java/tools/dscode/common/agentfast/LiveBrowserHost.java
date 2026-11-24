@@ -469,7 +469,7 @@ public final class LiveBrowserHost {
      * error, or this gate would be untestable.
      */
     private static final Set<String> EVENTS_WITHOUT_PAGE = Set.of(
-            "chat-poll", "chat_wait", "chat-send", "chat-history", "chat-turn", "ui-poll", "ui-catalog"
+            "chat-poll", "chat_wait", "chat-send", "chat-history", "chat-turn", "chat-read", "ui-poll", "ui-catalog"
     );
 
     private static void command(HttpExchange exchange, String token, Path project, String sessionId) throws IOException {

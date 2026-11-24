@@ -145,7 +145,7 @@ public final class WorkbenchAgentCommands {
                 case "session-hold" -> sessionHold(parsed, safeOut, safeErr, true);
                 case "session-release" -> sessionHold(parsed, safeOut, safeErr, false);
                 case "observe", "launch", "windows", "tabs",
-                     "chat-send", "chat-history", "chat-poll",
+                     "chat-send", "chat-history", "chat-poll", "chat-read",
                      "highlight", "unhighlight",
                      "overlay", "overlay-poll", "overlay-remove",
                      "label", "unlabel", "border", "unborder",

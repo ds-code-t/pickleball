@@ -156,6 +156,19 @@ class AgentExpansionTest {
     }
 
     @Test
+    void covers_command_chat_read() throws Exception {
+        assertEquals(0, agent("chat-send", temp.toString(), "--run-id=read", "--text=one", "--source=human").code);
+        assertEquals(0, agent("chat-send", temp.toString(), "--run-id=read", "--text=two", "--source=human").code);
+        Capture read = agent("chat-read", temp.toString(), "--run-id=read", "--last=1");
+        assertEquals(0, read.code, read.err);
+        assertTrue(read.out.contains("\"text\":\"two\""), read.out);
+        assertFalse(read.out.contains("\"text\":\"one\""), read.out);
+        assertTrue(read.out.contains("\"markedRead\":0"), read.out);
+        Capture polled = agent("chat-poll", temp.toString(), "--run-id=read");
+        assertTrue(polled.out.contains("\"text\":\"two\""), "chat-read moved the chat cursor: " + polled.out);
+    }
+
+    @Test
     void covers_command_chat_poll() throws Exception {
         Capture first = agent("chat-send", temp.toString(), "--run-id=chat", "--text=one");
         assertEquals(0, first.code, first.err);

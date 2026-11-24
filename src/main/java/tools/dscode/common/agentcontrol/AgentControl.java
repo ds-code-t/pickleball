@@ -208,6 +208,7 @@ public final class AgentControl {
                 case "tabs" -> windows(project, runId, values, "tab");
                 case "chat-send" -> chatSend(project, runId, values, agentId);
                 case "chat-history" -> chatHistory(project, runId, values);
+                case "chat-read" -> chatRead(project, runId, values);
                 case "chat-poll" -> chatPoll(project, runId, values, agentId);
                 case "chat-turn" -> chatTurn(project, runId, values, agentId);
                 case "ui-verify" -> uiVerify(project, runId);
@@ -408,7 +409,9 @@ public final class AgentControl {
         );
         Map<String, Object> body = ok("Chat message stored for this run channel.");
         body.put("message", ChatLog.toMap(message));
-        if ("run".equals(message.channel())) PageSurfaces.pushChat(panelRow(message));
+        boolean delivered = "run".equals(message.channel()) && PageSurfaces.pushChat(panelRow(message));
+        body.put("sentId", message.id());
+        body.put("status", delivered ? "delivered" : "stored");
         // The popup draws ledger rows whose op is chat. A stored ChatLog line alone is not visible.
         if (!"off".equals(tools.dscode.common.agentsurface.PopupConfig.mode())) {
             tools.dscode.common.agentsurface.PopupLedger.append(
@@ -636,6 +639,13 @@ public final class AgentControl {
         if (!PageSurfaces.hasLivePage()) return fail(1, "ask needs a live browser page; run launch first");
         if (present(args.get("handle"))) spec.put("t", expandHandle(args.get("handle")));
         if ("true".equalsIgnoreCase(String.valueOf(args.get("sensitive")))) spec.put("sensitive", true);
+        if (present(args.get("min-show"))) {
+            try {
+                spec.put("minShow", timeoutMillis(Map.of("timeout", args.get("min-show")), 0L));
+            } catch (NumberFormatException failure) {
+                return fail(2, "ask --min-show is milliseconds");
+            }
+        }
         String reply = PageSurfaces.runtimeCall("ask", spec, true);
         if (reply == null || "null".equals(reply)) return fail(1, "ask did not show on the page");
         CompositeLog.info("ui", "ask " + reply);
@@ -673,7 +683,7 @@ public final class AgentControl {
         }
         String value = pollAnswer(project, runId, before, started, id, choices, timeout);
         if (value == null) {
-            PageSurfaces.runtimeCall("askClose", id, false);
+            PageSurfaces.runtimeCall("askTimeout", id, false);
             Result failed = fail(1, "timeout");
             failed.body().put("op", "ask-and-wait");
             failed.body().put("id", id);
@@ -702,7 +712,7 @@ public final class AgentControl {
         tools.dscode.control.protocol.AgentFastLog.log(project, "wait", "answer-wait id=" + id);
         String value = pollAnswer(project, runId, before, started, id, choices, timeout);
         if (value == null) {
-            PageSurfaces.runtimeCall("askClose", id, false);
+            PageSurfaces.runtimeCall("askTimeout", id, false);
             Result failed = fail(1, "timeout");
             failed.body().put("op", "answer-wait");
             failed.body().put("id", id);
@@ -921,6 +931,54 @@ public final class AgentControl {
         return new Result(0, body);
     }
 
+    /**
+     * The last {@code --last} messages (default 20) and the recent card trail, as the person sees the pane.
+     * Read-only: the chat cursor does not move and nothing is marked read unless {@code --mark-read=true}.
+     */
+    private static Result chatRead(Path project, String runId, Map<String, String> args) throws Exception {
+        int last = integer(args.get("last"), 20);
+        if (last < 1) return fail(2, "chat-read --last is a whole number of at least 1");
+        PageSurfaces.drainPanelChat(project, runId);
+        List<ChatLog.Message> rows = ChatLog.history(project, runId, args.get("channel"), last);
+        java.util.Set<String> read = new java.util.LinkedHashSet<>(ReadMarks.ids(project, runId));
+        read.addAll(PageSurfaces.readIds());
+        List<Map<String, Object>> messages = new ArrayList<>();
+        List<String> marked = new ArrayList<>();
+        for (ChatLog.Message message : rows) {
+            Map<String, Object> row = ChatLog.toMap(message);
+            boolean seen = read.contains(message.id()) || (!message.pageId().isBlank() && read.contains(message.pageId()));
+            row.put("read", seen);
+            messages.add(row);
+            if (!"human".equals(message.source())) continue;
+            marked.add(message.id());
+            if (!message.pageId().isBlank()) marked.add(message.pageId());
+        }
+        boolean mark = "true".equalsIgnoreCase(String.valueOf(args.get("mark-read")));
+        if (mark && !marked.isEmpty()) {
+            ReadMarks.note(project, runId, marked);
+            PageSurfaces.markRead(marked);
+        }
+        Map<String, Object> body = ok(mark ? "Chat read and marked read." : "Chat read; nothing was marked read.");
+        body.put("op", "chat-read");
+        body.put("count", messages.size());
+        body.put("messages", messages);
+        body.put("markedRead", mark ? marked.size() : 0);
+        body.put("recent", recentCards());
+        return new Result(0, body);
+    }
+
+    /** The page's card trail: the last few question cards and their state (open, answered, closed, timed-out). */
+    static List<Object> recentCards() {
+        try {
+            String reply = PageSurfaces.runtimeCall("cardTrailRead", null, false);
+            if (reply == null || "null".equals(reply)) return List.of();
+            Object parsed = AgentStore.JSON.readValue(reply, Object.class);
+            return parsed instanceof List<?> list ? new ArrayList<>(list) : List.of();
+        } catch (Exception failure) {
+            return List.of();
+        }
+    }
+
     private static Result chatPoll(Path project, String runId, Map<String, String> args, String agentId) throws Exception {
         String after = cursorAfter(project, runId, args);
         long waitMillis = 0;
@@ -995,14 +1053,14 @@ public final class AgentControl {
         if (!until.equals("human") && !until.equals("answer") && !until.equals("click")) {
             return fail(2, "chat-turn --until is human, answer, or click");
         }
-        long timeoutSec = 30;
+        long timeoutMs = 30_000L;
         if (present(args.get("timeout"))) {
             try {
-                timeoutSec = Long.parseLong(args.get("timeout").trim());
+                timeoutMs = secondsOrSuffixed(args.get("timeout"));
             } catch (NumberFormatException failure) {
                 return fail(2, "chat-turn --timeout is seconds from 0 to 120");
             }
-            if (timeoutSec < 0 || timeoutSec > 120) return fail(2, "chat-turn --timeout is seconds from 0 to 120");
+            if (timeoutMs < 0 || timeoutMs > 120_000L) return fail(2, "chat-turn --timeout is seconds from 0 to 120");
         }
         Map<String, String> send = new LinkedHashMap<>();
         send.put("text", args.get("text"));
@@ -1010,6 +1068,11 @@ public final class AgentControl {
         if (present(args.get("channel"))) send.put("channel", args.get("channel"));
         Result sent = chatSend(project, runId, send, agentId);
         if (sent.exit() != 0) return sent;
+        // The agent line is delivered before anything is read back; only a human line after it is the reply.
+        String sentId = String.valueOf(sent.body().getOrDefault("sentId", ""));
+        String sentStatus = String.valueOf(sent.body().getOrDefault("status", "stored"));
+        long sentNumber = longOr(sentId, Long.MAX_VALUE);
+        List<Map<String, Object>> earlier = new ArrayList<>();
         int eventsAt = 0;
         try {
             eventsAt = PageSurfaces.pollInput(project, runId).size();
@@ -1019,19 +1082,31 @@ public final class AgentControl {
         Map<String, String> poll = new LinkedHashMap<>();
         poll.put("from", "human");
         if (present(args.get("channel"))) poll.put("channel", args.get("channel"));
-        long deadline = System.nanoTime() + timeoutSec * 1_000_000_000L;
+        long deadline = System.nanoTime() + timeoutMs * 1_000_000L;
         while (true) {
             if ("human".equals(until) || "answer".equals(until)) {
                 java.util.Set<String> already = new java.util.LinkedHashSet<>(ReadMarks.ids(project, runId));
                 already.addAll(PageSurfaces.readIds());
                 Result polled = chatPoll(project, runId, poll, agentId);
-                List<Map<String, Object>> fresh = unreadChat(polled.body().get("messages"), already);
+                List<Map<String, Object>> fresh = new ArrayList<>();
+                for (Map<String, Object> row : unreadChat(polled.body().get("messages"), already)) {
+                    if (longOr(String.valueOf(row.get("id")), 0L) > sentNumber) {
+                        fresh.add(row);
+                    } else {
+                        Map<String, Object> old = new LinkedHashMap<>(row);
+                        old.put("earlier", true);
+                        earlier.add(old);
+                    }
+                }
                 if (!fresh.isEmpty()) {
                     Map<String, Object> body = ok("human".equals(until) ? "human replied" : "answer received");
                     body.put("op", "chat-turn");
                     body.put("until", until);
+                    body.put("sentId", sentId);
+                    body.put("status", sentStatus);
                     body.put("messages", fresh);
                     body.put("count", fresh.size());
+                    if (!earlier.isEmpty()) body.put("earlier", earlier);
                     return new Result(0, body);
                 }
             }
@@ -1055,6 +1130,9 @@ public final class AgentControl {
                     body.put("until", until);
                     body.put("events", List.of(event));
                     body.put("count", 1);
+                    body.put("sentId", sentId);
+                    body.put("status", sentStatus);
+                    if (!earlier.isEmpty()) body.put("earlier", earlier);
                     return new Result(0, body);
                 }
             }
@@ -1062,10 +1140,29 @@ public final class AgentControl {
                 Result failed = fail(1, "timeout");
                 failed.body().put("op", "chat-turn");
                 failed.body().put("until", until);
+                failed.body().put("sentId", sentId);
+                failed.body().put("status", sentStatus);
+                if (!earlier.isEmpty()) failed.body().put("earlier", earlier);
                 failed.body().put("fix", "chat-send --source=human, then chat-turn again");
                 return failed;
             }
             Thread.sleep(50L);
+        }
+    }
+
+    /** Seconds; a trailing {@code ms} or {@code s} is accepted. Returns milliseconds. */
+    static long secondsOrSuffixed(String text) {
+        String raw = text.trim().toLowerCase(java.util.Locale.ROOT);
+        if (raw.endsWith("ms")) return Math.round(Double.parseDouble(raw.substring(0, raw.length() - 2).trim()));
+        if (raw.endsWith("s")) raw = raw.substring(0, raw.length() - 1).trim();
+        return Math.round(Double.parseDouble(raw) * 1000.0);
+    }
+
+    private static long longOr(String text, long fallback) {
+        try {
+            return Long.parseLong(text == null ? "" : text.trim());
+        } catch (NumberFormatException failure) {
+            return fallback;
         }
     }
 

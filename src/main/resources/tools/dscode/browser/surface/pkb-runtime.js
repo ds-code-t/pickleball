@@ -1544,7 +1544,7 @@
     metaPurpose = 'callout';
     spec = spec || {};
     var id = String(spec.id || 'q1');
-    askClose(id);
+    askClose(id, 'replace');
     listen();
     var root = ensureLayer();
     var node = el('form', 'ask');
@@ -1608,7 +1608,8 @@
     cardTrail(id, spec.say, 'open', '');
     isolateKeys(node);
     root.appendChild(node);
-    asks.set(id, {id: id, node: node, t: spec.t, anchor: spec.t ? findTarget(spec.t) : null, scrollers: []});
+    asks.set(id, {id: id, node: node, t: spec.t, anchor: spec.t ? findTarget(spec.t) : null, scrollers: [],
+      shownAt: Date.now(), minShow: Math.max(0, +spec.minShow || 0)});
     update();
     if (field) { try { field.focus({preventScroll: true}); } catch (ignored) { /* focus refused */ } }
     return {id: id, choices: choices.length};
@@ -1636,6 +1637,15 @@
   function askClose(id, reason) {
     var a = asks.get(String(id));
     if (!a) return false;
+    // ask --min-show holds an unanswered card on screen at least that long; an answer or a replacement closes it now.
+    var held = a.minShow - (Date.now() - a.shownAt);
+    if (held > 0 && reason !== 'answered' && reason !== 'replace') {
+      if (!a.closing) {
+        a.closing = true;
+        setTimeout(function () { if (asks.get(String(id)) === a) { a.minShow = 0; askClose(id, reason); } }, held);
+      }
+      return true;
+    }
     cardTrail(String(id), a.node.getAttribute('data-pkb-card-title'), reason === 'timeout' ? 'timed-out' : (reason || 'closed'), '');
     a.node.remove();
     asks.delete(String(id));
@@ -3271,6 +3281,10 @@
     guideState: guideState,
     ask: ask,
     askClose: askClose,
+    askTimeout: function (id) { return askClose(id, 'timeout'); },
+    cardTrailRead: function () {
+      try { return JSON.parse(document.documentElement.getAttribute('data-pkb-card-trail') || '[]'); } catch (bad) { return []; }
+    },
     snapshot: snapshot,
     restoreWhenReady: restoreWhenReady,
     forget: forget,

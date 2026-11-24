@@ -137,7 +137,7 @@ class AgentDataFoundationTest {
     }
 
     @Test
-    void chatTurnSkipsAReadMessageAndReturnsAnUnreadOne() throws Exception {
+    void chatTurnSkipsAReadMessageListsAnEarlierUnreadOneAndReturnsALaterReply() throws Exception {
         ChatCursor.arm(project, "turn", "run");
         ChatLog.Message seen = ChatLog.send(project, "turn", "run", "human", "", "seen-reply", "h-seen");
         ReadMarks.note(project, "turn", java.util.List.of("h-seen"));
@@ -147,15 +147,33 @@ class AgentDataFoundationTest {
         args.put("until", "human");
         args.put("timeout", "0");
         args.put("channel", "run");
-        AgentControl.Result hit = AgentControl.execute(project, "turn", "chat-turn", args, List.of(), "a");
-        assertEquals(0, hit.exit(), String.valueOf(hit.body()));
-        assertTrue(String.valueOf(hit.body()).contains("fresh-reply"), String.valueOf(hit.body()));
-        assertFalse(String.valueOf(hit.body()).contains("seen-reply"), String.valueOf(hit.body()));
-        assertEquals(1, hit.body().get("count"), String.valueOf(hit.body()));
+        // An unread line from before the agent spoke is listed as earlier and is not the reply.
+        AgentControl.Result early = AgentControl.execute(project, "turn", "chat-turn", args, List.of(), "a");
+        assertEquals(1, early.exit(), String.valueOf(early.body()));
+        assertTrue(String.valueOf(early.body().get("earlier")).contains("fresh-reply"), String.valueOf(early.body()));
+        assertTrue(String.valueOf(early.body().get("earlier")).contains("earlier=true"), String.valueOf(early.body()));
+        assertFalse(String.valueOf(early.body()).contains("seen-reply"), String.valueOf(early.body()));
+        assertFalse(String.valueOf(early.body().get("sentId")).isBlank(), String.valueOf(early.body()));
         AgentControl.Result again = AgentControl.execute(project, "turn", "chat-turn", args, List.of(), "a");
         assertEquals(1, again.exit(), String.valueOf(again.body()));
         assertFalse(String.valueOf(again.body()).contains("fresh-reply"), String.valueOf(again.body()));
         assertEquals("h-seen", seen.pageId());
+        // A human line after the agent's line is the reply.
+        Map<String, String> waiting = new LinkedHashMap<>(args);
+        waiting.put("timeout", "5");
+        java.util.concurrent.CompletableFuture<AgentControl.Result> turn = java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+            try {
+                return AgentControl.execute(project, "turn", "chat-turn", waiting, List.of(), "a");
+            } catch (Exception failure) {
+                throw new IllegalStateException(failure);
+            }
+        });
+        Thread.sleep(600);
+        ChatLog.send(project, "turn", "run", "human", "", "later-reply", "h-later");
+        AgentControl.Result hit = turn.get(15, java.util.concurrent.TimeUnit.SECONDS);
+        assertEquals(0, hit.exit(), String.valueOf(hit.body()));
+        assertTrue(String.valueOf(hit.body()).contains("later-reply"), String.valueOf(hit.body()));
+        assertEquals(1, hit.body().get("count"), String.valueOf(hit.body()));
 
         ChatCursor.arm(project, "poll", "run");
         ChatLog.send(project, "poll", "run", "human", "", "still-polled", "h-polled");

@@ -27,6 +27,7 @@
       "capture-steps",
       "chat-history",
       "chat-poll",
+      "chat-read",
       "chat-send",
       "chat-turn",
       "chat_wait",

@@ -185,6 +185,65 @@ class CollabFixesLiveTest {
         assertTrue(pickedBody.path("picked").path("why").asText().contains("--pick=2"), picked.out);
     }
 
+    @Test
+    @Timeout(value = 150, unit = TimeUnit.SECONDS)
+    void c5_chatTurnSendsFirstChatReadIsReadOnlyAndCardsLeaveATrail() throws Exception {
+        start(page("c5.html", "<p>Chat</p>"), "c5");
+        assertEquals(0, run("panel-open", "--tab=guide", "--run-id=c5").code);
+        assertEquals(0, run("chat-send", "--source=human", "--text=earlier hi", "--run-id=c5").code);
+
+        Capture quiet = run("chat-turn", "--text=Your turn", "--timeout=2s", "--run-id=c5");
+        JsonNode quietBody = JSON.readTree(quiet.out);
+        assertEquals("timeout", quietBody.path("error").asText(), quiet.out);
+        assertFalse(quietBody.path("sentId").asText().isBlank(), quiet.out);
+        assertEquals("delivered", quietBody.path("status").asText(), quiet.out);
+        assertTrue(quietBody.path("earlier").toString().contains("earlier hi"), "earlier unread not listed: " + quiet.out);
+        assertTrue(quietBody.path("earlier").get(0).path("earlier").asBoolean(), quiet.out);
+
+        java.util.concurrent.CompletableFuture<Capture> turn = java.util.concurrent.CompletableFuture.supplyAsync(
+                () -> run("chat-turn", "--text=Ready?", "--timeout=10000ms", "--run-id=c5"));
+        Thread.sleep(1500);
+        assertEquals("1", eval(pane() + ".querySelectorAll('.pkb-msg[data-from=agent]').length - 1 + ''", "c5"),
+                "the agent line is on the page before the human answers");
+        assertEquals(0, run("chat-send", "--source=human", "--text=reply now", "--run-id=c5").code);
+        Capture replied = turn.get(20, TimeUnit.SECONDS);
+        assertEquals(0, replied.code, replied.err + replied.out);
+        assertTrue(replied.out.contains("reply now"), replied.out);
+        assertFalse(JSON.readTree(replied.out).path("items").toString().contains("earlier hi"), replied.out);
+        assertEquals("1", eval("Array.from(" + pane() + ".querySelectorAll('.pkb-msg')).filter(function(n){return n.textContent.indexOf('reply now')>=0}).length + ''", "c5"));
+
+        assertEquals("2 unread", eval(tab("chat") + ".getAttribute('aria-description')", "c5"));
+        assertEquals(0, run("panel-open", "--tab=chat", "--run-id=c5").code);
+        assertEquals(0, run("panel-open", "--tab=guide", "--run-id=c5").code);
+        assertEquals("null", eval(tab("chat") + ".getAttribute('aria-description') + ''", "c5"), "seen messages stay seen");
+
+        assertEquals(0, run("chat-send", "--source=human", "--text=unacked", "--run-id=c5").code);
+        JsonNode read = JSON.readTree(run("chat-read", "--last=1", "--run-id=c5").out);
+        assertEquals(1, read.path("items").size(), read.toString());
+        assertFalse(read.path("items").get(0).path("read").asBoolean(), read.toString());
+        assertEquals(0, read.path("markedRead").asInt(), read.toString());
+        JsonNode again = JSON.readTree(run("chat-read", "--last=1", "--run-id=c5").out);
+        assertFalse(again.path("items").get(0).path("read").asBoolean(), "chat-read acked without --mark-read: " + again);
+        JsonNode marked = JSON.readTree(run("chat-read", "--last=1", "--mark-read=true", "--run-id=c5").out);
+        assertTrue(marked.path("markedRead").asInt() > 0, marked.toString());
+        JsonNode after = JSON.readTree(run("chat-read", "--last=1", "--run-id=c5").out);
+        assertTrue(after.path("items").get(0).path("read").asBoolean(), after.toString());
+
+        assertEquals(0, run("ask", "--say=Pick", "--choices=Alpha,Beta", "--id=q9", "--run-id=c5").code);
+        assertEquals("true", JSON.readTree(run("act", "--target=browser:auto", "--query=Alpha", "--kind=click", "--run-id=c5").out).path("applied").asText());
+        assertEquals(0, run("ask", "--say=Hold", "--choices=Ok", "--id=m1", "--min-show=1500", "--run-id=c5").code);
+        Capture timedOut = run("answer-wait", "--id=m1", "--timeout=100", "--run-id=c5");
+        assertEquals(1, timedOut.code, timedOut.out);
+        assertEquals("1", eval("document.querySelector('pkb-layer').shadowRoot.querySelectorAll('[data-pkb-card-id=ask-m1]').length + ''", "c5"),
+                "--min-show keeps the card up");
+        Thread.sleep(2200);
+        JsonNode trail = JSON.readTree(run("chat-read", "--last=1", "--run-id=c5").out).path("recent");
+        assertTrue(trail.toString().contains("\"id\":\"ask-q9\"") && trail.toString().contains("answered"), trail.toString());
+        assertTrue(trail.toString().contains("timed-out"), trail.toString());
+        JsonNode snap = JSON.readTree(run("snap", "--target=browser:auto", "--run-id=c5").out);
+        assertTrue(snap.path("recent").toString().contains("ask-m1"), snap.toString());
+    }
+
     static String pane() {
         return "document.querySelector('pkb-layer').shadowRoot";
     }

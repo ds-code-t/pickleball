@@ -127,6 +127,31 @@ public final class CollabRows {
         return out;
     }
 
+    /** The {@code data-pkb-card-trail} JSON on {@code <html>}: the last few cards and their state. */
+    static List<Object> trail(DomNode root) {
+        DomNode html = htmlOf(root, 0);
+        String raw = attr(html, "data-pkb-card-trail");
+        if (raw.isBlank()) return List.of();
+        try {
+            JsonNode parsed = Jsons.MAPPER.readTree(raw);
+            List<Object> out = new ArrayList<>();
+            if (parsed.isArray()) for (JsonNode row : parsed) out.add(Jsons.MAPPER.convertValue(row, Map.class));
+            return out;
+        } catch (Exception failure) {
+            return List.of();
+        }
+    }
+
+    private static DomNode htmlOf(DomNode node, int depth) {
+        if (node == null || depth > 4) return null;
+        if ("html".equalsIgnoreCase(node.localName)) return node;
+        for (DomNode child : node.children) {
+            DomNode found = htmlOf(child, depth + 1);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
     /** Preset names for the CSS {@code highlight} writes. Anything else is {@code custom}. */
     static String presetOf(String css) {
         String text = css == null ? "" : css.toLowerCase(Locale.ROOT);

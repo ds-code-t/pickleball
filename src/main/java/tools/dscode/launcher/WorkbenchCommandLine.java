@@ -26,7 +26,7 @@ final class WorkbenchCommandLine {
             "inspect-page", "find-element", "query",
             "session-list", "session-info", "session-hold", "session-release",
             "observe", "launch", "windows", "tabs",
-            "chat-send", "chat-history", "chat-poll", "chat_wait", "chat-turn",
+            "chat-send", "chat-history", "chat-poll", "chat_wait", "chat-turn", "chat-read",
             "history-summary", "history-query", "entity-lookup", "open-run", "bridge-health", "start",
             "call", "execute-steps",
             "highlight", "unhighlight",

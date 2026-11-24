@@ -10,7 +10,7 @@ final class AgentHop {
     static final String INSIDE = "pkb.controller.inside";
     private static final Set<String> HOP = Set.of(
             "observe", "launch", "windows", "tabs",
-            "chat-send", "chat-history", "chat-poll", "chat_wait", "chat-turn",
+            "chat-send", "chat-history", "chat-poll", "chat_wait", "chat-turn", "chat-read",
             "highlight", "unhighlight",
             "overlay", "overlay-poll", "overlay-remove",
             "label", "unlabel", "border", "unborder", "arrow", "unarrow",
