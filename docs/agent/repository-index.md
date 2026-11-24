@@ -91,6 +91,11 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-agent-fast/consumer-field-report-2026-11-18.md`
 - `docs/maintainer/3.0.0-agent-fast/evaluation.md`
 - `docs/maintainer/3.0.0-agent-fast/README.md`
+- `docs/maintainer/3.0.0-collab-test/agent-notes.md`
+- `docs/maintainer/3.0.0-collab-test/findings-2026-11-23.md`
+- `docs/maintainer/3.0.0-collab-test/helper-brief.md`
+- `docs/maintainer/3.0.0-collab-test/human-notes.md`
+- `docs/maintainer/3.0.0-collab-test/plan.md`
 - `docs/maintainer/3.0.0-composite-v2-design.md`
 - `docs/maintainer/3.0.0-composite-verbs-scoreboard.md`
 - `docs/maintainer/3.0.0-consumer-ready-handoff.md`
@@ -157,6 +162,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/roadmaps/2.1.18-workbench-coverage-findings.md`
 - `docs/roadmaps/2.1.18-workbench-full-coverage.md`
 - `docs/roadmaps/3.0.0-agent-fast-roadmap.md`
+- `docs/roadmaps/3.0.0-collab-fixes-roadmap.md`
 - `docs/roadmaps/3.0.0-composite-v2-roadmap.md`
 - `docs/roadmaps/3.0.0-consumer-ready-roadmap.md`
 - `docs/roadmaps/3.0.0-dalton-roadmap.md`
