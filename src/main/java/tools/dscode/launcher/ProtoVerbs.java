@@ -24,7 +24,7 @@ final class ProtoVerbs {
     static final Set<String> VERBS = Set.of("browser-events", "errors", "logpoint", "net", "net-body", "har",
             "net-route", "net-unroute", "net-block", "net-headers", "net-auth", "ws-route", "net-cache", "security", "csp", "emulate", "clock", "permissions",
             "context-new", "context-list", "context-close", "tab-new", "tab-activate", "page-history", "print", "storage", "storage-state",
-            "downloads", "dialogs", "drop", "upload");
+            "downloads", "dialogs", "drop", "upload", "input", "find-role", "aria-snap", "aria-act", "webauthn", "extension", "webmcp");
 
     private ProtoVerbs() {
     }
@@ -51,6 +51,13 @@ final class ProtoVerbs {
                 payload.put("_credential", credential(flags.get("credential")));
                 return print(call(project, flags, command, payload), out, err);
             }
+            if ("webauthn".equals(command) && flags.get("private-key") != null) {
+                // E8: the private key ref is resolved here, sent only to the token-guarded loopback host, and never printed.
+                Map<String, String> payload = new LinkedHashMap<>(flags);
+                payload.remove("private-key");
+                payload.put("_credential", secret(flags.get("private-key"), "webauthn --private-key=env:PASSKEY_PKCS8 (base64 PKCS#8)"));
+                return print(call(project, flags, command, payload), out, err);
+            }
             return print(call(project, flags, command, flags), out, err);
         } catch (IllegalStateException | IllegalArgumentException failure) {
             return fail(err, failure.getMessage());
@@ -65,12 +72,20 @@ final class ProtoVerbs {
         if (ref == null || ref.isBlank() || "true".equals(ref)) {
             throw new IllegalArgumentException("error: net-auth needs --credential=<secret-ref>\nfix: net-auth --credential=env:SITE_LOGIN (SITE_LOGIN=user:password)");
         }
+        return secret(ref, "net-auth --credential=env:SITE_LOGIN (value user:password)");
+    }
+
+    /** Resolves a secret ref (env:, prop: or a pkb setting) and registers its value for redaction. */
+    static String secret(String ref, String example) {
+        if (ref == null || ref.isBlank() || "true".equals(ref)) {
+            throw new IllegalArgumentException("error: needs a secret ref\nfix: " + example);
+        }
         String value;
         if (ref.startsWith("env:")) value = System.getenv(ref.substring(4));
         else if (ref.startsWith("prop:")) value = System.getProperty(ref.substring(5));
         else value = BrowserProtocols.setting(ref);
         if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException("error: secret ref " + ref + " is not set\nfix: set it in the environment or as a JVM property (value user:password); it is never printed");
+            throw new IllegalArgumentException("error: secret ref " + ref + " is not set\nfix: set it in the environment or as a JVM property (" + example + "); it is never printed");
         }
         SecretRedactor.note("password", value);
         return value;

@@ -19,7 +19,7 @@ public final class VerbTiers {
 
     private static final Set<String> HUMAN_VERBS = Set.of(
             "act", "capture", "chat-read", "doctor", "explain", "find", "help", "screenshot", "snap", "wait",
-            "wait-for"
+            "wait-for", "input", "aria-snap"
     );
 
     private static final Set<String> CONTROL_VERBS = Set.of(
@@ -40,7 +40,7 @@ public final class VerbTiers {
             "tabs", "toast", "ui", "ui-apply", "ui-catalog", "ui-poll", "ui-verify", "unarrow", "unborder",
             "unhighlight", "unlabel", "unmagnifier", "unspotlight", "unstep-badge", "update-step", "upload",
             "use-version", "validate", "watch", "windows", "worker-check", "worker-restart", "worker-start",
-            "worker-stop", "workspace-edit", "workspace-seed", "workspace-show", "browser-events", "errors", "logpoint", "net", "net-body", "har", "net-route", "net-unroute", "net-block", "net-headers", "net-auth", "ws-route", "net-cache", "security", "csp", "emulate", "clock", "permissions", "context-new", "context-list", "context-close", "tab-new", "tab-activate", "page-history", "print", "storage", "storage-state", "downloads", "dialogs", "drop"
+            "worker-stop", "workspace-edit", "workspace-seed", "workspace-show", "browser-events", "errors", "logpoint", "net", "net-body", "har", "net-route", "net-unroute", "net-block", "net-headers", "net-auth", "ws-route", "net-cache", "security", "csp", "emulate", "clock", "permissions", "context-new", "context-list", "context-close", "tab-new", "tab-activate", "page-history", "print", "storage", "storage-state", "downloads", "dialogs", "drop", "webauthn", "extension", "webmcp"
     );
 
     /** act kinds a human-locked session accepts. */

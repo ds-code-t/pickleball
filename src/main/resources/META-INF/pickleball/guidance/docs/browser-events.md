@@ -92,6 +92,18 @@ WebSocket rows (`kind=ws`): `created`, `handshake`, `frame-sent`, `frame-receive
 
 `dialogs --policy=accept|dismiss|prompt:<text>|ask|default` answers alert, confirm and prompt dialogs as they open on CDP (`Page.javascriptDialogOpening`), BiDi (`browsingContext.userPromptOpened`) or Playwright (`page.onDialog`). Accepting a prompt without text keeps its default value. Each answer is a `kind=dialog subkind=handled` row; a dialog another client closed first is `subkind=unanswered`. A Playwright client attached to the same browser with no dialog listener of its own dismisses every dialog it sees, whatever the policy; use `--via=playwright` when a Playwright session stays attached. The Gherkin alert steps go through `BrowserAlerts`: Selenium's alert API first, then Selenium BiDi `browsingContext.handleUserPrompt`, then the reflective CDP call.
 
+## Input, accessibility locators, WebAuthn, extensions and WebMCP
+
+`input --actions=<json>|@chain.json` runs a W3C action chain: `key` sources (keyDown/keyUp; W3C key code points such as `\uE007` for Enter), `pointer` sources (mouse, pen or touch; pointerMove with `origin` viewport or pointer, pointerDown/pointerUp), `wheel` sources (scroll with deltaX/deltaY) and pauses, tick by tick. Backends in order: BiDi `input.performActions`, CDP `Input.dispatchKeyEvent`/`dispatchMouseEvent`/`dispatchTouchEvent`, Playwright mouse, keyboard and touchscreen. `input --release` lets go of held keys and buttons. A chain with only coordinates and keys is human tier, so it runs in a human-locked session; an element origin needs BiDi and is refused there. The log records the action count, never key values.
+
+`find --role=<role> [--name=] [--description=]` finds elements by accessibility role and exact name through the BiDi accessibility locator (`browsingContext.locateNodes`), Playwright `getByRole` (with its `description` option) or CDP `Accessibility.queryAXTree`. Hits have `source=role` with tag, id, text, description and box. `find` without `--role` ranks as before.
+
+`aria-snap [--boxes] [--depth=] [--mode=ai]` (also `snap --aria`) prints Playwright's aria snapshot. In `--mode=ai` each node has a `[ref=eN]`; `act --aria-ref=eN --kind=click|type|hover|press|select` acts on it through Playwright `getByRef`. Aria snapshots need Playwright, which the host attaches for these verbs.
+
+`webauthn --add-authenticator [--protocol=ctap2|u2f] [--resident] [--uv]` adds a virtual authenticator (Playwright `credentials()` first, CDP `WebAuthn.*` for u2f or non-default options), so passkey create and get ceremonies complete without hardware. `--add-credential=@cred.json` adds a credential (rpId, id, userHandle, signCount); the private key comes only from `--private-key=<secret-ref>` (resolved in the CLI) or a `privateKeyFile`, and a key inside the JSON is refused. `--list` shows ids, rpIds, user handles and sign counts, never keys; `--remove [--id=]` removes one credential or the authenticator.
+
+`extension --install=<unpacked dir> | --uninstall=<id> | --list` uses BiDi `webExtension.install`/`uninstall` or CDP `Extensions.loadUnpacked`/`uninstall`/`getExtensions`. Chrome allows these only when started with `--enable-unsafe-extension-debugging`; without it the reply says so. `webmcp --list | --call=<tool> --params=` lists or calls the tools a page registers through Playwright `page.webmcp`; on a page or browser without WebMCP it reports `unsupported: webmcp` with the reason.
+
 ## DOM changes (push)
 
 Pickleball listens for DOM changes instead of polling the page. One page script runs a `MutationObserver` and reports debounced, batched, scoped deltas through the backend's push channel:

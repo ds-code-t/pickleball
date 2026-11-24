@@ -181,15 +181,22 @@ public final class BrowserProtocols {
     public <T> Served<T> serve(String capability, String via, Function<Backend, T> impl) {
         List<Backend> order = order(capability, via);
         UnsupportedProtocolOperation last = null;
+        List<String> why = new ArrayList<>();
         for (Backend backend : order) {
             try {
                 return new Served<>(backend, impl.apply(backend));
             } catch (UnsupportedProtocolOperation unsupported) {
                 markUnavailable(capability, backend);
                 last = unsupported;
+                if (!unsupported.detail().isBlank()) why.add(backend.id() + ": " + unsupported.detail());
             }
         }
         IllegalStateException failure = unsupported(capability, via);
+        if (!why.isEmpty()) {
+            String message = failure.getMessage();
+            int fix = message.indexOf("\nfix: ");
+            failure = new IllegalStateException(message.substring(0, fix) + " (" + String.join("; ", why) + ")" + message.substring(fix));
+        }
         if (last != null) failure.addSuppressed(last);
         throw failure;
     }

@@ -180,12 +180,14 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/browser/proto/BrowserEventHub.java`
 - `src/main/java/tools/dscode/browser/proto/CdpSession.java`
 - `src/main/java/tools/dscode/browser/proto/ContextCommands.java`
+- `src/main/java/tools/dscode/browser/proto/DeviceCommands.java`
 - `src/main/java/tools/dscode/browser/proto/DialogCommands.java`
 - `src/main/java/tools/dscode/browser/proto/DomCommands.java`
 - `src/main/java/tools/dscode/browser/proto/EmulateCommands.java`
 - `src/main/java/tools/dscode/browser/proto/ErrorCommands.java`
 - `src/main/java/tools/dscode/browser/proto/EventCommands.java`
 - `src/main/java/tools/dscode/browser/proto/HarWriter.java`
+- `src/main/java/tools/dscode/browser/proto/InputCommands.java`
 - `src/main/java/tools/dscode/browser/proto/NetCommands.java`
 - `src/main/java/tools/dscode/browser/proto/Projectors.java`
 - `src/main/java/tools/dscode/browser/proto/ProtoClient.java`
@@ -1020,6 +1022,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/HousekeepingRoadmapTest.java`
 - `src/test/java/tools/dscode/launcher/HumanTierTest.java`
 - `src/test/java/tools/dscode/launcher/IdentityRefindTest.java`
+- `src/test/java/tools/dscode/launcher/InputLiveTest.java`
 - `src/test/java/tools/dscode/launcher/JsFallbackHonestyTest.java`
 - `src/test/java/tools/dscode/launcher/MaskQuietTest.java`
 - `src/test/java/tools/dscode/launcher/NavigateDataFileTest.java`

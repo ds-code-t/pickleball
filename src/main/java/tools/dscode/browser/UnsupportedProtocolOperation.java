@@ -8,11 +8,18 @@ package tools.dscode.browser;
 public final class UnsupportedProtocolOperation extends RuntimeException {
     private final String capability;
     private final String backend;
+    private final String detail;
 
     public UnsupportedProtocolOperation(String capability, String backend, String detail) {
         super("error: unsupported: " + capability + " on " + backend + (detail == null || detail.isBlank() ? "" : " (" + detail + ")"));
         this.capability = capability;
         this.backend = backend;
+        this.detail = detail == null ? "" : detail;
+    }
+
+    /** Why the backend could not serve it, or empty. */
+    public String detail() {
+        return detail;
     }
 
     public String capability() {

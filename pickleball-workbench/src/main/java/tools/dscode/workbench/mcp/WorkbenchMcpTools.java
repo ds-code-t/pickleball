@@ -789,6 +789,41 @@ final class WorkbenchMcpTools {
                         "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
                 )),
                 args -> forwardReady(protoArgs("drop", args)));
+        add("workbench_input",
+                "Run a W3C action chain (keys, mouse, pen, touch, wheel) on the live page.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for input; see help input."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("input", args)));
+        add("workbench_aria_snap",
+                "Playwright aria snapshot of the page; --mode=ai adds refs for act --aria-ref.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for aria-snap; see help aria-snap."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("aria-snap", args)));
+        add("workbench_webauthn",
+                "Virtual WebAuthn authenticator and credentials for passkey tests; keys never printed.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for webauthn; see help webauthn."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("webauthn", args)));
+        add("workbench_extension",
+                "Install, uninstall or list unpacked browser extensions.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for extension; see help extension."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("extension", args)));
+        add("workbench_webmcp",
+                "List or call the WebMCP tools a page registers.",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for webmcp; see help webmcp."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("webmcp", args)));
         add("workbench_chat_turn",
                 "Send one agent line, then wait for a human message, an answer, or a click.",
                 schema(view),

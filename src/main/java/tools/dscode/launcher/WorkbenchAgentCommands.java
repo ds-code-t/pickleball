@@ -176,6 +176,26 @@ public final class WorkbenchAgentCommands {
                 return 2;
             }
         }
+        // E8: find --role, act --aria-ref and snap --aria go to the protocol host (accessibility locators, Playwright refs).
+        String routed = "find".equals(parsed.command()) && hasFlagOrValue(args, "--role") ? "find-role"
+                : "act".equals(parsed.command()) && hasFlagOrValue(args, "--aria-ref") ? "aria-act"
+                : "snap".equals(parsed.command()) && hasFlagOrValue(args, "--aria") ? "aria-snap" : null;
+        if (routed != null) {
+            String[] hop = args.clone();
+            for (int i = 0; i < hop.length; i++) {
+                if (hop[i].equals(parsed.command())) {
+                    hop[i] = routed;
+                    break;
+                }
+            }
+            if (!hop[0].equals(routed)) {
+                String[] front = new String[hop.length + 1];
+                front[0] = routed;
+                System.arraycopy(hop, 0, front, 1, hop.length);
+                hop = front;
+            }
+            return ProtoVerbs.run(hop, parsed.project(), safeOut, safeErr);
+        }
         // E7: upload with --via or --on-dialog goes to the protocol host (BiDi input.setFiles, Playwright setInputFiles, CDP).
         if ("upload".equals(parsed.command()) && java.util.Arrays.stream(args).anyMatch(a -> a.startsWith("--via=") || a.equals("--on-dialog"))) {
             return ProtoVerbs.run(args, parsed.project(), safeOut, safeErr);
@@ -187,7 +207,7 @@ public final class WorkbenchAgentCommands {
                 case "relaunch-with-debug" -> RelaunchWithDebug.run(parsed, safeOut, safeErr);
                 case "pw", "cdp" -> PwCommand.run(args, parsed.project(), safeOut, safeErr);
                 // proto verbs
-                case "browser-events", "errors", "logpoint", "net", "net-body", "har", "net-route", "net-unroute", "net-block", "net-headers", "net-auth", "ws-route", "net-cache", "security", "csp", "emulate", "clock", "permissions", "context-new", "context-list", "context-close", "tab-new", "tab-activate", "page-history", "print", "storage", "storage-state", "downloads", "dialogs", "drop"  -> ProtoVerbs.run(args, parsed.project(), safeOut, safeErr);
+                case "browser-events", "errors", "logpoint", "net", "net-body", "har", "net-route", "net-unroute", "net-block", "net-headers", "net-auth", "ws-route", "net-cache", "security", "csp", "emulate", "clock", "permissions", "context-new", "context-list", "context-close", "tab-new", "tab-activate", "page-history", "print", "storage", "storage-state", "downloads", "dialogs", "drop", "input", "aria-snap", "webauthn", "extension", "webmcp"  -> ProtoVerbs.run(args, parsed.project(), safeOut, safeErr);
                 case "export-guidance" -> exportGuidance(parsed, safeOut, safeErr);
                 case "start" -> {
                     int started = ConsumerReadyCommands.start(parsed, safeOut, safeErr);
@@ -1815,6 +1835,11 @@ public final class WorkbenchAgentCommands {
             return 0;
         }
         return liveQuery(parsed, null, null, out, err);
+    }
+
+    static boolean hasFlagOrValue(String[] args, String name) {
+        for (String a : args) if (a.equals(name) || a.startsWith(name + "=")) return true;
+        return false;
     }
 
     private static int findElement(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
