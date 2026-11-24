@@ -23,7 +23,8 @@ class PreMapCliTest {
         assertEquals("pickleball.composite-snapshot", json.path("schema").asText());
         assertTrue(json.path("premap").path("sections").size() > 0);
         assertTrue(json.path("premap").path("labels").size() > 0, json.path("premap").path("labels").toString());
-        assertEquals(1, json.path("version").asInt());
+        // Offline premap --file has emitted version 2 since phase 4.
+        assertEquals(2, json.path("version").asInt());
     }
 
     @Test

@@ -826,6 +826,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/composite/EngineQueryFallbackTest.java`
 - `src/test/java/tools/dscode/common/composite/FrameCombineTest.java`
 - `src/test/java/tools/dscode/common/composite/GeometryViewTest.java`
+- `src/test/java/tools/dscode/common/composite/IdentityReplayAdapterTest.java`
 - `src/test/java/tools/dscode/common/composite/LeanWaitNestLiveTest.java`
 - `src/test/java/tools/dscode/common/composite/live/JavaEngineAdapterLiveTest.java`
 - `src/test/java/tools/dscode/common/composite/live/JavaEngineFlagsLiveTest.java`
@@ -1566,12 +1567,15 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/query/LiveXPath.java`
 - `dom-engine/src/main/java/dev/domengine/query/Look.java`
 - `dom-engine/src/main/java/dev/domengine/query/OcrHook.java`
+- `dom-engine/src/main/java/dev/domengine/query/OcrRuntime.java`
+- `dom-engine/src/main/java/dev/domengine/query/OnnxOcrRuntime.java`
 - `dom-engine/src/main/java/dev/domengine/query/package-info.java`
 - `dom-engine/src/main/java/dev/domengine/query/Query.java`
 - `dom-engine/src/main/java/dev/domengine/query/QueryHooks.java`
 - `dom-engine/src/main/java/dev/domengine/query/Relations.java`
 - `dom-engine/src/main/java/dev/domengine/query/RelationTerm.java`
 - `dom-engine/src/main/java/dev/domengine/query/RowStates.java`
+- `dom-engine/src/main/java/dev/domengine/query/StubOcrRuntime.java`
 - `dom-engine/src/main/java/dev/domengine/query/ViewMask.java`
 - `dom-engine/src/main/java/dev/domengine/session/BrowserSession.java`
 - `dom-engine/src/main/java/dev/domengine/session/ChromeProcess.java`
@@ -1620,6 +1624,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/DocumentWalkFixtureTest.java`
 - `dom-engine/src/test/java/dev/domengine/EngineLogTest.java`
 - `dom-engine/src/test/java/dev/domengine/FakeCdp.java`
+- `dom-engine/src/test/java/dev/domengine/IdentityReplayCliTest.java`
 - `dom-engine/src/test/java/dev/domengine/image/TemplateFeaturesTest.java`
 - `dom-engine/src/test/java/dev/domengine/LiveChromeActionSmokeTest.java`
 - `dom-engine/src/test/java/dev/domengine/LiveChromeBrowserAttachTest.java`
@@ -1648,6 +1653,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/query/ControlEngineCapabilitiesTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/CrossPlatformQueryTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/HookCallSiteTest.java`
+- `dom-engine/src/test/java/dev/domengine/query/HtmlTreeParseTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/HumanViewTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/NegativeRelationTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/OcrHookTest.java`
