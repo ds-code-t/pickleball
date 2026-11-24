@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Fails when a main-source file outside the classified allowlist grows a raw
  * WebDriver DOM read. Adapter files own the Selenium calls. Other allowlisted
  * files are outside the browser DOM (Swing, Gherkin, code-source, alerts,
- * window size). A cleaned file is not allowlisted. Every allowlisted file
+ * window size, BiDi log entries). A cleaned file is not allowlisted. Every allowlisted file
  * must still have at least one hit.
  */
 class DomAccessGuardTest {
@@ -67,6 +67,7 @@ class DomAccessGuardTest {
             "src/main/java/io/cucumber/core/runner/modularexecutions/CucumberScanUtil.java",
             "src/main/java/io/cucumber/core/runner/util/CucumberQueryUtil.java",
             "src/main/java/io/cucumber/core/runner/util/KeyFunctions.java",
+            "src/main/java/tools/dscode/browser/JsErrorGate.java",
             "src/main/java/tools/dscode/browser/SeleniumAdapter.java",
             "src/main/java/tools/dscode/common/agentcontrol/PageSurfaces.java",
             "src/main/java/tools/dscode/common/assertions/AssertionChain.java",

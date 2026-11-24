@@ -179,6 +179,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/browser/PlaywrightConnection.java`
 - `src/main/java/tools/dscode/browser/proto/BrowserEventHub.java`
 - `src/main/java/tools/dscode/browser/proto/CdpSession.java`
+- `src/main/java/tools/dscode/browser/proto/ContextCommands.java`
+- `src/main/java/tools/dscode/browser/proto/DialogCommands.java`
 - `src/main/java/tools/dscode/browser/proto/DomCommands.java`
 - `src/main/java/tools/dscode/browser/proto/EmulateCommands.java`
 - `src/main/java/tools/dscode/browser/proto/ErrorCommands.java`
@@ -193,6 +195,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/browser/proto/PwBridge.java`
 - `src/main/java/tools/dscode/browser/proto/RouteCommands.java`
 - `src/main/java/tools/dscode/browser/proto/SourceMaps.java`
+- `src/main/java/tools/dscode/browser/proto/StorageCommands.java`
 - `src/main/java/tools/dscode/browser/ProtocolSelector.java`
 - `src/main/java/tools/dscode/browser/ProtocolSocket.java`
 - `src/main/java/tools/dscode/browser/ProtocolSockets.java`
@@ -994,6 +997,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/CompositeVerbsCliTest.java`
 - `src/test/java/tools/dscode/launcher/ConfirmTest.java`
 - `src/test/java/tools/dscode/launcher/ConsumerReadyCliTest.java`
+- `src/test/java/tools/dscode/launcher/ContextLiveTest.java`
 - `src/test/java/tools/dscode/launcher/ControllerReliabilityTest.java`
 - `src/test/java/tools/dscode/launcher/ControllerUtf8Test.java`
 - `src/test/java/tools/dscode/launcher/DesktopSameVerbTest.java`

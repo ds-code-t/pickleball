@@ -176,6 +176,10 @@ public final class WorkbenchAgentCommands {
                 return 2;
             }
         }
+        // E7: upload with --via or --on-dialog goes to the protocol host (BiDi input.setFiles, Playwright setInputFiles, CDP).
+        if ("upload".equals(parsed.command()) && java.util.Arrays.stream(args).anyMatch(a -> a.startsWith("--via=") || a.equals("--on-dialog"))) {
+            return ProtoVerbs.run(args, parsed.project(), safeOut, safeErr);
+        }
         try {
             return switch (parsed.command()) {
                 case "session-mode" -> sessionMode(parsed, safeOut, safeErr);
@@ -183,7 +187,7 @@ public final class WorkbenchAgentCommands {
                 case "relaunch-with-debug" -> RelaunchWithDebug.run(parsed, safeOut, safeErr);
                 case "pw", "cdp" -> PwCommand.run(args, parsed.project(), safeOut, safeErr);
                 // proto verbs
-                case "browser-events", "errors", "logpoint", "net", "net-body", "har", "net-route", "net-unroute", "net-block", "net-headers", "net-auth", "ws-route", "net-cache", "security", "csp", "emulate", "clock", "permissions"  -> ProtoVerbs.run(args, parsed.project(), safeOut, safeErr);
+                case "browser-events", "errors", "logpoint", "net", "net-body", "har", "net-route", "net-unroute", "net-block", "net-headers", "net-auth", "ws-route", "net-cache", "security", "csp", "emulate", "clock", "permissions", "context-new", "context-list", "context-close", "tab-new", "tab-activate", "page-history", "print", "storage", "storage-state", "downloads", "dialogs", "drop"  -> ProtoVerbs.run(args, parsed.project(), safeOut, safeErr);
                 case "export-guidance" -> exportGuidance(parsed, safeOut, safeErr);
                 case "start" -> {
                     int started = ConsumerReadyCommands.start(parsed, safeOut, safeErr);

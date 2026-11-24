@@ -55,6 +55,8 @@ public final class ProtoHost {
         NetCommands.register();
         RouteCommands.register();
         EmulateCommands.register();
+        ContextCommands.register();
+        DialogCommands.register();
     }
 
     private final Path project;

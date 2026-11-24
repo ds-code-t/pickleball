@@ -705,6 +705,90 @@ final class WorkbenchMcpTools {
                         "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
                 )),
                 args -> forwardReady(protoArgs("permissions", args)));
+        add("workbench_context_new",
+                "E7: context-new (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for context-new; see help context-new."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("context-new", args)));
+        add("workbench_context_list",
+                "E7: context-list (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for context-list; see help context-list."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("context-list", args)));
+        add("workbench_context_close",
+                "E7: context-close (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for context-close; see help context-close."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("context-close", args)));
+        add("workbench_tab_new",
+                "E7: tab-new (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for tab-new; see help tab-new."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("tab-new", args)));
+        add("workbench_tab_activate",
+                "E7: tab-activate (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for tab-activate; see help tab-activate."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("tab-activate", args)));
+        add("workbench_page_history",
+                "E7: page-history (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for page-history; see help page-history."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("page-history", args)));
+        add("workbench_print",
+                "E7: print (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for print; see help print."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("print", args)));
+        add("workbench_storage",
+                "E7: storage (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for storage; see help storage."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("storage", args)));
+        add("workbench_storage_state",
+                "E7: storage-state (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for storage-state; see help storage-state."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("storage-state", args)));
+        add("workbench_downloads",
+                "E7: downloads (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for downloads; see help downloads."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("downloads", args)));
+        add("workbench_dialogs",
+                "E7: dialogs (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for dialogs; see help dialogs."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("dialogs", args)));
+        add("workbench_drop",
+                "E7: drop (same flags as the CLI verb).",
+                schema(Map.of(
+                        "flags", stringProperty("Space-separated --name=value flags for drop; see help drop."),
+                        "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")
+                )),
+                args -> forwardReady(protoArgs("drop", args)));
         add("workbench_chat_turn",
                 "Send one agent line, then wait for a human message, an answer, or a click.",
                 schema(view),

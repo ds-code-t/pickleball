@@ -74,9 +74,25 @@ public final class BrowserAlerts {
         } catch (RuntimeException failure) {
             seleniumFailure = failure;
         }
+        // E7: the engine layer (WebDriver BiDi browsingContext.handleUserPrompt) before the reflective CDP call.
+        if (handleUserPrompt(driver, accept)) return;
         if (handleJavaScriptDialog(driver, accept)) return;
         if (seleniumFailure instanceof NoAlertPresentException missing) throw missing;
         throw seleniumFailure;
+    }
+
+    /**
+     * The engine layer: WebDriver BiDi {@code browsingContext.handleUserPrompt} on the driver's own BiDi connection
+     * (Chrome, Edge and Firefox with {@code webSocketUrl}). Returns false when the driver has no BiDi or the call fails.
+     */
+    static boolean handleUserPrompt(WebDriver driver, boolean accept) {
+        if (!(driver instanceof org.openqa.selenium.bidi.HasBiDi bidi) || bidi.maybeGetBiDi().isEmpty()) return false;
+        try {
+            new org.openqa.selenium.bidi.browsingcontext.BrowsingContext(driver, driver.getWindowHandle()).handleUserPrompt(accept);
+            return true;
+        } catch (RuntimeException failure) {
+            return false;
+        }
     }
 
     /**
