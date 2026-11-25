@@ -82,6 +82,7 @@ The universal entity is the single primitive everything else hangs off. It is a 
 - Persistent socket connection vs per-command spawn for chatty dashboard interactions. CLI-style spawn matches the testability ideal; a persistent channel is an optimization that can be added without changing the contract. (User agreed: start with per-command spawn.)
 - Build the documented verb inventory: which verbs are CLI-only, which are MCP-only, which are bidirectional streams, and the rule that new Node surfaces register against it.
 - Custom classloader mechanics for warm-engine class reloading: static-state leakage and loader-retention risks need a concrete design before implementation.
+- Node.js Workbench: custom-browser mode (workbench-embedded page) vs side-by-side collaboration with a real browser. Side-by-side is the lean default; custom-browser is opt-in for headless/agent-only runs. Pause/resume via BiDi session freeze at step boundaries.
 
 ## Node.js Workbench GUI & Playwright Integration (LOCKED / REFINED)
 
@@ -103,21 +104,33 @@ Primary ordering matches actual workflow:
 - Dynamic run mode is for on-the-fly iteration: writing steps as you go, editing definitions that do not yet exist, or tweaking values for a specific step without committing to the main store.
 - ParsingMap / NodeMap is shown as an expandable tree (Node.js UI libraries). Each step has its own node map; children inherit from parents.
 - **Pre-step mapping hook**: Right before a step executes, the editor applies any pending map overrides for that step only. Parents remain untouched; children inherit the temporary change for that moment. The next step gets a fresh map unless overridden again.
-- Edits in dynamic mode write only to the in-memory run map for that step’s moment. They do **not** mutate SQLite or parent maps permanently.
+- Edits in dynamic mode write only to the in-memory run map for that step's moment. They do **not** mutate SQLite or parent maps permanently.
 - You can re-run a single step repeatedly with the current overrides.
-- The map view is labeled with the specific run and step it is bound to (especially when opened from a previous run’s log).
-- **Promote alert**: Before any dynamic edit is written back to SQL, config, a parent node map, or a saved snapshot, an alert asks for confirmation. Options include write to step definition row, parent map, or this run’s branch.
-- Dynamic mode rewrites the current session’s logs in place (rewind / re-tweak). Completed runs remain immutable records.
+- The map view is labeled with the specific run and step it is bound to (especially when opened from a previous run's log).
+- **Promote alert**: Before any dynamic edit is written back to SQL, config, a parent node map, or a saved snapshot, an alert asks for confirmation. Options include write to step definition row, parent map, or this run's branch.
+- Dynamic mode rewrites the current session's logs in place (rewind / re-tweak). Completed runs remain immutable records.
 
 ### Branching, Snapshots, and Promote (LOCKED)
 
 - Entering dynamic mode on a completed run immediately creates a cheap delta-based fork (using the universal entity: commit pin + independent delta). The original completed run stays pristine and immutable.
 - The fork can be discarded if no changes are made. If changes are made, it becomes the working branch.
-- **Always branch on edit**: There is no in-place editing of a log-bearing completed record. Branching is the only consistent move. An explicit “branch off” / save-state action exists; micro-edits within a session do not auto-spawn new visible branches.
+- **Always branch on edit**: There is no in-place editing of a log-bearing completed record. Branching is the only consistent move. An explicit "branch off" / save-state action exists; micro-edits within a session do not auto-spawn new visible branches.
 - Each branch keeps its own independent delta. A parent can never be silently rewritten by a child.
-- Optional parenting link stored in the entity as provenance metadata (useful for AI analysis of before/after logs). It is not a structural dependency; deleting a parent does not break the child’s delta.
+- Optional parenting link stored in the entity as provenance metadata (useful for AI analysis of before/after logs). It is not a structural dependency; deleting a parent does not break the child's delta.
 - Per-file branching tree visualization (collapsible) with color-shift per branch so you immediately see you are not on the original. The top-level branch selector aggregates these per-file trees.
-- Promote options: promote-to-parent or promote-to-top. On promote, a toggle asks whether to clear the branch’s logs or archive them. Multi-level promote graphs are deferred.
-- Logs belong to a specific branch. Completed-run logs are append-only truth; dynamic-session logs are ephemeral working data that can be cleared or GC’d independently.
+- Promote options: promote-to-parent or promote-to-top. On promote, a toggle asks whether to clear the branch's logs or archive them. Multi-level promote graphs are deferred.
+- Logs belong to a specific branch. Completed-run logs are append-only truth; dynamic-session logs are ephemeral working data that can be cleared or GC'd independently.
 
 All of the above is locked for the Node.js Workbench vision. Exact visual styling of the tree and color shifts remains an implementation detail.
+
+### One Control Plane, Many Surfaces (LOCKED)
+
+- **Single control plane**: The workbench GUI, browser sessions, OS-level automation, and headless/remote runs all hang off the same Java entry points and the same CLI/MCP verbs. The Node layer is a renderer that calls those entry points. No duplicated control logic across surfaces.
+- **Per-surface addressing (future-proof)**: Every command targets a specific surface via session ID or label. Built now so multiple concurrent agents (not communicating with each other directly) can address distinct surfaces without collision. Agent IDs and self-assigned tasks/instructions are part of the addressing model.
+- **Chat panel as first-class surface**: A general chat panel exists in the workbench before any scenario opens — the agent's home base for the session (run this, search logs, switch tabs, open prior runs). Browser-specific chat is one mode of it, not a separate system. The same workbench serves browser-based automation and non-browser automation (OS/desktop control), with or without a visible browser.
+- **Clean vs injected browser toggle**: Per-session. Default is no injection when the test depends on natural behavior or overlays would distort measurement. Injection is opt-in, declared in run config or triggered mid-session. The workbench tracks which sessions are injected vs pristine.
+- **Control lease extension**: The existing HUMAN vs AGENT control lease extends beyond the workbench UI to specific browser sessions — including mouse/keyboard input blocking and overlay lockdown on a running test page. The agent can take the lease on the workbench, on a browser session, or both.
+- **Multi-agent chat panels**: Each agent can inject its own independent chat panel (or share one), addressed by agent ID. Whether panels are independent or shared is the injecting agent's decision at injection time.
+- **Overlay-as-sibling default**: Injection creates a full-page transparent overlay element as a sibling layer above the real DOM — not mutations inside the page's component tree. Highlights are absolutely positioned divs using bounding-box coordinates from CDP/Playwright locator APIs. Reload and scroll are handled by re-querying positions on mutation/scroll events and re-anchoring. Direct DOM mutation is retained as a fallback for cases where the page itself must behave differently, not just be annotated.
+- **CDP/BiDi reliance**: CDP and BiDi replace most custom mutation listeners for observation (DOM changes, network, console via protocol without touching the page). A minimal local listener is kept only for things the protocol does not surface cleanly (element resize, overlay interactions).
+- **External state rule**: All interaction state (chat history, highlights, agent assignments, overlay positions) lives in the Pickleball runtime (Java/SQLite), never in the page. The page is a disposable viewport; on reload, the overlay re-renders from the external source. Global and local state both persist outside the page.
