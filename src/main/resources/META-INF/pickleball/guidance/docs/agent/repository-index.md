@@ -29,6 +29,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/agent/repository-index.md`
 - `docs/ai-run-configuration.md`
 - `docs/block-conditionals.md`
+- `docs/brainstorm/2026-11-25-sqlite-spine-and-cucumber-decoupling.md`
 - `docs/browser-events.md`
 - `docs/browser-protocols.md`
 - `docs/collaborative-recording.md`
