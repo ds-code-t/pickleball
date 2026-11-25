@@ -4,6 +4,14 @@
 
 # 2026-11-25 — SQLite Spine & Cucumber Decoupling
 
+## Guiding Philosophy (LOCKED)
+
+- Pickleball's spine is self-enclosed, isolated logic that runs itself.
+- Everything external is an adapter: Cucumber, Playwright, Gherkin, any script syntax, any programming language hosting step definitions.
+- The spine runs any text as business language and matches it to code via regex.
+- Step definitions may be defined in Java, TypeScript, or JavaScript for now; other languages later.
+- Adapters are the only external surface. The spine never imports or depends on Cucumber, Playwright, or any host framework at runtime.
+
 ## Locked Decisions
 
 - Cucumber is entirely decoupled from the spine. It is a legacy adapter / on-ramp, not integrated into core execution.
@@ -22,4 +30,6 @@
 
 ## Open Questions (not locked)
 
-- (none yet)
+- Playwright adapter: hydrate implicit fixture/page context into the row at ingest, or re-resolve at execution?
+- Cross-language run/pass state: SQLite shared map, or separate MapDB for cross-language cross-mapping?
+- Can the bundled Node.js engine from the Playwright dependency execute TypeScript/JavaScript step definitions directly?
