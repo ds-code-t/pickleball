@@ -9,11 +9,15 @@ import dev.domengine.tree.DomNode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -92,8 +96,13 @@ class LiveDesktopTest {
         }
 
         assertTrue(WindowsUia.captureScript().contains("UIAutomationClient"));
+        assertTrue(WindowsUia.captureScript().contains("EnumWindows"));
+        assertTrue(WindowsUia.captureScript().contains("not found:"));
+        assertTrue(WindowsUia.captureScript().contains("edit-class-is-textbox"));
         assertTrue(WindowsUia.clickScript().contains("InvokePattern"));
         assertTrue(WindowsUia.typeScript().contains("ValuePattern"));
+        assertTrue(WindowsUia.typeScript().contains("TextPattern"));
+        assertTrue(WindowsUia.typeScript().contains("SendInput"));
         assertTrue(MacAccessibility.captureScript().contains("System Events"));
         assertTrue(MacAccessibility.clickScript().contains("AXPress"));
         assertEquals(12, NativeDesktop.WALK_DEPTH);
@@ -164,6 +173,21 @@ class LiveDesktopTest {
         assertEquals("Save", root.children.get(0).accessibleName);
         assertEquals("textbox", root.children.get(1).role);
         assertEquals("1/2", root.children.get(1).attributes.get("ax-path"));
+
+        String winForms = """
+                NODE\t0\twindow\t0\t0\t100\t40\t9.1\tNotes
+                ATTR\t9.1\tclass-name\tWindowsForms10.Window.8.app.0
+                NODE\t1\tpane\t4\t4\t80\t16\t9.2\t
+                ATTR\t9.2\tclass-name\tWindowsForms10.EDIT.app.0
+                NODE\t1\tpane\t4\t24\t40\t12\t9.3\t
+                ATTR\t9.3\tclass-name\tWindowsForms10.BUTTON.app.0
+                """;
+        DomNode form = NativeDesktop.parseLines(winForms, "uia");
+        DesktopAnnotations.apply(form, winForms, "uia-runtime-id");
+        assertEquals("window", form.role);
+        assertEquals("textbox", form.children.get(0).role);
+        assertEquals("TEXTBOX", form.children.get(0).nodeName);
+        assertEquals("pane", form.children.get(1).role);
 
         DomNode window = new DomNode();
         window.role = "window";
@@ -303,6 +327,258 @@ class LiveDesktopTest {
         assertEquals(0, live.exit(), live.stderr());
         assertTrue(live.stdout().contains("\"ok\":true") || live.stdout().contains("\"ok\": true")
                 || live.stdout().contains("\"ok\" : true"), live.stdout());
+    }
+
+    @Test
+    @Timeout(value = 180, unit = TimeUnit.SECONDS)
+    void ownedEditTypeReadsBackTheValuePattern() throws Exception {
+        Assumptions.assumeTrue("windows".equals(NativeDesktop.family()), "requires Windows");
+        String marker = "pkb-p2-live-" + System.nanoTime();
+        Process host = startOwnedEdit(marker);
+        try {
+            DomNode editor = null;
+            for (int attempt = 0; attempt < 20 && editor == null; attempt++) {
+                try {
+                    DesktopTree.close("p2-live-note");
+                } catch (RuntimeException ignored) {
+                    // The first attempt has no session.
+                }
+                try {
+                    DesktopTree.Session session = DesktopTree.attachLive("p2-live-note", marker);
+                    editor = editor(session.root());
+                } catch (RuntimeException ignored) {
+                    editor = null;
+                }
+                if (editor == null) Thread.sleep(400);
+            }
+            assertTrue(editor != null, "owned edit was not on the UIA tree for " + marker);
+            String runtimeId = editor.attributes.get("uia-runtime-id");
+            assertTrue(runtimeId != null && !runtimeId.isBlank(), "editor has no uia-runtime-id");
+            focus(marker);
+            WindowsUia.type(editor, "pickleball-p2", false);
+            String value = readValue(runtimeId);
+            assertEquals("pickleball-p2", value.strip(), value);
+        } finally {
+            try {
+                DesktopTree.close("p2-live-note");
+            } catch (RuntimeException ignored) {
+                // Already closed.
+            }
+            closeOwnedEdit(host, marker);
+        }
+    }
+
+    private static DomNode editor(DomNode node) {
+        if (node == null) return null;
+        String role = node.role == null ? "" : node.role;
+        if ("document".equals(role) || "textbox".equals(role) || "edit".equals(role)) {
+            String id = node.attributes.get("uia-runtime-id");
+            if (id != null && !id.isBlank()) return node;
+        }
+        for (DomNode child : node.children) {
+            DomNode found = editor(child);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    private static Process startOwnedEdit(String marker) throws Exception {
+        String script = """
+                $ErrorActionPreference = 'Stop'
+                $ProgressPreference = 'SilentlyContinue'
+                Add-Type -AssemblyName System.Windows.Forms
+                Add-Type -AssemblyName System.Drawing
+                Add-Type -TypeDefinition @'
+                using System;
+                using System.Runtime.InteropServices;
+                public class PkbEditChildLive {
+                  [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+                  public static extern IntPtr CreateWindowEx(int ex, string cls, string title, int style, int x, int y, int w, int h, IntPtr parent, IntPtr menu, IntPtr inst, IntPtr param);
+                  [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+                  public static extern IntPtr GetModuleHandle(string name);
+                  public static void Add(IntPtr parent) {
+                    IntPtr hwnd = CreateWindowEx(0, "EDIT", "", 0x50800080, 12, 12, 440, 24, parent, new IntPtr(1), GetModuleHandle(null), IntPtr.Zero);
+                    if (hwnd == IntPtr.Zero) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+                  }
+                }
+                '@
+                $form = New-Object System.Windows.Forms.Form
+                $form.Text = [string]$env:PKB_MARKER
+                $form.StartPosition = 'Manual'
+                $form.Location = New-Object System.Drawing.Point(180, 180)
+                $form.ClientSize = New-Object System.Drawing.Size(480, 120)
+                $form.Add_Shown({ [PkbEditChildLive]::Add($form.Handle) })
+                [System.Windows.Forms.Application]::Run($form)
+                """;
+        String encoded = Base64.getEncoder().encodeToString(script.getBytes(StandardCharsets.UTF_16LE));
+        ProcessBuilder builder = new ProcessBuilder(
+                "powershell.exe", "-STA", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded);
+        builder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
+        builder.redirectError(ProcessBuilder.Redirect.DISCARD);
+        builder.environment().put("PKB_MARKER", marker);
+        return builder.start();
+    }
+
+    private static void focus(String marker) {
+        String script = """
+                $ErrorActionPreference = 'Stop'
+                Add-Type -TypeDefinition @'
+                using System;
+                using System.Text;
+                using System.Runtime.InteropServices;
+                public class PkbFocusLive {
+                  public delegate bool EnumProc(IntPtr hWnd, IntPtr lParam);
+                  [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc cb, IntPtr lParam);
+                  [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int count);
+                  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
+                  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+                  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+                  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+                  [DllImport("user32.dll")] public static extern bool AttachThreadInput(uint a, uint b, bool attach);
+                  [DllImport("user32.dll")] public static extern void keybd_event(byte key, byte scan, uint flags, UIntPtr extra);
+                  public static IntPtr Found;
+                  public static string Want;
+                  static EnumProc callback;
+                  public static bool Visit(IntPtr hWnd, IntPtr lParam) {
+                    StringBuilder sb = new StringBuilder(512);
+                    GetWindowText(hWnd, sb, sb.Capacity);
+                    string title = sb.ToString();
+                    if (title.Length == 0 || string.IsNullOrEmpty(Want)) return true;
+                    if (title.IndexOf(Want, StringComparison.OrdinalIgnoreCase) < 0) return true;
+                    Found = hWnd;
+                    return false;
+                  }
+                  public static bool Scan(string want) {
+                    Want = want;
+                    Found = IntPtr.Zero;
+                    callback = Visit;
+                    EnumWindows(callback, IntPtr.Zero);
+                    return Found != IntPtr.Zero;
+                  }
+                  public static void Focus(IntPtr hWnd) {
+                    uint ignored;
+                    uint mine = GetWindowThreadProcessId(hWnd, out ignored);
+                    IntPtr fg = GetForegroundWindow();
+                    uint fgIgnored;
+                    uint fgThread = GetWindowThreadProcessId(fg, out fgIgnored);
+                    ShowWindow(hWnd, 9);
+                    if (fgThread != mine) AttachThreadInput(fgThread, mine, true);
+                    keybd_event(0x12, 0, 0, UIntPtr.Zero);
+                    keybd_event(0x12, 0, 2, UIntPtr.Zero);
+                    SetForegroundWindow(hWnd);
+                    if (fgThread != mine) AttachThreadInput(fgThread, mine, false);
+                  }
+                }
+                '@
+                if (-not [PkbFocusLive]::Scan([string]$env:PKB_MARKER)) { exit 2 }
+                [PkbFocusLive]::Focus([PkbFocusLive]::Found)
+                exit 0
+                """;
+        NativeDesktop.CommandResult result = runPowershell(script, Map.of("PKB_MARKER", marker));
+        assertEquals(0, result.exit(), result.output());
+    }
+
+    private static String readValue(String runtimeId) {
+        String script = """
+                $ErrorActionPreference = 'Stop'
+                $ProgressPreference = 'SilentlyContinue'
+                Add-Type -AssemblyName UIAutomationClient
+                Add-Type -TypeDefinition @'
+                using System;
+                using System.Text;
+                using System.Runtime.InteropServices;
+                public class PkbReadLiveValue {
+                  [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "SendMessageW")]
+                  public static extern IntPtr SendGet(IntPtr hWnd, uint msg, IntPtr wParam, StringBuilder lParam);
+                  public static string Text(IntPtr hwnd) {
+                    if (hwnd == IntPtr.Zero) return "";
+                    StringBuilder sb = new StringBuilder(4000);
+                    SendGet(hwnd, 0x000D, new IntPtr(sb.Capacity), sb);
+                    return sb.ToString();
+                  }
+                }
+                '@
+                $want = [string]$env:DESKTOP_UIA_ID
+                function Find($el) {
+                  if ($null -eq $el) { return $null }
+                  $id = ''
+                  try { $id = (($el.GetRuntimeId() | ForEach-Object { $_.ToString() }) -join '.') } catch {}
+                  if ($id -eq $want) { return $el }
+                  $kids = @()
+                  try { $kids = $el.FindAll([System.Windows.Automation.TreeScope]::Children, [System.Windows.Automation.Condition]::TrueCondition) } catch { return $null }
+                  foreach ($kid in $kids) { $hit = Find $kid; if ($null -ne $hit) { return $hit } }
+                  return $null
+                }
+                $el = Find ([System.Windows.Automation.AutomationElement]::RootElement)
+                if ($null -eq $el) { Write-Error "missing $want"; exit 1 }
+                $text = ''
+                try {
+                  $pattern = $el.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
+                  $text = [string]$pattern.Current.Value
+                } catch {}
+                if ([string]::IsNullOrEmpty($text)) {
+                  $hwnd = [IntPtr]::Zero
+                  try { $hwnd = [IntPtr]$el.Current.NativeWindowHandle } catch {}
+                  $text = [PkbReadLiveValue]::Text($hwnd)
+                }
+                if ([string]::IsNullOrEmpty($text)) { Write-Error "empty value for $want"; exit 1 }
+                Write-Output $text
+                exit 0
+                """;
+        NativeDesktop.CommandResult result = runPowershell(script, Map.of("DESKTOP_UIA_ID", runtimeId));
+        assertEquals(0, result.exit(), result.output());
+        return result.output();
+    }
+
+    private static NativeDesktop.CommandResult runPowershell(String script, Map<String, String> env) {
+        String encoded = Base64.getEncoder().encodeToString(script.getBytes(StandardCharsets.UTF_16LE));
+        return NativeDesktop.run(List.of(
+                "powershell.exe", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded
+        ), env, 25);
+    }
+
+    private static void closeOwnedEdit(Process host, String marker) {
+        String script = """
+                $ErrorActionPreference = 'Stop'
+                Add-Type -TypeDefinition @'
+                using System;
+                using System.Text;
+                using System.Runtime.InteropServices;
+                public class PkbCloseLive {
+                  public delegate bool EnumProc(IntPtr hWnd, IntPtr lParam);
+                  [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc cb, IntPtr lParam);
+                  [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int count);
+                  [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr w, IntPtr l);
+                  public static string Want;
+                  static EnumProc callback;
+                  public static bool Visit(IntPtr hWnd, IntPtr lParam) {
+                    StringBuilder sb = new StringBuilder(512);
+                    GetWindowText(hWnd, sb, sb.Capacity);
+                    if (sb.ToString().IndexOf(Want, StringComparison.OrdinalIgnoreCase) >= 0) {
+                      PostMessage(hWnd, 0x0010, IntPtr.Zero, IntPtr.Zero);
+                    }
+                    return true;
+                  }
+                  public static void CloseAll(string want) {
+                    Want = want;
+                    callback = Visit;
+                    EnumWindows(callback, IntPtr.Zero);
+                  }
+                }
+                '@
+                [PkbCloseLive]::CloseAll([string]$env:PKB_MARKER)
+                exit 0
+                """;
+        runPowershell(script, Map.of("PKB_MARKER", marker));
+        if (host == null) return;
+        host.destroy();
+        try {
+            if (!host.waitFor(3, TimeUnit.SECONDS)) host.destroyForcibly();
+            host.waitFor(3, TimeUnit.SECONDS);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            host.destroyForcibly();
+        }
     }
 
     private static boolean accessibilityBusIsUp() {

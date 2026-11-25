@@ -133,6 +133,16 @@ public final class NativeDesktop {
         }
     }
 
+    /** Foreground window title. Empty off Windows and when the title cannot be read. */
+    public static String foregroundTitle() {
+        if (!"windows".equals(family())) return "";
+        try {
+            return WindowsUia.foregroundTitle();
+        } catch (RuntimeException failure) {
+            return "";
+        }
+    }
+
     public static void type(DomNode node, String text, boolean append) {
         if (node == null) throw new CdpException("type failed: no node");
         String backend = node.attributes.getOrDefault("desktop-backend", "");
@@ -205,6 +215,17 @@ public final class NativeDesktop {
         if (text == null || text.isBlank()) return "no output";
         String flat = text.replace('\n', ' ').replace('\r', ' ').trim();
         return flat.length() > 240 ? flat.substring(0, 240) : flat;
+    }
+
+    /** Failure text with the PowerShell progress CLIXML header skipped so the real message stays visible. */
+    static String useful(String text) {
+        if (text == null || text.isBlank()) return "no output";
+        String flat = text.replace('\n', ' ').replace('\r', ' ');
+        int id = flat.indexOf("FullyQualifiedErrorId");
+        String slice = id >= 0 ? flat.substring(Math.max(0, id - 500), id) : flat;
+        slice = slice.replaceAll("<[^>]*>", " ").replace("_x000D__x000A_", " ").replaceAll("\\s+", " ").trim();
+        if (slice.isBlank()) slice = flat.trim();
+        return slice.length() > 400 ? slice.substring(slice.length() - 400) : slice;
     }
 
     static DomNode parseLines(String output, String backend) {

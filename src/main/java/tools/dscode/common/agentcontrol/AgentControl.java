@@ -554,8 +554,13 @@ public final class AgentControl {
         if (!present(raw)) throw new IllegalArgumentException("guide requires --steps=<json array> or --steps=@file.json");
         String text = raw.trim();
         if (text.startsWith("@")) {
+            Path base = project == null ? Path.of("").toAbsolutePath().normalize() : project.toAbsolutePath().normalize();
             Path file = Path.of(text.substring(1));
-            if (!file.isAbsolute() && project != null) file = project.resolve(file);
+            if (!file.isAbsolute()) file = base.resolve(file).normalize();
+            else file = file.toAbsolutePath().normalize();
+            if (!java.nio.file.Files.isRegularFile(file)) {
+                throw new IllegalArgumentException("steps file not found: " + file + " (relative paths are from " + base + ")");
+            }
             text = java.nio.file.Files.readString(file);
         }
         Object parsed;
@@ -1269,7 +1274,6 @@ public final class AgentControl {
         }
         String channel = args.get("channel");
         String from = present(args.get("from")) ? args.get("from").trim() : "human";
-        boolean any = "any".equalsIgnoreCase(from) || "all".equalsIgnoreCase(from);
         PageSurfaces.drainPanelChat(project, runId);
         String newest = "0";
         for (ChatLog.Message message : ChatLog.poll(project, runId, channel, "0")) newest = message.id();
@@ -1280,8 +1284,7 @@ public final class AgentControl {
             PageSurfaces.drainPanelChat(project, runId);
             List<Map<String, Object>> fresh = new ArrayList<>();
             for (ChatLog.Message message : ChatLog.poll(project, runId, channel, newest)) {
-                if ("agent".equalsIgnoreCase(message.source())) continue;
-                if (!any && (message.source() == null || !from.equalsIgnoreCase(message.source()))) continue;
+                if (!waitSource(from, message.source())) continue;
                 fresh.add(ChatLog.toMap(message));
             }
             if (!fresh.isEmpty()) {
@@ -1304,6 +1307,19 @@ public final class AgentControl {
             }
             tools.dscode.common.agentfast.PushWake.await(wakeSeen, 200L, deadline);
         }
+    }
+
+    /**
+     * {@code --from=agent} is agent messages only. {@code human} (the default) is that source and skips agent.
+     * {@code any} and {@code all} keep every source, including agent.
+     */
+    static boolean waitSource(String from, String source) {
+        String want = from == null || from.isBlank() ? "human" : from.trim();
+        String have = source == null ? "" : source;
+        if ("any".equalsIgnoreCase(want) || "all".equalsIgnoreCase(want)) return true;
+        if ("agent".equalsIgnoreCase(want)) return "agent".equalsIgnoreCase(have);
+        if ("agent".equalsIgnoreCase(have)) return false;
+        return want.equalsIgnoreCase(have);
     }
 
     /** Seconds; a trailing {@code ms} or {@code s} is accepted. Returns milliseconds. */

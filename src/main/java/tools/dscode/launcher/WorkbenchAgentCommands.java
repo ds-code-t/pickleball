@@ -2202,6 +2202,8 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "within");
         copyFlag(args, parsed, "depth");
         copyFlag(args, parsed, "budget");
+        copyFlag(args, parsed, "budget-ms");
+        copyFlag(args, parsed, "from");
         copyFlag(args, parsed, "strict");
         copyFlag(args, parsed, "rank");
         copyFlag(args, parsed, "scroll-search");
@@ -2313,7 +2315,7 @@ public final class WorkbenchAgentCommands {
         List<String> extra = new ArrayList<>();
         // extra is filled below; the live-worker post uses the same maps.
         java.util.Optional<tools.dscode.control.protocol.LiveBridgeFile.Bridge> liveBridge =
-                livePageTarget(parsed.project(), args.get("session"));
+                pageTargetFor(parsed.project(), args.get("session"), command, args);
         String[] forwarded = parsed.forwarded();
         if (forwarded != null) {
             for (int index = 0; index < forwarded.length; index++) {
@@ -2460,6 +2462,26 @@ public final class WorkbenchAgentCommands {
     ) {
         return tools.dscode.control.protocol.LiveSessionAttach.resolve(project, sessionId, false)
                 .map(tools.dscode.control.protocol.LiveSessionAttach.Attached::bridge);
+    }
+
+    /**
+     * {@code frame} with no {@code --enter} and no {@code --reset} is the start host's frame list.
+     * Every other page verb still prefers a live isolate worker.
+     */
+    static java.util.Optional<tools.dscode.control.protocol.LiveBridgeFile.Bridge> pageTargetFor(
+            java.nio.file.Path project,
+            String sessionId,
+            String command,
+            java.util.Map<String, String> args
+    ) {
+        String enter = args == null ? null : args.get("enter");
+        boolean reset = args != null && "true".equals(args.get("reset"));
+        if ("frame".equals(command) && (enter == null || enter.isBlank()) && !reset) {
+            java.util.Optional<tools.dscode.control.protocol.LiveSessionAttach.Attached> start =
+                    tools.dscode.control.protocol.LiveSessionAttach.start(project);
+            if (start.isPresent()) return java.util.Optional.of(start.get().bridge());
+        }
+        return livePageTarget(project, sessionId);
     }
 
     private static boolean alivePid(long pid) {

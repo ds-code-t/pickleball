@@ -7,6 +7,7 @@ import dev.domengine.action.PageActions;
 import dev.domengine.cdp.CdpConnection;
 import dev.domengine.cdp.CdpException;
 import dev.domengine.desktop.DesktopTree;
+import dev.domengine.desktop.NativeDesktop;
 import dev.domengine.json.Jsons;
 import dev.domengine.query.Displayed;
 import dev.domengine.query.Frames;
@@ -78,8 +79,11 @@ public final class TargetVerb {
     private static final Set<String> ACT_KEYS = Set.of(
             "target", "kind", "query", "ref", "value", "snap", "run-id", "agent", "agent-id",
             "fixture", "timeout", "condition", "frame", "group", "sequence",
-            "format", "fields", "where", "limit", "budget", "pick", "session", "sessionId", "exposure", "purpose", "file", "human", "refind", "identity"
+            "format", "fields", "where", "limit", "budget", "budget-ms", "pick", "session", "sessionId", "exposure", "purpose", "file", "human", "refind", "identity"
     );
+
+    /** Time budget for the find or act that is running on this thread. */
+    private static final ThreadLocal<LookupBudget> LOOKUP = new ThreadLocal<>();
 
     /** CSS or text selector for a fresh {@code ref:}. Null when the ref is unknown or stale. */
     public static String anchorSelector(String raw) {
@@ -408,6 +412,9 @@ public final class TargetVerb {
         Map<String, String> values = stripHumanOverride(verb, SessionIds.rewrite(args == null ? Map.of() : args));
         RUN.set(runId);
         try {
+            if ("find".equals(verb) || "act".equals(verb) || "upload".equals(verb)) {
+                LOOKUP.set(LookupBudget.parse(values));
+            }
             TargetSelector.Parsed target = TargetSelector.parse(values.get("target"));
             if (needsLiveTarget(verb) && (target.raw().isBlank() || "none".equals(target.kind())) && liveBrowserPresent()) {
                 target = TargetSelector.parse("browser:auto");
@@ -444,6 +451,7 @@ public final class TargetVerb {
             return fail(verb, message);
         } finally {
             RUN.remove();
+            LOOKUP.remove();
             TYPE_VIA.remove();
             TYPE_VALUE.remove();
             TYPE_VERIFIED.remove();
@@ -868,7 +876,9 @@ public final class TargetVerb {
                 }
                 query = hit.query;
             } else {
-                List<DomNode> hits = locate(root, query, scopedFrame(runId, target));
+                Map<String, String> locateFlags = new LinkedHashMap<>(scopedFrame(runId, target));
+                if ("type".equals(blank(args.get("kind")))) locateFlags.put("text-target", "true");
+                List<DomNode> hits = locate(root, query, locateFlags);
                 if (hits.isEmpty()) {
                     Outcome missed = fail("act", "not found");
                     stamp(missed.body(), page.session.connection(), null);
@@ -1392,11 +1402,14 @@ public final class TargetVerb {
         List<SnapRow> rowsBefore = desktopRows(session);
         boolean wantAuto = "auto".equals(blank(args.get("snap")));
         List<String> autoBefore = wantAuto ? compactDesktop(session, runId) : List.of();
+        Outcome refused = foregroundRefusal(session);
+        if (refused != null) return refused;
         boolean live = desktopAct(session, node, args);
         DesktopTree.Session after = DesktopTree.open(session.id());
         if (after == null) after = session;
         Map<String, Object> body = base("act", "desktop", "desktop", TargetSelector.parse("desktop:" + hit.sessionId));
         body.put("applied", live);
+        putWindow(body, after);
         String afterVersion = "desktop:" + after.sequence();
         body.put("docVersion", afterVersion);
         body.put("session", after.id());
@@ -1410,8 +1423,13 @@ public final class TargetVerb {
 
     private static Outcome actDesktop(Path project, String runId, TargetSelector.Parsed target, Map<String, String> args) {
         DesktopTree.Session session = openDesktop(target, args.get("fixture"));
+        Outcome refused = foregroundRefusal(session);
+        if (refused != null) return refused;
         String query = blank(args.get("query"));
-        List<DomNode> hits = locate(session.root(), query, Map.of());
+        Map<String, String> locateFlags = new LinkedHashMap<>();
+        if ("type".equals(blank(args.get("kind")))) locateFlags.put("text-target", "true");
+        List<DomNode> hits = locate(session.root(), query, locateFlags);
+        if ("type".equals(blank(args.get("kind")))) hits = typeEditors(hits);
         if (hits.isEmpty()) return fail("act", "not found");
         DomNode node = hits.get(0);
         if (hits.size() > 1 || !blank(args.get("pick")).isBlank()) {
@@ -1435,6 +1453,7 @@ public final class TargetVerb {
         if (after == null) after = session;
         Map<String, Object> body = base("act", "desktop", "desktop", target);
         body.put("applied", live);
+        putWindow(body, after);
         String afterVersion = "desktop:" + after.sequence();
         body.put("docVersion", afterVersion);
         body.put("session", after.id());
@@ -3807,7 +3826,13 @@ public final class TargetVerb {
         if (query != null && !query.isBlank()) hits.addAll(named(search, query));
         // Only pickleball's own panel or chat text matched: the page may still have a control whose name has these words.
         if (query != null && !query.isBlank() && allOwn(hits)) hits.addAll(namedWords(search, query));
-        return deepest(controlsFor(search, preferControls(preferBody(preferLinks(hits)))));
+        boolean keepText = extra != null && "true".equalsIgnoreCase(blank(extra.get("text-target")));
+        return deepest(controlsFor(search, preferControls(preferBody(preferLinks(hits)), keepText)));
+    }
+
+    /** Package entry for a fixture tree. {@code text-target=true} keeps a document or edit. */
+    static List<DomNode> locateQuery(DomNode root, String query, Map<String, String> extra) {
+        return locate(root, query, extra == null ? Map.of() : extra);
     }
 
     /**
@@ -3985,8 +4010,17 @@ public final class TargetVerb {
      * A document shell stays out even when its accessible role is button.
      */
     private static List<DomNode> preferControls(List<DomNode> hits) {
+        return preferControls(hits, false);
+    }
+
+    private static List<DomNode> preferControls(List<DomNode> hits, boolean keepText) {
         List<DomNode> controls = new ArrayList<>();
         if (hits == null) return controls;
+        if (keepText) {
+            List<DomNode> text = new ArrayList<>();
+            for (DomNode node : hits) if (node != null && textTarget(node)) text.add(node);
+            if (!text.isEmpty()) return text;
+        }
         for (DomNode node : hits) {
             if (node != null && interactiveNode(node) && !depthWrapper(node)) controls.add(node);
         }
@@ -4035,6 +4069,44 @@ public final class TargetVerb {
         if (node.shadowRoot || node.nodeType == 9 || node.nodeType == 11) return true;
         String tag = node.tag();
         return "html".equals(tag) || "body".equals(tag) || "head".equals(tag);
+    }
+
+    /**
+     * A type into a named window lands on the editor inside it. A hit that is already a document, edit, or
+     * textbox stays. Otherwise the editors under those hits are the candidates, so {@code --pick=document}
+     * and {@code --pick=textbox} can see them.
+     */
+    static List<DomNode> typeEditors(List<DomNode> hits) {
+        if (hits == null || hits.isEmpty()) return hits == null ? List.of() : hits;
+        for (DomNode hit : hits) if (editorNode(hit)) return hits;
+        List<DomNode> editors = new ArrayList<>();
+        for (DomNode hit : hits) collectEditors(hit, editors);
+        return editors.isEmpty() ? hits : editors;
+    }
+
+    private static void collectEditors(DomNode node, List<DomNode> editors) {
+        if (node == null) return;
+        for (DomNode child : node.children) {
+            if (editorNode(child)) editors.add(child);
+            collectEditors(child, editors);
+        }
+    }
+
+    private static boolean editorNode(DomNode node) {
+        if (node == null) return false;
+        if (textTarget(node)) return true;
+        String roleName = node.role == null ? "" : node.role;
+        if ("textbox".equalsIgnoreCase(roleName)) return true;
+        String className = node.attributes.getOrDefault("class-name", "");
+        return className.toLowerCase(Locale.ROOT).contains("edit");
+    }
+
+    /** A document or edit is the type target even when a nested button shares its label. */
+    private static boolean textTarget(DomNode node) {
+        String tag = node.tag();
+        String roleName = node.role == null ? "" : node.role.toLowerCase(Locale.ROOT);
+        return "document".equals(roleName) || "edit".equals(roleName) || "text".equals(roleName)
+                || "textarea".equals(tag) || "textarea".equals(roleName) || "document".equals(tag);
     }
 
     private static boolean interactiveNode(DomNode node) {
@@ -5278,7 +5350,62 @@ public final class TargetVerb {
         JsonNode tree = cdp.call("Page.getFrameTree", Jsons.object(), Duration.ofSeconds(5));
         collectFrameRows(cdp, tree.path("frameTree"), "", rows);
         addCoveredFrames(cdp, rows);
+        stampSameOrigin(rows);
         return rows;
+    }
+
+    /** Top frame is same-origin. A child is same-origin only when scheme, host, and port match. */
+    static boolean sameOrigin(String frameUrl, String topUrl) {
+        String left = originOf(frameUrl);
+        String right = originOf(topUrl);
+        if (left.isEmpty() || right.isEmpty()) return false;
+        return left.equalsIgnoreCase(right);
+    }
+
+    static void stampSameOrigin(List<Map<String, Object>> rows) {
+        if (rows == null || rows.isEmpty()) return;
+        String topUrl = "";
+        boolean sawTop = false;
+        for (Map<String, Object> row : rows) {
+            Object parent = row.get("parentId");
+            if (parent == null || String.valueOf(parent).isBlank()) {
+                Object url = row.get("url");
+                topUrl = url == null ? "" : String.valueOf(url);
+                sawTop = true;
+                break;
+            }
+        }
+        if (!sawTop) {
+            Object url = rows.get(0).get("url");
+            topUrl = url == null ? "" : String.valueOf(url);
+        }
+        for (Map<String, Object> row : rows) {
+            Object parent = row.get("parentId");
+            if (parent == null || String.valueOf(parent).isBlank()) {
+                row.put("sameOrigin", true);
+                continue;
+            }
+            Object url = row.get("url");
+            row.put("sameOrigin", sameOrigin(url == null ? "" : String.valueOf(url), topUrl));
+        }
+    }
+
+    private static String originOf(String url) {
+        if (url == null || url.isBlank() || url.startsWith("about:")) return "";
+        try {
+            java.net.URI uri = java.net.URI.create(url.trim());
+            String scheme = uri.getScheme();
+            String host = uri.getHost();
+            if (scheme == null || host == null || scheme.isBlank() || host.isBlank()) return "";
+            int port = uri.getPort();
+            if (port < 0) {
+                if ("https".equalsIgnoreCase(scheme)) port = 443;
+                else if ("http".equalsIgnoreCase(scheme)) port = 80;
+            }
+            return scheme.toLowerCase(Locale.ROOT) + "://" + host.toLowerCase(Locale.ROOT) + (port < 0 ? "" : ":" + port);
+        } catch (RuntimeException failure) {
+            return "";
+        }
     }
 
     private static void collectFrameRows(CdpConnection cdp, JsonNode node, String parent, List<Map<String, Object>> rows) {
@@ -5370,16 +5497,22 @@ public final class TargetVerb {
      */
     private static ScrollSearch scrollFind(BrowserSession session, String query, Map<String, String> flags) {
         CdpConnection cdp = session.connection();
+        LookupBudget budget = LOOKUP.get();
+        if (budget == null) budget = LookupBudget.none();
         List<DomNode> hits = List.of();
         Map<String, Object> capped = null;
         try {
             List<ScrollCandidate> plan = scrollPlan(cdp, query);
             String saved = scrollState(cdp);
+            search:
             for (ScrollCandidate candidate : plan) {
                 int steps = 0;
                 int stuck = 0;
                 hits = locate(tree(session), query, flags);
+                if (budget.exceeded()) break;
                 while (hits.isEmpty() && steps < SCROLL_STEPS) {
+                    budget.progress("find");
+                    if (budget.exceeded()) break search;
                     if (!scrollBox(cdp, candidate.mark())) {
                         hits = locate(tree(session), query, flags);
                         if (!hits.isEmpty() || ++stuck >= 3) break;
@@ -5796,6 +5929,7 @@ public final class TargetVerb {
     }
 
     private static Outcome ok(Map<String, Object> body) {
+        stampLookup(body);
         return new Outcome(0, body);
     }
 
@@ -5805,8 +5939,107 @@ public final class TargetVerb {
         body.put("op", op == null ? "" : op);
         body.put("applied", false);
         body.put("error", error == null ? "failed" : error);
+        stampLookup(body);
         boolean usage = error != null && (error.startsWith("unknown kind") || error.contains("does not use"));
         return new Outcome(usage ? 2 : 1, body);
+    }
+
+    private static void stampLookup(Map<String, Object> body) {
+        LookupBudget budget = LOOKUP.get();
+        if (budget == null || body == null) return;
+        Object op = body.get("op");
+        if (!"find".equals(op) && !"act".equals(op)) return;
+        budget.stamp(body);
+    }
+
+    /** Case-insensitive equality, or either title contains the other. Blank never matches. */
+    static boolean titlesMatch(String window, String foreground) {
+        String left = window == null ? "" : window.trim();
+        String right = foreground == null ? "" : foreground.trim();
+        if (left.isEmpty() || right.isEmpty()) return false;
+        if (left.equalsIgnoreCase(right)) return true;
+        String a = left.toLowerCase(Locale.ROOT);
+        String b = right.toLowerCase(Locale.ROOT);
+        return a.contains(b) || b.contains(a);
+    }
+
+    /** Live desktop input only. A fixture is not refused. */
+    private static Outcome foregroundRefusal(DesktopTree.Session session) {
+        if (session == null || !session.live()) return null;
+        String title = windowName(session.root());
+        if (title.isBlank()) title = session.window() == null ? "" : session.window();
+        String foreground = NativeDesktop.foregroundTitle();
+        if (titlesMatch(title, foreground)) return null;
+        Outcome missed = fail("act", "desktop input refused: window is not foreground");
+        missed.body().put("window", title);
+        missed.body().put("foreground", foreground == null ? "" : foreground);
+        missed.body().put("fix", "focus the window \"" + title + "\" and retry the desktop act");
+        return missed;
+    }
+
+    private static void putWindow(Map<String, Object> body, DesktopTree.Session session) {
+        if (body == null || session == null) return;
+        String title = windowName(session.root());
+        if (title.isBlank()) title = session.window() == null ? "" : session.window();
+        body.put("window", title);
+    }
+
+    /** Millisecond cap for find and act. Separate from the byte {@code --budget}. */
+    static final class LookupBudget {
+        private final Long limit;
+        private final long started = System.nanoTime();
+        private long lastProgress;
+
+        private LookupBudget(Long limit) {
+            this.limit = limit;
+        }
+
+        static LookupBudget none() {
+            return new LookupBudget(null);
+        }
+
+        static LookupBudget parse(Map<String, String> args) {
+            if (args == null) return none();
+            String raw = args.get("budget-ms");
+            if (raw == null || raw.isBlank()) return none();
+            long ms;
+            try {
+                ms = Long.parseLong(raw.trim());
+            } catch (NumberFormatException failure) {
+                throw new Miss("budget-ms is milliseconds");
+            }
+            if (ms < 0) throw new Miss("budget-ms is milliseconds");
+            return new LookupBudget(ms);
+        }
+
+        boolean limited() {
+            return limit != null;
+        }
+
+        /** True after any elapsed nanosecond when the limit is 0, and after the limit otherwise. */
+        boolean exceeded() {
+            if (limit == null) return false;
+            return System.nanoTime() - started > limit * 1_000_000L;
+        }
+
+        long elapsedMs() {
+            return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
+        }
+
+        /** Stderr line at most every 2 seconds, and only after the lookup has already run that long. */
+        void progress(String what) {
+            if (!limited()) return;
+            long now = System.nanoTime();
+            if (now - started < TimeUnit.MILLISECONDS.toNanos(2000)) return;
+            if (lastProgress != 0 && now - lastProgress < TimeUnit.MILLISECONDS.toNanos(2000)) return;
+            lastProgress = now;
+            System.err.println((what == null || what.isBlank() ? "find" : what) + " still looking (" + elapsedMs() + " ms)");
+        }
+
+        void stamp(Map<String, Object> body) {
+            if (body == null || !exceeded()) return;
+            body.put("budgetExceeded", true);
+        }
     }
 
     private static String chain(String op) {

@@ -33,6 +33,7 @@ final class DesktopAnnotations {
                 String value = parts[3].trim();
                 if (key.isBlank() || value.isBlank()) continue;
                 node.attributes.put(key, value);
+                if ("class-name".equals(key)) promoteEditClass(node, value);
             } else if (line.startsWith("REL\t")) {
                 String[] parts = line.split("\t", 4);
                 if (parts.length < 4) continue;
@@ -82,6 +83,20 @@ final class DesktopAnnotations {
         String id = node.attributes.get(idAttribute);
         if (id != null && !id.isBlank()) byId.putIfAbsent(id, node);
         for (DomNode child : node.children) index(child, idAttribute, byId);
+    }
+
+    /**
+     * WinForms exposes a real EDIT as ControlType.Pane. Its class name contains EDIT
+     * ({@code WindowsForms10.EDIT...}). A window class such as {@code WindowsForms10.Window}
+     * does not, so the frame stays a window. Only pane, custom, unknown, and group are promoted.
+     */
+    private static void promoteEditClass(DomNode node, String className) {
+        if (className == null || !className.toLowerCase(Locale.ROOT).contains("edit")) return;
+        String role = node.role == null ? "" : node.role.toLowerCase(Locale.ROOT);
+        if (!role.equals("pane") && !role.equals("custom") && !role.equals("unknown") && !role.equals("group")) return;
+        node.role = "textbox";
+        node.localName = "textbox";
+        node.nodeName = "TEXTBOX";
     }
 
     private static void add(DomNode node, String state) {

@@ -50,6 +50,11 @@ public final class LiveSessionAttach {
         return startHost(project);
     }
 
+    /** The start host when its pid is alive. A live isolate worker does not hide it. */
+    public static Optional<Attached> start(Path project) {
+        return startHost(project);
+    }
+
     private static Optional<Attached> match(Path project, String sessionId) {
         Optional<LiveBridgeFile.Bridge> worker = LiveBridgeFile.read(project);
         if (worker.isPresent() && sessionId.equals(worker.get().sessionId())) {

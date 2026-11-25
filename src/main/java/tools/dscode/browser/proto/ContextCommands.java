@@ -211,6 +211,17 @@ final class ContextCommands {
     static ObjectNode tabNew(ProtoHost host, Map<String, String> f) {
         String url = f.getOrDefault("url", "about:blank");
         String context = f.get("context");
+        boolean activate = activateRequested(f.get("activate"));
+        String previous = "";
+        if (!activate && host.hasCdp()) {
+            try {
+                CdpSession.Target page = host.cdp().page(f.get("page"));
+                if (page != null && page.targetId != null) previous = page.targetId;
+            } catch (RuntimeException ignored) {
+                previous = "";
+            }
+        }
+        final String remembered = previous;
         BrowserProtocols.Served<String> served = host.protocols().serve("tabs", f.get("via"), backend -> {
             switch (backend) {
                 case BIDI -> {
@@ -222,7 +233,33 @@ final class ContextCommands {
                     Map<String, Object> p = new LinkedHashMap<>();
                     p.put("url", url);
                     if (context != null && !"default".equals(context)) p.put("browserContextId", context);
-                    return host.cdp().browser("Target.createTarget", p).path("targetId").asText();
+                    String id;
+                    if (!activate) p.put("background", Boolean.TRUE);
+                    try {
+                        id = host.cdp().browser("Target.createTarget", p).path("targetId").asText();
+                    } catch (RuntimeException rejected) {
+                        if (activate || !p.containsKey("background")) throw rejected;
+                        p.remove("background");
+                        id = host.cdp().browser("Target.createTarget", p).path("targetId").asText();
+                    }
+                    if (activate) {
+                        try {
+                            host.cdp().browser("Target.activateTarget", Map.of("targetId", id));
+                        } catch (RuntimeException ignored) {
+                            // The new tab exists even when activate is refused.
+                        }
+                        host.cdp().rememberProtocol(id);
+                        host.cdp().rememberVisible(id);
+                    } else if (!remembered.isBlank()) {
+                        try {
+                            host.cdp().browser("Target.activateTarget", Map.of("targetId", remembered));
+                        } catch (RuntimeException ignored) {
+                            // background:true already left the previous tab in front.
+                        }
+                        host.cdp().rememberProtocol(remembered);
+                        host.cdp().rememberVisible(remembered);
+                    }
+                    return id;
                 }
                 case PLAYWRIGHT -> {
                     return host.pw().call(c -> {
@@ -236,8 +273,22 @@ final class ContextCommands {
                 default -> throw new UnsupportedProtocolOperation("tabs", backend.id(), null);
             }
         });
+        String protocolTarget = served.value();
+        if (host.cdpAttached()) {
+            String preferred = host.cdp().protocolPageId();
+            if (preferred != null && !preferred.isBlank()) protocolTarget = preferred;
+        }
         return ProtoJson.obj().put("op", "tab-new").put("via", served.via().id()).put("id", served.value()).put("url", url)
-                .put("context", context == null ? "default" : context);
+                .put("context", context == null ? "default" : context)
+                .put("activate", activate)
+                .put("protocolTarget", protocolTarget);
+    }
+
+    /** Absent, blank, and anything other than true/1/yes leave the new tab in the background. */
+    static boolean activateRequested(String raw) {
+        if (raw == null || raw.isBlank()) return false;
+        String value = raw.trim().toLowerCase(java.util.Locale.ROOT);
+        return "true".equals(value) || "1".equals(value) || "yes".equals(value);
     }
 
     static ObjectNode tabActivate(ProtoHost host, Map<String, String> f) {
@@ -246,7 +297,11 @@ final class ContextCommands {
         BrowserProtocols.Served<String> served = host.protocols().serve("tabs", f.get("via"), backend -> {
             switch (backend) {
                 case BIDI -> host.bidiModules().activate(id);
-                case CDP -> host.cdp().browser("Target.activateTarget", Map.of("targetId", id));
+                case CDP -> {
+                    host.cdp().browser("Target.activateTarget", Map.of("targetId", id));
+                    host.cdp().rememberProtocol(id);
+                    host.cdp().rememberVisible(id);
+                }
                 default -> throw new UnsupportedProtocolOperation("tabs", backend.id(), null);
             }
             return backend.id();

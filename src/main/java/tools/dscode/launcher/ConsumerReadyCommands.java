@@ -528,6 +528,32 @@ final class ConsumerReadyCommands {
         return false;
     }
 
+    /**
+     * A Chrome or Chromium process whose command line names this project.
+     * A Java protocol host is never an orphan, even when its command line mentions chrome and pickleball.
+     */
+    static boolean listsOrphan(String command, String needle) {
+        if (command == null || needle == null || needle.isBlank()) return false;
+        String lower = command.toLowerCase(Locale.ROOT);
+        if (!lower.contains("chrome") && !lower.contains("chromium")) return false;
+        if (!command.contains(needle) || !lower.contains("pickleball")) return false;
+        if (command.contains(" --type=")) return false;
+        if (javaHost(lower)) return false;
+        return !lower.contains("protohost") && !lower.contains("protocol-host");
+    }
+
+    /** The executable is java or javaw. A path segment such as Program Files is not the token. */
+    private static boolean javaHost(String lower) {
+        if (lower.startsWith("java ") || lower.startsWith("javaw ")) return true;
+        if (lower.contains("/java ") || lower.contains("\\java ") || lower.contains("/javaw ") || lower.contains("\\javaw ")) return true;
+        for (String token : lower.split("\\s+")) {
+            if (token.equals("java") || token.equals("javaw") || token.endsWith("/java") || token.endsWith("\\java")
+                    || token.endsWith("/javaw") || token.endsWith("\\javaw")
+                    || token.endsWith("java.exe") || token.endsWith("javaw.exe")) return true;
+        }
+        return false;
+    }
+
     /** Chrome or Chromium processes whose command line names this project and is not the live host. */
     private static String orphans(Path project, long chromePid) {
         Path proc = Path.of("/proc");
@@ -553,11 +579,7 @@ final class ConsumerReadyCommands {
                 } catch (IOException ignored) {
                     continue;
                 }
-                String lower = command.toLowerCase(Locale.ROOT);
-                if (!lower.contains("chrome") && !lower.contains("chromium")) continue;
-                if (!command.contains(needle) || !lower.contains("pickleball")) continue;
-                // Renderer, GPU, and utility children (--type=) belong to their browser; the browser is the orphan.
-                if (command.contains(" --type=")) continue;
+                if (!listsOrphan(command, needle)) continue;
                 found.add(Long.toString(pid));
             }
         } catch (IOException ignored) {

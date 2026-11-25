@@ -329,7 +329,8 @@ public final class DesktopTree {
 
     public static ObjectNode type(String id, Map<String, String> flags) {
         Session session = require(id);
-        DomNode node = one(id, flags);
+        DomNode node = nodeByBackend(session, flags);
+        if (node == null) node = one(id, flags);
         String text = flags.getOrDefault("text", "");
         boolean append = "true".equals(flags.get("append"));
         if (session.live) NativeDesktop.type(node, text, append);
@@ -347,6 +348,30 @@ public final class DesktopTree {
 
     public static ObjectNode snapshot(String id, Map<String, String> flags) {
         return dev.domengine.snapshot.DesktopSnapshotProducer.produce(require(id), flags);
+    }
+
+    /** The node {@code act} already resolved. A query is used only when {@code node-id} is absent. */
+    private static DomNode nodeByBackend(Session session, Map<String, String> flags) {
+        if (session == null || session.root == null || flags == null) return null;
+        String raw = flags.get("node-id");
+        if (raw == null || raw.isBlank()) return null;
+        try {
+            return findBackend(session.root, Long.parseLong(raw.trim()));
+        } catch (NumberFormatException failure) {
+            return null;
+        }
+    }
+
+    private static DomNode findBackend(DomNode node, long id) {
+        if (node == null) return null;
+        if (node.backendNodeId == id) return node;
+        if (node.children != null) {
+            for (DomNode child : node.children) {
+                DomNode found = findBackend(child, id);
+                if (found != null) return found;
+            }
+        }
+        return null;
     }
 
     private static void store(Session session) {

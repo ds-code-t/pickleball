@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -234,8 +235,58 @@ class PwCommandLiveTest {
         assertTrue(none.err.contains("fix: set pkb_cdp_endpoint"), none.err);
     }
 
+    @Test
+    void areaAndActionFlagsReadThePageTitle() throws Exception {
+        home();
+        JsonNode title = ok("pw", "--area=page", "--action=title", target);
+        assertEquals("pw-index", title.path("title").asText(), title.toString());
+    }
+
+    @Test
+    void stepsFileRunsThePageTitle() throws Exception {
+        home();
+        Path steps = temp.resolve("title-steps.json");
+        Files.writeString(steps, "[{\"area\":\"page\",\"action\":\"title\"}]");
+        JsonNode ran = ok("pw", "run", "--steps=" + steps, target);
+        assertEquals("pw-index", ran.path("steps").get(0).path("title").asText(), ran.toString());
+    }
+
+    @Test
+    void projectPathIsNotAnAreaAndAMissingStepsFileFailsBeforeConnect() throws Exception {
+        Path empty = Files.createDirectories(temp.resolve("empty-pw"));
+        Capture positional = direct(empty, "pw", "page", "title");
+        assertEquals(1, positional.code, positional.out + positional.err);
+        assertFalse(positional.err.contains("pw needs an area"), positional.err);
+        assertTrue(positional.err.contains("no CDP endpoint"), positional.err);
+
+        Capture withDir = direct(empty, "pw", empty.toString(), "page", "title");
+        assertEquals(1, withDir.code, withDir.out + withDir.err);
+        assertFalse(withDir.err.contains("pw needs an area"), withDir.err);
+        assertTrue(withDir.err.contains("no CDP endpoint"), withDir.err);
+
+        Capture flags = direct(empty, "pw", "--area=page", "--action=title", empty.toString());
+        assertEquals(1, flags.code, flags.out + flags.err);
+        assertFalse(flags.err.contains("pw needs an area"), flags.err);
+        assertTrue(flags.err.contains("no CDP endpoint"), flags.err);
+
+        Capture missing = direct(empty, "pw", "run", "--steps=missing-steps.json");
+        assertEquals(1, missing.code, missing.out + missing.err);
+        assertTrue(missing.err.contains("steps file not found"), missing.err);
+        assertTrue(missing.err.contains(empty.toAbsolutePath().normalize().toString()), missing.err);
+        assertFalse(missing.err.contains("no CDP endpoint"), missing.err);
+    }
+
     Capture agent(String... args) {
         return agentIn(temp.resolve("project"), args);
+    }
+
+    static Capture direct(Path project, String... args) {
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        int code = PwCommand.run(args, project,
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(stderr, true, StandardCharsets.UTF_8));
+        return new Capture(code, stdout.toString(StandardCharsets.UTF_8), stderr.toString(StandardCharsets.UTF_8));
     }
 
     static Capture agentIn(Path project, String... args) {

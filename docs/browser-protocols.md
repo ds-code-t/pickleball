@@ -44,6 +44,8 @@ As observed by the `doctor --protocols` probes and the live tests on this releas
 | Network control, HAR, route, auth | Playwright, BiDi, CDP | BiDi | no |
 | Emulation, clock, permissions | Playwright, BiDi, CDP | BiDi (subset) | no |
 | Contexts, tabs, storage, downloads, uploads, dialogs | Playwright, BiDi, CDP | BiDi | no |
+
+`tab-new` defaults to `--activate=false`. The new tab stays in the background and is not the protocol target (`protocolTarget` stays the previous page). `--activate=true` switches to the new tab. `context-list` still lists every tab. A protocol reply includes `warning` when the protocol target and the visible tab differ.
 | Input chains, `find --role` | Playwright, BiDi, CDP | BiDi | no |
 | `aria-snap`, `aria-act` | Playwright | no | no |
 | WebAuthn | Playwright, CDP | no | no |

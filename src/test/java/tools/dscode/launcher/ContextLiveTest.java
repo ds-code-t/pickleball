@@ -16,14 +16,22 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.AclEntry;
+import java.nio.file.attribute.AclEntryPermission;
+import java.nio.file.attribute.AclEntryType;
+import java.nio.file.attribute.AclFileAttributeView;
+import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /** E7 live (fresh Chrome per test): contexts, tabs, history, print, storage, storage-state, downloads, uploads, file dialogs, drop, dialogs. */
 class ContextLiveTest {
@@ -47,7 +55,11 @@ class ContextLiveTest {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", exchange -> {
             String path = exchange.getRequestURI().getPath();
-            byte[] body = (path.equals("/dl") ? "report body" : path.startsWith("/page") ? "<!doctype html><title>" + path + "</title>" : PAGE).getBytes(StandardCharsets.UTF_8);
+            String html = path.equals("/dl") ? "report body"
+                    : path.equals("/frames") ? "<!doctype html><title>frames</title><iframe name=\"child\" src=\"/page-child\"></iframe><iframe name=\"blank\" src=\"about:blank\"></iframe>"
+                    : path.startsWith("/page") ? "<!doctype html><title>" + path + "</title>"
+                    : PAGE;
+            byte[] body = html.getBytes(StandardCharsets.UTF_8);
             if (path.equals("/dl")) {
                 exchange.getResponseHeaders().add("Content-Type", "text/plain");
                 exchange.getResponseHeaders().add("Content-Disposition", "attachment; filename=\"report.txt\"");
@@ -244,7 +256,7 @@ class ContextLiveTest {
         ok(p, "storage", "--set={\"cookies\":[{\"name\":\"sid\",\"value\":\"keep-me\",\"url\":\"" + base + "\"}],\"local\":{\"theme\":\"dark\"}}");
         JsonNode saved = ok(p, "storage-state", "--save=state/session.json");
         Path file = p.resolve("state/session.json");
-        assertEquals("rw-------", PosixFilePermissions.toString(Files.getPosixFilePermissions(file)), "owner-only");
+        assertOwnerOnly(file);
         assertFalse(saved.toString().contains("keep-me"));
         JsonNode state = BrowserEventsLiveTest.JSON.readTree(file.toFile());
         assertEquals("keep-me", state.path("cookies").path(0).path("value").asText());
@@ -356,5 +368,73 @@ class ContextLiveTest {
         assertFalse(log.contains("Ann"), "prompt text is not logged");
         PwCommandLiveTest.Capture bad = run(p, "dialogs", "--policy=maybe");
         assertEquals(1, bad.code());
+    }
+
+    @Test
+    void tabNewStaysOffTheProtocolTargetUnlessActivate() throws Exception {
+        Path p = project("tab-activate-default");
+        go(p, "/");
+        String first = ok(p, "context-list").path("contexts").path(0).path("tabs").path(0).path("id").asText();
+        JsonNode background = ok(p, "tab-new", "--url=" + base + "/page-bg");
+        assertFalse(background.path("activate").asBoolean(), background.toString());
+        assertEquals(first, background.path("protocolTarget").asText(), background.toString());
+        assertFalse(first.equals(background.path("id").asText()), background.toString());
+        assertTrue(ok(p, "context-list").toString().contains(background.path("id").asText()), background.toString());
+        JsonNode front = ok(p, "tab-new", "--url=" + base + "/page-front", "--activate=true");
+        assertTrue(front.path("activate").asBoolean(), front.toString());
+        assertEquals(front.path("id").asText(), front.path("protocolTarget").asText(), front.toString());
+        assertTrue(ok(p, "context-list").toString().contains(front.path("id").asText()));
+    }
+
+    @Test
+    void frameListOnALivePageReportsSameOrigin() throws Exception {
+        Path p = project("frames");
+        go(p, "/frames");
+        JsonNode listed = ok(p, "frame", "--list");
+        JsonNode frames = listed.path("frames");
+        assertTrue(frames.isArray() && frames.size() >= 2, listed.toString());
+        boolean top = false;
+        boolean child = false;
+        boolean blank = false;
+        for (JsonNode row : frames) {
+            assertFalse(row.path("id").asText().isBlank(), row.toString());
+            assertTrue(row.has("name") && row.has("url") && row.has("sameOrigin"), row.toString());
+            String url = row.path("url").asText();
+            String name = row.path("name").asText();
+            if (row.path("parentId").asText().isBlank()) {
+                assertTrue(row.path("sameOrigin").asBoolean(), row.toString());
+                top = true;
+            }
+            if ("child".equals(name) || url.contains("/page-child")) {
+                assertTrue(row.path("sameOrigin").asBoolean(), row.toString());
+                child = true;
+            }
+            if ("blank".equals(name) || "about:blank".equals(url)) {
+                assertFalse(row.path("sameOrigin").asBoolean(), row.toString());
+                blank = true;
+            }
+        }
+        assertTrue(top && child && blank, listed.toString());
+    }
+
+    /** POSIX keeps {@code rw-------}. Windows keeps a DACL whose only reader is the file owner. */
+    static void assertOwnerOnly(Path file) throws java.io.IOException {
+        if (Files.getFileAttributeView(file, PosixFileAttributeView.class) != null) {
+            assertEquals("rw-------", PosixFilePermissions.toString(Files.getPosixFilePermissions(file)), "owner-only");
+            return;
+        }
+        AclFileAttributeView aclView = Files.getFileAttributeView(file, AclFileAttributeView.class);
+        assertNotNull(aclView, "owner-only");
+        UserPrincipal owner = Files.getOwner(file);
+        boolean ownerCanRead = false;
+        for (AclEntry entry : aclView.getAcl()) {
+            if (entry.type() != AclEntryType.ALLOW) continue;
+            if (!entry.permissions().contains(AclEntryPermission.READ_DATA)) continue;
+            if (!entry.principal().equals(owner)) {
+                fail("owner-only: " + entry.principal().getName() + " can read " + file);
+            }
+            ownerCanRead = true;
+        }
+        assertTrue(ownerCanRead, "owner can read " + file);
     }
 }
