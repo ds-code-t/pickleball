@@ -1,0 +1,85 @@
+diff --git a/src/main/java/tools/dscode/common/agentfast/TargetVerb.java b/src/main/java/tools/dscode/common/agentfast/TargetVerb.java
+index 33690dc2..a5eaea6c 100644
+--- a/src/main/java/tools/dscode/common/agentfast/TargetVerb.java
++++ b/src/main/java/tools/dscode/common/agentfast/TargetVerb.java
+@@ -3351,6 +3351,8 @@ public final class TargetVerb {
+             String want = purpose;
+             hits = new ArrayList<>(hits.stream().filter(node -> hasPurpose(node, want)).toList());
+         }
++        // A page control outranks pickleball's own panel, card, and chat text (a chat line "r4-upload" is not the Upload File input).
++        if (!text.isBlank()) hits = preferPage(hits);
+         if (!text.isBlank() && hits.size() > 1) {
+             String wanted = text.replaceAll("\\s+", " ").trim();
+             List<DomNode> exact = new ArrayList<>();
+@@ -3363,6 +3365,33 @@ public final class TargetVerb {
+         return hits;
+     }
+ 
++    /** True when every hit is inside pickleball's own UI (or there are none). */
++    private static boolean allOwn(List<DomNode> hits) {
++        for (DomNode node : hits) if (!pkbOwned(node)) return false;
++        return true;
++    }
++
++    private static List<DomNode> preferPage(List<DomNode> hits) {
++        if (hits == null || hits.size() < 2) return hits;
++        List<DomNode> page = new ArrayList<>();
++        for (DomNode node : hits) if (!pkbOwned(node)) page.add(node);
++        return page.isEmpty() || page.size() == hits.size() ? hits : page;
++    }
++
++    /** Inside pickleball's layer, panel, cards, or recorder. Page-wide markers on html and body do not count. */
++    static boolean pkbOwned(DomNode node) {
++        for (DomNode cursor = node; cursor != null; cursor = cursor.parent) {
++            String tag = cursor.tag();
++            if ("html".equals(tag) || "body".equals(tag)) return false;
++            if (tag != null && tag.startsWith("pkb-")) return true;
++            if (cursor.attributes.containsKey("data-pkb-agent") || cursor.attributes.containsKey("data-pkb-layer")
++                    || cursor.attributes.containsKey("data-pkb-record") || "true".equals(cursor.attributes.get("data-pkb-meta"))) {
++                return true;
++            }
++        }
++        return false;
++    }
++
+     private static boolean hasPurpose(DomNode node, String token) {
+         String tokens = attr(node, "data-pkb-purpose");
+         if (tokens.isBlank()) return false;
+@@ -3404,7 +3433,8 @@ public final class TargetVerb {
+             if (!message.contains("not found") && !message.contains("query requires")) throw failure;
+         }
+         if (query != null && !query.isBlank()) hits.addAll(named(search, query));
+-        if (hits.isEmpty() && query != null && !query.isBlank()) hits.addAll(namedWords(search, query));
++        // Only pickleball's own panel or chat text matched: the page may still have a control whose name has these words.
++        if (query != null && !query.isBlank() && allOwn(hits)) hits.addAll(namedWords(search, query));
+         return deepest(controlsFor(search, preferControls(preferBody(preferLinks(hits)))));
+     }
+ 
+diff --git a/src/test/java/tools/dscode/launcher/RetestFixesLiveTest.java b/src/test/java/tools/dscode/launcher/RetestFixesLiveTest.java
+index f7c7006a..1d64ad5c 100644
+--- a/src/test/java/tools/dscode/launcher/RetestFixesLiveTest.java
++++ b/src/test/java/tools/dscode/launcher/RetestFixesLiveTest.java
+@@ -185,6 +185,23 @@ class RetestFixesLiveTest {
+         agent("answer-wait", "--id=r8", "--timeout=1");
+     }
+ 
++    /** S1: a panel chat line that ends in the query word ("r4-upload") does not outrank the page's Upload File control. */
++    @Test
++    void pageControlsOutrankPickleballChatText() throws Exception {
++        assertEquals(0, agent("chat-send", "--text=r4-upload").code);
++        for (String query : new String[] {"Upload", "upload"}) {
++            JsonNode found = JSON.readTree(agent("find", "--target=browser:auto", "--query=" + query, "--exposure=full").out);
++            assertTrue(found.path("ok").asBoolean(false), query + " " + found);
++            assertEquals("Upload File", found.path("items").path(0).path("name").asText(), query + " " + found);
++            JsonNode human = JSON.readTree(human("find", "--target=browser:auto", "--query=" + query).out);
++            assertEquals("Upload File", human.path("items").path(0).path("name").asText(), "human " + query + " " + human);
++        }
++        JsonNode send = JSON.readTree(agent("find", "--target=browser:auto", "--purpose=send", "--query=Send", "--exposure=full").out);
++        assertTrue(send.path("ok").asBoolean(false), "a panel-only control is still found: " + send);
++        JsonNode bubble = JSON.readTree(agent("find", "--target=browser:auto", "--query=r4-upload", "--exposure=full").out);
++        assertTrue(bubble.path("ok").asBoolean(false), "text only pickleball shows is still found: " + bubble);
++    }
++
+     static JsonNode row(JsonNode snap, String name) {
+         for (JsonNode item : snap.path("items")) if (name.equals(item.path("name").asText())) return item;
+         return JSON.createObjectNode();

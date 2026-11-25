@@ -112,6 +112,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-collab-test/retest-2026-11-24/round2-plan.md`
 - `docs/maintainer/3.0.0-composite-v2-design.md`
 - `docs/maintainer/3.0.0-composite-verbs-scoreboard.md`
+- `docs/maintainer/3.0.0-consumer-fixes/consumer-report-2026-11-24.md`
+- `docs/maintainer/3.0.0-consumer-fixes/round2-findings.md`
+- `docs/maintainer/3.0.0-consumer-fixes/scoreboard.md`
+- `docs/maintainer/3.0.0-consumer-fixes/triage.md`
 - `docs/maintainer/3.0.0-consumer-ready-handoff.md`
 - `docs/maintainer/3.0.0-consumer-report-2026-11-17/agent-blockers-digest.md`
 - `docs/maintainer/3.0.0-consumer-report-2026-11-17/agreed-plan.md`
@@ -181,6 +185,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/roadmaps/3.0.0-agent-fast-roadmap.md`
 - `docs/roadmaps/3.0.0-collab-fixes-roadmap.md`
 - `docs/roadmaps/3.0.0-composite-v2-roadmap.md`
+- `docs/roadmaps/3.0.0-consumer-fixes.md`
 - `docs/roadmaps/3.0.0-consumer-ready-roadmap.md`
 - `docs/roadmaps/3.0.0-dalton-roadmap.md`
 - `docs/roadmaps/3.0.0-dalton-round2-roadmap.md`
