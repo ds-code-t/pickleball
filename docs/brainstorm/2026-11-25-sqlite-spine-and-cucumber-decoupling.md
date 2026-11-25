@@ -79,6 +79,21 @@ The universal entity is the single primitive everything else hangs off. It is a 
 
 - **MAJOR — Runtime snapshot SQLite and universal entity linking.** Current run/log storage is file-based (reports/diagnostic-runs JSON+JSONL, runs/ trees, dot-pickleball/runs), with a derived FTS5 SQLite search index (diagnostics.db) rebuilt from those JSON rows — not a first-class store. The hydration SQLite and the run-log SQLite are separate today. Target model: a runtime snapshot SQLite per run (or shared run-history DB) that freezes the hydrated entity state as it existed at execution time, plus dynamic run attributes (active tags, execution order, system-property-triggered scenario selection, pass/fail history). All entities linked via foreign keys — scenarios to steps to step definitions to logs to source files to git commits (pkb_gitsnapshot provenance already stamps sourceRevision). Dashboard queries become ordinary SQL joins instead of file scraping. Long-term vision: dashboard as a lightweight webpage, potentially hosted on GitHub Pages, acting as a central report hub specific to the project. Open sub-questions: one DB vs per-run DBs; whether the snapshot is a copy of the hydrated store or a separate schema optimized for querying; how git-commit linkage interacts with sandbox branches; retention/GC policy for old snapshots.
 - Playwright adapter: hydrate implicit fixture/page context into the row at ingest, or re-resolve at execution? (ON HOLD — revisit after other items resolve)
-- Persistent socket connection vs per-command spawn for chatty dashboard interactions. CLI-style spawn matches the testability ideal; a persistent channel is an optimization that can be added without changing the contract.
+- Persistent socket connection vs per-command spawn for chatty dashboard interactions. CLI-style spawn matches the testability ideal; a persistent channel is an optimization that can be added without changing the contract. (User agreed: start with per-command spawn.)
 - Build the documented verb inventory: which verbs are CLI-only, which are MCP-only, which are bidirectional streams, and the rule that new Node surfaces register against it.
 - Custom classloader mechanics for warm-engine class reloading: static-state leakage and loader-retention risks need a concrete design before implementation.
+
+## Node.js Workbench GUI & Playwright Integration (PROPOSED / OPEN)
+
+- Replace current Java Swing Workbench with a Node.js-based dynamic GUI as the primary human-facing interface and AI agent collaboration surface.
+- Use Playwright-bundled browsers (even if system browsers exist) for full DOM control, injection, CDP/BiDi, network mocking, overlays, chat panels, styling, mutation listeners, etc.
+- Single logical entity: Workbench editors, log navigation, reports, dynamic step execution, and DOM control/injection are all one interconnected surface. Linking is core.
+- Tabbed editor for hydrated SQLite logical views:
+  - Prominent tab: scenarios/tests with expandable business-language steps that drop down to show/edit Java/TS/JS step definitions.
+  - Tabs for global/run variables (synced as SQL records, round-trip to extracted files), configs, global paths, etc. — flat intuitive forms that edit the underlying SQL, which syncs to files unless in a sandbox branch.
+  - Full SQL database representation: queryable/searchable GUI (exact, partial, regex searches).
+- Branching/sandbox: selecting a sandbox branch creates another version of the editor, selectable from a branches tab. Visual indicators (slight color styling, title bar with specifics) when not on master.
+- Run history: starting a run auto-creates/associates a branched snapshot of the current state. If an unchanged snapshot already exists, associate the new run with it. Runs and branches always linked. Runs accessible in a history tab. Branch stores its own logs and run history in its SQL.
+- Map tab (when a run/branch selected): read-only view of NodeMap/ParsingMap entries, internal objects/arrays, running logs, screenshots. Optional dynamic run mode: editable ParsingMap and custom steps in a sandbox; edits override configs/files for the session without mutating the underlying SQLite or synced files. Consistent with ParsingMap inheritance.
+- Workbench can function as a custom browser with extreme session control/monitoring, or side-by-side with the DOM under test. Chat panels/overlays can be in the Workbench or injected into the target DOM.
+- Relates to Playwright adapter open item: full integration of Playwright into the spine and GUI.
