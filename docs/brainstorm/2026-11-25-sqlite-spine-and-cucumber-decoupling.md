@@ -27,9 +27,10 @@
 - Glue path is no longer a Cucumber concept; it is just another ingested attribute. Scripts need not come from feature files.
 - External binaries that cannot be inlined (Java source, compiled classes, feature files containing Gherkin) stay outside the DB as references. Inlinable internals (JSON, XML, YAML) pass into the database.
 - Even a Cucumber-looking start hydrates into SQLite and executes from there — Cucumber is only the entry door.
+- Cross-language shared state (parsing map, run state, pass state, scenario-level or global state of any kind) follows one pattern: TypeScript/JavaScript never holds or sees the Java object. It calls fixed Java entry-point functions (e.g. "resolve this text") that encapsulate all access. The parsing map and all sub-components stay private Java implementation details.
+- No additional dependencies for cross-language state (no MapDB). SQLite for durable entities; Java-side objects for live state; function-call seam between them.
+- The bundled Node.js engine from the Playwright dependency can execute TypeScript/JavaScript step definitions directly. The adapter talks to it over stdio or a small socket, registers handlers; the spine never knows Node exists.
 
 ## Open Questions (not locked)
 
-- Playwright adapter: hydrate implicit fixture/page context into the row at ingest, or re-resolve at execution?
-- Cross-language run/pass state: SQLite shared map, or separate MapDB for cross-language cross-mapping?
-- Can the bundled Node.js engine from the Playwright dependency execute TypeScript/JavaScript step definitions directly?
+- Playwright adapter: hydrate implicit fixture/page context into the row at ingest, or re-resolve at execution? (ON HOLD — revisit after other items resolve)
