@@ -3,6 +3,7 @@ package tools.dscode.browser.proto;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.microsoft.playwright.Frame;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.options.AriaRole;
@@ -373,6 +374,129 @@ final class InputCommands {
         }
     }
 
+    /** {@code --frame} defaults to every frame. {@code top} is the page target. An id matches the target id or url. */
+    private static List<CdpSession.Target> roleTargets(ProtoHost host, Map<String, String> f) {
+        String frame = f.get("frame");
+        if (frame == null || frame.isBlank() || "true".equals(frame)) frame = "all";
+        CdpSession.Target page = ContextCommands.target(host, f);
+        List<CdpSession.Target> targets = new ArrayList<>();
+        if ("top".equalsIgnoreCase(frame)) {
+            if (page != null) targets.add(page);
+            return targets;
+        }
+        if ("all".equalsIgnoreCase(frame)) {
+            if (page != null) targets.add(page);
+            for (CdpSession.Target target : host.cdp().all()) {
+                if (target == page) continue;
+                if ("iframe".equals(target.type) || "page".equals(target.type)) targets.add(target);
+            }
+            return targets;
+        }
+        for (CdpSession.Target target : host.cdp().all()) {
+            String url = target.url == null ? "" : target.url;
+            if (frame.equals(target.targetId) || url.contains(frame)) targets.add(target);
+        }
+        return targets;
+    }
+
+    /**
+     * Role search on one target. An out-of-process iframe is its own target. A same-site iframe stays in the page
+     * process, so the page document is pierced and each content document is queried on its own.
+     */
+    private static void queryRole(ProtoHost host, CdpSession.Target target, String role, String name, String frame, int limit, List<String> described, Set<String> seen) {
+        boolean pierce = frame == null || frame.isBlank() || "true".equals(frame) || "all".equalsIgnoreCase(frame);
+        try {
+            JsonNode root = host.cdp().send(target.sessionId, "DOM.getDocument",
+                    ContextCommands.p("depth", pierce ? -1 : 0, "pierce", pierce)).path("root");
+            List<JsonNode> docs = new ArrayList<>();
+            if (root.isObject() && root.has("nodeId")) docs.add(root);
+            if (pierce) collectContentDocuments(root, docs);
+            for (JsonNode doc : docs) {
+                if (described.size() >= limit) return;
+                String token = doc == root ? ("iframe".equals(target.type) ? target.targetId : "") : frameToken(doc);
+                if (!frameAllowed(frame, token, target)) continue;
+                try {
+                    collectRoleNodes(host, target, doc, role, name, token, limit, described, seen);
+                } catch (RuntimeException ignored) {
+                    // One frame that is still loading does not drop the others.
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // A target that left during the scan is skipped.
+        }
+    }
+
+    private static void collectRoleNodes(ProtoHost host, CdpSession.Target target, JsonNode doc, String role, String name,
+            String frameToken, int limit, List<String> described, Set<String> seen) {
+        JsonNode nodes = axNodes(host, target, doc, role, name);
+        boolean fallback = (nodes == null || !nodes.isArray() || nodes.isEmpty()) && name != null && !name.isBlank();
+        if (fallback) nodes = axNodes(host, target, doc, role, null);
+        if (nodes == null || !nodes.isArray()) return;
+        for (JsonNode node : nodes) {
+            if (described.size() >= limit) return;
+            if (node.path("ignored").asBoolean(false) || !node.has("backendDOMNodeId")) continue;
+            if (fallback && !axName(node).equalsIgnoreCase(name.trim())) continue;
+            int backend = node.path("backendDOMNodeId").asInt();
+            if (backend <= 0 || !seen.add(target.sessionId + ":" + backend)) continue;
+            JsonNode object = host.cdp().send(target.sessionId, "DOM.resolveNode", ContextCommands.p("backendNodeId", backend)).path("object");
+            JsonNode read = host.cdp().send(target.sessionId, "Runtime.callFunctionOn", ContextCommands.p("functionDeclaration", DESCRIBE_FN,
+                    "objectId", object.path("objectId").asText(), "returnByValue", true));
+            described.add(withFrame(read.path("result").path("value").asText(), frameToken));
+        }
+    }
+
+    private static JsonNode axNodes(ProtoHost host, CdpSession.Target target, JsonNode doc, String role, String name) {
+        Map<String, Object> query = new LinkedHashMap<>(ContextCommands.p("nodeId", doc.path("nodeId").asInt(), "role", role));
+        if (name != null && !name.isBlank()) query.put("accessibleName", name);
+        return host.cdp().send(target.sessionId, "Accessibility.queryAXTree", query).path("nodes");
+    }
+
+    private static String axName(JsonNode node) {
+        JsonNode name = node.path("name");
+        String value = name.path("value").asText("");
+        return value.isBlank() ? name.asText("") : value;
+    }
+
+    private static void collectContentDocuments(JsonNode node, List<JsonNode> docs) {
+        if (node == null || node.isMissingNode()) return;
+        JsonNode content = node.get("contentDocument");
+        if (content != null && content.isObject() && content.has("nodeId")) {
+            docs.add(content);
+            collectContentDocuments(content, docs);
+        }
+        for (JsonNode child : node.path("children")) collectContentDocuments(child, docs);
+        for (JsonNode shadow : node.path("shadowRoots")) collectContentDocuments(shadow, docs);
+    }
+
+    private static String frameToken(JsonNode doc) {
+        String id = doc.path("frameId").asText("");
+        return id.isBlank() ? "frame" : id;
+    }
+
+    private static boolean frameAllowed(String filter, String frameToken, CdpSession.Target target) {
+        if (filter == null || filter.isBlank() || "true".equals(filter) || "all".equalsIgnoreCase(filter)) return true;
+        if ("top".equalsIgnoreCase(filter)) return frameToken == null || frameToken.isBlank();
+        String url = target.url == null ? "" : target.url;
+        return filter.equals(frameToken) || filter.equals(target.targetId) || url.contains(filter);
+    }
+
+    private static List<Frame> roleFrames(Page page, String frame) {
+        if (frame == null || frame.isBlank() || "true".equals(frame) || "all".equalsIgnoreCase(frame)) return page.frames();
+        if ("top".equalsIgnoreCase(frame)) return List.of(page.mainFrame());
+        List<Frame> matched = new ArrayList<>();
+        for (Frame one : page.frames()) {
+            String url = one.url() == null ? "" : one.url();
+            if (frame.equals(one.name()) || url.contains(frame)) matched.add(one);
+        }
+        return matched;
+    }
+
+    private static String withFrame(String json, String frame) {
+        if (json == null || json.isBlank() || frame == null || frame.isBlank() || !json.endsWith("}")) return json == null ? "" : json;
+        String escaped = frame.replace("\\", "\\\\").replace("\"", "\\\"");
+        return json.substring(0, json.length() - 1) + ",\"frame\":\"" + escaped + "\"}";
+    }
+
     static ObjectNode findRole(ProtoHost host, Map<String, String> f) throws Exception {
         String role = f.get("role");
         if (role == null || role.isBlank() || "true".equals(role)) throw new IllegalArgumentException("error: find --role needs a role\nfix: find --role=button --name=Submit");
@@ -394,29 +518,30 @@ final class InputCommands {
                     }
                 }
                 case CDP -> {
-                    CdpSession.Target t = ContextCommands.target(host, f);
-                    JsonNode root = host.cdp().send(t.sessionId, "DOM.getDocument", ContextCommands.p("depth", 0)).path("root");
-                    Map<String, Object> q = new LinkedHashMap<>(ContextCommands.p("nodeId", root.path("nodeId").asInt(), "role", role));
-                    if (name != null) q.put("accessibleName", name);
-                    JsonNode nodes = host.cdp().send(t.sessionId, "Accessibility.queryAXTree", q).path("nodes");
-                    for (JsonNode node : nodes) {
+                    host.cdp().autoAttachChildren();
+                    String frame = f.get("frame");
+                    Set<String> seen = new LinkedHashSet<>();
+                    for (CdpSession.Target t : roleTargets(host, f)) {
                         if (described.size() >= limit) break;
-                        if (node.path("ignored").asBoolean(false) || !node.has("backendDOMNodeId")) continue;
-                        JsonNode object = host.cdp().send(t.sessionId, "DOM.resolveNode", ContextCommands.p("backendNodeId", node.path("backendDOMNodeId").asInt())).path("object");
-                        JsonNode r = host.cdp().send(t.sessionId, "Runtime.callFunctionOn", ContextCommands.p("functionDeclaration", DESCRIBE_FN,
-                                "objectId", object.path("objectId").asText(), "returnByValue", true));
-                        described.add(r.path("result").path("value").asText());
+                        queryRole(host, t, role, name, frame, limit, described, seen);
                     }
                 }
                 case PLAYWRIGHT -> described.addAll(host.pw().call(c -> {
                     Page page = PwBridge.page(c, f.get("page"));
-                    Page.GetByRoleOptions options = new Page.GetByRoleOptions().setExact(true);
-                    if (name != null) options.setName(name);
-                    if (description != null) options.setDescription(description);
-                    Locator found = page.getByRole(ariaRole(role), options);
                     List<String> out = new ArrayList<>();
-                    int count = Math.min(found.count(), limit);
-                    for (int i = 0; i < count; i++) out.add(String.valueOf(found.nth(i).evaluate("el => (" + DESCRIBE_FN + ")(el)")));
+                    for (Frame frame : roleFrames(page, f.get("frame"))) {
+                        if (out.size() >= limit) break;
+                        Frame.GetByRoleOptions options = new Frame.GetByRoleOptions().setExact(true);
+                        if (name != null) options.setName(name);
+                        Locator found = frame.getByRole(ariaRole(role), options);
+                        int count = Math.min(found.count(), limit - out.size());
+                        for (int i = 0; i < count; i++) {
+                            String raw = String.valueOf(found.nth(i).evaluate("el => (" + DESCRIBE_FN + ")(el)"));
+                            String frameId = frame == page.mainFrame() ? "" : frame.name();
+                            if (frameId.isBlank() && frame != page.mainFrame()) frameId = frame.url();
+                            out.add(withFrame(raw, frameId));
+                        }
+                    }
                     return out;
                 }));
                 default -> throw new UnsupportedProtocolOperation("find-role", backend.id(), null);

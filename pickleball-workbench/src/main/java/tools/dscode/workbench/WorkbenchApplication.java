@@ -230,7 +230,10 @@ public final class WorkbenchApplication {
             String token = args[index];
             if (token == null) continue;
             if (token.startsWith(name + "=")) return token.substring(name.length() + 1);
-            if (name.equals(token) && index + 1 < args.length) return args[index + 1];
+            if (name.equals(token)) {
+                if (index + 1 < args.length && args[index + 1] != null && !args[index + 1].startsWith("--")) return args[index + 1];
+                return "";
+            }
         }
         return null;
     }

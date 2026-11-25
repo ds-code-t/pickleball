@@ -145,7 +145,8 @@ if (op === 'remove' || op === 'cleanup') {
   return {ok:true, removed:removed};
 }
 if (spec.handle && !node()) {
-  return {ok:false, error:'unknown handle'};
+  var positioned = spec.x !== undefined && spec.x !== null && spec.y !== undefined && spec.y !== null;
+  if (!positioned) return {ok:false, error:'unknown handle'};
 }
 var host = document.createElement('div');
 setHtml(host, spec.html || '');

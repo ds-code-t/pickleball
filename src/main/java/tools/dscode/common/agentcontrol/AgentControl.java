@@ -573,7 +573,11 @@ public final class AgentControl {
             if (!(item instanceof Map<?, ?> map)) throw new IllegalArgumentException("guide step " + n + " must be an object with t and say");
             Object t = map.get("t");
             Object say = map.get("say");
-            if (t == null || String.valueOf(t).isBlank() || say == null || String.valueOf(say).isBlank()) {
+            Object role = map.get("role");
+            Object name = map.get("name");
+            boolean hasTarget = t != null && !String.valueOf(t).isBlank();
+            boolean hasRole = role != null && !String.valueOf(role).isBlank() && name != null && !String.valueOf(name).isBlank();
+            if ((!hasTarget && !hasRole) || say == null || String.valueOf(say).isBlank()) {
                 throw new IllegalArgumentException("guide step " + n + " needs t (target) and say (instruction)");
             }
             Object action = map.get("do");
@@ -642,6 +646,32 @@ public final class AgentControl {
     private static Result guide(Path project, String runId, Map<String, String> args) throws Exception {
         List<Map<String, Object>> steps = guideSteps(project, args.get("steps"));
         if (!PageSurfaces.hasLivePage()) return fail(1, "guide needs a live browser page; run launch first");
+        for (Map<String, Object> step : steps) {
+            Object t = step.get("t");
+            if ((t == null || String.valueOf(t).isBlank()) && step.get("role") != null && step.get("name") != null) {
+                String role = String.valueOf(step.get("role")).trim();
+                String name = String.valueOf(step.get("name")).replace("\"", "").trim();
+                Object frameHint = step.get("frame");
+                String published = tools.dscode.common.agentfast.TargetVerb.shortIdFor(
+                        role, name, frameHint == null ? "" : String.valueOf(frameHint));
+                step.put("t", published != null ? published : "role:" + role + "[name=\"" + name + "\"]");
+            }
+            Object token = step.get("t");
+            if (token != null) {
+                String tokenText = String.valueOf(token);
+                int[] box = tools.dscode.common.agentfast.TargetVerb.boxForHandle(tokenText);
+                if (box == null || box.length < 4 || (box[2] <= 0 && box[3] <= 0)) {
+                    box = PageSurfaces.viewportBox(tokenText);
+                }
+                if (box != null && box.length >= 4 && (box[2] > 0 || box[3] > 0)) {
+                    step.put("box", Map.of("x", box[0], "y", box[1], "w", box[2], "h", box[3]));
+                }
+                String placed = tools.dscode.common.agentfast.TargetVerb.placementHandle(tokenText);
+                if (placed != null && placed.contains(":") && !placed.startsWith("top:")) {
+                    step.put("frame", placed.substring(0, placed.lastIndexOf(':')));
+                }
+            }
+        }
         Map<String, Object> spec = new LinkedHashMap<>();
         spec.put("id", present(args.get("id")) ? args.get("id").trim() : "g1");
         spec.put("steps", steps);
@@ -1924,6 +1954,8 @@ public final class AgentControl {
 
     private static Result remove(Path project, String runId, Map<String, String> args, String kind) throws Exception {
         String id = present(args.get("id")) ? args.get("id") : args.get("handle");
+        String mapped = PageSurfaces.placementFor(id);
+        if (mapped != null) id = mapped;
         Map<String, Object> removed = PageSurfaces.remove(explicitPage(project, args), id, AgentStore.root(project, runId), kind);
         removed.put("ok", true);
         removed.put("kind", kind);

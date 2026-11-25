@@ -213,13 +213,37 @@ final class ConsumerReadyCommands {
     }
 
     private static boolean headed(WorkbenchCommandLine.Parsed parsed, String browser) {
-        if (hasToken(parsed, "--headed")) {
-            String value = flag(parsed, "--headed");
-            boolean request = value == null || value.isBlank() || "true".equalsIgnoreCase(value) || "1".equals(value);
-            if ("false".equalsIgnoreCase(value) || "0".equals(value)) request = false;
-            return request && !GraphicsEnvironment.isHeadless();
-        }
+        if (hasToken(parsed, "--headed")) return headedRequest(parsed) && !GraphicsEnvironment.isHeadless();
         return showHeaded(browser);
+    }
+
+    /**
+     * The {@code --headed} request, before the headless-display check.
+     * A bare {@code --headed} is true, including when the next token is another flag.
+     */
+    static boolean headedRequest(WorkbenchCommandLine.Parsed parsed) {
+        if (!hasToken(parsed, "--headed")) return false;
+        String value = flag(parsed, "--headed");
+        // start is not a forwarded command, so the project token (".") sits after a bare --headed.
+        if (projectToken(parsed, value)) value = "";
+        if ("false".equalsIgnoreCase(value) || "0".equals(value)) return false;
+        return value == null || value.isBlank() || "true".equalsIgnoreCase(value) || "1".equals(value);
+    }
+
+    /** A project directory taken by the parser is not a value of a bare boolean flag. */
+    private static boolean projectToken(WorkbenchCommandLine.Parsed parsed, String value) {
+        if (value == null || value.isBlank()) return false;
+        if (".".equals(value) || "..".equals(value)) return true;
+        if (parsed.project() == null) return false;
+        try {
+            java.nio.file.Path token = java.nio.file.Path.of(value);
+            java.nio.file.Path project = parsed.project().toAbsolutePath().normalize();
+            java.nio.file.Path resolved = token.isAbsolute() ? token.normalize() : project.getParent() == null
+                    ? token.normalize() : project.resolveSibling(value).normalize();
+            return resolved.equals(project);
+        } catch (RuntimeException failure) {
+            return false;
+        }
     }
 
     /** Chrome, Chromium, or Edge. Null means the name is unsupported or the binary is missing. */
@@ -1158,7 +1182,10 @@ final class ConsumerReadyCommands {
             String token = args[index];
             if (token == null) continue;
             if (token.startsWith(name + "=")) return token.substring(name.length() + 1);
-            if (name.equals(token) && index + 1 < args.length) return args[index + 1];
+            if (name.equals(token)) {
+                if (index + 1 < args.length && args[index + 1] != null && !args[index + 1].startsWith("--")) return args[index + 1];
+                return "";
+            }
         }
         return null;
     }

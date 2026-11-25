@@ -118,6 +118,9 @@ public final class ProtoClient {
             if (cdp != null) command.add("--cdp=" + cdp);
             if (bidi != null) command.add("--bidi=" + bidi);
             if (run != null) command.add("--run=" + run);
+            // A Gradle test classpath exceeds the Windows command-line limit (CreateProcess 206).
+            tools.dscode.control.protocol.speed.JavaArguments.fitClasspath(
+                    command, ProtoHost.dir(project).resolve("host-classpath.args"));
             ProcessBuilder builder = new ProcessBuilder(command).redirectErrorStream(true)
                     .redirectOutput(ProcessBuilder.Redirect.appendTo(ProtoHost.dir(project).resolve("host.log").toFile()));
             builder.environment().put("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "1");

@@ -176,8 +176,9 @@ public final class WorkbenchAgentCommands {
                 return 2;
             }
         }
-        // E8: find --role, act --aria-ref and snap --aria go to the protocol host (accessibility locators, Playwright refs).
-        String routed = "find".equals(parsed.command()) && hasFlagOrValue(args, "--role") ? "find-role"
+        // E8: find --role on a CDP or BiDi endpoint, act --aria-ref, and snap --aria go to the protocol host.
+        // A live start host (browser:auto) keeps find --role on the page tree so the hit id is a short id.
+        String routed = "find".equals(parsed.command()) && hasFlagOrValue(args, "--role") && protocolLocator(args) ? "find-role"
                 : "act".equals(parsed.command()) && hasFlagOrValue(args, "--aria-ref") ? "aria-act"
                 : "snap".equals(parsed.command()) && hasFlagOrValue(args, "--aria") ? "aria-snap" : null;
         if (routed != null) {
@@ -1842,6 +1843,17 @@ public final class WorkbenchAgentCommands {
         return false;
     }
 
+    /** A CDP, BiDi, or explicit {@code --via} find stays on the protocol host. A live start host does not. */
+    private static boolean protocolLocator(String[] args) {
+        if (args == null) return false;
+        for (String token : args) {
+            if (token == null) continue;
+            if (token.startsWith("--target=browser:cdp") || token.startsWith("--cdp-endpoint=")
+                    || token.startsWith("--bidi-endpoint=") || token.startsWith("--via=")) return true;
+        }
+        return false;
+    }
+
     private static int findElement(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
         if (selectorTarget(flag(parsed, "--target"))) return agentControl(parsed, "find", out, err);
         long startedNs = System.nanoTime();
@@ -2150,6 +2162,8 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "target");
         copyFlag(args, parsed, "pane");
         copyFlag(args, parsed, "query");
+        copyFlag(args, parsed, "role");
+        copyFlag(args, parsed, "name");
         copyFlag(args, parsed, "on-top");
         copyFlag(args, parsed, "headless");
         copyFlag(args, parsed, "color");
@@ -2508,7 +2522,10 @@ public final class WorkbenchAgentCommands {
             String token = args[index];
             if (token == null) continue;
             if (token.startsWith(name + "=")) return token.substring(name.length() + 1);
-            if (name.equals(token) && index + 1 < args.length) return args[index + 1];
+            if (name.equals(token)) {
+                if (index + 1 < args.length && args[index + 1] != null && !args[index + 1].startsWith("--")) return args[index + 1];
+                return "";
+            }
         }
         return null;
     }
@@ -2522,7 +2539,10 @@ public final class WorkbenchAgentCommands {
             String token = args[index];
             if (token == null) continue;
             if (token.startsWith(name + "=")) values.add(token.substring(name.length() + 1));
-            else if (name.equals(token) && index + 1 < args.length) values.add(args[index + 1]);
+            else if (name.equals(token)) {
+                if (index + 1 < args.length && args[index + 1] != null && !args[index + 1].startsWith("--")) values.add(args[index + 1]);
+                else values.add("true");
+            }
         }
         return values.isEmpty() ? null : String.join(",", values);
     }

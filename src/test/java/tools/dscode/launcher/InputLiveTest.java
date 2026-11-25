@@ -40,7 +40,9 @@ class InputLiveTest {
     static final List<Process> started = new ArrayList<>();
     static final List<Path> projects = new ArrayList<>();
     static HttpServer server;
+    static HttpServer childServer;
     static String base;
+    static String childBase;
     static int port;
     static String endpoint;
 
@@ -49,7 +51,12 @@ class InputLiveTest {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", exchange -> {
             String path = exchange.getRequestURI().getPath();
-            byte[] body = (path.startsWith("/webauthn") ? WEBAUTHN : PAGE).getBytes(StandardCharsets.UTF_8);
+            String html = path.startsWith("/webauthn") ? WEBAUTHN
+                    : path.startsWith("/framed")
+                    ? "<!doctype html><title>framed</title><button id=go>Submit</button><button>Cancel</button><iframe id=child src=\""
+                    + childBase + "/child\"></iframe>"
+                    : PAGE;
+            byte[] body = html.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "text/html");
             exchange.sendResponseHeaders(200, body.length);
             exchange.getResponseBody().write(body);
@@ -58,6 +65,16 @@ class InputLiveTest {
         server.start();
         port = server.getAddress().getPort();
         base = "http://127.0.0.1:" + port;
+        childServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        childServer.createContext("/child", exchange -> {
+            byte[] body = "<!doctype html><title>child</title><button id=inner>Inner Submit</button>".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "text/html");
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+        childServer.start();
+        childBase = "http://127.0.0.1:" + childServer.getAddress().getPort();
     }
 
     @AfterEach
@@ -72,6 +89,7 @@ class InputLiveTest {
     @AfterAll
     static void stop() {
         if (server != null) server.stop(0);
+        if (childServer != null) childServer.stop(0);
     }
 
     private static Path project(String name) throws Exception {
@@ -161,6 +179,26 @@ class InputLiveTest {
         assertEquals("Sends the form", pw.path("items").path(0).path("description").asText());
         assertEquals(2, ok(p, "find", "--role=button").path("count").asInt());
         assertEquals(0, ok(p, "find", "--role=button", "--name=Submit", "--description=nothing like it").path("count").asInt());
+    }
+
+    /** L2: find --role searches every frame unless --frame=top. */
+    @Test
+    void findRoleSearchesEveryFrame() throws Exception {
+        Path p = project("framed-role");
+        go(p, base + "/framed");
+        JsonNode all = null;
+        for (int i = 0; i < 25; i++) {
+            all = ok(p, "find", "--role=button");
+            if (all.path("count").asInt() >= 3) break;
+            Thread.sleep(200);
+        }
+        assertTrue(all.path("count").asInt() >= 3, all.toString());
+        JsonNode named = ok(p, "find", "--role=button", "--name=Inner Submit");
+        assertEquals(1, named.path("count").asInt(), named.toString());
+        JsonNode top = ok(p, "find", "--role=button", "--frame=top");
+        assertEquals(2, top.path("count").asInt(), top.toString());
+        JsonNode pw = ok(p, "find", "--role=button", "--name=Inner Submit", "--via=playwright");
+        assertEquals(1, pw.path("count").asInt(), pw.toString());
     }
 
     @Test

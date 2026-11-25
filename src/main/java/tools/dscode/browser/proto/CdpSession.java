@@ -79,7 +79,9 @@ public final class CdpSession implements AutoCloseable {
                 case "Target.targetCreated" -> {
                     JsonNode info = params.path("targetInfo");
                     String type = info.path("type").asText();
-                    if ("page".equals(type) || (attachWorkers && worker(info))) attach(info.path("targetId").asText());
+                    if ("page".equals(type) || (autoAttachChildren && "iframe".equals(type)) || (attachWorkers && worker(info))) {
+                        attach(info.path("targetId").asText());
+                    }
                 }
                 case "Target.attachedToTarget" -> onAttached(params, sessionId);
                 case "Target.detachedFromTarget" -> bySession.remove(params.path("sessionId").asText());
@@ -180,14 +182,24 @@ public final class CdpSession implements AutoCloseable {
 
     /** E10: auto-attach workers, service workers and OOPIFs under every page. */
     public void autoAttachChildren() {
-        if (autoAttachChildren) return;
-        autoAttachChildren = true;
-        for (Target target : pages()) {
-            try {
-                channel.call("Target.setAutoAttach", Map.of("autoAttach", true, "waitForDebuggerOnStart", false, "flatten", true), target.sessionId);
-            } catch (RuntimeException ignored) {
-                // Older targets without auto-attach.
+        if (!autoAttachChildren) {
+            autoAttachChildren = true;
+            for (Target target : pages()) {
+                try {
+                    channel.call("Target.setAutoAttach", Map.of("autoAttach", true, "waitForDebuggerOnStart", false, "flatten", true), target.sessionId);
+                } catch (RuntimeException ignored) {
+                    // Older targets without auto-attach.
+                }
             }
+        }
+        // A later find must see an iframe that was not a target on the first call. Same-site
+        // frames stay in-process and are not listed here; the role scan pierces those documents.
+        try {
+            for (JsonNode info : channel.call("Target.getTargets", Map.of()).path("targetInfos")) {
+                if ("iframe".equals(info.path("type").asText())) attach(info.path("targetId").asText());
+            }
+        } catch (RuntimeException ignored) {
+            // A browser that cannot list targets still attaches children as they appear.
         }
     }
 

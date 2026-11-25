@@ -84,6 +84,8 @@ No Chrome: exit 1, `skipped` true, `sentence` `selftest record found no Chrome b
 
 Hover and focus stay off the script unless noise mode is on. The panel, the step editor, the recording bar, and other injected UI are not steps. That is what the missing `Pause`, `hover`, and `Accept` text proves.
 
+Page `find`, `act`, `highlight`, and `upload --query` do not treat pickleball's own panel, chat, cards, or checklist as the page control. A page control outranks that text. `--purpose=` still finds a panel control, and text that exists only in the panel is still found. `find --role` searches every frame unless `--frame=top` or `--frame=<id>`. A short id from a frame (`s1.h165`) is used in that frame by `highlight`, `label`, `arrow`, `step-badge`, `unstep-badge`, `spotlight`, and `act --query`. A guide step may be `{"t":"s1.h165","say":"..."}` or `{"role":"textbox","name":"City","frame":"<id>","say":"..."}`. `act --kind=type` reports `via` (`cdp-insertText`, `cdp-keys`, or `input-chain`), `value`, and `verified`. `applied` follows that read-back. A bare `--headed` is true when the next token is another flag (`--headed --panel`). `--human-override=<reason>` works on `act` and `call` for the session owner and is logged.
+
 ## Step editor, pop-out, and save
 
 No Chrome. Indexes are 0-based. Run each line as its own launcher invocation. Add the scratch directory as the last token when you are not using the consumer project.

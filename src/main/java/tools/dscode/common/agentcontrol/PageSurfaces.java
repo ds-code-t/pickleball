@@ -490,7 +490,7 @@ final class PageSurfaces {
             HandleRef named = parseHandle(handle);
             if (named.frameId != null || named.browserId != null) {
                 FrameOwner owner = frameOwner(named);
-                if (owner == null || !browserStillManaged(owner)) {
+                if ((owner == null || !browserStillManaged(owner)) && lookupBounds(handle) == null) {
                     throw new IllegalArgumentException("unknown handle: " + handle);
                 }
             }
@@ -536,6 +536,7 @@ final class PageSurfaces {
         }
         Path idFile = idStore(page, ledger, destination, destinationTab);
         String id = allocateId(idFile);
+        rememberAnchor(handle, id);
         int left = point == null ? 0 : point[0];
         int top = point == null ? 0 : point[1];
         String css = overlay ? overlayCss(kind, point, box) : (visual ? VisualKinds.css(kind, point[0], point[1], box, extras) : "");
@@ -630,6 +631,25 @@ final class PageSurfaces {
             }
         }
         return body;
+    }
+
+    /** Element handle (short id, element id, or frame:backend) to the placement id that painted it. */
+    private static final Map<String, String> ANCHOR_IDS = new java.util.concurrent.ConcurrentHashMap<>();
+
+    static void rememberAnchor(String handle, String id) {
+        if (handle == null || handle.isBlank() || id == null || id.isBlank()) return;
+        ANCHOR_IDS.put(handle.trim(), id);
+        String placed = tools.dscode.common.agentfast.TargetVerb.placementHandle(handle);
+        if (placed != null && !placed.isBlank()) ANCHOR_IDS.put(placed, id);
+    }
+
+    /** Placement id for an element handle, or null when this process did not paint one. */
+    static String placementFor(String handle) {
+        if (handle == null || handle.isBlank()) return null;
+        String direct = ANCHOR_IDS.get(handle.trim());
+        if (direct != null) return direct;
+        String placed = tools.dscode.common.agentfast.TargetVerb.placementHandle(handle);
+        return placed == null ? null : ANCHOR_IDS.get(placed);
     }
 
     static Map<String, Object> remove(Path page, String id) throws IOException {
@@ -920,9 +940,38 @@ final class PageSurfaces {
         return css + "max-width:280px;";
     }
 
+    /**
+     * Sized viewport box for a short id, an element id, or {@code frame:backend}.
+     * A box stored while painting is reused. Otherwise the live box is read once.
+     * A cross-origin frame handle is painted from this box on the top document.
+     */
+    static int[] viewportBox(String handle) {
+        int[] box = lookupBounds(handle);
+        if (box != null) return box.clone();
+        if (handle == null || handle.isBlank()) return null;
+        String placed = tools.dscode.common.agentfast.TargetVerb.placementHandle(handle);
+        String ranked = placed != null && !placed.isBlank() ? placed : handle;
+        HandleRef ref = parseHandle(ranked);
+        if (ref.backend == null || !rememberRankedBox(ranked, ref.backend)) return null;
+        box = lookupBounds(handle);
+        if (box == null) box = lookupBounds(ranked);
+        return box == null ? null : box.clone();
+    }
+
     private static int[] lookupBounds(String handle) {
         if (handle == null || handle.isBlank()) return null;
-        int[] box = BOUNDS.get(handle);
+        int[] box = sized(BOUNDS.get(handle));
+        if (box != null) return box;
+        box = sized(tools.dscode.common.agentfast.TargetVerb.boxForHandle(handle));
+        if (box != null) return box;
+        String placed = tools.dscode.common.agentfast.TargetVerb.placementHandle(handle);
+        if (placed == null || placed.isBlank() || placed.equals(handle)) return null;
+        box = sized(BOUNDS.get(placed));
+        if (box != null) return box;
+        return sized(tools.dscode.common.agentfast.TargetVerb.boxForHandle(placed));
+    }
+
+    private static int[] sized(int[] box) {
         if (box == null || box.length < 4 || box[2] < 0 || box[3] < 0) return null;
         return box;
     }
@@ -1396,11 +1445,19 @@ final class PageSurfaces {
             }
             Object model = cdp(web, "DOM.getBoxModel", Map.of("backendNodeId", backend));
             double[] box = boxOf(model);
-            if (box == null) return false;
+            if (box == null) {
+                int[] stored = tools.dscode.common.agentfast.TargetVerb.boxForHandle(handle);
+                if (stored == null) return false;
+                rememberBounds(handle, stored[0], stored[1], stored[2], stored[3], web, currentHandle(web));
+                return true;
+            }
             rememberBounds(handle, box[0], box[1], box[2], box[3], web, currentHandle(web));
             return true;
         } catch (RuntimeException failure) {
-            return false;
+            int[] stored = tools.dscode.common.agentfast.TargetVerb.boxForHandle(handle);
+            if (stored == null || stored.length < 4 || stored[2] < 0 || stored[3] < 0) return false;
+            rememberBounds(handle, stored[0], stored[1], stored[2], stored[3], web, currentHandle(web));
+            return true;
         }
     }
 
@@ -2149,6 +2206,16 @@ final class PageSurfaces {
         ENTRY_FAILURE.remove();
         HandleRef ref = HandleRef.parse(handle);
         if (ref.frameId != null || ref.browserId != null) {
+            // A stored viewport box is painted on the top document. Cross-origin frame
+            // ids are not Selenium frames, and the node's backend id is not in the parent.
+            if (lookupBounds(handle) != null) {
+                if (driver != null && focusedTab != null && !focusedTab.isBlank() && !activate(driver, focusedTab)) {
+                    ENTRY_FAILURE.set("tab switch failed");
+                    return null;
+                }
+                if (driver == null && !managed().isEmpty()) return managed().get(managed().size() - 1).driver();
+                return driver;
+            }
             FrameOwner owner = frameOwner(ref);
             if (owner == null) {
                 ENTRY_FAILURE.set("unknown handle");
@@ -3007,11 +3074,11 @@ final class PageSurfaces {
             HandleRef ref = HandleRef.parse(handle);
             if (ref.frameId != null || ref.browserId != null) {
                 FrameOwner owner = frameOwner(ref);
-                if (owner == null || !browserStillManaged(owner)) {
-                    throw new IllegalStateException("unknown handle");
+                if (owner != null && browserStillManaged(owner)) {
+                    String tab = owner.tab == null || owner.tab.isBlank() ? text(currentHandle(owner.driver)) : owner.tab;
+                    return new Selected(owner.driver, tab);
                 }
-                String tab = owner.tab == null || owner.tab.isBlank() ? text(currentHandle(owner.driver)) : owner.tab;
-                return new Selected(owner.driver, tab);
+                if (lookupBounds(handle) == null) throw new IllegalStateException("unknown handle");
             }
         }
         String tab = focusedTab == null ? "" : focusedTab;
