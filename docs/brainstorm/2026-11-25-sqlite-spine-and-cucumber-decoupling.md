@@ -19,6 +19,13 @@
 - Bidirectional sync is the default posture: edit in the Pickleball SQL GUI and it writes back to source files; edit a source file and hydration picks it up. The SQL GUI is expected to be where most people end up editing.
 - Granular fine-detail editing in SQL is the philosophy — not "toggle as a feature" but everything as an editable, queryable SQL object. Entities, scenarios, steps, step definitions, tags, paths, run variables: all rows with attributes, all editable at any granularity, one at a time or in folders.
 
+## Universal Control Guiding Principle (LOCKED)
+
+- Headless core is the spine: CLI and MCP verbs cover every capability. A browser or workbench window is always optional presentation, never required machinery. Everything visible in the Workbench GUI is reachable without any GUI, without any web page, without any browser at all.
+- Agent-generated UI: an AI agent asked to "show me a report" or "organize these logs" may compose a purpose-built transient surface — a screenshot gallery sorted by failure cluster, a log diff viewer, a selectable timeline — served as a page that lives only as long as the question does. The Workbench does not bloat into a kitchen-sink app; agents generate the right interface for the moment.
+- Any UI an agent generates is itself just another surface on the same control plane: it reads and writes through the same verbs, so it is accountable to the CLI contract like everything else. A generated page that cannot be driven from a terminal has drifted outside the philosophy.
+- Future-proof addressing: per-surface session IDs and agent IDs are built in now so multiple concurrent agents — not communicating with each other directly — can address distinct surfaces, chat panels, and browser sessions without collision. Agent self-assigned tasks and instructions are part of the addressing model.
+
 ## Locked Decisions
 
 - Cucumber is entirely decoupled from the spine. It is a legacy adapter / on-ramp, not integrated into core execution.
@@ -53,6 +60,30 @@
 - Modular layered architecture: business-language document layer (any text), adapter layer (Cucumber, Playwright-test, future formats translating into the spine), step-definition layer (Java/TS/JS bindings). Each layer swappable without affecting the others. Hydration stores entities in their logical layered structure in SQLite, navigable as an expandable tree (feature → scenario → step → step definition) distinct from but parallel to the file-directory tree, with a GUI to browse either.
 - Universal hydration: everything in the project folder is hydrated into SQLite whether or not it is used in a given execution. Toggled-off entities remain as rows with a boolean attribute. Large binaries that cannot be inlined are stored as references; the reference itself is always saved. Presence and execution are separate axes.
 
+## Execution Model: Three Layers (LOCKED)
+
+Three layers separate long-lived infrastructure from per-run work and from cross-project memory.
+
+**Layer 1 — Warm spine.** One long-running JVM holding the hydrated SQLite, the parsing map, and all classloaders. Maven and Gradle enter the picture only when Java source actually changes and needs recompilation. Running scenarios, switching snapshots, and querying logs all happen inside this process with no startup tax. This is the compile-once-edit-after model: one full compilation pass populates the class cache the spine draws from; after that, only changed files recompile.
+
+**Layer 2 — Per-snapshot execution contexts.** Each snapshot or sandbox branch gets its own isolated execution context inside the warm spine — a sandboxed classloader scope by default. Starting a scenario against snapshot B does not rebuild anything; it points the execution context at B's delta chain and runs. When heavy parallel regression or A/B matrix work would overwhelm the shared heap, the spine spawns isolated JVMs from a subprocess pool, each with its own heap, while the warm spine stays lean for interactive work. Pool size comes from config, not hard-coded. Subprocess JVMs go through the full build process again on spin-up.
+
+**Layer 3 — Cross-cutting store.** A separate file-based SQLite outside any project and outside Git that survives Pickleball being fully off. Agent notes, cross-snapshot links, dashboard state, who ran what and when across machines and people. The spine opens it on demand. Even if every execution JVM dies, the notes and links survive.
+
+## Resource-Sampling Gate (LOCKED)
+
+The spine samples JVM heap and off-heap usage, GC pressure, and thread counts, exposing that as queryable state through the same CLI and MCP verbs so an agent can check before spinning up parallel work. If heap crosses a configured threshold, the spine can refuse new snapshot contexts or force the subprocess path automatically. Sampling is not just observability — it is a gate the agent respects.
+
+## Hot-Reload Rules (LOCKED)
+
+**Java step definitions.** Reload via a custom classloader that drops the old class and loads the new one; the spine never restarts. The rule: no static mutable state in step definitions, because static fields become shared global state across reloads. This is enforced as a brief, non-blocking warning at ingest time — "this would reload faster as a static function" — not a hard block, since forcing it would break existing step definitions that rely on injected state or framework contexts. Initial build is one full compilation pass (Maven/Gradle); after that the spine watches source directories and triggers incremental recompilation itself through the Java compiler API directly, with no build tool in the loop for unchanged code.
+
+**TypeScript/JavaScript step definitions.** Node's module system lets you re-require or re-import a file to get a fresh module instance. The spine's Node subprocess pool gives each execution context its own module registry, so reloading a TS/JS step def is just re-importing it. tsx watch mode or equivalent handles the watch-and-recompile side. No classloader gymnastics.
+
+**Dependency changes.** If a step's Java code pulls in a new library, or a TS file imports a new npm package, that is not a hot-reload event — it is a rebuild event that forces the full initial-compilation path again, including spinning a fresh JVM if one is already running. That is the boundary where compile-once stops being free.
+
+**Code-tab editing.** Syntax highlighting for the workbench code tabs pulls in Monaco or CodeMirror through the bundled Node layer, consistent with the zero-install rule. This is a later milestone, not a blocker.
+
 ## CENTRAL — Universal Entity: Commit Pin + Delta (LOCKED)
 
 The universal entity is the single primitive everything else hangs off. It is a format-agnostic Java object: a Git commit reference (the pinned project state) plus an ordered list of deltas on top of it. Storage format is just a projection of this entity — SQLite, report file, sandbox branch are all the same thing at different thicknesses.
@@ -79,58 +110,5 @@ The universal entity is the single primitive everything else hangs off. It is a 
 
 - **MAJOR — Runtime snapshot SQLite and universal entity linking.** Current run/log storage is file-based (reports/diagnostic-runs JSON+JSONL, runs/ trees, dot-pickleball/runs), with a derived FTS5 SQLite search index (diagnostics.db) rebuilt from those JSON rows — not a first-class store. The hydration SQLite and the run-log SQLite are separate today. Target model: a runtime snapshot SQLite per run (or shared run-history DB) that freezes the hydrated entity state as it existed at execution time, plus dynamic run attributes (active tags, execution order, system-property-triggered scenario selection, pass/fail history). All entities linked via foreign keys — scenarios to steps to step definitions to logs to source files to git commits (pkb_gitsnapshot provenance already stamps sourceRevision). Dashboard queries become ordinary SQL joins instead of file scraping. Long-term vision: dashboard as a lightweight webpage, potentially hosted on GitHub Pages, acting as a central report hub specific to the project. Open sub-questions: one DB vs per-run DBs; whether the snapshot is a copy of the hydrated store or a separate schema optimized for querying; how git-commit linkage interacts with sandbox branches; retention/GC policy for old snapshots.
 - Playwright adapter: hydrate implicit fixture/page context into the row at ingest, or re-resolve at execution? (ON HOLD — revisit after other items resolve)
-- Persistent socket connection vs per-command spawn for chatty dashboard interactions. CLI-style spawn matches the testability ideal; a persistent channel is an optimization that can be added without changing the contract. (User agreed: start with per-command spawn.)
 - Build the documented verb inventory: which verbs are CLI-only, which are MCP-only, which are bidirectional streams, and the rule that new Node surfaces register against it.
 - Custom classloader mechanics for warm-engine class reloading: static-state leakage and loader-retention risks need a concrete design before implementation.
-- Node.js Workbench: custom-browser mode (workbench-embedded page) vs side-by-side collaboration with a real browser. Side-by-side is the lean default; custom-browser is opt-in for headless/agent-only runs. Pause/resume via BiDi session freeze at step boundaries.
-
-## Node.js Workbench GUI & Playwright Integration (LOCKED / REFINED)
-
-- Replace current Java Swing Workbench with a Node.js-based dynamic GUI as the primary human-facing interface and AI agent collaboration surface.
-- Use Playwright-bundled browsers (even if system browsers exist) for full DOM control, injection, CDP/BiDi, network mocking, overlays, chat panels, styling, mutation listeners, etc.
-- Single logical entity: Workbench editors, log navigation, reports, dynamic step execution, and DOM control/injection are all one interconnected surface. Linking is core.
-
-### Tab Layout (LOCKED)
-
-Primary ordering matches actual workflow:
-- **Scenarios / Tests tab (most prominent)**: Business-language steps as the main view. Each step expands in place to show and edit its associated Java / TypeScript / JavaScript step definition. Optional dedicated code editor tab or one-click jump from the expand. Business language stays primary; code is one level deep.
-- **Globals / Run Vars / Configs tabs**: Flat, human-friendly forms over the underlying SQL. Configs are grouped under logical parents (e.g. Browser → Selenium / Playwright children). These are top-level because they cascade to every scenario. Edits write to SQL and sync to extracted files unless in a sandbox.
-- **Data tab**: Human-readable view of data files / entities, more intuitive than raw SQL.
-- **Full SQL query tab (least prominent)**: Escape hatch for searching/editing anything. Shared search box at the top of Data and SQL tabs supports exact, partial, and regex queries so you can bounce between them.
-- When a previous run or branch is selected, additional run-specific tabs appear (Map tab, logs, screenshots, etc.).
-
-### Dynamic Run Mode & ParsingMap Editing (LOCKED)
-
-- Dynamic run mode is for on-the-fly iteration: writing steps as you go, editing definitions that do not yet exist, or tweaking values for a specific step without committing to the main store.
-- ParsingMap / NodeMap is shown as an expandable tree (Node.js UI libraries). Each step has its own node map; children inherit from parents.
-- **Pre-step mapping hook**: Right before a step executes, the editor applies any pending map overrides for that step only. Parents remain untouched; children inherit the temporary change for that moment. The next step gets a fresh map unless overridden again.
-- Edits in dynamic mode write only to the in-memory run map for that step's moment. They do **not** mutate SQLite or parent maps permanently.
-- You can re-run a single step repeatedly with the current overrides.
-- The map view is labeled with the specific run and step it is bound to (especially when opened from a previous run's log).
-- **Promote alert**: Before any dynamic edit is written back to SQL, config, a parent node map, or a saved snapshot, an alert asks for confirmation. Options include write to step definition row, parent map, or this run's branch.
-- Dynamic mode rewrites the current session's logs in place (rewind / re-tweak). Completed runs remain immutable records.
-
-### Branching, Snapshots, and Promote (LOCKED)
-
-- Entering dynamic mode on a completed run immediately creates a cheap delta-based fork (using the universal entity: commit pin + independent delta). The original completed run stays pristine and immutable.
-- The fork can be discarded if no changes are made. If changes are made, it becomes the working branch.
-- **Always branch on edit**: There is no in-place editing of a log-bearing completed record. Branching is the only consistent move. An explicit "branch off" / save-state action exists; micro-edits within a session do not auto-spawn new visible branches.
-- Each branch keeps its own independent delta. A parent can never be silently rewritten by a child.
-- Optional parenting link stored in the entity as provenance metadata (useful for AI analysis of before/after logs). It is not a structural dependency; deleting a parent does not break the child's delta.
-- Per-file branching tree visualization (collapsible) with color-shift per branch so you immediately see you are not on the original. The top-level branch selector aggregates these per-file trees.
-- Promote options: promote-to-parent or promote-to-top. On promote, a toggle asks whether to clear the branch's logs or archive them. Multi-level promote graphs are deferred.
-- Logs belong to a specific branch. Completed-run logs are append-only truth; dynamic-session logs are ephemeral working data that can be cleared or GC'd independently.
-
-All of the above is locked for the Node.js Workbench vision. Exact visual styling of the tree and color shifts remains an implementation detail.
-
-### One Control Plane, Many Surfaces (LOCKED)
-
-- **Single control plane**: The workbench GUI, browser sessions, OS-level automation, and headless/remote runs all hang off the same Java entry points and the same CLI/MCP verbs. The Node layer is a renderer that calls those entry points. No duplicated control logic across surfaces.
-- **Per-surface addressing (future-proof)**: Every command targets a specific surface via session ID or label. Built now so multiple concurrent agents (not communicating with each other directly) can address distinct surfaces without collision. Agent IDs and self-assigned tasks/instructions are part of the addressing model.
-- **Chat panel as first-class surface**: A general chat panel exists in the workbench before any scenario opens — the agent's home base for the session (run this, search logs, switch tabs, open prior runs). Browser-specific chat is one mode of it, not a separate system. The same workbench serves browser-based automation and non-browser automation (OS/desktop control), with or without a visible browser.
-- **Clean vs injected browser toggle**: Per-session. Default is no injection when the test depends on natural behavior or overlays would distort measurement. Injection is opt-in, declared in run config or triggered mid-session. The workbench tracks which sessions are injected vs pristine.
-- **Control lease extension**: The existing HUMAN vs AGENT control lease extends beyond the workbench UI to specific browser sessions — including mouse/keyboard input blocking and overlay lockdown on a running test page. The agent can take the lease on the workbench, on a browser session, or both.
-- **Multi-agent chat panels**: Each agent can inject its own independent chat panel (or share one), addressed by agent ID. Whether panels are independent or shared is the injecting agent's decision at injection time.
-- **Overlay-as-sibling default**: Injection creates a full-page transparent overlay element as a sibling layer above the real DOM — not mutations inside the page's component tree. Highlights are absolutely positioned divs using bounding-box coordinates from CDP/Playwright locator APIs. Reload and scroll are handled by re-querying positions on mutation/scroll events and re-anchoring. Direct DOM mutation is retained as a fallback for cases where the page itself must behave differently, not just be annotated.
-- **CDP/BiDi reliance**: CDP and BiDi replace most custom mutation listeners for observation (DOM changes, network, console via protocol without touching the page). A minimal local listener is kept only for things the protocol does not surface cleanly (element resize, overlay interactions).
-- **External state rule**: All interaction state (chat history, highlights, agent assignments, overlay positions) lives in the Pickleball runtime (Java/SQLite), never in the page. The page is a disposable viewport; on reload, the overlay re-renders from the external source. Global and local state both persist outside the page.
