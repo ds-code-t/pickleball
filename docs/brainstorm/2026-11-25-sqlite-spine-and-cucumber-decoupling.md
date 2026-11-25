@@ -83,17 +83,41 @@ The universal entity is the single primitive everything else hangs off. It is a 
 - Build the documented verb inventory: which verbs are CLI-only, which are MCP-only, which are bidirectional streams, and the rule that new Node surfaces register against it.
 - Custom classloader mechanics for warm-engine class reloading: static-state leakage and loader-retention risks need a concrete design before implementation.
 
-## Node.js Workbench GUI & Playwright Integration (PROPOSED / OPEN)
+## Node.js Workbench GUI & Playwright Integration (LOCKED / REFINED)
 
 - Replace current Java Swing Workbench with a Node.js-based dynamic GUI as the primary human-facing interface and AI agent collaboration surface.
 - Use Playwright-bundled browsers (even if system browsers exist) for full DOM control, injection, CDP/BiDi, network mocking, overlays, chat panels, styling, mutation listeners, etc.
 - Single logical entity: Workbench editors, log navigation, reports, dynamic step execution, and DOM control/injection are all one interconnected surface. Linking is core.
-- Tabbed editor for hydrated SQLite logical views:
-  - Prominent tab: scenarios/tests with expandable business-language steps that drop down to show/edit Java/TS/JS step definitions.
-  - Tabs for global/run variables (synced as SQL records, round-trip to extracted files), configs, global paths, etc. — flat intuitive forms that edit the underlying SQL, which syncs to files unless in a sandbox branch.
-  - Full SQL database representation: queryable/searchable GUI (exact, partial, regex searches).
-- Branching/sandbox: selecting a sandbox branch creates another version of the editor, selectable from a branches tab. Visual indicators (slight color styling, title bar with specifics) when not on master.
-- Run history: starting a run auto-creates/associates a branched snapshot of the current state. If an unchanged snapshot already exists, associate the new run with it. Runs and branches always linked. Runs accessible in a history tab. Branch stores its own logs and run history in its SQL.
-- Map tab (when a run/branch selected): read-only view of NodeMap/ParsingMap entries, internal objects/arrays, running logs, screenshots. Optional dynamic run mode: editable ParsingMap and custom steps in a sandbox; edits override configs/files for the session without mutating the underlying SQLite or synced files. Consistent with ParsingMap inheritance.
-- Workbench can function as a custom browser with extreme session control/monitoring, or side-by-side with the DOM under test. Chat panels/overlays can be in the Workbench or injected into the target DOM.
-- Relates to Playwright adapter open item: full integration of Playwright into the spine and GUI.
+
+### Tab Layout (LOCKED)
+
+Primary ordering matches actual workflow:
+- **Scenarios / Tests tab (most prominent)**: Business-language steps as the main view. Each step expands in place to show and edit its associated Java / TypeScript / JavaScript step definition. Optional dedicated code editor tab or one-click jump from the expand. Business language stays primary; code is one level deep.
+- **Globals / Run Vars / Configs tabs**: Flat, human-friendly forms over the underlying SQL. Configs are grouped under logical parents (e.g. Browser → Selenium / Playwright children). These are top-level because they cascade to every scenario. Edits write to SQL and sync to extracted files unless in a sandbox.
+- **Data tab**: Human-readable view of data files / entities, more intuitive than raw SQL.
+- **Full SQL query tab (least prominent)**: Escape hatch for searching/editing anything. Shared search box at the top of Data and SQL tabs supports exact, partial, and regex queries so you can bounce between them.
+- When a previous run or branch is selected, additional run-specific tabs appear (Map tab, logs, screenshots, etc.).
+
+### Dynamic Run Mode & ParsingMap Editing (LOCKED)
+
+- Dynamic run mode is for on-the-fly iteration: writing steps as you go, editing definitions that do not yet exist, or tweaking values for a specific step without committing to the main store.
+- ParsingMap / NodeMap is shown as an expandable tree (Node.js UI libraries). Each step has its own node map; children inherit from parents.
+- **Pre-step mapping hook**: Right before a step executes, the editor applies any pending map overrides for that step only. Parents remain untouched; children inherit the temporary change for that moment. The next step gets a fresh map unless overridden again.
+- Edits in dynamic mode write only to the in-memory run map for that step’s moment. They do **not** mutate SQLite or parent maps permanently.
+- You can re-run a single step repeatedly with the current overrides.
+- The map view is labeled with the specific run and step it is bound to (especially when opened from a previous run’s log).
+- **Promote alert**: Before any dynamic edit is written back to SQL, config, a parent node map, or a saved snapshot, an alert asks for confirmation. Options include write to step definition row, parent map, or this run’s branch.
+- Dynamic mode rewrites the current session’s logs in place (rewind / re-tweak). Completed runs remain immutable records.
+
+### Branching, Snapshots, and Promote (LOCKED)
+
+- Entering dynamic mode on a completed run immediately creates a cheap delta-based fork (using the universal entity: commit pin + independent delta). The original completed run stays pristine and immutable.
+- The fork can be discarded if no changes are made. If changes are made, it becomes the working branch.
+- **Always branch on edit**: There is no in-place editing of a log-bearing completed record. Branching is the only consistent move. An explicit “branch off” / save-state action exists; micro-edits within a session do not auto-spawn new visible branches.
+- Each branch keeps its own independent delta. A parent can never be silently rewritten by a child.
+- Optional parenting link stored in the entity as provenance metadata (useful for AI analysis of before/after logs). It is not a structural dependency; deleting a parent does not break the child’s delta.
+- Per-file branching tree visualization (collapsible) with color-shift per branch so you immediately see you are not on the original. The top-level branch selector aggregates these per-file trees.
+- Promote options: promote-to-parent or promote-to-top. On promote, a toggle asks whether to clear the branch’s logs or archive them. Multi-level promote graphs are deferred.
+- Logs belong to a specific branch. Completed-run logs are append-only truth; dynamic-session logs are ephemeral working data that can be cleared or GC’d independently.
+
+All of the above is locked for the Node.js Workbench vision. Exact visual styling of the tree and color shifts remains an implementation detail.
