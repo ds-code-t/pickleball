@@ -20,8 +20,9 @@ import java.util.stream.Stream;
 
 /**
  * Step-definition catalog derived from Java glue annotations and from
- * {@code glue/js} source. JS and TS stay source only. There is no JS/TS step runtime.
+ * {@code glue/js} source. JS and TS stay source only until a step host runs them.
  * {@code definition_id} is SHA-256 of language, pattern, path, and line.
+ * {@code host} is the file language. {@link GlueStaticScan} warns on a mutable static field.
  */
 public final class StoreStepCatalog {
     private static final int MAX_BYTES = 1_048_576;
@@ -39,7 +40,8 @@ public final class StoreStepCatalog {
             String methodName,
             String sourcePath,
             int sourceLine,
-            String contentHash
+            String contentHash,
+            String host
     ) {
     }
 
@@ -75,8 +77,8 @@ public final class StoreStepCatalog {
         for (Stored row : existing) existingById.put(row.id(), row);
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO step_definitions(
-                    definition_id, language, pattern, method_name, source_path, source_line, content_hash, hydrated_at, removed)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+                    definition_id, language, pattern, method_name, source_path, source_line, content_hash, hydrated_at, removed, host)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
                 ON CONFLICT(definition_id) DO UPDATE SET
                     language = excluded.language,
                     pattern = excluded.pattern,
@@ -85,12 +87,14 @@ public final class StoreStepCatalog {
                     source_line = excluded.source_line,
                     content_hash = excluded.content_hash,
                     hydrated_at = excluded.hydrated_at,
-                    removed = 0
+                    removed = 0,
+                    host = excluded.host
                 """)) {
             int queued = 0;
             for (Definition definition : found) {
                 Stored prior = existingById.get(definition.id());
-                if (prior != null && !prior.removed() && prior.contentHash().equals(definition.contentHash())) {
+                if (prior != null && !prior.removed() && prior.contentHash().equals(definition.contentHash())
+                        && prior.host().equals(definition.host())) {
                     continue;
                 }
                 statement.setString(1, definition.id());
@@ -101,11 +105,13 @@ public final class StoreStepCatalog {
                 statement.setInt(6, definition.sourceLine());
                 statement.setString(7, definition.contentHash());
                 statement.setString(8, hydratedAt);
+                statement.setString(9, definition.host());
                 statement.addBatch();
                 queued++;
             }
             if (queued > 0) statement.executeBatch();
         }
+        warnJava(project, found);
         try (PreparedStatement move = connection.prepareStatement(
                 "UPDATE step_executions SET definition_id = ? WHERE definition_id = ?")) {
             for (Stored row : existing) {
@@ -160,8 +166,21 @@ public final class StoreStepCatalog {
             if (language == null) continue;
             List<Definition> found = definitionsFrom(path, language, entry.getValue());
             replacePath(connection, path, found, now);
+            warnJava(project, found);
         }
         StoreLog.log(project, "track", "step-definitions", "merge sources " + sources.size());
+    }
+
+    private static void warnJava(Path project, List<Definition> found) {
+        if (found == null) return;
+        for (Definition definition : found) {
+            if ("java".equals(definition.language())) GlueStaticScan.scan(project, definition.sourcePath());
+        }
+    }
+
+    static String hostFor(String language) {
+        if (language == null || language.isBlank()) return "java";
+        return language;
     }
 
     private static String sourceLanguage(String path) {
@@ -187,7 +206,8 @@ public final class StoreStepCatalog {
                     hit.method(),
                     path,
                     hit.line(),
-                    hash));
+                    hash,
+                    hostFor(language)));
         }
         return found;
     }
@@ -198,7 +218,7 @@ public final class StoreStepCatalog {
         for (Definition definition : found) foundById.put(definition.id(), definition);
         List<Stored> existing = new ArrayList<>();
         try (PreparedStatement statement = connection.prepareStatement(
-                "SELECT definition_id, language, pattern, source_path, content_hash, removed FROM step_definitions WHERE source_path = ?")) {
+                "SELECT definition_id, language, pattern, source_path, content_hash, removed, host FROM step_definitions WHERE source_path = ?")) {
             statement.setString(1, path);
             try (ResultSet result = statement.executeQuery()) {
                 while (result.next()) {
@@ -206,14 +226,15 @@ public final class StoreStepCatalog {
                             result.getString(1),
                             result.getString(2) + "\u001f" + result.getString(3) + "\u001f" + result.getString(4),
                             result.getString(5) == null ? "" : result.getString(5),
-                            result.getInt(6) != 0));
+                            result.getInt(6) != 0,
+                            result.getString(7) == null || result.getString(7).isBlank() ? "java" : result.getString(7)));
                 }
             }
         }
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO step_definitions(
-                    definition_id, language, pattern, method_name, source_path, source_line, content_hash, hydrated_at, removed)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+                    definition_id, language, pattern, method_name, source_path, source_line, content_hash, hydrated_at, removed, host)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
                 ON CONFLICT(definition_id) DO UPDATE SET
                     language = excluded.language,
                     pattern = excluded.pattern,
@@ -222,7 +243,8 @@ public final class StoreStepCatalog {
                     source_line = excluded.source_line,
                     content_hash = excluded.content_hash,
                     hydrated_at = excluded.hydrated_at,
-                    removed = 0
+                    removed = 0,
+                    host = excluded.host
                 """)) {
             for (Definition definition : found) {
                 statement.setString(1, definition.id());
@@ -233,6 +255,7 @@ public final class StoreStepCatalog {
                 statement.setInt(6, definition.sourceLine());
                 statement.setString(7, definition.contentHash());
                 statement.setString(8, hydratedAt);
+                statement.setString(9, definition.host());
                 statement.addBatch();
             }
             if (!found.isEmpty()) statement.executeBatch();
@@ -252,20 +275,21 @@ public final class StoreStepCatalog {
         return definition.language() + "\u001f" + definition.pattern() + "\u001f" + definition.sourcePath();
     }
 
-    private record Stored(String id, String key, String contentHash, boolean removed) {
+    private record Stored(String id, String key, String contentHash, boolean removed, String host) {
     }
 
     private static List<Stored> stored(Connection connection) throws SQLException {
         List<Stored> rows = new ArrayList<>();
         try (PreparedStatement statement = connection.prepareStatement(
-                     "SELECT definition_id, language, pattern, source_path, content_hash, removed FROM step_definitions");
+                     "SELECT definition_id, language, pattern, source_path, content_hash, removed, host FROM step_definitions");
              ResultSet result = statement.executeQuery()) {
             while (result.next()) {
                 rows.add(new Stored(
                         result.getString(1),
                         result.getString(2) + "\u001f" + result.getString(3) + "\u001f" + result.getString(4),
                         result.getString(5) == null ? "" : result.getString(5),
-                        result.getInt(6) != 0));
+                        result.getInt(6) != 0,
+                        result.getString(7) == null || result.getString(7).isBlank() ? "java" : result.getString(7)));
             }
         }
         return rows;
@@ -275,7 +299,7 @@ public final class StoreStepCatalog {
         if (!StorePaths.ready(project)) return List.of();
         try (StoreDatabase database = StoreDatabase.open(project);
              PreparedStatement statement = database.connection().prepareStatement("""
-                     SELECT definition_id, language, pattern, method_name, source_path, source_line, content_hash
+                     SELECT definition_id, language, pattern, method_name, source_path, source_line, content_hash, host
                      FROM step_definitions
                      WHERE removed = 0
                      ORDER BY source_path, source_line, definition_id
@@ -290,7 +314,8 @@ public final class StoreStepCatalog {
                         rows.getString(4),
                         rows.getString(5),
                         rows.getInt(6),
-                        rows.getString(7)));
+                        rows.getString(7),
+                        rows.getString(8) == null || rows.getString(8).isBlank() ? "java" : rows.getString(8)));
             }
             return found;
         }
@@ -304,7 +329,9 @@ public final class StoreStepCatalog {
             String methodName,
             String sourcePath,
             int sourceLine,
-            int enabled
+            int enabled,
+            String host,
+            String contentHash
     ) {
     }
 
@@ -312,7 +339,7 @@ public final class StoreStepCatalog {
     public static List<MatchRow> matchRows(Connection connection) throws SQLException {
         List<MatchRow> rows = new ArrayList<>();
         try (PreparedStatement statement = connection.prepareStatement("""
-                SELECT definition_id, language, pattern, parameter_types, method_name, source_path, source_line, enabled
+                SELECT definition_id, language, pattern, parameter_types, method_name, source_path, source_line, enabled, host, content_hash
                 FROM step_definitions
                 WHERE removed = 0
                 ORDER BY source_path, source_line, definition_id
@@ -327,7 +354,9 @@ public final class StoreStepCatalog {
                         result.getString(5),
                         result.getString(6),
                         result.getInt(7),
-                        result.getInt(8)));
+                        result.getInt(8),
+                        result.getString(9) == null || result.getString(9).isBlank() ? hostFor(result.getString(2)) : result.getString(9),
+                        result.getString(10) == null ? "" : result.getString(10)));
             }
         }
         return rows;
@@ -374,7 +403,8 @@ public final class StoreStepCatalog {
                             hit.method(),
                             path,
                             hit.line(),
-                            hash));
+                            hash,
+                            hostFor(kind)));
                 }
             }
         } catch (IOException ignored) {

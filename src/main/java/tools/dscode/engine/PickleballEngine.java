@@ -1,6 +1,7 @@
 package tools.dscode.engine;
 
 import tools.dscode.engine.context.ExecutionContext;
+import tools.dscode.engine.match.ForeignStepHosts;
 import tools.dscode.engine.match.StepKind;
 import tools.dscode.engine.match.StepRegistry;
 import tools.dscode.engine.model.DocText;
@@ -59,6 +60,7 @@ public final class PickleballEngine {
         NativeScenarioCatalog.bind(settings.project(), loaded);
         List<ScenarioResult> scenarios = new ArrayList<>();
         boolean topLevel = ExecutionContext.current() == null;
+        if (topLevel) ForeignStepHosts.begin(settings.project());
         Object parked = CucumberLane.park(topLevel);
         // Block conditionals log at DEBUG. The adapter uses that level so a
         // surrounding suite that lowered the level still records the same lines.
@@ -79,6 +81,7 @@ public final class PickleballEngine {
             PickleballRunner.LOG_LEVEL = previousLevel;
             NativeScenarioCatalog.clear();
             CucumberLane.restore(topLevel, parked);
+            if (topLevel) ForeignStepHosts.end();
         }
         RunResult result = RunResult.of(scenarios);
         EngineLog.log(settings.project(), "run", source.id(), result.status() + " scenarios=" + scenarios.size());

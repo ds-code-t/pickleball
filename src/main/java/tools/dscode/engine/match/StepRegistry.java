@@ -327,7 +327,8 @@ public final class StepRegistry {
             List<GlueStep> candidates = new ArrayList<>();
             for (StoreStepCatalog.MatchRow row : rows) {
                 if (row.enabled() != 1) continue;
-                candidates.add(define("Given", row.pattern(), bind(row), row.parameterTypes()));
+                candidates.add(define("Given", row.pattern(), bind(row), row.parameterTypes(),
+                        row.id(), row.host(), row.contentHash()));
             }
             for (GlueStep step : steps) {
                 Method method = step.method();
@@ -454,6 +455,18 @@ public final class StepRegistry {
     }
 
     private static GlueStep define(String keyword, String pattern, Method method, String parameterTypes) {
+        return define(keyword, pattern, method, parameterTypes, "", "java", "");
+    }
+
+    private static GlueStep define(
+            String keyword,
+            String pattern,
+            Method method,
+            String parameterTypes,
+            String definitionId,
+            String host,
+            String contentHash
+    ) {
         Type[] types = method == null ? new Type[0] : method.getGenericParameterTypes();
         boolean table = false;
         boolean doc = false;
@@ -470,7 +483,9 @@ public final class StepRegistry {
             }
             expressionTypes.add(types[index]);
         }
-        return new GlueStep(keyword, pattern, method, expressionTypes, table, doc, classify(pattern, method), parameterTypes);
+        return new GlueStep(
+                keyword, pattern, method, expressionTypes, table, doc, classify(pattern, method),
+                parameterTypes, definitionId, host, contentHash);
     }
 
     static StepKind classify(String pattern, Method method) {

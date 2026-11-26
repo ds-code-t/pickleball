@@ -20,6 +20,8 @@ import tools.dscode.control.override.StepOverrideContext;
 import tools.dscode.control.override.StepOverrideRegistry;
 import tools.dscode.engine.context.ExecutionContext;
 import tools.dscode.engine.match.AmbiguousMatchException;
+import tools.dscode.engine.match.ForeignStepHosts;
+import tools.dscode.engine.match.GlueStep;
 import tools.dscode.engine.match.StepKind;
 import tools.dscode.engine.match.StepMatch;
 import tools.dscode.engine.match.StepRegistry;
@@ -318,10 +320,11 @@ public final class SharedStepRun {
         StepMatch match = registry == null ? StepMatch.undefined(text) : registry.matchNative(text);
         if (step.method == null) {
             if (match.kind() == StepKind.OVERRIDE) return override(step, match, context);
-            if (!match.matched() || match.step() == null || match.step().method() == null) {
+            if (match.matched() && match.step() != null && match.step().method() != null) {
+                step.attachNativeMethod(match.step().method());
+            } else if (match.step() == null || match.step().definitionId().isBlank()) {
                 throw new UndefinedStep(text);
             }
-            step.attachNativeMethod(match.step().method());
         }
         if (match.kind() == StepKind.GLUE && step.definitionFlags != null
                 && !step.definitionFlags.contains(NO_STEP_TEXT_RESOLUTION)
@@ -334,8 +337,31 @@ public final class SharedStepRun {
         }
         if (match.kind() == StepKind.OVERRIDE) return override(step, match, context);
         prepareData(step, match);
+        Object hosted = hostCall(step, match, text);
+        if (hosted != SKIP_HOST) return hosted;
         if (step.method == null) throw new UndefinedStep(text);
         return call(step, match, context);
+    }
+
+    private static final Object SKIP_HOST = new Object();
+
+    /**
+     * A stored row whose host has no registered adapter fails the step.
+     * A bound Java method stays on the existing invoke so a data table still arrives as a table.
+     * Any other stored row goes through {@link ForeignStepHosts}.
+     */
+    private static Object hostCall(StepExtension step, StepMatch match, String text) {
+        GlueStep glue = match == null ? null : match.step();
+        if (glue == null || glue.definitionId().isBlank()) return SKIP_HOST;
+        String host = glue.host();
+        boolean javaMethod = "java".equals(host) && step.method != null;
+        if (javaMethod) return SKIP_HOST;
+        if (!ForeignStepHosts.supports(host)) {
+            throw new IllegalStateException("error: no step host for " + host
+                    + "\nfix: register a ForeignStepHost that supports " + host);
+        }
+        List<String> args = match.captures() == null ? List.of() : match.captures();
+        return ForeignStepHosts.invoke(glue.definitionId(), text, args, host);
     }
 
     private static Object override(StepExtension step, StepMatch match, ExecutionContext context) throws ReflectiveOperationException {

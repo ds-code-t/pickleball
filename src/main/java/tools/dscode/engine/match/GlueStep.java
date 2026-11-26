@@ -13,8 +13,24 @@ public record GlueStep(
         boolean dataTable,
         boolean docString,
         StepKind kind,
-        String parameterTypes
+        String parameterTypes,
+        String definitionId,
+        String host,
+        String contentHash
 ) {
+    public GlueStep(
+            String keyword,
+            String pattern,
+            Method method,
+            List<Type> expressionTypes,
+            boolean dataTable,
+            boolean docString,
+            StepKind kind,
+            String parameterTypes
+    ) {
+        this(keyword, pattern, method, expressionTypes, dataTable, docString, kind, parameterTypes, "", "java", "");
+    }
+
     public GlueStep(
             String keyword,
             String pattern,
@@ -33,6 +49,9 @@ public record GlueStep(
         expressionTypes = expressionTypes == null ? List.of() : List.copyOf(expressionTypes);
         kind = kind == null ? StepKind.GLUE : kind;
         parameterTypes = parameterTypes == null ? "" : parameterTypes;
+        definitionId = definitionId == null ? "" : definitionId;
+        host = host == null || host.isBlank() ? "java" : host;
+        contentHash = contentHash == null ? "" : contentHash;
     }
 
     public String location() {

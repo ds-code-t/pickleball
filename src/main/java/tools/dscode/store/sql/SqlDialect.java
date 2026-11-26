@@ -160,6 +160,7 @@ public final class SqlDialect {
                 removed INTEGER NOT NULL DEFAULT 0,
                 enabled INTEGER NOT NULL DEFAULT 1,
                 parameter_types TEXT NOT NULL DEFAULT '[]',
+                host TEXT NOT NULL DEFAULT 'java',
                 PRIMARY KEY (definition_id)
             )
             """,
@@ -540,6 +541,7 @@ public final class SqlDialect {
         addColumn(session, "steps", "enabled", "INTEGER NOT NULL DEFAULT 1");
         addColumn(session, "step_definitions", "enabled", "INTEGER NOT NULL DEFAULT 1");
         addColumn(session, "step_definitions", "parameter_types", "TEXT NOT NULL DEFAULT '[]'");
+        addColumn(session, "step_definitions", "host", "TEXT NOT NULL DEFAULT 'java'");
         addColumn(session, "steps", "max_iterations", "INTEGER");
         addColumn(session, "steps", "timeout_seconds", "INTEGER");
         addColumn(session, "steps", "retry", "INTEGER NOT NULL DEFAULT 0");

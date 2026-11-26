@@ -146,8 +146,8 @@ SELECT path, source_type, db_edited, length(raw_content), content_hash, last_syn
 """,
             """
 INSERT INTO step_definitions(
-                    definition_id, language, pattern, method_name, source_path, source_line, content_hash, hydrated_at, removed)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+                    definition_id, language, pattern, method_name, source_path, source_line, content_hash, hydrated_at, removed, host)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
                 ON CONFLICT(definition_id) DO UPDATE SET
                     language = excluded.language,
                     pattern = excluded.pattern,
@@ -156,7 +156,8 @@ INSERT INTO step_definitions(
                     source_line = excluded.source_line,
                     content_hash = excluded.content_hash,
                     hydrated_at = excluded.hydrated_at,
-                    removed = 0
+                    removed = 0,
+                    host = excluded.host
 """,
             """
 SELECT definition_id, language, pattern, method_name, source_path, source_line, content_hash

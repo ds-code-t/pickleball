@@ -770,7 +770,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/engine/EngineLog.java`
 - `src/main/java/tools/dscode/engine/EngineOptions.java`
 - `src/main/java/tools/dscode/engine/match/AmbiguousMatchException.java`
+- `src/main/java/tools/dscode/engine/match/ForeignStepHost.java`
+- `src/main/java/tools/dscode/engine/match/ForeignStepHosts.java`
 - `src/main/java/tools/dscode/engine/match/GlueStep.java`
+- `src/main/java/tools/dscode/engine/match/JavaStepHost.java`
 - `src/main/java/tools/dscode/engine/match/PatternMatcher.java`
 - `src/main/java/tools/dscode/engine/match/StepKind.java`
 - `src/main/java/tools/dscode/engine/match/StepMatch.java`
@@ -864,6 +867,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/store/FileRules.java`
 - `src/main/java/tools/dscode/store/GherkinRewrite.java`
 - `src/main/java/tools/dscode/store/GlueRules.java`
+- `src/main/java/tools/dscode/store/GlueStaticScan.java`
 - `src/main/java/tools/dscode/store/HeadMaterializer.java`
 - `src/main/java/tools/dscode/store/LegacyNames.java`
 - `src/main/java/tools/dscode/store/ProjectElementCategories.java`
@@ -940,6 +944,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/resources/META-INF/pickleball/configs/CHROME_HEADLESS.yaml`
 - `src/main/resources/META-INF/services/org.junit.platform.engine.TestEngine`
 - `src/main/resources/META-INF/services/org.junit.platform.launcher.LauncherSessionListener`
+- `src/main/resources/META-INF/services/tools.dscode.engine.match.ForeignStepHost`
 - `src/main/resources/tools/dscode/browser/dom-mutations.js`
 - `src/main/resources/tools/dscode/browser/surface/arrow.css`
 - `src/main/resources/tools/dscode/browser/surface/arrow.html`
@@ -1172,6 +1177,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/engine/framerestore/FramePageGlue.java`
 - `src/test/java/tools/dscode/engine/jserror/JsErrorPageGlue.java`
 - `src/test/java/tools/dscode/engine/maskquiet/MaskPageGlue.java`
+- `src/test/java/tools/dscode/engine/match/JavaStepHostFixture.java`
+- `src/test/java/tools/dscode/engine/match/JavaStepHostTest.java`
 - `src/test/java/tools/dscode/engine/match/PatternMatcherParityTest.java`
 - `src/test/java/tools/dscode/engine/match/StepRegistryTest.java`
 - `src/test/java/tools/dscode/engine/NativeDataExecutionTest.java`
@@ -1334,6 +1341,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/store/FileEditTest.java`
 - `src/test/java/tools/dscode/store/GherkinRewriteTest.java`
 - `src/test/java/tools/dscode/store/GlueEditTest.java`
+- `src/test/java/tools/dscode/store/GlueStaticScanTest.java`
 - `src/test/java/tools/dscode/store/HeadMaterializerTest.java`
 - `src/test/java/tools/dscode/store/JarHashResetTest.java`
 - `src/test/java/tools/dscode/store/LargeFileBranchCopyTest.java`
