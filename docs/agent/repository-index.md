@@ -1026,6 +1026,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/browser/BrowserProtocolsTest.java`
 - `src/test/java/tools/dscode/browser/BrowserVersionResolverTest.java`
 - `src/test/java/tools/dscode/browser/CdpAdapterTest.java`
+- `src/test/java/tools/dscode/browser/DebugPortAttachTest.java`
 - `src/test/java/tools/dscode/browser/DebugPortOwnerTest.java`
 - `src/test/java/tools/dscode/browser/DomMutationsTest.java`
 - `src/test/java/tools/dscode/browser/FacadeContractTest.java`

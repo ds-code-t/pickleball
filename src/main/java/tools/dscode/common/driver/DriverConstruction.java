@@ -15,6 +15,7 @@ import org.openqa.selenium.edge.EdgeDriverService;
 import org.openqa.selenium.edge.EdgeOptions;
 import tools.dscode.browser.BrowserFacade;
 import tools.dscode.browser.BrowserVersionResolver;
+import tools.dscode.browser.DebugPortOwner;
 import tools.dscode.browser.ProtocolSelector;
 import tools.dscode.common.agentcontrol.AgentDriverHooks;
 import tools.dscode.common.agentcontrol.AgentLaunch;
@@ -283,18 +284,23 @@ public final class DriverConstruction {
             ByteArrayOutputStream capture
     ) {
         try {
-            return newChromiumDriverOnce(browserName, driverConfig, fullConfiguration, clientConfig, service, capture);
-        } catch (RuntimeException failure) {
-            if (BIDI_REJECTED.get() || !tools.dscode.browser.BrowserProtocols.bidiEnabled() || !bidiRejected(failure)) throw failure;
-            if (BIDI_WARNED.compareAndSet(false, true)) {
-                System.err.println("WARN driver rejected webSocketUrl=true; BiDi is off for this session (pkb_bidi=false hides this)");
-            }
-            BIDI_REJECTED.set(true);
             try {
                 return newChromiumDriverOnce(browserName, driverConfig, fullConfiguration, clientConfig, service, capture);
-            } finally {
-                BIDI_REJECTED.set(false);
+            } catch (RuntimeException failure) {
+                if (BIDI_REJECTED.get() || !tools.dscode.browser.BrowserProtocols.bidiEnabled() || !bidiRejected(failure)) throw failure;
+                if (BIDI_WARNED.compareAndSet(false, true)) {
+                    System.err.println("WARN driver rejected webSocketUrl=true; BiDi is off for this session (pkb_bidi=false hides this)");
+                }
+                BIDI_REJECTED.set(true);
+                try {
+                    return newChromiumDriverOnce(browserName, driverConfig, fullConfiguration, clientConfig, service, capture);
+                } finally {
+                    BIDI_REJECTED.set(false);
+                }
             }
+        } catch (RuntimeException failure) {
+            DebugPortOwner.releasePending();
+            throw failure;
         }
     }
 
@@ -818,6 +824,10 @@ public final class DriverConstruction {
         if (isDevToolsListening("127.0.0.1", debugPort)) {
             logInfo("Attaching to existing " + browserName + " browser on debugging port: " + debugPort);
             options.setExperimentalOption("debuggerAddress", "127.0.0.1:" + debugPort);
+            // A start that only publishes --remote-debugging-port does not claim. The same owner
+            // may attach again when a BiDi rejection rebuilds these options.
+            DebugPortOwner.attach(debugPort, "driver", Path.of("").toAbsolutePath());
+            DebugPortOwner.notePending(debugPort);
         } else {
             logInfo("Starting new " + browserName + " browser on debugging port: " + debugPort);
             options.addArguments("--remote-debugging-port=" + debugPort);

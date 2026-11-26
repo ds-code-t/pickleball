@@ -172,7 +172,7 @@ browser:
 
 `version` precision: `131` is any 131 build, `131.0` is the newest patch of that minor, `131.0.6778.69` is that build, and `latest` is the highest the source allows. `local` with no version is any local browser of that channel. `local` with a version is that version or a failure.
 
-`framePolicy` is `top` (the default), `iframe`, or `all`. `top` does not change finds. Ingest stores the value as `frame_policy` in `run_variables`. `browser.selenium.bidi: on` enables the `bidi` verbs. `browser ports` lists debug-port owners. A second attach to the same port fails.
+`framePolicy` is `top` (the default), `iframe`, or `all`. `top` does not change finds. Ingest stores the value as `frame_policy` in `run_variables`. `browser.selenium.bidi: on` enables the `bidi` verbs. `browser ports` lists debug-port owners. A listening Chrome or Edge debug-port attach, and Playwright `connectOverCDP`, claim that port. A launch that only sets `--remote-debugging-port` for a browser it starts does not claim it. The same owner may attach again, so a driver retry still works. A different owner fails with `error:` and `fix:`. The claim is released when that driver session or Playwright connection closes. The owner is written into an existing `.pickleball/workbench/cli-session.json` and is not written when that file is absent.
 
 ### Browser protocols
 
