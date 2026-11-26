@@ -84,6 +84,8 @@ No Chrome: exit 1, `skipped` true, `sentence` `selftest record found no Chrome b
 
 Hover and focus stay off the script unless noise mode is on. The panel, the step editor, the recording bar, and other injected UI are not steps. That is what the missing `Pause`, `hover`, and `Accept` text proves.
 
+Page `find`, `act`, `highlight`, and `upload --query` do not treat pickleball's own panel, chat, cards, or checklist as the page control. A page control outranks that text. `--purpose=` still finds a panel control, and text that exists only in the panel is still found. `find --role` searches every frame unless `--frame=top` or `--frame=<id>`. A short id from a frame (`s1.h165`) is used in that frame by `highlight`, `label`, `arrow`, `step-badge`, `unstep-badge`, `spotlight`, and `act --query`. A guide step may be `{"t":"s1.h165","say":"..."}` or `{"role":"textbox","name":"City","frame":"<id>","say":"..."}`. `act --kind=type` reports `via` (`cdp-insertText`, `cdp-keys`, or `input-chain`), `value`, and `verified`. `applied` follows that read-back. A bare `--headed` is true when the next token is another flag (`--headed --panel`). `--human-override=<reason>` works on `act` and `call` for the session owner and is logged.
+
 ## Step editor, pop-out, and save
 
 No Chrome. Indexes are 0-based. Run each line as its own launcher invocation. Add the scratch directory as the last token when you are not using the consumer project.
@@ -273,15 +275,18 @@ Finish with `live-stop`. Do not add this section to `@all`.
 
 A repeatable test with two actors on one `start` session. `TwoActorRecipeLiveTest` runs scenarios 1, 2, and 5 of this recipe as a scripted version.
 
-- **Helper (human tier).** Runs under its own run id, locked with `session-mode --human=on --run-id=<helper>`. It uses only human-tier verbs: `snap`, `find`, `act`, `wait`, `capture`, `chat-read`, `doctor`, `explain`, and `help`. It talks to the agent only through what is on the page: cards, the panel composer, highlights, and guides. A control verb exits 2 with `error: <verb> is a control-tier verb`.
-- **Agent (full access).** Runs under its own run id with control verbs. It waits without blocking the start host's lane: `ask-and-wait --async` with `answer-wait --id`, and `chat-turn`.
+- **Helper (human tier).** Runs under its own run id, locked with `session-mode --human=on --run-id=<helper>`. It uses only human-tier verbs: `snap`, `find`, `act`, `wait`, `capture`, `chat-read`, `doctor`, `explain`, and `help`. It talks to the agent only through what is on the page: cards, the panel composer, highlights, and guides. A control verb exits 2 with `error: <verb> is a control-tier verb`. The lock is per run id. There are no per-caller tiers.
+- **Agent (full access).** Runs under its own run id with control verbs. It waits without blocking the start host's lane: `ask-and-wait --async` with `answer-wait --id`, `wait-any` (the first of an answer, a chat line, or a click), and `chat-turn`.
 
 Start and attach in this order. This avoids the start race and the notes-file deadlock seen on 2026-11-23.
 
 1. The agent runs `start` alone, and runs `doctor` until it shows `health=ok`.
-2. Only then does the helper attach: `session-mode --human=on`, then a first `snap`.
+2. Only then does the helper attach: `session-mode --human=on --run-id=<helper>`, then a first `snap`. `session-mode --human=on` with no `--run-id` still locks the default run id and warns: `warning: the human lock applies to the default run id`, with `fix: --run-id=<helper>`. Pass the helper's run id so the lock does not cover the agent's calls.
 3. Each side writes its notes to its own file. Neither side waits on the other's notes file.
 4. Neither side starts a second `start` while the first one is still running.
+5. Every later call from that actor repeats its `--run-id`. A call that omits `--run-id` is the default run id (`session`). That lock is not the helper's lock and it is not the agent's lock.
+
+Frame lookup, quoting, and expected timings are in [Iframe-heavy apps](iframe-apps.md).
 
 Polling cadence:
 

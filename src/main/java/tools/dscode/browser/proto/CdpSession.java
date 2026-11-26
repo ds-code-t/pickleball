@@ -44,6 +44,10 @@ public final class CdpSession implements AutoCloseable {
     private final Map<String, Boolean> attaching = new ConcurrentHashMap<>();
     private volatile boolean autoAttachChildren;
     private volatile boolean attachWorkers;
+    /** Page the protocol verbs use. Map iteration order must not replace it. */
+    private volatile String protocolPageId;
+    /** Last tab this session activated, or the page left in front when a new tab stays in the background. */
+    private volatile String visiblePageId;
 
     private CdpSession(RpcChannel channel, String endpoint) {
         this.channel = channel;
@@ -79,7 +83,9 @@ public final class CdpSession implements AutoCloseable {
                 case "Target.targetCreated" -> {
                     JsonNode info = params.path("targetInfo");
                     String type = info.path("type").asText();
-                    if ("page".equals(type) || (attachWorkers && worker(info))) attach(info.path("targetId").asText());
+                    if ("page".equals(type) || (autoAttachChildren && "iframe".equals(type)) || (attachWorkers && worker(info))) {
+                        attach(info.path("targetId").asText());
+                    }
                 }
                 case "Target.attachedToTarget" -> onAttached(params, sessionId);
                 case "Target.detachedFromTarget" -> bySession.remove(params.path("sessionId").asText());
@@ -180,14 +186,24 @@ public final class CdpSession implements AutoCloseable {
 
     /** E10: auto-attach workers, service workers and OOPIFs under every page. */
     public void autoAttachChildren() {
-        if (autoAttachChildren) return;
-        autoAttachChildren = true;
-        for (Target target : pages()) {
-            try {
-                channel.call("Target.setAutoAttach", Map.of("autoAttach", true, "waitForDebuggerOnStart", false, "flatten", true), target.sessionId);
-            } catch (RuntimeException ignored) {
-                // Older targets without auto-attach.
+        if (!autoAttachChildren) {
+            autoAttachChildren = true;
+            for (Target target : pages()) {
+                try {
+                    channel.call("Target.setAutoAttach", Map.of("autoAttach", true, "waitForDebuggerOnStart", false, "flatten", true), target.sessionId);
+                } catch (RuntimeException ignored) {
+                    // Older targets without auto-attach.
+                }
             }
+        }
+        // A later find must see an iframe that was not a target on the first call. Same-site
+        // frames stay in-process and are not listed here; the role scan pierces those documents.
+        try {
+            for (JsonNode info : channel.call("Target.getTargets", Map.of()).path("targetInfos")) {
+                if ("iframe".equals(info.path("type").asText())) attach(info.path("targetId").asText());
+            }
+        } catch (RuntimeException ignored) {
+            // A browser that cannot list targets still attaches children as they appear.
         }
     }
 
@@ -213,17 +229,33 @@ public final class CdpSession implements AutoCloseable {
         return new ArrayList<>(bySession.values());
     }
 
-    /** The page whose URL contains {@code url}, else the first non-devtools page. Waits briefly for one to attach. */
+    /** The page whose URL contains {@code url}, else the remembered protocol page, else the first non-devtools page. */
     public Target page(String url) {
         long deadline = System.currentTimeMillis() + 3000;
         while (true) {
+            if (url == null || url.isBlank()) {
+                Target preferred = pageByTargetId(protocolPageId);
+                if (preferred != null) return preferred;
+            }
             Target fallback = null;
+            Target urlHit = null;
             for (Target target : pages()) {
                 String u = target.url == null ? "" : target.url;
-                if (url != null && !url.isBlank() && u.contains(url)) return target;
+                if (url != null && !url.isBlank() && u.contains(url)) {
+                    urlHit = target;
+                    break;
+                }
                 if (fallback == null && !u.startsWith("devtools://") && !u.startsWith("chrome-extension://")) fallback = target;
             }
-            if (fallback != null && (url == null || url.isBlank())) return fallback;
+            if (urlHit != null) return urlHit;
+            if (fallback != null && (url == null || url.isBlank())) {
+                if (protocolPageId == null || protocolPageId.isBlank()) {
+                    rememberProtocol(fallback.targetId);
+                    rememberVisible(fallback.targetId);
+                }
+                Target preferred = pageByTargetId(protocolPageId);
+                return preferred != null ? preferred : fallback;
+            }
             if (System.currentTimeMillis() > deadline) {
                 if (fallback != null) return fallback;
                 throw new IllegalStateException("error: no page target is attached\nfix: open a tab in the browser, or check the endpoint");
@@ -235,6 +267,35 @@ public final class CdpSession implements AutoCloseable {
                 throw new IllegalStateException("error: interrupted while waiting for a page");
             }
         }
+    }
+
+    void rememberProtocol(String targetId) {
+        protocolPageId = targetId;
+    }
+
+    void rememberVisible(String targetId) {
+        visiblePageId = targetId;
+    }
+
+    String protocolPageId() {
+        return protocolPageId;
+    }
+
+    /** Null when either id is unknown or they name the same tab. */
+    public static String targetWarning(String protocolId, String visibleId) {
+        if (protocolId == null || visibleId == null) return null;
+        if (protocolId.isBlank() || visibleId.isBlank() || protocolId.equals(visibleId)) return null;
+        return "protocol target " + protocolId + " differs from the visible tab " + visibleId;
+    }
+
+    String targetWarning() {
+        return targetWarning(protocolPageId, visiblePageId);
+    }
+
+    private Target pageByTargetId(String targetId) {
+        if (targetId == null || targetId.isBlank()) return null;
+        for (Target target : pages()) if (targetId.equals(target.targetId)) return target;
+        return null;
     }
 
     public JsonNode send(String sessionId, String method, Map<String, ?> params) {

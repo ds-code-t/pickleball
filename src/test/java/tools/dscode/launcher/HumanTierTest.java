@@ -20,6 +20,7 @@ import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -140,6 +141,22 @@ class HumanTierTest {
         Capture owner = run("note", "--text=hi", "--human-override=debug", "--agent-id=owner-a", "--run-id=f2");
         assertTrue(!owner.err.contains("control-tier") && !owner.err.contains("session owner"), "the owner's logged override passes the lock: " + owner.err);
         assertTrue(Files.exists(temp.resolve(".pickleball/human-lock/f2.json")), "an override does not leave human mode");
+    }
+
+    /** D4/D5: act and call accept --human-override for the owner and still refuse a stranger. */
+    @Test
+    void covers_act_and_call_human_override() throws Exception {
+        assertEquals(0, run("session-mode", "--human=on", "--agent-id=owner-a", "--run-id=f3").code);
+        Capture act = run("act", "--target=browser:auto", "--kind=click", "--query=Go",
+                "--human-override=agent", "--agent-id=owner-a", "--run-id=f3");
+        assertFalse((act.out + act.err).contains("does not use --human-override"), act.out + act.err);
+        Capture stranger = run("act", "--target=browser:auto", "--kind=click", "--query=Go",
+                "--human-override=agent", "--agent-id=someone-else", "--run-id=f3");
+        assertTrue((stranger.out + stranger.err).contains("only for the session owner"), stranger.out + stranger.err);
+        java.nio.file.Path file = temp.resolve("call-act.json");
+        java.nio.file.Files.writeString(file, "{\"target\":\"browser:auto\",\"kind\":\"click\",\"query\":\"Go\"}");
+        Capture call = run("call", "act", "--args-file=" + file, "--human-override=agent", "--agent-id=owner-a", "--run-id=f3");
+        assertFalse((call.out + call.err).contains("does not use --human-override"), call.out + call.err);
     }
 
     Capture run(String... args) {

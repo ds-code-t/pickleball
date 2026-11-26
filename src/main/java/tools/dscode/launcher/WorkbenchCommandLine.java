@@ -48,7 +48,7 @@ final class WorkbenchCommandLine {
             "screenshot",
             "selftest",
             "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame", "upload", "navigate",
-            "ask-and-wait", "answer-wait", "pin", "toast", "checklist", "ui",
+            "ask-and-wait", "answer-wait", "wait-any", "pin", "toast", "checklist", "ui",
             "ref", "controller-start", "controller-stop", "controller-status", "controller-ping",
             "help"
     );
@@ -234,6 +234,7 @@ final class WorkbenchCommandLine {
         List<String> splitTags = new ArrayList<>();
         Path project = null;
         List<String> rest = new ArrayList<>();
+        List<String> positionals = new ArrayList<>();
         for (int index = 1; index < args.length; index++) {
             String token = args[index];
             if (token == null) continue;
@@ -600,12 +601,18 @@ final class WorkbenchCommandLine {
                 }
                 continue;
             }
-            if (project == null && looksLikeProject(token)) {
-                project = Path.of(token).toAbsolutePath().normalize();
-                continue;
+            if (project == null && acceptsAsProject(command, token)) {
+                try {
+                    project = Path.of(token).toAbsolutePath().normalize();
+                    continue;
+                } catch (java.nio.file.InvalidPathException ignored) {
+                    // An illegal path is a leftover token, not a project directory.
+                }
             }
             rest.add(token);
+            positionals.add(token);
         }
+        rejectUnknownPositionals(command, positionals);
         rejectSplitTags(tags, splitTags);
         if (project == null) project = cwd;
         if (tagsFile != null) {
@@ -1019,10 +1026,13 @@ final class WorkbenchCommandLine {
         return lower.startsWith("-d") || token.contains("/") || token.contains("\\");
     }
 
+    /**
+     * An existing directory, or {@code .} / {@code ..}. A slash in the token is not enough:
+     * {@code chat-send} used to create {@code Case\ menu} because every slash token was a project.
+     */
     private static boolean looksLikeProject(String token) {
         if (token == null || token.isBlank()) return false;
         if (".".equals(token) || "..".equals(token)) return true;
-        if (token.contains("/") || token.contains("\\")) return true;
         try {
             return Files.isDirectory(Path.of(token));
         } catch (java.nio.file.InvalidPathException failure) {
@@ -1030,5 +1040,56 @@ final class WorkbenchCommandLine {
             // An illegal path is not a project directory, so the token stays a choice.
             return false;
         }
+    }
+
+    /**
+     * Relative scratch paths that may not exist yet. Every verb still accepts an absolute project path
+     * that does not exist yet; that rule lives in {@link #acceptsAsProject}.
+     */
+    private static final Set<String> DIRECTORY_ARGUMENT_VERBS = Set.of("record", "selftest", "pw", "cdp");
+
+    /**
+     * Verbs whose leftover words are arguments, not unknown positionals.
+     * {@code export-guidance} and {@code help} return before this check.
+     */
+    private static final Set<String> POSITIONAL_COMMANDS = Set.of(
+            "pw", "setup", "optional-install", "optional-uninstall", "call",
+            "query", "history-query", "execute-step", "status", "selftest", "record"
+    );
+
+    private static boolean acceptsAsProject(String command, String token) {
+        if (token == null || token.isBlank()) return false;
+        // A bare pw area (page, run, ...) stays a word even when a directory of that name exists.
+        if (barePwArea(command, token)) return false;
+        if (looksLikeProject(token)) return true;
+        if (absoluteProjectPath(token)) return true;
+        if (!DIRECTORY_ARGUMENT_VERBS.contains(command)) return false;
+        return token.contains("/") || token.contains("\\");
+    }
+
+    /** The harness puts the project at index 1 before that directory exists. A relative stray token is not this. */
+    private static boolean absoluteProjectPath(String token) {
+        try {
+            Path path = Path.of(token);
+            return path.isAbsolute() && !Files.isRegularFile(path);
+        } catch (java.nio.file.InvalidPathException failure) {
+            return false;
+        }
+    }
+
+    private static boolean barePwArea(String command, String token) {
+        if (!"pw".equals(command)) return false;
+        if (token.indexOf('/') >= 0 || token.indexOf('\\') >= 0) return false;
+        return PwCommand.AREAS.contains(token.toLowerCase(Locale.ROOT));
+    }
+
+    private static void rejectUnknownPositionals(String command, List<String> positionals) {
+        if (positionals == null || positionals.isEmpty()) return;
+        if (isForwardedCommand(command) || POSITIONAL_COMMANDS.contains(command)) return;
+        String token = positionals.get(0);
+        throw cliError(
+                "unknown positional \"" + token + "\"",
+                "Drop that token. See help " + command + "."
+        );
     }
 }

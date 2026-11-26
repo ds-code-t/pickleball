@@ -7,6 +7,7 @@ docs/agent/prompt-examples.md
 docs/agent/repository-index.md
 docs/ai-run-configuration.md
 docs/block-conditionals.md
+docs/brainstorm/2026-11-25-sqlite-spine-and-cucumber-decoupling.md
 docs/browser-events.md
 docs/browser-protocols.md
 docs/collaborative-recording.md
@@ -31,6 +32,7 @@ docs/dynamic-control-api.md
 docs/dynamic-steps.md
 docs/experimental-features.md
 docs/getting-started.md
+docs/iframe-apps.md
 docs/java-values.md
 docs/key-parser-dsl.md
 docs/log-and-assert-steps.md

@@ -18,6 +18,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -183,6 +184,49 @@ class RetestFixesLiveTest {
         assertTrue(trail.contains("New-card"), trail);
         assertFalse(trail.contains("Old-card"), trail);
         agent("answer-wait", "--id=r8", "--timeout=1");
+    }
+
+    /** S1: a panel chat line that ends in the query word ("r4-upload") does not outrank the page's Upload File control. */
+    @Test
+    void pageControlsOutrankPickleballChatText() throws Exception {
+        assertEquals(0, agent("chat-send", "--text=r4-upload").code);
+        for (String query : new String[] {"Upload", "upload"}) {
+            JsonNode found = JSON.readTree(agent("find", "--target=browser:auto", "--query=" + query, "--exposure=full").out);
+            assertTrue(found.path("ok").asBoolean(false), query + " " + found);
+            assertEquals("Upload File", found.path("items").path(0).path("name").asText(), query + " " + found);
+            JsonNode human = JSON.readTree(human("find", "--target=browser:auto", "--query=" + query).out);
+            assertEquals("Upload File", human.path("items").path(0).path("name").asText(), "human " + query + " " + human);
+        }
+        JsonNode send = JSON.readTree(agent("find", "--target=browser:auto", "--purpose=send", "--query=Send", "--exposure=full").out);
+        assertTrue(send.path("ok").asBoolean(false), "a panel-only control is still found: " + send);
+        JsonNode bubble = JSON.readTree(agent("find", "--target=browser:auto", "--query=r4-upload", "--exposure=full").out);
+        assertTrue(bubble.path("ok").asBoolean(false), "text only pickleball shows is still found: " + bubble);
+    }
+
+    /** A checklist row named Upload is pickleball UI and does not replace the page's Upload File control. */
+    @Test
+    void checklistRowsAreNotPageCandidates() throws Exception {
+        assertEquals(0, agent("checklist", "--items=Upload|Later").code);
+        JsonNode found = JSON.readTree(agent("find", "--target=browser:auto", "--query=Upload", "--exposure=full").out);
+        assertEquals("Upload File", found.path("items").path(0).path("name").asText(), found.toString());
+        JsonNode purpose = JSON.readTree(agent("find", "--target=browser:auto", "--purpose=send", "--query=Send", "--exposure=full").out);
+        assertTrue(purpose.path("ok").asBoolean(false), "purpose still finds the panel: " + purpose);
+    }
+
+    /** --pick=<role> chooses the one hit with that role and an ambiguous reply names why the others lost. */
+    @Test
+    void pickRoleBreaksATieAndAmbiguousListsWhy() throws Exception {
+        Capture seeded = agent("eval", "--target=browser:auto", "--world=main", "--expr="
+                + "(()=>{var b=document.getElementById('tone-btn'); if(!b){b=document.createElement('button'); b.id='tone-btn'; b.textContent='Tone'; document.body.appendChild(b);} "
+                + "var s=document.getElementById('tone-span'); if(!s){s=document.createElement('span'); s.id='tone-span'; s.textContent='Tone'; document.body.appendChild(s);} return 'ok';})()");
+        assertEquals(0, seeded.code, seeded.out + seeded.err);
+        Capture chosen = agent("act", "--target=browser:auto", "--kind=click", "--query=Tone", "--pick=button");
+        assertEquals(0, chosen.code, chosen.out + chosen.err);
+        assertTrue(chosen.out.contains("button"), chosen.out);
+        Capture ambiguous = agent("act", "--target=browser:auto", "--kind=click", "--query=Tone");
+        assertNotEquals(0, ambiguous.code, ambiguous.out);
+        assertTrue(ambiguous.out.contains("ambiguous"), ambiguous.out);
+        assertTrue(ambiguous.out.contains("lost"), ambiguous.out);
     }
 
     static JsonNode row(JsonNode snap, String name) {

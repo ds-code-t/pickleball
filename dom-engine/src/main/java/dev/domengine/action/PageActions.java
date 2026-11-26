@@ -174,6 +174,11 @@ public final class PageActions {
             Map<String, String> lookup = new LinkedHashMap<>();
             if (flags != null) lookup.putAll(flags);
             lookup.put("mask", "off");
+            lookup.remove("text");
+            lookup.remove("append");
+            lookup.remove("value");
+            lookup.remove("kind");
+            if (Query.pipelineOf(lookup) == null) throw new CdpException("act requires --query or --ref");
             JsonNode found = Query.run(tree.root, lookup);
             JsonNode nodes = found.get("nodes");
             if (nodes == null || nodes.isEmpty()) throw new CdpException("not found");

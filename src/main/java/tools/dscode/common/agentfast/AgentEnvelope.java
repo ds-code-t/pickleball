@@ -3,6 +3,7 @@ package tools.dscode.common.agentfast;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.dscode.control.protocol.VerbTiers;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -36,15 +37,16 @@ public final class AgentEnvelope {
     ) {
         Map<String, Object> copy = new LinkedHashMap<>();
         if (body != null) copy.putAll(body);
+        String verb = canonicalVerb(op, copy);
         if (copy.get("v") instanceof Number number && number.intValue() == VERSION && copy.get("state") instanceof Map) {
             long ms = longValue(copy.get("elapsedMs"), longValue(copy.get("ms"), 0));
             copy.put("ms", ms);
             copy.put("state", state(copy, project, runId));
+            stampIdentity(copy, verb, runId, agentId);
+            if (Boolean.FALSE.equals(copy.get("ok"))) stampErrorCode(copy);
             return copy;
         }
-        String verb = op == null || op.isBlank() ? String.valueOf(copy.getOrDefault("op", "")) : op;
         // `wait-for` is the `wait` alias. The reply names the canonical verb.
-        if ("wait-for".equals(verb)) verb = "wait";
         boolean ok = exit == 0 && !Boolean.FALSE.equals(copy.get("ok"));
         long ms = longValue(copy.get("elapsedMs"), longValue(copy.get("ms"), 0));
         copy.put("v", VERSION);
@@ -71,6 +73,8 @@ public final class AgentEnvelope {
         compactVersions(copy);
         copy.put("err", ok ? null : error(copy, verb));
         copy.put("trunc", trunc(copy));
+        stampIdentity(copy, verb, runId, agentId);
+        if (!ok) stampErrorCode(copy);
         if ("ui-apply".equals(verb) || "ui-poll".equals(verb)) leanBatch(copy);
         int cap = replyCap(copy, verb);
         if (cap > 0 && SnapView.fitJson(copy, cap)) {
@@ -241,7 +245,10 @@ public final class AgentEnvelope {
         boolean held = worker || tools.dscode.control.protocol.LeaseClock.fresh(project);
         state.put("browser", up ? "up" : "down");
         Object frame = body.get("frame");
-        state.put("frame", frame == null || String.valueOf(frame).isBlank() ? "top" : String.valueOf(frame));
+        String frameText = frame == null || String.valueOf(frame).isBlank() ? "top" : String.valueOf(frame);
+        boolean desktop = "desktop".equals(String.valueOf(body.get("kind"))) || "desktop".equals(String.valueOf(body.get("used")));
+        if (desktop && !"top".equals(frameText) && !frameText.startsWith("desktop:")) frameText = "desktop:" + frameText;
+        state.put("frame", frameText);
         state.put("lease", held ? "held" : "none");
         return state;
     }
@@ -374,10 +381,90 @@ public final class AgentEnvelope {
     }
 
     private static String fixFor(String code, String op) {
-        if ("stale_ref".equals(code)) return "run snap (or find) again for a fresh ref";
+        if ("stale_ref".equals(code)) return "pass --refind=chain";
         if ("ambiguous".equals(code)) return "pass --ref or a tighter --query";
         if (code != null && code.contains("no live browser")) return "run start --url= --browser=";
         return "help " + (op == null || op.isBlank() ? "snap" : op);
+    }
+
+    /** `wait-for` is the `wait` alias. Tier and the printed verb use the canonical name. */
+    private static String canonicalVerb(String op, Map<String, Object> copy) {
+        String verb = op == null || op.isBlank() ? String.valueOf(copy.getOrDefault("op", "")) : op;
+        if (verb == null || "null".equals(verb)) verb = "";
+        if ("wait-for".equals(verb)) verb = "wait";
+        return verb;
+    }
+
+    /**
+     * Additive reply fields. {@code tier} is the registry tier of the verb.
+     * {@code caller} is the run id, or the agent id when the run id is blank.
+     * A blank pair leaves {@code caller} off the reply.
+     */
+    private static void stampIdentity(Map<String, Object> copy, String verb, String runId, String agentId) {
+        String tier = VerbTiers.tier(verb);
+        if (tier != null) copy.put("tier", tier);
+        String caller = runId == null || runId.isBlank() ? "" : runId.trim();
+        if (caller.isBlank() && agentId != null && !agentId.isBlank()) caller = agentId.trim();
+        if (!caller.isBlank()) copy.put("caller", caller);
+    }
+
+    /**
+     * Stable {@code code} and {@code retryable} beside the human {@code error} text.
+     * An existing {@code E_*} code is kept. Text that matches none of the codes is left unlabeled.
+     * {@code err.code} stays the human message.
+     */
+    private static void stampErrorCode(Map<String, Object> copy) {
+        Object existing = copy.get("code");
+        if (existing instanceof String text && text.startsWith("E_")) return;
+        String message = errorMessage(copy);
+        if (message.isBlank()) return;
+        String lower = message.toLowerCase(java.util.Locale.ROOT);
+        String code = null;
+        boolean retryable = false;
+        if (lower.contains("stale_ref") || lower.contains("stale ref")) {
+            code = "E_STALE_REF";
+            retryable = true;
+        } else if (lower.contains("ambiguous")) {
+            code = "E_AMBIGUOUS";
+            retryable = false;
+        } else if (lower.contains("unsupported on attached")) {
+            code = "E_UNSUPPORTED_TARGET";
+            retryable = false;
+        } else if (lower.contains("control-tier") || lower.contains("human-locked") || lower.contains("not human input")) {
+            code = "E_TIER";
+            retryable = false;
+        } else if (lower.contains("not applied") || lower.contains("unverified") || lower.contains("not verified")) {
+            code = "E_NOT_APPLIED_UNVERIFIED";
+            retryable = true;
+        } else if (lower.contains("budget")) {
+            code = "E_BUDGET";
+            retryable = true;
+        } else if (lower.contains("not found")) {
+            code = "E_NOT_FOUND";
+            retryable = true;
+        }
+        if (code == null) return;
+        copy.put("code", code);
+        copy.put("retryable", retryable);
+    }
+
+    private static String errorMessage(Map<String, Object> copy) {
+        StringBuilder text = new StringBuilder();
+        appendError(text, copy.get("error"));
+        Object err = copy.get("err");
+        if (err instanceof Map<?, ?> map) {
+            appendError(text, map.get("code"));
+            appendError(text, map.get("msg"));
+        }
+        return text.toString();
+    }
+
+    private static void appendError(StringBuilder text, Object value) {
+        if (value == null) return;
+        String line = String.valueOf(value).trim();
+        if (line.isEmpty() || "null".equals(line)) return;
+        if (!text.isEmpty()) text.append('\n');
+        text.append(line);
     }
 
     private static long longValue(Object value, long fallback) {

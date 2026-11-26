@@ -15,6 +15,13 @@ public final class SnapView {
     public static final int BYTE_CAP = 12_000;
     public static final int REPLY_CAP = 16 * 1024;
     private static final ObjectMapper JSON = new ObjectMapper();
+    /** Names a snap, find, chat, or event row may project. A name in neither this set nor a row is an error. */
+    static final java.util.Set<String> KNOWN_FIELDS = java.util.Set.of(
+            "ref", "id", "role", "type", "name", "handle", "visible", "enabled", "interactive", "frame",
+            "via", "shadow", "shadow_path", "collapsed", "source", "value", "checked", "purpose", "badge",
+            "highlight", "guide", "card", "msg", "at", "agent", "channel", "text", "pageId", "read",
+            "event", "sessionId", "priority"
+    );
 
     private SnapView() {
     }
@@ -42,6 +49,7 @@ public final class SnapView {
         if (rows == null) return kept;
         String where = args == null ? "" : blank(args.get("where"));
         List<String> fields = fields(args);
+        requireFields(fields, rows);
         int limit = limit(args);
         for (Map<String, Object> row : rows) {
             if (!matches(row, where)) continue;
@@ -96,6 +104,28 @@ public final class SnapView {
         if (lines == null) return 0;
         for (String line : lines) total += (line == null ? 0 : line.length()) + 1;
         return total;
+    }
+
+    /**
+     * An unknown projection name fails. A token that contains {@code =} is an id=value pair
+     * ({@code form-fill --fields}) and is not a projection name.
+     */
+    static void requireFields(List<String> names, List<Map<String, Object>> rows) {
+        if (names == null || names.isEmpty()) return;
+        for (String name : names) {
+            if (name != null && name.contains("=")) return;
+        }
+        java.util.Set<String> known = new java.util.LinkedHashSet<>(KNOWN_FIELDS);
+        if (rows != null) {
+            for (Map<String, Object> row : rows) {
+                if (row != null) known.addAll(row.keySet());
+            }
+        }
+        for (String name : names) {
+            if (!known.contains(name)) {
+                throw new IllegalArgumentException("unknown field \"" + name + "\"; known: " + String.join(", ", known));
+            }
+        }
     }
 
     private static List<String> fields(Map<String, String> args) {

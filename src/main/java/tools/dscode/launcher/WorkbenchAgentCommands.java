@@ -111,7 +111,7 @@ public final class WorkbenchAgentCommands {
         String runId = parsed.coordination().runId();
         if (human == null || human.isBlank()) {
             boolean on = tools.dscode.common.agentcontrol.HumanLock.locked(parsed.project(), runId);
-            out.println("{\"ok\":true,\"op\":\"session-mode\",\"human\":\"" + (on ? "on" : "off") + "\"}");
+            printSessionMode(out, err, on ? "on" : "off", runId, false);
             return 0;
         }
         String value = human.trim().toLowerCase(java.util.Locale.ROOT);
@@ -122,8 +122,26 @@ public final class WorkbenchAgentCommands {
         boolean on = "on".equals(value) || "true".equals(value);
         if (on) tools.dscode.common.agentcontrol.HumanLock.lock(parsed.project(), runId, agentIdOf(parsed));
         else tools.dscode.common.agentcontrol.HumanLock.unlock(parsed.project(), runId);
-        out.println("{\"ok\":true,\"op\":\"session-mode\",\"human\":\"" + (on ? "on" : "off") + "\"}");
+        printSessionMode(out, err, on ? "on" : "off", runId, on && (runId == null || runId.isBlank()));
         return 0;
+    }
+
+    /**
+     * Prints the session-mode object. Turning the lock on with no run id warns that the lock
+     * applies to the default run id. The warning is not an {@code error:} line, and the exit stays 0.
+     */
+    private static void printSessionMode(PrintStream out, PrintStream err, String human, String runId, boolean warn) throws java.io.IOException {
+        String caller = runId == null || runId.isBlank() ? "session" : runId.trim();
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("ok", true);
+        body.put("op", "session-mode");
+        body.put("human", human);
+        body.put("tier", "control");
+        body.put("caller", caller);
+        out.println(JSON.writeValueAsString(body));
+        if (!warn) return;
+        err.println("warning: the human lock applies to the default run id");
+        err.println("fix: --run-id=<helper>");
     }
 
     public static int run(String[] args, PrintStream out, PrintStream err) {
@@ -176,8 +194,9 @@ public final class WorkbenchAgentCommands {
                 return 2;
             }
         }
-        // E8: find --role, act --aria-ref and snap --aria go to the protocol host (accessibility locators, Playwright refs).
-        String routed = "find".equals(parsed.command()) && hasFlagOrValue(args, "--role") ? "find-role"
+        // E8: find --role on a CDP or BiDi endpoint, act --aria-ref, and snap --aria go to the protocol host.
+        // A live start host (browser:auto) keeps find --role on the page tree so the hit id is a short id.
+        String routed = "find".equals(parsed.command()) && hasFlagOrValue(args, "--role") && protocolLocator(args) ? "find-role"
                 : "act".equals(parsed.command()) && hasFlagOrValue(args, "--aria-ref") ? "aria-act"
                 : "snap".equals(parsed.command()) && hasFlagOrValue(args, "--aria") ? "aria-snap" : null;
         if (routed != null) {
@@ -295,7 +314,7 @@ public final class WorkbenchAgentCommands {
                      "record",
                      "screenshot", "selftest",
                      "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame", "upload", "navigate",
-                     "ask-and-wait", "answer-wait", "pin", "toast", "checklist", "ui", "ref",
+                     "ask-and-wait", "answer-wait", "wait-any", "pin", "toast", "checklist", "ui", "ref",
                      "chat-turn", "ui-verify" ->
                         agentControl(parsed, safeOut, safeErr);
                 case "help" -> help(args, safeOut, safeErr);
@@ -1842,6 +1861,17 @@ public final class WorkbenchAgentCommands {
         return false;
     }
 
+    /** A CDP, BiDi, or explicit {@code --via} find stays on the protocol host. A live start host does not. */
+    private static boolean protocolLocator(String[] args) {
+        if (args == null) return false;
+        for (String token : args) {
+            if (token == null) continue;
+            if (token.startsWith("--target=browser:cdp") || token.startsWith("--cdp-endpoint=")
+                    || token.startsWith("--bidi-endpoint=") || token.startsWith("--via=")) return true;
+        }
+        return false;
+    }
+
     private static int findElement(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
         if (selectorTarget(flag(parsed, "--target"))) return agentControl(parsed, "find", out, err);
         long startedNs = System.nanoTime();
@@ -1936,14 +1966,18 @@ public final class WorkbenchAgentCommands {
             err.println(several.getMessage());
             return 2;
         }
-        if (session.isEmpty()) {
-            err.println(WorkbenchCliHelp.structured("start a session first", "isolate, then retry this command."));
-            return 2;
-        }
         String op = category == null || category.isBlank() ? "inspect-page" : "find-element";
         String query = flag(parsed, "--query");
         if (query != null && !query.isBlank() && "find-element".equals(commandOf(parsed))) {
             op = "find-element";
+        }
+        if (session.isEmpty()) {
+            if (tools.dscode.control.protocol.LiveHostFile.read(parsed.project()).isPresent()) {
+                err.println(WorkbenchCliHelp.structured(op + " needs an isolate worker", "isolate, then retry " + op));
+                return 2;
+            }
+            err.println(WorkbenchCliHelp.structured("start a session first", "isolate, then retry this command."));
+            return 2;
         }
         try {
             WorkbenchSessionCommands.SessionState state = session.get();
@@ -2150,6 +2184,8 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "target");
         copyFlag(args, parsed, "pane");
         copyFlag(args, parsed, "query");
+        copyFlag(args, parsed, "role");
+        copyFlag(args, parsed, "name");
         copyFlag(args, parsed, "on-top");
         copyFlag(args, parsed, "headless");
         copyFlag(args, parsed, "color");
@@ -2174,12 +2210,16 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "ttl");
         copyFlag(args, parsed, "ops");
         copyFlag(args, parsed, "verbose");
+        if (hasFlag(parsed, "--verbose") && !args.containsKey("verbose")) args.put("verbose", "true");
         copyFlag(args, parsed, "chat-after");
         copyFlag(args, parsed, "component");
         copyFlag(args, parsed, "mode");
         copyFlag(args, parsed, "kind");
         copyFlag(args, parsed, "condition");
         copyFlag(args, parsed, "timeout");
+        copyFlag(args, parsed, "answer");
+        copyFlag(args, parsed, "chat");
+        copyFlag(args, parsed, "watch");
         copyFlag(args, parsed, "request");
         copyFlag(args, parsed, "response");
         copyFlag(args, parsed, "ref");
@@ -2188,6 +2228,8 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "within");
         copyFlag(args, parsed, "depth");
         copyFlag(args, parsed, "budget");
+        copyFlag(args, parsed, "budget-ms");
+        copyFlag(args, parsed, "from");
         copyFlag(args, parsed, "strict");
         copyFlag(args, parsed, "rank");
         copyFlag(args, parsed, "scroll-search");
@@ -2198,6 +2240,8 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "world");
         copyFlag(args, parsed, "clip");
         copyFlag(args, parsed, "frame");
+        String await = flag(parsed, "--await");
+        if (await != null) args.put("await", await.isBlank() ? "true" : await);
         copyFlag(args, parsed, "enter");
         copyFlag(args, parsed, "kinds");
         copyFlag(args, parsed, "fixture");
@@ -2299,7 +2343,7 @@ public final class WorkbenchAgentCommands {
         List<String> extra = new ArrayList<>();
         // extra is filled below; the live-worker post uses the same maps.
         java.util.Optional<tools.dscode.control.protocol.LiveBridgeFile.Bridge> liveBridge =
-                livePageTarget(parsed.project(), args.get("session"));
+                pageTargetFor(parsed.project(), args.get("session"), command, args);
         String[] forwarded = parsed.forwarded();
         if (forwarded != null) {
             for (int index = 0; index < forwarded.length; index++) {
@@ -2435,7 +2479,13 @@ public final class WorkbenchAgentCommands {
             return WorkbenchCliHelp.structured("no live browser", "run start --url= --browser=");
         }
         if ("stale_ref".equals(text)) {
-            return WorkbenchCliHelp.structured("stale_ref", "run snap (or find) again for a fresh ref");
+            return WorkbenchCliHelp.structured("stale_ref", "pass --refind=chain");
+        }
+        if (text.startsWith("unknown field ")) {
+            return WorkbenchCliHelp.structured(text, "Pass one of the known names.");
+        }
+        if ("timeout".equals(text) || text.contains("timeout is milliseconds") || text.contains("--timeout")) {
+            return WorkbenchCliHelp.structured(text, "pass --timeout=<ms>");
         }
         return WorkbenchCliHelp.usageError(text, command);
     }
@@ -2446,6 +2496,26 @@ public final class WorkbenchAgentCommands {
     ) {
         return tools.dscode.control.protocol.LiveSessionAttach.resolve(project, sessionId, false)
                 .map(tools.dscode.control.protocol.LiveSessionAttach.Attached::bridge);
+    }
+
+    /**
+     * {@code frame} with no {@code --enter} and no {@code --reset} is the start host's frame list.
+     * Every other page verb still prefers a live isolate worker.
+     */
+    static java.util.Optional<tools.dscode.control.protocol.LiveBridgeFile.Bridge> pageTargetFor(
+            java.nio.file.Path project,
+            String sessionId,
+            String command,
+            java.util.Map<String, String> args
+    ) {
+        String enter = args == null ? null : args.get("enter");
+        boolean reset = args != null && "true".equals(args.get("reset"));
+        if ("frame".equals(command) && (enter == null || enter.isBlank()) && !reset) {
+            java.util.Optional<tools.dscode.control.protocol.LiveSessionAttach.Attached> start =
+                    tools.dscode.control.protocol.LiveSessionAttach.start(project);
+            if (start.isPresent()) return java.util.Optional.of(start.get().bridge());
+        }
+        return livePageTarget(project, sessionId);
     }
 
     private static boolean alivePid(long pid) {
@@ -2508,7 +2578,10 @@ public final class WorkbenchAgentCommands {
             String token = args[index];
             if (token == null) continue;
             if (token.startsWith(name + "=")) return token.substring(name.length() + 1);
-            if (name.equals(token) && index + 1 < args.length) return args[index + 1];
+            if (name.equals(token)) {
+                if (index + 1 < args.length && args[index + 1] != null && !args[index + 1].startsWith("--")) return args[index + 1];
+                return "";
+            }
         }
         return null;
     }
@@ -2522,7 +2595,10 @@ public final class WorkbenchAgentCommands {
             String token = args[index];
             if (token == null) continue;
             if (token.startsWith(name + "=")) values.add(token.substring(name.length() + 1));
-            else if (name.equals(token) && index + 1 < args.length) values.add(args[index + 1]);
+            else if (name.equals(token)) {
+                if (index + 1 < args.length && args[index + 1] != null && !args[index + 1].startsWith("--")) values.add(args[index + 1]);
+                else values.add("true");
+            }
         }
         return values.isEmpty() ? null : String.join(",", values);
     }

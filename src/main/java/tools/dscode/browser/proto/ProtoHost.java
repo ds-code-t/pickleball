@@ -16,9 +16,17 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.AclEntry;
+import java.nio.file.attribute.AclEntryPermission;
+import java.nio.file.attribute.AclEntryType;
+import java.nio.file.attribute.AclFileAttributeView;
+import java.nio.file.attribute.PosixFileAttributeView;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.nio.file.attribute.UserPrincipal;
 import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.EnumSet;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -160,11 +168,28 @@ public final class ProtoHost {
         System.exit(0);
     }
 
+    /**
+     * Restricts a secret file to its owner. POSIX gets {@code rw-------}. Windows replaces the DACL with one allow
+     * entry for the owner. A platform with neither view leaves the file unchanged.
+     */
     public static void ownerOnly(Path file) {
         try {
-            Files.setPosixFilePermissions(file, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+            PosixFileAttributeView posix = Files.getFileAttributeView(file, PosixFileAttributeView.class);
+            if (posix != null) {
+                posix.setPermissions(PosixFilePermissions.fromString("rw-------"));
+                return;
+            }
+            AclFileAttributeView acl = Files.getFileAttributeView(file, AclFileAttributeView.class);
+            if (acl == null) return;
+            UserPrincipal owner = Files.getOwner(file);
+            AclEntry allowOwner = AclEntry.newBuilder()
+                    .setType(AclEntryType.ALLOW)
+                    .setPrincipal(owner)
+                    .setPermissions(EnumSet.allOf(AclEntryPermission.class))
+                    .build();
+            acl.setAcl(List.of(allowOwner));
         } catch (UnsupportedOperationException | IOException ignored) {
-            // Windows: the file stays under the user's profile ACLs.
+            // No owner-only view on this file.
         }
     }
 
@@ -201,6 +226,10 @@ public final class ProtoHost {
         try {
             ObjectNode out = handler.handle(this, flags);
             if (!out.has("ok")) out.put("ok", true);
+            if (cdp != null && !out.has("warning")) {
+                String warning = cdp.targetWarning();
+                if (warning != null) out.put("warning", warning);
+            }
             log(verb + " ok" + (out.has("via") ? " via=" + out.path("via").asText() : ""));
             return out;
         } catch (Exception failure) {
@@ -266,6 +295,11 @@ public final class ProtoHost {
 
     public boolean hasCdp() {
         return cdpEndpoint != null && !protocols().firefox();
+    }
+
+    /** True only after a CDP session is already open. Does not connect. */
+    boolean cdpAttached() {
+        return cdp != null;
     }
 
     public synchronized CdpSession cdp() {

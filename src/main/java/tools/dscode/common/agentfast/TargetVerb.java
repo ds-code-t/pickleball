@@ -7,6 +7,7 @@ import dev.domengine.action.PageActions;
 import dev.domengine.cdp.CdpConnection;
 import dev.domengine.cdp.CdpException;
 import dev.domengine.desktop.DesktopTree;
+import dev.domengine.desktop.NativeDesktop;
 import dev.domengine.json.Jsons;
 import dev.domengine.query.Displayed;
 import dev.domengine.query.Frames;
@@ -53,6 +54,9 @@ public final class TargetVerb {
     /** How long a dispatched click waits for a visible change before it is reported quiet. */
     private static final long CLICK_SETTLE_MS = 500;
     /** Least-recently used refs drop once the cap is passed. */
+    /** Viewport box for a published ref or short id, so a frame handle can be placed without a top-document node id. */
+    private static final Map<String, int[]> BOXES = new ConcurrentHashMap<>();
+
     private static final Map<String, Hit> HITS = java.util.Collections.synchronizedMap(new LinkedHashMap<>(64, 0.75f, true) {
         @Override
         protected boolean removeEldestEntry(Map.Entry<String, Hit> eldest) {
@@ -75,8 +79,11 @@ public final class TargetVerb {
     private static final Set<String> ACT_KEYS = Set.of(
             "target", "kind", "query", "ref", "value", "snap", "run-id", "agent", "agent-id",
             "fixture", "timeout", "condition", "frame", "group", "sequence",
-            "format", "fields", "where", "limit", "budget", "pick", "session", "sessionId", "exposure", "purpose", "file", "human", "refind", "identity"
+            "format", "fields", "where", "limit", "budget", "budget-ms", "pick", "session", "sessionId", "exposure", "purpose", "file", "human", "refind", "identity"
     );
+
+    /** Time budget for the find or act that is running on this thread. */
+    private static final ThreadLocal<LookupBudget> LOOKUP = new ThreadLocal<>();
 
     /** CSS or text selector for a fresh {@code ref:}. Null when the ref is unknown or stale. */
     public static String anchorSelector(String raw) {
@@ -98,13 +105,63 @@ public final class TargetVerb {
     public static String placementHandle(String raw) {
         Hit hit = published(raw);
         if (hit == null) return null;
+        String frame = hit.frameId == null || hit.frameId.isBlank() || "main".equals(hit.frameId) ? "top" : hit.frameId;
+        // A node inside a frame is addressed in that frame. An HTML id on the iframe host is not the node.
+        if (!"top".equals(frame)) return frame + ":" + hit.backend;
         String selector = hit.selector == null ? "" : hit.selector.trim();
         String query = hit.query == null ? "" : hit.query.trim();
         if (selector.startsWith("#") && selector.length() > 1 && !selector.equals(query)) {
             return selector.substring(1);
         }
-        String frame = hit.frameId == null || hit.frameId.isBlank() || "main".equals(hit.frameId) ? "top" : hit.frameId;
         return frame + ":" + hit.backend;
+    }
+
+    /**
+     * Short id of a published hit with this role and accessible name.
+     * {@code frame} empty matches any frame; otherwise the frame id or its URL must contain it.
+     * Null when none or more than one short id matches.
+     */
+    public static String shortIdFor(String role, String name, String frame) {
+        if (role == null || role.isBlank() || name == null || name.isBlank()) return null;
+        String wantRole = role.trim().toLowerCase(Locale.ROOT);
+        String wantName = name.trim();
+        String wantFrame = frame == null ? "" : frame.trim();
+        String found = null;
+        synchronized (HITS) {
+            for (Map.Entry<String, Hit> entry : HITS.entrySet()) {
+                String key = entry.getKey();
+                if (key == null || key.length() < 4 || key.charAt(0) != 's' || !key.contains(".h")) continue;
+                Hit hit = entry.getValue();
+                if (hit == null || hit.role() == null || !wantRole.equals(hit.role().toLowerCase(Locale.ROOT))) continue;
+                if (hit.name() == null || !wantName.equalsIgnoreCase(hit.name().trim())) continue;
+                if (!wantFrame.isBlank()) {
+                    String id = hit.frameId() == null ? "" : hit.frameId();
+                    String url = hit.url() == null ? "" : hit.url();
+                    if (!wantFrame.equals(id) && !id.contains(wantFrame) && !url.contains(wantFrame)) continue;
+                }
+                if (found != null && !found.equals(key)) return null;
+                found = key;
+            }
+        }
+        return found;
+    }
+
+    /** Viewport box stored when the hit was published. Null when this process has no box for the token. */
+    public static int[] boxForHandle(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        String token = raw.trim();
+        int[] box = BOXES.get(token);
+        if (box != null) return box.clone();
+        String expanded = SessionIds.expand(token);
+        if (expanded != null) {
+            box = BOXES.get(expanded);
+            if (box != null) return box.clone();
+        }
+        Hit hit = published(token);
+        if (hit == null) return null;
+        box = BOXES.get(hit.frameId + ":" + hit.backend);
+        if (box != null) return box.clone();
+        return null;
     }
 
     private static Hit published(String raw) {
@@ -221,6 +278,12 @@ public final class TargetVerb {
 
     /** Paints the first control {@code query} finds (same matching as find) on the selected browser page. */
     public static Outcome highlightQuery(String targetRaw, String query, String css, String runId) {
+        if (query != null && !query.isBlank()) {
+            String token = query.trim();
+            if (SessionIds.expand(token) != null || published(token) != null) {
+                return highlight(targetRaw, token, css, runId);
+            }
+        }
         TargetSelector.Parsed target = TargetSelector.parse(targetRaw);
         if (target == null || "desktop".equals(target.kind()) || "none".equals(target.kind())) {
             Outcome failed = fail("highlight", "unknown target");
@@ -346,9 +409,12 @@ public final class TargetVerb {
 
     public static Outcome run(Path project, String runId, String op, Map<String, String> args) {
         String verb = op == null ? "" : op;
-        Map<String, String> values = SessionIds.rewrite(args == null ? Map.of() : args);
+        Map<String, String> values = stripHumanOverride(verb, SessionIds.rewrite(args == null ? Map.of() : args));
         RUN.set(runId);
         try {
+            if ("find".equals(verb) || "act".equals(verb) || "upload".equals(verb)) {
+                LOOKUP.set(LookupBudget.parse(values));
+            }
             TargetSelector.Parsed target = TargetSelector.parse(values.get("target"));
             if (needsLiveTarget(verb) && (target.raw().isBlank() || "none".equals(target.kind())) && liveBrowserPresent()) {
                 target = TargetSelector.parse("browser:auto");
@@ -379,13 +445,30 @@ public final class TargetVerb {
             String message = failure.getMessage() == null ? "failed" : failure.getMessage();
             if (message.contains("not found")) return fail(verb, "not found");
             if (message.contains("timeout")) return fail(verb, "timeout");
+            if (message.contains("query requires")) {
+                if ("act".equals(verb) || "upload".equals(verb)) return fail(verb, "act requires --query or --ref");
+                if ("find".equals(verb)) return fail(verb, "find requires --query");
+            }
             return fail(verb, message);
         } catch (RuntimeException failure) {
             String message = failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
             return fail(verb, message);
         } finally {
             RUN.remove();
+            LOOKUP.remove();
+            TYPE_VIA.remove();
+            TYPE_VALUE.remove();
+            TYPE_VERIFIED.remove();
         }
+    }
+
+    /** {@code --human-override} is owner-checked before this runs. Verbs do not treat it as their own flag. */
+    private static Map<String, String> stripHumanOverride(String verb, Map<String, String> values) {
+        if (values == null || !values.containsKey("human-override")) return values == null ? Map.of() : values;
+        Map<String, String> copy = new LinkedHashMap<>(values);
+        String reason = copy.remove("human-override");
+        tools.dscode.common.composite.CompositeLog.info("human-lock", "verb " + verb + " override reason=" + (reason == null ? "" : reason.trim()));
+        return copy;
     }
 
     /** Page verbs with no selector use the browser this process already has open. */
@@ -440,13 +523,20 @@ public final class TargetVerb {
             DomNode root = tree(page.session);
             Map<String, Object> capped = null;
             List<DomNode> hits;
-            if (args.get("scroll-search") == null) {
+            String roleName = blank(args.get("role"));
+            if (!roleName.isBlank() && args.get("scroll-search") == null) {
+                String frame = blank(args.get("frame"));
+                if (frame.isBlank()) frame = flags.getOrDefault("frame", "");
+                hits = locateRole(root, roleName, blank(args.get("name")), frame);
+            } else if (args.get("scroll-search") == null) {
                 hits = locate(root, query, flags);
             } else {
                 ScrollSearch searched = scrollFind(page.session, query, flags);
                 hits = searched.hits();
                 capped = searched.capped();
             }
+            hits = new ArrayList<>(hits);
+            hits.removeIf(TargetVerb::hiddenInput);
             if (hits.isEmpty()) {
                 Outcome missed = fail("find", "not found");
                 if (capped != null) missed.body().put("scrollSearch", capped);
@@ -456,9 +546,10 @@ public final class TargetVerb {
             }
             String version = docVersion(page.session.connection());
             List<Map<String, Object>> rows = publish(runId, "browser", page.session.id, version, hits, query, page.session.connection());
+            if (!roleName.isBlank()) stampRoleNames(rows, hits, blank(args.get("name")));
             String exposure = exposureOf(args);
             if (exposure == null) return fail("find", "exposure is human or full");
-            if ("human".equals(exposure)) rows.removeIf(row -> Boolean.FALSE.equals(row.get("visible")));
+            if ("human".equals(exposure)) rows.removeIf(row -> !humanKeeps(row));
             if (rows.isEmpty()) return fail("find", "not found");
             CollabRows.narrow(rows, blank(args.get("include")));
             remember(runId, page.session);
@@ -640,10 +731,41 @@ public final class TargetVerb {
     /** Candidates and the pick reason for the act running on this thread, added to its reply. */
     private static final ThreadLocal<Map<String, Object>> PICKED = new ThreadLocal<>();
 
+    /** Type and select read-back for the act running on this thread. */
+    private static final ThreadLocal<String> TYPE_VIA = new ThreadLocal<>();
+    private static final ThreadLocal<String> TYPE_VALUE = new ThreadLocal<>();
+    private static final ThreadLocal<Boolean> TYPE_VERIFIED = new ThreadLocal<>();
+
     private static Outcome withPick(Outcome outcome) {
         Map<String, Object> note = PICKED.get();
         PICKED.remove();
-        if (note != null && outcome != null && outcome.body() != null) outcome.body().putAll(note);
+        String via = TYPE_VIA.get();
+        String written = TYPE_VALUE.get();
+        Boolean verified = TYPE_VERIFIED.get();
+        TYPE_VIA.remove();
+        TYPE_VALUE.remove();
+        TYPE_VERIFIED.remove();
+        if (outcome != null && outcome.body() != null) {
+            if (note != null) outcome.body().putAll(note);
+            if (via != null || verified != null) {
+                if (via != null) outcome.body().put("via", via);
+                outcome.body().put("value", written == null ? "" : written);
+                boolean ok = Boolean.TRUE.equals(verified);
+                outcome.body().put("verified", ok);
+                outcome.body().put("applied", ok);
+                if (ok && outcome.exit() != 0) {
+                    outcome.body().put("ok", true);
+                    outcome.body().remove("error");
+                    return new Outcome(0, outcome.body());
+                }
+                if (!ok && outcome.exit() == 0) {
+                    outcome.body().put("ok", false);
+                    outcome.body().put("applied", false);
+                    outcome.body().put("error", "not applied");
+                    return new Outcome(1, outcome.body());
+                }
+            }
+        }
         return outcome;
     }
 
@@ -720,6 +842,10 @@ public final class TargetVerb {
         String ref = blank(args.get("ref"));
         if (ref.isBlank() && "ref".equals(target.kind())) ref = target.raw();
         if (ref.isBlank() && SessionIds.expand(blank(args.get("query"))) != null) ref = blank(args.get("query"));
+        if (ref.isBlank() && blank(args.get("query")).isBlank() && blank(args.get("identity")).isBlank()
+                && blank(args.get("purpose")).isBlank()) {
+            return fail("act", "act requires --query or --ref");
+        }
         Hit hit = ref.isBlank() ? null : requireHit(ref);
         if (hit != null && "desktop".equals(hit.kind)) return actDesktop(project, runId, hit, args);
         if ("desktop".equals(target.kind())) return actDesktop(project, runId, target, args);
@@ -760,7 +886,9 @@ public final class TargetVerb {
                 }
                 query = hit.query;
             } else {
-                List<DomNode> hits = locate(root, query, scopedFrame(runId, target));
+                Map<String, String> locateFlags = new LinkedHashMap<>(scopedFrame(runId, target));
+                if ("type".equals(blank(args.get("kind")))) locateFlags.put("text-target", "true");
+                List<DomNode> hits = locate(root, query, locateFlags);
                 if (hits.isEmpty()) {
                     Outcome missed = fail("act", "not found");
                     stamp(missed.body(), page.session.connection(), null);
@@ -771,7 +899,9 @@ public final class TargetVerb {
                     DomNode chosen = blank(args.get("pick")).isBlank() ? null : pickHit(hits, args.get("pick"));
                     if (chosen == null) {
                         Outcome missed = fail("act", "ambiguous");
-                        missed.body().put("candidates", publish(runId, "browser", page.session.id, docVersion(page.session.connection()), hits, query, page.session.connection()));
+                        List<Map<String, Object>> candidates = publish(runId, "browser", page.session.id, docVersion(page.session.connection()), hits, query, page.session.connection());
+                        noteLost(candidates, hits, args.get("pick"));
+                        missed.body().put("candidates", candidates);
                         missed.body().put("fix", blank(args.get("pick")).isBlank()
                                 ? "pass --ref or a tighter --query"
                                 : "pass --pick as a 1-based index or the accessible name");
@@ -810,6 +940,11 @@ public final class TargetVerb {
                     ? elementRows(page.session.connection(), page.session.id, before) : List.of();
             List<String> autoBefore = wantAuto ? compactBrowser(page.session, runId, target) : List.of();
             Effect effect = perform(project, runId, page.session, node, args, query, selector(node, query));
+            if ((kind.isBlank() || "click".equals(kind)) && !effect.applied() && !effect.refused()
+                    && uploadOfferShown(page.session.connection())) {
+                effect = Effect.changed(effect.used());
+            }
+            if ("select".equals(kind) && !effect.refused()) effect = notedSelect(effect, page.session.connection(), node, blank(args.get("value")));
             List<SnapRow> rowsAfter = wantDiff
                     ? elementRows(page.session.connection(), page.session.id, docVersion(page.session.connection())) : List.of();
             if (effect.refused()) {
@@ -1089,10 +1224,18 @@ public final class TargetVerb {
             row.put("error", missing.error);
             return row;
         }
+        String via = TYPE_VIA.get();
+        Boolean verified = TYPE_VERIFIED.get();
+        String written = TYPE_VALUE.get();
+        TYPE_VIA.remove();
+        TYPE_VALUE.remove();
+        TYPE_VERIFIED.remove();
         String read = readField(cdp, node);
-        boolean stuck = effect.applied() && valueMatches(value, read);
-        row.put("value", read);
+        boolean stuck = verified != null ? verified : effect.applied() && valueMatches(value, read);
+        row.put("value", verified != null && written != null ? written : read);
         row.put("applied", stuck);
+        row.put("verified", stuck);
+        if (via != null) row.put("via", via);
         return row;
     }
 
@@ -1269,11 +1412,14 @@ public final class TargetVerb {
         List<SnapRow> rowsBefore = desktopRows(session);
         boolean wantAuto = "auto".equals(blank(args.get("snap")));
         List<String> autoBefore = wantAuto ? compactDesktop(session, runId) : List.of();
+        Outcome refused = foregroundRefusal(session);
+        if (refused != null) return refused;
         boolean live = desktopAct(session, node, args);
         DesktopTree.Session after = DesktopTree.open(session.id());
         if (after == null) after = session;
         Map<String, Object> body = base("act", "desktop", "desktop", TargetSelector.parse("desktop:" + hit.sessionId));
         body.put("applied", live);
+        putWindow(body, after);
         String afterVersion = "desktop:" + after.sequence();
         body.put("docVersion", afterVersion);
         body.put("session", after.id());
@@ -1287,8 +1433,13 @@ public final class TargetVerb {
 
     private static Outcome actDesktop(Path project, String runId, TargetSelector.Parsed target, Map<String, String> args) {
         DesktopTree.Session session = openDesktop(target, args.get("fixture"));
+        Outcome refused = foregroundRefusal(session);
+        if (refused != null) return refused;
         String query = blank(args.get("query"));
-        List<DomNode> hits = locate(session.root(), query, Map.of());
+        Map<String, String> locateFlags = new LinkedHashMap<>();
+        if ("type".equals(blank(args.get("kind")))) locateFlags.put("text-target", "true");
+        List<DomNode> hits = locate(session.root(), query, locateFlags);
+        if ("type".equals(blank(args.get("kind")))) hits = typeEditors(hits);
         if (hits.isEmpty()) return fail("act", "not found");
         DomNode node = hits.get(0);
         if (hits.size() > 1 || !blank(args.get("pick")).isBlank()) {
@@ -1312,6 +1463,7 @@ public final class TargetVerb {
         if (after == null) after = session;
         Map<String, Object> body = base("act", "desktop", "desktop", target);
         body.put("applied", live);
+        putWindow(body, after);
         String afterVersion = "desktop:" + after.sequence();
         body.put("docVersion", afterVersion);
         body.put("session", after.id());
@@ -1402,8 +1554,9 @@ public final class TargetVerb {
             List<Map<String, Object>> rows = publish(runId, "browser", page.session.id, version, shown, "", page.session.connection());
             String exposure = exposureOf(args);
             if (exposure == null) return fail("snap", "exposure is human or full");
-            if ("human".equals(exposure)) rows.removeIf(row -> Boolean.FALSE.equals(row.get("visible")));
-            rows.addAll(CollabRows.messages(shownRoot, 5));
+            String panelState = panelPending(page.session.connection());
+            if ("human".equals(exposure)) rows.removeIf(row -> !humanKeeps(row));
+            if (!"collapsed".equals(panelState)) rows.addAll(CollabRows.messages(shownRoot, 5));
             CollabRows.narrow(rows, blank(args.get("include")));
             String since = blank(args.get("since"));
             Map<String, Object> sinceDiff = since.isBlank() ? null : SnapSince.since(since, rows);
@@ -1423,7 +1576,6 @@ public final class TargetVerb {
             }
             List<Object> recent = CollabRows.trail(root);
             if (!recent.isEmpty()) body.put("recent", recent);
-            String panelState = panelPending(page.session.connection());
             if (!panelState.isBlank()) body.put("panel", panelState);
             body.put("mode", mode);
             body.put("docVersion", version);
@@ -1886,6 +2038,50 @@ public final class TargetVerb {
         return null;
     }
 
+    /** Each ambiguous candidate says why it was not chosen. */
+    private static void noteLost(List<Map<String, Object>> rows, List<DomNode> hits, String pick) {
+        if (rows == null || rows.isEmpty()) return;
+        String token = pick == null ? "" : pick.trim();
+        String wanted = token;
+        if (wanted.regionMatches(true, 0, "role=", 0, 5)) wanted = wanted.substring(5).trim();
+        else if (wanted.regionMatches(true, 0, "role:", 0, 5)) wanted = wanted.substring(5).trim();
+        int n = rows.size();
+        for (Map<String, Object> row : rows) {
+            String role = String.valueOf(row.getOrDefault("role", ""));
+            String name = String.valueOf(row.getOrDefault("name", ""));
+            String lost;
+            if (token.isBlank()) {
+                lost = "tied with " + n + " other hits; pass --pick=<role|name|index>";
+            } else if (role.equalsIgnoreCase(wanted) || name.equalsIgnoreCase(token)) {
+                lost = "matched --pick but was not the only match";
+            } else if (!wanted.isBlank() && !wanted.equals(token)) {
+                lost = "role is " + role + ", --pick wanted " + wanted;
+            } else if (token.matches("\\d+")) {
+                lost = "index is " + row.get("index") + ", --pick wanted " + token;
+            } else {
+                lost = "role is " + role + ", --pick wanted " + token;
+            }
+            row.put("lost", lost);
+        }
+    }
+
+    private static void rememberBox(String key, DomNode node) {
+        if (key == null || key.isBlank() || node == null) return;
+        int[] box = null;
+        if (node.hasVisual && node.visualWidth > 0 && node.visualHeight > 0) {
+            box = new int[]{
+                    (int) Math.round(node.visualX), (int) Math.round(node.visualY),
+                    (int) Math.round(node.visualWidth), (int) Math.round(node.visualHeight)
+            };
+        } else if (node.hasBox && node.width > 0 && node.height > 0) {
+            box = new int[]{
+                    (int) Math.round(node.x), (int) Math.round(node.y),
+                    (int) Math.round(node.width), (int) Math.round(node.height)
+            };
+        }
+        if (box != null) BOXES.put(key, box);
+    }
+
     private static void putReadBack(Map<String, Object> body, DomNode node, boolean settled) {
         boolean visible = node != null && node.displayed && !node.states.contains("hidden");
         boolean enabled = node != null && !node.states.contains("disabled") && !node.attributes.containsKey("disabled");
@@ -2047,7 +2243,12 @@ public final class TargetVerb {
             ObjectNode params = Jsons.object();
             params.put("expression", expr);
             params.put("returnByValue", true);
-            String session = enteredSession(page.session.connection(), runId);
+            if (awaitRequested(args.get("await"))) params.put("awaitPromise", true);
+            String frameArg = blank(args.get("frame"));
+            String session = frameArg.isBlank()
+                    ? enteredSession(page.session.connection(), runId)
+                    : FrameCoverage.sessionId(page.session.connection(), frameArg);
+            if (session == null || session.isBlank()) session = enteredSession(page.session.connection(), runId);
             if ("pkb".equals(world)) {
                 int context = session.isBlank()
                         ? pkbContext(page.session.connection())
@@ -2120,11 +2321,16 @@ public final class TargetVerb {
         if (inputOff && "on".equals(args.get("human"))) {
             return Effect.refused("js", "human mode needs real input; CDP input is off");
         }
+        // A collapsed panel still has a composer node. Typing or selecting it must not report applied.
+        if (("type".equals(kind) || "select".equals(kind)) && controlHidden(control)) {
+            return Effect.refused(inputOff ? "js" : "cdp", "hidden: the control is inside a collapsed or hidden container");
+        }
         String framed = cdpSessionOf(node);
         if ("click".equals(kind)) {
             String coveredBy = coverOf(session.connection(), framed, acted);
             if (!coveredBy.isBlank()) return Effect.covered(inputOff ? "js" : "cdp", coveredBy);
         }
+        if ("type".equals(kind)) return typeInto(session.connection(), node, value, inputOff);
         if (!framed.isBlank()) return actInFrame(session.connection(), framed, kind, value, node);
         if ("click".equals(kind) && insideFrame(node) && !closedShadow(acted)) {
             return clickInPlace(session.connection(), node);
@@ -2525,20 +2731,134 @@ public final class TargetVerb {
 
     private static String controlValue(CdpConnection cdp, DomNode node) {
         if (cdp == null || node == null || node.backendNodeId <= 0) return "";
-        try {
-            ObjectNode params = Jsons.object();
-            params.put("backendNodeId", node.backendNodeId);
-            JsonNode resolved = cdp.call("DOM.resolveNode", params, Duration.ofSeconds(5));
-            String objectId = resolved.path("object").path("objectId").asText("");
-            if (objectId.isBlank()) return "";
-            ObjectNode call = Jsons.object();
-            call.put("objectId", objectId);
-            call.put("functionDeclaration", "function(){ if(this.tagName==='SELECT'){ var o=this.options[this.selectedIndex]; return o?String(o.value||o.text||'').trim():''; } if('value' in this) return String(this.value); return ''; }");
-            call.put("returnByValue", true);
-            return cdp.call("Runtime.callFunctionOn", call, Duration.ofSeconds(5)).path("result").path("value").asText("");
-        } catch (RuntimeException failure) {
-            return "";
+        String read = callOnNode(cdp, cdpSessionOf(node), node,
+                "function(){ if(this.tagName==='SELECT'){ var o=this.options[this.selectedIndex]; return o?String(o.value||o.text||'').trim():''; } if('value' in this) return String(this.value); return ''; }");
+        return read == null ? "" : read;
+    }
+
+    /** A person's click that raised the upload offer counts as applied. */
+    private static boolean uploadOfferShown(CdpConnection cdp) {
+        String read = evalText(cdp, "", "(function(){var n=document.querySelector('.pkb-upload-ask');return n?'1':'';})()");
+        return "1".equals(read);
+    }
+
+    private static Effect notedSelect(Effect effect, CdpConnection cdp, DomNode node, String value) {
+        String read = controlValue(cdp, selectOf(node));
+        boolean ok = valueMatches(value, read);
+        TYPE_VALUE.set(read);
+        TYPE_VERIFIED.set(ok);
+        if (ok && (effect == null || !effect.applied())) return new Effect(effect == null ? "cdp" : effect.used(), true);
+        if (!ok && effect != null && effect.applied()) return new Effect(effect.used(), false);
+        return effect;
+    }
+
+    /**
+     * Types into the node's frame: {@code Input.insertText}, then key events, then a click at the
+     * centre and the input chain. {@code applied} follows the value read back.
+     */
+    private static Effect typeInto(CdpConnection cdp, DomNode node, String value, boolean inputOff) {
+        String wanted = value == null ? "" : value;
+        String session = cdpSessionOf(node);
+        if (!inputOff) {
+            focusNode(cdp, session, node);
+            clearControl(cdp, session, node);
+            if (insertText(cdp, session, wanted) && valueMatches(wanted, controlValue(cdp, node))) {
+                noteWrite("cdp-insertText", wanted, true);
+                return new Effect("cdp", true);
+            }
+            if (typeKeys(cdp, session, wanted) && valueMatches(wanted, controlValue(cdp, node))) {
+                noteWrite("cdp-keys", wanted, true);
+                return new Effect("cdp", true);
+            }
+            clickCenter(cdp, session, node);
+            clearControl(cdp, session, node);
+            if (insertText(cdp, session, wanted) && valueMatches(wanted, controlValue(cdp, node))) {
+                noteWrite("input-chain", wanted, true);
+                return new Effect("cdp", true);
+            }
         }
+        String read = callOnNode(cdp, session, node, "function(){ this.focus(); this.value=" + jsString(wanted)
+                + "; this.dispatchEvent(new Event('input',{bubbles:true})); this.dispatchEvent(new Event('change',{bubbles:true})); return String(this.value); }");
+        String got = controlValue(cdp, node);
+        if (got.isBlank() && read != null) got = read;
+        boolean ok = valueMatches(wanted, got);
+        noteWrite("input-chain", ok ? wanted : got, ok);
+        return new Effect(inputOff ? "js" : "cdp", ok);
+    }
+
+    private static void noteWrite(String via, String value, boolean verified) {
+        TYPE_VIA.set(via);
+        TYPE_VALUE.set(value == null ? "" : value);
+        TYPE_VERIFIED.set(verified);
+    }
+
+    private static void focusNode(CdpConnection cdp, String session, DomNode node) {
+        callOnNode(cdp, session, node, "function(){ try{ this.focus(); }catch(e){} }");
+    }
+
+    private static void clearControl(CdpConnection cdp, String session, DomNode node) {
+        callOnNode(cdp, session, node, "function(){ if('value' in this){ this.value=''; this.dispatchEvent(new Event('input',{bubbles:true})); } }");
+    }
+
+    private static boolean insertText(CdpConnection cdp, String session, String text) {
+        try {
+            ObjectNode insert = Jsons.object();
+            insert.put("text", text == null ? "" : text);
+            if (session == null || session.isBlank()) cdp.call("Input.insertText", insert, Duration.ofSeconds(5));
+            else cdp.call("Input.insertText", insert, session, Duration.ofSeconds(5));
+            return true;
+        } catch (RuntimeException failure) {
+            return false;
+        }
+    }
+
+    private static boolean typeKeys(CdpConnection cdp, String session, String text) {
+        if (text == null || text.isEmpty()) return true;
+        try {
+            for (int i = 0; i < text.length(); i++) {
+                String ch = text.substring(i, i + 1);
+                dispatchKey(cdp, session, "keyDown", ch);
+                dispatchKey(cdp, session, "keyUp", ch);
+            }
+            return true;
+        } catch (RuntimeException failure) {
+            return false;
+        }
+    }
+
+    private static void dispatchKey(CdpConnection cdp, String session, String type, String ch) {
+        ObjectNode params = Jsons.object();
+        params.put("type", type);
+        params.put("key", ch);
+        if ("keyDown".equals(type)) params.put("text", ch);
+        if (session == null || session.isBlank()) cdp.call("Input.dispatchKeyEvent", params, Duration.ofSeconds(5));
+        else cdp.call("Input.dispatchKeyEvent", params, session, Duration.ofSeconds(5));
+    }
+
+    private static void clickCenter(CdpConnection cdp, String session, DomNode node) {
+        String raw = callOnNode(cdp, session, node,
+                "function(){ var r=this.getBoundingClientRect(); return Math.round(r.left+r.width/2)+','+Math.round(r.top+r.height/2); }");
+        if (raw == null || !raw.contains(",")) return;
+        String[] parts = raw.split(",");
+        try {
+            double x = Double.parseDouble(parts[0].trim());
+            double y = Double.parseDouble(parts[1].trim());
+            dispatchMouse(cdp, session, "mousePressed", x, y);
+            dispatchMouse(cdp, session, "mouseReleased", x, y);
+        } catch (RuntimeException ignored) {
+            // The input chain below still writes the value.
+        }
+    }
+
+    private static void dispatchMouse(CdpConnection cdp, String session, String type, double x, double y) {
+        ObjectNode params = Jsons.object();
+        params.put("type", type);
+        params.put("x", x);
+        params.put("y", y);
+        params.put("button", "left");
+        params.put("clickCount", 1);
+        if (session == null || session.isBlank()) cdp.call("Input.dispatchMouseEvent", params, Duration.ofSeconds(5));
+        else cdp.call("Input.dispatchMouseEvent", params, session, Duration.ofSeconds(5));
     }
 
     /** A loading mask holds the click only when it covers that click. The check itself cannot run forever. */
@@ -3053,7 +3373,7 @@ public final class TargetVerb {
 
     private static Outcome staleRef(String op) {
         Outcome missed = fail(op, "stale_ref");
-        missed.body().put("fix", "run snap (or find) again for a fresh ref");
+        missed.body().put("fix", "pass --refind=chain");
         return missed;
     }
 
@@ -3351,6 +3671,9 @@ public final class TargetVerb {
             String want = purpose;
             hits = new ArrayList<>(hits.stream().filter(node -> hasPurpose(node, want)).toList());
         }
+        // A page control outranks pickleball's own panel, card, and chat text (a chat line "r4-upload" is not the Upload File input).
+        // --purpose= names a pickleball token, so those hits stay. A query that matches only own UI stays too.
+        if (!text.isBlank() && purpose.isBlank()) hits = preferPage(hits);
         if (!text.isBlank() && hits.size() > 1) {
             String wanted = text.replaceAll("\\s+", " ").trim();
             List<DomNode> exact = new ArrayList<>();
@@ -3361,6 +3684,118 @@ public final class TargetVerb {
             if (!exact.isEmpty() && exact.size() < hits.size()) return exact;
         }
         return hits;
+    }
+
+    /** {@code find --role} on the live page, including documents grafted from iframes. {@code --frame=top} skips those. */
+    private static List<DomNode> locateRole(DomNode root, String roleName, String name, String frame) {
+        if (root != null) root.linkParents();
+        String wantRole = roleName == null ? "" : roleName.trim().toLowerCase(Locale.ROOT);
+        String wantName = name == null ? "" : name.trim();
+        String wantFrame = frame == null || frame.isBlank() || "true".equalsIgnoreCase(frame) ? "all" : frame.trim();
+        List<DomNode> hits = new ArrayList<>();
+        walk(root, node -> {
+            if (node == null || node.nodeType != 1) return;
+            if (!roleMatches(node, wantRole)) return;
+            if (!wantName.isBlank() && !roleNamed(node, wantName)) return;
+            if (!roleFrame(node, wantFrame)) return;
+            addHit(hits, node);
+        });
+        return hits;
+    }
+
+    private static boolean roleMatches(DomNode node, String wantRole) {
+        String have = role(node);
+        if (have != null && wantRole.equals(have.toLowerCase(Locale.ROOT))) return true;
+        String tag = node.tag();
+        if ("textbox".equals(wantRole) && "input".equals(tag)) {
+            String type = attr(node, "type").toLowerCase(Locale.ROOT);
+            return type.isBlank() || "text".equals(type) || "search".equals(type) || "email".equals(type)
+                    || "password".equals(type) || "tel".equals(type) || "url".equals(type) || "number".equals(type);
+        }
+        if ("combobox".equals(wantRole) && "select".equals(tag)) return true;
+        if ("button".equals(wantRole) && "button".equals(tag)) return true;
+        return false;
+    }
+
+    private static boolean roleFrame(DomNode node, String wantFrame) {
+        if ("all".equalsIgnoreCase(wantFrame)) return true;
+        boolean framed = insideFrame(node);
+        if ("top".equalsIgnoreCase(wantFrame)) return !framed;
+        String id = node.frameId == null ? "" : node.frameId;
+        String hostId = "";
+        String url = "";
+        for (DomNode cursor = node; cursor != null; cursor = cursor.parent) {
+            if (id.isBlank() && cursor.frameId != null) id = cursor.frameId;
+            if (cursor.iframe) {
+                hostId = attr(cursor, "id");
+                String src = attr(cursor, "src");
+                if (!src.isBlank()) url = src;
+                break;
+            }
+        }
+        return wantFrame.equals(id) || wantFrame.equals(hostId) || (!url.isBlank() && url.contains(wantFrame));
+    }
+
+    /**
+     * A role query names the accessible name. A select's compact name also appends the selected
+     * option ({@code Color Pick}), and that compact form stays on snap.
+     */
+    private static boolean roleNamed(DomNode node, String wantName) {
+        if (node == null || wantName == null || wantName.isBlank()) return false;
+        if (name(node).equalsIgnoreCase(wantName)) return true;
+        return !roleLabel(node, wantName).isBlank();
+    }
+
+    /** Label, accessible name, or aria-label when it is the requested role name. Blank otherwise. */
+    private static String roleLabel(DomNode node, String wantName) {
+        if (node == null || wantName == null || wantName.isBlank()) return "";
+        String accessible = node.accessibleName == null ? "" : node.accessibleName.trim();
+        if (accessible.equalsIgnoreCase(wantName)) return accessible;
+        String label = labelOf(node);
+        if (!label.isBlank() && label.equalsIgnoreCase(wantName)) return label;
+        String aria = attr(node, "aria-label");
+        return aria.equalsIgnoreCase(wantName) ? aria : "";
+    }
+
+    /** Role-find rows report the accessible name the query asked for, not the compact select value. */
+    private static void stampRoleNames(List<Map<String, Object>> rows, List<DomNode> hits, String wantName) {
+        if (wantName == null || wantName.isBlank() || rows == null || hits == null) return;
+        for (int i = 0; i < rows.size() && i < hits.size(); i++) {
+            String shown = String.valueOf(rows.get(i).get("name"));
+            if (shown.equalsIgnoreCase(wantName)) continue;
+            String label = roleLabel(hits.get(i), wantName);
+            if (!label.isBlank()) rows.get(i).put("name", label);
+        }
+    }
+
+    /** True when every hit is inside pickleball's own UI (or there are none). */
+    private static boolean allOwn(List<DomNode> hits) {
+        for (DomNode node : hits) if (!pkbOwned(node)) return false;
+        return true;
+    }
+
+    private static List<DomNode> preferPage(List<DomNode> hits) {
+        if (hits == null || hits.size() < 2) return hits;
+        List<DomNode> page = new ArrayList<>();
+        for (DomNode node : hits) if (!pkbOwned(node)) page.add(node);
+        return page.isEmpty() || page.size() == hits.size() ? hits : page;
+    }
+
+    /** Inside pickleball's layer, panel, cards, or recorder. Page-wide markers on html and body do not count. */
+    static boolean pkbOwned(DomNode node) {
+        for (DomNode cursor = node; cursor != null; cursor = cursor.parent) {
+            String tag = cursor.tag();
+            if ("html".equals(tag) || "body".equals(tag)) return false;
+            if (tag != null && tag.startsWith("pkb-")) return true;
+            String id = cursor.attributes.get("id");
+            if (id != null && id.startsWith("pkb-")) return true;
+            String cls = cursor.attributes.get("class");
+            if (cls != null && cls.contains("pkb-")) return true;
+            for (String key : cursor.attributes.keySet()) {
+                if (key != null && key.startsWith("data-pkb-")) return true;
+            }
+        }
+        return false;
     }
 
     private static boolean hasPurpose(DomNode node, String token) {
@@ -3404,8 +3839,15 @@ public final class TargetVerb {
             if (!message.contains("not found") && !message.contains("query requires")) throw failure;
         }
         if (query != null && !query.isBlank()) hits.addAll(named(search, query));
-        if (hits.isEmpty() && query != null && !query.isBlank()) hits.addAll(namedWords(search, query));
-        return deepest(controlsFor(search, preferControls(preferBody(preferLinks(hits)))));
+        // Only pickleball's own panel or chat text matched: the page may still have a control whose name has these words.
+        if (query != null && !query.isBlank() && allOwn(hits)) hits.addAll(namedWords(search, query));
+        boolean keepText = extra != null && "true".equalsIgnoreCase(blank(extra.get("text-target")));
+        return deepest(controlsFor(search, preferControls(preferBody(preferLinks(hits)), keepText)));
+    }
+
+    /** Package entry for a fixture tree. {@code text-target=true} keeps a document or edit. */
+    static List<DomNode> locateQuery(DomNode root, String query, Map<String, String> extra) {
+        return locate(root, query, extra == null ? Map.of() : extra);
     }
 
     /**
@@ -3475,6 +3917,7 @@ public final class TargetVerb {
             if (labelMatches(attr(node, "aria-label"), query)) addHit(hits, node);
             else if (query.equals(attr(node, "id"))) addHit(hits, node);
             else if (query.equals(attr(node, "placeholder")) || equalsIgnore(query, attr(node, "placeholder"))) addHit(hits, node);
+            else if (labelMatches(ownText(node), query)) addHit(hits, node);
         });
         return hits;
     }
@@ -3491,7 +3934,8 @@ public final class TargetVerb {
         walk(root, node -> {
             if (node == null || node.nodeType != 1) return;
             if (wordRun(node.accessibleName, wanted) || wordRun(attr(node, "aria-label"), wanted)
-                    || wordRun(attr(node, "placeholder"), wanted) || wordRun(HtmlTree.textOf(node), wanted)) {
+                    || wordRun(attr(node, "placeholder"), wanted) || wordRun(HtmlTree.textOf(node), wanted)
+                    || wordRun(ownText(node), wanted)) {
                 addHit(hits, node);
             }
         });
@@ -3581,12 +4025,42 @@ public final class TargetVerb {
      * A document shell stays out even when its accessible role is button.
      */
     private static List<DomNode> preferControls(List<DomNode> hits) {
+        return preferControls(hits, false);
+    }
+
+    private static List<DomNode> preferControls(List<DomNode> hits, boolean keepText) {
         List<DomNode> controls = new ArrayList<>();
         if (hits == null) return controls;
+        if (keepText) {
+            List<DomNode> text = new ArrayList<>();
+            for (DomNode node : hits) if (node != null && textTarget(node)) text.add(node);
+            if (!text.isEmpty()) return text;
+        }
         for (DomNode node : hits) {
             if (node != null && interactiveNode(node) && !depthWrapper(node)) controls.add(node);
         }
-        return controls.isEmpty() ? hits : controls;
+        if (controls.isEmpty()) return hits;
+        // A parent whose text is only its control is not a second target. A sibling with the same words stays,
+        // so --pick can choose and an unpicked act stays ambiguous.
+        List<DomNode> kept = new ArrayList<>(controls);
+        for (DomNode node : hits) {
+            if (node == null || controls.contains(node) || depthWrapper(node)) continue;
+            boolean nested = false;
+            for (DomNode control : controls) {
+                if (contains(node, control) || contains(control, node)) {
+                    nested = true;
+                    break;
+                }
+            }
+            if (!nested) kept.add(node);
+        }
+        return kept;
+    }
+
+    /** Shown-or-not, including a collapsed ancestor. Clicks still land; type and select refuse. */
+    private static boolean controlHidden(DomNode node) {
+        if (node == null) return true;
+        return !node.displayed || node.states.contains("hidden") || hiddenByAncestor(node);
     }
 
     private static String attr(DomNode node, String name) {
@@ -3612,6 +4086,44 @@ public final class TargetVerb {
         return "html".equals(tag) || "body".equals(tag) || "head".equals(tag);
     }
 
+    /**
+     * A type into a named window lands on the editor inside it. A hit that is already a document, edit, or
+     * textbox stays. Otherwise the editors under those hits are the candidates, so {@code --pick=document}
+     * and {@code --pick=textbox} can see them.
+     */
+    static List<DomNode> typeEditors(List<DomNode> hits) {
+        if (hits == null || hits.isEmpty()) return hits == null ? List.of() : hits;
+        for (DomNode hit : hits) if (editorNode(hit)) return hits;
+        List<DomNode> editors = new ArrayList<>();
+        for (DomNode hit : hits) collectEditors(hit, editors);
+        return editors.isEmpty() ? hits : editors;
+    }
+
+    private static void collectEditors(DomNode node, List<DomNode> editors) {
+        if (node == null) return;
+        for (DomNode child : node.children) {
+            if (editorNode(child)) editors.add(child);
+            collectEditors(child, editors);
+        }
+    }
+
+    private static boolean editorNode(DomNode node) {
+        if (node == null) return false;
+        if (textTarget(node)) return true;
+        String roleName = node.role == null ? "" : node.role;
+        if ("textbox".equalsIgnoreCase(roleName)) return true;
+        String className = node.attributes.getOrDefault("class-name", "");
+        return className.toLowerCase(Locale.ROOT).contains("edit");
+    }
+
+    /** A document or edit is the type target even when a nested button shares its label. */
+    private static boolean textTarget(DomNode node) {
+        String tag = node.tag();
+        String roleName = node.role == null ? "" : node.role.toLowerCase(Locale.ROOT);
+        return "document".equals(roleName) || "edit".equals(roleName) || "text".equals(roleName)
+                || "textarea".equals(tag) || "textarea".equals(roleName) || "document".equals(tag);
+    }
+
     private static boolean interactiveNode(DomNode node) {
         String tag = node.tag();
         String roleName = node.role == null ? "" : node.role.toLowerCase(Locale.ROOT);
@@ -3625,7 +4137,7 @@ public final class TargetVerb {
             for (DomNode shadow : node.shadowRoots) walkInteractive(shadow, depthLeft, hits);
             return;
         }
-        if (interactiveNode(node)) hits.add(node);
+        if (interactiveNode(node) && !hiddenInput(node)) hits.add(node);
         if (depthLeft == 0) return;
         int next = depthLeft < 0 ? -1 : depthLeft - 1;
         for (DomNode child : node.children) walkInteractive(child, next, hits);
@@ -3789,13 +4301,19 @@ public final class TargetVerb {
             HITS.put(legacy, hit);
             if (!legacy.equals(ref)) HITS.put(ref, hit);
             HITS.put(shortId, hit);
+            rememberBox(legacy, node);
+            rememberBox(ref, node);
+            rememberBox(shortId, node);
+            rememberBox(frameId + ":" + node.backendNodeId, node);
             JsonNode chain = chains.get(node);
             if (chain != null && chain.size() > 0) {
                 CHAINS.put(legacy, chain);
                 CHAINS.put(ref, chain);
                 CHAINS.put(shortId, chain);
             }
-            boolean visible = node.displayed && !node.states.contains("hidden") && !hiddenByAncestor(node);
+            boolean visible = layoutVisible(node);
+            boolean collapsed = collapsedRow(node);
+            if ("Open agent panel".equals(name(node)) && agentPanelOpen(node)) visible = false;
             boolean enabled = !node.states.contains("disabled") && !node.attributes.containsKey("disabled");
             String roleName = role(node);
             String tag = node.tag();
@@ -3809,6 +4327,7 @@ public final class TargetVerb {
             row.put("name", name(node));
             row.put("handle", node.backendNodeId);
             row.put("visible", visible);
+            if (collapsed) row.put("collapsed", true);
             row.put("enabled", enabled);
             row.put("interactive", interactive);
             row.put("frame", frame);
@@ -3927,6 +4446,7 @@ public final class TargetVerb {
         if (priority) {
             ordered.sort(java.util.Comparator.comparingInt(TargetVerb::priorityRank));
         }
+        SnapView.requireFields(SnapView.fieldNames(args), ordered);
         Map<String, List<String>> groups = new LinkedHashMap<>();
         for (Map<String, Object> row : ordered) {
             String key = byType
@@ -4106,6 +4626,62 @@ public final class TargetVerb {
      * A node under a {@code display:none}, {@code hidden}, or otherwise undisplayed ancestor (through shadow hosts)
      * is not visible even though its own computed style is. A minimized panel hides its card this way.
      */
+    /** Human find keeps a collapsed control so the row can say {@code visible=false}. */
+    static boolean humanKeeps(Map<String, Object> row) {
+        if (row == null) return false;
+        if (Boolean.TRUE.equals(row.get("collapsed"))) return true;
+        return !Boolean.FALSE.equals(row.get("visible"));
+    }
+
+    static boolean hiddenInput(DomNode node) {
+        if (node == null || !"input".equals(node.tag())) return false;
+        return "hidden".equalsIgnoreCase(attr(node, "type"));
+    }
+
+    /** Layout visibility: the node's own hidden, display, visibility, and box, plus ancestors. */
+    static boolean layoutVisible(DomNode node) {
+        if (node == null) return false;
+        if (node.attributes.containsKey("hidden") || node.states.contains("hidden")) return false;
+        if (hiddenByAncestor(node)) return false;
+        String style = node.attributes.getOrDefault("style", "").toLowerCase(java.util.Locale.ROOT).replace(" ", "");
+        if (style.contains("display:none") || style.contains("visibility:hidden") || style.contains("visibility:collapse")) return false;
+        if (!node.computed.isEmpty() || node.hasBox || node.boxRead) return Displayed.isDisplayed(node);
+        return node.displayed;
+    }
+
+    static boolean collapsedRow(DomNode node) {
+        for (DomNode cursor = node; cursor != null; cursor = cursor.parent) {
+            if (cursor.states.contains("collapsed")) return true;
+            if ("false".equals(cursor.attributes.get("aria-expanded"))) return true;
+        }
+        return false;
+    }
+
+    private static boolean agentPanelOpen(DomNode node) {
+        DomNode root = node;
+        while (root != null && root.parent != null) root = root.parent;
+        return panelSectionOpen(root, 0);
+    }
+
+    private static boolean panelSectionOpen(DomNode node, int depth) {
+        if (node == null || depth > 40) return false;
+        if (node.attributes.containsKey("data-pkb-panel")) {
+            if (node.attributes.containsKey("hidden") || node.states.contains("hidden")) return false;
+            if (!node.displayed && !node.computed.isEmpty()) return false;
+            return true;
+        }
+        for (DomNode child : node.children) if (panelSectionOpen(child, depth + 1)) return true;
+        for (DomNode shadow : node.shadowRoots) if (panelSectionOpen(shadow, depth + 1)) return true;
+        return false;
+    }
+
+    private static boolean awaitRequested(String raw) {
+        if (raw == null) return false;
+        if (raw.isBlank()) return true;
+        String value = raw.trim().toLowerCase(java.util.Locale.ROOT);
+        return "true".equals(value) || "1".equals(value) || "yes".equals(value);
+    }
+
     static boolean hiddenByAncestor(DomNode node) {
         int hops = 0;
         for (DomNode up = node == null ? null : node.parent; up != null && hops++ < 200; up = up.parent) {
@@ -4656,6 +5232,9 @@ public final class TargetVerb {
                 frameId, url, loader, roleName, shown);
         HITS.put(legacy, hit);
         if (!legacy.equals(ref)) HITS.put(ref, hit);
+        rememberBox(legacy, node);
+        rememberBox(ref, node);
+        rememberBox(frameId + ":" + node.backendNodeId, node);
         StringBuilder line = new StringBuilder();
         line.append("- ").append(roleName).append(" \"").append(shown.replace("\"", "'")).append("\"");
         if (value != null) line.append(" value=\"").append(value.replace("\"", "'")).append("\"");
@@ -4846,7 +5425,62 @@ public final class TargetVerb {
         JsonNode tree = cdp.call("Page.getFrameTree", Jsons.object(), Duration.ofSeconds(5));
         collectFrameRows(cdp, tree.path("frameTree"), "", rows);
         addCoveredFrames(cdp, rows);
+        stampSameOrigin(rows);
         return rows;
+    }
+
+    /** Top frame is same-origin. A child is same-origin only when scheme, host, and port match. */
+    static boolean sameOrigin(String frameUrl, String topUrl) {
+        String left = originOf(frameUrl);
+        String right = originOf(topUrl);
+        if (left.isEmpty() || right.isEmpty()) return false;
+        return left.equalsIgnoreCase(right);
+    }
+
+    static void stampSameOrigin(List<Map<String, Object>> rows) {
+        if (rows == null || rows.isEmpty()) return;
+        String topUrl = "";
+        boolean sawTop = false;
+        for (Map<String, Object> row : rows) {
+            Object parent = row.get("parentId");
+            if (parent == null || String.valueOf(parent).isBlank()) {
+                Object url = row.get("url");
+                topUrl = url == null ? "" : String.valueOf(url);
+                sawTop = true;
+                break;
+            }
+        }
+        if (!sawTop) {
+            Object url = rows.get(0).get("url");
+            topUrl = url == null ? "" : String.valueOf(url);
+        }
+        for (Map<String, Object> row : rows) {
+            Object parent = row.get("parentId");
+            if (parent == null || String.valueOf(parent).isBlank()) {
+                row.put("sameOrigin", true);
+                continue;
+            }
+            Object url = row.get("url");
+            row.put("sameOrigin", sameOrigin(url == null ? "" : String.valueOf(url), topUrl));
+        }
+    }
+
+    private static String originOf(String url) {
+        if (url == null || url.isBlank() || url.startsWith("about:")) return "";
+        try {
+            java.net.URI uri = java.net.URI.create(url.trim());
+            String scheme = uri.getScheme();
+            String host = uri.getHost();
+            if (scheme == null || host == null || scheme.isBlank() || host.isBlank()) return "";
+            int port = uri.getPort();
+            if (port < 0) {
+                if ("https".equalsIgnoreCase(scheme)) port = 443;
+                else if ("http".equalsIgnoreCase(scheme)) port = 80;
+            }
+            return scheme.toLowerCase(Locale.ROOT) + "://" + host.toLowerCase(Locale.ROOT) + (port < 0 ? "" : ":" + port);
+        } catch (RuntimeException failure) {
+            return "";
+        }
     }
 
     private static void collectFrameRows(CdpConnection cdp, JsonNode node, String parent, List<Map<String, Object>> rows) {
@@ -4938,16 +5572,22 @@ public final class TargetVerb {
      */
     private static ScrollSearch scrollFind(BrowserSession session, String query, Map<String, String> flags) {
         CdpConnection cdp = session.connection();
+        LookupBudget budget = LOOKUP.get();
+        if (budget == null) budget = LookupBudget.none();
         List<DomNode> hits = List.of();
         Map<String, Object> capped = null;
         try {
             List<ScrollCandidate> plan = scrollPlan(cdp, query);
             String saved = scrollState(cdp);
+            search:
             for (ScrollCandidate candidate : plan) {
                 int steps = 0;
                 int stuck = 0;
                 hits = locate(tree(session), query, flags);
+                if (budget.exceeded()) break;
                 while (hits.isEmpty() && steps < SCROLL_STEPS) {
+                    budget.progress("find");
+                    if (budget.exceeded()) break search;
                     if (!scrollBox(cdp, candidate.mark())) {
                         hits = locate(tree(session), query, flags);
                         if (!hits.isEmpty() || ++stuck >= 3) break;
@@ -5364,6 +6004,7 @@ public final class TargetVerb {
     }
 
     private static Outcome ok(Map<String, Object> body) {
+        stampLookup(body);
         return new Outcome(0, body);
     }
 
@@ -5373,8 +6014,107 @@ public final class TargetVerb {
         body.put("op", op == null ? "" : op);
         body.put("applied", false);
         body.put("error", error == null ? "failed" : error);
+        stampLookup(body);
         boolean usage = error != null && (error.startsWith("unknown kind") || error.contains("does not use"));
         return new Outcome(usage ? 2 : 1, body);
+    }
+
+    private static void stampLookup(Map<String, Object> body) {
+        LookupBudget budget = LOOKUP.get();
+        if (budget == null || body == null) return;
+        Object op = body.get("op");
+        if (!"find".equals(op) && !"act".equals(op)) return;
+        budget.stamp(body);
+    }
+
+    /** Case-insensitive equality, or either title contains the other. Blank never matches. */
+    static boolean titlesMatch(String window, String foreground) {
+        String left = window == null ? "" : window.trim();
+        String right = foreground == null ? "" : foreground.trim();
+        if (left.isEmpty() || right.isEmpty()) return false;
+        if (left.equalsIgnoreCase(right)) return true;
+        String a = left.toLowerCase(Locale.ROOT);
+        String b = right.toLowerCase(Locale.ROOT);
+        return a.contains(b) || b.contains(a);
+    }
+
+    /** Live desktop input only. A fixture is not refused. */
+    private static Outcome foregroundRefusal(DesktopTree.Session session) {
+        if (session == null || !session.live()) return null;
+        String title = windowName(session.root());
+        if (title.isBlank()) title = session.window() == null ? "" : session.window();
+        String foreground = NativeDesktop.foregroundTitle();
+        if (titlesMatch(title, foreground)) return null;
+        Outcome missed = fail("act", "desktop input refused: window is not foreground");
+        missed.body().put("window", title);
+        missed.body().put("foreground", foreground == null ? "" : foreground);
+        missed.body().put("fix", "focus the window \"" + title + "\" and retry the desktop act");
+        return missed;
+    }
+
+    private static void putWindow(Map<String, Object> body, DesktopTree.Session session) {
+        if (body == null || session == null) return;
+        String title = windowName(session.root());
+        if (title.isBlank()) title = session.window() == null ? "" : session.window();
+        body.put("window", title);
+    }
+
+    /** Millisecond cap for find and act. Separate from the byte {@code --budget}. */
+    static final class LookupBudget {
+        private final Long limit;
+        private final long started = System.nanoTime();
+        private long lastProgress;
+
+        private LookupBudget(Long limit) {
+            this.limit = limit;
+        }
+
+        static LookupBudget none() {
+            return new LookupBudget(null);
+        }
+
+        static LookupBudget parse(Map<String, String> args) {
+            if (args == null) return none();
+            String raw = args.get("budget-ms");
+            if (raw == null || raw.isBlank()) return none();
+            long ms;
+            try {
+                ms = Long.parseLong(raw.trim());
+            } catch (NumberFormatException failure) {
+                throw new Miss("budget-ms is milliseconds");
+            }
+            if (ms < 0) throw new Miss("budget-ms is milliseconds");
+            return new LookupBudget(ms);
+        }
+
+        boolean limited() {
+            return limit != null;
+        }
+
+        /** True after any elapsed nanosecond when the limit is 0, and after the limit otherwise. */
+        boolean exceeded() {
+            if (limit == null) return false;
+            return System.nanoTime() - started > limit * 1_000_000L;
+        }
+
+        long elapsedMs() {
+            return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
+        }
+
+        /** Stderr line at most every 2 seconds, and only after the lookup has already run that long. */
+        void progress(String what) {
+            if (!limited()) return;
+            long now = System.nanoTime();
+            if (now - started < TimeUnit.MILLISECONDS.toNanos(2000)) return;
+            if (lastProgress != 0 && now - lastProgress < TimeUnit.MILLISECONDS.toNanos(2000)) return;
+            lastProgress = now;
+            System.err.println((what == null || what.isBlank() ? "find" : what) + " still looking (" + elapsedMs() + " ms)");
+        }
+
+        void stamp(Map<String, Object> body) {
+            if (body == null || !exceeded()) return;
+            body.put("budgetExceeded", true);
+        }
     }
 
     private static String chain(String op) {

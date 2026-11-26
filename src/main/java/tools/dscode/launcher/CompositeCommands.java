@@ -73,6 +73,10 @@ final class CompositeCommands {
             err.println("fix: help");
             return 1;
         }
+        String override = flag(parsed, "--human-override");
+        if (override != null && !override.isBlank() && !override.startsWith("--") && !args.containsKey("human-override")) {
+            args.put("human-override", override);
+        }
         List<String> argv = new ArrayList<>();
         argv.add(verb);
         for (Map.Entry<String, String> entry : args.entrySet()) {
@@ -388,7 +392,10 @@ final class CompositeCommands {
             String token = args[index];
             if (token == null) continue;
             if (token.startsWith(name + "=")) return token.substring(name.length() + 1);
-            if (name.equals(token) && index + 1 < args.length) return args[index + 1];
+            if (name.equals(token)) {
+                if (index + 1 < args.length && args[index + 1] != null && !args[index + 1].startsWith("--")) return args[index + 1];
+                return "";
+            }
         }
         return null;
     }

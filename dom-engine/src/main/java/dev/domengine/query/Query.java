@@ -359,6 +359,10 @@ public final class Query {
         if (flags.containsKey("xpath")) return "xpath=" + flags.get("xpath");
         if (flags.containsKey("pw")) return "css=" + flags.get("pw");
         if (flags.containsKey("by")) return "css=" + flags.get("by");
+        String text = flags.get("text");
+        if (text != null && !text.isBlank()) {
+            return "text=\"" + text.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+        }
         String selector = flags.get("selector");
         if (selector != null && !selector.isBlank()) {
             String trimmed = selector.trim();
@@ -570,6 +574,7 @@ public final class Query {
         if ("checkbox".equalsIgnoreCase(type)) return "checkbox";
         if ("radio".equalsIgnoreCase(type)) return "radio";
         if ("button".equalsIgnoreCase(type) || "submit".equalsIgnoreCase(type)) return "button";
+        if ("hidden".equalsIgnoreCase(type)) return "";
         return "textbox";
     }
 

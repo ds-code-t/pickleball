@@ -213,13 +213,37 @@ final class ConsumerReadyCommands {
     }
 
     private static boolean headed(WorkbenchCommandLine.Parsed parsed, String browser) {
-        if (hasToken(parsed, "--headed")) {
-            String value = flag(parsed, "--headed");
-            boolean request = value == null || value.isBlank() || "true".equalsIgnoreCase(value) || "1".equals(value);
-            if ("false".equalsIgnoreCase(value) || "0".equals(value)) request = false;
-            return request && !GraphicsEnvironment.isHeadless();
-        }
+        if (hasToken(parsed, "--headed")) return headedRequest(parsed) && !GraphicsEnvironment.isHeadless();
         return showHeaded(browser);
+    }
+
+    /**
+     * The {@code --headed} request, before the headless-display check.
+     * A bare {@code --headed} is true, including when the next token is another flag.
+     */
+    static boolean headedRequest(WorkbenchCommandLine.Parsed parsed) {
+        if (!hasToken(parsed, "--headed")) return false;
+        String value = flag(parsed, "--headed");
+        // start is not a forwarded command, so the project token (".") sits after a bare --headed.
+        if (projectToken(parsed, value)) value = "";
+        if ("false".equalsIgnoreCase(value) || "0".equals(value)) return false;
+        return value == null || value.isBlank() || "true".equalsIgnoreCase(value) || "1".equals(value);
+    }
+
+    /** A project directory taken by the parser is not a value of a bare boolean flag. */
+    private static boolean projectToken(WorkbenchCommandLine.Parsed parsed, String value) {
+        if (value == null || value.isBlank()) return false;
+        if (".".equals(value) || "..".equals(value)) return true;
+        if (parsed.project() == null) return false;
+        try {
+            java.nio.file.Path token = java.nio.file.Path.of(value);
+            java.nio.file.Path project = parsed.project().toAbsolutePath().normalize();
+            java.nio.file.Path resolved = token.isAbsolute() ? token.normalize() : project.getParent() == null
+                    ? token.normalize() : project.resolveSibling(value).normalize();
+            return resolved.equals(project);
+        } catch (RuntimeException failure) {
+            return false;
+        }
     }
 
     /** Chrome, Chromium, or Edge. Null means the name is unsupported or the binary is missing. */
@@ -460,12 +484,34 @@ final class ConsumerReadyCommands {
         if (bidi == null) bidi = tools.dscode.browser.BrowserProtocols.setting("pkb_bidi_endpoint");
         if (cdp == null && bidi == null) {
             out.println("protocols=none (no browser attached; fix: start or attach a browser, or pass --cdp-endpoint= / --bidi-endpoint=)");
+            out.println("protocols.start=none");
+            printWorkerProtocols(project, out);
             return;
         }
         tools.dscode.browser.BrowserProtocols protocols = tools.dscode.browser.BrowserProtocols.probe(cdp, bidi);
         out.println("protocols=" + protocols.summary() + (full ? "" : " (doctor --protocols for the capability table)"));
+        out.println("protocols.start=" + protocols.summary());
+        printWorkerProtocols(project, out);
         if (full) protocols.table().forEach(line -> out.println("protocol." + line));
         if (full) hostRoutes(project, out);
+    }
+
+    /** The isolate worker's Selenium debugger, labelled separately from the start host. */
+    private static void printWorkerProtocols(Path project, java.io.PrintStream out) {
+        java.util.Optional<tools.dscode.control.protocol.LiveBridgeFile.Bridge> bridge =
+                tools.dscode.control.protocol.LiveBridgeFile.read(project);
+        if (bridge.isEmpty()) return;
+        String address = tools.dscode.control.protocol.SessionDescriptorWriter.read(project, bridge.get().sessionId())
+                .map(tools.dscode.control.protocol.SessionDescriptor::cdpDebuggerAddress)
+                .orElse(null);
+        String summary = "unknown:classic";
+        if (address != null && !address.isBlank()) {
+            String probe = address.startsWith("http") || address.startsWith("ws") ? address : "http://" + address;
+            tools.dscode.browser.BrowserProtocols worker = tools.dscode.browser.BrowserProtocols.probe(probe, null);
+            worker.live(tools.dscode.browser.BrowserProtocols.Backend.CLASSIC, "selenium", address);
+            summary = worker.summary();
+        }
+        out.println("protocols.worker=" + summary);
     }
 
     /** E5: routes, mocks and overrides held by this project's protocol host (none when no host runs). */
@@ -504,6 +550,32 @@ final class ConsumerReadyCommands {
         return false;
     }
 
+    /**
+     * A Chrome or Chromium process whose command line names this project.
+     * A Java protocol host is never an orphan, even when its command line mentions chrome and pickleball.
+     */
+    static boolean listsOrphan(String command, String needle) {
+        if (command == null || needle == null || needle.isBlank()) return false;
+        String lower = command.toLowerCase(Locale.ROOT);
+        if (!lower.contains("chrome") && !lower.contains("chromium")) return false;
+        if (!command.contains(needle) || !lower.contains("pickleball")) return false;
+        if (command.contains(" --type=")) return false;
+        if (javaHost(lower)) return false;
+        return !lower.contains("protohost") && !lower.contains("protocol-host");
+    }
+
+    /** The executable is java or javaw. A path segment such as Program Files is not the token. */
+    private static boolean javaHost(String lower) {
+        if (lower.startsWith("java ") || lower.startsWith("javaw ")) return true;
+        if (lower.contains("/java ") || lower.contains("\\java ") || lower.contains("/javaw ") || lower.contains("\\javaw ")) return true;
+        for (String token : lower.split("\\s+")) {
+            if (token.equals("java") || token.equals("javaw") || token.endsWith("/java") || token.endsWith("\\java")
+                    || token.endsWith("/javaw") || token.endsWith("\\javaw")
+                    || token.endsWith("java.exe") || token.endsWith("javaw.exe")) return true;
+        }
+        return false;
+    }
+
     /** Chrome or Chromium processes whose command line names this project and is not the live host. */
     private static String orphans(Path project, long chromePid) {
         Path proc = Path.of("/proc");
@@ -529,11 +601,7 @@ final class ConsumerReadyCommands {
                 } catch (IOException ignored) {
                     continue;
                 }
-                String lower = command.toLowerCase(Locale.ROOT);
-                if (!lower.contains("chrome") && !lower.contains("chromium")) continue;
-                if (!command.contains(needle) || !lower.contains("pickleball")) continue;
-                // Renderer, GPU, and utility children (--type=) belong to their browser; the browser is the orphan.
-                if (command.contains(" --type=")) continue;
+                if (!listsOrphan(command, needle)) continue;
                 found.add(Long.toString(pid));
             }
         } catch (IOException ignored) {
@@ -1158,7 +1226,10 @@ final class ConsumerReadyCommands {
             String token = args[index];
             if (token == null) continue;
             if (token.startsWith(name + "=")) return token.substring(name.length() + 1);
-            if (name.equals(token) && index + 1 < args.length) return args[index + 1];
+            if (name.equals(token)) {
+                if (index + 1 < args.length && args[index + 1] != null && !args[index + 1].startsWith("--")) return args[index + 1];
+                return "";
+            }
         }
         return null;
     }

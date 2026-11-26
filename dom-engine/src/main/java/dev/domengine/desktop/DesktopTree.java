@@ -329,7 +329,8 @@ public final class DesktopTree {
 
     public static ObjectNode type(String id, Map<String, String> flags) {
         Session session = require(id);
-        DomNode node = one(id, flags);
+        DomNode node = nodeByBackend(session, flags);
+        if (node == null) node = one(id, flags);
         String text = flags.getOrDefault("text", "");
         boolean append = "true".equals(flags.get("append"));
         if (session.live) NativeDesktop.type(node, text, append);
@@ -347,6 +348,30 @@ public final class DesktopTree {
 
     public static ObjectNode snapshot(String id, Map<String, String> flags) {
         return dev.domengine.snapshot.DesktopSnapshotProducer.produce(require(id), flags);
+    }
+
+    /** The node {@code act} already resolved. A query is used only when {@code node-id} is absent. */
+    private static DomNode nodeByBackend(Session session, Map<String, String> flags) {
+        if (session == null || session.root == null || flags == null) return null;
+        String raw = flags.get("node-id");
+        if (raw == null || raw.isBlank()) return null;
+        try {
+            return findBackend(session.root, Long.parseLong(raw.trim()));
+        } catch (NumberFormatException failure) {
+            return null;
+        }
+    }
+
+    private static DomNode findBackend(DomNode node, long id) {
+        if (node == null) return null;
+        if (node.backendNodeId == id) return node;
+        if (node.children != null) {
+            for (DomNode child : node.children) {
+                DomNode found = findBackend(child, id);
+                if (found != null) return found;
+            }
+        }
+        return null;
     }
 
     private static void store(Session session) {
@@ -372,8 +397,12 @@ public final class DesktopTree {
     private static Selected select(String id, Map<String, String> flags, boolean act) {
         rejectBrowserOnly(flags);
         Session session = require(id);
-        Map<String, String> queryFlags = flagsForQuery(flags);
-        JsonNode found = Query.run(session.root, withSession(session, flags));
+        Map<String, String> queryFlags = actionQuery(flags);
+        boolean pinned = flags != null && flags.get("node-id") != null && !flags.get("node-id").isBlank();
+        if (act && !pinned && Query.pipelineOf(queryFlags) == null) {
+            throw new CdpException("act requires --query or --ref");
+        }
+        JsonNode found = Query.run(session.root, withSession(session, queryFlags));
         JsonNode nodes = found.get("nodes");
         double[] viewport = viewport(session.root);
         BoxCaps caps = BoxCaps.fromFlags(flags);
@@ -430,6 +459,16 @@ public final class DesktopTree {
         }
         if (role == null || role.isBlank()) return Set.of();
         return Set.of(role);
+    }
+
+    /** Type and click payloads are not a query. {@code --text} on the query verb stays a text stage. */
+    private static Map<String, String> actionQuery(Map<String, String> flags) {
+        Map<String, String> copy = flags == null ? new LinkedHashMap<>() : new LinkedHashMap<>(flags);
+        copy.remove("text");
+        copy.remove("append");
+        copy.remove("value");
+        copy.remove("kind");
+        return flagsForQuery(copy);
     }
 
     private static Map<String, String> flagsForQuery(Map<String, String> flags) {

@@ -36,7 +36,7 @@ final class ProtoVerbs {
     static int run(String[] args, Path project, PrintStream out, PrintStream err) {
         String command = args.length == 0 ? "" : args[0];
         Map<String, String> flags = PwCommand.flags(args);
-        List<String> positional = PwCommand.positional(args);
+        List<String> positional = PwCommand.positional(args, project);
         if (!positional.isEmpty()) flags.put("_args", String.join(" ", positional));
         try {
             if ("browser-events".equals(command)) return events(project, flags, out, err);

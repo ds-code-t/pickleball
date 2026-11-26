@@ -122,12 +122,19 @@ final class PwCommand {
 
     static int run(String[] args, Path project, PrintStream out, PrintStream err) {
         String command = args.length == 0 ? "" : args[0];
-        List<String> positional = positional(args);
+        List<String> positional = positional(args, project);
         Map<String, String> flags = flags(args);
-        String area = "cdp".equals(command) ? "cdp" : positional.isEmpty() ? "" : positional.get(0);
-        String action = "cdp".equals(command) ? "send" : positional.size() > 1 ? positional.get(1) : "";
+        String area = "cdp".equals(command) ? "cdp" : firstText(flags.get("area"), positional, 0);
+        String action = "cdp".equals(command) ? "send" : firstText(flags.get("action"), positional, 1);
         if (!"cdp".equals(area) && !AREAS.contains(area)) {
             return fail(err, "pw needs an area: " + String.join(", ", AREAS), "pw page list, pw screenshot --out=page.png, or pw run --steps=steps.json");
+        }
+        if ("run".equals(area)) {
+            try {
+                steps(flags.get("steps"), project);
+            } catch (IllegalArgumentException | IOException invalid) {
+                return fail(err, invalid.getMessage(), "pass --steps=<file or JSON array>; a relative path is from the project");
+            }
         }
         String endpoint;
         try {
@@ -151,7 +158,7 @@ final class PwCommand {
         try {
             if ("run".equals(area)) {
                 ArrayNode results = body.putArray("steps");
-                for (JsonNode step : steps(flags.get("steps"))) {
+                for (JsonNode step : steps(flags.get("steps"), project)) {
                     Map<String, String> stepFlags = new LinkedHashMap<>();
                     step.fields().forEachRemaining(entry -> {
                         if (!"area".equals(entry.getKey()) && !"action".equals(entry.getKey())) {
@@ -680,8 +687,25 @@ final class PwCommand {
     }
 
     static List<JsonNode> steps(String value) throws IOException {
+        return steps(value, null);
+    }
+
+    /** A relative steps file is resolved from {@code project} and must exist before Playwright connects. */
+    static List<JsonNode> steps(String value, Path project) throws IOException {
         if (value == null || value.isBlank()) throw new IllegalArgumentException("pw run needs --steps=<file or JSON array>");
-        String text = value.trim().startsWith("[") ? value : Files.readString(Path.of(value.trim()));
+        String trimmed = value.trim();
+        String text;
+        if (trimmed.startsWith("[")) {
+            text = trimmed;
+        } else {
+            Path base = project == null ? Path.of("").toAbsolutePath().normalize() : project.toAbsolutePath().normalize();
+            Path file = Path.of(trimmed);
+            if (!file.isAbsolute()) file = base.resolve(file).normalize();
+            if (!Files.isRegularFile(file)) {
+                throw new IllegalArgumentException("steps file not found: " + file + " (relative paths are from " + base + ")");
+            }
+            text = Files.readString(file);
+        }
         JsonNode node = JSON.readTree(text);
         if (!node.isArray()) throw new IllegalArgumentException("pw run --steps must be a JSON array of {\"area\":...,\"action\":...}");
         List<JsonNode> out = new ArrayList<>();
@@ -690,9 +714,47 @@ final class PwCommand {
     }
 
     static List<String> positional(String[] args) {
+        return positional(args, null);
+    }
+
+    /**
+     * Area and action words. Skips flags, {@code .}, {@code ..}, and the resolved project path
+     * whether it sits at index 1 or last. Other directories stay, so a folder named like an area is not dropped.
+     */
+    static List<String> positional(String[] args, Path project) {
         List<String> out = new ArrayList<>();
-        for (int i = 2; i < args.length; i++) if (args[i] != null && !args[i].startsWith("--")) out.add(args[i].trim().toLowerCase(Locale.ROOT));
+        Path base = null;
+        if (project != null) {
+            try {
+                base = project.toAbsolutePath().normalize();
+            } catch (RuntimeException ignored) {
+                base = project;
+            }
+        }
+        if (args == null) return out;
+        for (int i = 1; i < args.length; i++) {
+            String token = args[i];
+            if (token == null || token.startsWith("--")) continue;
+            String trimmed = token.trim();
+            if (trimmed.isEmpty() || ".".equals(trimmed) || "..".equals(trimmed)) continue;
+            if (base != null && samePath(trimmed, base)) continue;
+            out.add(trimmed.toLowerCase(Locale.ROOT));
+        }
         return out;
+    }
+
+    private static String firstText(String flag, List<String> positional, int index) {
+        if (flag != null && !flag.isBlank()) return flag.trim().toLowerCase(Locale.ROOT);
+        if (positional != null && positional.size() > index) return positional.get(index);
+        return "";
+    }
+
+    private static boolean samePath(String token, Path project) {
+        try {
+            return Path.of(token).toAbsolutePath().normalize().equals(project.toAbsolutePath().normalize());
+        } catch (RuntimeException failure) {
+            return false;
+        }
     }
 
     static Map<String, String> flags(String[] args) {

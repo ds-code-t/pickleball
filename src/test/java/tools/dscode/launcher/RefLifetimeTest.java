@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  */
 class RefLifetimeTest {
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final String FIX = "run snap (or find) again for a fresh ref";
+    private static final String FIX = "pass --refind=chain";
 
     @TempDir
     Path temp;

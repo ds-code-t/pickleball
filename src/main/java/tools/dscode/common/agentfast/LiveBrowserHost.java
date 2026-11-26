@@ -451,7 +451,7 @@ public final class LiveBrowserHost {
                 return false;
             }
         }
-        return "ask-and-wait".equals(op) || "answer-wait".equals(op)
+        return "ask-and-wait".equals(op) || "answer-wait".equals(op) || "wait-any".equals(op)
                 || "chat-turn".equals(op) || "chat_wait".equals(op)
                 || "wait".equals(op) || "wait-for".equals(op) || "watch".equals(op);
     }

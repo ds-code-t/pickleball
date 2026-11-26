@@ -66,8 +66,9 @@ public final class TargetSelector {
         int windowAt = rest.lastIndexOf("/window:");
         String head = windowAt < 0 ? rest : rest.substring(0, windowAt);
         String window = windowAt < 0 ? "" : rest.substring(windowAt + "/window:".length());
-        if (head.startsWith("app~")) {
-            return new Parsed(text, "desktop", "", "", "", "", "", head.substring("app~".length()), window, "", "", false);
+        if (head.startsWith("app~") || head.startsWith("app=")) {
+            String app = head.startsWith("app=") ? head.substring("app=".length()) : head.substring("app~".length());
+            return new Parsed(text, "desktop", "", "", "", "", "", app, window, "", "", false);
         }
         boolean digits = !head.isEmpty();
         for (int index = 0; index < head.length(); index++) {

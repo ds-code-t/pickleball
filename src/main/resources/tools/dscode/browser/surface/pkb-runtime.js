@@ -560,6 +560,27 @@
     return Math.min(Math.max(value, low), high);
   }
 
+  function controlBoxes() {
+    var nodes = document.querySelectorAll('button, a, input, select, textarea, [role="button"], [role="link"], [role="checkbox"], [role="textbox"]');
+    var boxes = [];
+    for (var i = 0; i < nodes.length; i++) {
+      var el = nodes[i];
+      if (el.closest && el.closest('[data-pkb-agent],[data-pkb-layer],[data-pkb-meta]')) continue;
+      var b = el.getBoundingClientRect();
+      if (b.width < 1 || b.height < 1) continue;
+      boxes.push(b);
+    }
+    return boxes;
+  }
+
+  function hitsControl(x, y, w, h, boxes) {
+    for (var i = 0; i < boxes.length; i++) {
+      var b = boxes[i];
+      if (x < b.right && x + w > b.left && y < b.bottom && y + h > b.top) return true;
+    }
+    return false;
+  }
+
   function beside(r, w, h, at, vp) {
     var gap = 10;
     var order = ['right', 'left', 'bottom', 'top'];
@@ -570,8 +591,22 @@
       bottom: {x: clamp(r.left, 4, vp.w - w - 4), y: r.bottom + gap, fits: r.bottom + gap + h <= vp.h - 4},
       top: {x: clamp(r.left, 4, vp.w - w - 4), y: r.top - gap - h, fits: r.top - gap - h >= 4}
     };
+    var controls = controlBoxes();
+    var fallback = null;
     for (var i = 0; i < order.length; i++) {
-      if (spots[order[i]].fits) return {x: spots[order[i]].x, y: spots[order[i]].y, side: order[i]};
+      var spot = spots[order[i]];
+      if (!spot.fits) continue;
+      if (!hitsControl(spot.x, spot.y, w, h, controls)) return {x: spot.x, y: spot.y, side: order[i]};
+      if (!fallback) fallback = {x: spot.x, y: spot.y, side: order[i]};
+    }
+    if (fallback) {
+      var nudged = {x: fallback.x, y: fallback.y, side: fallback.side};
+      for (var n = 0; n < 8; n++) {
+        if (!hitsControl(nudged.x, nudged.y, w, h, controls)) return nudged;
+        nudged.y += h + gap;
+        if (nudged.y + h > vp.h - 4) break;
+      }
+      return fallback;
     }
     return {x: spots[order[0]].x, y: spots[order[0]].y, side: order[0]};
   }
@@ -1147,13 +1182,30 @@
     return items.size === 0 && !panel && !editor && guides.size === 0 && asks.size === 0;
   }
 
-  function findTarget(t) {
+  function findTarget(t, frameHint) {
     if (!t) return null;
     var text = String(t);
+    var hit = findInDocument(document, text);
+    if (hit) return hit;
+    var frames = document.querySelectorAll('iframe');
+    for (var f = 0; f < frames.length; f++) {
+      var frame = frames[f];
+      if (frameHint && frame.id !== frameHint && frame.name !== frameHint && frame.getAttribute('data-pkb-frame') !== frameHint) continue;
+      var doc = null;
+      try { doc = frame.contentDocument; } catch (e) { doc = null; }
+      if (!doc) continue;
+      hit = findInDocument(doc, text);
+      if (hit) return hit;
+    }
+    return null;
+  }
+
+  function findInDocument(doc, text) {
+    if (!doc || !text) return null;
     try {
       if (text.indexOf('text:') === 0) {
         var want = text.slice(5).trim();
-        var all = document.querySelectorAll('button,a,label,input,select,textarea,[role],h1,h2,h3,p,span,div,li,td');
+        var all = doc.querySelectorAll('button,a,label,input,select,textarea,[role],h1,h2,h3,p,span,div,li,td');
         for (var i = 0; i < all.length; i++) {
           if (ours(all[i])) continue;
           var own = ((all[i].innerText || all[i].value || '') + '').trim();
@@ -1167,7 +1219,7 @@
         var role = m[1];
         var name = m[2] ? m[2].replace(/^["']|["']$/g, '') : null;
         var implicit = {button: 'button,input[type=button],input[type=submit]', link: 'a[href]', textbox: 'input:not([type]),input[type=text],input[type=email],input[type=password],textarea', checkbox: 'input[type=checkbox]', combobox: 'select'};
-        var list = document.querySelectorAll('[role="' + role + '"]' + (implicit[role] ? ',' + implicit[role] : ''));
+        var list = doc.querySelectorAll('[role="' + role + '"]' + (implicit[role] ? ',' + implicit[role] : ''));
         for (var j = 0; j < list.length; j++) {
           if (ours(list[j])) continue;
           var label = (list[j].getAttribute('aria-label') || list[j].innerText || list[j].value || (list[j].labels && list[j].labels[0] && list[j].labels[0].innerText) || '').trim();
@@ -1176,17 +1228,24 @@
         return null;
       }
       if (text.indexOf('x:') === 0) {
-        return document.evaluate(text.slice(2), document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+        return doc.evaluate(text.slice(2), doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
       }
-      if (text.indexOf('h:') === 0) text = text.slice(2);
-      var idHit = byDomId(idToken(text));
+      var lookup = text.indexOf('h:') === 0 ? text.slice(2) : text;
+      var idHit = byDomIdIn(doc, idToken(lookup));
       if (idHit && !ours(idHit)) return idHit;
-      var marked = document.querySelector('[data-pkb-handle="' + CSS.escape(text) + '"]');
+      var marked = doc.querySelector('[data-pkb-handle="' + CSS.escape(lookup) + '"]');
       if (marked) return marked;
-      return document.querySelector(text);
+      return doc.querySelector(lookup);
     } catch (bad) {
       return null;
     }
+  }
+
+  function boxRect(box) {
+    if (!box) return null;
+    var x = Number(box.x) || 0, y = Number(box.y) || 0, w = Number(box.w) || 0, h = Number(box.h) || 0;
+    if (w <= 0 && h <= 0) return null;
+    return {left: x, top: y, width: w, height: h, right: x + w, bottom: y + h};
   }
 
   function idToken(text) {
@@ -1199,16 +1258,20 @@
   }
 
   function byDomId(id) {
-    if (!id) return null;
-    var hit = document.getElementById(id);
+    return byDomIdIn(document, id);
+  }
+
+  function byDomIdIn(doc, id) {
+    if (!id || !doc) return null;
+    var hit = doc.getElementById(id);
     if (hit) return hit;
     var quoted = id.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
     try {
-      hit = document.querySelector('[id="' + quoted + '"]');
+      hit = doc.querySelector('[id="' + quoted + '"]');
       if (hit) return hit;
     } catch (ignored) { /* bad id */ }
     try {
-      hit = document.querySelector('#' + CSS.escape(id));
+      hit = doc.querySelector('#' + CSS.escape(id));
       if (hit) return hit;
     } catch (ignored) { /* selector rejected */ }
     return null;
@@ -1346,9 +1409,27 @@
     guides.forEach(function (g) {
       g.steps.forEach(function (step, i) {
         if (!step.anchor || !step.anchor.isConnected) {
-          step.anchor = findTarget(step.t);
+          step.anchor = findTarget(step.t, step.frame);
           step.scrollers = step.anchor ? scrollersOf(step.anchor) : [];
           if (step.anchor && resizeObserver) { try { resizeObserver.observe(step.anchor); } catch (ignored) { /* detached */ } }
+        }
+        if (!step.anchor && boxRect(step.box)) {
+          step.missing = false;
+          var br = boxRect(step.box);
+          var bvis = '';
+          step.badge.style.visibility = bvis;
+          step.ring.style.visibility = bvis;
+          var bb = badgeSpot(br, step.badge.offsetWidth || 22, step.badge.offsetHeight || 22, vp);
+          placeAt(step.badge, bb.x, bb.y);
+          placeAt(step.ring, br.left, br.top);
+          step.ring.style.width = Math.round(br.width) + 'px';
+          step.ring.style.height = Math.round(br.height) + 'px';
+          if (i === g.current) {
+            g.tip.style.visibility = bvis;
+            var bspot = beside(br, g.tip.offsetWidth || 200, g.tip.offsetHeight || 40, 'right', vp);
+            placeAt(g.tip, bspot.x, bspot.y);
+          }
+          return;
         }
         if (!step.anchor) {
           step.missing = true;
@@ -1429,7 +1510,7 @@
     guides.forEach(function (g) {
       var step = g.steps[g.current];
       if (!step) return;
-      if (!step.anchor || !step.anchor.isConnected) step.anchor = findTarget(step.t);
+      if (!step.anchor || !step.anchor.isConnected) step.anchor = findTarget(step.t, step.frame);
       if (!matches(step, ev.target, ev.type)) return;
       var how = ev.type === 'click' ? 'click' : ((step.anchor.nodeName || '').toLowerCase() === 'select' ? 'select' : (step.anchor.type === 'checkbox' ? 'check' : 'input'));
       var at = g.current;
@@ -1476,23 +1557,23 @@
     listen();
     guideListen();
     var g = {id: id, current: 0, scroll: !!spec.scroll, pulse: true, spec: {id: id, scroll: !!spec.scroll, steps: steps.map(function (st) {
-      return {t: st.t, say: st.say, do: st.do, n: st.n, sensitive: st.sensitive, capture: st.capture, expect: st.expect};
+      return {t: st.t, say: st.say, do: st.do, n: st.n, sensitive: st.sensitive, capture: st.capture, expect: st.expect, box: st.box, frame: st.frame, role: st.role, name: st.name};
     })}, steps: steps.map(function (st, i) {
-      return {t: st.t, say: st.say, do: st.do || 'any', n: st.n || i + 1, sensitive: !!st.sensitive, capture: !!st.capture, expect: st.expect == null ? '' : String(st.expect), done: false};
+      return {t: st.t, say: st.say, do: st.do || 'any', n: st.n || i + 1, sensitive: !!st.sensitive, capture: !!st.capture, expect: st.expect == null ? '' : String(st.expect), done: false, box: st.box, frame: st.frame, role: st.role, name: st.name};
     })};
     var miss = [];
     g.steps.forEach(function (step) {
-      step.anchor = findTarget(step.t);
+      step.anchor = findTarget(step.t, step.frame);
       step.scrollers = step.anchor ? scrollersOf(step.anchor) : [];
-      step.missing = !step.anchor;
-      if (!step.anchor) miss.push(step.n);
+      step.missing = !step.anchor && !boxRect(step.box);
+      if (step.missing) miss.push(step.n);
     });
     if (typeof spec.at === 'number' && spec.at > 1) {
       for (var k = 0; k < g.steps.length && g.steps[k].n < spec.at; k++) g.steps[k].done = true;
       g.current = Math.min(k, g.steps.length);
     }
     var current = g.steps[g.current];
-    var unresolved = !!(current && !current.anchor);
+    var unresolved = !!(current && !current.anchor && !boxRect(current.box));
     if (unresolved) {
       return {id: id, steps: g.steps.length, current: current ? current.n : null, miss: miss, unresolved: true,
         flag: 'step ' + current.n + ' target was not found'};

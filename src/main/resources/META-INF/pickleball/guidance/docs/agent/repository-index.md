@@ -29,6 +29,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/agent/repository-index.md`
 - `docs/ai-run-configuration.md`
 - `docs/block-conditionals.md`
+- `docs/brainstorm/2026-11-25-sqlite-spine-and-cucumber-decoupling.md`
 - `docs/browser-events.md`
 - `docs/browser-protocols.md`
 - `docs/collaborative-recording.md`
@@ -53,6 +54,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/dynamic-steps.md`
 - `docs/experimental-features.md`
 - `docs/getting-started.md`
+- `docs/iframe-apps.md`
 - `docs/java-values.md`
 - `docs/key-parser-dsl.md`
 - `docs/log-and-assert-steps.md`
@@ -805,6 +807,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/browser/JsErrorGateLiveTest.java`
 - `src/test/java/tools/dscode/browser/PlaywrightAdapterTest.java`
 - `src/test/java/tools/dscode/browser/PlaywrightCdpLiveTest.java`
+- `src/test/java/tools/dscode/browser/proto/ConsumerFixesP2TabTest.java`
+- `src/test/java/tools/dscode/browser/proto/ConsumerFixesP3ProtoTest.java`
 - `src/test/java/tools/dscode/browser/proto/OwnStorageFilterTest.java`
 - `src/test/java/tools/dscode/browser/proto/SourceMapsTest.java`
 - `src/test/java/tools/dscode/browser/ProtocolSelectorPlaywrightTest.java`
@@ -817,6 +821,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentcontrol/BindingEventTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/ChatCursorTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/ChatLockChild.java`
+- `src/test/java/tools/dscode/common/agentcontrol/ConsumerFixesP2WaitTest.java`
+- `src/test/java/tools/dscode/common/agentcontrol/ConsumerFixesP4WaitTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/DialogBlocksBindingTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/FallbackLogTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/ForgetLeavesPanelTest.java`
@@ -839,6 +845,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentcontrol/UnownedDriverQuitTest.java`
 - `src/test/java/tools/dscode/common/agentfast/ActHonestyTest.java`
 - `src/test/java/tools/dscode/common/agentfast/CompactReplyTest.java`
+- `src/test/java/tools/dscode/common/agentfast/ConsumerFixesP2FindTest.java`
+- `src/test/java/tools/dscode/common/agentfast/ConsumerFixesP3ViewTest.java`
+- `src/test/java/tools/dscode/common/agentfast/ConsumerFixesP4EnvelopeTest.java`
 - `src/test/java/tools/dscode/common/agentfast/FallbackRunCapTest.java`
 - `src/test/java/tools/dscode/common/agentfast/FormatViewTest.java`
 - `src/test/java/tools/dscode/common/agentfast/HostLanesTest.java`
@@ -1009,6 +1018,11 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/CompactSnapshotTest.java`
 - `src/test/java/tools/dscode/launcher/CompositeVerbsCliTest.java`
 - `src/test/java/tools/dscode/launcher/ConfirmTest.java`
+- `src/test/java/tools/dscode/launcher/ConsumerFixesFrameLiveTest.java`
+- `src/test/java/tools/dscode/launcher/ConsumerFixesP2CliTest.java`
+- `src/test/java/tools/dscode/launcher/ConsumerFixesP3CliTest.java`
+- `src/test/java/tools/dscode/launcher/ConsumerFixesP3LiveTest.java`
+- `src/test/java/tools/dscode/launcher/ConsumerFixesP4CliTest.java`
 - `src/test/java/tools/dscode/launcher/ConsumerReadyCliTest.java`
 - `src/test/java/tools/dscode/launcher/ContextLiveTest.java`
 - `src/test/java/tools/dscode/launcher/ControllerReliabilityTest.java`
@@ -1030,6 +1044,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/FrameRestoreTest.java`
 - `src/test/java/tools/dscode/launcher/GcRunsDryRunTest.java`
 - `src/test/java/tools/dscode/launcher/GuidanceCommandGoldenTest.java`
+- `src/test/java/tools/dscode/launcher/HeadedFlagTest.java`
 - `src/test/java/tools/dscode/launcher/HousekeepingRoadmapTest.java`
 - `src/test/java/tools/dscode/launcher/HumanTierTest.java`
 - `src/test/java/tools/dscode/launcher/IdentityRefindTest.java`
@@ -1716,6 +1731,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/CliSurfaceTest.java`
 - `dom-engine/src/test/java/dev/domengine/CliWireShapeTest.java`
 - `dom-engine/src/test/java/dev/domengine/ConformanceSuiteTest.java`
+- `dom-engine/src/test/java/dev/domengine/ConsumerFixesP3QueryTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/DesktopOneMatchTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/DesktopScreenshotTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/DesktopSnapshotTest.java`
