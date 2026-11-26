@@ -197,6 +197,7 @@ public final class VerbCatalog {
         add(rows, "log tail", "workbench", LOG);
         add(rows, "chat", "workbench", CHAT);
         add(rows, "spine", "workbench", SPINE);
+        add(rows, "spine sample", "workbench", SPINE);
         add(rows, "spine start", "workbench", SPINE);
         add(rows, "spine stop", "workbench", SPINE);
         add(rows, "spine warm", "workbench", SPINE);

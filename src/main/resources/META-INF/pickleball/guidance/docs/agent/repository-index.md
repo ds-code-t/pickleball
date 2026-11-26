@@ -639,6 +639,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/engine/resolve/ScenarioResolver.java`
 - `src/main/java/tools/dscode/engine/runtime/NativeScenarioCatalog.java`
 - `src/main/java/tools/dscode/engine/runtime/NoopGlueMode.java`
+- `src/main/java/tools/dscode/engine/runtime/ResourceGate.java`
 - `src/main/java/tools/dscode/engine/runtime/StepFlags.java`
 - `src/main/java/tools/dscode/engine/runtime/StepRows.java`
 - `src/main/java/tools/dscode/engine/runtime/StepWatchdog.java`
@@ -1061,6 +1062,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/engine/PickleballEngineTest.java`
 - `src/test/java/tools/dscode/engine/resolve/ResolutionParityTest.java`
 - `src/test/java/tools/dscode/engine/resolve/ScenarioResolverTest.java`
+- `src/test/java/tools/dscode/engine/runtime/ResourceGateTest.java`
 - `src/test/java/tools/dscode/engine/runtime/StepCeilingTest.java`
 - `src/test/java/tools/dscode/engine/runtime/StepWatchdogTest.java`
 - `src/test/java/tools/dscode/engine/runtime/VisualTargetTest.java`

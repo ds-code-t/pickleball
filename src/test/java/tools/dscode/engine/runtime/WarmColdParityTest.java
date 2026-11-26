@@ -108,11 +108,8 @@ class WarmColdParityTest {
     }
 
     @Test
-    void unknownSpineCommandsStayOutOfThisClass() {
+    void sessionStaysOutOfThisClass() {
         ByteArrayOutputStream err = new ByteArrayOutputStream();
-        assertEquals(2, SpineCli.execute(new String[] {"spine", "sample"}, sink(), new PrintStream(err)));
-        assertTrue(err.toString(StandardCharsets.UTF_8).contains("unknown spine command sample"));
-        err.reset();
         assertEquals(2, SpineCli.execute(new String[] {"spine", "session"}, sink(), new PrintStream(err)));
         assertTrue(err.toString(StandardCharsets.UTF_8).contains("unknown spine command session"));
     }

@@ -2,7 +2,9 @@ package tools.dscode.launcher;
 
 import tools.dscode.control.protocol.speed.ProcessTree;
 import tools.dscode.engine.EngineLog;
+import tools.dscode.engine.runtime.ResourceGate;
 import tools.dscode.engine.runtime.WarmProcessFile;
+import tools.dscode.engine.runtime.WarmSpine;
 import tools.dscode.store.StoreGlueCompiler;
 
 import java.io.IOException;
@@ -17,8 +19,8 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Warm-spine verbs: {@code spine start}, {@code spine stop}, and {@code spine warm status}.
- * {@code spine sample} is added with the resource gate. This class does not own a session verb.
+ * Warm-spine verbs: {@code spine start}, {@code spine stop}, {@code spine warm status}, and {@code spine sample}.
+ * This class does not own a session verb.
  */
 public final class SpineCli {
     private SpineCli() {
@@ -42,6 +44,7 @@ public final class SpineCli {
                 Usage: spine start [--project=<dir>]
                        spine stop [--project=<dir>]
                        spine warm status [--project=<dir>]
+                       spine sample [--json] [--project=<dir>]
                 spine start is opt-in. It writes .pickleball/spine/warm.json with pid and started-at.
                 pkb_warm defaults to off. CI and mvn test stay cold. Do not run spine start in CI.
                 store run without a running warm JVM stays cold.
@@ -71,6 +74,7 @@ public final class SpineCli {
                 case "start" -> start(project, stdout, stderr);
                 case "stop" -> stop(project, stdout, stderr);
                 case "warm" -> status(project, stdout);
+                case "sample" -> sample(project, tokens, stdout);
                 default -> unknown(verb, stderr);
             };
         } catch (IllegalStateException failure) {
@@ -105,7 +109,23 @@ public final class SpineCli {
         return 0;
     }
 
+    private static int sample(Path project, List<String> tokens, PrintStream stdout) {
+        ResourceGate.Report report = ResourceGate.report(project, "sample");
+        if (tokens.stream().anyMatch("--json"::equals)) stdout.println(ResourceGate.json(report));
+        else {
+            ResourceGate.Reading reading = report.reading();
+            stdout.println("heapUsed=" + reading.heapUsed());
+            stdout.println("heapMax=" + reading.heapMax());
+            stdout.println("nonHeapUsed=" + reading.nonHeapUsed());
+            stdout.println("gcTimeMs=" + reading.gcTimeMs());
+            stdout.println("threadCount=" + reading.threadCount());
+            stdout.println("decision=" + report.decision().wire());
+        }
+        return 0;
+    }
+
     private static int stop(Path project, PrintStream stdout, PrintStream stderr) {
+        WarmSpine.shared().stopChildren();
         Optional<WarmProcessFile.Record> record = WarmProcessFile.read(project);
         if (record.isEmpty()) {
             stdout.println("warm=off");

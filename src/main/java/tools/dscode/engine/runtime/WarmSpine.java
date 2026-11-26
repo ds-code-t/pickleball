@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.Collection;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * One {@link WarmClassLoader} per snapshot id. Replacing a loader closes the old one
@@ -13,6 +14,7 @@ public final class WarmSpine {
     private static final WarmSpine SHARED = new WarmSpine();
 
     private final ConcurrentHashMap<String, WarmClassLoader> loaders = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, Process> children = new ConcurrentHashMap<>();
 
     public WarmSpine() {
     }
@@ -51,8 +53,35 @@ public final class WarmSpine {
     }
 
     public void reset() {
+        stopChildren();
         for (WarmClassLoader loader : loaders.values()) closeQuietly(loader);
         loaders.clear();
+    }
+
+    /** Live subprocess JVMs. A process that has already exited is dropped. */
+    public int liveChildren() {
+        children.entrySet().removeIf(entry -> entry.getValue() == null || !entry.getValue().isAlive());
+        return children.size();
+    }
+
+    public Process track(Process process) {
+        if (process == null) throw new IllegalArgumentException("subprocess is required");
+        children.put(process.pid(), process);
+        return process;
+    }
+
+    /** Stops every tracked child. `spine stop` calls this. The pool is then zero. */
+    public void stopChildren() {
+        for (Process process : children.values()) {
+            if (process == null) continue;
+            if (process.isAlive()) process.destroyForcibly();
+            try {
+                process.waitFor(5, TimeUnit.SECONDS);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        children.clear();
     }
 
     private static String key(String snapshotId) {

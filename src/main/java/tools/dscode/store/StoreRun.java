@@ -187,6 +187,11 @@ public final class StoreRun {
         return state(root(project));
     }
 
+    /** Classpath a cold subprocess uses. The wrapper cache, or `pkb_store_run_classpath`. */
+    public static String wrapperClasspath(Path project) throws java.io.IOException {
+        return String.join(java.io.File.pathSeparator, classpathEntries(project, false));
+    }
+
     static List<String> classpathEntries(Path project, boolean prependClasses) throws java.io.IOException {
         Path root = root(project);
         List<String> entries = new ArrayList<>();
