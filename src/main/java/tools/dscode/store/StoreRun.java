@@ -1,6 +1,7 @@
 package tools.dscode.store;
 
 import tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner;
+import tools.dscode.engine.runtime.WarmFlags;
 import tools.dscode.engine.runtime.WarmProcessFile;
 
 import java.io.BufferedReader;
@@ -65,13 +66,13 @@ public final class StoreRun {
             return new Outcome(0, "dry-run " + plan.line() + "\n", "", false, elapsed(started), plan);
         }
         if (plan.compile()) {
-            if (plan.compileCommand().isEmpty()) {
+            GlueCompile compiled = compileGlue(root);
+            if (compiled.command().isEmpty()) {
                 return new Outcome(1, "", "error: glue changed and this project has no mvnw or gradlew\n"
                         + "fix: compile the tests, then run store run again\n", false, elapsed(started), plan);
             }
-            int compiled = compile(root, plan.compileCommand());
-            if (compiled != 0) {
-                return new Outcome(compiled, "", "error: glue compile failed\nfix: run the project wrapper and read its log\n",
+            if (compiled.exit() != 0) {
+                return new Outcome(compiled.exit(), "", "error: glue compile failed\nfix: run the project wrapper and read its log\n",
                         false, elapsed(started), plan);
             }
             Files.createDirectories(state(root));
@@ -86,7 +87,21 @@ public final class StoreRun {
             try {
                 StoreGlueCompiler.compile(root);
             } catch (IllegalStateException failure) {
-                return new Outcome(1, "", failure.getMessage() + "\n", false, elapsed(started), plan);
+                String message = failure.getMessage() == null ? "" : failure.getMessage();
+                if (message.contains("rebuild")) {
+                    List<String> command = compileCommand(root);
+                    if (command.isEmpty()) {
+                        return new Outcome(1, "", "error: glue changed and this project has no mvnw or gradlew\n"
+                                + "fix: compile the tests, then run store run again\n", false, elapsed(started), plan);
+                    }
+                    int rebuilt = compile(root, command);
+                    if (rebuilt != 0) {
+                        return new Outcome(rebuilt, "", "error: glue compile failed\nfix: run the project wrapper and read its log\n",
+                                false, elapsed(started), plan);
+                    }
+                } else {
+                    return new Outcome(1, "", message + "\n", false, elapsed(started), plan);
+                }
             } catch (Exception failure) {
                 return new Outcome(1, "", "error: glue compile failed\nfix: store glue compile\n", false, elapsed(started), plan);
             }
@@ -289,6 +304,53 @@ public final class StoreRun {
         }
         if (!any) return "empty";
         return HexFormat.of().formatHex(digest.digest());
+    }
+
+    /**
+     * Compiles changed glue. {@code StoreRun.execute} calls this when the fingerprint changes.
+     * When {@code pkb_warm=on} and the spine warm JVM is alive, only files whose source hash changed
+     * are compiled with {@code javax.tools.JavaCompiler} into {@code .pickleball/spine/classes}, and the
+     * warm loader is reloaded. A missing-symbol diagnostic runs the project wrapper. {@code pkb_warm=off}
+     * keeps the wrapper compile.
+     */
+    public static GlueCompile compileGlue(Path project) throws Exception {
+        Path root = root(project);
+        if (WarmFlags.enabled() && WarmProcessFile.alive(root)) {
+            StoreGlueCompiler.IncrementalDecision decision = StoreGlueCompiler.compileChanged(root);
+            if (decision.rebuild()) {
+                List<String> command = decision.command().isEmpty() ? compileCommand(root) : decision.command();
+                if (command.isEmpty()) {
+                    return new GlueCompile(1, "wrapper", List.of(), true, decision.detail());
+                }
+                int code = compile(root, command);
+                String detail = code == 0
+                        ? decision.detail()
+                        : "error: glue compile failed\nfix: run the project wrapper and read its log";
+                return new GlueCompile(code, "wrapper", command, true, detail);
+            }
+            return new GlueCompile(0, decision.tool(), decision.command(), false, decision.detail());
+        }
+        List<String> command = compileCommand(root);
+        if (command.isEmpty()) {
+            return new GlueCompile(1, "wrapper", List.of(), false,
+                    "error: glue changed and this project has no mvnw or gradlew\nfix: compile the tests, then run store run again");
+        }
+        int code = compile(root, command);
+        String detail = code == 0 ? "wrapper" : "error: glue compile failed\nfix: run the project wrapper and read its log";
+        return new GlueCompile(code, "wrapper", command, false, detail);
+    }
+
+    /** Result of {@link #compileGlue(Path)}. */
+    public record GlueCompile(int exit, String tool, List<String> command, boolean rebuild, String detail) {
+        public GlueCompile {
+            command = command == null ? List.of() : List.copyOf(command);
+            tool = tool == null ? "" : tool;
+            detail = detail == null ? "" : detail;
+        }
+
+        public String commandLine() {
+            return String.join(" ", command);
+        }
     }
 
     public static List<String> compileCommand(Path project) {

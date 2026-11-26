@@ -1,6 +1,12 @@
 package tools.dscode.store;
 
 import tools.dscode.engine.EngineLog;
+import tools.dscode.engine.context.ExecutionContext;
+import tools.dscode.engine.runtime.WarmClassLoader;
+import tools.dscode.engine.runtime.WarmFlags;
+import tools.dscode.engine.runtime.WarmPackages;
+import tools.dscode.engine.runtime.WarmProcessFile;
+import tools.dscode.engine.runtime.WarmSpine;
 import tools.dscode.store.sql.Binding;
 
 import javax.tools.JavaCompiler;
@@ -35,6 +41,7 @@ public final class StoreGlueCompiler {
     static volatile Supplier<JavaCompiler> compilerOverride;
 
     private static final Map<String, Map<String, String>> WARM_HASHES = new ConcurrentHashMap<>();
+    private static final Map<String, Map<String, String>> CHANGED_HASHES = new ConcurrentHashMap<>();
     private static final Map<String, Boolean> WARM_STARTED = new ConcurrentHashMap<>();
 
     private StoreGlueCompiler() {
@@ -154,6 +161,7 @@ public final class StoreGlueCompiler {
     /** Tests drop the in-memory warm hashes. */
     public static void resetWarmState() {
         WARM_HASHES.clear();
+        CHANGED_HASHES.clear();
         WARM_STARTED.clear();
     }
 
@@ -187,7 +195,36 @@ public final class StoreGlueCompiler {
         }
     }
 
+    /**
+     * Compiles Java sources whose hash changed into {@code .pickleball/spine/classes} and reloads the warm loader.
+     * A missing symbol returns the wrapper command and does not run it. {@link StoreRun#compileGlue} runs that command.
+     */
+    public static IncrementalDecision compileChanged(Path project) throws java.io.IOException {
+        Path root = root(project);
+        return compileHashed(root, javaSources(root));
+    }
+
     public static String compile(Path project) throws Exception {
+        Path root = root(project);
+        if (WarmFlags.enabled() && WarmProcessFile.alive(root)) {
+            List<Row> rows = editedJava(project);
+            if (rows.isEmpty()) {
+                StoreLog.log(project, "glue", "compile", StoreScope.label(StoreScope.current()), "no edited java");
+                return "glue compile: no edited java";
+            }
+            List<Path> files = new ArrayList<>();
+            Path scratch = root.resolve(".pickleball").resolve("spine").resolve("sources");
+            for (Row row : rows) {
+                Path file = scratch.resolve(row.path());
+                Files.createDirectories(file.getParent());
+                Files.write(file, row.body());
+                files.add(file);
+            }
+            IncrementalDecision edited = compileHashed(root, files);
+            if (edited.rebuild()) throw new IllegalStateException(edited.detail());
+            StoreLog.log(project, "glue", "compile", StoreScope.label(StoreScope.current()), "classes=" + rows.size());
+            return "glue compile: " + rows.size();
+        }
         Binding binding = StoreScope.current();
         String box = StoreScope.label(binding);
         List<Row> rows = editedJava(project);
@@ -261,6 +298,57 @@ public final class StoreGlueCompiler {
 
     private static Path root(Path project) {
         return project == null ? Path.of("").toAbsolutePath().normalize() : project.toAbsolutePath().normalize();
+    }
+
+    private static IncrementalDecision compileHashed(Path root, List<Path> files) throws java.io.IOException {
+        Map<String, String> hashes = CHANGED_HASHES.computeIfAbsent(root.toString(), ignored -> new ConcurrentHashMap<>());
+        IncrementalDecision last = new IncrementalDecision("JavaCompiler", List.of("JavaCompiler"), false, "unchanged");
+        boolean any = false;
+        for (Path file : files) {
+            String key = file.toAbsolutePath().normalize().toString();
+            String hash = sha256(Files.readAllBytes(file));
+            String previous = hashes.get(key);
+            if (previous != null && previous.equals(hash)) continue;
+            IncrementalDecision decision = compileIncremental(root, file);
+            if (decision.rebuild()) return decision;
+            hashes.put(key, hash);
+            any = true;
+            last = decision;
+        }
+        if (any) reloadWarm(root);
+        return last;
+    }
+
+    private static void reloadWarm(Path project) {
+        Path classes = warmClasses(project);
+        if (!Files.isDirectory(classes)) return;
+        java.net.URL url;
+        try {
+            url = classes.toUri().toURL();
+        } catch (java.net.MalformedURLException failure) {
+            return;
+        }
+        WarmClassLoader next = new WarmClassLoader(
+                new java.net.URL[] {url}, WarmClassLoader.spineLoader(), WarmPackages.resolve(project));
+        String snapshot = "live";
+        ExecutionContext context = ExecutionContext.current();
+        if (context != null && context.id() != null && !context.id().isBlank()) snapshot = context.id();
+        WarmSpine.shared().replace(snapshot, next);
+    }
+
+    private static List<Path> javaSources(Path root) throws java.io.IOException {
+        List<Path> files = new ArrayList<>();
+        for (String dir : List.of("src/main/java", "src/test/java")) {
+            Path source = root.resolve(dir);
+            if (!Files.isDirectory(source)) continue;
+            try (var walk = Files.walk(source)) {
+                walk.filter(Files::isRegularFile)
+                        .filter(file -> file.getFileName().toString().endsWith(".java"))
+                        .sorted()
+                        .forEach(files::add);
+            }
+        }
+        return files;
     }
 
     private static boolean hasJavaSources(Path root) throws java.io.IOException {

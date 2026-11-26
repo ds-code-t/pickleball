@@ -49,14 +49,13 @@ The 3.0.0 retest-fix rounds (R, S) ran only targeted tests on the Linux box and 
 - **Spine R3, Windows only:** `JavaStepHostTest`, `GlueStaticScanTest`, `NodeStepHostTest`, `NodeStepHostTsTest`, `EngineDoesNotSpawnNodeTest`, `JsStepCatalogTest`, `JsStepRunTest`, `PlaywrightTestIngestTest`, `PlaywrightSpecHostTest`, and `PlaywrightSpecIngestLiveTest`.
 - **Spine R4, Windows only:** `VerbDispatchTest`, `McpDirectHotPathTest`, `VerbCatalogTest`, `ElementRecordTest`, `ArgsFileTest`, `AgentEnvelopeStoreTest`, `RouteModifyBodyTest`, `ExecuteStepsPwTest`, `DesktopLaunchTest`, `DesktopScreenshotVerbTest`, and `DesktopLaunch`.
 - **Spine R7, Windows only:** `RunSnapshotTest`, `ReportScriptTest`, `VisualTargetTest`, `PickleballExceptionTest`, `SnapFindIndexTest` (`tools.dscode.common.composite`), `SnapshotRetainTest`, and `CrossStoreTest`.
-- **Spine R8, Windows only:** `WarmClassLoaderTest`, `WarmColdParityTest`, `IncrementalGlueCompileTest`, `ResourceGateTest`, `BrowserVersionResolverTest`, `BrowserCacheAndLocalVersionTest`, `SeleniumBidiCommandTest`, `DebugPortOwnerTest`, `DebugPortAttachTest`, `SnapshotContextGateTest`, `WarmCdpTest`, `DesktopTreeCacheTest`, and `WindowsStructureChangedTest`.
+- **Spine R8, Windows only:** `WarmClassLoaderTest`, `WarmColdParityTest`, `IncrementalGlueCompileTest`, `ResourceGateTest`, `BrowserVersionResolverTest`, `BrowserCacheAndLocalVersionTest`, `SeleniumBidiCommandTest`, `DebugPortOwnerTest`, `DebugPortAttachTest`, `SnapshotContextGateTest`, `WarmCdpTest`, `DesktopTreeCacheTest`, `WindowsStructureChangedTest`, and `WarmGlueCompilePathTest`.
 - **macOS, Safari:** channel `safari` selects Selenium `safaridriver` and the Windows test does not start a process. A live Safari run on macOS has not been executed.
 
 ## Spine R8 production wiring (open, found in R8 verification 2026-11-26)
 
 The R8 classes and their targeted tests are on the branch. These paths are reached only through test hooks today. A follow-up Build owns them.
 
-- **Incremental glue compile:** `StoreGlueCompiler.warmCompile` and `compileIncremental` have no production caller. Only `spine start` runs `warmStart`.
 - **BiDi script and intercept:** no production code binds `SeleniumBidiCommands` to a live Selenium session, so `bidi script` and `bidi intercept` always report no session. `bidi intercept` passes the body to the script call and does not replace a response body.
 - **Hold JVM flags:** `spine start` passes only `-cp` to the hold JVM. `-Dpkb_warm`, `-Dpkb_heap_*`, and endpoint properties set on the starting JVM do not reach it. Only `PKB_WARM` and the other environment variables do.
 
