@@ -7,7 +7,7 @@ const root = process.env.PKB_UI_ROOT || import.meta.dirname;
 const hostFile = process.env.PKB_UI_HOST || "";
 const bridgePort = process.env.PKB_UI_BRIDGE_PORT || "";
 const project = process.env.PKB_UI_PROJECT || "";
-const pageFile = root + "/" + "pages/index.html";
+const pageFile = path.join(root, "pages/index.html");
 
 function same(left, right) {
     const a = Buffer.from(String(left));
@@ -86,7 +86,7 @@ function safePart(value) {
 }
 
 function serveGenerated(req, res, url, name) {
-    const prefix = "/" + "ui" + "/";
+    const prefix = "/ui/";
     if (req.method !== "GET" || !name.startsWith(prefix)) return false;
     const parts = name.slice(prefix.length).split("/");
     if (parts.length !== 2 || !safePart(parts[0]) || !safePart(parts[1])) {
@@ -142,7 +142,7 @@ const server = http.createServer((req, res) => {
         send(res, 200, fs.readFileSync(pageFile), "text/html; charset=utf-8");
         return;
     }
-    const assetPrefix = "/" + "node_modules" + "/";
+    const assetPrefix = "/node_modules/";
     if (req.method === "GET" && name.startsWith(assetPrefix)) {
         const relative = name.slice(1);
         if (relative.split("/").includes("..")) {

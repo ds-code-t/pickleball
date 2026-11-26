@@ -135,6 +135,13 @@ class VerbCatalogTest {
         assertTrue(VerbCatalog.routeAllowed("/"));
         Path ui = Path.of("workbench-ui");
         assertTrue(Files.isDirectory(ui), "workbench-ui");
+        String server = Files.readString(ui.resolve("server.mjs"), StandardCharsets.UTF_8);
+        String page = Files.readString(ui.resolve("pages/index.html"), StandardCharsets.UTF_8);
+        assertTrue(server.contains("\"/node_modules/\""), server);
+        assertTrue(server.contains("\"/ui/\""), server);
+        assertTrue(page.contains("\"/node_modules/monaco-editor/min/vs\""), page);
+        assertTrue(VerbCatalog.routeAllowed("/node_modules/monaco-editor/min/vs/loader.js"));
+        assertTrue(VerbCatalog.routeAllowed("/ui/session/page.html"));
         List<String> forbidden = VerbCatalog.forbiddenRoutes(ui);
         assertTrue(forbidden.isEmpty(), forbidden.toString());
     }

@@ -69,7 +69,6 @@ These items stay out of `3.0.0-consumer-fixes`. The roadmap lists them under "No
 7. `lease take` and `lease release` use `UiLease`, a file lock nothing else consults, instead of `WorkbenchControlLease` and `LeaseHold`, so the holder does not gate the protected controls.
 8. `input block --on` only makes the agent's own `input` verb refuse and does not block human mouse and keyboard on the page.
 9. `VerbCatalog.outsideCatalog` only checks quoted paths that start with `/`, and a generated page cannot call `/store` because that route requires the main UI token.
-10. `workbench-ui/server.mjs` and `workbench-ui/pages/index.html` build `/node_modules/`, `/ui/`, and the page path by joining strings, so the route scan never sees those routes.
 11. The Scenarios, Globals, Data, branch selector, code tab, and Point button do not call the store and point commands the roadmap requires, and an open-then-save round trip writes the glue-show JSON wrapper into the glue file.
 13. `VerbDispatch` does not require `--session=<id>` or a default session created by `spine session new`.
 15. `docs/pickleball-workbench.md` and the `AgentHop` comment still describe Swing as the current window, lease, editor, and bare `ui`.

@@ -91,7 +91,7 @@ document.getElementById("search").addEventListener("change", async function () {
 });
 let definitionEditor = null;
 function monacoRoot() {
-    return ["", "node_modules", "monaco-editor", "min", "vs"].join("/");
+    return "/node_modules/monaco-editor/min/vs";
 }
 function loadMonaco() {
     if (window.monaco && window.monaco.editor) return Promise.resolve();

@@ -263,6 +263,8 @@ public final class VerbCatalog {
         if (raw.length() > 1 && raw.endsWith("/")) raw = raw.substring(0, raw.length() - 1);
         if (!raw.startsWith("/")) return true;
         if (UI_PAGES.contains(raw)) return true;
+        if ("/node_modules".equals(raw) || raw.startsWith("/node_modules/")) return true;
+        if ("/ui".equals(raw) || raw.startsWith("/ui/")) return true;
         String rest = raw.substring(1);
         int slash = rest.indexOf('/');
         String first = slash < 0 ? rest : rest.substring(0, slash);
