@@ -64,16 +64,28 @@ public final class PatternMatcher {
         return match(pattern, text, null, hints);
     }
 
-    /** Translates a glue annotation into a stored regex and a parameter-type array. */
+    /**
+     * Translates a glue annotation into a stored regex and a parameter-type array.
+     * A {@code /pattern/} literal is stored with the slashes. {@link #match} still
+     * treats that form as a regular expression. Storing only the inside would make
+     * the next hydrate classify it as a Cucumber expression.
+     */
     public static Translation translation(String pattern) {
         String source = pattern == null ? "" : pattern;
         try {
             Compiled compiled = compile(source);
-            return new Translation(compiled.pattern, json(compiled.names), false, "");
+            String stored = slashWrapped(source) ? source : compiled.pattern;
+            return new Translation(stored, json(compiled.names), false, "");
         } catch (IllegalArgumentException failure) {
             String message = failure.getMessage() == null ? "pattern was not translated" : failure.getMessage();
             return new Translation(source, "[]", true, message);
         }
+    }
+
+    private static boolean slashWrapped(String expression) {
+        return expression.length() >= 2
+                && expression.charAt(0) == '/'
+                && expression.charAt(expression.length() - 1) == '/';
     }
 
     private static List<String> matchRegex(String pattern, String text, Type... hints) {

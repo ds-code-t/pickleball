@@ -84,6 +84,25 @@ class StoreSchemaTest {
     }
 
     @Test
+    void openAddsHostWhenTheContextColumnsAreAlreadyPresent() throws Exception {
+        Path nested = project.resolve("host-repair");
+        Files.createDirectories(nested);
+        try (SqlStore fresh = SqlStore.open(nested, Binding.main())) {
+            fresh.session().script("DROP TRIGGER IF EXISTS step_definitions_pkb_insert");
+            fresh.session().script("DROP TRIGGER IF EXISTS step_definitions_pkb_update");
+            fresh.session().script("DROP TRIGGER IF EXISTS step_definitions_pkb_delete");
+            fresh.session().script("ALTER TABLE step_definitions DROP COLUMN host");
+            assertEquals(null, fresh.session().scalar(
+                    "SELECT name FROM pragma_table_info('step_definitions') WHERE name = ?", "host"));
+            int fullBefore = SqlDialect.schemaFullEnsures();
+            SqlDialect.ensureSchema(fresh.session());
+            assertEquals(fullBefore, SqlDialect.schemaFullEnsures(), "host repair ran full DDL");
+            assertEquals("host", fresh.session().scalar(
+                    "SELECT name FROM pragma_table_info('step_definitions') WHERE name = ?", "host"));
+        }
+    }
+
+    @Test
     void runStateStaysOffABranchCreatedFromHead() throws Exception {
         store.createBranch("see");
         try (SqlStore other = SqlStore.open(project, Binding.sandbox("see"))) {

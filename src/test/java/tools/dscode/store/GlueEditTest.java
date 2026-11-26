@@ -113,7 +113,7 @@ class GlueEditTest {
         Capture js = run("store", "glue", "put", "--path=glue/js/steps.js",
                 "--text=export function ready() {}\n", "--json", "--project=" + project);
         assertEquals(0, js.code, js.err);
-        assertTrue(JSON.readTree(js.out).get("message").asText().contains("no step runtime"), js.out);
+        assertTrue(JSON.readTree(js.out).get("message").asText().contains("js/ts step definitions refreshed"), js.out);
         Capture ts = run("store", "glue", "put", "--path=glue/js/steps.ts",
                 "--text=export function ready(): void {}\n", "--json", "--project=" + project);
         assertEquals(0, ts.code, ts.err);

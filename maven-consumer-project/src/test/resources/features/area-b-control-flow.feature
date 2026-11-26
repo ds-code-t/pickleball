@@ -388,3 +388,8 @@ Feature: Area B control flow
       | 1   |
       | 2   |
       | 3   |
+
+  @all @area-b @area-b-js-step
+  Scenario: A JavaScript defineStep saves a value the next step reads
+    * I count 2 for the js step
+    * , ensure "<jsStepCount>" equals "2"

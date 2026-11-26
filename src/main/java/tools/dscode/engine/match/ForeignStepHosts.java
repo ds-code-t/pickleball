@@ -57,6 +57,12 @@ public final class ForeignStepHosts {
         }
     }
 
+    public static boolean started() {
+        synchronized (LOCK) {
+            return depth > 0;
+        }
+    }
+
     public static Path project() {
         Path project = PROJECT.get();
         if (project != null) return project;

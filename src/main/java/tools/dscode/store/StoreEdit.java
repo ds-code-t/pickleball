@@ -9,10 +9,14 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -240,6 +244,7 @@ public final class StoreEdit {
         if (store) {
             StoreContent.put(project, relative, body);
             edited = true;
+            refreshScriptCatalog(project, relative, body);
         } else {
             Path disk = project.resolve(relative);
             Files.createDirectories(disk.getParent());
@@ -274,6 +279,25 @@ public final class StoreEdit {
         }
         if (!removed) throw new IllegalArgumentException("not found: " + relative);
         return Outcome.deleted(relative, idOf(relative), StoreConfig.enabled(project));
+    }
+
+    private static void refreshScriptCatalog(Path project, String relative, byte[] body) throws SQLException {
+        String normal = relative.replace('\\', '/');
+        if (!normal.endsWith(".js") && !normal.endsWith(".ts")) return;
+        if (!isGluePath(normal)) return;
+        try (StoreDatabase database = StoreDatabase.open(project)) {
+            Connection connection = database.connection();
+            connection.setAutoCommit(false);
+            try {
+                StoreStepCatalog.refreshSources(connection, project, Map.of(relative, body), Instant.now().toString());
+                connection.commit();
+            } catch (SQLException | RuntimeException failure) {
+                connection.rollback();
+                throw failure;
+            } finally {
+                connection.setAutoCommit(true);
+            }
+        }
     }
 
     static void validate(Path project, String path, byte[] body) {

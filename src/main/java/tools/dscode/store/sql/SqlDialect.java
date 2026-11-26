@@ -487,8 +487,9 @@ public final class SqlDialect {
 
     /**
      * A database that already has {@code hydration_spine} still needs columns added
-     * by a later build. The full DDL stays on the slow path. This check is one
-     * lookup, then {@link #ensureHydrationColumns} only when the newest column is missing.
+     * by a later build. The full DDL stays on the slow path. This check looks up
+     * the newest columns, then {@link #ensureHydrationColumns} when one is missing.
+     * {@code steps.context_scope} and {@code step_definitions.host} are both required.
      */
     private static void ensureAdditiveOnReady(SqlSession session) throws SQLException {
         if (additiveColumnsPresent(session)) return;
@@ -501,7 +502,9 @@ public final class SqlDialect {
     private static boolean additiveColumnsPresent(SqlSession session) {
         try {
             return "context_scope".equals(session.scalar(
-                    "SELECT name FROM pragma_table_info('steps') WHERE name = ?", "context_scope"));
+                    "SELECT name FROM pragma_table_info('steps') WHERE name = ?", "context_scope"))
+                    && "host".equals(session.scalar(
+                    "SELECT name FROM pragma_table_info('step_definitions') WHERE name = ?", "host"));
         } catch (SQLException ignored) {
             return false;
         }

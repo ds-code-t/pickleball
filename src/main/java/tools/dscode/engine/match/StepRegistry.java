@@ -52,6 +52,7 @@ public final class StepRegistry {
     private final List<GlueStep> steps = new ArrayList<>();
     private final List<Hook> hooks = new ArrayList<>();
     private Path logProject;
+    private String preferredDefinition = "";
     private boolean nativeDecided;
     private List<GlueStep> nativeSteps;
 
@@ -66,6 +67,12 @@ public final class StepRegistry {
 
     public StepRegistry logTo(Path project) {
         this.logProject = project;
+        return this;
+    }
+
+    /** When set, native match keeps only this {@code definition_id}. */
+    public StepRegistry prefer(String definitionId) {
+        this.preferredDefinition = definitionId == null ? "" : definitionId;
         return this;
     }
 
@@ -288,6 +295,7 @@ public final class StepRegistry {
         List<GlueStep> hits = new ArrayList<>();
         List<List<String>> captures = new ArrayList<>();
         for (GlueStep step : candidates) {
+            if (!preferredDefinition.isBlank() && !preferredDefinition.equals(step.definitionId())) continue;
             List<String> arguments = PatternMatcher.match(
                     step.pattern(), body, step.parameterTypes(), step.expressionTypes().toArray(Type[]::new));
             if (arguments == null) continue;

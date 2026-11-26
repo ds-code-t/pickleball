@@ -35,6 +35,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -67,6 +68,7 @@ public final class NodeStepHost implements ForeignStepHost, AutoCloseable {
     private final Object writeLock = new Object();
     private final AtomicLong ids = new AtomicLong();
     private final Map<Long, CompletableFuture<JsonNode>> pending = new ConcurrentHashMap<>();
+    private final LinkedBlockingQueue<JsonNode> inboundCalls = new LinkedBlockingQueue<>();
     private final Map<String, String> loadedHash = new LinkedHashMap<>();
     private final List<String> calls = Collections.synchronizedList(new ArrayList<>());
     private final StringBuilder stderr = new StringBuilder();
@@ -192,9 +194,20 @@ public final class NodeStepHost implements ForeignStepHost, AutoCloseable {
         long id = message.get("id").asLong();
         CompletableFuture<JsonNode> future = new CompletableFuture<>();
         pending.put(id, future);
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
         try {
             send(message);
-            return future.get(30, TimeUnit.SECONDS);
+            while (true) {
+                if (future.isDone()) return future.get();
+                long remaining = deadline - System.nanoTime();
+                if (remaining <= 0) {
+                    pending.remove(id);
+                    throw new TimeoutException("step host");
+                }
+                long waitMs = Math.min(50L, Math.max(1L, TimeUnit.NANOSECONDS.toMillis(remaining)));
+                JsonNode call = inboundCalls.poll(waitMs, TimeUnit.MILLISECONDS);
+                if (call != null) reply(call);
+            }
         } catch (TimeoutException failure) {
             pending.remove(id);
             throw new IllegalStateException("error: step host timed out\nfix: store glue show " + sourcePath
@@ -253,7 +266,7 @@ public final class NodeStepHost implements ForeignStepHost, AutoCloseable {
             return;
         }
         if ("call".equals(message.path("op").asText(""))) {
-            reply(message);
+            inboundCalls.add(message);
             return;
         }
         CompletableFuture<JsonNode> future = pending.remove(message.path("id").asLong());

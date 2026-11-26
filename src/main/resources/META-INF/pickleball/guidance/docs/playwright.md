@@ -6,6 +6,8 @@ Playwright for Java 1.65.1 (Apache-2.0) and its `driver-bundle` (Apache-2.0, wit
 
 The same driver-bundle Node runs JavaScript and TypeScript step definitions. `NodeStepHost` in `tools.dscode.launcher` locates that binary through `PlaywrightNode` and spawns `step-host.mjs`. It does not download Node, does not look on `PATH`, does not run npm, and does not copy Node into the pickleball jar. `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` stays set. Browsers are still never downloaded.
 
+Project files under `glue/js`, `src/test/resources/glue/js`, and `src/main/resources/glue/js` are those definitions. `defineStep(/pattern/, ...)` is stored with the slashes. `defineStep("pattern", ...)` and `Given("pattern", ...)` store the quoted pattern. `engine step --definition=<id> --text=<step>` runs one of them.
+
 The host and the script exchange one JSON object per line. A step may call `resolveText`, `saveValue`, `getValue`, `softFail`, `secret`, `log`, and `entityGet`. The parsing map stays in Java. `secret` and a secret `entityGet` return `~MASK;` or a reference string. An unknown function fails the step. A bare import such as `left-pad` fails at load with `error: bare import is a rebuild` and `fix: add the package to workbench-ui and rebuild`. Relative imports are loaded from the hydrated file rows.
 
 Node runs erasable TypeScript. `enum`, `namespace`, and parameter properties fail at load with `fix: keep the TypeScript erasable`. There is no TypeScript compiler package in this phase. `pkb_engine_log=host` logs spawn, load, invoke, and the call name. It does not log a secret return value. The engine package does not reference `NodeStepHost`, `PlaywrightNode`, or `step-host.mjs`.

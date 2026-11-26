@@ -20,7 +20,9 @@ import java.util.stream.Stream;
 
 /**
  * Step-definition catalog derived from Java glue annotations and from
- * {@code glue/js} source. JS and TS stay source only until a step host runs them.
+ * {@code glue/js} and {@code src/test/resources/glue/js} source. A {@code .js} or
+ * {@code .ts} file runs through the step host. A {@code /pattern/} literal is stored
+ * with the slashes so the match is a regular expression.
  * {@code definition_id} is SHA-256 of language, pattern, path, and line.
  * {@code host} is the file language. {@link GlueStaticScan} warns on a mutable static field.
  */
@@ -29,6 +31,8 @@ public final class StoreStepCatalog {
     private static final Pattern JAVA_ANNOTATION = Pattern.compile("@(?:Given|When|Then|And|But)\\b");
     private static final Pattern JS_STEP = Pattern.compile(
             "\\b(?:Given|When|Then|And|But|defineStep)\\s*\\(\\s*(['\"`])((?:\\\\.|(?!\\1).)*)\\1");
+    private static final Pattern JS_REGEX = Pattern.compile(
+            "\\b(?:Given|When|Then|And|But|defineStep)\\s*\\(\\s*(/(?:\\\\.|[^/\\r\\n])+/)");
 
     private StoreStepCatalog() {
     }
@@ -372,6 +376,8 @@ public final class StoreStepCatalog {
         walk(project, project.resolve("src/main/java"), "java", found);
         walk(project, project.resolve("src/test/java"), "java", found);
         walk(project, project.resolve("glue/js"), "js", found);
+        walk(project, project.resolve("src/main/resources/glue/js"), "js", found);
+        walk(project, project.resolve("src/test/resources/glue/js"), "js", found);
         found.sort(Comparator.comparing(Definition::sourcePath).thenComparingInt(Definition::sourceLine).thenComparing(Definition::id));
         return List.copyOf(found);
     }
@@ -442,6 +448,13 @@ public final class StoreStepCatalog {
             String pattern = unescape(matcher.group(2));
             if (pattern.isEmpty()) continue;
             hits.add(new Hit(lineAt(text, matcher.start()), pattern, null));
+        }
+        Matcher regex = JS_REGEX.matcher(text);
+        while (regex.find()) {
+            if (inComment(text, regex.start())) continue;
+            String pattern = regex.group(1);
+            if (pattern == null || pattern.length() < 3) continue;
+            hits.add(new Hit(lineAt(text, regex.start()), pattern, null));
         }
         return hits;
     }

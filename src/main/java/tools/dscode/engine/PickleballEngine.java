@@ -89,23 +89,42 @@ public final class PickleballEngine {
     }
 
     public static StepResult runStep(String text, String argument, ExecutionContext context) {
-        EngineStep step = EngineStep.of("* ", text == null ? "" : text);
-        if (argument != null && !argument.isBlank()) {
-            step = new EngineStep(step.keyword(), step.text(), StepArgument.doc(DocText.of(argument)), step.location(), step.metadata(), false);
+        boolean ownHosts = !ForeignStepHosts.started();
+        if (ownHosts) ForeignStepHosts.begin(projectOf(context));
+        try {
+            EngineStep step = EngineStep.of("* ", text == null ? "" : text);
+            if (argument != null && !argument.isBlank()) {
+                step = new EngineStep(step.keyword(), step.text(), StepArgument.doc(DocText.of(argument)), step.location(), step.metadata(), false);
+            }
+            StepRegistry registry = registry(context);
+            ScenarioResult scenario = tools.dscode.engine.adapter.cucumber.NativeScenarioRun.run(
+                    EngineScenario.of("step", List.of(step)),
+                    registry,
+                    EngineOptions.of()
+            );
+            if (scenario.steps().isEmpty()) return finish(Status.UNDEFINED, step, "undefined", "", System.nanoTime());
+            return scenario.steps().getFirst();
+        } finally {
+            if (ownHosts) ForeignStepHosts.end();
         }
-        StepRegistry registry = registry(context);
-        ScenarioResult scenario = tools.dscode.engine.adapter.cucumber.NativeScenarioRun.run(
-                EngineScenario.of("step", List.of(step)),
-                registry,
-                EngineOptions.of()
-        );
-        if (scenario.steps().isEmpty()) return finish(Status.UNDEFINED, step, "undefined", "", System.nanoTime());
-        return scenario.steps().getFirst();
+    }
+
+    private static Path projectOf(ExecutionContext context) {
+        if (context != null && context.resources().get("project") instanceof Path path) {
+            return path.toAbsolutePath().normalize();
+        }
+        Path current = ForeignStepHosts.project();
+        if (current != null) return current;
+        return Path.of("").toAbsolutePath().normalize();
     }
 
     private static StepRegistry registry(ExecutionContext context) {
         if (context != null && context.resources().get("registry") instanceof StepRegistry existing) return existing;
         StepRegistry created = new StepRegistry().scanPackage("tools.dscode.coredefinitions");
+        if (context != null && context.resources().get("project") instanceof Path path) created.logTo(path);
+        if (context != null && context.resources().get("definition") instanceof String id && !id.isBlank()) {
+            created.prefer(id);
+        }
         Object glue = context == null ? null : context.resources().get("glue");
         if (glue instanceof List<?> list) {
             List<Class<?>> types = new ArrayList<>();

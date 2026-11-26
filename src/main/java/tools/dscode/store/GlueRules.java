@@ -11,8 +11,9 @@ import java.util.regex.Pattern;
 /**
  * Java glue annotations stay single string literals. A successful change
  * compiles and stops the warm worker so the next run starts clean. A compile
- * failure leaves the fingerprint and the worker alone. JS and TS under
- * {@code glue/js/} are source only. There is no JS/TS step runtime.
+ * failure leaves the fingerprint and the worker alone. A {@code .js} or
+ * {@code .ts} file under {@code glue/js/} refreshes the step catalog. The
+ * step host runs those definitions.
  */
 final class GlueRules {
     private static final Pattern ANNOTATION = Pattern.compile("@(?:Given|When|Then|And|But)\\b");
@@ -40,7 +41,7 @@ final class GlueRules {
     static String afterWrite(Path project, String path) {
         if (path == null || !StoreEdit.isGluePath(path)) return "";
         if (!path.endsWith(".java")) {
-            return "js/ts source only; no step runtime";
+            return "js/ts step definitions refreshed";
         }
         if (StoreConfig.enabled(project)) {
             StoreLog.log(project, "glue", path, "compile pending");

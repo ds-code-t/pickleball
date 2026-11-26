@@ -35,6 +35,7 @@ import tools.dscode.coredefinitions.GeneralSteps;
 import tools.dscode.store.StoreFeatureSource;
 import tools.dscode.engine.EngineLog;
 import tools.dscode.engine.EngineOptions;
+import tools.dscode.engine.match.ForeignStepHosts;
 import tools.dscode.engine.match.StepRegistry;
 import tools.dscode.engine.model.DocText;
 import tools.dscode.engine.model.EngineFeature;
@@ -93,6 +94,8 @@ public final class NativeSuiteExecution {
         EngineExecutionListener listener = request.getEngineExecutionListener();
         TestDescriptor root = request.getRootTestDescriptor();
         listener.executionStarted(root);
+        Path project = tools.dscode.engine.EngineConfig.project();
+        ForeignStepHosts.begin(project);
         Throwable failure = null;
         try {
             GeneralSteps.startSuite();
@@ -100,10 +103,10 @@ public final class NativeSuiteExecution {
             String name = setting(request, Constants.FILTER_NAME_PROPERTY_NAME, "pkb_name");
             String glue = setting(request, Constants.GLUE_PROPERTY_NAME, "pkb_glue");
             Bus bus = plugins(setting(request, Constants.PLUGIN_PROPERTY_NAME, "cucumber.plugin"));
-            StepRegistry registry = registry(glue);
+            StepRegistry registry = registry(glue).logTo(project);
             ensureCachingGlue(glue);
             Catalog catalog = new Catalog();
-            EngineOptions options = EngineOptions.of().project(tools.dscode.engine.EngineConfig.project());
+            EngineOptions options = EngineOptions.of().project(project);
             walk(listener, root, tags, name, registry, catalog, options, bus);
         } catch (Throwable error) {
             failure = error;
@@ -114,6 +117,7 @@ public final class NativeSuiteExecution {
                 if (failure == null) failure = cleanup;
                 else failure.addSuppressed(cleanup);
             }
+            ForeignStepHosts.end();
             if (parked == null) {
                 io.cucumber.core.runner.CurrentScenarioState.currentScenarioState.remove();
             } else {

@@ -1256,6 +1256,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/IdentityRefindTest.java`
 - `src/test/java/tools/dscode/launcher/InputLiveTest.java`
 - `src/test/java/tools/dscode/launcher/JsFallbackHonestyTest.java`
+- `src/test/java/tools/dscode/launcher/JsStepRunTest.java`
 - `src/test/java/tools/dscode/launcher/MaskQuietTest.java`
 - `src/test/java/tools/dscode/launcher/MonitorLiveTest.java`
 - `src/test/java/tools/dscode/launcher/NavigateDataFileTest.java`
@@ -1350,6 +1351,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/store/GlueStaticScanTest.java`
 - `src/test/java/tools/dscode/store/HeadMaterializerTest.java`
 - `src/test/java/tools/dscode/store/JarHashResetTest.java`
+- `src/test/java/tools/dscode/store/JsStepCatalogTest.java`
 - `src/test/java/tools/dscode/store/LargeFileBranchCopyTest.java`
 - `src/test/java/tools/dscode/store/LargeFileReferenceTest.java`
 - `src/test/java/tools/dscode/store/LegacyNamesTest.java`

@@ -70,7 +70,7 @@ public final class EngineCli {
         return """
                 Usage: engine help
                 Usage: engine run [--project=<dir>] [--text=<gherkin>] [--file=<path>] [--steps=<line>] [--glue=<class>] [--name=<scenario>] [--store] [--sandbox=<name>] [--feature=<path>]
-                Usage: engine step --text=<step> [--argument=<text>] [--glue=<class>] [--project=<dir>]
+                Usage: engine step --text=<step> [--definition=<id>] [--argument=<text>] [--glue=<class>] [--project=<dir>]
                 The engine runs steps without Cucumber. --text and --steps do not read a feature file.
                 --store reads feature bytes from the Store store at .pickleball/store/data. --glue is a glue class name.
                 Workbench, MCP, and Gradle forward this command and do not run steps themselves.
@@ -105,6 +105,9 @@ public final class EngineCli {
         StoreScope.bindCommand(tokens);
         try (ExecutionContext context = ExecutionContext.open(EngineScenario.of("step", List.of()))) {
             context.resource("glue", options(tokens, project).glue());
+            context.resource("project", project);
+            String definition = value(tokens, "--definition");
+            if (definition != null && !definition.isBlank()) context.resource("definition", definition);
             StepResult result = PickleballEngine.runStep(text, value(tokens, "--argument"), context);
             out.println("step " + result.status() + " " + result.text());
             return result.status().isOk() ? 0 : 1;
