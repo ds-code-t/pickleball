@@ -4,8 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import tools.dscode.store.sql.Binding;
+import tools.dscode.store.sql.SqliteOpen;
+
 import java.io.PrintStream;
 import java.nio.file.Path;
+import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
@@ -50,27 +54,32 @@ public final class StoreSql {
                 return 1;
             }
         }
-        try (StoreDatabase database = StoreDatabase.open(project);
-             Statement statement = database.connection().createStatement()) {
-            statement.setMaxRows(MAX_ROWS);
-            try (ResultSet rows = statement.executeQuery(query)) {
-                ResultSetMetaData meta = rows.getMetaData();
-                int columns = meta.getColumnCount();
-                List<String> names = new ArrayList<>();
-                for (int index = 1; index <= columns; index++) names.add(meta.getColumnLabel(index));
-                List<List<String>> kept = new ArrayList<>();
-                while (rows.next()) {
-                    List<String> cells = new ArrayList<>();
-                    for (int index = 1; index <= columns; index++) {
-                        String value = rows.getString(index);
-                        cells.add(value == null ? "" : value);
-                    }
-                    if (keep(cells, text, regex)) kept.add(cells);
+        Binding binding = StoreScope.current();
+        Path file = binding == null || binding.primary()
+                ? StorePaths.mainDatabase(project)
+                : StorePaths.sandboxDatabase(project, binding.name());
+        try (StoreDatabase ignored = StoreDatabase.open(project);
+             Connection connection = SqliteOpen.openReadOnly(file);
+             Statement statement = connection.createStatement();
+             ResultSet rows = statement.executeQuery(query)) {
+            ResultSetMetaData meta = rows.getMetaData();
+            int columns = meta.getColumnCount();
+            List<String> names = new ArrayList<>();
+            for (int index = 1; index <= columns; index++) names.add(meta.getColumnLabel(index));
+            List<List<String>> kept = new ArrayList<>();
+            while (rows.next()) {
+                List<String> cells = new ArrayList<>();
+                for (int index = 1; index <= columns; index++) {
+                    String value = rows.getString(index);
+                    cells.add(value == null ? "" : value);
                 }
-                if (json) out.println(json(names, kept));
-                else out.print(text(names, kept));
-                return 0;
+                if (!keep(cells, text, regex)) continue;
+                if (kept.size() >= MAX_ROWS) break;
+                kept.add(cells);
             }
+            if (json) out.println(json(names, kept));
+            else out.print(text(names, kept));
+            return 0;
         } catch (SQLException failure) {
             String message = failure.getMessage() == null ? "store sql failed" : failure.getMessage();
             err.println("error: " + message);

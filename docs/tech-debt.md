@@ -72,6 +72,5 @@ These items stay out of `3.0.0-consumer-fixes`. The roadmap lists them under "No
 10. `workbench-ui/server.mjs` and `workbench-ui/pages/index.html` build `/node_modules/`, `/ui/`, and the page path by joining strings, so the route scan never sees those routes.
 11. The Scenarios, Globals, Data, branch selector, code tab, and Point button do not call the store and point commands the roadmap requires, and an open-then-save round trip writes the glue-show JSON wrapper into the glue file.
 13. `VerbDispatch` does not require `--session=<id>` or a default session created by `spine session new`.
-14. `store sql` enforces read-only with a text check only, and `--text` filtering runs after the 200-row cap.
 15. `docs/pickleball-workbench.md` and the `AgentHop` comment still describe Swing as the current window, lease, editor, and bare `ui`.
 17. Packaging must keep `monaco-editor` (MIT) and `typescript` (Apache-2.0), with no added packages, second Node, or runtime download.

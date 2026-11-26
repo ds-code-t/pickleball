@@ -3,11 +3,17 @@ package tools.dscode.launcher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.store.StoreCli;
+import tools.dscode.store.StoreDatabase;
+import tools.dscode.store.StorePaths;
+import tools.dscode.store.sql.SqliteOpen;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -46,6 +52,43 @@ class StoreSqlReadOnlyTest {
         assertEquals(2, multi.code, multi.err);
         assertTrue(multi.err.contains("error:"), multi.err);
         assertTrue(multi.err.contains("fix:"), multi.err);
+    }
+
+    @Test
+    void textFilterKeepsAMatchPastTheRowCapAndTheConnectionIsQueryOnly(@TempDir Path project) throws Exception {
+        try (StoreDatabase database = StoreDatabase.open(project);
+             Statement statement = database.connection().createStatement()) {
+            statement.execute("CREATE TABLE probe (v TEXT)");
+            for (int index = 0; index < 200; index++) {
+                statement.execute("INSERT INTO probe(v) VALUES ('no')");
+            }
+            statement.execute("INSERT INTO probe(v) VALUES ('needle')");
+        }
+        String root = project.toAbsolutePath().toString();
+        Capture filtered = run("store", "sql", "--query=SELECT v FROM probe", "--text=exact:needle", "--project=" + root);
+        assertEquals(0, filtered.code, filtered.err);
+        assertTrue(filtered.out.contains("needle"), filtered.out);
+
+        Capture mode = run("store", "sql", "--query=SELECT * FROM pragma_query_only", "--project=" + root);
+        assertEquals(0, mode.code, mode.err);
+        assertTrue(mode.out.contains("1"), mode.out);
+        assertFalse(mode.out.contains("0"), mode.out);
+
+        SQLException rejected = null;
+        try (Connection connection = SqliteOpen.openReadOnly(StorePaths.mainDatabase(project));
+             Statement statement = connection.createStatement()) {
+            statement.execute("UPDATE probe SET v = 'smuggled' WHERE v = 'needle'");
+        } catch (SQLException failure) {
+            rejected = failure;
+        }
+        assertTrue(rejected != null && rejected.getMessage() != null
+                && rejected.getMessage().toLowerCase().contains("readonly"), String.valueOf(rejected));
+        Capture unchanged = run("store", "sql", "--query=SELECT v FROM probe", "--text=exact:needle", "--project=" + root);
+        assertEquals(0, unchanged.code, unchanged.err);
+        assertTrue(unchanged.out.contains("needle"), unchanged.out);
+        Capture missing = run("store", "sql", "--query=SELECT v FROM probe", "--text=exact:smuggled", "--project=" + root);
+        assertEquals(0, missing.code, missing.err);
+        assertFalse(missing.out.contains("smuggled"), missing.out);
     }
 
     private static Capture run(String... args) {

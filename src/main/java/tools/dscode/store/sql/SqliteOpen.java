@@ -5,6 +5,7 @@ import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Properties;
 
 /** Opens one SQLite file. JDBC URLs stay in this package. The driver is runtime-only. */
@@ -40,5 +41,26 @@ public final class SqliteOpen {
         properties.setProperty("synchronous", "NORMAL");
         properties.setProperty("transaction_mode", "IMMEDIATE");
         return DriverManager.getConnection("jdbc:sqlite:" + file.toAbsolutePath(), properties);
+    }
+
+    /**
+     * A connection that cannot write. The file must already exist.
+     * {@code mode=ro} and {@code PRAGMA query_only} are both set.
+     */
+    public static Connection openReadOnly(Path file) throws SQLException {
+        if (!driverPresent()) throw new SQLException(MISSING_DRIVER);
+        if (file == null || !Files.isRegularFile(file)) {
+            throw new SQLException("store database is missing");
+        }
+        String path = file.toAbsolutePath().normalize().toString().replace('\\', '/');
+        Connection connection = DriverManager.getConnection("jdbc:sqlite:file:" + path + "?mode=ro");
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("PRAGMA query_only=ON");
+            statement.execute("PRAGMA busy_timeout=5000");
+        } catch (SQLException failure) {
+            connection.close();
+            throw failure;
+        }
+        return connection;
     }
 }
