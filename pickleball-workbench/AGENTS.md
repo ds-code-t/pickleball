@@ -24,7 +24,7 @@ Workbench-only dependencies, including Jackson and the MCP SDK, belong only on t
 
 ## Runtime ownership
 
-The Workbench controller owns synchronization, worker process/session lifecycle, bridge client behavior, MCP stdio, the localhost UI-attach endpoint (`attach.json`), the headless CLI session (`session` command, `cli-session.json`, serial execute-step queue), the watched-agent control lease, and the thin Swing UI. Pickleball owns consumer-worker behavior such as the bridge server/coordinator, DynamicControl/Gherkin execution, Step Override runtime, Mapping state, browser/service-call access, and woven Cucumber integration.
+The Workbench controller owns synchronization, worker process/session lifecycle, bridge client behavior, MCP stdio, the localhost UI-attach endpoint (`attach.json`), the headless CLI session (`session` command, `cli-session.json`, serial execute-step queue), and the watched-agent control lease. The launched window is the Node renderer started by `pickleball ui` in the pickleball JVM. This module does not spawn Node and does not launch Swing. Swing classes that tests still construct are not that window. Pickleball owns consumer-worker behavior such as the bridge server/coordinator, DynamicControl/Gherkin execution, Step Override runtime, Mapping state, browser/service-call access, and woven Cucumber integration.
 
 `WorkbenchServices` is the shared plain-Java adapter boundary. `WorkbenchController` composes synchronization, `WorkbenchLiveSession`, `LiveScenarioPlayer`, and the control lease; MCP, HTTP attach, and Swing must delegate to that service surface instead of implementing their own worker ownership, bridge calls, Mapping semantics, Step Override behavior, scenario retry rules, or a second live Gherkin document.
 

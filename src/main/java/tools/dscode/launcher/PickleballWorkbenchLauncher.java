@@ -318,6 +318,11 @@ public final class PickleballWorkbenchLauncher {
             if (exitCode != 0) exitProcess(exitCode);
             return;
         }
+        if (controllerUiWithoutOps(parsed.command(), args)) {
+            int exitCode = WorkbenchUiServer.open(project, System.out, System.err);
+            finish(args, exitCode);
+            return;
+        }
 
         String[] forwarded = parsed.forwarded() != null ? parsed.forwarded() : normalizedArguments(args);
         if (parsed.project() == null) {
@@ -378,8 +383,8 @@ public final class PickleballWorkbenchLauncher {
     }
 
     /**
-     * Bare {@code ui} is the controller window. {@code ui --ops} is the catalog batch
-     * and stays in this process. A missing {@code --ops} must fail closed on the controller jar.
+     * Bare {@code ui} starts the Node renderer in this JVM and does not extract the controller.
+     * {@code ui --ops} is the catalog batch and stays on {@link VerbDispatch}.
      */
     private static boolean controllerUiWithoutOps(String command, String[] args) {
         if (!"ui".equals(command)) return false;

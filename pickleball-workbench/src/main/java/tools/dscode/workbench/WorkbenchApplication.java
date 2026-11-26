@@ -252,25 +252,8 @@ public final class WorkbenchApplication {
 
     private static int ui(String[] args) {
         IsolateArgs parsed = projectCommandArgs(args, "ui");
-        WorkbenchWindowLifecycle.armDedicatedProcess();
-        claimWarm(parsed.project());
-        try {
-            if (parsed.runId() != null) {
-                WindowDriver.show(parsed.project(), parsed.runId(), parsed.agentId(), parsed.agentId() != null);
-            } else {
-                WindowDriver.markOpen(parsed.project());
-            }
-        } catch (RuntimeException failure) {
-            System.err.println(failure.getMessage());
-            releaseWarm(parsed.project());
-            return 1;
-        }
-        try {
-            WorkbenchUi.launch(parsed.project(), parsed.runId(), parsed.agentId());
-            return 0;
-        } finally {
-            releaseWarm(parsed.project());
-        }
+        System.out.println("The Node renderer is started by the pickleball launcher (pickleball ui " + parsed.project() + ").");
+        return 0;
     }
 
     static int isolate(String[] args, PrintStream out, PrintStream err, boolean interactiveStdin) {
@@ -810,6 +793,6 @@ public final class WorkbenchApplication {
         out.println("session is the headless long-lived CLI controller: sync, start the Discover-snapshot worker, and serve 127.0.0.1 HTTP plus the same session commands the window uses. State is .pickleball/v/<version>/workbench/cli-session.json when current.json is complete, unless --session-file names that run's own session file. --run-id and --agent-id are copied onto the worker as pkb_run_id and pkb_agent_id. Two headless sessions do not share one session file.");
         out.println("Consumer agents start session through PickleballWorkbenchLauncher isolate/session-start (detached) when testing for themselves. Do not open the GUI for your own testing. Open it with open-window --run-id to show a person a run you already have. That does not start a second test. Close it with close-window when you are done showing it. While testing for yourself, stay headless. When a window is already open, only one agent drives the live run. Other agents stay headless or attach read-only.");
         out.println("mcp serves the same Workbench services over protocol-only stdio; optional host wiring, not an agent setup step.");
-        out.println("ui opens the one Swing Workbench over the same controller services and writes a localhost agent-attach endpoint to .pickleball/workbench/attach.json (versioned under v/<version>/ when current.json is complete). Optional --run-id loads that run's record, logs, reports, and config. It does not start a test. The window calls the session commands; it does not keep a second copy of them or of the run data.");
+        out.println("ui does not open a window. pickleball ui starts the Node renderer in the pickleball JVM. This controller process does not spawn Node and does not launch Swing.");
     }
 }

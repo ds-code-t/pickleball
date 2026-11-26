@@ -9,7 +9,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Launches the thin Swing Workbench adapter for one consumer project. */
+/** Kept for tests that still construct Swing panels. `pickleball ui` does not call this class. */
 public final class WorkbenchUi {
     private WorkbenchUi() {
     }

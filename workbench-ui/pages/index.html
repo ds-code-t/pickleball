@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pickleball</title>
+<style>
+:root { --accent: #1f6feb; }
+body { margin: 0; font-family: "Segoe UI", sans-serif; color: #1a1a1a; }
+header { padding: 12px 16px; border-bottom: 4px solid var(--accent); display: flex; gap: 16px; align-items: center; }
+nav { display: flex; gap: 12px; padding: 8px 16px; background: #f4f6f8; }
+nav a { color: var(--accent); font-weight: 600; }
+main { padding: 16px; }
+label { display: block; margin: 8px 0; }
+textarea { width: 100%; min-height: 80px; }
+pre { white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<header>
+<h1 id="title">Pickleball</h1>
+<label>Branch <select id="branch"></select></label>
+</header>
+<nav>
+<a href="/scenarios">Scenarios</a>
+<a href="/globals">Globals</a>
+<a href="/data">Data</a>
+<a href="/sql">Raw SQL</a>
+</nav>
+<main>
+<section id="scenarios">
+<h2>Scenarios</h2>
+<label>Search <input id="search" type="text"></label>
+<pre id="scenario-body"></pre>
+</section>
+<section id="globals">
+<h2>Globals</h2>
+<pre id="globals-body"></pre>
+</section>
+<section id="data">
+<h2>Data</h2>
+<pre id="data-body"></pre>
+</section>
+<section id="sql">
+<h2>Raw SQL</h2>
+<label>Query <textarea id="query">SELECT 1</textarea></label>
+<button id="run-sql" type="button">Run</button>
+<pre id="sql-body"></pre>
+</section>
+</main>
+<script>
+const token = new URLSearchParams(location.search).get("t") || "";
+const accents = ["#1f6feb", "#0f7b4c", "#8a4b08", "#6e3cbc", "#9b2335", "#0b6e7a", "#3d4c6b", "#5c4a32"];
+document.querySelectorAll("a").forEach(function (link) {
+    const href = link.getAttribute("href");
+    if (href && location.search && href.indexOf("?") < 0) link.setAttribute("href", href + location.search);
+});
+async function callStore(args) {
+    const response = await fetch("/store" + location.search, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-pkb-ui-token": token },
+        body: JSON.stringify({ args: args })
+    });
+    return response.json();
+}
+function show(id) {
+    ["scenarios", "globals", "data", "sql"].forEach(function (name) {
+        document.getElementById(name).hidden = name !== id;
+    });
+}
+function pageId() {
+    const path = location.pathname;
+    if (path === "/globals") return "globals";
+    if (path === "/data") return "data";
+    if (path === "/sql") return "sql";
+    return "scenarios";
+}
+show(pageId());
+document.getElementById("search").addEventListener("change", async function () {
+    const text = document.getElementById("search").value;
+    const args = ["query", "--json"];
+    if (text) args.push("--text=" + text);
+    const result = await callStore(args);
+    document.getElementById("scenario-body").textContent = (result.out || "") + (result.err || "");
+});
+document.getElementById("run-sql").addEventListener("click", async function () {
+    const args = ["sql", "--query=" + document.getElementById("query").value, "--json"];
+    const text = document.getElementById("search").value;
+    if (text) args.push("--text=" + text);
+    const result = await callStore(args);
+    document.getElementById("sql-body").textContent = (result.out || "") + (result.err || "");
+});
+callStore(["sandbox", "list", "--json"]).then(function (result) {
+    const body = result.out || "";
+    document.getElementById("scenario-body").textContent = body;
+    let name = "main";
+    const match = body.match(/"name"\s*:\s*"([^"]+)"/);
+    if (match) name = match[1];
+    const select = document.getElementById("branch");
+    const option = document.createElement("option");
+    option.value = name;
+    option.textContent = name;
+    select.appendChild(option);
+    document.getElementById("title").textContent = name;
+    document.title = name;
+    let hash = 0;
+    for (let index = 0; index < name.length; index++) hash = (hash + name.charCodeAt(index)) % accents.length;
+    document.documentElement.style.setProperty("--accent", accents[hash]);
+});
+document.getElementById("branch").addEventListener("change", function () {
+    const name = document.getElementById("branch").value;
+    callStore(["sandbox", "use", name]);
+    document.getElementById("title").textContent = name;
+    document.title = name;
+});
+callStore(["scenarios", "list", "--json"]).then(function (result) {
+    if (result.out) document.getElementById("scenario-body").textContent = result.out;
+});
+callStore(["var", "list", "--json"]).then(function (result) {
+    document.getElementById("globals-body").textContent = (result.out || "") + (result.err || "");
+});
+callStore(["files", "list", "--json"]).then(function (result) {
+    document.getElementById("data-body").textContent = (result.out || "") + (result.err || "");
+});
+</script>
+</body>
+</html>

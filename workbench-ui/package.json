@@ -1,0 +1,7 @@
+{
+  "name": "pickleball-workbench-ui",
+  "private": true,
+  "version": "3.0.0",
+  "description": "Pickleball workbench renderer. The server uses node:http and node:fs. End users do not run npm.",
+  "type": "module"
+}

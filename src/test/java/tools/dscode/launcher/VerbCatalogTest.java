@@ -128,9 +128,15 @@ class VerbCatalogTest {
     }
 
     @Test
-    void privateRouteFails() {
+    void privateRouteFails() throws Exception {
+        assertFalse(VerbCatalog.routeAllowed("/secret-action"));
+        assertTrue(VerbCatalog.routeAllowed("/store"));
+        assertTrue(VerbCatalog.routeAllowed("/scenarios"));
+        assertTrue(VerbCatalog.routeAllowed("/"));
         Path ui = Path.of("workbench-ui");
-        assertFalse(Files.exists(ui), "workbench-ui is not part of this phase");
+        assertTrue(Files.isDirectory(ui), "workbench-ui");
+        List<String> forbidden = VerbCatalog.forbiddenRoutes(ui);
+        assertTrue(forbidden.isEmpty(), forbidden.toString());
     }
 
     private static Set<String> names(List<VerbCatalog.Row> rows) {

@@ -53,7 +53,8 @@ class WorkbenchWindowLifecycleTest {
             WorkbenchSessionActions actions = new WorkbenchSessionActions(controller);
             Map<String, Object> opened = actions.openUi("run-1", "agent-1");
             assertEquals("SUCCESS", opened.get("status"));
-            assertTrue(java.util.Set.of("HEADLESS", "OPENING").contains(String.valueOf(opened.get("playback"))));
+            assertEquals("NODE", opened.get("playback"));
+            assertEquals("pickleball ui", opened.get("renderer"));
         }
         assertFalse(WorkbenchWindowLifecycle.dedicatedProcess());
     }

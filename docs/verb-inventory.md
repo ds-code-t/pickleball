@@ -261,6 +261,7 @@ MCP-only count: 0
 | store sandbox | store | cli | tools.dscode.store.StoreCli.execute |
 | store scenario | store | cli | tools.dscode.store.StoreCli.execute |
 | store scenarios | store | cli | tools.dscode.store.StoreCli.execute |
+| store sql | store | cli | tools.dscode.store.StoreCli.execute |
 | store status | store | cli | tools.dscode.store.StoreCli.execute |
 | store step | store | cli | tools.dscode.store.StoreCli.execute |
 | store steps | store | cli | tools.dscode.store.StoreCli.execute |

@@ -9,14 +9,20 @@ import tools.dscode.common.agentfast.AgentEnvelope;
 import tools.dscode.engine.EngineCli;
 import tools.dscode.store.StoreCli;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Locale;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /**
  * One registry of CLI verbs. {@code engine inventory} prints it.
@@ -229,5 +235,61 @@ public final class VerbCatalog {
         if (WorkbenchCommandLine.isAgentCoreCommand(name)) return AGENT;
         if (WorkbenchCommandLine.isSessionClientCommand(name)) return SESSION;
         return DISPATCH;
+    }
+
+    /** Static renderer pages. Any other quoted path must be a catalog verb or an asset. */
+    public static final List<String> UI_PAGES = List.of("/", "/scenarios", "/globals", "/data", "/sql");
+
+    private static final Set<String> ASSET_EXTENSIONS = Set.of(
+            "css", "js", "mjs", "map", "svg", "png", "jpg", "jpeg", "gif", "webp",
+            "ttf", "woff", "woff2", "html", "json", "txt", "ico"
+    );
+    private static final Pattern QUOTED_ROUTE = Pattern.compile("([\"'`])(/[^\"'`\\s]*)\\1");
+
+    public static boolean routeAllowed(String path) {
+        if (path == null || path.isBlank()) return true;
+        String raw = path.trim();
+        int hash = raw.indexOf('#');
+        if (hash >= 0) raw = raw.substring(0, hash);
+        int query = raw.indexOf('?');
+        if (query >= 0) raw = raw.substring(0, query);
+        if (raw.length() > 1 && raw.endsWith("/")) raw = raw.substring(0, raw.length() - 1);
+        if (!raw.startsWith("/")) return true;
+        if (UI_PAGES.contains(raw)) return true;
+        String rest = raw.substring(1);
+        int slash = rest.indexOf('/');
+        String first = slash < 0 ? rest : rest.substring(0, slash);
+        int dot = first.lastIndexOf('.');
+        if (dot > 0 && ASSET_EXTENSIONS.contains(first.substring(dot + 1).toLowerCase(Locale.ROOT))) return true;
+        return verbNames().contains(first);
+    }
+
+    /** Quoted routes under {@code root} that are not a catalog verb, a static page, or an asset. */
+    public static List<String> forbiddenRoutes(Path root) throws IOException {
+        List<String> found = new ArrayList<>();
+        if (root == null || !Files.exists(root)) return found;
+        try (Stream<Path> walk = Files.walk(root)) {
+            for (Path file : walk.filter(Files::isRegularFile).toList()) {
+                String relative = root.relativize(file).toString().replace('\\', '/');
+                if (relative.startsWith("node_modules/") || relative.contains("/node_modules/")) continue;
+                String text = Files.readString(file);
+                Matcher matcher = QUOTED_ROUTE.matcher(text);
+                while (matcher.find()) {
+                    String path = matcher.group(2);
+                    if (!routeAllowed(path)) found.add(relative + " " + path);
+                }
+            }
+        }
+        return found;
+    }
+
+    private static Set<String> verbNames() {
+        Set<String> names = new TreeSet<>();
+        for (Row row : rows()) {
+            String name = row.name();
+            int space = name.indexOf(' ');
+            names.add(space < 0 ? name : name.substring(0, space));
+        }
+        return names;
     }
 }

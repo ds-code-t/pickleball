@@ -438,16 +438,9 @@ public final class WorkbenchSessionActions {
 
     public Map<String, Object> openUi(String runId, String agentId) {
         tools.dscode.workbench.ui.WorkbenchWindowLifecycle.armSharedController();
-        if (java.awt.GraphicsEnvironment.isHeadless()) {
-            return accepted("open-ui", "HEADLESS");
-        }
-        Thread thread = new Thread(
-                () -> tools.dscode.workbench.ui.WorkbenchUi.launch(services.projectRoot(), runId, agentId),
-                "pickleball-workbench-open-ui"
-        );
-        thread.setDaemon(true);
-        thread.start();
-        return accepted("open-ui", "OPENING");
+        LinkedHashMap<String, Object> payload = accepted("open-ui", "NODE");
+        payload.put("renderer", "pickleball ui");
+        return payload;
     }
 
     public Map<String, Object> showRun(String runId, String agentId, boolean claim) {

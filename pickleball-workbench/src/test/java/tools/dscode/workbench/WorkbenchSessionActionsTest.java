@@ -94,7 +94,8 @@ class WorkbenchSessionActionsTest {
             Map<String, Object> opened = actions.dispatch("open-ui", Map.of("runId", "alpha"));
             assertEquals("SUCCESS", opened.get("status"));
             assertEquals("open-ui", opened.get("op"));
-            assertTrue(java.util.Set.of("HEADLESS", "OPENING").contains(String.valueOf(opened.get("playback"))));
+            assertEquals("NODE", opened.get("playback"));
+            assertEquals("pickleball ui", opened.get("renderer"));
         }
     }
 
