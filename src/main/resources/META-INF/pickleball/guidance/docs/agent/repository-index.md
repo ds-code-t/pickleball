@@ -706,6 +706,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/store/StoreChanges.java`
 - `src/main/java/tools/dscode/store/StoreCli.java`
 - `src/main/java/tools/dscode/store/StoreConfig.java`
+- `src/main/java/tools/dscode/store/StoreConflictChoice.java`
 - `src/main/java/tools/dscode/store/StoreContent.java`
 - `src/main/java/tools/dscode/store/StoreDatabase.java`
 - `src/main/java/tools/dscode/store/StoreDiscovery.java`
@@ -1135,6 +1136,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/ScenarioObjectTest.java`
 - `src/test/java/tools/dscode/store/CategoryEditTest.java`
 - `src/test/java/tools/dscode/store/ChangesCliTest.java`
+- `src/test/java/tools/dscode/store/ConflictChoiceTest.java`
 - `src/test/java/tools/dscode/store/dashboard/DashboardTest.java`
 - `src/test/java/tools/dscode/store/DeltaWindowTest.java`
 - `src/test/java/tools/dscode/store/EmbeddedStoreOpenTest.java`

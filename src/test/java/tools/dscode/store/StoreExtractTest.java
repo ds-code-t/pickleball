@@ -99,6 +99,24 @@ class StoreExtractTest {
     }
 
     @Test
+    void extractWithoutChooseStillRefusesBothSides() throws Exception {
+        byte[] original = feature("finished");
+        byte[] fromFile = feature("finished from file");
+        byte[] both = feature("finished from both");
+        write(FEATURE_PATH, original);
+        StoreHydrator.hydrate(project, StoreHydrator.Options.full());
+        Files.write(project.resolve(FEATURE_PATH), fromFile);
+        edit(FEATURE_PATH, both);
+
+        Capture conflict = run("store", "extract", "--project=" + project);
+        assertEquals(1, conflict.code, conflict.out);
+        assertTrue(conflict.err.contains("conflict: " + FEATURE_PATH), conflict.err);
+        assertTrue(conflict.out.contains("conflicts=1"), conflict.out);
+        assertArrayEquals(fromFile, Files.readAllBytes(project.resolve(FEATURE_PATH)));
+        assertFalse(Files.isDirectory(project.resolve(".pickleball").resolve("store").resolve("discarded")));
+    }
+
+    @Test
     void extractPathLimitUsesForwardSlashes() throws Exception {
         write(FEATURE_PATH, feature("one"));
         write(OTHER_PATH, feature("two"));

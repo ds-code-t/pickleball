@@ -56,6 +56,11 @@ public final class StoreCli {
             return 1;
         }
         try {
+            StoreConflictChoice.sweep(project);
+        } catch (java.io.IOException ignored) {
+            // A discard sweep must not fail an unrelated store command.
+        }
+        try {
             return switch (command) {
                 case "help", "--help", "-h" -> {
                     stdout.print(help());
@@ -85,7 +90,7 @@ public final class StoreCli {
                 case "features" -> features(project, tokens, json(tokens), stdout, stderr);
                 case "scenario", "scenarios" -> scenarios(project, tokens, json(tokens), stdout, stderr);
                 case "step", "steps" -> steps(project, tokens, json(tokens), stdout, stderr);
-                case "conflicts" -> conflicts(project, json(tokens), stdout, stderr);
+                case "conflicts" -> conflictsCommand(project, tokens, stdout, stderr);
                 case "pin" -> pinCommand(project, tokens, stdout, stderr);
                 case "delta" -> deltaCommand(project, tokens, stdout, stderr);
                 case "head" -> headCommand(project, tokens, stdout, stderr);
@@ -189,6 +194,8 @@ public final class StoreCli {
                 Usage: store scenarios list [--feature=<relative-path>] [--project=<dir>] [--json]
                 Usage: store steps list [--feature=<relative-path>] [--scenario=<ord-or-name>] [--project=<dir>] [--json]
                 Usage: store conflicts [--project=<dir>] [--json]
+                Usage: store conflicts show <relative-path> [--json] [--project=<dir>]
+                Usage: store conflicts choose <relative-path> --keep=db|file [--json] [--project=<dir>]
                 Usage: store query [--entity=Type#id] [--field=<name>] [--step-def=<definition-id>] [--scenario=<key>] [--status=<status>] [--from=<iso>] [--to=<iso>] [--tag=<tag>] [--feature=<path>] [--run=<run-id>] [--text=<log text>] [--limit=N] [--offset=N] [--json] [--project=<dir>]
                 Usage: store timeline [--from=<iso>] [--to=<iso>] [--entity=Type#id] [--tag=<tag>] [--feature=<path>] [--run=<run-id>] [--text=<log text>] [--cursor=<cursor>] [--before=<cursor>] [--latest] [--limit=N] [--offset=N] [--json] [--project=<dir>]
                 Usage: store retain [--days=N] [--max-bytes=N] [--project=<dir>]
@@ -214,7 +221,7 @@ public final class StoreCli {
                 feature put writes that .feature text into the database. It sets db_edited, leaves last_synced_hash, and replaces the stored scenarios, steps, tags, docstrings, and data tables in the same transaction. Bad Gherkin is rejected and the previous rows stay. The file is not changed until store extract. Use --file for multiline text. store scenario put and store step put are rejected. A database row whose content hash moved while db_edited is still 0 is an untracked DB edit. hydrate reports it and will not overwrite it unless --force is set.
                 category, file, glue, and feature scenario-add, scenario-modify, scenario-delete, step-add, step-modify, and step-delete are the shared edit model. --json prints one object with ok, command, family, action, store, path, id, dbEdited, conflict, confirmRequired, applied, items, text, message, error, and fix. remove and delete require --confirm and do not write without it. Validation runs before a write. A conflict or an untracked DB edit on that path is refused unless --force is set. When Store is off the command writes the file and does not open the database. When Store is on, put uses the same db_edited write as feature put. Set pkb_store_log=edit to log each edit. The log is date-stamped, per entity, and size-capped.
                 entity put uses that same write, so the entity file row and the entity table stay together.
-                files, features, scenarios, steps, and conflicts are read-only. They do not create a database. --json prints one stable JSON object. Text mode prints labels. conflicts lists an untracked database edit and a row edited on both sides.
+                files, features, scenarios, and steps are read-only. They do not create a database. --json prints one stable JSON object. Text mode prints labels. store conflicts lists an untracked database edit and a row edited on both sides. store conflicts show prints the file text and the database text. A secret field is printed as its stored reference. store conflicts choose --keep=db writes the database bytes to the file and sets last_synced_hash. --keep=file replaces the database row from the file and clears db_edited. The discarded text goes under .pickleball/store/discarded/. A file older than 24 hours, or one whose start marker names another JVM, is deleted on the next store command. There is no merge. Set pkb_store_log=conflict to log the path, the choice, and the discarded file name.
                 Discovery reads include, exclude, max-file-size (default 1048576), binary-policy (include or skip, default include), and large-file-bytes (default 262144, 0 means every binary) from store.properties. System properties pkb_store_include, pkb_store_exclude, pkb_store_max_file_size, pkb_store_binary_policy, and pkb_store_large_file_bytes win over that file. hash-only is not a policy. An empty include keeps the fixed directories. Exclude is added to the defaults, which already skip .git, target, build, .pickleball, and common binary extensions. include tracks those binaries. A file over the size limit is ignored unless it is a large binary reference. A binary is an extension on that list, a null byte, or a high control-byte ratio. A large binary whose bytes equal the Git blob at HEAD is a reference: empty raw content, location, sha256, git blob, git commit, and byte size. Any other tracked binary is stored. Reading a reference checks the file hash and then git cat-file blob. If both fail the error names the path, hash, and commit and prints a fix: line. A write that changes a referenced file copies the bytes into that branch (binary_ref=0, location=db). Extract leaves an unchanged reference and reports binary_ref_changed when the file on disk no longer matches. store status prints refs= and owned-large= and does not create a database. Hydrate prints ignored= for skipped files. --path still applies the limits. --path --force is the only bypass. Set pkb_store_log=discover,git,refs to log each reason.
                 store run executes from the database on a warm JVM. It sets pkb_store=true and uses the pickleball-test-engine, the same engine as a normal run. --tags, --name, and --glue become pkb_tags, pkb_name, and pkb_glue. It prints one line per scenario (`scenario PASSED|FAILED <name>`) and one line per step (`step PASSED|FAILED <text>`). Each run gets its own id, the same shape as a diagnostic run id, unless the caller already set pkb_run_id or a diagnostic run is already active. An in-process PickleballEngine.run mints its own id the same way and clears a self-minted id when that call returns. Java glue is fingerprinted by path, size, and modification time. A change compiles once with mvnw test-compile or gradlew testClasses, then restarts the worker. The classpath is pkb_store_run_classpath or the Workbench classpath.cache. --dry-run prints the plan and writes nothing. Full Gradle or Maven remains the CI build. Set pkb_store_log=run to log the worker. --engine forwards the same selection to the native engine CLI and does not start the Cucumber runner.
                 """;
@@ -1047,6 +1054,62 @@ public final class StoreCli {
         } else {
             stdout.println("var enable " + name + " " + (on ? "on" : "off"));
         }
+        return 0;
+    }
+
+    private static int conflictsCommand(Path project, List<String> tokens, PrintStream out, PrintStream err) {
+        String action = tokens.size() > 1 && !tokens.get(1).startsWith("--") ? tokens.get(1) : "";
+        try {
+            if ("show".equals(action)) return conflictShow(project, tokens, out, err);
+            if ("choose".equals(action)) return conflictChoose(project, tokens, out, err);
+            return conflicts(project, json(tokens), out, err);
+        } catch (StoreConflictChoice.Usage failure) {
+            err.println("error: " + failure.getMessage());
+            err.println("fix: " + failure.fix());
+            return 2;
+        } catch (StoreConflictChoice.Refusal failure) {
+            err.println("error: " + failure.getMessage());
+            err.println("fix: " + failure.fix());
+            return 1;
+        } catch (IllegalArgumentException failure) {
+            err.println("error: " + failure.getMessage());
+            err.println("fix: store conflicts show <relative-path>");
+            return 2;
+        } catch (Exception failure) {
+            err.println("error: " + failure.getMessage());
+            err.println("fix: store conflicts");
+            return 1;
+        }
+    }
+
+    private static int conflictShow(Path project, List<String> tokens, PrintStream out, PrintStream err)
+            throws Exception {
+        if (tokens.size() < 3 || tokens.get(2).startsWith("--")) {
+            err.println("error: store conflicts show needs a relative path");
+            err.println("fix: store conflicts show <relative-path>");
+            return 2;
+        }
+        StoreConflictChoice.View view = StoreConflictChoice.show(project, tokens.get(2));
+        out.println(json(tokens) ? StoreConflictChoice.showJson(view) : StoreConflictChoice.showText(view));
+        return 0;
+    }
+
+    private static int conflictChoose(Path project, List<String> tokens, PrintStream out, PrintStream err)
+            throws Exception {
+        if (tokens.size() < 3 || tokens.get(2).startsWith("--")) {
+            err.println("error: store conflicts choose needs a relative path");
+            err.println("fix: store conflicts choose <relative-path> --keep=db|file");
+            return 2;
+        }
+        String keep = option(tokens, "--keep=");
+        if (keep == null || keep.isBlank()) {
+            err.println("error: store conflicts choose needs --keep=db|file");
+            err.println("fix: store conflicts choose <relative-path> --keep=db|file");
+            return 2;
+        }
+        StoreConflictChoice.View view = StoreConflictChoice.choose(project, tokens.get(2), keep);
+        if (json(tokens)) out.println(StoreConflictChoice.chooseJson(view, keep));
+        else out.print(StoreConflictChoice.chooseText(view, keep));
         return 0;
     }
 

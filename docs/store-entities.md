@@ -98,3 +98,14 @@ store var enable <name> --on|--off
 `store enable` off on a feature, scenario, or folder writes `@pkb-ignore` on that scenario or on the Feature line. On removes only that tag. The write goes through the feature edit. A both-sides edit is refused. Gherkin that does not parse rolls back. A step id is `<feature>#<scenarioOrd>#<stepOrd>` and flips `steps.enabled`. A definition id flips `step_definitions.enabled`. `store query --tag` still matches `scenarios.tags` and also matches `scenario_tags`.
 
 `store var set` on main writes the properties file and the `run_variables` row. A sandbox set updates that database only. A cleartext secret is rejected with `error:` and `fix:`. `pkb_store_log=enable` logs the entity id and the toggle. It does not log variable values. Java source the editor can change stays a stored row. Workbench, Gradle, and MCP only forward these commands.
+
+## Conflict choice
+
+`store conflicts` lists an untracked database edit and a row that changed on both sides. Extract still refuses that row unless `--force` is set.
+
+```
+store conflicts show <relative-path>
+store conflicts choose <relative-path> --keep=db|file
+```
+
+`store conflicts show` prints the file text and the database text. A secret field is shown as the stored reference (`<password:name>`, `<entity:Type#id.field>`, or `~MASK;`). `store conflicts choose --keep=db` writes the database bytes to the file and sets `last_synced_hash` to that hash. `--keep=file` replaces the database row from the file and clears `db_edited`. The side that was not kept is written to `.pickleball/store/discarded/<utc-timestamp>-<path>`, with `/` and `\` turned into `_`. The start id for this JVM is `.pickleball/store/discarded/session`, and each discarded file has a sibling marker of the same name plus `.start`. The next store command deletes a discarded file older than 24 hours and any discarded file whose marker names a different JVM. There is no merge. `store sandbox merge` is unchanged. `pkb_store_log=conflict` logs the path, the choice, and the discarded file name. It does not log the body. Workbench, Gradle, and MCP only forward these commands.
