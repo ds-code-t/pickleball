@@ -85,6 +85,60 @@ function safePart(value) {
     return /^[A-Za-z0-9._-]+$/.test(value);
 }
 
+function sessionAuthorized(presented) {
+    if (!project || !presented) return false;
+    const dir = path.join(project, ".pickleball", "workbench-ui", "sessions");
+    let names;
+    try {
+        names = fs.readdirSync(dir);
+    } catch (failure) {
+        return false;
+    }
+    for (const name of names) {
+        if (!name.endsWith(".json")) continue;
+        try {
+            const node = JSON.parse(fs.readFileSync(path.join(dir, name), "utf8"));
+            if (node && same(String(node.token || ""), presented)) return true;
+        } catch (failure) {
+            // A bad session file is not a token.
+        }
+    }
+    return false;
+}
+
+function storeAuthorized(req, url) {
+    const query = url.searchParams.get("t") || "";
+    const header = String(req.headers["x-pkb-ui-token"] || "");
+    if (query && same(query, token)) return true;
+    if (header && same(header, token)) return true;
+    if (query && sessionAuthorized(query)) return true;
+    if (header && sessionAuthorized(header)) return true;
+    return false;
+}
+
+function serveStore(req, res, url) {
+    if (!storeAuthorized(req, url)) {
+        send(res, 401, "unauthorized\n");
+        return;
+    }
+    const chunks = [];
+    req.on("data", (chunk) => chunks.push(chunk));
+    req.on("end", async () => {
+        let args = [];
+        let verb = "store";
+        try {
+            const body = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
+            if (Array.isArray(body.args)) args = body.args.map((item) => String(item));
+            if (body && typeof body.verb === "string" && body.verb.trim()) verb = body.verb.trim();
+        } catch (failure) {
+            send(res, 400, JSON.stringify({ code: 2, out: "", err: "error: ui body is not json\nfix: send args\n" }));
+            return;
+        }
+        const result = await forward(verb, args, token);
+        send(res, 200, result, "application/json; charset=utf-8");
+    });
+}
+
 function serveGenerated(req, res, url, name) {
     const prefix = "/ui/";
     if (req.method !== "GET" || !name.startsWith(prefix)) return false;
@@ -134,6 +188,10 @@ const server = http.createServer((req, res) => {
     }
     const name = url.pathname;
     if (serveGenerated(req, res, url, name)) return;
+    if (req.method === "POST" && name === "/store") {
+        serveStore(req, res, url);
+        return;
+    }
     if (!presentedToken(req, url)) {
         send(res, 401, "unauthorized\n");
         return;
@@ -166,25 +224,6 @@ const server = http.createServer((req, res) => {
             "cache-control": "no-store"
         });
         res.end(bytes);
-        return;
-    }
-    if (req.method === "POST" && name === "/store") {
-        const chunks = [];
-        req.on("data", (chunk) => chunks.push(chunk));
-        req.on("end", async () => {
-            let args = [];
-            let verb = "store";
-            try {
-                const body = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
-                if (Array.isArray(body.args)) args = body.args.map((item) => String(item));
-                if (body && typeof body.verb === "string" && body.verb.trim()) verb = body.verb.trim();
-            } catch (failure) {
-                send(res, 400, JSON.stringify({ code: 2, out: "", err: "error: ui body is not json\nfix: send args\n" }));
-                return;
-            }
-            const result = await forward(verb, args, token);
-            send(res, 200, result, "application/json; charset=utf-8");
-        });
         return;
     }
     send(res, 404, "not found\n");

@@ -244,6 +244,20 @@ final class WorkbenchCommandLine {
             String token = args[index];
             if (token == null) continue;
             noteFlag(seenFlags, token);
+            if (token.startsWith("--project=") || "--project".equals(token)) {
+                String value = token.startsWith("--project=")
+                        ? token.substring("--project=".length())
+                        : (index + 1 < args.length ? args[++index] : null);
+                if (value != null && !value.isBlank()) {
+                    try {
+                        project = Path.of(value).toAbsolutePath().normalize();
+                    } catch (java.nio.file.InvalidPathException ignored) {
+                        // An illegal path does not set the project.
+                    }
+                }
+                seenFlags.remove("--project");
+                continue;
+            }
             if (tagsSplitOpen && isFlag(token) && !isTagsValueFlag(token)) {
                 tagsSplitOpen = false;
                 rejectSplitTags(tags, splitTags);

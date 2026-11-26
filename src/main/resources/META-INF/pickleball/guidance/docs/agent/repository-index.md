@@ -1125,6 +1125,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/FrameInReplyTest.java`
 - `src/test/java/tools/dscode/launcher/FrameRestoreTest.java`
 - `src/test/java/tools/dscode/launcher/GcRunsDryRunTest.java`
+- `src/test/java/tools/dscode/launcher/GeneratedPageAccessTest.java`
 - `src/test/java/tools/dscode/launcher/GuidanceCommandGoldenTest.java`
 - `src/test/java/tools/dscode/launcher/HeadedFlagTest.java`
 - `src/test/java/tools/dscode/launcher/HousekeepingRoadmapTest.java`

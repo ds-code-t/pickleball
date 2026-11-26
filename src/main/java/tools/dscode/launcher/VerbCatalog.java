@@ -252,6 +252,18 @@ public final class VerbCatalog {
             "ttf", "woff", "woff2", "html", "json", "txt", "ico"
     );
     private static final Pattern QUOTED_ROUTE = Pattern.compile("([\"'`])(/[^\"'`\\s]*)\\1");
+    private static final Pattern SCHEME_URL = Pattern.compile("(?i)(?:https?|wss?|ftp|file|javascript):\\S*");
+    private static final String[] URL_SINKS = {
+            "fetch(",
+            "sendbeacon(",
+            "import(",
+            "websocket(",
+            "window.open(",
+            "location.assign(",
+            "location.replace(",
+            "location.href",
+            "location="
+    };
 
     public static boolean routeAllowed(String path) {
         if (path == null || path.isBlank()) return true;
@@ -261,6 +273,7 @@ public final class VerbCatalog {
         int query = raw.indexOf('?');
         if (query >= 0) raw = raw.substring(0, query);
         if (raw.length() > 1 && raw.endsWith("/")) raw = raw.substring(0, raw.length() - 1);
+        if (external(raw)) return false;
         if (!raw.startsWith("/")) return true;
         if (UI_PAGES.contains(raw)) return true;
         if ("/node_modules".equals(raw) || raw.startsWith("/node_modules/")) return true;
@@ -273,7 +286,11 @@ public final class VerbCatalog {
         return verbNames().contains(first);
     }
 
-    /** Quoted routes in one HTML page that are not a catalog verb, a static page, or an asset. */
+    /**
+     * Routes in one HTML page that are not a catalog verb, a static page, or an asset.
+     * An absolute or external URL is refused, and so is a computed URL whose target is
+     * not a proven catalog path.
+     */
     public static List<String> outsideCatalog(String html) {
         List<String> found = new ArrayList<>();
         if (html == null || html.isBlank()) return found;
@@ -282,7 +299,75 @@ public final class VerbCatalog {
             String path = matcher.group(2);
             if (!routeAllowed(path)) found.add(path);
         }
+        Matcher schemes = SCHEME_URL.matcher(html);
+        while (schemes.find()) found.add(schemes.group());
+        sinks(html, found);
         return found;
+    }
+
+    private static boolean external(String raw) {
+        if (raw == null) return false;
+        String text = raw.trim();
+        if (text.startsWith("//")) return true;
+        String lower = text.toLowerCase(Locale.ROOT);
+        return lower.startsWith("http:")
+                || lower.startsWith("https:")
+                || lower.startsWith("ws:")
+                || lower.startsWith("wss:")
+                || lower.startsWith("ftp:")
+                || lower.startsWith("file:")
+                || lower.startsWith("javascript:");
+    }
+
+    private static void sinks(String html, List<String> found) {
+        String lower = html.toLowerCase(Locale.ROOT);
+        for (String sink : URL_SINKS) {
+            int from = 0;
+            while (from < lower.length()) {
+                int at = lower.indexOf(sink, from);
+                if (at < 0) break;
+                if (at > 0 && Character.isLetterOrDigit(lower.charAt(at - 1))) {
+                    from = at + sink.length();
+                    continue;
+                }
+                int valueAt = at + sink.length();
+                if ("location.href".equals(sink)) {
+                    while (valueAt < html.length() && Character.isWhitespace(html.charAt(valueAt))) valueAt++;
+                    if (valueAt >= html.length() || html.charAt(valueAt) != '=') {
+                        from = at + sink.length();
+                        continue;
+                    }
+                    valueAt++;
+                }
+                if (!provenTarget(html.substring(valueAt))) {
+                    String sample = html.substring(valueAt).stripLeading();
+                    int cut = Math.min(sample.length(), 80);
+                    int newline = sample.indexOf('\n');
+                    if (newline >= 0 && newline < cut) cut = newline;
+                    found.add(sample.substring(0, cut).trim());
+                }
+                from = at + sink.length();
+            }
+        }
+    }
+
+    /** A quoted catalog path, optionally plus {@code location.search}. */
+    private static boolean provenTarget(String value) {
+        String body = value == null ? "" : value.trim();
+        if (body.isEmpty()) return false;
+        char quote = body.charAt(0);
+        if (quote != '"' && quote != '\'' && quote != '`') return false;
+        int end = body.indexOf(quote, 1);
+        if (end < 0) return false;
+        String inner = body.substring(1, end);
+        if (quote == '`' && inner.contains("${")) return false;
+        if (!routeAllowed(inner)) return false;
+        String rest = body.substring(end + 1).trim();
+        if (!rest.startsWith("+")) return true;
+        String expr = rest.substring(1).trim();
+        return expr.equals("location.search")
+                || expr.startsWith("location.search,")
+                || expr.startsWith("location.search)");
     }
 
     /** Quoted routes under {@code root} that are not a catalog verb, a static page, or an asset. */
