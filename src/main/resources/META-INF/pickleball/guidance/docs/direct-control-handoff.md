@@ -113,6 +113,8 @@ try (Client client = new Client();
 
 HTTP is `POST /v1/session/attach` with `"cdp"`, `"id"`, and `"i_accept_local_attach": true`. MCP and the other bindings only forward those arguments.
 
+Workbench MCP's hot path is the same authenticated loopback protocol. It posts `{verb, flags, project}` to `POST /v1/verb`. The worker calls `VerbDispatch.run`. `pkb_mcp_transport=cli` keeps the process forwarder for a verb that disagrees. Default is `direct`. A direct call with no live bridge returns `error: direct MCP needs a live worker` and does not start a shell. Six verbs stay on that call until the stream ends or `--once` is set: `browser-events --follow`, `observe --follow`, `log tail --follow`, `domengine session log --follow`, `chat --follow`, and `record --follow`.
+
 Drive the page with the engine CLI, MCP (`domengine serve --stdio`, or `composite serve --stdio` on an explicit binary), or HTTP `/v1`. That is in addition to Gherkin and the Workbench session commands, not a replacement.
 
 ## Detach

@@ -11,6 +11,8 @@ import java.util.Arrays;
  * Toggleable, per-capability, per-entity, date-stamped, size-capped engine log.
  * Off unless {@code pkb_engine_log} (or {@code PKB_ENGINE_LOG}) names
  * {@code true}, {@code all}, or a comma-separated capability list.
+ * {@code dispatch} records a verb run. The line is the verb name and {@code file=yes|no}.
+ * Flag values are not written.
  * {@code pkb_engine_log_entity} limits lines to those entities when set.
  * The file is {@code .pickleball/engine/engine.log}.
  */

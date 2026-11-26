@@ -80,6 +80,8 @@ public final class ControlBridgeRequests {
             String agentId,
             List<String> extraArgs
     ) { }
+    /** MCP and other callers ask the worker to run one CLI verb. {@code flags} is a {@link VerbArgs} map. */
+    public record VerbRunRequest(String verb, Map<String, String> flags, String project) { }
     public record BreakpointAddRequest(
             String scenarioId,
             String hook,

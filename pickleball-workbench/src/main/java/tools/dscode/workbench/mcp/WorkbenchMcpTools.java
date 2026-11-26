@@ -5,6 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.modelcontextprotocol.server.McpServerFeatures;
 import io.modelcontextprotocol.spec.McpSchema;
 import tools.dscode.control.protocol.AgentLog;
+import tools.dscode.control.protocol.LiveSessionAttach;
+import tools.dscode.control.protocol.McpTransport;
+import tools.dscode.control.protocol.VerbArgs;
 import tools.dscode.control.protocol.VerbTiers;
 import tools.dscode.control.protocol.OutputFormatter;
 import tools.dscode.control.protocol.SecretRedactor;
@@ -26,6 +29,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 
 /** MCP tool definitions that adapt the shared Workbench controller surface. */
@@ -1065,6 +1069,14 @@ final class WorkbenchMcpTools {
     }
 
     private Object forwardReady(List<String> verbArgs) {
+        if (McpTransport.direct()) {
+            if (verbArgs == null || verbArgs.isEmpty() || verbArgs.get(0) == null || verbArgs.get(0).isBlank()) {
+                throw new IllegalArgumentException("error: missing verb\nfix: pass the CLI verb as the first argument.");
+            }
+            String verb = verbArgs.get(0);
+            List<String> rest = verbArgs.subList(1, verbArgs.size());
+            return directVerb(verb, new ArrayList<>(rest));
+        }
         ConsumerReadyForwarder.Result result = ConsumerReadyForwarder.forward(services.projectRoot(), verbArgs);
         Map<String, Object> body = new LinkedHashMap<>();
         String out = result.out() == null ? "" : result.out().strip();
@@ -1437,6 +1449,7 @@ final class WorkbenchMcpTools {
         if (args.isEmpty()) {
             throw new IllegalArgumentException("error: store requires args.\nfix: Pass {\"args\":[\"status\"]}.");
         }
+        if (McpTransport.direct()) return directVerb("store", args);
         StoreCliForwarder.Result result = StoreCliForwarder.run(services.projectRoot(), args);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("exit", result.exit());
@@ -1458,6 +1471,7 @@ final class WorkbenchMcpTools {
         if (args.isEmpty()) {
             throw new IllegalArgumentException("error: domengine requires args.\nfix: Pass {\"args\":[\"version\"]}.");
         }
+        if (McpTransport.direct()) return directVerb("domengine", args);
         DomEngineCliForwarder.Result result =
                 DomEngineCliForwarder.run(services.projectRoot(), args);
         Map<String, Object> body = new LinkedHashMap<>();
@@ -1480,12 +1494,45 @@ final class WorkbenchMcpTools {
         if (args.isEmpty()) {
             throw new IllegalArgumentException("error: engine requires args.\nfix: Pass {\"args\":[\"help\"]}.");
         }
+        if (McpTransport.direct()) return directVerb("engine", args);
         EngineCliForwarder.Result result = EngineCliForwarder.run(services.projectRoot(), args);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("exit", result.exit());
         body.put("out", result.out());
         body.put("err", result.err());
         body.put("forwarded", args);
+        return body;
+    }
+
+    /**
+     * Hot path. Posts the verb and flag map. A missing bridge does not shell out.
+     * {@code forwarded} stays the token list the tool received.
+     */
+    private Object directVerb(String verb, List<String> args) {
+        Map<String, String> flags = new LinkedHashMap<>(VerbArgs.fromTokens(args));
+        Path project = services.projectRoot();
+        if (project != null) flags.put("project", project.toAbsolutePath().normalize().toString());
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("forwarded", args);
+        body.put("transport", McpTransport.DIRECT);
+        Optional<LiveSessionAttach.Attached> live = project == null
+                ? Optional.empty()
+                : LiveSessionAttach.current(project);
+        if (live.isEmpty()) {
+            body.put("exit", 1);
+            body.put("out", "");
+            body.put("err", "error: direct MCP needs a live worker\nfix: start a session, or set pkb_mcp_transport=cli\n");
+            body.put("ok", false);
+            return body;
+        }
+        LiveSessionAttach.VerbReply reply = LiveSessionAttach.postVerb(
+                live.get().bridge(), verb, flags, project
+        );
+        body.put("exit", reply.exit());
+        body.put("out", reply.out() == null ? "" : reply.out());
+        if (reply.err() != null && !reply.err().isBlank()) body.put("err", reply.err());
+        body.put("transport", reply.transport() == null ? McpTransport.DIRECT : reply.transport());
+        body.put("ok", reply.exit() == 0);
         return body;
     }
 

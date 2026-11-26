@@ -148,6 +148,68 @@ public final class LiveSessionAttach {
         };
     }
 
+    /**
+     * Post one verb to {@code /v1/verb}. A follow without {@code once} stays open, so the
+     * client timeout is six hours. Every other verb uses 60 seconds. The six stream verbs
+     * are {@code browser-events}, {@code observe}, {@code log} tail, {@code domengine session log},
+     * {@code chat}, and {@code record}, each with {@code --follow}.
+     */
+    public static VerbReply postVerb(
+            LiveBridgeFile.Bridge bridge,
+            String verb,
+            Map<String, String> flags,
+            Path project
+    ) {
+        String host = bridge.host() == null || bridge.host().isBlank() ? "127.0.0.1" : bridge.host();
+        URI uri = URI.create("http://" + host + ":" + bridge.port() + "/v1/verb");
+        boolean follow = truthy(flags == null ? null : flags.get("follow"))
+                && !truthy(flags == null ? null : flags.get("once"));
+        Duration timeout = follow ? Duration.ofHours(6) : Duration.ofSeconds(60);
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("verb", verb == null ? "" : verb);
+        payload.put("flags", flags == null ? Map.of() : flags);
+        payload.put("project", project == null ? "" : project.toAbsolutePath().normalize().toString());
+        try {
+            byte[] bytes = JsonLite.write(payload).getBytes(StandardCharsets.UTF_8);
+            HttpRequest request = HttpRequest.newBuilder(uri)
+                    .timeout(timeout)
+                    .header("Authorization", "Bearer " + bridge.token())
+                    .header("Accept", "application/json")
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofByteArray(bytes))
+                    .build();
+            HttpResponse<byte[]> response = HTTP.send(request, HttpResponse.BodyHandlers.ofByteArray());
+            String text = new String(response.body(), StandardCharsets.UTF_8);
+            if (response.statusCode() != 200) {
+                return new VerbReply(1, "", "error: live worker HTTP " + response.statusCode(), McpTransport.DIRECT);
+            }
+            Object parsed = JsonLite.parse(text.isBlank() ? "{}" : text);
+            Map<String, Object> node = JsonLite.object(parsed);
+            if (node == null) return new VerbReply(1, "", "error: live worker returned a non-object", McpTransport.DIRECT);
+            int exit = 1;
+            Object exitValue = node.get("exit");
+            if (exitValue instanceof Number number) exit = number.intValue();
+            String out = node.get("out") == null ? "" : String.valueOf(node.get("out"));
+            String err = node.get("err") == null ? "" : String.valueOf(node.get("err"));
+            String transport = node.get("transport") == null ? McpTransport.DIRECT : String.valueOf(node.get("transport"));
+            return new VerbReply(exit, out, err, transport);
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            return new VerbReply(1, "", "error: live worker interrupted", McpTransport.DIRECT);
+        } catch (Exception failure) {
+            String message = failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
+            return new VerbReply(1, "", "error: live worker unreachable: " + message, McpTransport.DIRECT);
+        }
+    }
+
+    private static boolean truthy(String value) {
+        return value != null && ("true".equalsIgnoreCase(value) || "1".equals(value) || "yes".equalsIgnoreCase(value));
+    }
+
+    /** Stdout and stderr from {@code /v1/verb}. {@code transport} is {@code direct} on this path. */
+    public record VerbReply(int exit, String out, String err, String transport) {
+    }
+
     public static Posted post(
             LiveBridgeFile.Bridge bridge,
             String op,

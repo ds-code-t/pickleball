@@ -6,6 +6,7 @@ import tools.dscode.control.protocol.PickleballArtifactLocator;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.PickleballLocalStore;
 import tools.dscode.control.protocol.PickleballVersion;
+import tools.dscode.control.protocol.VerbArgs;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -94,7 +95,7 @@ public final class PickleballWorkbenchLauncher {
      */
     static int dispatchEngineIfAny(String[] args, PrintStream out, PrintStream err) {
         if (!tools.dscode.engine.EngineCli.handles(args)) return -1;
-        return tools.dscode.engine.EngineCli.execute(args, out, err);
+        return VerbDispatch.run("engine", VerbArgs.capture(args), out, err);
     }
 
     /** Test hook. Production resolves {@code DomEngineMain.dispatch} on the first domengine call, not in {@code <clinit>}. */
@@ -129,11 +130,18 @@ public final class PickleballWorkbenchLauncher {
      */
     static int dispatchDomEngineIfAny(String[] args, PrintStream out, PrintStream err) {
         if (args == null || args.length == 0 || args[0] == null || !"domengine".equals(args[0].trim())) return -1;
+        return VerbDispatch.run("domengine", VerbArgs.capture(args), out, err);
+    }
+
+    /** In-process domengine body. {@link VerbDispatch} calls this. It does not call {@link VerbDispatch}. */
+    static int runDomEngine(String[] args, PrintStream out, PrintStream err) {
         PrintStream stdout = out == null ? System.out : out;
         PrintStream stderr = err == null ? System.err : err;
         java.util.List<String> rest = new java.util.ArrayList<>();
-        for (int index = 1; index < args.length; index++) {
-            if (args[index] != null) rest.add(args[index]);
+        if (args != null) {
+            for (int index = 1; index < args.length; index++) {
+                if (args[index] != null) rest.add(args[index]);
+            }
         }
         dev.domengine.cli.CliResult result;
         try {
@@ -153,7 +161,8 @@ public final class PickleballWorkbenchLauncher {
      */
     static int dispatchLogIfAny(String[] args, PrintStream out, PrintStream err) {
         if (!tools.dscode.common.composite.DomLogCli.handles(args)) return -1;
-        return tools.dscode.common.composite.DomLogCli.execute(args, out, err);
+        String verb = args[0] == null ? "log" : args[0].trim();
+        return VerbDispatch.run(verb, VerbArgs.capture(args), out, err);
     }
 
     /**
@@ -162,7 +171,7 @@ public final class PickleballWorkbenchLauncher {
      */
     static int dispatchDashboardIfAny(String[] args, PrintStream out, PrintStream err) {
         if (!tools.dscode.store.dashboard.DashboardCli.handles(args)) return -1;
-        return tools.dscode.store.dashboard.DashboardCli.execute(args, out, err);
+        return VerbDispatch.run("dashboard", VerbArgs.capture(args), out, err);
     }
 
     /**
@@ -172,7 +181,7 @@ public final class PickleballWorkbenchLauncher {
      */
     static int dispatchStoreIfAny(String[] args, PrintStream out, PrintStream err) {
         if (!tools.dscode.store.StoreCli.handles(args)) return -1;
-        return tools.dscode.store.StoreCli.execute(args, out, err);
+        return VerbDispatch.run("store", VerbArgs.capture(args), out, err);
     }
 
     /**
@@ -238,12 +247,12 @@ public final class PickleballWorkbenchLauncher {
         }
 
         if (WorkbenchCommandLine.isAgentCoreCommand(parsed.command()) && !controllerUiWithoutOps(parsed.command(), args)) {
-            int exitCode = WorkbenchAgentCommands.run(args, System.out, System.err);
+            int exitCode = VerbDispatch.run(parsed.command(), VerbArgs.capture(args), System.out, System.err);
             if (exitCode != 0) exitProcess(exitCode);
             return;
         }
         if (WorkbenchCommandLine.isSessionClientCommand(parsed.command())) {
-            int exitCode = WorkbenchSessionCommands.run(args, System.out, System.err);
+            int exitCode = VerbDispatch.run(parsed.command(), VerbArgs.capture(args), System.out, System.err);
             if (exitCode != 0) exitProcess(exitCode);
             return;
         }

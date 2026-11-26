@@ -20,7 +20,9 @@ import tools.dscode.control.protocol.SelectorWatchdog;
 import static tools.dscode.control.protocol.ControlBridgeRequests.*;
 import static tools.dscode.control.protocol.ControlBridgeResponses.*;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.InetSocketAddress;
@@ -241,6 +243,27 @@ final class ControlBridgeRuntime implements AutoCloseable {
                             request.agentId()
                     );
             return new AgentCommandResult(result.exit(), result.body());
+        }));
+        server.createContext("/v1/verb", exchange -> handle(exchange, "POST", () -> {
+            VerbRunRequest request = readRequired(exchange, VerbRunRequest.class);
+            Map<String, String> flags = new java.util.LinkedHashMap<>();
+            if (request.flags() != null) flags.putAll(request.flags());
+            if (request.project() != null && !request.project().isBlank() && !flags.containsKey("project")) {
+                flags.put("project", request.project());
+            }
+            ByteArrayOutputStream outBytes = new ByteArrayOutputStream();
+            ByteArrayOutputStream errBytes = new ByteArrayOutputStream();
+            PrintStream verbOut = new PrintStream(outBytes, true, StandardCharsets.UTF_8);
+            PrintStream verbErr = new PrintStream(errBytes, true, StandardCharsets.UTF_8);
+            int exit = tools.dscode.launcher.VerbDispatch.run(request.verb(), flags, verbOut, verbErr);
+            verbOut.flush();
+            verbErr.flush();
+            return new VerbRunResult(
+                    exit,
+                    outBytes.toString(StandardCharsets.UTF_8),
+                    errBytes.toString(StandardCharsets.UTF_8),
+                    "direct"
+            );
         }));
         server.createContext("/v1/browser/release", exchange -> handle(exchange, "POST", () -> {
             tools.dscode.common.agentcontrol.AgentDriverHooks.releaseUnowned();

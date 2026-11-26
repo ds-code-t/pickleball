@@ -24,8 +24,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * One long-lived JVM per project. It owns agent verbs for that project so
- * later CLI calls are socket clients. MCP and the live bridge are unchanged:
- * a verb still goes through {@link WorkbenchAgentCommands}.
+ * later CLI calls are socket clients. MCP's hot path posts to {@code POST /v1/verb}
+ * and the worker calls {@link VerbDispatch}. {@code pkb_mcp_transport=cli} is the debug shell-out.
+ * A verb that stays in this process still goes through {@link WorkbenchAgentCommands}.
  */
 public final class AgentController {
     private static final ObjectMapper JSON = new ObjectMapper();

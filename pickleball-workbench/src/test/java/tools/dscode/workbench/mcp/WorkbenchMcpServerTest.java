@@ -3,7 +3,10 @@ package tools.dscode.workbench.mcp;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.modelcontextprotocol.spec.McpSchema;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import tools.dscode.control.protocol.McpTransport;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.control.protocol.ControlBridgeCallResult;
 import tools.dscode.control.protocol.ControlBridgeError;
@@ -45,6 +48,20 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WorkbenchMcpServerTest {
+    private String transportBefore;
+
+    @BeforeEach
+    void keepShellOutAssertionsOnTheCliTransport() {
+        transportBefore = System.getProperty(McpTransport.PROPERTY);
+        if (transportBefore == null) System.setProperty(McpTransport.PROPERTY, McpTransport.CLI);
+    }
+
+    @AfterEach
+    void restoreMcpTransport() {
+        if (transportBefore == null) System.clearProperty(McpTransport.PROPERTY);
+        else System.setProperty(McpTransport.PROPERTY, transportBefore);
+    }
+
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final Duration STARTUP_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration RESPONSE_TIMEOUT = Duration.ofSeconds(5);
