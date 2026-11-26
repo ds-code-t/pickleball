@@ -1,4 +1,4 @@
-package tools.dscode.engine.adapter;
+package tools.dscode.engine.adapter.cucumber;
 
 import io.cucumber.core.backend.Backend;
 import io.cucumber.core.backend.Container;
@@ -46,7 +46,7 @@ import tools.dscode.engine.model.StepArgument;
 import tools.dscode.engine.model.StepResult;
 import tools.dscode.engine.model.Table;
 import tools.dscode.engine.parse.GherkinEngineParser;
-import tools.dscode.engine.runtime.NativeScenarioRun;
+import tools.dscode.engine.adapter.cucumber.NativeScenarioRun;
 
 import java.io.IOException;
 import java.lang.reflect.Constructor;

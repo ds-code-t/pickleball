@@ -1,6 +1,6 @@
 package tools.dscode.engine.resolve;
 
-import io.cucumber.tagexpressions.TagExpressionParser;
+import tools.dscode.engine.adapter.cucumber.CucumberTags;
 import tools.dscode.control.protocol.ExampleRowSelector;
 import tools.dscode.engine.model.EngineFeature;
 import tools.dscode.engine.model.EngineScenario;
@@ -80,7 +80,7 @@ public final class ScenarioResolver {
 
     private static boolean accepts(EngineFeature feature, EngineScenario scenario, Query query) {
         if (text(query.featureName()) && !query.featureName().equals(feature.name())) return false;
-        if (text(query.tags()) && !TagExpressionParser.parse(query.tags().trim()).evaluate(scenario.tags())) return false;
+        if (text(query.tags()) && !CucumberTags.evaluate(query.tags(), scenario.tags())) return false;
         if (text(query.name()) && !Pattern.compile(query.name().trim()).matcher(scenario.name()).find()) return false;
         if (text(query.stepMarker())) {
             boolean found = false;

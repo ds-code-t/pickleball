@@ -1,4 +1,4 @@
-package tools.dscode.engine.runtime;
+package tools.dscode.engine.adapter.cucumber;
 
 import io.cucumber.core.runner.CurrentScenarioState;
 import io.cucumber.core.runner.ScenarioStep;
@@ -49,7 +49,8 @@ public final class NativeModularRun {
         }
         ExecutionContext context = ExecutionContext.current();
         StepRegistry registry = context == null ? null : registry(context);
-        CurrentScenarioState state = context == null ? null : context.legacy();
+        CurrentScenarioState state = context != null && context.legacy() instanceof CurrentScenarioState legacy
+                ? legacy : null;
         List<StepExtension> frames = new ArrayList<>();
         if (scenario != null) {
             for (EngineStep step : scenario.steps()) {
@@ -58,7 +59,7 @@ public final class NativeModularRun {
                         ? new StepExtension(step.keyword(), step.text())
                         : NativeScenarioRun.preparedFrame(step, registry, state);
                 if (frame.isStepMarker && registry != null) {
-                    StepMatch match = registry.match(step.text());
+                    StepMatch match = registry.matchNative(step.text());
                     if (!match.captures().isEmpty() && match.captures().getFirst() != null) {
                         frame.stepMarkerText = match.captures().getFirst();
                     }

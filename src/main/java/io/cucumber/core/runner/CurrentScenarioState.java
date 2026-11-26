@@ -46,7 +46,7 @@ import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static io.cucumber.core.runner.GlobalState.pickleballLog;
 import static io.cucumber.core.runner.StepLogic.stepCloner;
-import tools.dscode.engine.runtime.NativeStepTrace;
+import tools.dscode.engine.adapter.cucumber.NativeStepTrace;
 import static org.junit.jupiter.api.Assertions.fail;
 import static tools.dscode.common.GlobalConstants.ALWAYS_RUN;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_FAILED;
@@ -536,7 +536,7 @@ public class CurrentScenarioState extends ScenarioMapping {
         // Cucumber records flag metadata when the pickle is matched. Native
         // steps must do the same before shouldRun, or ALWAYS RUN is skipped
         // after a hard failure and its inline child never exists.
-        tools.dscode.engine.runtime.SharedStepRun.bindGlue(stepExtension);
+        tools.dscode.engine.adapter.cucumber.SharedStepRun.bindGlue(stepExtension);
 
         if (!shouldRun(stepExtension)) {
             stepExtension.skipped = true;

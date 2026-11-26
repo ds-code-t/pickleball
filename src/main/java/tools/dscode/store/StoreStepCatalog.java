@@ -296,6 +296,43 @@ public final class StoreStepCatalog {
         }
     }
 
+    public record MatchRow(
+            String id,
+            String language,
+            String pattern,
+            String parameterTypes,
+            String methodName,
+            String sourcePath,
+            int sourceLine,
+            int enabled
+    ) {
+    }
+
+    /** Live catalog rows, including definitions whose {@code enabled} flag is off. */
+    public static List<MatchRow> matchRows(Connection connection) throws SQLException {
+        List<MatchRow> rows = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT definition_id, language, pattern, parameter_types, method_name, source_path, source_line, enabled
+                FROM step_definitions
+                WHERE removed = 0
+                ORDER BY source_path, source_line, definition_id
+                """);
+             ResultSet result = statement.executeQuery()) {
+            while (result.next()) {
+                rows.add(new MatchRow(
+                        result.getString(1),
+                        result.getString(2),
+                        result.getString(3),
+                        result.getString(4) == null ? "[]" : result.getString(4),
+                        result.getString(5),
+                        result.getString(6),
+                        result.getInt(7),
+                        result.getInt(8)));
+            }
+        }
+        return rows;
+    }
+
     public static String definitionId(String language, String pattern, String sourcePath, int sourceLine) {
         String raw = language + "|" + pattern + "|" + sourcePath + "|" + sourceLine;
         return StoreHashes.sha256(raw.getBytes(StandardCharsets.UTF_8));

@@ -31,7 +31,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import tools.dscode.engine.context.ExecutionContext;
-import tools.dscode.engine.context.RunBindings;
+import tools.dscode.engine.adapter.cucumber.RunBindings;
 import static tools.dscode.common.assertions.ValueWrapper.ValueTypes.DURATION;
 import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
 import static tools.dscode.common.browseroperations.BrowserAlerts.getText;

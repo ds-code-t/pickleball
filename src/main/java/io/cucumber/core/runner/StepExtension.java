@@ -226,7 +226,7 @@ public class StepExtension extends StepData {
 
     public Object runAndGetReturnValue() {
         if (pickleStepTestStep == null) {
-            return tools.dscode.engine.runtime.SharedStepRun.valueOf(this);
+            return tools.dscode.engine.adapter.cucumber.SharedStepRun.valueOf(this);
         }
         Object instanceOrNull;
         try {
@@ -247,7 +247,7 @@ public class StepExtension extends StepData {
             cause.printStackTrace();
             throw new RuntimeException(cause);
         }
-        tools.dscode.engine.runtime.SharedStepRun.noteConsumerNoop(method);
+        tools.dscode.engine.adapter.cucumber.SharedStepRun.noteConsumerNoop(method);
         return value;
     }
 
@@ -287,7 +287,7 @@ public class StepExtension extends StepData {
                 && result.getStatus() != io.cucumber.plugin.event.Status.UNDEFINED) {
             return;
         }
-        tools.dscode.engine.runtime.NativeStepTrace.record(this);
+        tools.dscode.engine.adapter.cucumber.NativeStepTrace.record(this);
     }
 
     public Result run() {
@@ -297,16 +297,16 @@ public class StepExtension extends StepData {
             // that hook, so the native trace must record this step first.
             // SharedStepRun restores the frame. Restoring here as well would pop twice.
             try {
-                return tools.dscode.engine.runtime.SharedStepRun.run(this);
+                return tools.dscode.engine.adapter.cucumber.SharedStepRun.run(this);
             } finally {
                 recordNativeStep();
             }
         }
-        tools.dscode.engine.runtime.SharedStepRun.markFrame(this);
+        tools.dscode.engine.adapter.cucumber.SharedStepRun.markFrame(this);
         try {
             return runPickleStep();
         } finally {
-            tools.dscode.engine.runtime.SharedStepRun.restoreFrame(this);
+            tools.dscode.engine.adapter.cucumber.SharedStepRun.restoreFrame(this);
         }
     }
 
@@ -523,12 +523,12 @@ public class StepExtension extends StepData {
             modifiedStep.parentStep = parentStep;
             modifiedStep.nestingLevel = nestingLevel;
             modifiedStep.lineData = lineData == null ? null : lineData.clone();
-            tools.dscode.engine.runtime.SharedStepRun.attachRenderedArgument(modifiedStep, gherkinArgument);
+            tools.dscode.engine.adapter.cucumber.SharedStepRun.attachRenderedArgument(modifiedStep, gherkinArgument);
             if (gherkinArgument != null && !gherkinArgument.isBlank()
-                    && tools.dscode.engine.runtime.SharedStepRun.bound(modifiedStep) == null) {
-                tools.dscode.engine.runtime.SharedStepRun.transfer(this, modifiedStep);
+                    && tools.dscode.engine.adapter.cucumber.SharedStepRun.bound(modifiedStep) == null) {
+                tools.dscode.engine.adapter.cucumber.SharedStepRun.transfer(this, modifiedStep);
             }
-            tools.dscode.engine.runtime.SharedStepRun.bindGlue(modifiedStep);
+            tools.dscode.engine.adapter.cucumber.SharedStepRun.bindGlue(modifiedStep);
             return modifiedStep;
         }
         StepExtension modifiedStep = new StepExtension(
@@ -549,7 +549,7 @@ public class StepExtension extends StepData {
         if (pickleStepTestStep == null) {
             // The real table or doc string wins. A marker peeled off the end of
             // the line is nativeInline* and belongs on the last branch only.
-            String rendered = tools.dscode.engine.runtime.SharedStepRun.renderedArgument(this);
+            String rendered = tools.dscode.engine.adapter.cucumber.SharedStepRun.renderedArgument(this);
             if (rendered != null && !rendered.isBlank()) return rendered;
             String inlineTable = gherkinDataTableForInlineType(nativeInlineType, nativeInlineText);
             if (inlineTable != null) return inlineTable;
@@ -575,8 +575,8 @@ public class StepExtension extends StepData {
             modifiedStep.setStepParsingMap(getStepParsingMap());
             modifiedStep.parentStep = parentStep;
             modifiedStep.nestingLevel = nestingLevel;
-            tools.dscode.engine.runtime.SharedStepRun.attachRenderedArgument(modifiedStep, gherkinArgument);
-            tools.dscode.engine.runtime.SharedStepRun.bindGlue(modifiedStep);
+            tools.dscode.engine.adapter.cucumber.SharedStepRun.attachRenderedArgument(modifiedStep, gherkinArgument);
+            tools.dscode.engine.adapter.cucumber.SharedStepRun.bindGlue(modifiedStep);
             return modifiedStep;
         }
         PickleStepTestStep newPickleStepTestStep = getPickleStepTestStepFromStrings(

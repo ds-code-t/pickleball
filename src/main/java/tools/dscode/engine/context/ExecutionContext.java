@@ -1,8 +1,5 @@
 package tools.dscode.engine.context;
 
-import io.cucumber.core.runner.CurrentScenarioState;
-import io.cucumber.core.runner.ScenarioStep;
-
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.MappingProcessor;
 import tools.dscode.common.mappings.NodeMap;
@@ -22,10 +19,11 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Explicit run state for the native engine. A live Cucumber
- * {@link CurrentScenarioState} thread local still wins in
- * {@code GlobalState.getCurrentScenarioState()}. This context is used only
- * when that thread local is empty, so an existing Cucumber run is unchanged.
+ * Explicit run state for the native engine. A live Cucumber scenario thread
+ * local still wins in {@code GlobalState.getCurrentScenarioState()}. This
+ * context is used only when that thread local is empty, so an existing
+ * Cucumber run is unchanged. The legacy scenario and root step are held as
+ * {@code Object} so this class does not name Cucumber types.
  */
 public final class ExecutionContext implements AutoCloseable {
     public enum Phase {
@@ -50,8 +48,8 @@ public final class ExecutionContext implements AutoCloseable {
     private final ExecutionContext previous;
     private final Instant opened = Instant.now();
     private Phase phase = Phase.READY;
-    private CurrentScenarioState legacy;
-    private ScenarioStep rootStep;
+    private Object legacy;
+    private Object rootStep;
     private boolean closed;
 
     private ExecutionContext(EngineScenario scenario) {
@@ -78,7 +76,7 @@ public final class ExecutionContext implements AutoCloseable {
     }
 
     /** Legacy scenario used only when Cucumber has not set its thread local. */
-    public static CurrentScenarioState legacyOrNull() {
+    public static Object legacyOrNull() {
         ExecutionContext context = CURRENT.get();
         return context == null ? null : context.legacy;
     }
@@ -170,22 +168,22 @@ public final class ExecutionContext implements AutoCloseable {
         return Duration.between(opened, Instant.now());
     }
 
-    public ExecutionContext attachLegacy(CurrentScenarioState state) {
+    public ExecutionContext attachLegacy(Object state) {
         this.legacy = state;
         return this;
     }
 
-    public CurrentScenarioState legacy() {
+    public Object legacy() {
         return legacy;
     }
 
     /** Native scenario root. Cucumber roots stay on the test case. */
-    public ExecutionContext rootStep(ScenarioStep root) {
+    public ExecutionContext rootStep(Object root) {
         this.rootStep = root;
         return this;
     }
 
-    public ScenarioStep rootStep() {
+    public Object rootStep() {
         return rootStep;
     }
 

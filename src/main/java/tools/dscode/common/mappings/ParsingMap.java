@@ -32,7 +32,7 @@ import tools.dscode.common.treeparsing.parsedComponents.DataElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.dataoperations.NeutralRows;
 import tools.dscode.engine.context.ExecutionContext;
-import tools.dscode.engine.context.RunBindings;
+import tools.dscode.engine.adapter.cucumber.RunBindings;
 import tools.dscode.engine.model.DocText;
 import tools.dscode.engine.model.Table;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;

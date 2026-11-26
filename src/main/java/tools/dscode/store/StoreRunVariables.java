@@ -22,7 +22,7 @@ import java.util.Map;
  * Run variables copied from the property and profile files the project already
  * loads. Secret names stay references. Values are not written to the store log.
  */
-final class StoreRunVariables {
+public final class StoreRunVariables {
     private static final List<String> PROPERTY_FILES = List.of(
             "pickleball.properties",
             "src/test/resources/pickleball.properties",
@@ -38,6 +38,24 @@ final class StoreRunVariables {
     private static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory());
 
     private StoreRunVariables() {
+    }
+
+    /**
+     * Copies named {@code pkb_*} keys that are already in the property or profile
+     * files. A missing key is left unset. Lookup rules are not applied.
+     */
+    public static void copyNamed(Connection connection, Path project, String... names) throws IOException, SQLException {
+        if (names == null || names.length == 0) return;
+        Map<String, Assigned> found = new LinkedHashMap<>();
+        for (String relative : PROPERTY_FILES) readProperties(project, relative, found);
+        for (String relative : YAML_FILES) readYaml(project, relative, found);
+        for (String name : names) {
+            if (name == null || name.isBlank()) continue;
+            Assigned assigned = found.get(name);
+            if (assigned == null) continue;
+            if (StoreSecrets.secretName(project, name) && !StoreSecrets.reference(assigned.value())) continue;
+            upsert(connection, name, assigned.value(), assigned.source(), assigned.hash());
+        }
     }
 
     static int sync(Connection connection, Path project) throws IOException, SQLException {

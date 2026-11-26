@@ -6,7 +6,7 @@ import io.cucumber.messages.types.InlinePickleArgument;
 import tools.dscode.common.assertions.AssertionChain;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import tools.dscode.engine.context.ExecutionContext;
-import tools.dscode.engine.context.RunBindings;
+import tools.dscode.engine.adapter.cucumber.RunBindings;
 
 import java.util.ArrayList;
 import java.util.List;

@@ -10,7 +10,7 @@ import io.cucumber.core.runner.StepBase;
 import io.cucumber.core.runner.StepExtension;
 import tools.dscode.common.mappings.queries.Tokenized;
 import tools.dscode.engine.context.ExecutionContext;
-import tools.dscode.engine.context.RunBindings;
+import tools.dscode.engine.adapter.cucumber.RunBindings;
 
 import java.util.ArrayList;
 import java.util.Arrays;

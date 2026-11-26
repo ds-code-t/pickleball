@@ -2,7 +2,7 @@ package tools.dscode.engine.parity;
 
 import tools.dscode.engine.EngineOptions;
 import tools.dscode.engine.PickleballEngine;
-import tools.dscode.engine.adapter.CucumberAdapterRun;
+import tools.dscode.engine.adapter.cucumber.CucumberAdapterRun;
 import tools.dscode.engine.model.RunResult;
 
 import java.io.IOException;

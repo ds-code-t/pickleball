@@ -4,6 +4,10 @@
 
 Cucumber is a supported compatibility adapter. The default engine is native, and `pkb_engine=cucumber` keeps Cucumber. Standard Cucumber features and Java step definitions keep working, and dynamic steps can be mixed with them. Both engines fire `BEFORE_CUCUMBER_RUN` before the first scenario and `AFTER_CUCUMBER_RUN` after the last, then close logs, finish ReportPortal, stop the pickleball log, and call `AgentCoordination.finishCurrent`.
 
+The native engine matches stored rows. `store hydrate` reads each glue annotation and writes `step_definitions.pattern` plus `step_definitions.parameter_types`. `PatternMatcher` matches a step against those rows and does not import Cucumber. A Cucumber expression such as `{string}`, `{int}`, `{float}`, `{word}`, `{bigdecimal}`, `{biginteger}`, `{double}`, `{byte}`, `{short}`, or `{long}` becomes a regular expression and a parameter-type name. A pattern that cucumber-expressions already treats as a regular expression (it starts with `^`, ends with `$`, or is wrapped in `/.../`) is stored as that expression and `parameter_types` is `[]`. A parameter type hydrate cannot translate fails that definition with `error:` and `fix: store glue show <path>`, and the previous row stays. The hydrate summary prints `translated=` and `failed=`. `pkb_engine_log=ingest` logs each translation. `pkb_glue` sets `step_definitions.enabled` for Java packages named in that list. A blank `pkb_glue` leaves definitions in the glue roots enabled. Ingest is the only writer of `scenario_tags`. `pkb_callpath` and `pkb_componentpath` are copied into `run_variables` as the strings already in the property files. Their lookup rules are unchanged.
+
+The Cucumber adapter still dispatches Java glue with Cucumber. That matching lives in `CucumberStepRegistry` under `tools.dscode.engine.adapter.cucumber`. `engine run` and `engine step` stay the native execution verbs.
+
 ## Standard Cucumber behavior remains available
 
 Feature files may continue to use:

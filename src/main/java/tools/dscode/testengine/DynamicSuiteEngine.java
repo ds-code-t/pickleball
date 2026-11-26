@@ -143,7 +143,7 @@ public final class DynamicSuiteEngine implements TestEngine {
             );
 
             if (tools.dscode.engine.EngineConfig.nativeSelected()) {
-                tools.dscode.engine.adapter.NativeSuiteExecution.execute(wrappedRequest);
+                tools.dscode.engine.adapter.cucumber.NativeSuiteExecution.execute(wrappedRequest);
                 logTrace("[DynamicSuiteEngine] Native execution completed");
                 return;
             }

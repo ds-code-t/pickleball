@@ -1,4 +1,6 @@
-package tools.dscode.engine.context;
+package tools.dscode.engine.adapter.cucumber;
+
+import tools.dscode.engine.context.ExecutionContext;
 
 import io.cucumber.core.runner.CurrentScenarioState;
 import io.cucumber.core.runner.GlobalState;
@@ -37,14 +39,15 @@ public final class RunBindings {
         if (cucumberScenarioLive()) {
             return CurrentScenarioState.currentScenarioState.get();
         }
-        if (context != null && context.legacy() != null) {
-            return context.legacy();
+        if (context != null && context.legacy() instanceof CurrentScenarioState legacy) {
+            return legacy;
         }
         CurrentScenarioState parked = CurrentScenarioState.currentScenarioState.get();
         if (parked != null) {
             return parked;
         }
-        return ExecutionContext.legacyOrNull();
+        Object fallback = ExecutionContext.legacyOrNull();
+        return fallback instanceof CurrentScenarioState state ? state : null;
     }
 
     public StepExtension runningStep() {
@@ -63,12 +66,12 @@ public final class RunBindings {
         if (cucumberScenarioLive()) {
             return GlobalState.getRootScenarioStep();
         }
-        if (context != null && context.rootStep() != null) {
-            return context.rootStep();
+        if (context != null && context.rootStep() instanceof ScenarioStep root) {
+            return root;
         }
         ExecutionContext current = ExecutionContext.current();
-        if (current != null && current.rootStep() != null) {
-            return current.rootStep();
+        if (current != null && current.rootStep() instanceof ScenarioStep root) {
+            return root;
         }
         return null;
     }

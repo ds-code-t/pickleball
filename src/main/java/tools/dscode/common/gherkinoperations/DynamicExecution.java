@@ -57,9 +57,9 @@ public class DynamicExecution {
             StepExtension nativeStep = new StepExtension("* ", stepText);
             nativeStep.setStepParsingMap(getRunningParsingMap());
             if (!argumentText.isBlank()) {
-                tools.dscode.engine.runtime.SharedStepRun.attachRenderedArgument(nativeStep, argumentText);
+                tools.dscode.engine.adapter.cucumber.SharedStepRun.attachRenderedArgument(nativeStep, argumentText);
             }
-            tools.dscode.engine.runtime.SharedStepRun.bindGlue(nativeStep);
+            tools.dscode.engine.adapter.cucumber.SharedStepRun.bindGlue(nativeStep);
             return nativeStep;
         }
         StepExtension modifiedStep = new StepExtension(getTestCase(), getPickleStepTestStepFromStrings(getGivenKeyword(), stepText, argumentText));

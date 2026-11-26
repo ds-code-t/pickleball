@@ -1,5 +1,6 @@
 package tools.dscode.store;
 
+import tools.dscode.engine.adapter.cucumber.CucumberIngest;
 import tools.dscode.store.sql.SqlDialect;
 
 import java.io.IOException;
@@ -36,8 +37,23 @@ public final class StoreHydrator {
             boolean dryRun,
             List<String> conflictPaths,
             List<String> notices,
-            int ignored
+            int ignored,
+            int translated,
+            int failed
     ) {
+        public Result(
+                int inserted,
+                int updated,
+                int skipped,
+                int conflicts,
+                boolean dryRun,
+                List<String> conflictPaths,
+                List<String> notices,
+                int ignored
+        ) {
+            this(inserted, updated, skipped, conflicts, dryRun, conflictPaths, notices, ignored, 0, 0);
+        }
+
         public Result {
             conflictPaths = conflictPaths == null ? List.of() : List.copyOf(conflictPaths);
             notices = notices == null ? List.of() : List.copyOf(notices);
@@ -47,7 +63,8 @@ public final class StoreHydrator {
             String prefix = dryRun ? "dry-run" : "hydrated";
             return prefix + " inserted=" + inserted + " updated=" + updated
                     + " skipped=" + skipped + " conflicts=" + conflicts
-                    + " ignored=" + ignored;
+                    + " ignored=" + ignored
+                    + " translated=" + translated + " failed=" + failed;
         }
     }
 
@@ -76,6 +93,8 @@ public final class StoreHydrator {
             int rehydrated = 0;
             List<String> conflicts = new ArrayList<>();
             List<String> notices = new ArrayList<>();
+            int translated = 0;
+            int failed = 0;
             String jar = StoreHashes.jarHash();
             connection.setAutoCommit(false);
             try {
@@ -154,7 +173,12 @@ public final class StoreHydrator {
                     UniversalEntity.putMeta(connection, "hydrate_reused", Integer.toString(reused));
                     UniversalEntity.putMeta(connection, "hydrate_rehydrated", Integer.toString(rehydrated));
                     stampJar(connection, jar);
+                    var prior = CucumberIngest.snapshot(connection);
                     StoreStepCatalog.refresh(connection, project, now);
+                    CucumberIngest.Counts ingest = CucumberIngest.apply(connection, project, prior);
+                    notices.addAll(ingest.notices());
+                    translated = ingest.translated();
+                    failed = ingest.failed();
                     connection.commit();
                 } else {
                     connection.rollback();
@@ -195,7 +219,9 @@ public final class StoreHydrator {
             StoreLog.log(project, "hydrate", "files",
                     (options.dryRun() ? "dry-run " : "") + "inserted=" + inserted + " updated=" + updated
                             + " ignored=" + ignored);
-            return new Result(inserted, updated, skipped, conflicts.size(), options.dryRun(), conflicts, notices, ignored);
+            return new Result(
+                    inserted, updated, skipped, conflicts.size(), options.dryRun(), conflicts, notices, ignored,
+                    translated, failed);
         }
     }
 

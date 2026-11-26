@@ -21,6 +21,6 @@ public class DynamicSteps  extends CoreSteps {
 
     @Given("^,(?s)(.*)$")
     public void executeDynamicStep(String stepText) {
-        tools.dscode.engine.runtime.SharedStepRun.executeDynamic(getRunningStep());
+        tools.dscode.engine.adapter.cucumber.SharedStepRun.executeDynamic(getRunningStep());
     }
 }

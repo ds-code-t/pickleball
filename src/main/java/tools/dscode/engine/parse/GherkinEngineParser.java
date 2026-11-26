@@ -1,26 +1,20 @@
 package tools.dscode.engine.parse;
 
-import io.cucumber.gherkin.GherkinParser;
-import io.cucumber.messages.types.Envelope;
-import io.cucumber.messages.types.ParseError;
-import io.cucumber.core.gherkin.messages.NGherkinFactory;
-import io.cucumber.messages.types.InlinePickleArgument;
 import tools.dscode.common.GlobalConstants;
-import tools.dscode.engine.convert.CucumberModelConverter;
+import tools.dscode.engine.adapter.cucumber.CucumberGherkin;
 import tools.dscode.engine.model.EngineFeature;
 import tools.dscode.engine.model.EngineScenario;
 import tools.dscode.engine.model.EngineStep;
 import tools.dscode.engine.model.ExampleTable;
 import tools.dscode.engine.model.SourceLocation;
 
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Parses Gherkin with {@link GherkinParser} and converts to the neutral model.
+ * Parses Gherkin through the Cucumber adapter and converts to the neutral model.
  * Placeholders stay in the step text, matching ForceNullValuesRowAspect.
  * Outline rows, background steps, and Scenario Tags are applied by {@link #expand}.
  */
@@ -29,25 +23,7 @@ public final class GherkinEngineParser {
     }
 
     public static EngineFeature parse(String uri, String text) {
-        String sourceUri = uri == null || uri.isBlank() ? "memory:" : uri;
-        String rewritten = EncodingRewrite.apply(text);
-        GherkinParser parser = GherkinParser.builder()
-                .includeSource(false)
-                .includePickles(false)
-                .includeGherkinDocument(true)
-                .build();
-        List<String> errors = new ArrayList<>();
-        EngineFeature feature = null;
-        for (Envelope envelope : parser.parse(sourceUri, rewritten.getBytes(StandardCharsets.UTF_8)).toList()) {
-            envelope.getParseError().map(ParseError::getMessage).ifPresent(errors::add);
-            if (envelope.getGherkinDocument().isPresent()) {
-                feature = CucumberModelConverter.fromDocument(envelope.getGherkinDocument().get());
-            }
-        }
-        if (!errors.isEmpty()) {
-            throw new IllegalArgumentException(String.join("\n", errors));
-        }
-        return feature == null ? EngineFeature.of("", List.of()) : feature;
+        return CucumberGherkin.parse(uri, text);
     }
 
     /** One scenario per Examples row. Step text is not interpolated. */
@@ -189,26 +165,7 @@ public final class GherkinEngineParser {
      * meta text, an inline argument is split off, and escaped line breaks return.
      */
     private static EngineStep official(EngineStep step) {
-        String text = step.text() == null ? "" : step.text();
-        String meta = null;
-        int flag = text.indexOf(GlobalConstants.PARSER_FLAG);
-        if (flag >= 0) {
-            meta = text.substring(flag + GlobalConstants.PARSER_FLAG.length());
-            text = text.substring(0, flag);
-        }
-        InlinePickleArgument.Extracted inline = InlinePickleArgument.extract(text);
-        if (inline != null) text = inline.stepText();
-        text = NGherkinFactory.restoreStepLineBreaks(text);
-        if (meta != null) meta = NGherkinFactory.restoreStepLineBreaks(meta);
-        LinkedHashMap<String, String> metadata = new LinkedHashMap<>(step.metadata());
-        if (meta != null) metadata.put("metaText", meta);
-        if (inline != null) {
-            metadata.put("inlineArgumentType", inline.argumentType());
-            String argument = NGherkinFactory.restoreStepLineBreaks(inline.argumentText());
-            metadata.put("inlineArgumentText", argument == null ? "" : argument);
-        }
-        if (text.equals(step.text()) && metadata.equals(step.metadata())) return step;
-        return new EngineStep(step.keyword(), text, step.argument(), step.location(), metadata, step.fromBackground());
+        return CucumberGherkin.official(step);
     }
 
     private static List<String> ruleTags(EngineScenario scenario) {

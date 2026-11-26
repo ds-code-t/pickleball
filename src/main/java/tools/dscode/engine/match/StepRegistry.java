@@ -1,23 +1,17 @@
 package tools.dscode.engine.match;
 
-import tools.dscode.engine.adapter.cucumber.GlueHooks;
-import io.cucumber.cucumberexpressions.Argument;
-import io.cucumber.cucumberexpressions.Expression;
-import io.cucumber.cucumberexpressions.ExpressionFactory;
-import io.cucumber.cucumberexpressions.ParameterTypeRegistry;
-import io.cucumber.datatable.DataTable;
-import io.cucumber.docstring.DocString;
-import io.cucumber.java.After;
-import io.cucumber.java.AfterStep;
-import io.cucumber.java.Before;
-import io.cucumber.java.BeforeStep;
-import io.cucumber.java.StepDefinitionAnnotation;
-import io.cucumber.tagexpressions.TagExpressionParser;
 import tools.dscode.control.override.StepOverrideRegistry;
 import tools.dscode.control.override.StepOverrideRule;
 import tools.dscode.engine.EngineLog;
+import tools.dscode.engine.adapter.cucumber.CucumberStepRegistry;
+import tools.dscode.engine.adapter.cucumber.CucumberTags;
+import tools.dscode.engine.adapter.cucumber.GlueHooks;
 import tools.dscode.engine.model.DocText;
 import tools.dscode.engine.model.Table;
+import tools.dscode.store.StoreConfig;
+import tools.dscode.store.StoreDatabase;
+import tools.dscode.store.StorePaths;
+import tools.dscode.store.StoreStepCatalog;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;
@@ -38,7 +32,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.IdentityHashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -47,17 +40,20 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Reads the same step annotations Cucumber reads and matches with
- * {@link ExpressionFactory}, which is the regex-versus-Cucumber-expression rule
- * Cucumber uses. Annotation values are not rewritten.
+ * Reads the same step annotations Cucumber reads. Native matching uses
+ * {@link PatternMatcher}. The Cucumber adapter keeps {@code ExpressionFactory}
+ * in {@link CucumberStepRegistry}. Annotation values are not rewritten here.
  */
 public final class StepRegistry {
+    private static final String CUCUMBER_TABLE = "io.cucumber.datatable.DataTable";
+    private static final String CUCUMBER_DOC = "io.cucumber.docstring.DocString";
+    private static final String CUCUMBER_STEP_META = "io.cucumber.java.StepDefinitionAnnotation";
+
     private final List<GlueStep> steps = new ArrayList<>();
     private final List<Hook> hooks = new ArrayList<>();
-    private final ExpressionFactory expressions;
-    private final GlueConverters converters;
-    private final Map<String, Expression> compiled = new LinkedHashMap<>();
     private Path logProject;
+    private boolean nativeDecided;
+    private List<GlueStep> nativeSteps;
 
     public StepRegistry() {
         this(Locale.ENGLISH);
@@ -65,18 +61,12 @@ public final class StepRegistry {
 
     public StepRegistry(Locale locale) {
         Locale chosen = locale == null ? Locale.ENGLISH : locale;
-        expressions = new ExpressionFactory(new ParameterTypeRegistry(chosen));
-        converters = new GlueConverters(chosen);
+        CucumberStepRegistry.attach(this, chosen);
     }
 
     public StepRegistry logTo(Path project) {
         this.logProject = project;
         return this;
-    }
-
-    /** Converter for step tables. Custom types are already registered when this returns. */
-    public DataTable.TableConverter tableConverter() {
-        return converters.converter();
     }
 
     public List<GlueStep> steps() {
@@ -196,7 +186,7 @@ public final class StepRegistry {
     }
 
     public GlueStep register(String keyword, String pattern, Method method) {
-        GlueStep step = define(keyword, pattern, method);
+        GlueStep step = define(keyword, pattern, method, "");
         add(step);
         return step;
     }
@@ -205,6 +195,23 @@ public final class StepRegistry {
         Optional<StepMatch> override = liveOverride(text);
         if (override.isPresent()) return override.get();
         return matchGlue(text);
+    }
+
+    /**
+     * Native match. Store rows are used when Store is on and the catalog has
+     * definitions. Scanned glue is the file-only path and the extra classes a
+     * caller registered that are not already in the catalog.
+     */
+    public StepMatch matchNative(String text) {
+        Optional<StepMatch> override = liveOverride(text);
+        if (override.isPresent()) return override.get();
+        List<GlueStep> rows = nativeCandidates();
+        if (rows == null) return matchGlue(text);
+        return matchSteps(text, rows);
+    }
+
+    public void addHook(String phase, int order, String tags, Method method) {
+        hooks.add(new Hook(phase, order, tags, method));
     }
 
     /** Override rules registered for {@code scenarioId}, then glue. No live Cucumber scenario required. */
@@ -273,14 +280,19 @@ public final class StepRegistry {
     }
 
     private StepMatch matchGlue(String text) {
+        return matchSteps(text, steps);
+    }
+
+    private StepMatch matchSteps(String text, List<GlueStep> candidates) {
         String body = text == null ? "" : text;
         List<GlueStep> hits = new ArrayList<>();
         List<List<String>> captures = new ArrayList<>();
-        for (GlueStep step : steps) {
-            List<Argument<?>> arguments = expression(step).match(body, step.expressionTypes().toArray(Type[]::new));
+        for (GlueStep step : candidates) {
+            List<String> arguments = PatternMatcher.match(
+                    step.pattern(), body, step.parameterTypes(), step.expressionTypes().toArray(Type[]::new));
             if (arguments == null) continue;
             hits.add(step);
-            captures.add(stringify(arguments));
+            captures.add(arguments);
         }
         if (hits.isEmpty()) {
             EngineLog.log(logProject, "match", "undefined", body);
@@ -294,33 +306,94 @@ public final class StepRegistry {
         return new StepMatch(step.kind(), body, step, captures.getFirst(), "");
     }
 
-    private Expression expression(GlueStep step) {
-        return compiled.computeIfAbsent(step.pattern(), expressions::createExpression);
+    private List<GlueStep> nativeCandidates() {
+        if (nativeDecided) return nativeSteps;
+        nativeDecided = true;
+        nativeSteps = loadNative();
+        return nativeSteps;
+    }
+
+    /** Null means the scanned glue is the catalog. */
+    private List<GlueStep> loadNative() {
+        if (logProject == null || !StoreConfig.enabled(logProject) || !StorePaths.ready(logProject)) return null;
+        try (StoreDatabase database = StoreDatabase.open(logProject)) {
+            List<StoreStepCatalog.MatchRow> rows = StoreStepCatalog.matchRows(database.connection());
+            if (rows.isEmpty()) return null;
+            java.util.Set<String> storedClasses = new java.util.HashSet<>();
+            for (StoreStepCatalog.MatchRow row : rows) {
+                String className = className(row.sourcePath());
+                if (className != null) storedClasses.add(className);
+            }
+            List<GlueStep> candidates = new ArrayList<>();
+            for (StoreStepCatalog.MatchRow row : rows) {
+                if (row.enabled() != 1) continue;
+                candidates.add(define("Given", row.pattern(), bind(row), row.parameterTypes()));
+            }
+            for (GlueStep step : steps) {
+                Method method = step.method();
+                if (method != null && storedClasses.contains(method.getDeclaringClass().getName())) continue;
+                candidates.add(step);
+            }
+            return candidates;
+        } catch (RuntimeException | java.sql.SQLException failure) {
+            EngineLog.log(logProject, "match", "store", failure.toString());
+            return null;
+        }
+    }
+
+    private static Method bind(StoreStepCatalog.MatchRow row) {
+        String className = className(row.sourcePath());
+        if (className == null || row.methodName() == null || row.methodName().isBlank()) return null;
+        ClassLoader loader = Thread.currentThread().getContextClassLoader();
+        if (loader == null) loader = StepRegistry.class.getClassLoader();
+        Class<?> type;
+        try {
+            type = Class.forName(className, true, loader);
+        } catch (Throwable failure) {
+            return null;
+        }
+        List<Method> named = new ArrayList<>();
+        Class<?> cursor = type;
+        while (cursor != null && cursor != Object.class) {
+            for (Method method : cursor.getDeclaredMethods()) {
+                if (method.getName().equals(row.methodName()) && !method.isSynthetic() && !method.isBridge()) {
+                    named.add(method);
+                }
+            }
+            cursor = cursor.getSuperclass();
+        }
+        if (named.isEmpty()) return null;
+        if (named.size() == 1) return named.getFirst();
+        for (Method method : named) {
+            for (Annotation annotation : method.getAnnotations()) {
+                for (Found found : valuesOf(annotation)) {
+                    PatternMatcher.Translation translation = PatternMatcher.translation(found.pattern());
+                    if (!translation.rejected() && translation.regex().equals(row.pattern())) return method;
+                    if (found.pattern().equals(row.pattern())) return method;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static String className(String sourcePath) {
+        if (sourcePath == null) return null;
+        String norm = sourcePath.replace('\\', '/');
+        String rel = null;
+        int main = norm.indexOf("src/main/java/");
+        int test = norm.indexOf("src/test/java/");
+        if (main >= 0) rel = norm.substring(main + "src/main/java/".length());
+        else if (test >= 0) rel = norm.substring(test + "src/test/java/".length());
+        if (rel == null || !rel.endsWith(".java")) return null;
+        return rel.substring(0, rel.length() - ".java".length()).replace('/', '.');
     }
 
     private void scanMethod(Method method) {
-        converters.register(method);
-        scanHook(method);
+        CucumberStepRegistry.observe(this, method);
         for (Annotation annotation : method.getAnnotations()) {
             for (Found found : valuesOf(annotation)) {
-                add(define(found.keyword(), found.pattern(), method));
+                add(define(found.keyword(), found.pattern(), method, ""));
             }
-        }
-    }
-
-    private void scanHook(Method method) {
-        if (method == null || !GlueHooks.callable(method)) return;
-        for (Before before : method.getAnnotationsByType(Before.class)) {
-            hooks.add(new Hook("before", before.order(), before.value(), method));
-        }
-        for (After after : method.getAnnotationsByType(After.class)) {
-            hooks.add(new Hook("after", after.order(), after.value(), method));
-        }
-        for (BeforeStep beforeStep : method.getAnnotationsByType(BeforeStep.class)) {
-            hooks.add(new Hook("beforestep", beforeStep.order(), beforeStep.value(), method));
-        }
-        for (AfterStep afterStep : method.getAnnotationsByType(AfterStep.class)) {
-            hooks.add(new Hook("afterstep", afterStep.order(), afterStep.value(), method));
         }
     }
 
@@ -367,7 +440,7 @@ public final class StepRegistry {
     public record Hook(String phase, int order, String tags, Method method) {
         public boolean matches(List<String> scenarioTags) {
             if (tags == null || tags.isBlank()) return true;
-            return TagExpressionParser.parse(tags.trim()).evaluate(scenarioTags == null ? List.of() : scenarioTags);
+            return CucumberTags.evaluate(tags, scenarioTags);
         }
     }
 
@@ -380,22 +453,24 @@ public final class StepRegistry {
         EngineLog.log(logProject, "registry", step.location(), step.keyword() + " " + step.pattern());
     }
 
-    private static GlueStep define(String keyword, String pattern, Method method) {
+    private static GlueStep define(String keyword, String pattern, Method method, String parameterTypes) {
         Type[] types = method == null ? new Type[0] : method.getGenericParameterTypes();
         boolean table = false;
         boolean doc = false;
         List<Type> expressionTypes = new ArrayList<>();
         for (int index = 0; index < types.length; index++) {
             Class<?> raw = raw(types[index]);
-            boolean argument = raw == DataTable.class || raw == DocString.class || raw == Table.class || raw == DocText.class;
+            String rawName = raw == null ? "" : raw.getName();
+            boolean argument = CUCUMBER_TABLE.equals(rawName) || CUCUMBER_DOC.equals(rawName)
+                    || raw == Table.class || raw == DocText.class;
             if (argument && index == types.length - 1) {
-                table = raw == DataTable.class || raw == Table.class;
-                doc = raw == DocString.class || raw == DocText.class;
+                table = CUCUMBER_TABLE.equals(rawName) || raw == Table.class;
+                doc = CUCUMBER_DOC.equals(rawName) || raw == DocText.class;
                 continue;
             }
             expressionTypes.add(types[index]);
         }
-        return new GlueStep(keyword, pattern, method, expressionTypes, table, doc, classify(pattern, method));
+        return new GlueStep(keyword, pattern, method, expressionTypes, table, doc, classify(pattern, method), parameterTypes);
     }
 
     static StepKind classify(String pattern, Method method) {
@@ -420,7 +495,7 @@ public final class StepRegistry {
         if (annotation == null) return List.of();
         Class<? extends Annotation> type = annotation.annotationType();
         try {
-            if (type.isAnnotationPresent(StepDefinitionAnnotation.class)) {
+            if (stepAnnotation(type)) {
                 Object value = type.getMethod("value").invoke(annotation);
                 if (value instanceof String pattern) {
                     return List.of(new Found(type.getSimpleName(), pattern));
@@ -441,14 +516,12 @@ public final class StepRegistry {
         return List.of();
     }
 
-    private static List<String> stringify(List<Argument<?>> arguments) {
-        List<String> values = new ArrayList<>();
-        if (arguments == null) return values;
-        for (Argument<?> argument : arguments) {
-            Object value = argument == null ? null : argument.getValue();
-            values.add(value == null ? null : String.valueOf(value));
+    private static boolean stepAnnotation(Class<? extends Annotation> type) {
+        if (type.getName().startsWith("io.cucumber.java.en.")) return true;
+        for (Annotation meta : type.getAnnotations()) {
+            if (CUCUMBER_STEP_META.equals(meta.annotationType().getName())) return true;
         }
-        return Collections.unmodifiableList(values);
+        return false;
     }
 
     private static Class<?> raw(Type type) {

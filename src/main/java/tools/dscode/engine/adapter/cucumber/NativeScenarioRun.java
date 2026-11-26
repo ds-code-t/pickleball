@@ -1,4 +1,4 @@
-package tools.dscode.engine.runtime;
+package tools.dscode.engine.adapter.cucumber;
 
 import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.core.runner.CurrentScenarioState;
@@ -372,7 +372,7 @@ public final class NativeScenarioRun {
         if (inlineText != null) frame.nativeInlineText = inlineText;
         frame.setStepParsingMap(state.getParsingMap());
         if (registry != null) {
-            StepMatch match = registry.match(engineStep.text());
+            StepMatch match = registry.matchNative(engineStep.text());
             if (match.step() != null && match.step().method() != null) {
                 frame.attachNativeMethod(match.step().method());
                 SharedStepRun.prepareData(frame, match);

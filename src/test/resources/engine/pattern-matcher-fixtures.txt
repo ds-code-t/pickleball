@@ -1,0 +1,47 @@
+{"pattern":"^ALWAYS RUN(?: AND IGNORE FAILURES|\\s*:.*)?$","text":"ALWAYS RUN"}
+{"pattern":"^ALWAYS RUN(?: AND IGNORE FAILURES|\\s*:.*)?$","text":"ALWAYS RUN AND IGNORE FAILURES"}
+{"pattern":"^ALWAYS RUN(?: AND IGNORE FAILURES|\\s*:.*)?$","text":"ALWAYS RUN: later"}
+{"pattern":"^RUN IF SCENARIO PASSING(?:(?: AND SCENARIO FINISHED)?(?: AND IGNORE FAILURES)?|\\s*:.*)$","text":"RUN IF SCENARIO PASSING"}
+{"pattern":"^RUN IF SCENARIO PASSING(?:(?: AND SCENARIO FINISHED)?(?: AND IGNORE FAILURES)?|\\s*:.*)$","text":"RUN IF SCENARIO PASSING AND SCENARIO FINISHED AND IGNORE FAILURES"}
+{"pattern":"^RUN IF SCENARIO FAILED(?:\\s*:.*)?$","text":"RUN IF SCENARIO FAILED"}
+{"pattern":"^RUN IF SCENARIO HARD FAILED(?:\\s*:.*)?$","text":"RUN IF SCENARIO HARD FAILED: note"}
+{"pattern":"^RUN IF SCENARIO SOFT FAILED(?:\\s*:.*)?$","text":"RUN IF SCENARIO SOFT FAILED"}
+{"pattern":"IGNORE FAILURES","text":"IGNORE FAILURES"}
+{"pattern":"LOG FAILURES BUT CONTINUE SCENARIO","text":"LOG FAILURES BUT CONTINUE SCENARIO"}
+{"pattern":"RUN IF SCENARIO FINISHED","text":"RUN IF SCENARIO FINISHED"}
+{"pattern":"^RETURN:(.*)$","text":"RETURN:hello"}
+{"pattern":"^RETURN:(.*)$","text":"not a return"}
+{"pattern":"^DATA-TEXT$","text":"DATA-TEXT"}
+{"pattern":"^DATA$","text":"DATA"}
+{"pattern":"^DATA-TABLE$","text":"DATA-TABLE"}
+{"pattern":"^DATA\\.(LISTS?|MAPS?)$","text":"DATA.LIST"}
+{"pattern":"^DATA\\.(LISTS?|MAPS?)$","text":"DATA.MAPS"}
+{"pattern":"^\uFEFF\u200B\u00A0\u200C\uFEFFSCENARIO: \\s*(?:.*)$","text":"\uFEFF\u200B\u00A0\u200C\uFEFFSCENARIO: Checkout"}
+{"pattern":"^---(.*)$","text":"---note"}
+{"pattern":"^\\|__$","text":"|__"}
+{"pattern":"\uFEFF\u200B\u00A0\u200C\uFEFF-ROOT-STEP-","text":"\uFEFF\u200B\u00A0\u200C\uFEFF-ROOT-STEP-"}
+{"pattern":"^\uFEFF\u200B\u00A0\u200CINFO: (.*)$","text":"\uFEFF\u200B\u00A0\u200CINFO: ready"}
+{"pattern":"^\uFEFF\u200B\u00A0\u200CFAil ERROR: (.*)$","text":"nope"}
+{"pattern":"^\uFEFF\u200B\u00A0\u200CFAIL ERROR: (.*)$","text":"\uFEFF\u200B\u00A0\u200CFAIL ERROR: boom"}
+{"pattern":"^\uFEFF\u200B\u00A0\u200CERROR: (.*)$","text":"\uFEFF\u200B\u00A0\u200CERROR: boom"}
+{"pattern":"^SKIPPING: (.*)$","text":"SKIPPING: later"}
+{"pattern":"^print(.*)$","text":"print hi"}
+{"pattern":"^RETRY:.*$","text":"RETRY: again"}
+{"pattern":"\u207ANXT","text":"\u207ANXT"}
+{"pattern":"(?i)^ScenarioName$","text":"scenarioname"}
+{"pattern":"(?i)^ScenarioNameAndLine$","text":"ScenarioNameAndLine"}
+{"pattern":"(?i)^\u207A_OR(.+)$","text":"\u207A_ORhello"}
+{"pattern":"^GET:(.*)$","text":"GET:abc"}
+{"pattern":"echo {string}","text":"echo \"hi\""}
+{"pattern":"echo {string}","text":"echo 'hi'"}
+{"pattern":"echo {string}","text":"echo \"say \\\"hi\\\"\""}
+{"pattern":"count {int}","text":"count 4"}
+{"pattern":"count {long}","text":"count 4"}
+{"pattern":"label {word}","text":"label hello"}
+{"pattern":"n {float}","text":"n 1.5"}
+{"pattern":"n {double}","text":"n 1.5"}
+{"pattern":"n {bigdecimal}","text":"n 1.5"}
+{"pattern":"n {biginteger}","text":"n 12"}
+{"pattern":"n {byte}","text":"n 3"}
+{"pattern":"n {short}","text":"n 3"}
+{"pattern":"{nope}","reject":true}

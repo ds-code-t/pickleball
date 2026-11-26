@@ -1,4 +1,4 @@
-package tools.dscode.engine.convert;
+package tools.dscode.engine.adapter.cucumber;
 
 import io.cucumber.messages.types.Background;
 import io.cucumber.messages.types.Examples;
@@ -97,7 +97,9 @@ public final class CucumberModelConverter {
         tools.dscode.engine.context.ExecutionContext context = tools.dscode.engine.context.ExecutionContext.current();
         if (context == null) return null;
         Object registry = context.resources().get("registry");
-        if (registry instanceof tools.dscode.engine.match.StepRegistry steps) return steps.tableConverter();
+        if (registry instanceof tools.dscode.engine.match.StepRegistry steps) {
+            return CucumberStepRegistry.tableConverter(steps);
+        }
         return null;
     }
 

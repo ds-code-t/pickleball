@@ -6,7 +6,7 @@ import tools.dscode.coredefinitions.LogAndAssertSteps;
 import tools.dscode.coredefinitions.ServiceCallSteps;
 import tools.dscode.engine.EngineOptions;
 import tools.dscode.engine.PickleballEngine;
-import tools.dscode.engine.adapter.CucumberAdapterRun;
+import tools.dscode.engine.adapter.cucumber.CucumberAdapterRun;
 import tools.dscode.engine.model.RunResult;
 import tools.dscode.engine.model.ScenarioResult;
 import tools.dscode.engine.model.Status;

@@ -1,5 +1,8 @@
-package tools.dscode.engine.runtime;
+package tools.dscode.engine.adapter.cucumber;
 
+import tools.dscode.engine.runtime.NoopGlueMode;
+
+import io.cucumber.core.runner.CurrentScenarioState;
 import io.cucumber.core.runner.StepExtension;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
@@ -24,7 +27,7 @@ import tools.dscode.engine.model.DocText;
 import tools.dscode.engine.model.EngineStep;
 import tools.dscode.engine.model.StepArgument;
 import tools.dscode.engine.model.Table;
-import tools.dscode.engine.convert.CucumberModelConverter;
+import tools.dscode.engine.adapter.cucumber.CucumberModelConverter;
 import tools.dscode.control.protocol.NoopNotice;
 import tools.dscode.coredefinitions.GeneralSteps;
 
@@ -94,7 +97,7 @@ public final class SharedStepRun {
         String text = step.getUnmodifiedText();
         StepMatch match;
         try {
-            match = registry.match(text);
+            match = registry.matchNative(text);
         } catch (RuntimeException thrown) {
             // Ambiguous and other match failures stay unbound so run() reports them.
             return;
@@ -312,7 +315,7 @@ public final class SharedStepRun {
         ExecutionContext context = ExecutionContext.current();
         StepRegistry registry = registry(context);
         String text = step.getUnmodifiedText();
-        StepMatch match = registry == null ? StepMatch.undefined(text) : registry.match(text);
+        StepMatch match = registry == null ? StepMatch.undefined(text) : registry.matchNative(text);
         if (step.method == null) {
             if (match.kind() == StepKind.OVERRIDE) return override(step, match, context);
             if (!match.matched() || match.step() == null || match.step().method() == null) {
@@ -326,7 +329,7 @@ public final class SharedStepRun {
             String resolved = step.getStepParsingMap().resolveWholeText(text);
             if (resolved != null && !resolved.equals(text)) {
                 step.nativeText = resolved;
-                if (registry != null) match = registry.match(resolved);
+                if (registry != null) match = registry.matchNative(resolved);
             }
         }
         if (match.kind() == StepKind.OVERRIDE) return override(step, match, context);
@@ -344,7 +347,7 @@ public final class SharedStepRun {
                 keyword(step).trim(),
                 found.captures(),
                 argumentValue(step),
-                context == null ? null : context.legacy(),
+                context != null && context.legacy() instanceof CurrentScenarioState legacy ? legacy : null,
                 step,
                 step.getStepParsingMap()
         );

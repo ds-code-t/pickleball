@@ -69,18 +69,18 @@ public final class ScenarioStepData {
         DocString resolvedDoc;
         if (sourceStep.pickleStepTestStep == null) {
             tools.dscode.engine.model.EngineStep bound =
-                    tools.dscode.engine.runtime.SharedStepRun.bound(sourceStep);
+                    tools.dscode.engine.adapter.cucumber.SharedStepRun.bound(sourceStep);
             resolvedTable = sourceStep.dataTable;
             resolvedDoc = sourceStep.docString;
             if (resolvedTable == null
                     && bound != null
                     && bound.argument() instanceof tools.dscode.engine.model.StepArgument.TableArg table) {
-                resolvedTable = tools.dscode.engine.convert.CucumberModelConverter.toDataTable(table.table());
+                resolvedTable = tools.dscode.engine.adapter.cucumber.CucumberModelConverter.toDataTable(table.table());
             }
             if (resolvedDoc == null
                     && bound != null
                     && bound.argument() instanceof tools.dscode.engine.model.StepArgument.DocArg doc) {
-                resolvedDoc = tools.dscode.engine.convert.CucumberModelConverter.toDocString(doc.doc());
+                resolvedDoc = tools.dscode.engine.adapter.cucumber.CucumberModelConverter.toDocString(doc.doc());
             }
         } else {
             PickleStepArgument pickleArgument = sourceStep.pickleStepTestStep
@@ -207,7 +207,7 @@ public final class ScenarioStepData {
                         .map(cell -> cell.getValue())
                         .toList())
                 .toList();
-        return tools.dscode.engine.convert.CucumberModelConverter.dataTable(cells);
+        return tools.dscode.engine.adapter.cucumber.CucumberModelConverter.dataTable(cells);
     }
 
     static DocString docStringFromPickleArgument(

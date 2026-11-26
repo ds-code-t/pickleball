@@ -16,7 +16,7 @@ import tools.dscode.common.util.datetime.BusinessTimeRange;
 import tools.dscode.common.util.datetime.DurationFormattingUtils;
 import tools.dscode.common.util.datetime.TemporalValue;
 
-import tools.dscode.engine.context.RunBindings;
+import tools.dscode.engine.adapter.cucumber.RunBindings;
 import static tools.dscode.common.evaluations.AviatorUtil.isStringTruthy;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.normalizeText;
 

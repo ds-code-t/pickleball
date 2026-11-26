@@ -22,7 +22,7 @@ import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.Operati
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.PlaceHolderMatch;
 import tools.dscode.common.treeparsing.preparsing.LineData;
 import tools.dscode.engine.context.ExecutionContext;
-import tools.dscode.engine.context.RunBindings;
+import tools.dscode.engine.adapter.cucumber.RunBindings;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;

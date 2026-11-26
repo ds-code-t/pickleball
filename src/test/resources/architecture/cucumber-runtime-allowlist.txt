@@ -44,17 +44,6 @@ src/main/java/tools/dscode/coredefinitions/ObjectRegistrationSteps.java
 src/main/java/tools/dscode/coredefinitions/ReportingSteps.java
 src/main/java/tools/dscode/coredefinitions/RunRowCondition.java
 src/main/java/tools/dscode/coredefinitions/ServiceCallSteps.java
-src/main/java/tools/dscode/engine/PickleballEngine.java
-src/main/java/tools/dscode/engine/adapter/CucumberAdapterRun.java
-src/main/java/tools/dscode/engine/adapter/NativeSuiteExecution.java
-src/main/java/tools/dscode/engine/context/ExecutionContext.java
-src/main/java/tools/dscode/engine/context/RunBindings.java
-src/main/java/tools/dscode/engine/convert/CucumberModelConverter.java
-src/main/java/tools/dscode/engine/parse/GherkinEngineParser.java
-src/main/java/tools/dscode/engine/runtime/NativeModularRun.java
-src/main/java/tools/dscode/engine/runtime/NativeScenarioRun.java
-src/main/java/tools/dscode/engine/runtime/NativeStepTrace.java
-src/main/java/tools/dscode/engine/runtime/SharedStepRun.java
 src/main/java/tools/dscode/internal/ValuesSupport.java
 src/main/java/tools/dscode/testengine/DynamicSuiteBootstrap.java
 src/main/java/tools/dscode/testengine/DynamicSuiteConfigUtils.java

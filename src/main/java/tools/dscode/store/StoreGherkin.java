@@ -1,5 +1,7 @@
 package tools.dscode.store;
 
+import tools.dscode.engine.adapter.cucumber.CucumberIngest;
+
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -258,10 +260,6 @@ public final class StoreGherkin {
              PreparedStatement examples = connection.prepareStatement("""
                 INSERT INTO example_blocks(file_path, scenario_ord, ord, line, tags)
                 VALUES (?, ?, ?, ?, ?)
-                """);
-             PreparedStatement tags = connection.prepareStatement("""
-                INSERT INTO scenario_tags(file_path, scenario_ord, tag) VALUES (?, ?, ?)
-                ON CONFLICT(file_path, scenario_ord, tag) DO NOTHING
                 """)) {
             for (Scenario one : document.scenarios()) {
                 boolean scenarioIgnored = featureIgnored || containsIgnore(one.tags());
@@ -275,7 +273,6 @@ public final class StoreGherkin {
                 scenario.setString(7, one.description());
                 scenario.setInt(8, enabled);
                 scenario.executeUpdate();
-                writeTags(tags, path, one.ord(), one.tags());
                 for (Step oneStep : one.steps()) {
                     step.setString(1, path);
                     step.setInt(2, one.ord());
@@ -295,7 +292,6 @@ public final class StoreGherkin {
                         examples.setInt(4, oneStep.line());
                         examples.setString(5, exampleTags);
                         examples.executeUpdate();
-                        writeTags(tags, path, one.ord(), exampleTags);
                     }
                 }
             }
@@ -307,6 +303,7 @@ public final class StoreGherkin {
                 file.executeUpdate();
             }
         }
+        CucumberIngest.syncTags(connection, path);
         StoreLog.log(project, "parse", path, "scenarios=" + document.scenarios().size());
     }
 
@@ -341,17 +338,6 @@ public final class StoreGherkin {
             if ("@pkb-ignore".equals(part)) return true;
         }
         return false;
-    }
-
-    private static void writeTags(PreparedStatement tags, String path, int ord, String text) throws SQLException {
-        if (text == null || text.isBlank()) return;
-        for (String part : text.split("\\s+")) {
-            if (!part.startsWith("@") || part.length() < 2) continue;
-            tags.setString(1, path);
-            tags.setInt(2, ord);
-            tags.setString(3, part);
-            tags.executeUpdate();
-        }
     }
 
     /** Parses only when a previous hydrate stored the file before the query model existed. */

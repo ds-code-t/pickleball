@@ -16,7 +16,7 @@ import tools.dscode.internal.ValuesSupport;
 import tools.dscode.engine.model.DocText;
 import tools.dscode.engine.model.Table;
 import tools.dscode.engine.context.ExecutionContext;
-import tools.dscode.engine.context.RunBindings;
+import tools.dscode.engine.adapter.cucumber.RunBindings;
 import tools.dscode.common.dataoperations.NeutralRows;
 import tools.dscode.common.mappings.queries.Tokenized;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;

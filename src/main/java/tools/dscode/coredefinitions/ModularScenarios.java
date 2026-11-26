@@ -13,7 +13,7 @@ import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ParsingMap;
 import tools.dscode.engine.model.EngineScenario;
 import tools.dscode.engine.resolve.ScenarioResolver;
-import tools.dscode.engine.runtime.NativeModularRun;
+import tools.dscode.engine.adapter.cucumber.NativeModularRun;
 import tools.dscode.engine.runtime.NativeScenarioCatalog;
 import java.util.ArrayList;
 import java.util.HashMap;

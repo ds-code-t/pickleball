@@ -7,7 +7,7 @@ import tools.dscode.engine.PickleballEngine;
 import tools.dscode.engine.model.RunResult;
 import tools.dscode.engine.model.Status;
 
-import tools.dscode.engine.adapter.CucumberAdapterRun;
+import tools.dscode.engine.adapter.cucumber.CucumberAdapterRun;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;

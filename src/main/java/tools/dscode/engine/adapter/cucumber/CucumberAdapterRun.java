@@ -1,4 +1,4 @@
-package tools.dscode.engine.adapter;
+package tools.dscode.engine.adapter.cucumber;
 
 import io.cucumber.core.feature.FeatureWithLines;
 import io.cucumber.core.feature.GluePath;

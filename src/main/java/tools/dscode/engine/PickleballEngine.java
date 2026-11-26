@@ -18,8 +18,8 @@ import tools.dscode.engine.source.MemoryScenarioSource;
 import tools.dscode.engine.source.ScenarioSource;
 import tools.dscode.engine.source.StepListScenarioSource;
 import tools.dscode.common.reporting.logging.Level;
+import tools.dscode.engine.adapter.cucumber.CucumberLane;
 import tools.dscode.testengine.PickleballRunner;
-import io.cucumber.core.runner.CurrentScenarioState;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -54,8 +54,7 @@ public final class PickleballEngine {
         NativeScenarioCatalog.bind(settings.project(), loaded);
         List<ScenarioResult> scenarios = new ArrayList<>();
         boolean topLevel = ExecutionContext.current() == null;
-        CurrentScenarioState parked = topLevel ? CurrentScenarioState.currentScenarioState.get() : null;
-        if (topLevel) CurrentScenarioState.currentScenarioState.remove();
+        Object parked = CucumberLane.park(topLevel);
         // Block conditionals log at DEBUG. The adapter uses that level so a
         // surrounding suite that lowered the level still records the same lines.
         Level previousLevel = PickleballRunner.LOG_LEVEL;
@@ -74,7 +73,7 @@ public final class PickleballEngine {
             if (runLease != null) runLease.close();
             PickleballRunner.LOG_LEVEL = previousLevel;
             NativeScenarioCatalog.clear();
-            if (topLevel && parked != null) CurrentScenarioState.currentScenarioState.set(parked);
+            CucumberLane.restore(topLevel, parked);
         }
         RunResult result = RunResult.of(scenarios);
         EngineLog.log(settings.project(), "run", source.id(), result.status() + " scenarios=" + scenarios.size());
@@ -87,7 +86,7 @@ public final class PickleballEngine {
             step = new EngineStep(step.keyword(), step.text(), StepArgument.doc(DocText.of(argument)), step.location(), step.metadata(), false);
         }
         StepRegistry registry = registry(context);
-        ScenarioResult scenario = tools.dscode.engine.runtime.NativeScenarioRun.run(
+        ScenarioResult scenario = tools.dscode.engine.adapter.cucumber.NativeScenarioRun.run(
                 EngineScenario.of("step", List.of(step)),
                 registry,
                 EngineOptions.of()
@@ -111,7 +110,7 @@ public final class PickleballEngine {
     }
 
     private static ScenarioResult runScenario(EngineScenario scenario, StepRegistry registry, EngineOptions options) {
-        return tools.dscode.engine.runtime.NativeScenarioRun.run(scenario, registry, options);
+        return tools.dscode.engine.adapter.cucumber.NativeScenarioRun.run(scenario, registry, options);
     }
 
     private static StepResult finish(Status status, EngineStep step, String message, String returned, long started) {

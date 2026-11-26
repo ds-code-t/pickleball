@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.control.protocol.Workspace;
 import tools.dscode.engine.runtime.NoopGlueMode;
-import tools.dscode.engine.runtime.SharedStepRun;
+import tools.dscode.engine.adapter.cucumber.SharedStepRun;
 
 import java.lang.reflect.Method;
 import java.nio.file.Files;

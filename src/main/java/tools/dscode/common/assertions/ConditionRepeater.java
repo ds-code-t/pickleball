@@ -2,7 +2,7 @@ package tools.dscode.common.assertions;
 
 import io.cucumber.core.runner.StepData;
 import tools.dscode.engine.context.ExecutionContext;
-import tools.dscode.engine.context.RunBindings;
+import tools.dscode.engine.adapter.cucumber.RunBindings;
 
 import java.util.function.Supplier;
 

@@ -159,6 +159,7 @@ public final class SqlDialect {
                 hydrated_at TEXT NOT NULL,
                 removed INTEGER NOT NULL DEFAULT 0,
                 enabled INTEGER NOT NULL DEFAULT 1,
+                parameter_types TEXT NOT NULL DEFAULT '[]',
                 PRIMARY KEY (definition_id)
             )
             """,
@@ -513,6 +514,7 @@ public final class SqlDialect {
         addColumn(session, "scenarios", "enabled", "INTEGER NOT NULL DEFAULT 1");
         addColumn(session, "steps", "enabled", "INTEGER NOT NULL DEFAULT 1");
         addColumn(session, "step_definitions", "enabled", "INTEGER NOT NULL DEFAULT 1");
+        addColumn(session, "step_definitions", "parameter_types", "TEXT NOT NULL DEFAULT '[]'");
     }
 
     private static void addColumn(SqlSession session, String table, String column, String definition) throws SQLException {

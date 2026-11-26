@@ -1,5 +1,7 @@
 package tools.dscode.engine.context;
 
+import tools.dscode.engine.adapter.cucumber.RunBindings;
+
 import io.cucumber.core.runner.CurrentScenarioState;
 import io.cucumber.core.runner.ScenarioStep;
 import io.cucumber.java.en.Given;
@@ -36,7 +38,8 @@ class RunBindingsTest {
             rootMatched = context != null
                     && context.rootStep() != null
                     && RunBindings.of(context).scenarioState() == context.legacy()
-                    && NodeMap.getNodeMap("SCENARIO ROOT", context) == context.rootStep().getDefaultStepNodeMap();
+                    && NodeMap.getNodeMap("SCENARIO ROOT", context)
+                    == ((ScenarioStep) context.rootStep()).getDefaultStepNodeMap();
             DataContext data = DataContextFactory.create("bound", DataElementKind.DATA_VALUE, context);
             dataMatched = data.executionContext() == context;
         }

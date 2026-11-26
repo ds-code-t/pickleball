@@ -4,7 +4,7 @@ import io.cucumber.core.runner.StepExtension;
 import tools.dscode.common.treeparsing.parsedComponents.Phrase;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.Attempt;
-import tools.dscode.engine.context.RunBindings;
+import tools.dscode.engine.adapter.cucumber.RunBindings;
 
 import java.util.ArrayList;
 import java.util.List;

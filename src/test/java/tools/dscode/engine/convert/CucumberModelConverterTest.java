@@ -1,5 +1,7 @@
 package tools.dscode.engine.convert;
 
+import tools.dscode.engine.adapter.cucumber.CucumberModelConverter;
+
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
 import io.cucumber.plugin.event.Status;

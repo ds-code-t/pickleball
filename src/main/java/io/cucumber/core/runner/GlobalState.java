@@ -275,7 +275,8 @@ public class GlobalState {
     public static io.cucumber.core.runner.CurrentScenarioState getCurrentScenarioState() {
         CurrentScenarioState live = currentScenarioState.get();
         if (live != null) return live;
-        return tools.dscode.engine.context.ExecutionContext.legacyOrNull();
+        Object legacy = tools.dscode.engine.context.ExecutionContext.legacyOrNull();
+        return legacy instanceof CurrentScenarioState state ? state : null;
     }
 
 
@@ -300,7 +301,7 @@ public class GlobalState {
         if (live != null && live.testCase != null) {
             return live.testCase.getRootScenarioStep();
         }
-        return tools.dscode.engine.context.RunBindings.of(null).rootScenarioStep();
+        return tools.dscode.engine.adapter.cucumber.RunBindings.of(null).rootScenarioStep();
     }
 
 

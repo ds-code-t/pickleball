@@ -1,5 +1,7 @@
 package tools.dscode.engine.convert;
 
+import tools.dscode.engine.adapter.cucumber.CucumberModelConverter;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import io.cucumber.datatable.DataTable;
 import org.junit.jupiter.api.Test;

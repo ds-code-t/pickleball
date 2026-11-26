@@ -53,7 +53,7 @@ Create `src/test/java/tools/dscode/launcher/BranchColorTest.java`. The page's co
 
 `engine map set --run=<id> --step=<ord> --key=<k> --value=<v>` writes a delta `kind=map` on the fork only. The value is the text the user typed. If the key is a secret field, the command refuses a cleartext value. The delta does not modify the original run.
 
-`tools.dscode.engine.runtime.NativeScenarioRun` applies those deltas in `tools.dscode.engine.runtime.PreStepHook` immediately before the step runs. Children of that step see the value. The parent step's map and later steps that are not descendants do not. The hook reads deltas. It does not read the Node page.
+`tools.dscode.engine.adapter.cucumber.NativeScenarioRun` applies those deltas in `tools.dscode.engine.runtime.PreStepHook` immediately before the step runs. Children of that step see the value. The parent step's map and later steps that are not descendants do not. The hook reads deltas. It does not read the Node page.
 
 The shell's Map tab calls `map show` and `map set`. It appears when a run or a fork is selected. Logs and screenshots tabs call the existing `store timeline` and artifact list. They are not a new store.
 
