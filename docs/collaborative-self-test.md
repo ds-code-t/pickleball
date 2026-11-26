@@ -275,13 +275,13 @@ Finish with `live-stop`. Do not add this section to `@all`.
 
 A repeatable test with two actors on one `start` session. `TwoActorRecipeLiveTest` runs scenarios 1, 2, and 5 of this recipe as a scripted version.
 
-- **Helper (human tier).** Runs under its own run id, locked with `session-mode --human=on --run-id=<helper>`. It uses only human-tier verbs: `snap`, `find`, `act`, `wait`, `capture`, `chat-read`, `doctor`, `explain`, and `help`. It talks to the agent only through what is on the page: cards, the panel composer, highlights, and guides. A control verb exits 2 with `error: <verb> is a control-tier verb`.
-- **Agent (full access).** Runs under its own run id with control verbs. It waits without blocking the start host's lane: `ask-and-wait --async` with `answer-wait --id`, and `chat-turn`.
+- **Helper (human tier).** Runs under its own run id, locked with `session-mode --human=on --run-id=<helper>`. It uses only human-tier verbs: `snap`, `find`, `act`, `wait`, `capture`, `chat-read`, `doctor`, `explain`, and `help`. It talks to the agent only through what is on the page: cards, the panel composer, highlights, and guides. A control verb exits 2 with `error: <verb> is a control-tier verb`. The lock is per run id. There are no per-caller tiers.
+- **Agent (full access).** Runs under its own run id with control verbs. It waits without blocking the start host's lane: `ask-and-wait --async` with `answer-wait --id`, `wait-any` (the first of an answer, a chat line, or a click), and `chat-turn`.
 
 Start and attach in this order. This avoids the start race and the notes-file deadlock seen on 2026-11-23.
 
 1. The agent runs `start` alone, and runs `doctor` until it shows `health=ok`.
-2. Only then does the helper attach: `session-mode --human=on`, then a first `snap`.
+2. Only then does the helper attach: `session-mode --human=on --run-id=<helper>`, then a first `snap`. `session-mode --human=on` with no `--run-id` still locks the default run id and warns: `warning: the human lock applies to the default run id`, with `fix: --run-id=<helper>`. Pass the helper's run id so the lock does not cover the agent's calls.
 3. Each side writes its notes to its own file. Neither side waits on the other's notes file.
 4. Neither side starts a second `start` while the first one is still running.
 

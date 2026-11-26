@@ -103,7 +103,7 @@ public final class LiveSessionAttach {
      * The wait a waiting verb declared, in milliseconds, capped at {@link #MAX_WAIT_MS}.
      * chat-turn and chat_wait take {@code --timeout} in seconds, ui-poll and chat-poll take
      * {@code --wait} in seconds, watch takes {@code --duration} in milliseconds, and
-     * ask-and-wait, answer-wait, wait and wait-for take {@code --timeout} in milliseconds.
+     * ask-and-wait, answer-wait, wait-any, wait and wait-for take {@code --timeout} in milliseconds.
      * A trailing {@code s} or {@code ms} wins over the verb's bare unit.
      * Text that is not a number throws {@link NumberFormatException}.
      */
@@ -140,6 +140,7 @@ public final class LiveSessionAttach {
             case "chat-turn" -> "chat-read --last=5 shows a reply that arrived late; then chat-turn again (--timeout max 120)";
             case "chat_wait" -> "chat-read --last=5, then chat_wait again (--timeout max 120)";
             case "ask-and-wait", "answer-wait" -> "answer-wait --id=<question> reads a stored choice (--timeout max 120s)";
+            case "wait-any" -> "wait-any again with --answer, --chat, or --watch (--timeout max 120s)";
             case "ui-poll" -> "ui-poll again with the returned cursor (--wait max 120)";
             case "watch" -> "watch again (--duration max 120000 ms)";
             case "wait", "wait-for" -> op + " again (--timeout max 120000 ms)";
@@ -246,7 +247,7 @@ public final class LiveSessionAttach {
 
     private static boolean waits(String op) {
         return "chat-turn".equals(op) || "chat_wait".equals(op) || "ask-and-wait".equals(op)
-                || "answer-wait".equals(op) || "ui-poll".equals(op) || "chat-poll".equals(op)
+                || "answer-wait".equals(op) || "wait-any".equals(op) || "ui-poll".equals(op) || "chat-poll".equals(op)
                 || "watch".equals(op) || "wait".equals(op) || "wait-for".equals(op);
     }
 

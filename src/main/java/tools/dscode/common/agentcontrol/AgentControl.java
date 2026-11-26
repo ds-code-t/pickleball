@@ -152,16 +152,16 @@ public final class AgentControl {
         Map<String, String> values = args == null ? new java.util.LinkedHashMap<>() : new java.util.LinkedHashMap<>(args);
         tools.dscode.common.agentfast.AgentCursor.absorb(op, values);
         String humanRefusal = HumanLock.check(project, runId, op, values, agentId);
-        if (humanRefusal != null) return timed(refusal(humanRefusal), started, project, runId, op);
+        if (humanRefusal != null) return timed(refusal(humanRefusal), started, project, runId, op, agentId);
         String attached = attachedRefusal(op, runId, values);
         if (attached != null) {
             Result failed = fail(2, attached);
             failed.body().put("fix", (op == null ? "that verb" : op) + " serves the start host or the isolate worker");
-            return timed(failed, started, project, runId, op);
+            return timed(failed, started, project, runId, op, agentId);
         }
         try {
             Optional<Result> routed = AgentSurfaceRouter.route(project, runId, op, values, agentId);
-            if (routed.isPresent()) return timed(routed.get(), started, project, runId, op);
+            if (routed.isPresent()) return timed(routed.get(), started, project, runId, op, agentId);
             if (values.get("scope") != null && !values.get("scope").isBlank()) UiState.scope(values.get("scope"));
             if (values.get("ttl") != null && !values.get("ttl").isBlank()) UiState.expires(values.get("ttl"), 0L);
             Result result = dispatch(project, runId, op, values, extraArgs, agentId);
@@ -170,15 +170,15 @@ public final class AgentControl {
             }
             if (result.exit() == 0 && UiState.TRACKED.contains(op)) UiState.sync(project, runId, values);
             if (result.exit() == 0 && "html-cleanup".equals(op)) UiState.clear(project, runId);
-            return timed(result, started, project, runId, op);
+            return timed(result, started, project, runId, op, agentId);
         } catch (IllegalArgumentException failure) {
-            return timed(fail(2, failure.getMessage() == null ? "usage" : failure.getMessage()), started, project, runId, op);
+            return timed(fail(2, failure.getMessage() == null ? "usage" : failure.getMessage()), started, project, runId, op, agentId);
         } catch (Exception failure) {
-            return timed(fail(1, failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()), started, project, runId, op);
+            return timed(fail(1, failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()), started, project, runId, op, agentId);
         }
     }
 
-    private static Result timed(Result result, long started, Path project, String runId, String op) {
+    private static Result timed(Result result, long started, Path project, String runId, String op, String agentId) {
         long elapsedMs = Math.max(0L, (System.nanoTime() - started) / 1_000_000L);
         Map<String, Object> body = result.body();
         if (body != null && !body.containsKey("frame")) {
@@ -188,7 +188,7 @@ public final class AgentControl {
         Map<String, Object> stamped = ReplyFields.stamp(body, elapsedMs);
         if (stamped.get("op") == null && op != null) stamped.put("op", op);
         return new Result(result.exit(), tools.dscode.common.agentfast.AgentEnvelope.apply(
-                stamped, result.exit(), op, project, runId));
+                stamped, result.exit(), op, project, runId, agentId));
     }
 
     /** Main frame id when this process has a live browser. Empty otherwise. */
@@ -230,6 +230,7 @@ public final class AgentControl {
                 case "ask" -> ask(project, runId, values);
                 case "ask-and-wait" -> askAndWait(project, runId, values);
                 case "answer-wait" -> answerWait(project, runId, values);
+                case "wait-any" -> waitAny(project, runId, values);
                 case "pin", "toast", "checklist", "status" -> surfaceCard(project, runId, op, values);
                 case "ui", "ui-apply" -> UiBatch.apply(project, runId, values, agentId);
                 case "ui-poll" -> UiBatch.poll(project, runId, values, agentId);
@@ -829,6 +830,150 @@ public final class AgentControl {
             return failed;
         }
         return answered("answer-wait", id, value);
+    }
+
+    /**
+     * Returns the first new answer, chat line, or click. Events already stored are ignored.
+     * {@code fired} is {@code answer}, {@code chat}, or {@code watch}. A tie on {@code at} prefers
+     * answer, then chat, then watch. The wait does not hold the command lane.
+     */
+    private static Result waitAny(Path project, String runId, Map<String, String> args) throws Exception {
+        String answerId = present(args.get("answer")) ? args.get("answer").trim() : "";
+        String chatMode = present(args.get("chat")) ? args.get("chat").trim().toLowerCase(java.util.Locale.ROOT) : "";
+        String watch = present(args.get("watch")) ? args.get("watch").trim() : "";
+        if (answerId.isEmpty() && chatMode.isEmpty() && watch.isEmpty()) {
+            return fail(2, "wait-any needs --answer, --chat, or --watch");
+        }
+        if (!chatMode.isEmpty() && !chatMode.equals("human") && !chatMode.equals("agent") && !chatMode.equals("any")) {
+            return fail(2, "wait-any --chat is human, agent, or any");
+        }
+        String watchId = "";
+        if (!watch.isEmpty()) {
+            int colon = watch.indexOf(':');
+            String kind = colon < 0 ? "" : watch.substring(colon + 1).trim();
+            watchId = colon <= 0 ? "" : watch.substring(0, colon).trim();
+            if (watchId.isEmpty() || !"click".equals(kind)) {
+                return fail(2, "wait-any --watch is <short id>:click");
+            }
+        }
+        long timeout;
+        try {
+            timeout = timeoutMillis(args, 30_000L);
+        } catch (NumberFormatException failure) {
+            return fail(2, "timeout is milliseconds");
+        }
+        int before = inputCount(project, runId);
+        String chatAfter = "0";
+        try {
+            chatAfter = ChatLog.latestId(project, runId, "run");
+        } catch (RuntimeException | IOException ignored) {
+            chatAfter = "0";
+        }
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(Math.max(0, timeout));
+        while (true) {
+            long wakeSeen = tools.dscode.common.agentfast.PushWake.generation();
+            Result hit = waitAnyHit(project, runId, before, chatAfter, answerId, chatMode, watchId);
+            if (hit != null) return hit;
+            if (System.nanoTime() >= deadline) {
+                hit = waitAnyHit(project, runId, before, chatAfter, answerId, chatMode, watchId);
+                if (hit != null) return hit;
+                Result failed = fail(1, "timeout");
+                failed.body().put("op", "wait-any");
+                return failed;
+            }
+            tools.dscode.common.agentfast.PushWake.await(wakeSeen, 50, deadline);
+        }
+    }
+
+    /** The earliest matching event in this pass, or null when nothing new matches. */
+    private static Result waitAnyHit(
+            Path project,
+            String runId,
+            int before,
+            String chatAfter,
+            String answerId,
+            String chatMode,
+            String watchId
+    ) throws Exception {
+        WaitPick pick = new WaitPick();
+        if (!answerId.isEmpty()) {
+            try {
+                for (Map<String, Object> event : PageSurfaces.pollInput(project, runId, before)) {
+                    String picked = acceptedChoice(event, answerId, null);
+                    if (picked == null) continue;
+                    Map<String, Object> fields = new LinkedHashMap<>();
+                    fields.put("fired", "answer");
+                    fields.put("id", answerId);
+                    fields.put("value", picked);
+                    fields.put("choice", picked);
+                    pick.offer(event.get("at"), 0, fields);
+                }
+            } catch (RuntimeException | IOException failure) {
+                CompositeLog.info("ui", "wait-any answer poll skipped " + failure.getMessage());
+            }
+        }
+        if (!chatMode.isEmpty()) {
+            try {
+                for (ChatLog.Message message : ChatLog.poll(project, runId, "run", chatAfter)) {
+                    String source = message.source() == null ? "" : message.source();
+                    if (!chatSourceMatches(chatMode, source)) continue;
+                    Map<String, Object> fields = new LinkedHashMap<>();
+                    fields.put("fired", "chat");
+                    fields.put("id", message.id());
+                    fields.put("text", message.text());
+                    fields.put("source", source);
+                    pick.offer(message.at(), 1, fields);
+                }
+            } catch (RuntimeException | IOException failure) {
+                CompositeLog.info("ui", "wait-any chat poll skipped " + failure.getMessage());
+            }
+        }
+        if (!watchId.isEmpty()) {
+            try {
+                for (Map<String, Object> event : PageSurfaces.pollInput(project, runId, before)) {
+                    String type = String.valueOf(event.get("type")).toLowerCase(java.util.Locale.ROOT);
+                    if (!type.contains("click")) continue;
+                    String id = event.get("id") == null ? "" : String.valueOf(event.get("id"));
+                    String ref = event.get("ref") == null ? "" : String.valueOf(event.get("ref"));
+                    String handle = event.get("handle") == null ? "" : String.valueOf(event.get("handle"));
+                    if (!watchId.equals(id) && !watchId.equals(ref) && !watchId.equals(handle)) continue;
+                    Map<String, Object> fields = new LinkedHashMap<>();
+                    fields.put("fired", "watch");
+                    fields.put("id", watchId);
+                    pick.offer(event.get("at"), 2, fields);
+                }
+            } catch (RuntimeException | IOException failure) {
+                CompositeLog.info("ui", "wait-any watch poll skipped " + failure.getMessage());
+            }
+        }
+        if (pick.fields == null) return null;
+        String fired = String.valueOf(pick.fields.get("fired"));
+        Map<String, Object> body = ok("wait-any fired " + fired);
+        body.put("op", "wait-any");
+        body.putAll(pick.fields);
+        return new Result(0, body);
+    }
+
+    /** {@code any} is human or agent. A system line, including an overlay echo, is not a chat hit. */
+    private static boolean chatSourceMatches(String mode, String source) {
+        if (source == null || source.isBlank() || "system".equals(source)) return false;
+        if ("any".equals(mode)) return "human".equals(source) || "agent".equals(source);
+        return mode.equals(source);
+    }
+
+    /** Earliest {@code at} wins. An equal stamp prefers answer, then chat, then watch. */
+    private static final class WaitPick {
+        private String at = "\uffff";
+        private int rank = 9;
+        private Map<String, Object> fields;
+
+        private void offer(Object stamp, int rank, Map<String, Object> fields) {
+            String at = stamp == null || String.valueOf(stamp).isBlank() ? "\uffff" : String.valueOf(stamp);
+            if (this.fields != null && (at.compareTo(this.at) > 0 || (at.equals(this.at) && rank >= this.rank))) return;
+            this.at = at;
+            this.rank = rank;
+            this.fields = fields;
+        }
     }
 
     private static boolean asyncAsked(Map<String, String> args) {

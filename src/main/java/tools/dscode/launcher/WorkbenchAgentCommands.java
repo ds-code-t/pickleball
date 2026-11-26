@@ -111,7 +111,7 @@ public final class WorkbenchAgentCommands {
         String runId = parsed.coordination().runId();
         if (human == null || human.isBlank()) {
             boolean on = tools.dscode.common.agentcontrol.HumanLock.locked(parsed.project(), runId);
-            out.println("{\"ok\":true,\"op\":\"session-mode\",\"human\":\"" + (on ? "on" : "off") + "\"}");
+            printSessionMode(out, err, on ? "on" : "off", runId, false);
             return 0;
         }
         String value = human.trim().toLowerCase(java.util.Locale.ROOT);
@@ -122,8 +122,26 @@ public final class WorkbenchAgentCommands {
         boolean on = "on".equals(value) || "true".equals(value);
         if (on) tools.dscode.common.agentcontrol.HumanLock.lock(parsed.project(), runId, agentIdOf(parsed));
         else tools.dscode.common.agentcontrol.HumanLock.unlock(parsed.project(), runId);
-        out.println("{\"ok\":true,\"op\":\"session-mode\",\"human\":\"" + (on ? "on" : "off") + "\"}");
+        printSessionMode(out, err, on ? "on" : "off", runId, on && (runId == null || runId.isBlank()));
         return 0;
+    }
+
+    /**
+     * Prints the session-mode object. Turning the lock on with no run id warns that the lock
+     * applies to the default run id. The warning is not an {@code error:} line, and the exit stays 0.
+     */
+    private static void printSessionMode(PrintStream out, PrintStream err, String human, String runId, boolean warn) throws java.io.IOException {
+        String caller = runId == null || runId.isBlank() ? "session" : runId.trim();
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("ok", true);
+        body.put("op", "session-mode");
+        body.put("human", human);
+        body.put("tier", "control");
+        body.put("caller", caller);
+        out.println(JSON.writeValueAsString(body));
+        if (!warn) return;
+        err.println("warning: the human lock applies to the default run id");
+        err.println("fix: --run-id=<helper>");
     }
 
     public static int run(String[] args, PrintStream out, PrintStream err) {
@@ -296,7 +314,7 @@ public final class WorkbenchAgentCommands {
                      "record",
                      "screenshot", "selftest",
                      "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame", "upload", "navigate",
-                     "ask-and-wait", "answer-wait", "pin", "toast", "checklist", "ui", "ref",
+                     "ask-and-wait", "answer-wait", "wait-any", "pin", "toast", "checklist", "ui", "ref",
                      "chat-turn", "ui-verify" ->
                         agentControl(parsed, safeOut, safeErr);
                 case "help" -> help(args, safeOut, safeErr);
@@ -2199,6 +2217,9 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "kind");
         copyFlag(args, parsed, "condition");
         copyFlag(args, parsed, "timeout");
+        copyFlag(args, parsed, "answer");
+        copyFlag(args, parsed, "chat");
+        copyFlag(args, parsed, "watch");
         copyFlag(args, parsed, "request");
         copyFlag(args, parsed, "response");
         copyFlag(args, parsed, "ref");
