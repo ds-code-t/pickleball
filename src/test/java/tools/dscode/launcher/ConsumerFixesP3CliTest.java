@@ -32,6 +32,18 @@ class ConsumerFixesP3CliTest {
     }
 
     @Test
+    void absoluteMissingProjectPathIsTheProject() {
+        Path missing = temp.resolve("not-created-yet");
+        assertFalse(Files.exists(missing));
+        WorkbenchCommandLine.Parsed events = WorkbenchCommandLine.parse(
+                new String[]{"browser-events", missing.toString(), "--start"});
+        assertEquals(missing.toAbsolutePath().normalize(), events.project().toAbsolutePath().normalize());
+        WorkbenchCommandLine.Parsed made = WorkbenchCommandLine.parse(
+                new String[]{"context-new", temp.resolve("close").toString()});
+        assertTrue(made.project().toString().endsWith("close"), made.project().toString());
+    }
+
+    @Test
     void recordStillAcceptsAScratchDirectoryThatDoesNotExistYet() {
         WorkbenchCommandLine.Parsed parsed = WorkbenchCommandLine.parse(new String[]{
                 "record", "build/p3-scratch-missing"

@@ -118,6 +118,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-consumer-fixes/round2-findings.md`
 - `docs/maintainer/3.0.0-consumer-fixes/scoreboard.md`
 - `docs/maintainer/3.0.0-consumer-fixes/triage.md`
+- `docs/maintainer/3.0.0-consumer-fixes/windows-recheck.md`
 - `docs/maintainer/3.0.0-consumer-ready-handoff.md`
 - `docs/maintainer/3.0.0-consumer-report-2026-11-17/agent-blockers-digest.md`
 - `docs/maintainer/3.0.0-consumer-report-2026-11-17/agreed-plan.md`

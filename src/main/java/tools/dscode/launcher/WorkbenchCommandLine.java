@@ -1042,8 +1042,11 @@ final class WorkbenchCommandLine {
         }
     }
 
-    /** {@code record} and {@code selftest} still take a scratch directory that does not exist yet. */
-    private static final Set<String> DIRECTORY_ARGUMENT_VERBS = Set.of("record", "selftest");
+    /**
+     * Relative scratch paths that may not exist yet. Every verb still accepts an absolute project path
+     * that does not exist yet; that rule lives in {@link #acceptsAsProject}.
+     */
+    private static final Set<String> DIRECTORY_ARGUMENT_VERBS = Set.of("record", "selftest", "pw", "cdp");
 
     /**
      * Verbs whose leftover words are arguments, not unknown positionals.
@@ -1055,9 +1058,29 @@ final class WorkbenchCommandLine {
     );
 
     private static boolean acceptsAsProject(String command, String token) {
+        if (token == null || token.isBlank()) return false;
+        // A bare pw area (page, run, ...) stays a word even when a directory of that name exists.
+        if (barePwArea(command, token)) return false;
         if (looksLikeProject(token)) return true;
-        if (token == null || !DIRECTORY_ARGUMENT_VERBS.contains(command)) return false;
+        if (absoluteProjectPath(token)) return true;
+        if (!DIRECTORY_ARGUMENT_VERBS.contains(command)) return false;
         return token.contains("/") || token.contains("\\");
+    }
+
+    /** The harness puts the project at index 1 before that directory exists. A relative stray token is not this. */
+    private static boolean absoluteProjectPath(String token) {
+        try {
+            Path path = Path.of(token);
+            return path.isAbsolute() && !Files.isRegularFile(path);
+        } catch (java.nio.file.InvalidPathException failure) {
+            return false;
+        }
+    }
+
+    private static boolean barePwArea(String command, String token) {
+        if (!"pw".equals(command)) return false;
+        if (token.indexOf('/') >= 0 || token.indexOf('\\') >= 0) return false;
+        return PwCommand.AREAS.contains(token.toLowerCase(Locale.ROOT));
     }
 
     private static void rejectUnknownPositionals(String command, List<String> positionals) {

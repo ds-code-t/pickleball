@@ -62,6 +62,33 @@ class ConsumerFixesP2CliTest {
     }
 
     @Test
+    void pwKeepsAMissingProjectPathAheadOfAnAreaWord() throws Exception {
+        Path missing = temp.resolve("not-created-yet");
+        assertFalse(Files.exists(missing));
+        Capture none = cli(missing, "pw", "page", "list");
+        assertEquals(1, none.code, none.out + none.err);
+        assertFalse((none.out + none.err).contains("pw needs an area"), none.out + none.err);
+        assertTrue(none.err.startsWith("error: no CDP endpoint for Playwright"), none.err);
+
+        Path areaDir = Path.of("locator").toAbsolutePath().normalize();
+        boolean created = false;
+        try {
+            if (!Files.exists(areaDir)) {
+                Files.createDirectory(areaDir);
+                created = true;
+            }
+            assertTrue(Files.isDirectory(areaDir), areaDir.toString());
+            WorkbenchCommandLine.Parsed bare = WorkbenchCommandLine.parse(new String[]{"pw", "locator", "list"});
+            assertFalse(areaDir.equals(bare.project().toAbsolutePath().normalize()), bare.project().toString());
+            WorkbenchCommandLine.Parsed parsed = WorkbenchCommandLine.parse(
+                    new String[]{"pw", missing.toString(), "locator", "list"});
+            assertEquals(missing.toAbsolutePath().normalize(), parsed.project().toAbsolutePath().normalize());
+        } finally {
+            if (created) Files.deleteIfExists(areaDir);
+        }
+    }
+
+    @Test
     void callPwArgsFileIsAnAreaNotAUsageError() throws Exception {
         Path project = Files.createDirectories(temp.resolve("call"));
         Path file = project.resolve("pw-args.json");
