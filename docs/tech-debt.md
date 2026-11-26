@@ -60,3 +60,23 @@ These items stay out of `3.0.0-consumer-fixes`. The roadmap lists them under "No
 | 6.1.5 | Shared frame policy. The case is consumer config (L13). |
 | 6.3.6 | Warm PW/CDP at start. |
 | 6.7.3 | UIA tree cache. |
+
+## Spine R5 production wiring (open, found in R5 verification 2026-11-26)
+
+1. `WorkbenchUiServer.assets()` only resolves a `file:` resource or `./workbench-ui`, so `pickleball ui` from the published jar fails with "assets are missing" instead of exploding `META-INF/pickleball/workbench-ui/` beside the run.
+2. `PickleballWorkbenchLauncher.controllerUiWithoutOps` treats any `ui` without `--ops` as bare `ui`, so `pickleball ui page` opens the renderer instead of writing the page.
+3. `open-window` falls through from playback `NODE` to `startUi`, which starts the controller `ui` that prints a line and exits, so the Node renderer never opens on that run.
+4. `inject on` only writes a JSON flag, attach consumes `target.hashCode()`, and mutate and layer ids are labels, so the sibling overlay, `RuntimeInstall`, per-agent layers, and reload re-emit do not run.
+5. `OverlayReceipts.record` and `ack`, and `AskCards.answer`, have no production caller, so `overlay-poll` never receives `read_at` and a typed ask answer never reaches `ui-poll`.
+6. `chat --follow` sleeps the timeout and prints one list instead of emitting each new message as it arrives.
+7. `lease take` and `lease release` use `UiLease`, a file lock nothing else consults, instead of `WorkbenchControlLease` and `LeaseHold`, so the holder does not gate the protected controls.
+8. `input block --on` only makes the agent's own `input` verb refuse and does not block human mouse and keyboard on the page.
+9. `VerbCatalog.outsideCatalog` only checks quoted paths that start with `/`, and a generated page cannot call `/store` because that route requires the main UI token.
+10. `workbench-ui/server.mjs` and `workbench-ui/pages/index.html` build `/node_modules/`, `/ui/`, and the page path by joining strings, so the route scan never sees those routes.
+11. The Scenarios, Globals, Data, branch selector, code tab, and Point button do not call the store and point commands the roadmap requires, and an open-then-save round trip writes the glue-show JSON wrapper into the glue file.
+12. `WorkbenchUiServerTest` passes on the static `id="monaco"` element even when the packaged `monaco-editor` loader is not served.
+13. `VerbDispatch` does not require `--session=<id>` or a default session created by `spine session new`.
+14. `store sql` enforces read-only with a text check only, and `--text` filtering runs after the 200-row cap.
+15. `docs/pickleball-workbench.md` and the `AgentHop` comment still describe Swing as the current window, lease, editor, and bare `ui`.
+16. `WorkbenchUiPackager.ALLOWED` and `WorkbenchUiLicenseTest` allow `Unlicense` and `CC0-1.0`, which the design license list does not name.
+17. Packaging must keep `monaco-editor` (MIT) and `typescript` (Apache-2.0), with no added packages, second Node, or runtime download.
