@@ -4,7 +4,7 @@ Roadmap: `docs/roadmaps/3.0.0-spine/R1-core-hydration-spine-universal-entity.md`
 
 | Phase | Items | Status | SHAs | CI | Targeted tests run (filters, pass/fail) | Windows live repro | Notes / blockers |
 |---|---|---|---|---|---|---|---|
-| P1 | Pin, deltas, head, undo, window of 100 | pending | | | | | |
+| P1 | Pin, deltas, head, undo, window of 100 | done | 6615c459560ae94e64514c37ed8ca6544ece0c28 | | `.\gradlew.bat :test --tests tools.dscode.store.UniversalEntityTest --tests tools.dscode.store.DeltaWindowTest --tests tools.dscode.store.HeadMaterializerTest --tests tools.dscode.store.sql.StoreSchemaTest --console=plain` — 11 passed, 0 failed | | Windows only |
 | P2 | JAR hash, incremental hydrate, enabled flags, tags, paths, run variables, @pkb-ignore | pending | | | | | |
 | P3 | Conflict show and choose, discarded hold | pending | | | | | |
 | P4 | Cow sandbox default, copy mode kept, promote storage | pending | | | | | |
