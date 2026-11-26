@@ -30,6 +30,9 @@ The following components are licensed under the Apache License 2.0:
 - com.microsoft.playwright:playwright:1.65.1, com.microsoft.playwright:driver:1.65.1, com.microsoft.playwright:driver-bundle:1.65.1
   (normal POM dependencies, not shaded into the pickleball jar; driver-bundle carries a Node.js binary under the
   Node.js license, https://github.com/nodejs/node/blob/main/LICENSE, with Node's own bundled third-party notices)
+- typescript 5.6.3, packaged at `META-INF/pickleball/workbench-ui/node_modules/typescript/` inside the pickleball jar
+  (Apache-2.0, https://github.com/microsoft/TypeScript/blob/main/LICENSE.txt). The Node binary stays in driver-bundle
+  and is not copied into the jar.
 - org.apache.poi:poi-ooxml:5.5.1
 
 - com.googlecode.aviator:aviator:5.4.3
@@ -103,6 +106,8 @@ Pickleball Studio source navigation also embeds `io.cucumber:gherkin:35.1.0` and
 `io.cucumber:messages:29.0.1` inside its isolated nested executable JAR.
 
 - io.github.classgraph:classgraph:4.8.184
+- monaco-editor 0.52.2, packaged at `META-INF/pickleball/workbench-ui/node_modules/monaco-editor/` inside the pickleball jar
+  (MIT, https://github.com/microsoft/monaco-editor/blob/main/LICENSE)
 
 - xpathy:xpathy:3.0.0 (bundled manually as libs/xpathy-3.0.0.jar)
 

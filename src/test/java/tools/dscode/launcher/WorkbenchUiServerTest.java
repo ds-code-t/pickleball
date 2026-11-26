@@ -30,6 +30,10 @@ class WorkbenchUiServerTest {
 
             String foreign = exchange(handle.port(), request("GET", "/?t=" + handle.token(), "example.com"));
             assertTrue(status(foreign).startsWith("HTTP/1.1 403"), status(foreign));
+
+            String code = exchange(handle.port(), request("GET", "/scenarios?t=" + handle.token(), "127.0.0.1"));
+            assertTrue(status(code).startsWith("HTTP/1.1 200"), status(code));
+            assertTrue(code.contains("monaco"), code);
         }
     }
 

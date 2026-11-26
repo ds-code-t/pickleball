@@ -1,5 +1,6 @@
 import http from "node:http";
 import fs from "node:fs";
+import path from "node:path";
 
 const token = process.env.PKB_UI_TOKEN || "";
 const root = process.env.PKB_UI_ROOT || import.meta.dirname;
@@ -30,6 +31,18 @@ function presentedToken(req, url) {
     if (query && same(query, token)) return true;
     if (header && same(header, token)) return true;
     return false;
+}
+
+function contentType(file) {
+    const ext = path.extname(file).toLowerCase();
+    if (ext === ".js" || ext === ".mjs") return "application/javascript; charset=utf-8";
+    if (ext === ".css") return "text/css; charset=utf-8";
+    if (ext === ".json" || ext === ".map") return "application/json; charset=utf-8";
+    if (ext === ".svg") return "image/svg+xml";
+    if (ext === ".ttf") return "font/ttf";
+    if (ext === ".woff") return "font/woff";
+    if (ext === ".woff2") return "font/woff2";
+    return "application/octet-stream";
 }
 
 function send(res, status, body, type) {
@@ -80,6 +93,32 @@ const server = http.createServer((req, res) => {
     const name = url.pathname;
     if (req.method === "GET" && (name === "/" || name === "/scenarios" || name === "/globals" || name === "/data" || name === "/sql")) {
         send(res, 200, fs.readFileSync(pageFile), "text/html; charset=utf-8");
+        return;
+    }
+    const assetPrefix = "/" + "node_modules" + "/";
+    if (req.method === "GET" && name.startsWith(assetPrefix)) {
+        const relative = name.slice(1);
+        if (relative.split("/").includes("..")) {
+            send(res, 404, "not found\n");
+            return;
+        }
+        const file = path.resolve(root, relative);
+        const base = path.resolve(root);
+        if (file !== base && !file.startsWith(base + path.sep)) {
+            send(res, 404, "not found\n");
+            return;
+        }
+        if (!fs.existsSync(file) || !fs.statSync(file).isFile()) {
+            send(res, 404, "not found\n");
+            return;
+        }
+        const bytes = fs.readFileSync(file);
+        res.writeHead(200, {
+            "content-type": contentType(file),
+            "content-length": bytes.length,
+            "cache-control": "no-store"
+        });
+        res.end(bytes);
         return;
     }
     if (req.method === "POST" && name === "/store") {

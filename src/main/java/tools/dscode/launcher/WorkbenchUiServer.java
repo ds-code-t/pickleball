@@ -26,7 +26,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
@@ -256,12 +255,7 @@ public final class WorkbenchUiServer {
     }
 
     private static Path nodeBinary() {
-        Optional<Path> driver = PlaywrightNode.locate();
-        if (driver.isEmpty()) return null;
-        List<String> command = PlaywrightNode.command(driver.get(), List.of());
-        if (command.isEmpty() || command.get(0) == null || command.get(0).isBlank()) return null;
-        Path node = Path.of(command.get(0));
-        return Files.isRegularFile(node) ? node : null;
+        return PlaywrightNode.nodeBinary();
     }
 
     private static String token() {

@@ -30,6 +30,11 @@ pre { white-space: pre-wrap; }
 <section id="scenarios">
 <h2>Scenarios</h2>
 <label>Search <input id="search" type="text"></label>
+<label>Definition <input id="definition-path" type="text"></label>
+<button id="open-definition" type="button">open definition</button>
+<button id="save-definition" type="button">Save definition</button>
+<div id="monaco" style="height: 240px; border: 1px solid #ccc"></div>
+<pre id="definition-message"></pre>
 <pre id="scenario-body"></pre>
 </section>
 <section id="globals">
@@ -82,6 +87,50 @@ document.getElementById("search").addEventListener("change", async function () {
     if (text) args.push("--text=" + text);
     const result = await callStore(args);
     document.getElementById("scenario-body").textContent = (result.out || "") + (result.err || "");
+});
+let definitionEditor = null;
+function monacoRoot() {
+    return ["", "node_modules", "monaco-editor", "min", "vs"].join("/");
+}
+function loadMonaco() {
+    if (window.monaco && window.monaco.editor) return Promise.resolve();
+    return new Promise(function (resolve, reject) {
+        const script = document.createElement("script");
+        script.src = monacoRoot() + "/loader.js" + location.search;
+        script.onload = function () {
+            window.require.config({ paths: { vs: monacoRoot().slice(1) }, urlArgs: "t=" + token });
+            window.require(["vs/editor/editor.main"], resolve);
+        };
+        script.onerror = function () { reject(new Error("monaco")); };
+        document.body.appendChild(script);
+    });
+}
+document.getElementById("open-definition").addEventListener("click", async function () {
+    const path = document.getElementById("definition-path").value;
+    const result = await callStore(["glue", "show", "--path=" + path, "--json"]);
+    const message = document.getElementById("definition-message");
+    message.textContent = (result.err || "") + (result.out || "");
+    try {
+        await loadMonaco();
+        const value = result.out || "";
+        if (!definitionEditor) {
+            definitionEditor = window.monaco.editor.create(document.getElementById("monaco"), {
+                value: value,
+                language: path.endsWith(".ts") ? "typescript" : "java",
+                automaticLayout: true
+            });
+        } else {
+            definitionEditor.setValue(value);
+        }
+    } catch (failure) {
+        message.textContent = (message.textContent || "") + "\nmonaco did not load";
+    }
+});
+document.getElementById("save-definition").addEventListener("click", async function () {
+    const path = document.getElementById("definition-path").value;
+    const text = definitionEditor ? definitionEditor.getValue() : "";
+    const result = await callStore(["glue", "put", "--path=" + path, "--text=" + text]);
+    document.getElementById("definition-message").textContent = (result.err || "") + (result.out || "");
 });
 document.getElementById("point").addEventListener("click", async function () {
     const result = await callStore(["--x=0", "--y=0"], "point");

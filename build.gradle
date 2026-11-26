@@ -1169,7 +1169,7 @@ def workbenchUiOut = layout.buildDirectory.dir('generated/workbench-ui')
 
 tasks.register('workbenchUi', JavaExec) {
     group = 'build'
-    description = 'Copy the workbench renderer into META-INF/pickleball/workbench-ui. npm ci runs only when the lockfile lists packages.'
+    description = 'Copy the workbench renderer into META-INF/pickleball/workbench-ui. npm ci runs when the lockfile lists packages.'
     dependsOn tasks.named('ajcMain')
     classpath = files(sourceSets.main.java.destinationDirectory) + sourceSets.main.compileClasspath
     mainClass = 'tools.dscode.launcher.WorkbenchUiPackager'
@@ -1177,8 +1177,14 @@ tasks.register('workbenchUi', JavaExec) {
         languageVersion = JavaLanguageVersion.of(21)
     }
     workingDir = layout.projectDirectory.asFile
-    args layout.projectDirectory.asFile.absolutePath, workbenchUiOut.get().asFile.absolutePath
-    inputs.dir('workbench-ui')
+    args layout.projectDirectory.asFile.absolutePath, workbenchUiOut.get().asFile.absolutePath, gradle.gradleUserHomeDir.absolutePath
+    def npmRegistry = System.getProperty('pkb_npm_registry')
+    if (npmRegistry) systemProperty 'pkb_npm_registry', npmRegistry
+    def npmRegistryEnv = System.getenv('PKB_NPM_REGISTRY')
+    if (npmRegistryEnv) environment 'PKB_NPM_REGISTRY', npmRegistryEnv
+    inputs.files(fileTree('workbench-ui') {
+        exclude 'node_modules/**'
+    })
     outputs.dir(workbenchUiOut)
 }
 
