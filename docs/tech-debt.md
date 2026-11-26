@@ -14,21 +14,21 @@ This page lists behavior that is not a feature. Do not document an open item as 
 
 `RETRY:`, `IGNORE FAILURES`, `LOG FAILURES BUT CONTINUE SCENARIO`, and `RUN IF SCENARIO FINISHED` change which steps run and how a failure is recorded. `FlagSteps` and `GeneralSteps.retryStep` call `StepFlags.applyFromPhrase`. Hydrate writes the matching columns on `steps`. `IGNORE FAILURES` and `LOG FAILURES BUT CONTINUE SCENARIO` as their own steps mark the following step. A suffix `AND IGNORE FAILURES` marks that same step. `AND SCENARIO FINISHED` on `RUN IF SCENARIO PASSING` sets both passing and finished. `RUN IF SCENARIO FINISHED` runs after the scenario outcome is known. `RETRY:` runs the remainder again until it passes or the repeat cap is hit. The cap is `max_iterations` when set, otherwise `pkb_stepRepeatMaxCount`.
 
-## Unsupported context words
+## Context words (closed, spine R2 P4)
 
-These words do not resolve and are not context words: `between`, `inside`, `within`, `of`, `on`, `near`, `next to`, `following`, and `preceding`. `between` is under investigation.
+`inside` and `within` use the `inside` lookup. `near` and `next to` use `near` (center distance at most 150). `following` is document order `after`. `preceding` is document order `before`. `on` and `of` use the same lookup as `in`. `between` A `and` B keeps a displayed candidate whose center lies in the axis-aligned box of the two anchor centers. A missing second anchor is an error. A word inside quotes is not a relation. `pkb_engine_log=match` logs `word -> relation` for a translated context word. The log stays off unless that capability is named.
 
-## Unsupported condition word
+## Condition word exists (closed, spine R2 P4)
 
-`exists` is not a condition. Use `is present` or `is displayed` for elements, or a bare reference for values. Do not document `exists` as syntax.
+`exists` on an element uses the same result as `is present`. A hidden element matches `exists` only when `is present` would. `exists` on a value is true when the value is non-null and is not an empty reference such as `<name>`. `exists` is not another spelling of `is displayed`.
 
-## Any parent context
+## Any parent context (closed, spine R2 P4)
 
-There is no syntax that means "any parent context". `PhraseData.context` and `PhraseData.getPhraseContextList` are the hook. `AllContextsScan` must not special-case that syntax.
+`in any parent` sets `steps.context_scope` to `any-parent`. `PhraseData.getPhraseContextList` keeps every ancestor context the phrase chain already walks. The search ORs those ancestor contexts. `AllContextsScan` has no branch for this syntax.
 
-## Phrase-local context
+## Phrase-local context (closed, spine R2 P4)
 
-A phrase cannot opt out of `ALL_CONTEXTS` or pin `Loading` to the inherited `in` / `from` / `for` context. A future flag would be read only by `ElementMatch.searchesAllContexts()`.
+A trailing `with local context` sets `steps.context_mode` to `local` and `ElementMatch.searchesAllContexts` returns false, so `Loading` stays on the inherited `in`, `from`, or `for` context. A trailing `with all contexts` sets `all` and the scan runs. The default `inherit` keeps the category `ALL_CONTEXTS` flag. The mode is read before that flag.
 
 ## Inline until (closed, spine R2 P3)
 

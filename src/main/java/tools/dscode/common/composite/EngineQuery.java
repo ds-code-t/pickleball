@@ -126,7 +126,7 @@ public record EngineQuery(
     }
 
     private static String visualNameAt(String text, int start) {
-        for (String name : List.of("left-of", "right-of", "inside", "above", "below", "near", "left", "right")) {
+        for (String name : List.of("left-of", "right-of", "between", "inside", "above", "below", "near", "left", "right")) {
             if (!text.regionMatches(true, start, name, 0, name.length())) continue;
             int end = start + name.length();
             if (end > text.length()) continue;
@@ -164,6 +164,6 @@ public record EngineQuery(
     }
 
     private static final java.util.Set<String> VISUAL_RELATIVES = java.util.Set.of(
-            "near", "below", "above", "left-of", "right-of", "left", "right", "inside"
+            "near", "below", "above", "left-of", "right-of", "left", "right", "inside", "between"
     );
 }

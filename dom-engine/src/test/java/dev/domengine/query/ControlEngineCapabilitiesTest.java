@@ -22,7 +22,7 @@ class ControlEngineCapabilitiesTest {
         JsonNode json = Jsons.MAPPER.readTree(result.stdout());
         assertEquals("Control Engine", json.path("display_name").asText());
         assertEquals(List.of("AND", "OR", "NOT"), texts(json.path("syntax").path("operators")));
-        assertEquals(List.of("near", "below", "above", "left-of", "right-of", "inside", "after", "before"),
+        assertEquals(List.of("near", "below", "above", "left-of", "right-of", "inside", "after", "before", "between"),
                 texts(json.path("syntax").path("relations")));
         assertEquals(List.of("stage", "filter"), texts(json.path("syntax").path("relation_forms")));
         assertTrue(json.path("syntax").path("negative_relations").asBoolean());

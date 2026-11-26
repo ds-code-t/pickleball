@@ -1,5 +1,6 @@
 package dev.domengine.query;
 
+import dev.domengine.cdp.CdpException;
 import dev.domengine.log.EngineLog;
 import dev.domengine.tree.DomNode;
 
@@ -11,7 +12,7 @@ import java.util.List;
 /**
  * Relative locators. Stage forms of {@code near}, {@code below}, {@code above},
  * {@code left-of} and {@code right-of} stay in {@link Engines}. This type owns
- * {@code inside}, {@code after}, {@code before}, and the filter form of every relation.
+ * {@code inside}, {@code after}, {@code before}, {@code between}, and the filter form of every relation.
  */
 final class Relations {
     private Relations() {
@@ -31,7 +32,18 @@ final class Relations {
         return document("before", expr, anchors, root, pierce, null);
     }
 
+    static Query.Hit between(String expr, List<DomNode> anchors, DomNode root) {
+        List<DomNode> ends = displayedBoxes(anchors);
+        if (ends.size() < 2) throw new CdpException("between requires two anchors");
+        String selector = expr == null || expr.isBlank() ? "*" : expr;
+        List<DomNode> candidates = Engines.css(selector, List.of(root), false).nodes;
+        return geometric("between", candidates, List.of(ends.get(0), ends.get(1)), root, null, null);
+    }
+
     static Query.Hit filter(RelationTerm term, List<DomNode> scope, DomNode root, String pierce) {
+        if (term.relation() == RelationTerm.Relation.BETWEEN) {
+            return betweenFilter(term, scope, root, pierce);
+        }
         List<DomNode> anchors = anchorNodes(term, root, pierce);
         QueryHooks.note(anchors);
         String label = label(term);
@@ -117,7 +129,117 @@ final class Relations {
             case INSIDE -> insideScore(candidate, anchors, order);
             case AFTER -> orderScore(candidate, anchors, order, true);
             case BEFORE -> orderScore(candidate, anchors, order, false);
+            case BETWEEN -> betweenScore(candidate, anchors, order);
         };
+    }
+
+    private static Query.Hit betweenFilter(RelationTerm term, List<DomNode> scope, DomNode root, String pierce) {
+        List<String> parts = splitAnchors(term.anchor());
+        if (parts.size() < 2) throw new CdpException("between requires two anchors");
+        List<DomNode> first = anchorQuery(parts.get(0), root, pierce);
+        List<DomNode> second = anchorQuery(parts.get(1), root, pierce);
+        if (first.isEmpty() || second.isEmpty()) throw new CdpException("between requires two anchors");
+        List<DomNode> anchors = List.of(first.get(0), second.get(0));
+        QueryHooks.note(anchors);
+        String label = label(term);
+        List<String> anchorIds = ids(anchors);
+        List<DomNode> candidates = new ArrayList<>();
+        for (DomNode candidate : Engines.scopeElements(scope, root, pierce)) {
+            if (!anchorIds.contains(candidate.id())) candidates.add(candidate);
+        }
+        List<DomNode> positive = keep(term.relation(), candidates, anchors, root, pierce);
+        if (!term.negated()) {
+            log(label, anchors.size(), candidates.size(), positive.size(), space(term.relation()));
+            return new Query.Hit(positive, label + "(" + term.anchor() + ") anchors=" + anchors.size() + " matched " + positive.size());
+        }
+        List<DomNode> kept = subtract(candidates, positive, root, pierce);
+        log(label, anchors.size(), candidates.size(), kept.size(), space(term.relation()));
+        return new Query.Hit(kept, label + "(" + term.anchor() + ") anchors=" + anchors.size() + " matched " + kept.size());
+    }
+
+    static List<String> splitAnchors(String anchor) {
+        List<String> parts = new ArrayList<>();
+        String source = anchor == null ? "" : anchor;
+        StringBuilder current = new StringBuilder();
+        int depth = 0;
+        char quote = 0;
+        for (int i = 0; i < source.length(); i++) {
+            char c = source.charAt(i);
+            if (quote != 0) {
+                current.append(c);
+                if (c == quote) quote = 0;
+                continue;
+            }
+            if (c == '"' || c == '\'') {
+                quote = c;
+                current.append(c);
+                continue;
+            }
+            if (c == '(') {
+                depth++;
+                current.append(c);
+                continue;
+            }
+            if (c == ')') {
+                if (depth > 0) depth--;
+                current.append(c);
+                continue;
+            }
+            if (depth == 0 && c == ',') {
+                addAnchor(parts, current);
+                continue;
+            }
+            if (depth == 0 && source.regionMatches(true, i, " and ", 0, 5)) {
+                addAnchor(parts, current);
+                i += 4;
+                continue;
+            }
+            current.append(c);
+        }
+        addAnchor(parts, current);
+        return parts;
+    }
+
+    private static void addAnchor(List<String> parts, StringBuilder current) {
+        String piece = current.toString().trim();
+        current.setLength(0);
+        if (!piece.isEmpty()) parts.add(piece);
+    }
+
+    private static List<DomNode> anchorQuery(String expr, DomNode root, String pierce) {
+        if (expr == null || expr.isBlank()) return List.of();
+        return Expressions.eval(Expressions.parse(expr), List.of(root), root, pierce).nodes;
+    }
+
+    private static List<DomNode> displayedBoxes(List<DomNode> anchors) {
+        List<DomNode> kept = new ArrayList<>();
+        if (anchors == null) return kept;
+        for (DomNode anchor : anchors) {
+            if (anchor != null && anchor.displayed && anchor.hasBox) kept.add(anchor);
+        }
+        return kept;
+    }
+
+    private static Score betweenScore(DomNode candidate, List<DomNode> anchors, IdentityHashMap<DomNode, Integer> order) {
+        if (!candidate.displayed || !candidate.hasBox) return null;
+        List<DomNode> ends = displayedBoxes(anchors);
+        if (ends.size() < 2) return null;
+        DomNode first = ends.get(0);
+        DomNode second = ends.get(1);
+        if (first == candidate || second == candidate) return null;
+        double ax = Engines.originX(first) + first.width / 2.0;
+        double ay = Engines.originY(first) + first.height / 2.0;
+        double bx = Engines.originX(second) + second.width / 2.0;
+        double by = Engines.originY(second) + second.height / 2.0;
+        double left = Math.min(ax, bx);
+        double right = Math.max(ax, bx);
+        double top = Math.min(ay, by);
+        double bottom = Math.max(ay, by);
+        double cx = Engines.originX(candidate) + candidate.width / 2.0;
+        double cy = Engines.originY(candidate) + candidate.height / 2.0;
+        if (cx < left || cx > right || cy < top || cy > bottom) return null;
+        double rank = Math.hypot(cx - (ax + bx) / 2.0, cy - (ay + by) / 2.0);
+        return new Score(rank, order.getOrDefault(candidate, Integer.MAX_VALUE));
     }
 
     private static Score near(DomNode candidate, List<DomNode> anchors) {

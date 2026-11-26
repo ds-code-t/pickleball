@@ -96,11 +96,25 @@ Context words that parse and resolve:
 
 | Word | Lookup |
 |---|---|
-| `in`, `from`, `for` | inside the anchor |
-| `after` | following the anchor in document order |
-| `before` | preceding the anchor in document order |
+| `in`, `from`, `for`, `on`, `of` | inside the anchor |
+| `inside`, `within` | inside the anchor, the same lookup as `in` |
+| `after`, `following` | following the anchor in document order |
+| `before`, `preceding` | preceding the anchor in document order |
+| `near`, `next to` | center distance at most 150 |
+| `between` A `and` B | Control Engine relation `between`. The candidate center lies in the box of the two anchor centers. A missing second anchor is an error. Displayed candidates only |
+| `in any parent` | every ancestor context already on the phrase chain |
+| `with local context` | do not search all contexts. `Loading` stays on the inherited `in`, `from`, or `for` |
+| `with all contexts` | search all contexts |
 
-`after` and `before` use document order, not the visual position.
+`after`, `before`, `following`, and `preceding` use document order, not the visual position. A word inside quotes is not a context word. `exists` on an element uses the same result as `is present`. `exists` on a value is true when the value is non-null and is not an empty reference such as `<name>`. `exists` is not another spelling of `is displayed`.
+
+```gherkin
+* , inside the "Primary Queue" Test Panel, click the "Approve" Button
+* , in the "Secondary Queue" Test Panel, in the "Inner Queue" Test Panel, in any parent, click the "Approve" Button
+* , wait Loading with local context
+* , ensure the "Approve" Button exists
+* , ensure "saved" exists
+```
 
 ## The `it` placeholder
 
@@ -333,7 +347,9 @@ Gherkin element phrases do not change. The controller `query` string accepts the
 | the `"Save"` Button in the `"Billing"` Section | `(role=region AND text="Billing") >> (role=button AND text="Save")` |
 | the `"Save"` Button after the `"Billing"` Section | `(role=button AND text="Save") AND after(role=region AND text="Billing")` |
 | the `"Save"` Button before the `"Billing"` Section | `(role=button AND text="Save") AND before(role=region AND text="Billing")` |
-| the `"Save"` Button above, below, left of, right of, near, or inside the `"Billing"` Section | `(role=button AND text="Save") AND <relation>(role=region AND text="Billing")` (`left of` is `left-of`, `right of` is `right-of`) |
+| the `"Save"` Button above, below, left of, right of, near, next to, inside, or within the `"Billing"` Section | `(role=button AND text="Save") AND <relation>(role=region AND text="Billing")` (`left of` is `left-of`, `right of` is `right-of`, `next to` is `near`, `within` is `inside`) |
+| the `"Save"` Button following or preceding the `"Billing"` Section | `(role=button AND text="Save") AND after(...)` or `before(...)` |
+| query `css=div AND between(css=#a, css=#b)` | displayed candidates whose centers lie in the box of the two anchor centers. One anchor is an error |
 | a custom `Product Card` | `(desc="Product Card" AND text=...)` |
 | `first` / `2nd` / `last` / `every 2nd` | one `PositionSelection` after displayed, nesting, and regex. An engine query ordinal uses that same index |
 

@@ -520,7 +520,7 @@ final class Expressions {
 
         private static int relationNameEnd(String text, int start) {
             String[] names = {
-                    "left-of", "right-of", "inside", "before", "above", "below", "after", "right", "near", "left"
+                    "left-of", "right-of", "between", "inside", "before", "above", "below", "after", "right", "near", "left"
             };
             for (String name : names) {
                 if (!text.regionMatches(true, start, name, 0, name.length())) continue;

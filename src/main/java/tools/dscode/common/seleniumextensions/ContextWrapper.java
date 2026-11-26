@@ -22,6 +22,7 @@ import static tools.dscode.common.reporting.logging.LogForwarder.logDebug;
 import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineOr;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.prettyPrintXPath;
 public class ContextWrapper {
 
@@ -60,6 +61,13 @@ public class ContextWrapper {
         logTrace("starting searchContext: " + searchContext);
 
         List<XPathy> xPathyList = new ArrayList<>();
+        boolean anyParent = false;
+        for (PhraseData phraseData : contextList) {
+            if ("any-parent".equals(phraseData.contextScope)) {
+                anyParent = true;
+                break;
+            }
+        }
         for (int j = 0; j < contextList.size(); j++) {
             PhraseData phraseData = contextList.get(j);
 
@@ -67,12 +75,12 @@ public class ContextWrapper {
             logTrace("current-categoryFlags: " + phraseData.categoryFlags);
             logTrace("current-xPathyList: " + xPathyList);
 
-            if (phraseData.contextElement != null) {
+            if (!anyParent && phraseData.contextElement != null) {
                 logTrace("has contextElement");
                 logTrace("current-contextElement:: " + phraseData.contextElement);
                 searchContext = phraseData.getSearchContext();
                 logTrace("new searchContext: " + searchContext);
-            } else if (phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)) {
+            } else if (!anyParent && phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)) {
                 logTrace("is PAGE_CONTEXT");
                 if (!xPathyList.isEmpty()) {
                     XPathy combinedXPathy = combineAnd(xPathyList);
@@ -120,6 +128,16 @@ public class ContextWrapper {
             return searchContext;
         }
 
+        if (anyParent && xPathyList.size() > 1) {
+            List<XPathy> contexts = new ArrayList<>();
+            for (XPathy xpath : xPathyList) {
+                if (xpath != null) contexts.add(xpath);
+            }
+            if (contexts.size() > 1) {
+                xPathyList.clear();
+                xPathyList.add(combineOr(contexts));
+            }
+        }
         xPathyList.add(elementMatch.xPathy);
 
         logTrace("final-xPathyList: " + xPathyList);
@@ -201,7 +219,9 @@ public class ContextWrapper {
         return "below".equals(context)
                 || "above".equals(context)
                 || "left of".equals(context)
-                || "right of".equals(context);
+                || "right of".equals(context)
+                || "near".equals(context)
+                || "next to".equals(context);
     }
 
     private static String anchorXPath(PhraseData phraseData) {
@@ -283,8 +303,17 @@ public class ContextWrapper {
             case "above" -> candidateBottom <= anchorTop + 1 && horizontalOverlap;
             case "left of" -> candidateRight <= anchorLeft + 1 && verticalOverlap;
             case "right of" -> candidateLeft >= anchorRight - 1 && verticalOverlap;
+            case "near", "next to" -> centerDistance(anchor, candidate) <= 150;
             default -> false;
         };
+    }
+
+    private static double centerDistance(Rectangle anchor, Rectangle candidate) {
+        double ax = anchor.x + anchor.width / 2.0;
+        double ay = anchor.y + anchor.height / 2.0;
+        double cx = candidate.x + candidate.width / 2.0;
+        double cy = candidate.y + candidate.height / 2.0;
+        return Math.hypot(cx - ax, cy - ay);
     }
 
     private static NestingMode nestingMode(ElementMatch elementMatch) {

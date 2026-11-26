@@ -330,13 +330,34 @@ public enum AssertionOperations implements OperationsInterface {
 
             phraseData.result = Attempt.run(repetition, 500, () -> {
                 return ValueWrapperCompareReducer.evalElements(
-                        ElementWrapper::isDisplayed,
+                        wrapper -> matchesPresent(wrapper.isDisplayed()),
                         firstElement.getElementWrappers(),
                         modeSet
                 );
             });
 
 
+        }
+    },
+    EXISTS {
+        @Override
+        public void execute(PhraseData phraseData) {
+            if (elementBranch(phraseData) == DISPLAYED) {
+                DISPLAYED.execute(phraseData);
+                return;
+            }
+            logInfo(phraseData + " : Executing Assertion " + this.name());
+            ValueWrapper value = null;
+            for (ElementMatch match : phraseData.getElementMatches()) {
+                if (match == null) continue;
+                ValueWrapper candidate = match.getValue();
+                if (candidate != null) {
+                    value = candidate;
+                    break;
+                }
+            }
+            boolean exists = valueExists(value);
+            phraseData.result = new Attempt.Result(phraseData.hasNo ^ exists, null);
         }
     },
 
@@ -548,6 +569,40 @@ public enum AssertionOperations implements OperationsInterface {
         );
     }
 
+
+    /** An element {@code exists} check uses the same result as {@code is present}. */
+    public static boolean matchesPresent(boolean displayed) {
+        return displayed;
+    }
+
+    /**
+     * A value {@code exists} when it is non-null and is not an empty reference such as {@code <name>}.
+     * This is not a spelling of {@code is displayed}.
+     */
+    public static boolean valueExists(ValueWrapper value) {
+        if (value == null || value.getValue() == null) return false;
+        String text = String.valueOf(value.getValue()).trim();
+        if (text.isEmpty()) return false;
+        if (text.length() >= 3 && text.charAt(0) == '<' && text.charAt(text.length() - 1) == '>'
+                && text.indexOf('<', 1) < 0) {
+            return false;
+        }
+        return true;
+    }
+
+    /** Element operands share the {@code is present} check. A value operand returns null. */
+    public static AssertionOperations elementBranch(PhraseData phraseData) {
+        if (phraseData == null) return null;
+        for (ElementMatch match : phraseData.getElementMatches()) {
+            if (match == null || match.elementTypes == null) continue;
+            if (match.elementTypes.contains(ElementType.HTML_ELEMENT)
+                    || match.elementTypes.contains(ElementType.ALERT)
+                    || match.elementTypes.contains(ElementType.BROWSER_WINDOW)) {
+                return DISPLAYED;
+            }
+        }
+        return null;
+    }
 
     public static AssertionOperations
 

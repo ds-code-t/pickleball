@@ -139,7 +139,7 @@ public final class SelectorTranslator {
         if (relation != null && context != null) {
             add(stages, (target == null ? "" : target + " AND ") + relation + "(" + unwrap(context) + ")");
         } else switch (word) {
-            case "in", "from", "for" -> {
+            case "in", "from", "for", "on", "of" -> {
                 add(stages, context);
                 add(stages, target);
             }
@@ -158,12 +158,13 @@ public final class SelectorTranslator {
 
     private static String relationWord(String word) {
         return switch (word) {
-            case "after" -> "after";
-            case "before" -> "before";
+            case "after", "following" -> "after";
+            case "before", "preceding" -> "before";
             case "above" -> "above";
             case "below" -> "below";
-            case "near" -> "near";
-            case "inside" -> "inside";
+            case "near", "next to" -> "near";
+            case "inside", "within" -> "inside";
+            case "between" -> "between";
             case "left of", "left-of" -> "left-of";
             case "right of", "right-of" -> "right-of";
             default -> null;

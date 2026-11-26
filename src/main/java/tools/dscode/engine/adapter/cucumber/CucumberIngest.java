@@ -1,5 +1,6 @@
 package tools.dscode.engine.adapter.cucumber;
 
+import tools.dscode.common.treeparsing.ContextWords;
 import tools.dscode.engine.EngineLog;
 import tools.dscode.engine.match.PatternMatcher;
 import tools.dscode.engine.runtime.StepFlags;
@@ -304,7 +305,8 @@ public final class CucumberIngest {
         try (PreparedStatement update = connection.prepareStatement("""
                 UPDATE steps SET retry = ?, ignore_failures = ?, log_failures_continue = ?,
                     run_if_finished = ?, always_run = ?, run_if_passing = ?, run_if_failed = ?,
-                    run_if_hard_failed = ?, run_if_soft_failed = ?, until_mode = ?
+                    run_if_hard_failed = ?, run_if_soft_failed = ?, until_mode = ?,
+                    context_mode = ?, context_scope = ?
                 WHERE file_path = ? AND scenario_ord = ? AND ord = ?
                 """)) {
             for (Row row : rows) {
@@ -314,6 +316,7 @@ public final class CucumberIngest {
                     scenario = row.scenario;
                 }
                 StepFlags.Parsed parsed = StepFlags.parse(row.text);
+                ContextWords.Reading context = ContextWords.read(row.text == null ? "" : row.text);
                 int ignore = parsed.ignoreFailures() || ignoreNext ? 1 : 0;
                 int log = parsed.logFailuresContinue() || logNext ? 1 : 0;
                 ignoreNext = parsed.ignoreOnNext();
@@ -329,9 +332,12 @@ public final class CucumberIngest {
                 update.setInt(9, parsed.runIfSoftFailed() ? 1 : 0);
                 if (parsed.untilMode() == null) update.setNull(10, Types.VARCHAR);
                 else update.setString(10, parsed.untilMode());
-                update.setString(11, path);
-                update.setInt(12, row.scenario);
-                update.setInt(13, row.ord);
+                update.setString(11, context.mode());
+                if (context.scope() == null) update.setNull(12, Types.VARCHAR);
+                else update.setString(12, context.scope());
+                update.setString(13, path);
+                update.setInt(14, row.scenario);
+                update.setInt(15, row.ord);
                 update.executeUpdate();
             }
         }

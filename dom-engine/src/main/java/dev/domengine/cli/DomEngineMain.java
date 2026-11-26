@@ -245,7 +245,7 @@ public final class DomEngineMain {
         array(syntax, "operators", List.of("AND", "OR", "NOT"));
         syntax.put("grouping", "()");
         syntax.put("pipeline", ">>");
-        array(syntax, "relations", List.of("near", "below", "above", "left-of", "right-of", "inside", "after", "before"));
+        array(syntax, "relations", List.of("near", "below", "above", "left-of", "right-of", "inside", "after", "before", "between"));
         array(syntax, "relation_forms", List.of("stage", "filter"));
         syntax.put("negative_relations", true);
         syntax.put("weights", "@<w>");
@@ -827,7 +827,8 @@ public final class DomEngineMain {
                 query --file page.html --css SELECTOR [--selector EXPR] [--pipeline EXPR] [--geometry] [--explain] [--viewport file.pgm] [--identity FILE|JSON]
                   EXPR accepts engine=value stages joined by >> and boolean AND, OR, and NOT
                   live xpath is XPath 1.0 via document.evaluate. An invalid expression is an error, not zero hits.
-                  relatives: near below above left-of right-of inside after before (left and right are aliases); filter form <relation>(<anchor query>)
+                  relatives: near below above left-of right-of inside after before between (left and right are aliases); filter form <relation>(<anchor query>)
+                  between keeps a displayed candidate whose center lies in the box of the two anchor centers; a missing second anchor is an error
                   negatives: not-<relation> or NOT <relation>; weights <relation>@<w>
                   look: look=color=red or look=opacity>0.5,background-color=#fff (comma AND, pipe OR)
                   example: (css=button AND text="Submit") >> near=50

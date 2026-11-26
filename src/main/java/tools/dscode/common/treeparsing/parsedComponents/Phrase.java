@@ -229,6 +229,8 @@ public final class Phrase extends PhraseData {
     }
     void processContextPhrase() {
         ElementMatch firstElement = getFirstElement();
+        // `in any parent` is a scope marker. It has no element of its own.
+        if (firstElement == null && "any-parent".equals(contextScope)) return;
         if (firstElement.elementTypes.contains(ElementType.DATA_TYPE)) {
             categoryFlags.add(ExecutionDictionary.CategoryFlags.DATA_CONTEXT);
             String key = null;

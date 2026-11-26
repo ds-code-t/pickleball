@@ -64,6 +64,7 @@ public final class Engines {
             case "inside" -> Relations.inside(expr, current, root);
             case "after" -> Relations.after(expr, current, root, pierce);
             case "before" -> Relations.before(expr, current, root, pierce);
+            case "between" -> Relations.between(expr, current, root);
             case "desc" -> desc(expr, scopes(current, root));
             case "a11y" -> a11y(expr, scopes(current, root));
             case "look" -> Look.apply(expr, scopes(current, root));

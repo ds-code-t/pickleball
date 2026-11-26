@@ -4,7 +4,7 @@ Features that work now but are not recommended and may change.
 
 ## Position context words
 
-`below`, `above`, `left of`, and `right of` parse and resolve by comparing element rectangles. The anchor itself is not a match. The edge comparison allows one pixel of slack. Do not treat these words as stable context words. The stable context words are `in`, `from`, `for`, `after`, and `before`.
+`below`, `above`, `left of`, and `right of` parse and resolve by comparing element rectangles. The anchor itself is not a match. The edge comparison allows one pixel of slack. Do not treat these four words as stable context words. The stable context words are `in`, `from`, `for`, `on`, `of`, `inside`, `within`, `after`, `before`, `following`, `preceding`, `near`, and `next to`. `between` is the Control Engine relation: a displayed candidate whose center lies in the box of the two anchor centers. `in any parent`, `with local context`, and `with all contexts` also change the lookup. See [Dynamic steps](dynamic-steps.md).
 
 | Word | Match |
 |---|---|

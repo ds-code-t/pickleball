@@ -22,7 +22,7 @@ import java.util.Set;
 public final class Query {
     public static final List<String> ENGINES = List.of(
             "css", "xpath", "text", "role", "frame", "shadow", "near", "below", "above", "left-of", "right-of",
-            "inside", "after", "before", "desc", "a11y", "look", "image"
+            "inside", "after", "before", "between", "desc", "a11y", "look", "image"
     );
     public static final List<String> QUERY_FLAGS = List.of(
             "within", "nesting", "nth", "every", "count-only", "geometry", "pierce", "point", "viewport", "exposure",
@@ -399,7 +399,7 @@ public final class Query {
     private static boolean relationLead(String text) {
         String piece = text;
         if (piece.regionMatches(true, 0, "not-", 0, 4)) piece = piece.substring(4);
-        for (String name : List.of("left-of", "right-of", "inside", "before", "above", "below", "after", "right", "near", "left")) {
+        for (String name : List.of("left-of", "right-of", "between", "inside", "before", "above", "below", "after", "right", "near", "left")) {
             if (!piece.regionMatches(true, 0, name, 0, name.length())) continue;
             if (piece.length() == name.length()) return false;
             char next = piece.charAt(name.length());

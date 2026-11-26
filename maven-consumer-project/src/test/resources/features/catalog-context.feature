@@ -27,6 +27,13 @@ Feature: Locate repeated and scoped catalog elements
     * , in the "Primary Queue" Test Panel, click the "Approve" Button
     * , ensure "Queue Result: primary" Text is displayed
 
+  @all @regression @browser @local-site @catalog @context @page-context @scoped-elements
+  Scenario: Inside and any parent reach a queue button
+    * , inside the "Primary Queue" Test Panel, click the "Approve" Button
+    * , ensure "Queue Result: primary" Text is displayed
+    * , in the "Secondary Queue" Test Panel, in the "Inner Queue" Test Panel, in any parent, click the "Approve" Button
+    * , ensure "Queue Result: secondary" Text is displayed
+
   @all @regression @browser @local-site @catalog @context @expanded-collapsed @state-assertions
   Scenario: Expanded and collapsed states are visible on a control
     * , ensure the "Advanced Filters" Button is collapsed

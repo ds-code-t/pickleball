@@ -57,6 +57,10 @@ public abstract class PassedData {
     private boolean newContext = false;
     public MatchNode phraseNode;
     public String context = "";
+    /** {@code inherit}, {@code local}, or {@code all}. {@code inherit} keeps the category flag. */
+    public String contextMode = "inherit";
+    /** {@code any-parent} or null. */
+    public String contextScope;
     public boolean isFrom;
     public boolean isTopContext;
     public boolean isPageContext;

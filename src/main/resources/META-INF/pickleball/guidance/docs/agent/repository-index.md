@@ -489,6 +489,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/servicecalls/RestAssuredUtil.java`
 - `src/main/java/tools/dscode/common/trace/InstanceRegistry.java`
 - `src/main/java/tools/dscode/common/trace/ObjDataRegistry.java`
+- `src/main/java/tools/dscode/common/treeparsing/ContextWords.java`
 - `src/main/java/tools/dscode/common/treeparsing/DefinitionContext.java`
 - `src/main/java/tools/dscode/common/treeparsing/DictionaryA.java`
 - `src/main/java/tools/dscode/common/treeparsing/Main.java`
@@ -973,6 +974,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/seleniumextensions/SnapshotFallbackWarnTest.java`
 - `src/test/java/tools/dscode/common/seleniumextensions/SnapshotPages.java`
 - `src/test/java/tools/dscode/common/servicecalls/JdbcTypeMappingTest.java`
+- `src/test/java/tools/dscode/common/treeparsing/AnyParentContextTest.java`
+- `src/test/java/tools/dscode/common/treeparsing/ExistsConditionTest.java`
+- `src/test/java/tools/dscode/common/treeparsing/PhraseContextIngestTest.java`
+- `src/test/java/tools/dscode/common/treeparsing/PhraseLocalContextTest.java`
 - `src/test/java/tools/dscode/common/treeparsing/PhraseSyntaxTest.java`
 - `src/test/java/tools/dscode/common/treeparsing/preparsing/ConditionalBranchArgumentTest.java`
 - `src/test/java/tools/dscode/common/treeparsing/preparsing/LazyBranchResolutionTest.java`
@@ -1805,6 +1810,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/premap/PreMapTest.java`
 - `dom-engine/src/test/java/dev/domengine/premap/QueryUsesPreMapTest.java`
 - `dom-engine/src/test/java/dev/domengine/premap/SectionDetectionTest.java`
+- `dom-engine/src/test/java/dev/domengine/query/BetweenRelationTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/BooleanConfirmTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/CanonicalTreeQueryTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/ControlEngineCapabilitiesTest.java`

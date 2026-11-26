@@ -286,7 +286,7 @@ public final class DefinitionContext {
 
         ParseNode position = new ParseNode("#\\d+");
 
-        ParseNode phrase = new ParseNode("^\\s*(?<separatorA>\\b[tT]hen\\b\\s*)?(?<conjunction>\\b(?:[aA]nd|[oO]r)\\b\\s*)?(?<separatorB>\\b[tT]hen\\b\\s*)?\\s*(?<conditional>\\b(?:until|else\\s+if|else|if)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>.*)$") {
+        ParseNode phrase = new ParseNode("^\\s*(?<separatorA>\\b[tT]hen\\b\\s*)?(?<conjunction>\\b(?:[aA]nd|[oO]r)\\b\\s*)?(?<separatorB>\\b[tT]hen\\b\\s*)?\\s*(?<conditional>\\b(?:until|else\\s+if|else|if)\\b)?\\s*(?i:(?<context>next to|left of|right of|following|preceding|between|inside|within|before|after|from|near|below|above|for|in|on|of)\\b)?(?<body>.*)$") {
             @Override
             public String onCapture(MatchNode self) {
                 String separator = self.resolvedGroupText("separatorA");
@@ -427,7 +427,7 @@ public final class DefinitionContext {
             }
         };
 
-        ParseNode assertion = new ParseNode("\\b(?:starts?\\s+with|ends?\\s+with|contains?|match(?:es)?|required|(non-?)?required|displayed|present|collapsed|expanded|(?:un)?selected|(?:un)?checked|enabled|disabled|less\\s+than\\s+or\\s+equals?|greater\\s+than\\s+or\\s+equals?|equals?|less\\s+than|greater\\s+than|is\\s+true|is\\s+false|(?:has|is)\\s+(?:<<no>>\\s+)?(?:values?|blank|on|off))\\b") {
+        ParseNode assertion = new ParseNode("\\b(?:starts?\\s+with|ends?\\s+with|contains?|match(?:es)?|required|(non-?)?required|exists|displayed|present|collapsed|expanded|(?:un)?selected|(?:un)?checked|enabled|disabled|less\\s+than\\s+or\\s+equals?|greater\\s+than\\s+or\\s+equals?|equals?|less\\s+than|greater\\s+than|is\\s+true|is\\s+false|(?:has|is)\\s+(?:<<no>>\\s+)?(?:values?|blank|on|off))\\b") {
             @Override
             public String onCapture(MatchNode self) {
                 String assertion = self.originalText().trim()

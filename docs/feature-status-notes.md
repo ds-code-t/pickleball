@@ -4,9 +4,9 @@ This maintainer-only file is intentionally not linked from the public documentat
 
 ## Context wording awaiting verification
 
-### `between`
+### `between` (shipped, spine R2 P4)
 
-Not a public context word. `resolveContextXPathy` does not apply it, and the phrase regex does not capture it. Confirm the business-language meaning and the two-anchor form before adding it.
+`between` is a Control Engine relation and a leading phrase word. A displayed candidate is kept when its center lies in the axis-aligned box of the two anchor centers. A missing second anchor is an error. `inside`, `within`, `on`, `of`, `near`, `next to`, `following`, and `preceding` are context words. See [Dynamic steps](../dynamic-steps.md).
 
 ### `in between`
 

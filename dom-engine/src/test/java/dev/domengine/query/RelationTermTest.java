@@ -22,7 +22,8 @@ class RelationTermTest {
                 RelationTerm.Relation.RIGHT_OF,
                 RelationTerm.Relation.INSIDE,
                 RelationTerm.Relation.AFTER,
-                RelationTerm.Relation.BEFORE
+                RelationTerm.Relation.BEFORE,
+                RelationTerm.Relation.BETWEEN
         }, order);
         assertEquals("near", RelationTerm.Relation.NEAR.engine());
         assertEquals("above", RelationTerm.Relation.ABOVE.engine());
@@ -32,6 +33,7 @@ class RelationTermTest {
         assertEquals("inside", RelationTerm.Relation.INSIDE.engine());
         assertEquals("after", RelationTerm.Relation.AFTER.engine());
         assertEquals("before", RelationTerm.Relation.BEFORE.engine());
+        assertEquals("between", RelationTerm.Relation.BETWEEN.engine());
         for (RelationTerm.Relation relation : order) {
             boolean geometric = relation != RelationTerm.Relation.AFTER && relation != RelationTerm.Relation.BEFORE;
             assertEquals(geometric, relation.geometric(), relation.name());

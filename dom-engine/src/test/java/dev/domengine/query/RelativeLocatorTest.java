@@ -102,6 +102,12 @@ class RelativeLocatorTest {
         DomNode order = HtmlTree.parse(ORDER);
         assertEquals(List.of("after"), ids(query(order, "(role=button AND text=\"Save\") AND after(role=region AND text=\"Billing\")")));
         assertEquals(List.of("before"), ids(query(order, "(role=button AND text=\"Save\") AND before(css=#billing)")));
+        DomNode between = HtmlTree.parse("""
+                <div id="a" data-x="0" data-y="0" data-w="20" data-h="20"></div>
+                <div id="b" data-x="200" data-y="100" data-w="20" data-h="20"></div>
+                <div id="mid" data-x="80" data-y="30" data-w="30" data-h="30"></div>
+                """);
+        assertEquals(List.of("mid"), ids(query(between, "css=div AND between(css=#a, css=#b)")));
     }
 
     @Test
@@ -137,12 +143,12 @@ class RelativeLocatorTest {
 
     @Test
     void capabilitiesListTheNewEngines() throws Exception {
-        assertTrue(Query.ENGINES.containsAll(List.of("inside", "after", "before")));
+        assertTrue(Query.ENGINES.containsAll(List.of("inside", "after", "before", "between")));
         CliResult result = DomEngineMain.dispatch(List.of("capabilities"));
         JsonNode json = Jsons.MAPPER.readTree(result.stdout());
         List<String> engines = new ArrayList<>();
         json.path("engines").forEach(node -> engines.add(node.asText()));
-        assertTrue(engines.containsAll(List.of("inside", "after", "before")), engines.toString());
+        assertTrue(engines.containsAll(List.of("inside", "after", "before", "between")), engines.toString());
     }
 
     private static JsonNode query(DomNode root, String pipeline) throws Exception {

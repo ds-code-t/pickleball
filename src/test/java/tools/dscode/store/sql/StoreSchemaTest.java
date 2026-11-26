@@ -66,6 +66,24 @@ class StoreSchemaTest {
     }
 
     @Test
+    void openAddsContextColumnsWhenTheSpineMarkerIsAlreadySet() throws Exception {
+        assertEquals("1", store.session().scalar(
+                "SELECT value FROM schema_meta WHERE `key` = 'hydration_spine'"));
+        store.session().script("ALTER TABLE steps DROP COLUMN context_mode");
+        store.session().script("ALTER TABLE steps DROP COLUMN context_scope");
+        try {
+            assertEquals(null, column("steps", "context_mode"));
+            int fullBefore = SqlDialect.schemaFullEnsures();
+            SqlDialect.ensureSchema(store.session());
+            assertEquals(fullBefore, SqlDialect.schemaFullEnsures(), "column repair ran full DDL");
+            assertEquals("context_mode", column("steps", "context_mode"));
+            assertEquals("context_scope", column("steps", "context_scope"));
+        } finally {
+            SqlDialect.ensureSchema(store.session());
+        }
+    }
+
+    @Test
     void runStateStaysOffABranchCreatedFromHead() throws Exception {
         store.createBranch("see");
         try (SqlStore other = SqlStore.open(project, Binding.sandbox("see"))) {

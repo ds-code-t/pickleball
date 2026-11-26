@@ -15,6 +15,7 @@ import tools.dscode.common.mappings.ParsingMap;
 import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.exceptions.SoftRuntimeException;
+import tools.dscode.common.treeparsing.ContextWords;
 import tools.dscode.common.treeparsing.MatchNode;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ActionOperations;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.AssertionOperations;
@@ -347,6 +348,8 @@ public abstract class PhraseData extends PassedData {
         separator = false;
         conjunction = "";
         context = "";
+        contextMode = "inherit";
+        contextScope = null;
         isFrom = false;
         isTopContext = false;
         isPageContext = false;
@@ -356,7 +359,8 @@ public abstract class PhraseData extends PassedData {
     }
 
     private void parseFromText(String source) {
-        MatchNode returnMatchNode = getNodeDictionary().parse(source);
+        ContextWords.Reading reading = ContextWords.read(source);
+        MatchNode returnMatchNode = getNodeDictionary().parse(ContextWords.withoutModeSuffix(source));
         phraseNode = returnMatchNode.getChild("phrase");
         assert phraseNode != null;
         booleanValues = phraseNode.getOrderedChildren("booleanValue").stream().map(ValueWrapper::createValueWrapper).toList();
@@ -379,6 +383,8 @@ public abstract class PhraseData extends PassedData {
 
         conjunction = phraseNode.getStringFromLocalState("conjunction");
         context = phraseNode.getStringFromLocalState("context");
+        contextMode = reading.mode();
+        contextScope = reading.scope();
         if (getConditional().contains("if")) {
             setAssertionType("conditional");
             setAssertion(phraseNode.getStringFromLocalState("assertion"));
@@ -425,8 +431,23 @@ public abstract class PhraseData extends PassedData {
             contextList.addFirst(new Phrase(parsedLine));
         return contextList;
     }
+    private boolean expandsAnyParent() {
+        PhraseData current = this;
+        int guard = 0;
+        while (current != null && guard++ < 64) {
+            if ("any-parent".equals(current.contextScope)) return true;
+            if (current != this) {
+                Character end = current.termination;
+                if (end == null || (end != ',' && end != ':')) return false;
+            }
+            current = current.getPreviousPhrase();
+        }
+        return false;
+    }
+
     private List<PhraseData> getContextListFromInheritedPhrases() {
         List<PhraseData> contextList = new ArrayList<>();
+        boolean anyParent = expandsAnyParent();
         PhraseData currentPhrase = this;
         int counter = 0;
         while (currentPhrase != null) {
@@ -437,12 +458,12 @@ public abstract class PhraseData extends PassedData {
                 }
                 if (currentPhrase.phraseType == PhraseType.CONTEXT) {
                     contextList.addFirst(currentPhrase);
-                    if (currentPhrase.isTopContext || currentPhrase.contextElement != null) {
+                    if (!anyParent && (currentPhrase.isTopContext || currentPhrase.contextElement != null)) {
                         return contextList;
                     }
                 }
             } else {
-                if (currentPhrase.isTopContext || currentPhrase.contextElement != null) {
+                if (!anyParent && (currentPhrase.isTopContext || currentPhrase.contextElement != null)) {
                     return contextList;
                 }
             }
@@ -457,7 +478,10 @@ public abstract class PhraseData extends PassedData {
 
 
     public static void getXPathyContext(PhraseData phraseData, List<ElementMatch> elements) {
-        if (elements.isEmpty()) phraseData.contextXPathy = null;
+        if (elements.isEmpty()) {
+            phraseData.contextXPathy = null;
+            return;
+        }
         String context = phraseData.context.toLowerCase();
         XPathy xPathy = elements.getFirst().xPathy;
         if (xPathy == null) {
@@ -469,14 +493,15 @@ public abstract class PhraseData extends PassedData {
 
     }
     private static XPathy resolveContextXPathy(String context, XPathy first) {
-        if (context.startsWith("for") || context.startsWith("from") || context.startsWith("in")) {
-            return insideOf(first);
-        }
-        if (context.startsWith("after")) {
+        if ("following".equals(context) || "after".equals(context)) {
             return afterOf(first);
         }
-        if (context.startsWith("before")) {
+        if ("preceding".equals(context) || "before".equals(context)) {
             return beforeOf(first);
+        }
+        if ("inside".equals(context) || "within".equals(context) || "on".equals(context) || "of".equals(context)
+                || "in".equals(context) || "from".equals(context) || "for".equals(context)) {
+            return insideOf(first);
         }
         return null;
     }

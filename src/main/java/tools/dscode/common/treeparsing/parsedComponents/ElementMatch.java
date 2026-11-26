@@ -659,6 +659,11 @@ public class ElementMatch {
     }
 
     public boolean searchesAllContexts() {
+        String mode = parentPhrase == null ? null : parentPhrase.contextMode;
+        if (mode != null) {
+            if ("local".equalsIgnoreCase(mode)) return false;
+            if ("all".equalsIgnoreCase(mode)) return true;
+        }
         return categoryFlags.contains(ExecutionDictionary.CategoryFlags.ALL_CONTEXTS);
     }
 

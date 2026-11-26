@@ -14,7 +14,7 @@ public record RelationTerm(Relation relation, boolean negated, String anchor, do
 
     public enum Relation {
         NEAR("near"), ABOVE("above"), BELOW("below"), LEFT_OF("left-of"), RIGHT_OF("right-of"),
-        INSIDE("inside"), AFTER("after"), BEFORE("before");
+        INSIDE("inside"), AFTER("after"), BEFORE("before"), BETWEEN("between");
 
         private final String engineName;
 

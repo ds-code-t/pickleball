@@ -452,12 +452,14 @@ public final class SqlDialect {
     public static void ensureSchema(SqlSession session) throws SQLException {
         rejectNewer(readStoreSchema(session));
         if (schemaReady(session)) {
+            ensureAdditiveOnReady(session);
             SCHEMA_FAST.incrementAndGet();
             return;
         }
         synchronized (schemaLock(session)) {
             rejectNewer(readStoreSchema(session));
             if (schemaReady(session)) {
+                ensureAdditiveOnReady(session);
                 SCHEMA_FAST.incrementAndGet();
                 return;
             }
@@ -472,12 +474,35 @@ public final class SqlDialect {
                     if (!schemaRace(failure) || attempt == 5) throw failure;
                     pause(attempt);
                     if (schemaReady(session)) {
+                        ensureAdditiveOnReady(session);
                         SCHEMA_FAST.incrementAndGet();
                         return;
                     }
                 }
             }
             if (last != null) throw last;
+        }
+    }
+
+    /**
+     * A database that already has {@code hydration_spine} still needs columns added
+     * by a later build. The full DDL stays on the slow path. This check is one
+     * lookup, then {@link #ensureHydrationColumns} only when the newest column is missing.
+     */
+    private static void ensureAdditiveOnReady(SqlSession session) throws SQLException {
+        if (additiveColumnsPresent(session)) return;
+        synchronized (schemaLock(session)) {
+            if (additiveColumnsPresent(session)) return;
+            ensureHydrationColumns(session);
+        }
+    }
+
+    private static boolean additiveColumnsPresent(SqlSession session) {
+        try {
+            return "context_scope".equals(session.scalar(
+                    "SELECT name FROM pragma_table_info('steps') WHERE name = ?", "context_scope"));
+        } catch (SQLException ignored) {
+            return false;
         }
     }
 
@@ -506,7 +531,7 @@ public final class SqlDialect {
         session.update(UPSERT_META, "hydration_spine", "1");
     }
 
-    /** Additive columns. Existing databases keep store_schema 1 and gain these when the marker is missing. */
+    /** Additive columns. Existing databases keep store_schema 1 and gain these on open, including when hydration_spine is already 1. */
     private static void ensureHydrationColumns(SqlSession session) throws SQLException {
         addColumn(session, "files", "enabled", "INTEGER NOT NULL DEFAULT 1");
         addColumn(session, "files", "norm_path", "TEXT NOT NULL DEFAULT ''");
@@ -527,6 +552,8 @@ public final class SqlDialect {
         addColumn(session, "steps", "run_if_hard_failed", "INTEGER NOT NULL DEFAULT 0");
         addColumn(session, "steps", "run_if_soft_failed", "INTEGER NOT NULL DEFAULT 0");
         addColumn(session, "steps", "until_mode", "TEXT");
+        addColumn(session, "steps", "context_mode", "TEXT");
+        addColumn(session, "steps", "context_scope", "TEXT");
     }
 
     private static void addColumn(SqlSession session, String table, String column, String definition) throws SQLException {
