@@ -1,5 +1,7 @@
 package tools.dscode.store;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -10,6 +12,8 @@ import tools.dscode.engine.PickleballEngine;
 import tools.dscode.engine.model.RunResult;
 import tools.dscode.engine.model.Status;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -119,6 +123,29 @@ class RunHistoryAccuracyTest {
         assertEquals(0, got.exit(), got.json());
         assertTrue(got.json().contains("\"outcome\":\"FAILED\""), got.json());
         assertTrue(got.json().contains("runstate.db"), got.json());
+    }
+
+    @Test
+    void historyShowJsonContainsSnapshotHeadId() throws Exception {
+        track("json-snap");
+        RunResult result = PickleballEngine.run("""
+                Feature: Snap
+                  Scenario: One
+                    * ASSERT: "a" equals "a"
+                """, EngineOptions.of().project(project));
+        assertEquals(Status.PASSED, result.status(), result.message());
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        int code = StoreCli.execute(new String[] {
+                "store", "history", "show", "json-snap", "--json", "--project=" + project
+        }, new PrintStream(out), new PrintStream(err));
+        String json = out.toString(StandardCharsets.UTF_8);
+        assertEquals(0, code, err.toString(StandardCharsets.UTF_8) + json);
+        JsonNode node = new ObjectMapper().readTree(json);
+        JsonNode head = node.path("items").path(0).path("snapshot").path("head_id");
+        assertFalse(head.asText("").isBlank(), json);
+        assertTrue(json.contains("\"snapshot\""), json);
+        assertTrue(json.contains("\"head_id\""), json);
     }
 
     private void assertNotEqualsPassed(StoreHistory.Run run) {

@@ -77,13 +77,14 @@ public final class SqlConnections {
         try (Statement statement = borrowed.connection().createStatement()) {
             for (String ddl : SqlDialect.RUN_DDL) statement.execute(ddl);
             addRunColumns(borrowed.connection());
+            markRunSnapshots(borrowed.connection());
         } finally {
             giveBack(borrowed.pool(), borrowed.connection());
         }
         RUN_SCHEMA.add(key);
     }
 
-    /** Older run-state files predate git commit and feature path. New files already have both. */
+    /** Older run-state files predate git commit, feature path, and the snapshot columns. New files already have them. */
     private static void addRunColumns(Connection connection) throws SQLException {
         java.util.Set<String> names = new java.util.HashSet<>();
         try (ResultSet rows = connection.createStatement().executeQuery("PRAGMA table_info(runs)")) {
@@ -97,6 +98,38 @@ public final class SqlConnections {
             if (!names.contains("feature_path")) {
                 statement.execute("ALTER TABLE runs ADD COLUMN feature_path TEXT NOT NULL DEFAULT ''");
             }
+            if (!names.contains("commit_sha")) {
+                statement.execute("ALTER TABLE runs ADD COLUMN commit_sha TEXT NOT NULL DEFAULT ''");
+            }
+            if (!names.contains("head_id")) {
+                statement.execute("ALTER TABLE runs ADD COLUMN head_id TEXT NOT NULL DEFAULT ''");
+            }
+            if (!names.contains("parent_commit")) {
+                statement.execute("ALTER TABLE runs ADD COLUMN parent_commit TEXT NOT NULL DEFAULT ''");
+            }
+            if (!names.contains("parent_head_id")) {
+                statement.execute("ALTER TABLE runs ADD COLUMN parent_head_id TEXT NOT NULL DEFAULT ''");
+            }
+        }
+    }
+
+    /**
+     * Run-state {@code schema_meta} is not the source table of the same name.
+     * This write stays on the run-state connection. {@code store_schema} is not changed.
+     */
+    private static void markRunSnapshots(Connection connection) throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS schema_meta (
+                        `key` TEXT NOT NULL,
+                        value TEXT NOT NULL,
+                        PRIMARY KEY (`key`)
+                    )
+                    """);
+            statement.execute("""
+                    INSERT INTO schema_meta(`key`, value) VALUES ('run_snapshots', '1')
+                    ON CONFLICT(`key`) DO UPDATE SET value = excluded.value
+                    """);
         }
     }
 

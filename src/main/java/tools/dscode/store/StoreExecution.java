@@ -149,6 +149,7 @@ public final class StoreExecution {
                 connection.setAutoCommit(false);
                 try {
                     ensureRun(connection, active.runId, active.started, now, active.recordedScenario);
+                    RunSnapshot.capture(connection, root, active.runId, active.started);
                     RunProvenance.fill(connection, root, active.runId, active.scenarioKey);
                     ensureScenario(connection, active.execId, active.runId, active.scenarioKey, active.scenarioHash(),
                             active.examplesRow, active.started, "RUNNING");

@@ -877,6 +877,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/store/ProjectElementCategories.java`
 - `src/main/java/tools/dscode/store/RunCatalog.java`
 - `src/main/java/tools/dscode/store/RunProvenance.java`
+- `src/main/java/tools/dscode/store/RunSnapshot.java`
 - `src/main/java/tools/dscode/store/sql/Binding.java`
 - `src/main/java/tools/dscode/store/sql/DashboardAccess.java`
 - `src/main/java/tools/dscode/store/sql/LegacySqlite.java`
@@ -1368,6 +1369,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/store/RenameGateTest.java`
 - `src/test/java/tools/dscode/store/RunHistoryAccuracyTest.java`
 - `src/test/java/tools/dscode/store/RunIdReuseGuardTest.java`
+- `src/test/java/tools/dscode/store/RunSnapshotTest.java`
 - `src/test/java/tools/dscode/store/RunVariableSyncTest.java`
 - `src/test/java/tools/dscode/store/SandboxCreateTimingTest.java`
 - `src/test/java/tools/dscode/store/SandboxIndependenceTest.java`

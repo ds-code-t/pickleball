@@ -25,7 +25,8 @@ public final class SqlDialect {
 
     public static final List<String> RUN_STATE_TABLES = List.of(
             "runs", "run_logs", "scenario_executions", "step_executions", "entity_usages",
-            "log_entity_links", "artifacts", "sandboxes");
+            "log_entity_links", "artifacts", "sandboxes",
+            "run_snapshots", "run_snapshot_entities", "run_attributes");
 
     /** The eleven {@code setAutoCommit(false)} sites, plus the schema commit. */
     public static final List<String> TRANSACTIONS = List.of(
@@ -251,6 +252,10 @@ public final class SqlDialect {
                 sandbox TEXT NOT NULL DEFAULT '',
                 git_commit TEXT NOT NULL DEFAULT '',
                 feature_path TEXT NOT NULL DEFAULT '',
+                commit_sha TEXT NOT NULL DEFAULT '',
+                head_id TEXT NOT NULL DEFAULT '',
+                parent_commit TEXT NOT NULL DEFAULT '',
+                parent_head_id TEXT NOT NULL DEFAULT '',
                 PRIMARY KEY (run_id)
             )
             """,
@@ -347,6 +352,38 @@ public final class SqlDialect {
                 ttl TEXT NOT NULL,
                 sandbox TEXT NOT NULL DEFAULT '',
                 PRIMARY KEY (name)
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS run_snapshots (
+                run_id TEXT PRIMARY KEY,
+                commit_sha TEXT NOT NULL,
+                head_id TEXT NOT NULL,
+                sandbox TEXT NOT NULL,
+                parent_commit TEXT NOT NULL DEFAULT '',
+                parent_head_id TEXT NOT NULL DEFAULT '',
+                enabled_hash TEXT NOT NULL,
+                started_at TEXT NOT NULL,
+                FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS run_snapshot_entities (
+                run_id TEXT NOT NULL,
+                entity_type TEXT NOT NULL,
+                entity_id TEXT NOT NULL,
+                content_hash TEXT NOT NULL,
+                PRIMARY KEY (run_id, entity_type, entity_id),
+                FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS run_attributes (
+                run_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                value TEXT NOT NULL,
+                PRIMARY KEY (run_id, name),
+                FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE
             )
             """);
 

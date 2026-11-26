@@ -104,6 +104,9 @@ class StoreSandboxRunStateTest {
                             "no central sandbox registry");
                     continue;
                 }
+                if ("run_snapshots".equals(table) || "run_snapshot_entities".equals(table) || "run_attributes".equals(table)) {
+                    continue;
+                }
                 String count = store.session().scalar("SELECT COUNT(*) FROM " + table + " WHERE sandbox = 'alpha'");
                 assertNotEquals("0", count, table);
             }

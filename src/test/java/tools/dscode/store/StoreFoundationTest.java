@@ -65,7 +65,8 @@ class StoreFoundationTest {
             ), columns(database, "entities"));
             assertEquals(Set.of(
                     "run_id", "started_at", "finished_at", "status", "scenario",
-                    "passed", "failed", "note", "sandbox", "git_commit", "feature_path"
+                    "passed", "failed", "note", "sandbox", "git_commit", "feature_path",
+                    "commit_sha", "head_id", "parent_commit", "parent_head_id"
             ), columns(database, "runs"));
             assertEquals(Set.of("id", "run_id", "logged_at", "entity", "message", "sandbox"),
                     columns(database, "run_logs"));
