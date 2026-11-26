@@ -2,6 +2,14 @@
 
 Playwright for Java 1.65.1 (Apache-2.0) and its `driver-bundle` (Apache-2.0, with a bundled Node.js under the Node.js license) are normal dependencies of pickleball. They are not inside pickleball's jar. Pickleball never downloads Playwright browsers: Playwright is created with `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`, `install` is never run, and Playwright only joins a browser that is already running, with `chromium().connectOverCDP(...)`. Configuration is in [Configuration](configuration.md#playwright-backend).
 
+## Step definitions
+
+The same driver-bundle Node runs JavaScript and TypeScript step definitions. `NodeStepHost` in `tools.dscode.launcher` locates that binary through `PlaywrightNode` and spawns `step-host.mjs`. It does not download Node, does not look on `PATH`, does not run npm, and does not copy Node into the pickleball jar. `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` stays set. Browsers are still never downloaded.
+
+The host and the script exchange one JSON object per line. A step may call `resolveText`, `saveValue`, `getValue`, `softFail`, `secret`, `log`, and `entityGet`. The parsing map stays in Java. `secret` and a secret `entityGet` return `~MASK;` or a reference string. An unknown function fails the step. A bare import such as `left-pad` fails at load with `error: bare import is a rebuild` and `fix: add the package to workbench-ui and rebuild`. Relative imports are loaded from the hydrated file rows.
+
+Node runs erasable TypeScript. `enum`, `namespace`, and parameter properties fail at load with `fix: keep the TypeScript erasable`. There is no TypeScript compiler package in this phase. `pkb_engine_log=host` logs spawn, load, invoke, and the call name. It does not log a secret return value. The engine package does not reference `NodeStepHost`, `PlaywrightNode`, or `step-host.mjs`.
+
 ## Attach to a running browser
 
 `attach` is the one entry point. `attach --target=browser:cdp=<ws>` works as before. The route flags below resolve to a browser websocket and then run that same join, so the attached browser is a normal live target: pass the printed `--target=browser:cdp=<ws>` to `snap`, `find`, `act`, `panel-open`, and the collab verbs. Routes, in the order to try them:

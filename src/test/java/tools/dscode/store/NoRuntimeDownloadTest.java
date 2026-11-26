@@ -2,13 +2,18 @@ package tools.dscode.store;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.engine.match.ForeignStepHosts;
+import tools.dscode.launcher.NodeStepHost;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.PreparedStatement;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -123,6 +128,50 @@ class NoRuntimeDownloadTest {
         } finally {
             restore("pkb_store_bin", bin);
             restore("pkb_store_auto_install", auto);
+        }
+    }
+
+    @Test
+    void stepHostLoadAndInvokeDoesNotRunNpmOrInstall() throws Exception {
+        String source = "defineStep(\"alpha\", function () { return resolveText(\"alpha\"); });\n";
+        try (StoreDatabase database = StoreDatabase.open(project)) {
+            try (PreparedStatement statement = database.connection().prepareStatement("""
+                    INSERT INTO files(
+                        path, content_hash, raw_content, mtime, source_type, last_hydrated_at,
+                        last_synced_hash, norm_path)
+                    VALUES ('glue/js/alpha.js', 'h1', ?, 0, 'glue', '2026-11-26T00:00:00Z', 'h1', 'glue/js/alpha.js')
+                    """)) {
+                statement.setBytes(1, source.getBytes(StandardCharsets.UTF_8));
+                statement.executeUpdate();
+            }
+            try (PreparedStatement statement = database.connection().prepareStatement("""
+                    INSERT INTO step_definitions(
+                        definition_id, language, pattern, method_name, source_path, source_line,
+                        content_hash, hydrated_at, removed, host)
+                    VALUES ('alpha', 'js', 'alpha', 'defineStep', 'glue/js/alpha.js', 1, 'h1',
+                            '2026-11-26T00:00:00Z', 0, 'js')
+                    """)) {
+                statement.executeUpdate();
+            }
+        }
+        ForeignStepHosts.begin(project);
+        NodeStepHost host = new NodeStepHost();
+        try {
+            assertEquals("alpha", host.invoke("alpha", "alpha", List.of()));
+            List<String> spawn = NodeStepHost.lastSpawn();
+            String joined = String.join(" ", spawn).toLowerCase(Locale.ROOT);
+            assertFalse(joined.contains("npm"), joined);
+            assertFalse(joined.contains("install"), joined);
+            assertFalse(joined.contains("cli.js"), joined);
+            assertFalse(joined.contains("registry.npmjs.org"), joined);
+            assertFalse(joined.contains("playwright.azureedge.net"), joined);
+            assertTrue(joined.contains("step-host.mjs"), joined);
+            assertTrue(spawn.size() >= 2, joined);
+        } finally {
+            host.close();
+            ForeignStepHosts.end();
+            ForeignStepHosts.install(null);
+            StoreScope.clear();
         }
     }
 

@@ -648,6 +648,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/launcher/CompositeCommands.java`
 - `src/main/java/tools/dscode/launcher/ConsumerReadyCommands.java`
 - `src/main/java/tools/dscode/launcher/LeaseHold.java`
+- `src/main/java/tools/dscode/launcher/NodeStepHost.java`
 - `src/main/java/tools/dscode/launcher/OcrSetup.java`
 - `src/main/java/tools/dscode/launcher/PickleballWorkbenchLauncher.java`
 - `src/main/java/tools/dscode/launcher/PkbMain.java`
@@ -777,6 +778,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/testengine/WorkspaceSeedMain.java`
 - `src/main/java/tools/dscode/Values.java`
 - `src/main/resources/META-INF/pickleball/configs/CHROME_HEADLESS.yaml`
+- `src/main/resources/META-INF/pickleball/node/pkb-api.mjs`
+- `src/main/resources/META-INF/pickleball/node/step-host.mjs`
 - `src/main/resources/META-INF/services/org.junit.platform.engine.TestEngine`
 - `src/main/resources/META-INF/services/org.junit.platform.launcher.LauncherSessionListener`
 - `src/main/resources/META-INF/services/tools.dscode.engine.match.ForeignStepHost`
@@ -1009,6 +1012,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/engine/convert/CucumberModelConverterTest.java`
 - `src/test/java/tools/dscode/engine/convert/NeutralDataTest.java`
 - `src/test/java/tools/dscode/engine/EngineConfigTest.java`
+- `src/test/java/tools/dscode/engine/EngineDoesNotSpawnNodeTest.java`
 - `src/test/java/tools/dscode/engine/framerestore/FramePageGlue.java`
 - `src/test/java/tools/dscode/engine/jserror/JsErrorPageGlue.java`
 - `src/test/java/tools/dscode/engine/maskquiet/MaskPageGlue.java`
@@ -1091,6 +1095,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/MonitorLiveTest.java`
 - `src/test/java/tools/dscode/launcher/NavigateDataFileTest.java`
 - `src/test/java/tools/dscode/launcher/NetLiveTest.java`
+- `src/test/java/tools/dscode/launcher/NodeStepHostTest.java`
+- `src/test/java/tools/dscode/launcher/NodeStepHostTsTest.java`
 - `src/test/java/tools/dscode/launcher/NoopGlueModeTest.java`
 - `src/test/java/tools/dscode/launcher/OffsetFrameClickTest.java`
 - `src/test/java/tools/dscode/launcher/OneCallActTest.java`
