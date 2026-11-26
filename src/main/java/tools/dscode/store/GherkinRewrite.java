@@ -32,6 +32,92 @@ final class GherkinRewrite {
         return true;
     }
 
+    static final String IGNORE_TAG = "@pkb-ignore";
+
+    /** {@code scenarioOrd} 0 is the Feature line. A positive ord is that scenario, skipping Background and Rule. */
+    static void setIgnored(Path project, String feature, int scenarioOrd, boolean ignored) {
+        rewriteTag(project, feature, scenarioOrd <= 0 ? "" : Integer.toString(scenarioOrd), IGNORE_TAG, ignored);
+    }
+
+    static void setTag(Path project, String feature, String selector, String tag, boolean present) {
+        String token = tag == null ? "" : tag.trim();
+        if (token.isEmpty()) throw new IllegalArgumentException("tag is required");
+        if (!token.startsWith("@")) token = "@" + token;
+        if (selector == null || selector.isBlank()) throw new IllegalArgumentException("scenario is required");
+        rewriteTag(project, feature, selector.trim(), token, present);
+    }
+
+    private static void rewriteTag(Path project, String feature, String selector, String token, boolean present) {
+        try {
+            StoreEdit.refuseConflict(project, feature, false);
+            String current = currentText(project, feature);
+            String newline = current != null && current.contains("\r\n") ? "\r\n" : "\n";
+            boolean trailing = current == null || current.isEmpty() || current.endsWith("\n") || current.endsWith("\r");
+            List<String> lines = split(current);
+            int header = selector == null || selector.isBlank() ? featureHeader(lines) : find(lines, selector).header;
+            toggleTag(lines, header, token, present);
+            String rewritten = join(lines, newline, trailing);
+            if (StoreGherkin.parse(rewritten) == null) {
+                throw new IllegalArgumentException("Gherkin is not valid: " + feature);
+            }
+            byte[] body = rewritten.getBytes(StandardCharsets.UTF_8);
+            if (StoreConfig.enabled(project)) {
+                StoreContent.put(project, feature, body);
+            } else {
+                Path disk = project.resolve(feature);
+                if (disk.getParent() != null) Files.createDirectories(disk.getParent());
+                Files.write(disk, body);
+            }
+        } catch (IllegalArgumentException failure) {
+            throw failure;
+        } catch (Exception failure) {
+            throw new IllegalArgumentException(failure.getMessage() == null ? "gherkin rewrite failed" : failure.getMessage());
+        }
+    }
+
+    private static int featureHeader(List<String> lines) {
+        for (int index = 0; index < lines.size(); index++) {
+            String trimmed = lines.get(index).trim();
+            if (trimmed.equals("Feature:") || trimmed.startsWith("Feature:") || trimmed.startsWith("Feature ")) {
+                return index;
+            }
+        }
+        throw new IllegalArgumentException("Feature line is missing");
+    }
+
+    private static void toggleTag(List<String> lines, int header, String token, boolean present) {
+        int tagLine = header - 1;
+        while (tagLine >= 0 && lines.get(tagLine).isBlank()) tagLine--;
+        if (tagLine >= 0 && isTag(lines.get(tagLine).trim())) {
+            String updated = rewriteTagLine(lines.get(tagLine), token, present);
+            if (updated.isBlank()) lines.remove(tagLine);
+            else lines.set(tagLine, updated);
+            return;
+        }
+        if (!present) return;
+        String indent = indentOf(lines.get(header));
+        lines.add(header, indent + token);
+    }
+
+    private static String rewriteTagLine(String line, String token, boolean present) {
+        int start = 0;
+        while (start < line.length() && (line.charAt(start) == ' ' || line.charAt(start) == '\t')) start++;
+        String indent = line.substring(0, start);
+        List<String> parts = new ArrayList<>();
+        for (String part : line.trim().split("\\s+")) {
+            if (!part.equals(token) && !part.isEmpty()) parts.add(part);
+        }
+        if (present) parts.add(token);
+        if (parts.isEmpty()) return "";
+        return indent + String.join(" ", parts);
+    }
+
+    private static String indentOf(String line) {
+        int start = 0;
+        while (start < line.length() && (line.charAt(start) == ' ' || line.charAt(start) == '\t')) start++;
+        return line.substring(0, start);
+    }
+
     static StoreEdit.Outcome apply(Path project, String action, String feature, List<String> tokens) {
         try {
             StoreEdit.refuseConflict(project, feature, tokens.contains("--force"));

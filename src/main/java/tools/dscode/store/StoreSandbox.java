@@ -68,6 +68,11 @@ public final class StoreSandbox {
         String suppliedTtl = value(tokens, "--ttl=");
         String ttl = suppliedTtl == null || suppliedTtl.isBlank() ? "24h" : suppliedTtl;
         parseDuration(ttl);
+        String mode = value(tokens, "--mode=");
+        if (mode != null && !mode.isBlank() && !"copy".equals(mode)) {
+            throw new IllegalArgumentException(
+                    "sandbox --mode must be copy\nfix: store sandbox create " + name + " --mode=copy");
+        }
         String from = value(tokens, "--from=");
         if (from != null && !from.isBlank() && !"main".equals(from)) {
             throw new IllegalArgumentException(

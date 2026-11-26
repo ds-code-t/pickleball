@@ -20,7 +20,8 @@ public final class SqlDialect {
     public static final List<String> SOURCE_TABLES = List.of(
             "schema_meta", "files", "provenance", "feature_docs", "scenarios", "example_blocks", "steps",
             "entities", "step_definitions",
-            "pins", "deltas", "heads", "head_rows");
+            "pins", "deltas", "heads", "head_rows",
+            "folders", "scenario_tags", "run_variables");
 
     public static final List<String> RUN_STATE_TABLES = List.of(
             "runs", "run_logs", "scenario_executions", "step_executions", "entity_usages",
@@ -64,6 +65,9 @@ public final class SqlDialect {
                 byte_size INTEGER,
                 location TEXT NOT NULL DEFAULT 'db',
                 git_commit TEXT NOT NULL DEFAULT '',
+                enabled INTEGER NOT NULL DEFAULT 1,
+                norm_path TEXT NOT NULL DEFAULT '',
+                folder_key TEXT NOT NULL DEFAULT '',
                 PRIMARY KEY (path)
             )
             """,
@@ -101,6 +105,7 @@ public final class SqlDialect {
                 line INTEGER NOT NULL,
                 tags TEXT NOT NULL,
                 description TEXT NOT NULL,
+                enabled INTEGER NOT NULL DEFAULT 1,
                 PRIMARY KEY (file_path, ord)
             )
             """,
@@ -125,6 +130,7 @@ public final class SqlDialect {
                 docstring TEXT,
                 docstring_type TEXT,
                 table_json TEXT,
+                enabled INTEGER NOT NULL DEFAULT 1,
                 PRIMARY KEY (file_path, scenario_ord, ord)
             )
             """,
@@ -152,6 +158,7 @@ public final class SqlDialect {
                 content_hash TEXT NOT NULL,
                 hydrated_at TEXT NOT NULL,
                 removed INTEGER NOT NULL DEFAULT 0,
+                enabled INTEGER NOT NULL DEFAULT 1,
                 PRIMARY KEY (definition_id)
             )
             """,
@@ -191,6 +198,30 @@ public final class SqlDialect {
                 payload_json TEXT NOT NULL,
                 tombstone INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY (head_id, tbl, pk)
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS folders (
+                folder_key TEXT PRIMARY KEY,
+                norm_path TEXT NOT NULL,
+                enabled INTEGER NOT NULL DEFAULT 1
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS scenario_tags (
+                file_path TEXT NOT NULL,
+                scenario_ord INTEGER NOT NULL,
+                tag TEXT NOT NULL,
+                PRIMARY KEY (file_path, scenario_ord, tag)
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS run_variables (
+                name TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                source_file TEXT NOT NULL DEFAULT '',
+                content_hash TEXT NOT NULL DEFAULT ''
             )
             """);
 
@@ -467,9 +498,34 @@ public final class SqlDialect {
                             + "ON CONFLICT(`key`) DO UPDATE SET value = excluded.value");
         }
         session.update("INSERT OR IGNORE INTO _pkb_actor(id, name) VALUES (1, '')");
-        if (!triggerExists(session, "files_pkb_insert")) installChangeLog(session);
+        ensureHydrationColumns(session);
+        installChangeLog(session);
         session.update(UPSERT_META, "universal_entity", "1");
         session.update(UPSERT_META, "delta_window", "100");
+        session.update(UPSERT_META, "hydration_spine", "1");
+    }
+
+    /** Additive columns. Existing databases keep store_schema 1 and gain these when the marker is missing. */
+    private static void ensureHydrationColumns(SqlSession session) throws SQLException {
+        addColumn(session, "files", "enabled", "INTEGER NOT NULL DEFAULT 1");
+        addColumn(session, "files", "norm_path", "TEXT NOT NULL DEFAULT ''");
+        addColumn(session, "files", "folder_key", "TEXT NOT NULL DEFAULT ''");
+        addColumn(session, "scenarios", "enabled", "INTEGER NOT NULL DEFAULT 1");
+        addColumn(session, "steps", "enabled", "INTEGER NOT NULL DEFAULT 1");
+        addColumn(session, "step_definitions", "enabled", "INTEGER NOT NULL DEFAULT 1");
+    }
+
+    private static void addColumn(SqlSession session, String table, String column, String definition) throws SQLException {
+        String found = session.scalar(
+                "SELECT name FROM pragma_table_info('" + table + "') WHERE name = ?", column);
+        if (column.equals(found)) return;
+        try {
+            session.script("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
+        } catch (SQLException failure) {
+            String message = failure.getMessage() == null ? "" : failure.getMessage().toLowerCase(Locale.ROOT);
+            if (message.contains("duplicate column")) return;
+            throw failure;
+        }
     }
 
     private static String readStoreSchema(SqlSession session) {
@@ -494,14 +550,16 @@ public final class SqlDialect {
         }
     }
 
-    /** Schema 1 with the changelog trigger and the universal-entity marker. */
+    /** Schema 1 with the changelog trigger, the universal-entity marker, and the hydration columns. */
     private static boolean schemaReady(SqlSession session) {
         String current = readStoreSchema(session);
         if (!"1".equals(current)) return false;
         try {
             if (!triggerExists(session, "files_pkb_insert")) return false;
+            if (!"1".equals(session.scalar(
+                    "SELECT value FROM schema_meta WHERE `key` = 'universal_entity'"))) return false;
             return "1".equals(session.scalar(
-                    "SELECT value FROM schema_meta WHERE `key` = 'universal_entity'"));
+                    "SELECT value FROM schema_meta WHERE `key` = 'hydration_spine'"));
         } catch (SQLException ignored) {
             return false;
         }

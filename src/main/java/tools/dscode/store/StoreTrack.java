@@ -225,6 +225,15 @@ public final class StoreTrack {
             sql.append(taggedExamples("e.scenario_key"));
             sql.append(" WHERE (' ' || eb.tags || ' ') LIKE ? ESCAPE '\\'))");
             values.add(pattern);
+            sql.append(" OR EXISTS (SELECT 1 FROM scenario_tags st JOIN scenarios sc ON sc.file_path = st.file_path AND sc.ord = st.scenario_ord WHERE ");
+            sql.append(taggedScenario("scenario_key"));
+            sql.append(" AND st.tag = ?)");
+            values.add(token);
+            sql.append(" OR (kind = 'run' AND run_id IN (SELECT e.run_id FROM scenario_executions e JOIN scenario_tags st ON 1 = 1");
+            sql.append(" JOIN scenarios sc ON sc.file_path = st.file_path AND sc.ord = st.scenario_ord WHERE ");
+            sql.append(taggedScenario("e.scenario_key"));
+            sql.append(" AND st.tag = ?))");
+            values.add(token);
             sql.append(")");
         }
         if (filter.text() != null && !filter.text().isBlank()) {

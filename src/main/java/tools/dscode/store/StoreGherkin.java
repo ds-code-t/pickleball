@@ -245,9 +245,11 @@ public final class StoreGherkin {
             feature.setString(6, document.description());
             feature.executeUpdate();
         }
+        boolean featureIgnored = containsIgnore(document.tags());
+        boolean inRoot = StorePaths.inFeatureOrGlueRoot(path);
         try (PreparedStatement scenario = connection.prepareStatement("""
-                INSERT INTO scenarios(file_path, ord, keyword, name, line, tags, description)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO scenarios(file_path, ord, keyword, name, line, tags, description, enabled)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """);
              PreparedStatement step = connection.prepareStatement("""
                 INSERT INTO steps(file_path, scenario_ord, ord, keyword, text, line, docstring, docstring_type, table_json)
@@ -256,8 +258,14 @@ public final class StoreGherkin {
              PreparedStatement examples = connection.prepareStatement("""
                 INSERT INTO example_blocks(file_path, scenario_ord, ord, line, tags)
                 VALUES (?, ?, ?, ?, ?)
+                """);
+             PreparedStatement tags = connection.prepareStatement("""
+                INSERT INTO scenario_tags(file_path, scenario_ord, tag) VALUES (?, ?, ?)
+                ON CONFLICT(file_path, scenario_ord, tag) DO NOTHING
                 """)) {
             for (Scenario one : document.scenarios()) {
+                boolean scenarioIgnored = featureIgnored || containsIgnore(one.tags());
+                int enabled = inRoot && !scenarioIgnored ? 1 : 0;
                 scenario.setString(1, path);
                 scenario.setInt(2, one.ord());
                 scenario.setString(3, one.keyword());
@@ -265,7 +273,9 @@ public final class StoreGherkin {
                 scenario.setInt(5, one.line());
                 scenario.setString(6, one.tags());
                 scenario.setString(7, one.description());
+                scenario.setInt(8, enabled);
                 scenario.executeUpdate();
+                writeTags(tags, path, one.ord(), one.tags());
                 for (Step oneStep : one.steps()) {
                     step.setString(1, path);
                     step.setInt(2, one.ord());
@@ -277,19 +287,71 @@ public final class StoreGherkin {
                     step.setString(8, oneStep.docstringType());
                     step.setString(9, oneStep.tableJson());
                     step.executeUpdate();
-                    String tags = examplesTags(oneStep.text());
-                    if ("Examples".equals(oneStep.keyword()) && !tags.isEmpty()) {
+                    String exampleTags = examplesTags(oneStep.text());
+                    if ("Examples".equals(oneStep.keyword()) && !exampleTags.isEmpty()) {
                         examples.setString(1, path);
                         examples.setInt(2, one.ord());
                         examples.setInt(3, oneStep.ord());
                         examples.setInt(4, oneStep.line());
-                        examples.setString(5, tags);
+                        examples.setString(5, exampleTags);
                         examples.executeUpdate();
+                        writeTags(tags, path, one.ord(), exampleTags);
                     }
                 }
             }
         }
+        if (featureIgnored) {
+            try (PreparedStatement file = connection.prepareStatement(
+                    "UPDATE files SET enabled = 0 WHERE path = ?")) {
+                file.setString(1, path);
+                file.executeUpdate();
+            }
+        }
         StoreLog.log(project, "parse", path, "scenarios=" + document.scenarios().size());
+    }
+
+    /** Reapplies {@code @pkb-ignore} onto enabled columns without rewriting an unchanged file row. */
+    public static void applyFlags(Connection connection, String path, String sourceType, byte[] raw) throws SQLException {
+        if (!isGherkin(path, sourceType)) return;
+        Document document = parse(raw);
+        if (document == null) return;
+        boolean featureIgnored = containsIgnore(document.tags());
+        boolean inRoot = StorePaths.inFeatureOrGlueRoot(path);
+        int fileEnabled = inRoot && !featureIgnored ? 1 : 0;
+        try (PreparedStatement file = connection.prepareStatement("UPDATE files SET enabled = ? WHERE path = ?")) {
+            file.setInt(1, fileEnabled);
+            file.setString(2, path);
+            file.executeUpdate();
+        }
+        try (PreparedStatement scenario = connection.prepareStatement(
+                "UPDATE scenarios SET enabled = ? WHERE file_path = ? AND ord = ?")) {
+            for (Scenario one : document.scenarios()) {
+                int enabled = fileEnabled == 1 && !containsIgnore(one.tags()) ? 1 : 0;
+                scenario.setInt(1, enabled);
+                scenario.setString(2, path);
+                scenario.setInt(3, one.ord());
+                scenario.executeUpdate();
+            }
+        }
+    }
+
+    static boolean containsIgnore(String tags) {
+        if (tags == null || tags.isBlank()) return false;
+        for (String part : tags.split("\\s+")) {
+            if ("@pkb-ignore".equals(part)) return true;
+        }
+        return false;
+    }
+
+    private static void writeTags(PreparedStatement tags, String path, int ord, String text) throws SQLException {
+        if (text == null || text.isBlank()) return;
+        for (String part : text.split("\\s+")) {
+            if (!part.startsWith("@") || part.length() < 2) continue;
+            tags.setString(1, path);
+            tags.setInt(2, ord);
+            tags.setString(3, part);
+            tags.executeUpdate();
+        }
     }
 
     /** Parses only when a previous hydrate stored the file before the query model existed. */
@@ -314,6 +376,7 @@ public final class StoreGherkin {
         for (String sql : List.of(
                 "DELETE FROM steps WHERE file_path = ?",
                 "DELETE FROM example_blocks WHERE file_path = ?",
+                "DELETE FROM scenario_tags WHERE file_path = ?",
                 "DELETE FROM scenarios WHERE file_path = ?",
                 "DELETE FROM feature_docs WHERE file_path = ?"
         )) {

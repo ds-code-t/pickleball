@@ -89,6 +89,9 @@ public final class StoreCli {
                 case "pin" -> pinCommand(project, tokens, stdout, stderr);
                 case "delta" -> deltaCommand(project, tokens, stdout, stderr);
                 case "head" -> headCommand(project, tokens, stdout, stderr);
+                case "enable" -> enableCommand(project, tokens, stdout, stderr);
+                case "tag" -> tagCommand(project, tokens, stdout, stderr);
+                case "var" -> varCommand(project, tokens, stdout, stderr);
                 case "query" -> trackCommand(project, tokens, false, stdout, stderr);
                 case "timeline" -> trackCommand(project, tokens, true, stdout, stderr);
                 case "retain" -> retainCommand(project, tokens, stdout, stderr);
@@ -157,6 +160,11 @@ public final class StoreCli {
                 Usage: store delta redo [--json] [--project=<dir>]
                 Usage: store head show [--json] [--project=<dir>]
                 Usage: store head rebuild [--json] [--project=<dir>]
+                Usage: store enable <feature|scenario|step|definition|folder> <id> --on|--off [--json] [--project=<dir>]
+                Usage: store tag add|remove --feature=<path> --scenario=<ord-or-name> --tag=<tag> [--json] [--project=<dir>]
+                Usage: store var list [--json] [--project=<dir>]
+                Usage: store var set <name> <value> [--json] [--project=<dir>]
+                Usage: store var enable <name> --on|--off [--json] [--project=<dir>]
                 Usage: store hydrate [--project=<dir>] [--path=<relative>] [--force] [--dry-run]
                 Usage: store extract [--project=<dir>] [--path=<relative>] [--force]
                 Usage: store history list [--project=<dir>]
@@ -190,6 +198,7 @@ public final class StoreCli {
                 sandbox merge compares _pkb_base, the sandbox, and main by hash. The default policy fail writes nothing when any key conflicts, prints a text table, and saves sandboxes/<name>/merge-<time>.json. branch-wins and main-wins resolve those keys. One transaction applies the chosen rows, rebuilds derived feature rows, and re-baselines the sandbox. --dry-run writes nothing. --drop drops the sandbox after a successful merge. store changes lists the _pkb_changes rows for the bound database. --since and --limit page by sequence. pkb_store_changes_days (default 14) is how long store retain and sandbox prune keep those rows. Set pkb_store_log=merge,changes to log them.
                 status and hydrate --dry-run do not create a database when it is missing.
                 store pin show prints the commit pin (commit sha, time, and dirty). An empty git directory stores an empty sha and dirty 0. store delta list prints the append-only log. store delta undo appends an inverse delta and does not delete the undone row. store delta redo appends a copy of the delta that undo inverted. store head show prints the flattened head and rebuilds it when it is stale. store head rebuild replays the remaining deltas. After a flatten, more than 100 deltas are folded into the head and those delta rows are deleted. Set pkb_store_log=pin,delta to log pin, head, append, undo, redo, and fold lines.
+                store status prints reused, rehydrated, and the first 12 characters of the code-source jar hash. A jar hash change deletes source rows and hydrates them again. It does not open runstate.db. Unchanged content hashes increment reused. Inserts and updates increment rehydrated. store enable turns a feature, scenario, step, definition, or folder on or off. Off on a feature, scenario, or folder writes @pkb-ignore through the feature edit path. On removes only that tag. A both-sides edit is refused. Bad Gherkin rolls back. Files outside the feature and glue roots stay in the database with enabled 0. files.norm_path uses backslashes and a lowercase drive letter on Windows. store tag add and remove write scenario_tags in the same transaction as the scenario text. store query --tag still matches scenarios.tags and also matches scenario_tags. store var list, set, and enable read and write run_variables. var set on main writes the properties file back. A sandbox var set updates that database only. A cleartext secret is rejected. Set pkb_store_log=enable to log toggles. The log does not include variable values.
                 hydrate copies features, configs, calls, components, resource maps, templates, and store-entities/*.entity files.
                 A .feature file also stores scenarios, steps, tags, docstrings, and data tables. The original bytes stay in the file row.
                 Unchanged content hashes are skipped. --force rewrites the database rows from files.
@@ -357,6 +366,11 @@ public final class StoreCli {
             HeadMaterializer.quiet(database.connection(), project);
             UniversalEntity.refreshPin(database.connection(), project);
             int version = database.schemaVersion();
+            String reused = metaOrZero(database.connection(), "hydrate_reused");
+            String rehydrated = metaOrZero(database.connection(), "hydrate_rehydrated");
+            String jarFull = UniversalEntity.meta(database.connection(), "jar_hash");
+            if (jarFull == null || jarFull.isBlank()) jarFull = StoreHashes.jarHash();
+            String jar = jarFull.length() <= 12 ? jarFull : jarFull.substring(0, 12);
             int files = count(database, "SELECT COUNT(*) FROM files");
             int scenarios = count(database, "SELECT COUNT(*) FROM scenarios");
             int entities = count(database, "SELECT COUNT(*) FROM entities");
@@ -374,10 +388,13 @@ public final class StoreCli {
                         + ",\"enabledSource\":\"" + jsonEscape(source) + "\",\"binaryRefs\":" + binaryRefs
                         + ",\"refs\":" + binaryRefs + ",\"ownedLarge\":" + ownedLarge
                         + ",\"hydrateCommit\":\"" + jsonEscape(hydrateCommit) + "\""
+                        + ",\"reused\":" + reused + ",\"rehydrated\":" + rehydrated
+                        + ",\"jar\":\"" + jsonEscape(jar) + "\""
                         + gitJson(project, database) + skipJson(skipped));
             } else {
                 out.println(enabledLine);
                 out.println("Store schema " + version);
+                out.println("reused=" + reused + " rehydrated=" + rehydrated + " jar=" + jar);
                 out.println("files " + files);
                 out.println("scenarios " + scenarios);
                 out.println("entities " + entities);
@@ -781,6 +798,258 @@ public final class StoreCli {
         }
     }
 
+    private static int enableCommand(Path project, List<String> tokens, PrintStream stdout, PrintStream stderr) {
+        if (tokens.size() < 3 || tokens.get(1).startsWith("--") || tokens.get(2).startsWith("--")) {
+            stderr.println("error: store enable needs a kind and an id");
+            stderr.println("fix: store enable <feature|scenario|step|definition|folder> <id> --on|--off");
+            return 2;
+        }
+        String kind = tokens.get(1);
+        String id = tokens.get(2);
+        boolean on = has(tokens, "--on");
+        boolean off = has(tokens, "--off");
+        if (on == off) {
+            stderr.println("error: store enable needs --on or --off");
+            stderr.println("fix: store enable " + kind + " " + id + " --on|--off");
+            return 2;
+        }
+        boolean enabled = on;
+        try {
+            switch (kind) {
+                case "feature" -> GherkinRewrite.setIgnored(project, id, 0, !enabled);
+                case "scenario" -> enableScenario(project, id, enabled);
+                case "step" -> enableStep(project, id, enabled);
+                case "definition" -> enableDefinition(project, id, enabled);
+                case "folder" -> enableFolder(project, id, enabled);
+                default -> {
+                    stderr.println("error: Unknown Store enable command: " + kind);
+                    stderr.println("fix: store enable <feature|scenario|step|definition|folder> <id> --on|--off");
+                    return 2;
+                }
+            }
+            StoreLog.log(project, "enable", id, (enabled ? "on" : "off") + " " + kind);
+            if (json(tokens)) {
+                stdout.println("{\"ok\":true,\"command\":\"enable\",\"kind\":\"" + jsonEscape(kind)
+                        + "\",\"id\":\"" + jsonEscape(id) + "\",\"enabled\":" + enabled + "}");
+            } else {
+                stdout.println("enable " + kind + " " + id + " " + (enabled ? "on" : "off"));
+            }
+            return 0;
+        } catch (IllegalArgumentException failure) {
+            stderr.println("error: " + failure.getMessage());
+            stderr.println("fix: store enable " + kind + " " + id + " --on|--off");
+            return 1;
+        } catch (Exception failure) {
+            stderr.println("error: " + failure.getMessage());
+            stderr.println("fix: store enable " + kind + " " + id + " --on|--off");
+            return 1;
+        }
+    }
+
+    private static void enableScenario(Path project, String id, boolean enabled) {
+        int hash = id.lastIndexOf('#');
+        if (hash <= 0 || hash == id.length() - 1) {
+            throw new IllegalArgumentException("scenario id is <feature>#<ord-or-name>");
+        }
+        String feature = id.substring(0, hash);
+        String selector = id.substring(hash + 1);
+        if (selector.chars().allMatch(Character::isDigit)) {
+            GherkinRewrite.setIgnored(project, feature, Integer.parseInt(selector), !enabled);
+        } else {
+            GherkinRewrite.setTag(project, feature, selector, GherkinRewrite.IGNORE_TAG, !enabled);
+        }
+    }
+
+    private static void enableStep(Path project, String id, boolean enabled) throws Exception {
+        String[] parts = id.split("#");
+        if (parts.length != 3) throw new IllegalArgumentException("step id is <feature>#<scenarioOrd>#<stepOrd>");
+        int scenario = Integer.parseInt(parts[1]);
+        int step = Integer.parseInt(parts[2]);
+        try (StoreDatabase database = StoreDatabase.open(project);
+             var statement = database.connection().prepareStatement(
+                     "UPDATE steps SET enabled = ? WHERE file_path = ? AND scenario_ord = ? AND ord = ?")) {
+            statement.setInt(1, enabled ? 1 : 0);
+            statement.setString(2, parts[0]);
+            statement.setInt(3, scenario);
+            statement.setInt(4, step);
+            if (statement.executeUpdate() == 0) throw new IllegalArgumentException("step not found: " + id);
+        }
+    }
+
+    private static void enableDefinition(Path project, String id, boolean enabled) throws Exception {
+        try (StoreDatabase database = StoreDatabase.open(project);
+             var statement = database.connection().prepareStatement(
+                     "UPDATE step_definitions SET enabled = ? WHERE definition_id = ?")) {
+            statement.setInt(1, enabled ? 1 : 0);
+            statement.setString(2, id);
+            if (statement.executeUpdate() == 0) throw new IllegalArgumentException("definition not found: " + id);
+        }
+    }
+
+    private static void enableFolder(Path project, String folder, boolean enabled) throws Exception {
+        String relative = StorePaths.normalizeRelative(folder);
+        Path directory = project.resolve(relative);
+        if (!java.nio.file.Files.isDirectory(directory)) {
+            throw new IllegalArgumentException("folder not found: " + relative);
+        }
+        List<Path> features;
+        try (var walk = java.nio.file.Files.walk(directory)) {
+            features = walk.filter(path -> path.getFileName().toString().endsWith(".feature")).sorted().toList();
+        }
+        if (features.isEmpty()) throw new IllegalArgumentException("folder has no features: " + relative);
+        for (Path file : features) {
+            String path = StorePaths.normalizeRelative(project.toAbsolutePath().normalize()
+                    .relativize(file.toAbsolutePath().normalize()).toString());
+            GherkinRewrite.setIgnored(project, path, 0, !enabled);
+        }
+        String key = StorePaths.normPath(relative);
+        try (StoreDatabase database = StoreDatabase.open(project);
+             var statement = database.connection().prepareStatement("""
+                     INSERT INTO folders(folder_key, norm_path, enabled) VALUES (?, ?, ?)
+                     ON CONFLICT(folder_key) DO UPDATE SET enabled = excluded.enabled, norm_path = excluded.norm_path
+                     """)) {
+            statement.setString(1, key);
+            statement.setString(2, key);
+            statement.setInt(3, enabled ? 1 : 0);
+            statement.executeUpdate();
+        }
+    }
+
+    private static int tagCommand(Path project, List<String> tokens, PrintStream stdout, PrintStream stderr) {
+        String verb = action(tokens);
+        if (!"add".equals(verb) && !"remove".equals(verb)) {
+            stderr.println("error: Unknown Store tag command: " + (verb.isEmpty() ? "tag" : verb));
+            stderr.println("fix: store tag add|remove --feature=<path> --scenario=<ord-or-name> --tag=<tag>");
+            return 2;
+        }
+        String feature = option(tokens, "--feature=");
+        String scenario = option(tokens, "--scenario=");
+        String tag = option(tokens, "--tag=");
+        if (feature == null || feature.isBlank() || scenario == null || scenario.isBlank() || tag == null || tag.isBlank()) {
+            stderr.println("error: store tag needs --feature, --scenario, and --tag");
+            stderr.println("fix: store tag " + verb + " --feature=<path> --scenario=<ord-or-name> --tag=<tag>");
+            return 2;
+        }
+        try {
+            GherkinRewrite.setTag(project, feature, scenario, tag, "add".equals(verb));
+            String token = tag.startsWith("@") ? tag : "@" + tag;
+            StoreLog.log(project, "enable", feature + "#" + scenario, ("add".equals(verb) ? "tag-add " : "tag-remove ") + token);
+            if (json(tokens)) {
+                stdout.println("{\"ok\":true,\"command\":\"tag\",\"action\":\"" + verb + "\",\"feature\":\""
+                        + jsonEscape(feature) + "\",\"scenario\":\"" + jsonEscape(scenario)
+                        + "\",\"tag\":\"" + jsonEscape(token) + "\"}");
+            } else {
+                stdout.println("tag " + verb + " " + feature + "#" + scenario + " " + token);
+            }
+            return 0;
+        } catch (RuntimeException failure) {
+            stderr.println("error: " + failure.getMessage());
+            stderr.println("fix: store tag " + verb + " --feature=<path> --scenario=<ord-or-name> --tag=<tag>");
+            return 1;
+        }
+    }
+
+    private static int varCommand(Path project, List<String> tokens, PrintStream stdout, PrintStream stderr) {
+        String verb = action(tokens);
+        try {
+            return switch (verb) {
+                case "list" -> varList(project, json(tokens), stdout);
+                case "set" -> varSet(project, tokens, stdout, stderr);
+                case "enable" -> varEnable(project, tokens, stdout, stderr);
+                default -> {
+                    stderr.println("error: Unknown Store var command: " + (verb.isEmpty() ? "var" : verb));
+                    stderr.println("fix: store var list|set|enable");
+                    yield 2;
+                }
+            };
+        } catch (IllegalArgumentException failure) {
+            stderr.println("error: " + failure.getMessage());
+            stderr.println("fix: store var list|set|enable");
+            return 1;
+        } catch (Exception failure) {
+            stderr.println("error: " + failure.getMessage());
+            stderr.println("fix: store var list|set|enable");
+            return 1;
+        }
+    }
+
+    private static int varList(Path project, boolean json, PrintStream stdout) throws Exception {
+        try (StoreDatabase database = StoreDatabase.open(project)) {
+            List<StoreRunVariables.Row> rows = StoreRunVariables.list(database.connection());
+            if (json) {
+                StringBuilder body = new StringBuilder();
+                body.append("{\"command\":\"var list\",\"count\":").append(rows.size()).append(",\"vars\":[");
+                for (int index = 0; index < rows.size(); index++) {
+                    if (index > 0) body.append(',');
+                    StoreRunVariables.Row row = rows.get(index);
+                    body.append("{\"name\":\"").append(jsonEscape(row.name()))
+                            .append("\",\"value\":\"").append(jsonEscape(row.value()))
+                            .append("\",\"enabled\":").append(row.enabled())
+                            .append(",\"source\":\"").append(jsonEscape(row.sourceFile())).append("\"}");
+                }
+                body.append("]}");
+                stdout.println(body);
+            } else {
+                stdout.println("vars " + rows.size());
+                for (StoreRunVariables.Row row : rows) {
+                    stdout.println(row.name() + " enabled=" + (row.enabled() ? 1 : 0)
+                            + " source=" + row.sourceFile() + " value=" + row.value());
+                }
+            }
+            return 0;
+        }
+    }
+
+    private static int varSet(Path project, List<String> tokens, PrintStream stdout, PrintStream stderr) throws Exception {
+        if (tokens.size() < 4 || tokens.get(2).startsWith("--") || tokens.get(3).startsWith("--")) {
+            stderr.println("error: store var set needs a name and a value");
+            stderr.println("fix: store var set <name> <value>");
+            return 2;
+        }
+        String name = tokens.get(2);
+        String value = tokens.get(3);
+        boolean main = StoreScope.current().primary();
+        try (StoreDatabase database = StoreDatabase.open(project)) {
+            StoreRunVariables.set(database.connection(), project, name, value, main);
+        }
+        if (StoreSecrets.highEntropy(value) && !StoreSecrets.secretName(project, name)) {
+            stderr.println(StoreSecrets.warning(name));
+        }
+        if (json(tokens)) {
+            stdout.println("{\"ok\":true,\"command\":\"var set\",\"name\":\"" + jsonEscape(name)
+                    + "\",\"wroteFile\":" + main + "}");
+        } else {
+            stdout.println("var set " + name + (main ? " file" : " sandbox"));
+        }
+        return 0;
+    }
+
+    private static int varEnable(Path project, List<String> tokens, PrintStream stdout, PrintStream stderr) throws Exception {
+        if (tokens.size() < 3 || tokens.get(2).startsWith("--")) {
+            stderr.println("error: store var enable needs a name");
+            stderr.println("fix: store var enable <name> --on|--off");
+            return 2;
+        }
+        String name = tokens.get(2);
+        boolean on = has(tokens, "--on");
+        boolean off = has(tokens, "--off");
+        if (on == off) {
+            stderr.println("error: store var enable needs --on or --off");
+            stderr.println("fix: store var enable " + name + " --on|--off");
+            return 2;
+        }
+        try (StoreDatabase database = StoreDatabase.open(project)) {
+            StoreRunVariables.enable(database.connection(), project, name, on);
+        }
+        if (json(tokens)) {
+            stdout.println("{\"ok\":true,\"command\":\"var enable\",\"name\":\"" + jsonEscape(name)
+                    + "\",\"enabled\":" + on + "}");
+        } else {
+            stdout.println("var enable " + name + " " + (on ? "on" : "off"));
+        }
+        return 0;
+    }
+
     private static int conflicts(Path project, boolean json, PrintStream out, PrintStream err) {
         try {
             List<StoreQuery.Conflict> conflicts = StoreQuery.conflicts(project);
@@ -1103,6 +1372,12 @@ public final class StoreCli {
             }
         }
         throw new IllegalArgumentException("entity put needs --payload or --payload-file");
+    }
+
+    private static String metaOrZero(Connection connection, String key) throws SQLException {
+        String value = UniversalEntity.meta(connection, key);
+        if (value == null || value.isBlank()) return "0";
+        return value.trim();
     }
 
     private static int count(StoreDatabase database, String sql) throws SQLException {

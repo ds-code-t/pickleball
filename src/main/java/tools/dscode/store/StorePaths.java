@@ -104,4 +104,34 @@ public final class StorePaths {
         }
         return value;
     }
+
+    /**
+     * Per-OS form of a stored relative path. Windows uses backslashes and a
+     * lowercase drive letter. The stored {@code files.path} stays {@code /}.
+     */
+    public static String normPath(String storedPath) {
+        String unified = storedPath == null ? "" : storedPath.replace('\\', '/');
+        if (unified.length() >= 2 && unified.charAt(1) == ':') {
+            unified = Character.toLowerCase(unified.charAt(0)) + unified.substring(1);
+        }
+        if (java.io.File.separatorChar == '\\') return unified.replace('/', '\\');
+        return unified;
+    }
+
+    /** Parent of {@link #normPath(String)}. A path with no parent is empty. */
+    public static String folderKey(String storedPath) {
+        String norm = normPath(storedPath);
+        int cut = Math.max(norm.lastIndexOf('\\'), norm.lastIndexOf('/'));
+        if (cut < 0) return "";
+        return norm.substring(0, cut);
+    }
+
+    /** Feature directories and Java or script glue roots stay enabled. Other discovered files are stored with enabled 0. */
+    public static boolean inFeatureOrGlueRoot(String storedPath) {
+        String path = storedPath == null ? "" : storedPath.replace('\\', '/');
+        if (path.startsWith("features/") || path.contains("/features/") || "features".equals(path)) return true;
+        if (path.startsWith("src/main/java/") || path.startsWith("src/test/java/")) return true;
+        if (path.startsWith("glue/") || "glue".equals(path)) return true;
+        return false;
+    }
 }

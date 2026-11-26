@@ -63,6 +63,26 @@ class StoreHydrateTest {
     }
 
     @Test
+    void unchangedFileIncrementsReusedAndNotRehydrated() throws Exception {
+        write(project.resolve("src/test/resources/features/one.feature"),
+                "Feature: One\n  Scenario: A\n    Given ready\n");
+        Capture first = run("store", "hydrate", "--project=" + project);
+        assertEquals(0, first.code, first.err);
+        Capture status = run("store", "status", "--project=" + project);
+        assertEquals(0, status.code, status.err);
+        assertTrue(status.out.contains("reused=0 rehydrated=1"), status.out);
+        assertTrue(status.out.contains("jar="), status.out);
+
+        Capture second = run("store", "hydrate", "--project=" + project);
+        assertEquals(0, second.code, second.err);
+        assertTrue(second.out.contains("skipped=1"), second.out);
+        Capture again = run("store", "status", "--project=" + project);
+        assertEquals(0, again.code, again.err);
+        assertTrue(again.out.contains("reused=1 rehydrated=0"), again.out);
+        assertTrue(again.out.contains("jar="), again.out);
+    }
+
+    @Test
     void windowsSeparatorsAreStoredWithForwardSlashes() throws Exception {
         write(project.resolve("src/test/resources/features/win.feature"), "Feature: Win\n");
         assertEquals("src/test/resources/features/win.feature",

@@ -80,3 +80,21 @@ store head rebuild
 `schema_meta` key `delta_cursor` is the seq the head currently reflects. A cheap append writes the delta and flattens it into `head_rows` in the same transaction. `expensive=1` sets `heads.stale=1` and waits. `store status` and the end of `store hydrate` call `HeadMaterializer.quiet`, which flattens a stale head. `store head show` rebuilds when the head is stale. `store head rebuild` replays the remaining deltas. An unchanged source row stays in its own table until a delta names it. A tombstone hides the parent row. After a flatten, more than 100 stored deltas are folded into the head and those oldest delta rows are deleted in the same transaction. A run does not read the head yet.
 
 `pkb_store_log=pin,delta` logs pin, head, append, undo, redo, and fold lines. The lines are date-stamped, name the sandbox, and do not include the payload. Workbench, Gradle, and MCP only forward these commands.
+
+## Hydration, flags, tags, and run variables
+
+`schema_meta` key `hydration_spine=1` marks the additive columns and tables. `store_schema` stays 1. `files.enabled`, `scenarios.enabled`, `steps.enabled`, and `step_definitions.enabled` default to 1. A file outside the feature and glue roots is stored with `enabled=0`. `files.norm_path` uses backslashes and a lowercase drive letter on Windows. `folder_key` is the parent path. `folders` stores that directory. `scenario_tags` stores one row per scenario tag and per Examples tag, on that scenario's ord. `scenarios.tags` stays. `run_variables` stores the `pkb_*` keys copied from the property and profile files.
+
+A full hydrate compares `schema_meta` `jar_hash` and `heads.jar_hash` with `StoreHashes.jarHash`. A different hash deletes the source rows and hydrates them from files. `runstate.db` is not opened for that wipe. A matching hash skips a file whose `content_hash` is unchanged and counts it as reused. An insert or update counts as rehydrated. `store status` prints `reused=<n> rehydrated=<n> jar=<12 hex chars>`.
+
+```
+store enable <feature|scenario|step|definition|folder> <id> --on|--off
+store tag add|remove --feature=<path> --scenario=<ord-or-name> --tag=<tag>
+store var list
+store var set <name> <value>
+store var enable <name> --on|--off
+```
+
+`store enable` off on a feature, scenario, or folder writes `@pkb-ignore` on that scenario or on the Feature line. On removes only that tag. The write goes through the feature edit. A both-sides edit is refused. Gherkin that does not parse rolls back. A step id is `<feature>#<scenarioOrd>#<stepOrd>` and flips `steps.enabled`. A definition id flips `step_definitions.enabled`. `store query --tag` still matches `scenarios.tags` and also matches `scenario_tags`.
+
+`store var set` on main writes the properties file and the `run_variables` row. A sandbox set updates that database only. A cleartext secret is rejected with `error:` and `fix:`. `pkb_store_log=enable` logs the entity id and the toggle. It does not log variable values. Java source the editor can change stays a stored row. Workbench, Gradle, and MCP only forward these commands.

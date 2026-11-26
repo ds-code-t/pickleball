@@ -44,7 +44,8 @@ class StoreFoundationTest {
             assertEquals(Set.of(
                     "path", "content_hash", "raw_content", "mtime", "source_type",
                     "last_hydrated_at", "last_synced_hash", "db_edited",
-                    "git_blob", "binary_ref", "byte_size", "location", "git_commit"
+                    "git_blob", "binary_ref", "byte_size", "location", "git_commit",
+                    "enabled", "norm_path", "folder_key"
             ), columns(database, "files"));
             assertTrue(columns(database, "schema_meta").contains("key"));
             assertTrue(columns(database, "provenance").contains("schema_version"));
@@ -52,11 +53,11 @@ class StoreFoundationTest {
             assertTrue(columns(database, "provenance").contains("github_repo"));
             assertEquals(Set.of("file_path", "keyword", "name", "language", "tags", "description"),
                     columns(database, "feature_docs"));
-            assertEquals(Set.of("file_path", "ord", "keyword", "name", "line", "tags", "description"),
+            assertEquals(Set.of("file_path", "ord", "keyword", "name", "line", "tags", "description", "enabled"),
                     columns(database, "scenarios"));
             assertEquals(Set.of(
                     "file_path", "scenario_ord", "ord", "keyword", "text", "line",
-                    "docstring", "docstring_type", "table_json"
+                    "docstring", "docstring_type", "table_json", "enabled"
             ), columns(database, "steps"));
             assertEquals(Set.of(
                     "entity_type", "entity_id", "version", "payload_json", "secret_refs",

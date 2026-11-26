@@ -41,6 +41,14 @@ class StoreSchemaTest {
                 "SELECT value FROM schema_meta WHERE `key` = 'universal_entity'"));
         assertEquals("100", store.session().scalar(
                 "SELECT value FROM schema_meta WHERE `key` = 'delta_window'"));
+        assertEquals("1", store.session().scalar(
+                "SELECT value FROM schema_meta WHERE `key` = 'hydration_spine'"));
+        assertEquals("enabled", column("files", "enabled"));
+        assertEquals("norm_path", column("files", "norm_path"));
+        assertEquals("folder_key", column("files", "folder_key"));
+        assertEquals("enabled", column("scenarios", "enabled"));
+        assertEquals("enabled", column("steps", "enabled"));
+        assertEquals("enabled", column("step_definitions", "enabled"));
         for (String table : SqlDialect.SOURCE_TABLES) {
             assertEquals(table, tableName(table), table);
         }
@@ -86,6 +94,11 @@ class StoreSchemaTest {
         } finally {
             System.clearProperty("pkb_store_log");
         }
+    }
+
+    private static String column(String table, String name) throws SQLException {
+        return store.session().scalar(
+                "SELECT name FROM pragma_table_info('" + table + "') WHERE name = ?", name);
     }
 
     private static String tableName(String table) throws SQLException {

@@ -88,9 +88,12 @@ public final class StoreFiles {
     }
 
     public static void upsert(Connection connection, Row row) throws SQLException {
+        String norm = StorePaths.normPath(row.path());
+        String folder = StorePaths.folderKey(row.path());
+        int enabled = enabledFor(row);
         try (PreparedStatement statement = connection.prepareStatement("""
-                INSERT INTO files(path, content_hash, raw_content, mtime, source_type, last_hydrated_at, last_synced_hash, db_edited, git_blob, binary_ref, byte_size, location, git_commit)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO files(path, content_hash, raw_content, mtime, source_type, last_hydrated_at, last_synced_hash, db_edited, git_blob, binary_ref, byte_size, location, git_commit, enabled, norm_path, folder_key)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(path) DO UPDATE SET
                     content_hash = excluded.content_hash,
                     raw_content = excluded.raw_content,
@@ -103,7 +106,10 @@ public final class StoreFiles {
                     binary_ref = excluded.binary_ref,
                     byte_size = excluded.byte_size,
                     location = excluded.location,
-                    git_commit = excluded.git_commit
+                    git_commit = excluded.git_commit,
+                    enabled = excluded.enabled,
+                    norm_path = excluded.norm_path,
+                    folder_key = excluded.folder_key
                 """)) {
             statement.setString(1, row.path());
             statement.setString(2, row.contentHash());
@@ -118,8 +124,31 @@ public final class StoreFiles {
             statement.setLong(11, row.byteSize());
             statement.setString(12, row.location());
             statement.setString(13, row.gitCommit());
+            statement.setInt(14, enabled);
+            statement.setString(15, norm);
+            statement.setString(16, folder);
             statement.executeUpdate();
         }
+        if (!folder.isEmpty()) {
+            try (PreparedStatement folderRow = connection.prepareStatement("""
+                    INSERT INTO folders(folder_key, norm_path, enabled) VALUES (?, ?, 1)
+                    ON CONFLICT(folder_key) DO UPDATE SET norm_path = excluded.norm_path
+                    """)) {
+                folderRow.setString(1, folder);
+                folderRow.setString(2, folder);
+                folderRow.executeUpdate();
+            }
+        }
+    }
+
+    /** In-root rows default to enabled. A feature-line {@code @pkb-ignore} turns the file off. Out-of-root rows stay stored and disabled. */
+    static int enabledFor(Row row) {
+        if (row == null || !StorePaths.inFeatureOrGlueRoot(row.path())) return 0;
+        if (row.raw() != null && StoreGherkin.isGherkin(row.path(), row.sourceType())) {
+            StoreGherkin.Document document = StoreGherkin.parse(row.raw());
+            if (document != null && StoreGherkin.containsIgnore(document.tags())) return 0;
+        }
+        return 1;
     }
 
     static Row read(ResultSet result) throws SQLException {

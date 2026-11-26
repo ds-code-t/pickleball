@@ -72,10 +72,17 @@ public final class StoreHydrator {
             int inserted = 0;
             int updated = 0;
             int skipped = 0;
+            int reused = 0;
+            int rehydrated = 0;
             List<String> conflicts = new ArrayList<>();
             List<String> notices = new ArrayList<>();
+            String jar = StoreHashes.jarHash();
             connection.setAutoCommit(false);
             try {
+                if (!options.dryRun() && options.paths().isEmpty() && jarDiffers(connection, jar)) {
+                    wipeSourceRows(connection);
+                    existing.clear();
+                }
                 for (StoreSources.Found source : sources) {
                     byte[] raw = Files.readAllBytes(source.file());
                     String hash = StoreHashes.sha256(raw);
@@ -90,6 +97,7 @@ public final class StoreHydrator {
                             continue;
                         }
                         inserted++;
+                        rehydrated++;
                         if (!options.dryRun()) persist(connection, project, decision.row());
                         continue;
                     }
@@ -113,8 +121,10 @@ public final class StoreHydrator {
                     }
                     if (same && !options.force()) {
                         skipped++;
+                        reused++;
                         if (!options.dryRun()) {
                             StoreGherkin.storeIfMissing(connection, project, source.path(), source.sourceType(), raw);
+                            StoreGherkin.applyFlags(connection, source.path(), source.sourceType(), raw);
                             if (StoreEntities.isRecord(source.path(), source.sourceType())) {
                                 StoreEntities.storeIfMissing(connection, project, source.path(), raw);
                             }
@@ -122,12 +132,14 @@ public final class StoreHydrator {
                         continue;
                     }
                     updated++;
+                    rehydrated++;
                     if (!options.dryRun()) {
                         StoreRefs.Decision decision = StoreRefs.decide(
                                 project, discovery, source.path(), source.sourceType(), raw, hash, mtime, now, head, bypassLimits);
                         if (decision.skip()) {
                             ignored++;
                             updated--;
+                            rehydrated--;
                             StoreLog.log(project, "discover", source.path(), decision.skipReason());
                             continue;
                         }
@@ -135,14 +147,23 @@ public final class StoreHydrator {
                     }
                 }
                 if (!options.dryRun()) {
+                    if (StoreScope.current().primary()) {
+                        StoreRunVariables.sync(connection, project);
+                    }
+                    UniversalEntity.putMeta(connection, "jar_hash", jar);
+                    UniversalEntity.putMeta(connection, "hydrate_reused", Integer.toString(reused));
+                    UniversalEntity.putMeta(connection, "hydrate_rehydrated", Integer.toString(rehydrated));
+                    stampJar(connection, jar);
                     StoreStepCatalog.refresh(connection, project, now);
                     connection.commit();
                 } else {
                     connection.rollback();
                 }
-            } catch (SQLException | RuntimeException failure) {
+            } catch (SQLException | IOException | RuntimeException failure) {
                 connection.rollback();
-                throw failure;
+                if (failure instanceof SQLException sql) throw sql;
+                if (failure instanceof IOException io) throw io;
+                throw (RuntimeException) failure;
             } finally {
                 connection.setAutoCommit(true);
             }
@@ -175,6 +196,38 @@ public final class StoreHydrator {
                     (options.dryRun() ? "dry-run " : "") + "inserted=" + inserted + " updated=" + updated
                             + " ignored=" + ignored);
             return new Result(inserted, updated, skipped, conflicts.size(), options.dryRun(), conflicts, notices, ignored);
+        }
+    }
+
+    private static boolean jarDiffers(java.sql.Connection connection, String jar) throws java.sql.SQLException {
+        String stored = UniversalEntity.meta(connection, "jar_hash");
+        return stored == null || !stored.equals(jar);
+    }
+
+    /** Source projection only. Run history in runstate.db is not opened. */
+    private static void wipeSourceRows(java.sql.Connection connection) throws java.sql.SQLException {
+        for (String table : List.of(
+                "files", "feature_docs", "scenarios", "example_blocks", "steps", "entities",
+                "step_definitions", "head_rows", "deltas", "heads", "folders", "scenario_tags", "run_variables")) {
+            try (var statement = connection.prepareStatement("DELETE FROM " + table)) {
+                statement.executeUpdate();
+            }
+        }
+        UniversalEntity.putMeta(connection, UniversalEntity.META_CURSOR, "0");
+    }
+
+    private static void stampJar(java.sql.Connection connection, String jar) throws java.sql.SQLException {
+        try (var update = connection.prepareStatement("UPDATE heads SET jar_hash = ? WHERE head_id = ?")) {
+            update.setString(1, jar);
+            update.setString(2, UniversalEntity.HEAD_ID);
+            if (update.executeUpdate() > 0) return;
+        }
+        try (var insert = connection.prepareStatement(
+                "INSERT INTO heads(head_id, built_at, stale, through_seq, jar_hash) VALUES (?, ?, 0, 0, ?)")) {
+            insert.setString(1, UniversalEntity.HEAD_ID);
+            insert.setString(2, Instant.now().toString());
+            insert.setString(3, jar);
+            insert.executeUpdate();
         }
     }
 
