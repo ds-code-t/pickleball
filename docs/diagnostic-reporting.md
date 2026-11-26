@@ -226,6 +226,8 @@ failureSite.definition
 
 Failures without a stable structured site deliberately use the class/message-only fallback. Signatures are investigation aids, not permanent identifiers or proof of one root cause.
 
+`exception_clusters` is a SQL view over failed runs. It groups `exception.signature`, `exception.scope`, and the hour of `runs.started_at`. No model is trained. `store report write` writes a `.pkb.json` report script of step references and artifact paths. `store report export --html` writes the read-only dashboard. `store diff` reports `break` when a definition is in only one of two runs.
+
 ## Scenario identity
 
 Scenario matching uses multiple signals rather than one fragile key, including execution ID, URI, name, scenario/outline lines, tags, example values, exact-source key, semantic/name keys, and source-order hints. This supports duplicate names and Scenario Outline rows across changing launchers/source locations.

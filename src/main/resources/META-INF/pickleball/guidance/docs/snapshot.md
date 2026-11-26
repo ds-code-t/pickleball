@@ -1,5 +1,7 @@
 # Snapshot and pre-map
 
+A step visual target is the column `steps.visual_ref`. It is not a new composite-snapshot schema version. `capabilities.snapshot_schema` stays 1. Playback replays the artifact file's identity chain and still matches the step regex after `{{name}}` substitution. A missing artifact, a raw screenshot with no chain, or a chain that does not hit is `error:` and `fix:`.
+
 `domengine premap --file page.html` writes a composite snapshot (`schema` `pickleball.composite-snapshot`, `version` 2, `transport` `fixture`). The builder always runs the pre-map. `domengine desktop snapshot` writes the same artifact for a desktop session. `domengine snapshot --session ID` (or `--cdp URL --i-accept-local-attach`) writes it for Chrome, Chromium, and Edge. The browser JSON adds `ok: true` and `document`, the pierced tree from `DomNode.toJson` (that object still contains `shadow_root`). Early 3.x still accepts a version 1 document that has no canonical tree. Producers emit version 2. `capabilities.snapshot_schema` stays 1.
 
 Logging uses `dev.domengine.log.EngineLog`. The entities are `snapshot`, `premap`, `affinity`, and `desktop-shot` (`DOMENGINE_LOG` or `COMPOSITE_LOG`). A protocol or tool fallback logs one WARN per run and reason through `SnapshotWarnings.once(reason)`.

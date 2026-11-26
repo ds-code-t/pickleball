@@ -65,6 +65,9 @@ public final class StoreRunTracePlugin implements ConcurrentEventListener {
         publisher.registerHandlerFor(TestStepFinished.class, event -> {
             if (event.getTestStep() instanceof PickleStepTestStep step && step.getStep() != null) {
                 append("step " + event.getResult().getStatus() + " " + step.getStep().getText());
+                if (event.getResult().getError() != null) {
+                    StoreExecution.noteFailure(event.getResult().getError());
+                }
                 if (StoreRunContext.current() != null) {
                     StoreExecution.afterStep(String.valueOf(event.getResult().getStatus()));
                 } else {

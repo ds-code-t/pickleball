@@ -561,6 +561,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/evaluations/AviatorFunctions.java`
 - `src/main/java/tools/dscode/common/evaluations/AviatorUtil.java`
 - `src/main/java/tools/dscode/common/evaluations/BookendUtils.java`
+- `src/main/java/tools/dscode/common/exceptions/PickleballException.java`
 - `src/main/java/tools/dscode/common/exceptions/PickleBallExceptionInterface.java`
 - `src/main/java/tools/dscode/common/exceptions/SoftException.java`
 - `src/main/java/tools/dscode/common/exceptions/SoftExceptionInterface.java`
@@ -803,6 +804,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/engine/runtime/StepFlags.java`
 - `src/main/java/tools/dscode/engine/runtime/StepRows.java`
 - `src/main/java/tools/dscode/engine/runtime/StepWatchdog.java`
+- `src/main/java/tools/dscode/engine/runtime/VisualTarget.java`
 - `src/main/java/tools/dscode/engine/source/FileScenarioSource.java`
 - `src/main/java/tools/dscode/engine/source/MemoryScenarioSource.java`
 - `src/main/java/tools/dscode/engine/source/ScenarioSource.java`
@@ -868,6 +870,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/store/dashboard/SqliteDashboardSource.java`
 - `src/main/java/tools/dscode/store/DeltaLog.java`
 - `src/main/java/tools/dscode/store/EditRules.java`
+- `src/main/java/tools/dscode/store/ExceptionCluster.java`
 - `src/main/java/tools/dscode/store/FileRules.java`
 - `src/main/java/tools/dscode/store/GherkinRewrite.java`
 - `src/main/java/tools/dscode/store/GlueRules.java`
@@ -875,9 +878,12 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/store/HeadMaterializer.java`
 - `src/main/java/tools/dscode/store/LegacyNames.java`
 - `src/main/java/tools/dscode/store/ProjectElementCategories.java`
+- `src/main/java/tools/dscode/store/RecordedEntity.java`
+- `src/main/java/tools/dscode/store/ReportScript.java`
 - `src/main/java/tools/dscode/store/RunCatalog.java`
 - `src/main/java/tools/dscode/store/RunProvenance.java`
 - `src/main/java/tools/dscode/store/RunSnapshot.java`
+- `src/main/java/tools/dscode/store/SnapFindIndex.java`
 - `src/main/java/tools/dscode/store/sql/Binding.java`
 - `src/main/java/tools/dscode/store/sql/DashboardAccess.java`
 - `src/main/java/tools/dscode/store/sql/LegacySqlite.java`
@@ -1112,6 +1118,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/composite/PrimaryPathAuditTest.java`
 - `src/test/java/tools/dscode/common/composite/RelationPhraseTest.java`
 - `src/test/java/tools/dscode/common/composite/SelectorAndAdapterTest.java`
+- `src/test/java/tools/dscode/common/composite/SnapFindIndexTest.java`
 - `src/test/java/tools/dscode/common/composite/XPathFallbackTest.java`
 - `src/test/java/tools/dscode/common/coordination/AgentCoordinationTest.java`
 - `src/test/java/tools/dscode/common/coordination/PathPrefixResolutionTest.java`
@@ -1124,6 +1131,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/driver/ApplyDebugPortTest.java`
 - `src/test/java/tools/dscode/common/driver/DriverConstructionProtocolTest.java`
 - `src/test/java/tools/dscode/common/driver/DriverDownloadFallbackTest.java`
+- `src/test/java/tools/dscode/common/exceptions/PickleballExceptionTest.java`
 - `src/test/java/tools/dscode/common/mappings/ParsingMapGreaterThanMaskTest.java`
 - `src/test/java/tools/dscode/common/mappings/queries/DocumentAndReservedFieldReadTest.java`
 - `src/test/java/tools/dscode/common/mappings/queries/TopLevelCollectionTest.java`
@@ -1205,6 +1213,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/engine/resolve/ScenarioResolverTest.java`
 - `src/test/java/tools/dscode/engine/runtime/StepCeilingTest.java`
 - `src/test/java/tools/dscode/engine/runtime/StepWatchdogTest.java`
+- `src/test/java/tools/dscode/engine/runtime/VisualTargetTest.java`
 - `src/test/java/tools/dscode/engine/SpineCucumberImportBanTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureRunnerTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureSteps.java`
@@ -1367,6 +1376,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/store/PkbIgnoreRoundTripTest.java`
 - `src/test/java/tools/dscode/store/RemovedNamesGateTest.java`
 - `src/test/java/tools/dscode/store/RenameGateTest.java`
+- `src/test/java/tools/dscode/store/ReportScriptTest.java`
 - `src/test/java/tools/dscode/store/RunHistoryAccuracyTest.java`
 - `src/test/java/tools/dscode/store/RunIdReuseGuardTest.java`
 - `src/test/java/tools/dscode/store/RunSnapshotTest.java`

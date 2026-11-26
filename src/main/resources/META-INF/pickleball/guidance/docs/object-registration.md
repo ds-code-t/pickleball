@@ -23,3 +23,7 @@ There is no separate cleanup step to add for ordinary scenario teardown. Use one
 - A Cucumber `@After` hook on the consumer runner or glue for Java teardown.
 
 The passing check is [`release-2-1-16.feature`](../maven-consumer-project/src/test/resources/features/release-2-1-16.feature). It registers an object whose `cleanup` action records a token after a pass. Hard-failed and soft-failed cleanup, including `isScenarioFailed` and `isScenarioComplete` while hard-fail cleanup runs, are executed by [`ExpectedFailureRunnerTest`](../src/test/java/tools/dscode/expectedfailure/ExpectedFailureRunnerTest.java) through the real runner. That feature is tagged `@expected-failure` and is not part of `@all`, because those scenarios stay failed.
+
+## Record an entity
+
+`RECORD ENTITY: "<value>" as Type#id` writes a store entity during the current tracked step. It does not use `constructor`, `postActions`, or `cleanup`. A value that fails the secret check is stored as `~MASK;`. The consumer scenario is `@area-b-record-entity` in [`area-b-control-flow.feature`](../maven-consumer-project/src/test/resources/features/area-b-control-flow.feature).

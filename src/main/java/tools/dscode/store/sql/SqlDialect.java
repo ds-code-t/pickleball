@@ -26,7 +26,7 @@ public final class SqlDialect {
     public static final List<String> RUN_STATE_TABLES = List.of(
             "runs", "run_logs", "scenario_executions", "step_executions", "entity_usages",
             "log_entity_links", "artifacts", "sandboxes",
-            "run_snapshots", "run_snapshot_entities", "run_attributes");
+            "run_snapshots", "run_snapshot_entities", "run_attributes", "snap_find_index");
 
     /** The eleven {@code setAutoCommit(false)} sites, plus the schema commit. */
     public static final List<String> TRANSACTIONS = List.of(
@@ -132,6 +132,7 @@ public final class SqlDialect {
                 docstring_type TEXT,
                 table_json TEXT,
                 enabled INTEGER NOT NULL DEFAULT 1,
+                visual_ref TEXT,
                 PRIMARY KEY (file_path, scenario_ord, ord)
             )
             """,
@@ -385,6 +386,20 @@ public final class SqlDialect {
                 PRIMARY KEY (run_id, name),
                 FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE
             )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS snap_find_index (
+                run_id TEXT,
+                head_id TEXT,
+                doc_version TEXT,
+                identity_chain TEXT,
+                handle TEXT,
+                role TEXT,
+                name TEXT,
+                backend_node_id TEXT,
+                PRIMARY KEY (run_id, handle),
+                FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE
+            )
             """);
 
     public static final String UPSERT_META = """
@@ -536,7 +551,7 @@ public final class SqlDialect {
      * A database that already has {@code hydration_spine} still needs columns added
      * by a later build. The full DDL stays on the slow path. This check looks up
      * the newest columns, then {@link #ensureHydrationColumns} when one is missing.
-     * {@code steps.context_scope}, {@code step_definitions.host}, and the {@code fixtures} table are all required.
+     * {@code steps.context_scope}, {@code steps.visual_ref}, {@code step_definitions.host}, and the {@code fixtures} table are all required.
      */
     private static void ensureAdditiveOnReady(SqlSession session) throws SQLException {
         if (additiveColumnsPresent(session)) return;
@@ -552,6 +567,8 @@ public final class SqlDialect {
                     "SELECT name FROM pragma_table_info('steps') WHERE name = ?", "context_scope"))
                     && "host".equals(session.scalar(
                     "SELECT name FROM pragma_table_info('step_definitions') WHERE name = ?", "host"))
+                    && "visual_ref".equals(session.scalar(
+                    "SELECT name FROM pragma_table_info('steps') WHERE name = ?", "visual_ref"))
                     && "fixtures".equals(session.scalar(
                     "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'fixtures'"));
         } catch (SQLException ignored) {
@@ -608,6 +625,7 @@ public final class SqlDialect {
         addColumn(session, "steps", "until_mode", "TEXT");
         addColumn(session, "steps", "context_mode", "TEXT");
         addColumn(session, "steps", "context_scope", "TEXT");
+        addColumn(session, "steps", "visual_ref", "TEXT");
         session.script("""
                 CREATE TABLE IF NOT EXISTS fixtures (
                     name TEXT NOT NULL,

@@ -101,6 +101,8 @@ public final class StoreCli {
                 case "timeline" -> trackCommand(project, tokens, true, stdout, stderr);
                 case "retain" -> retainCommand(project, tokens, stdout, stderr);
                 case "run" -> runCommand(project, tokens, stdout, stderr);
+                case "report" -> reportCommand(project, tokens, stdout, stderr);
+                case "diff" -> diffCommand(project, tokens, stdout, stderr);
                 case "run-classpath" -> runClasspath(tokens, stdout, stderr);
                 default -> {
                     stderr.println("error: Unknown Store command: " + command);
@@ -200,7 +202,11 @@ public final class StoreCli {
                 Usage: store query [--entity=Type#id] [--field=<name>] [--step-def=<definition-id>] [--scenario=<key>] [--status=<status>] [--from=<iso>] [--to=<iso>] [--tag=<tag>] [--feature=<path>] [--run=<run-id>] [--text=<log text>] [--limit=N] [--offset=N] [--json] [--project=<dir>]
                 Usage: store timeline [--from=<iso>] [--to=<iso>] [--entity=Type#id] [--tag=<tag>] [--feature=<path>] [--run=<run-id>] [--text=<log text>] [--cursor=<cursor>] [--before=<cursor>] [--latest] [--limit=N] [--offset=N] [--json] [--project=<dir>]
                 Usage: store retain [--days=N] [--max-bytes=N] [--project=<dir>]
-                Usage: store run [--project=<dir>] [--dry-run] [--tags=<expr>] [--name=<text>] [--glue=<packages>] [--sandbox=<name>] [--engine]
+                Usage: store run [--project=<dir>] [--dry-run] [--tags=<expr>] [--name=<text>] [--glue=<packages>] [--sandbox=<name>] [--engine] [--script=<file.pkb.json>] [--head=<headId>]
+                Usage: store report write --run=<id> --out=<file.pkb.json> [--project=<dir>]
+                Usage: store report export --run=<id> --html=<file> [--project=<dir>]
+                Usage: store run --script=<file.pkb.json> [--head=<headId>] [--project=<dir>]
+                Usage: store diff --run=<a> --run=<b> [--json] [--project=<dir>]
                 Usage: store run-classpath --out=<file> [--project=<dir>]
                 Files stay the source of truth. The working copy is .pickleball/store/main.db and is gitignored. Opening it starts no process and downloads nothing.
                 store sandbox create defaults to --mode=cow. The child records schema_meta sandbox_mode=cow and _pkb_branch parent. Edits are deltas in that child. A delete is a tombstone. --mode=copy is an independent database with no parent. store sandbox promote requires --logs=clear|archive. --to=parent writes one expensive delta per changed head row on the parent. --to=top walks parents until main. Promote onto main syncs those files through store extract and skips a both-sides conflict. Promote onto another sandbox does not touch the working tree. --logs=clear deletes that sandbox's run_logs rows. --logs=archive leaves them and prefixes runs.note with archived. Set pkb_store_log=sandbox to log create and promote. The log names the sandbox and does not include payloads.
@@ -278,7 +284,42 @@ public final class StoreCli {
         }
     }
 
+    private static int reportCommand(Path project, List<String> tokens, PrintStream out, PrintStream err) {
+        String verb = action(tokens);
+        try {
+            if ("write".equals(verb)) return ReportScript.write(project, tokens, out, err);
+            if ("export".equals(verb)) return ReportScript.export(project, tokens, out, err);
+        } catch (Exception failure) {
+            err.println("error: " + (failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()));
+            err.println("fix: store help");
+            return 1;
+        }
+        err.println("error: Unknown Store command: report " + verb);
+        err.println("fix: store help");
+        return 2;
+    }
+
+    private static int diffCommand(Path project, List<String> tokens, PrintStream out, PrintStream err) {
+        try {
+            return ReportScript.diff(project, tokens, out, err);
+        } catch (Exception failure) {
+            err.println("error: " + (failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()));
+            err.println("fix: store diff --run=<a> --run=<b> --json");
+            return 1;
+        }
+    }
+
     private static int runCommand(Path project, List<String> tokens, PrintStream out, PrintStream err) {
+        String script = option(tokens, "--script=");
+        if (script != null && !script.isBlank()) {
+            try {
+                return ReportScript.runScript(project, tokens, out, err);
+            } catch (Exception failure) {
+                err.println("error: " + (failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()));
+                err.println("fix: store run --script=<file.pkb.json>");
+                return 1;
+            }
+        }
         if (has(tokens, "--engine")) {
             List<String> forwarded = new ArrayList<>();
             forwarded.add("engine");

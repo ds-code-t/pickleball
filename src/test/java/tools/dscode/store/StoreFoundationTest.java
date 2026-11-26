@@ -57,7 +57,11 @@ class StoreFoundationTest {
                     columns(database, "scenarios"));
             assertEquals(Set.of(
                     "file_path", "scenario_ord", "ord", "keyword", "text", "line",
-                    "docstring", "docstring_type", "table_json", "enabled"
+                    "docstring", "docstring_type", "table_json", "enabled", "visual_ref",
+                    "max_iterations", "timeout_seconds", "retry", "ignore_failures",
+                    "log_failures_continue", "run_if_finished", "always_run",
+                    "run_if_passing", "run_if_failed", "run_if_hard_failed", "run_if_soft_failed",
+                    "until_mode", "context_mode", "context_scope"
             ), columns(database, "steps"));
             assertEquals(Set.of(
                     "entity_type", "entity_id", "version", "payload_json", "secret_refs",

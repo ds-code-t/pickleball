@@ -78,6 +78,7 @@ public final class SqlConnections {
             for (String ddl : SqlDialect.RUN_DDL) statement.execute(ddl);
             addRunColumns(borrowed.connection());
             markRunSnapshots(borrowed.connection());
+            markExceptionClusters(borrowed.connection());
         } finally {
             giveBack(borrowed.pool(), borrowed.connection());
         }
@@ -129,6 +130,25 @@ public final class SqlConnections {
             statement.execute("""
                     INSERT INTO schema_meta(`key`, value) VALUES ('run_snapshots', '1')
                     ON CONFLICT(`key`) DO UPDATE SET value = excluded.value
+                    """);
+        }
+    }
+
+    /** SQL view over failed-run attributes. Not a table, and not in {@link SqlDialect#RUN_STATE_TABLES}. */
+    private static void markExceptionClusters(Connection connection) throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("""
+                    CREATE VIEW IF NOT EXISTS exception_clusters AS
+                    SELECT signature.value AS signature,
+                           scope.value AS scope,
+                           substr(r.started_at, 1, 13) AS hour,
+                           COUNT(*) AS cluster_count
+                    FROM run_attributes signature
+                    JOIN run_attributes scope
+                      ON scope.run_id = signature.run_id AND scope.name = 'exception.scope'
+                    JOIN runs r ON r.run_id = signature.run_id
+                    WHERE signature.name = 'exception.signature'
+                    GROUP BY signature.value, scope.value, substr(r.started_at, 1, 13)
                     """);
         }
     }

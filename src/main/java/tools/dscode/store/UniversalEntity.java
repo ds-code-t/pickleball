@@ -105,6 +105,12 @@ public final class UniversalEntity {
         }
     }
 
+    /** The stored head id, or null when that head has not been written. */
+    public static String loadHead(Connection connection, String headId) throws SQLException {
+        if (headId == null || headId.isBlank()) return null;
+        return text(connection, "SELECT head_id FROM heads WHERE head_id = ?", headId);
+    }
+
     public static boolean headStale(Connection connection) throws SQLException {
         String raw = text(connection, "SELECT stale FROM heads WHERE head_id = ?", HEAD_ID);
         return raw != null && !"0".equals(raw.trim());

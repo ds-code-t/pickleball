@@ -303,6 +303,16 @@ public class ObjectRegistrationSteps {
         return constructObjectFromParsingMap(objectName);
     }
 
+    @Given("^RECORD ENTITY: \"([^\"]*)\" as ([A-Za-z][A-Za-z0-9]*)#([A-Za-z0-9._-]+)$")
+    public static void recordEntity(String value, String type, String id) {
+        tools.dscode.store.RecordedEntity.write(value, type, id);
+        try {
+            tools.dscode.Values.saveValue("recordedAccount", type + "#" + id);
+        } catch (RuntimeException ignored) {
+            // A direct call without a scenario map still records the entity row.
+        }
+    }
+
     private static String trimToNull(Object value) {
         if (value == null) {
             return null;

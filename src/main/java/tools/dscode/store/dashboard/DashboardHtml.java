@@ -1,5 +1,7 @@
 package tools.dscode.store.dashboard;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -291,7 +293,26 @@ public final class DashboardHtml {
                 </body>
                 </html>
                 """);
-        return html.toString();
+        String built = html.toString();
+        int close = built.indexOf("</main>");
+        if (close < 0) return built;
+        return built.substring(0, close) + staticTimeline(page) + built.substring(close);
+    }
+
+    /** Static run list ordered by start time. The JSON array above keeps insertion order. */
+    private static String staticTimeline(DashboardSnapshot page) {
+        List<DashboardSnapshot.RunView> ordered = new ArrayList<>(page.runs());
+        ordered.sort(Comparator.comparing(run -> run.startedAt() == null ? "" : run.startedAt()));
+        StringBuilder section = new StringBuilder();
+        section.append("<section id=\"run-timeline\"><h2>Runs by start</h2><ol>");
+        for (DashboardSnapshot.RunView run : ordered) {
+            section.append("<li>").append(esc(run.id()))
+                    .append(' ').append(esc(run.startedAt()))
+                    .append(' ').append(esc(run.note()))
+                    .append("</li>");
+        }
+        section.append("</ol></section>");
+        return section.toString();
     }
 
     private static String json(DashboardSnapshot page, String linkBase) {
@@ -343,6 +364,7 @@ public final class DashboardHtml {
     }
 
     private static String esc(String value) {
+        value = shown(value);
         if (value == null) return "";
         StringBuilder out = new StringBuilder(value.length() + 8);
         for (int i = 0; i < value.length(); i++) {
@@ -367,5 +389,16 @@ public final class DashboardHtml {
             }
         }
         return out.toString();
+    }
+
+    /** A secret assignment never reaches the page. The whole string becomes {@code ~MASK;}. */
+    private static String shown(String value) {
+        if (value == null || value.isBlank()) return value;
+        try {
+            tools.dscode.store.StoreSecrets.rejectAssignment(null, value);
+            return value;
+        } catch (RuntimeException ignored) {
+            return "~MASK;";
+        }
     }
 }

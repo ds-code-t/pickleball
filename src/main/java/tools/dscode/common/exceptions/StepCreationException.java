@@ -1,6 +1,6 @@
 package tools.dscode.common.exceptions;
 
-public class StepCreationException extends RuntimeException implements PickleBallExceptionInterface {
+public class StepCreationException extends PickleballException {
 
     public StepCreationException() {
         super();

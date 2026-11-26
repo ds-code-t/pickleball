@@ -276,7 +276,10 @@ public final class StoreExecution {
     }
 
     public static void finishScenario(String status) {
-        if (!shouldTrack()) return;
+        if (!shouldTrack()) {
+            ExceptionCluster.clear();
+            return;
+        }
         try {
             Active active = ACTIVE.get();
             if (active == null) return;
@@ -297,13 +300,40 @@ public final class StoreExecution {
                         statement.setString(1, active.runId);
                         statement.executeUpdate();
                     }
+                    ExceptionCluster.write(database.connection(), active.runId);
                 }
             }
             RunCatalog.publishStore(active.project, active.runId);
         } catch (RuntimeException | SQLException ignored) {
         } finally {
+            ExceptionCluster.clear();
             ACTIVE.remove();
             StoreRunContext.clear();
+        }
+    }
+
+    /** Records the failure while the step context is still active. Tracking failures stay quiet. */
+    public static void noteFailure(Throwable failure) {
+        try {
+            ExceptionCluster.note(failure);
+        } catch (RuntimeException ignored) {
+        }
+    }
+
+    /** Run id of a tracked step. Both tables are run-state, so the join stays on runstate.db. */
+    static String runOfStep(Path project, String stepExecId) throws SQLException {
+        if (project == null || stepExecId == null || stepExecId.isBlank()) return null;
+        try (StoreDatabase database = StoreDatabase.open(project);
+             PreparedStatement statement = database.connection().prepareStatement("""
+                     SELECT e.run_id
+                     FROM step_executions s
+                     JOIN scenario_executions e ON e.exec_id = s.scenario_exec_id
+                     WHERE s.step_exec_id = ?
+                     """)) {
+            statement.setString(1, stepExecId);
+            try (ResultSet rows = statement.executeQuery()) {
+                return rows.next() ? rows.getString(1) : null;
+            }
         }
     }
 
