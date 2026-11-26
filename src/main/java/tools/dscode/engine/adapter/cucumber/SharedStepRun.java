@@ -1,6 +1,7 @@
 package tools.dscode.engine.adapter.cucumber;
 
 import tools.dscode.engine.runtime.NoopGlueMode;
+import tools.dscode.engine.runtime.SnapshotChannel;
 
 import io.cucumber.core.runner.CurrentScenarioState;
 import io.cucumber.core.runner.StepExtension;
@@ -442,6 +443,17 @@ public final class SharedStepRun {
     @SuppressWarnings("unchecked")
     private static Object call(StepExtension step, StepMatch match, ExecutionContext context) throws ReflectiveOperationException {
         Method method = step.method;
+        if (context != null && context.subprocess()) {
+            EngineStep engineStep = BOUND.get().get(step);
+            String phrase = match == null || match.text().isBlank() ? step.getUnmodifiedText() : match.text();
+            return SnapshotChannel.step(
+                    context.subprocessProcess(),
+                    context.id(),
+                    ForeignStepHosts.project(),
+                    method.getDeclaringClass().getName(),
+                    phrase,
+                    SnapshotChannel.gherkin(phrase, engineStep == null ? null : engineStep.argument()));
+        }
         Map<Class<?>, Object> instances = instances(context);
         Object target = null;
         if (!java.lang.reflect.Modifier.isStatic(method.getModifiers())) {

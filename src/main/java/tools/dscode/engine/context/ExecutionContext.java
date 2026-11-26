@@ -8,6 +8,7 @@ import tools.dscode.engine.EngineLog;
 import tools.dscode.engine.model.EngineScenario;
 import tools.dscode.engine.model.EngineStep;
 import tools.dscode.engine.runtime.ResourceGate;
+import tools.dscode.engine.runtime.SnapshotChannel;
 import tools.dscode.engine.runtime.SnapshotContextWorker;
 import tools.dscode.engine.runtime.WarmClassLoader;
 import tools.dscode.engine.runtime.WarmFlags;
@@ -215,6 +216,11 @@ public final class ExecutionContext implements AutoCloseable {
         return subprocess != null;
     }
 
+    /** Cold JVM for this context. Null when the gate kept the work in-process. */
+    public Process subprocessProcess() {
+        return subprocess;
+    }
+
     private static Process admit(String snapshotId) {
         try {
             return ResourceGate.admit(Path.of("").toAbsolutePath(), snapshotId, SnapshotContextWorker.class.getName());
@@ -239,6 +245,7 @@ public final class ExecutionContext implements AutoCloseable {
             warmLoader = null;
         }
         if (subprocess != null) {
+            SnapshotChannel.close(subprocess);
             subprocess.destroyForcibly();
             try {
                 subprocess.waitFor(2, TimeUnit.SECONDS);

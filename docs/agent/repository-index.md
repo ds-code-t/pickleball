@@ -809,6 +809,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/engine/runtime/NativeScenarioCatalog.java`
 - `src/main/java/tools/dscode/engine/runtime/NoopGlueMode.java`
 - `src/main/java/tools/dscode/engine/runtime/ResourceGate.java`
+- `src/main/java/tools/dscode/engine/runtime/SnapshotChannel.java`
 - `src/main/java/tools/dscode/engine/runtime/SnapshotContextWorker.java`
 - `src/main/java/tools/dscode/engine/runtime/StepFlags.java`
 - `src/main/java/tools/dscode/engine/runtime/StepRows.java`
@@ -1243,6 +1244,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/engine/runtime/SnapshotContextGateTest.java`
 - `src/test/java/tools/dscode/engine/runtime/StepCeilingTest.java`
 - `src/test/java/tools/dscode/engine/runtime/StepWatchdogTest.java`
+- `src/test/java/tools/dscode/engine/runtime/SubprocessProbe.java`
+- `src/test/java/tools/dscode/engine/runtime/SubprocessStepTest.java`
 - `src/test/java/tools/dscode/engine/runtime/VisualTargetTest.java`
 - `src/test/java/tools/dscode/engine/runtime/WarmClassLoaderTest.java`
 - `src/test/java/tools/dscode/engine/runtime/WarmColdParityTest.java`

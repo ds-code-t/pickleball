@@ -15,6 +15,7 @@ public final class WarmSpine {
 
     private final ConcurrentHashMap<String, WarmClassLoader> loaders = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, Process> children = new ConcurrentHashMap<>();
+    private volatile long lastTrackedPid;
 
     public WarmSpine() {
     }
@@ -66,8 +67,14 @@ public final class WarmSpine {
 
     public Process track(Process process) {
         if (process == null) throw new IllegalArgumentException("subprocess is required");
+        lastTrackedPid = process.pid();
         children.put(process.pid(), process);
         return process;
+    }
+
+    /** Pid of the child most recently admitted. Stays after that process exits. */
+    public long lastTrackedPid() {
+        return lastTrackedPid;
     }
 
     /** Stops every tracked child. `spine stop` calls this. The pool is then zero. */

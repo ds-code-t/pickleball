@@ -3,10 +3,14 @@ package tools.dscode.engine.runtime;
 import tools.dscode.engine.EngineLog;
 import tools.dscode.store.StoreRun;
 
+import java.io.IOException;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryUsage;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Supplier;
@@ -144,10 +148,48 @@ public final class ResourceGate {
                     "error: subprocess classpath is empty\nfix: run the project wrapper once so the classpath cache exists");
         }
         String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
-        ProcessBuilder builder = new ProcessBuilder(List.of(java, "-cp", classpath, "-Dpkb_warm=off", mainClass));
+        Path args = argumentFile(classpath, mainClass);
+        ProcessBuilder builder = new ProcessBuilder(List.of(java, "@" + args.toAbsolutePath().normalize()));
         builder.directory((project == null ? Path.of("") : project).toAbsolutePath().normalize().toFile());
-        builder.redirectErrorStream(true);
         return WarmSpine.shared().track(builder.start());
+    }
+
+    /**
+     * Windows rejects a classpath that does not fit on the command line. The child is
+     * {@code java @argfile} with {@code -Dpkb_warm=off}. Stdout stays a pipe so the
+     * caller can read a child that prints and exits. The step channel is not attached here.
+     */
+    private static Path argumentFile(String classpath, String mainClass) throws IOException {
+        Path file = Files.createTempFile("pkb-cold-", ".args");
+        file.toFile().deleteOnExit();
+        List<String> lines = new ArrayList<>();
+        lines.add("-Dfile.encoding=UTF-8");
+        lines.add("-Dstdout.encoding=UTF-8");
+        lines.add("-Dstderr.encoding=UTF-8");
+        lines.add("-Dpkb_warm=off");
+        String store = System.getProperty("pkb_store");
+        if (store != null && !store.isBlank() && store.indexOf('\n') < 0 && store.indexOf('\r') < 0 && store.indexOf('"') < 0) {
+            lines.add("-Dpkb_store=" + store.trim());
+        }
+        lines.add("-cp");
+        lines.add(quote(classpath));
+        lines.add(mainClass);
+        Files.writeString(file, String.join("\n", lines) + "\n", StandardCharsets.UTF_8);
+        return file;
+    }
+
+    /**
+     * Inside a quoted argument file token, a backslash starts an escape, so a Windows
+     * path is stored with each backslash doubled.
+     */
+    private static String quote(String value) {
+        StringBuilder quoted = new StringBuilder("\"");
+        for (int i = 0; i < value.length(); i++) {
+            char ch = value.charAt(i);
+            if (ch == '\\' || ch == '"') quoted.append('\\');
+            quoted.append(ch);
+        }
+        return quoted.append('"').toString();
     }
 
     public static String json(Report report) {
