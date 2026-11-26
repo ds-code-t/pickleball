@@ -52,6 +52,19 @@ The 3.0.0 retest-fix rounds (R, S) ran only targeted tests on the Linux box and 
 - **Spine R8, Windows only:** `WarmClassLoaderTest`, `WarmColdParityTest`, `IncrementalGlueCompileTest`, `ResourceGateTest`, `BrowserVersionResolverTest`, `SeleniumBidiCommandTest`, `DebugPortOwnerTest`, `WarmCdpTest`, and `DesktopTreeCacheTest`.
 - **macOS, Safari:** channel `safari` selects Selenium `safaridriver` and the Windows test does not start a process. A live Safari run on macOS has not been executed.
 
+## Spine R8 production wiring (open, found in R8 verification 2026-11-26)
+
+The R8 classes and their targeted tests are on the branch. These paths are reached only through test hooks today. A follow-up Build owns them.
+
+- **`cdn` cache first:** `BrowserVersionResolver.cachedInstalls()` returns an empty list outside tests, so `cdn` never reads the Playwright browser cache first and `resolve cache-fallback` cannot happen in production.
+- **Local version detection:** registered local installs carry a blank version, so `local` with a `version`, and the `131` / `131.0` / exact / `latest` precision rules, only work with an injected catalog.
+- **One owner per debug port:** `DebugPortOwner.attach` has no production caller (the claim was taken out of `applyDebugPort`). `browser ports` lists owners, but a second real CDP or driver attach to the same port does not fail.
+- **Heap gate on new contexts:** `ResourceGate.admit` has no production caller. Only `spine sample` and `WarmCdp` read the decision, so new snapshot contexts are not moved to a subprocess or refused.
+- **Desktop structure-changed:** `DesktopTree.structureChanged` has no caller. No UI Automation structure-changed event drops a cached window tree.
+- **Incremental glue compile:** `StoreGlueCompiler.warmCompile` and `compileIncremental` have no production caller. Only `spine start` runs `warmStart`.
+- **BiDi script and intercept:** no production code binds `SeleniumBidiCommands` to a live Selenium session, so `bidi script` and `bidi intercept` always report no session. `bidi intercept` passes the body to the script call and does not replace a response body.
+- **Hold JVM flags:** `spine start` passes only `-cp` to the hold JVM. `-Dpkb_warm`, `-Dpkb_heap_*`, and endpoint properties set on the starting JVM do not reach it. Only `PKB_WARM` and the other environment variables do.
+
 ## Deferred from the 3.0.0 consumer-fixes branch (per Dan, 2026-11-25)
 
 These items stay out of `3.0.0-consumer-fixes`. The roadmap lists them under "Not in scope". P6 records them here. Do not treat a later drive-by as permission to implement them.
