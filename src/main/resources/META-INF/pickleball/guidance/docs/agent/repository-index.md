@@ -1135,6 +1135,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/GcRunsDryRunTest.java`
 - `src/test/java/tools/dscode/launcher/GuidanceCommandGoldenTest.java`
 - `src/test/java/tools/dscode/launcher/HeadedFlagTest.java`
+- `src/test/java/tools/dscode/launcher/HoldJvmFlagsTest.java`
 - `src/test/java/tools/dscode/launcher/HousekeepingRoadmapTest.java`
 - `src/test/java/tools/dscode/launcher/HumanTierTest.java`
 - `src/test/java/tools/dscode/launcher/IdentityRefindTest.java`

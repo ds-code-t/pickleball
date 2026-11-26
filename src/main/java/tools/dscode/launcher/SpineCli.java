@@ -1,5 +1,6 @@
 package tools.dscode.launcher;
 
+import tools.dscode.browser.PlaywrightConnection;
 import tools.dscode.control.protocol.speed.ProcessTree;
 import tools.dscode.engine.EngineLog;
 import tools.dscode.engine.runtime.ResourceGate;
@@ -14,7 +15,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
@@ -180,13 +183,13 @@ public final class SpineCli {
         if (classpath.isBlank()) {
             throw new IllegalStateException("error: spine start has no classpath\nfix: run spine start from the project JVM");
         }
-        String quoted = classpath.replace("\"", "\\\"");
-        Files.writeString(args, "-cp\n\"" + quoted + "\"\ntools.dscode.launcher.SpineCli\nhold\n", StandardCharsets.UTF_8);
+        Files.writeString(args, String.join("\n", holdArguments(classpath)) + "\n", StandardCharsets.UTF_8);
         String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
         ProcessBuilder builder = new ProcessBuilder(java, "@" + args.toAbsolutePath().normalize());
         builder.directory(project.toFile());
         builder.redirectOutput(dir.resolve("warm.out.log").toFile());
         builder.redirectError(dir.resolve("warm.err.log").toFile());
+        builder.environment().putAll(holdEnvironment());
         if (inlineHoldForTests) {
             WarmCdp.open(project);
             return ProcessHandle.current().pid();
@@ -205,6 +208,55 @@ public final class SpineCli {
         Path err = dir.resolve("warm.err.log");
         if (Files.isRegularFile(err)) logged = Files.readString(err);
         throw new IllegalStateException("error: warm JVM did not stay up\nfix: read .pickleball/spine/warm.err.log\n" + logged);
+    }
+
+    /** System properties the hold JVM receives in {@code java.args}. A credentialed CDP endpoint is omitted. */
+    static List<String> holdArguments(String classpath) {
+        List<String> lines = new ArrayList<>();
+        for (String key : List.of(
+                "pkb_warm",
+                "pkb_warm_packages",
+                "pkb_heap_subprocess_percent",
+                "pkb_heap_refuse_percent",
+                "pkb_worker_pool")) {
+            appendDefine(lines, key, System.getProperty(key));
+        }
+        String endpoint = System.getProperty(PlaywrightConnection.ENDPOINT_PROPERTY);
+        if (endpoint != null && !endpoint.isBlank() && !credentialed(endpoint)) {
+            appendDefine(lines, PlaywrightConnection.ENDPOINT_PROPERTY, endpoint);
+        }
+        String quoted = classpath.replace("\"", "\\\"");
+        lines.add("-cp");
+        lines.add("\"" + quoted + "\"");
+        lines.add("tools.dscode.launcher.SpineCli");
+        lines.add("hold");
+        return lines;
+    }
+
+    /**
+     * Environment entries for the hold JVM. A CDP endpoint with user info or a query token is passed as
+     * {@code PKB_CDP_ENDPOINT} and is not written into {@code java.args}.
+     */
+    static Map<String, String> holdEnvironment() {
+        Map<String, String> extra = new LinkedHashMap<>();
+        String endpoint = System.getProperty(PlaywrightConnection.ENDPOINT_PROPERTY);
+        if (endpoint != null && !endpoint.isBlank() && credentialed(endpoint)) {
+            extra.put(PlaywrightConnection.ENDPOINT_ENV, endpoint.trim());
+        }
+        return extra;
+    }
+
+    private static void appendDefine(List<String> lines, String key, String value) {
+        if (value == null || value.isBlank()) return;
+        String text = value.trim();
+        if (text.indexOf('\n') >= 0 || text.indexOf('\r') >= 0 || text.indexOf('"') >= 0) return;
+        String token = "-D" + key + "=" + text;
+        if (token.indexOf(' ') >= 0 || token.indexOf('\t') >= 0) token = "\"" + token + "\"";
+        lines.add(token);
+    }
+
+    private static boolean credentialed(String endpoint) {
+        return !endpoint.equals(PlaywrightConnection.redact(endpoint));
     }
 
     private static int unknown(String verb, PrintStream stderr) {

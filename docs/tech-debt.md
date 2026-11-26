@@ -52,12 +52,6 @@ The 3.0.0 retest-fix rounds (R, S) ran only targeted tests on the Linux box and 
 - **Spine R8, Windows only:** `WarmClassLoaderTest`, `WarmColdParityTest`, `IncrementalGlueCompileTest`, `ResourceGateTest`, `BrowserVersionResolverTest`, `BrowserCacheAndLocalVersionTest`, `SeleniumBidiCommandTest`, `DebugPortOwnerTest`, `DebugPortAttachTest`, `SnapshotContextGateTest`, `WarmCdpTest`, `DesktopTreeCacheTest`, `WindowsStructureChangedTest`, and `WarmGlueCompilePathTest`.
 - **macOS, Safari:** channel `safari` selects Selenium `safaridriver` and the Windows test does not start a process. A live Safari run on macOS has not been executed.
 
-## Spine R8 production wiring (open, found in R8 verification 2026-11-26)
-
-The R8 classes and their targeted tests are on the branch. These paths are reached only through test hooks today. A follow-up Build owns them.
-
-- **Hold JVM flags:** `spine start` passes only `-cp` to the hold JVM. `-Dpkb_warm`, `-Dpkb_heap_*`, and endpoint properties set on the starting JVM do not reach it. Only `PKB_WARM` and the other environment variables do.
-
 ## Deferred from the 3.0.0 consumer-fixes branch (per Dan, 2026-11-25)
 
 These items stay out of `3.0.0-consumer-fixes`. The roadmap lists them under "Not in scope". P6 records them here. Do not treat a later drive-by as permission to implement them.
