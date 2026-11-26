@@ -665,6 +665,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/launcher/SessionHealthWait.java`
 - `src/main/java/tools/dscode/launcher/SetupCommand.java`
 - `src/main/java/tools/dscode/launcher/UrlKeys.java`
+- `src/main/java/tools/dscode/launcher/VerbDispatch.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchAgentCommands.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchCliErrors.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchCliFlags.java`
@@ -1097,6 +1098,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/JsFallbackHonestyTest.java`
 - `src/test/java/tools/dscode/launcher/JsStepRunTest.java`
 - `src/test/java/tools/dscode/launcher/MaskQuietTest.java`
+- `src/test/java/tools/dscode/launcher/McpDirectHotPathTest.java`
 - `src/test/java/tools/dscode/launcher/MonitorLiveTest.java`
 - `src/test/java/tools/dscode/launcher/NavigateDataFileTest.java`
 - `src/test/java/tools/dscode/launcher/NetLiveTest.java`
@@ -1138,6 +1140,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/TargetAgnosticApiTest.java`
 - `src/test/java/tools/dscode/launcher/TargetCoverageTest.java`
 - `src/test/java/tools/dscode/launcher/TwoActorRecipeLiveTest.java`
+- `src/test/java/tools/dscode/launcher/VerbDispatchTest.java`
 - `src/test/java/tools/dscode/launcher/VersionSwitchTest.java`
 - `src/test/java/tools/dscode/launcher/VirtualizedScrollTest.java`
 - `src/test/java/tools/dscode/launcher/VisibleFlagTest.java`
@@ -1460,6 +1463,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/LiveBridgeFile.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/LiveHostFile.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/LiveSessionAttach.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/McpTransport.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/NoopNotice.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/OutputFormatter.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/PickleballArtifactLocator.java`
@@ -1484,6 +1488,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/WarmProcess.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/StoreHistoryReader.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/surface/NativeHighlightBox.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/VerbArgs.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/VerbTiers.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/WindowDriver.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/WorkbenchFeatureIndex.java`
@@ -1545,6 +1550,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mapping/MappingTreeModel.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mapping/MappingValueCodec.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/McpCommandContributor.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/McpInProcess.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/McpRegistry.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/popup/PopupMcpCommands.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/SnapshotCommand.java`
