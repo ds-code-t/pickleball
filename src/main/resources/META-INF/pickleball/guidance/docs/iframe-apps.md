@@ -17,7 +17,7 @@ Working recipe for pages built from iframes (Pega, Salesforce, Oracle, and the s
 
 ## Shell quoting
 
-Pass one argument per flag. An unknown positional is an error and is not created as a directory. An absolute path is the project even when that directory does not exist yet. `record`, `selftest`, `pw`, and `cdp` also accept a relative slash or backslash path that does not exist yet. A bare `pw` area word, such as `page` or `run`, stays the area even when a directory of that name exists. `.` and `..` are project paths. `@args.json` is not accepted on every verb. `call <verb> --args-file=<file>` is the argument-file path.
+Pass one argument per flag. An unknown positional is an error and is not created as a directory. An absolute path is the project even when that directory does not exist yet. `record`, `selftest`, `pw`, and `cdp` also accept a relative slash or backslash path that does not exist yet. A bare `pw` area word, such as `page` or `run`, stays the area even when a directory of that name exists. `.` and `..` are project paths. `@<file>.json` and `--args-file=<file>` are a JSON object of flags on every verb. An explicit flag wins. An unknown key fails, and the error does not print the value. `call <verb> --args-file=<file>` still forwards that file to the named tool. The quoting table in this section stays.
 
 | Shell | Commas | Embedded quotes | `&` in a URL |
 |---|---|---|---|

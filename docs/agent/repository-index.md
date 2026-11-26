@@ -412,9 +412,11 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentfast/AgentForward.java`
 - `src/main/java/tools/dscode/common/agentfast/CollabRows.java`
 - `src/main/java/tools/dscode/common/agentfast/CompactReply.java`
+- `src/main/java/tools/dscode/common/agentfast/ElementRecord.java`
 - `src/main/java/tools/dscode/common/agentfast/FallbackLog.java`
 - `src/main/java/tools/dscode/common/agentfast/FixturePages.java`
 - `src/main/java/tools/dscode/common/agentfast/HostLanes.java`
+- `src/main/java/tools/dscode/common/agentfast/JsonReply.java`
 - `src/main/java/tools/dscode/common/agentfast/LineView.java`
 - `src/main/java/tools/dscode/common/agentfast/LiveBrowserHost.java`
 - `src/main/java/tools/dscode/common/agentfast/LiveChromeDriver.java`
@@ -812,6 +814,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/internal/ValuesSupport.java`
 - `src/main/java/tools/dscode/launcher/AgentController.java`
 - `src/main/java/tools/dscode/launcher/AgentHop.java`
+- `src/main/java/tools/dscode/launcher/ArgsFiles.java`
 - `src/main/java/tools/dscode/launcher/BrowserAttach.java`
 - `src/main/java/tools/dscode/launcher/CompositeCommands.java`
 - `src/main/java/tools/dscode/launcher/ConsumerReadyCommands.java`
@@ -1047,6 +1050,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentfast/ConsumerFixesP2FindTest.java`
 - `src/test/java/tools/dscode/common/agentfast/ConsumerFixesP3ViewTest.java`
 - `src/test/java/tools/dscode/common/agentfast/ConsumerFixesP4EnvelopeTest.java`
+- `src/test/java/tools/dscode/common/agentfast/ElementRecordTest.java`
 - `src/test/java/tools/dscode/common/agentfast/FallbackRunCapTest.java`
 - `src/test/java/tools/dscode/common/agentfast/FormatViewTest.java`
 - `src/test/java/tools/dscode/common/agentfast/HostLanesTest.java`
@@ -1215,6 +1219,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/AgentControllerTest.java`
 - `src/test/java/tools/dscode/launcher/AgentExpansionTest.java`
 - `src/test/java/tools/dscode/launcher/AgentFastCliTest.java`
+- `src/test/java/tools/dscode/launcher/ArgsFileTest.java`
 - `src/test/java/tools/dscode/launcher/AskIdTest.java`
 - `src/test/java/tools/dscode/launcher/AutoSnapshotTest.java`
 - `src/test/java/tools/dscode/launcher/BackendHandoffLiveTest.java`
@@ -1348,6 +1353,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/scenarioobject/ScenarioObjectHookTest.java`
 - `src/test/java/tools/dscode/scenarioobject/ScenarioObjectSteps.java`
 - `src/test/java/tools/dscode/ScenarioObjectTest.java`
+- `src/test/java/tools/dscode/store/AgentEnvelopeStoreTest.java`
 - `src/test/java/tools/dscode/store/CategoryEditTest.java`
 - `src/test/java/tools/dscode/store/ChangesCliTest.java`
 - `src/test/java/tools/dscode/store/ConflictChoiceTest.java`
@@ -1415,6 +1421,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/store/StoreHandles.java`
 - `src/test/java/tools/dscode/store/StoreHistoryTest.java`
 - `src/test/java/tools/dscode/store/StoreHydrateTest.java`
+- `src/test/java/tools/dscode/store/StoreJson.java`
 - `src/test/java/tools/dscode/store/StoreLegacyMigrationTest.java`
 - `src/test/java/tools/dscode/store/StoreLinkedTrackingSmokeTest.java`
 - `src/test/java/tools/dscode/store/StoreLogLinkTest.java`
