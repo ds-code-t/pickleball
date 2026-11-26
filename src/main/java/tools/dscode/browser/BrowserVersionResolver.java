@@ -6,6 +6,9 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import dev.domengine.session.BrowserSession;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -312,17 +315,281 @@ public final class BrowserVersionResolver {
     private static List<Install> cachedInstalls(String channel) {
         Catalog hook = cache;
         if (hook != null) return hook.list(channel);
-        return List.of();
+        return playwrightCache(channel);
+    }
+
+    /**
+     * Playwright's browser cache. {@code PLAYWRIGHT_BROWSERS_PATH} (JVM property, then the
+     * environment variable) wins. Otherwise Windows uses {@code %LOCALAPPDATA%\ms-playwright}.
+     * A version comes from Playwright {@code browsers.json} metadata when that file is in the
+     * cache, then from a version directory or the browser binary's file version.
+     * {@code local} does not call this.
+     */
+    private static List<Install> playwrightCache(String channel) {
+        if (channel == null || channel.isBlank()) return List.of();
+        Path root = playwrightCacheRoot();
+        if (root == null || !Files.isDirectory(root)) return List.of();
+        String folder = playwrightFolder(channel);
+        if (folder == null) return List.of();
+        String label = channel.toLowerCase(Locale.ROOT);
+        Map<String, String> metadata = browserMetadata(root);
+        List<Install> found = new ArrayList<>();
+        try (var listed = Files.list(root)) {
+            for (Path dir : listed.toList()) {
+                if (!Files.isDirectory(dir)) continue;
+                String name = dir.getFileName().toString();
+                int dash = name.lastIndexOf('-');
+                if (dash <= 0) continue;
+                String browser = name.substring(0, dash);
+                if (!folder.equals(browser)) continue;
+                String version = metadata.getOrDefault(name, "");
+                if (version.isBlank()) version = versionBeside(dir);
+                Path binary = browserBinary(dir);
+                if (version.isBlank() && binary != null) version = fileVersion(binary);
+                found.add(new Install(label, version, binary == null ? dir : binary));
+            }
+        } catch (IOException failure) {
+            return List.of();
+        }
+        return List.copyOf(found);
+    }
+
+    private static Path playwrightCacheRoot() {
+        String pinned = firstSetting("PLAYWRIGHT_BROWSERS_PATH");
+        // Playwright treats 0 as "use the default cache", not as a path and not as disabled.
+        if (pinned != null && !"0".equals(pinned)) return Path.of(pinned);
+        String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+        if (os.contains("win")) {
+            String local = System.getenv("LOCALAPPDATA");
+            if (local == null || local.isBlank()) return null;
+            return Path.of(local, "ms-playwright");
+        }
+        String home = System.getProperty("user.home", "");
+        if (home.isBlank()) return null;
+        if (os.contains("mac")) return Path.of(home, "Library", "Caches", "ms-playwright");
+        return Path.of(home, ".cache", "ms-playwright");
+    }
+
+    /** Chromium cache folders serve chrome, msedge, and chromium. Firefox and webkit stay on their own names. */
+    private static String playwrightFolder(String channel) {
+        return switch (channel.toLowerCase(Locale.ROOT)) {
+            case "chrome", "chromium", "msedge", "edge" -> "chromium";
+            case "firefox" -> "firefox";
+            case "webkit" -> "webkit";
+            default -> null;
+        };
+    }
+
+    private static Map<String, String> browserMetadata(Path root) {
+        Path file = root.resolve("browsers.json");
+        if (!Files.isRegularFile(file)) return Map.of();
+        try {
+            JsonNode node = new ObjectMapper().readTree(Files.readString(file));
+            JsonNode browsers = node.path("browsers");
+            if (!browsers.isArray()) return Map.of();
+            Map<String, String> versions = new LinkedHashMap<>();
+            for (JsonNode browser : browsers) {
+                String name = browser.path("name").asText("").trim();
+                String revision = browser.path("revision").asText("").trim();
+                String version = browser.path("browserVersion").asText("").trim();
+                if (!name.isEmpty() && !revision.isEmpty() && !version.isEmpty()) {
+                    versions.put(name + "-" + revision, version);
+                }
+            }
+            return versions;
+        } catch (IOException | RuntimeException failure) {
+            return Map.of();
+        }
+    }
+
+    private static Path browserBinary(Path dir) {
+        List<String> names = List.of("chrome.exe", "chrome", "msedge.exe", "firefox.exe", "firefox", "Playwright.exe");
+        try (var walk = Files.walk(dir, 3)) {
+            List<Path> files = walk.filter(Files::isRegularFile).toList();
+            for (Path file : files) {
+                String name = file.getFileName().toString();
+                for (String expected : names) {
+                    if (expected.equalsIgnoreCase(name)) return file;
+                }
+            }
+        } catch (IOException ignored) {
+            return null;
+        }
+        return null;
     }
 
     private static List<Install> platform(String channel) {
         if (channel == null) return List.of();
         String name = channel.toLowerCase(Locale.ROOT);
-        String path = null;
-        if ("chrome".equals(name) || "chromium".equals(name)) path = BrowserSession.findChrome();
-        else if ("msedge".equals(name) || "edge".equals(name)) path = BrowserSession.findEdge();
+        String path = locatedBinary(name);
         if (path == null || path.isBlank()) return List.of();
-        return List.of(new Install(name, "", Path.of(path)));
+        Path binary = Path.of(path);
+        List<String> versions = installVersions(binary);
+        if (versions.isEmpty()) return List.of(new Install(name, "", binary));
+        List<Install> found = new ArrayList<>();
+        for (String version : versions) found.add(new Install(name, version, binary));
+        return List.copyOf(found);
+    }
+
+    /**
+     * An explicit {@code DOMENGINE_CHROME} or {@code DOMENGINE_EDGE} JVM property is that binary.
+     * A property that does not name a file is a miss and does not fall through to the machine install.
+     * With no property, the locations are {@link BrowserSession#findChrome()} and {@link BrowserSession#findEdge()}.
+     */
+    private static String locatedBinary(String channel) {
+        boolean edge = "msedge".equals(channel) || "edge".equals(channel);
+        boolean chrome = "chrome".equals(channel) || "chromium".equals(channel);
+        if (!edge && !chrome) return null;
+        String key = edge ? "DOMENGINE_EDGE" : "DOMENGINE_CHROME";
+        String property = System.getProperty(key);
+        if (property != null) {
+            String trimmed = property.trim();
+            if (!trimmed.isEmpty() && Files.isRegularFile(Path.of(trimmed))) return trimmed;
+            return null;
+        }
+        return edge ? BrowserSession.findEdge() : BrowserSession.findChrome();
+    }
+
+    /** Version directory names beside the executable, or the parent folder when the executable lives inside one. */
+    private static List<String> installVersions(Path binary) {
+        List<String> versions = new ArrayList<>();
+        Path parent = binary.getParent();
+        if (parent != null) {
+            String parentName = parent.getFileName() == null ? "" : parent.getFileName().toString();
+            if (isVersion(parentName)) versions.add(parentName);
+            try (var listed = Files.list(parent)) {
+                for (Path child : listed.toList()) {
+                    if (!Files.isDirectory(child)) continue;
+                    String name = child.getFileName().toString();
+                    if (isVersion(name)) versions.add(name);
+                }
+            } catch (IOException ignored) {
+                // A directory that cannot be listed still tries the file version below.
+            }
+        }
+        if (versions.isEmpty()) {
+            String fromFile = fileVersion(binary);
+            if (!fromFile.isBlank()) versions.add(fromFile);
+        }
+        return versions;
+    }
+
+    private static String versionBeside(Path dir) {
+        try (var listed = Files.list(dir)) {
+            String best = "";
+            for (Path child : listed.toList()) {
+                if (!Files.isDirectory(child)) continue;
+                String name = child.getFileName().toString();
+                if (!isVersion(name)) continue;
+                if (best.isEmpty() || compareParts(parts(name), parts(best)) > 0) best = name;
+            }
+            return best;
+        } catch (IOException failure) {
+            return "";
+        }
+    }
+
+    private static boolean isVersion(String name) {
+        if (name == null || name.isBlank()) return false;
+        String[] tokens = name.split("\\.");
+        if (tokens.length < 2 || tokens.length > 4) return false;
+        for (String token : tokens) {
+            if (token.isEmpty()) return false;
+            for (int index = 0; index < token.length(); index++) {
+                if (!Character.isDigit(token.charAt(index))) return false;
+            }
+        }
+        return true;
+    }
+
+    /** Windows file version. A file that is not a PE image returns blank. The browser is not started. */
+    private static String fileVersion(Path binary) {
+        if (binary == null || !Files.isRegularFile(binary)) return "";
+        try (InputStream input = Files.newInputStream(binary)) {
+            byte[] header = input.readNBytes(64);
+            if (header.length < 64 || header[0] != 'M' || header[1] != 'Z') return "";
+            int pe = ByteBuffer.wrap(header, 0x3C, 4).order(ByteOrder.LITTLE_ENDIAN).getInt();
+            if (pe < 0 || pe > 1_048_576) return "";
+            long skip = pe - 64L;
+            while (skip > 0) {
+                long read = input.skip(skip);
+                if (read <= 0) return "";
+                skip -= read;
+            }
+            byte[] peHeader = input.readNBytes(24);
+            if (peHeader.length < 24 || peHeader[0] != 'P' || peHeader[1] != 'E') return "";
+            int optionalSize = ByteBuffer.wrap(peHeader, 20, 2).order(ByteOrder.LITTLE_ENDIAN).getShort() & 0xFFFF;
+            if (optionalSize < 96) return "";
+            byte[] optional = input.readNBytes(optionalSize);
+            if (optional.length < optionalSize) return "";
+            int magic = ByteBuffer.wrap(optional, 0, 2).order(ByteOrder.LITTLE_ENDIAN).getShort() & 0xFFFF;
+            int dataDirectory = magic == 0x20B ? 112 : 96;
+            if (optional.length < dataDirectory + 16) return "";
+            int resourceRva = ByteBuffer.wrap(optional, dataDirectory + 8, 4).order(ByteOrder.LITTLE_ENDIAN).getInt();
+            if (resourceRva == 0) return "";
+            int sectionCount = ByteBuffer.wrap(peHeader, 6, 2).order(ByteOrder.LITTLE_ENDIAN).getShort() & 0xFFFF;
+            byte[] sections = input.readNBytes(sectionCount * 40);
+            if (sections.length < sectionCount * 40) return "";
+            long fileOffset = -1;
+            for (int index = 0; index < sectionCount; index++) {
+                int base = index * 40;
+                int virtual = ByteBuffer.wrap(sections, base + 12, 4).order(ByteOrder.LITTLE_ENDIAN).getInt();
+                int rawSize = ByteBuffer.wrap(sections, base + 16, 4).order(ByteOrder.LITTLE_ENDIAN).getInt();
+                int raw = ByteBuffer.wrap(sections, base + 20, 4).order(ByteOrder.LITTLE_ENDIAN).getInt();
+                if (resourceRva >= virtual && resourceRva < virtual + Math.max(rawSize, 1)) {
+                    fileOffset = raw + (resourceRva - virtual);
+                    break;
+                }
+            }
+            if (fileOffset < 0) return "";
+            byte[] resource = readRange(binary, fileOffset, 65536);
+            if (resource.length < 16) return "";
+            return versionFromResource(resource);
+        } catch (IOException | RuntimeException failure) {
+            return "";
+        }
+    }
+
+    private static byte[] readRange(Path file, long offset, int length) throws IOException {
+        try (InputStream input = Files.newInputStream(file)) {
+            long skip = offset;
+            while (skip > 0) {
+                long read = input.skip(skip);
+                if (read <= 0) return new byte[0];
+                skip -= read;
+            }
+            return input.readNBytes(length);
+        }
+    }
+
+    /** Walks one resource directory level for RT_VERSION (16) and reads VS_FIXEDFILEINFO. */
+    private static String versionFromResource(byte[] resource) {
+        int bytes = Math.min(resource.length, 65536);
+        for (int index = 0; index + 16 <= bytes; index++) {
+            if ((resource[index] & 0xFF) != 0xBD || (resource[index + 1] & 0xFF) != 0x04
+                    || (resource[index + 2] & 0xFF) != 0xEF || (resource[index + 3] & 0xFF) != 0xFE) {
+                continue;
+            }
+            if (index + 20 > bytes) return "";
+            ByteBuffer fixed = ByteBuffer.wrap(resource, index, 20).order(ByteOrder.LITTLE_ENDIAN);
+            fixed.getInt();
+            int ms = fixed.getInt(8);
+            int ls = fixed.getInt(12);
+            int major = (ms >>> 16) & 0xFFFF;
+            int minor = ms & 0xFFFF;
+            int patch = (ls >>> 16) & 0xFFFF;
+            int build = ls & 0xFFFF;
+            return major + "." + minor + "." + patch + "." + build;
+        }
+        return "";
+    }
+
+    private static String firstSetting(String name) {
+        String property = System.getProperty(name);
+        if (property != null && !property.isBlank()) return property.trim();
+        String env = System.getenv(name);
+        if (env != null && !env.isBlank()) return env.trim();
+        return null;
     }
 
     static Install best(List<Install> found, String channel, String requested) {

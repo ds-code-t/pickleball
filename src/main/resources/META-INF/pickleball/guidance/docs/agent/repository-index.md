@@ -857,6 +857,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/browser/AgentBoundaryTest.java`
 - `src/test/java/tools/dscode/browser/BidiAdapterTest.java`
 - `src/test/java/tools/dscode/browser/BidiModulesTest.java`
+- `src/test/java/tools/dscode/browser/BrowserCacheAndLocalVersionTest.java`
 - `src/test/java/tools/dscode/browser/BrowserProtocolsTest.java`
 - `src/test/java/tools/dscode/browser/BrowserVersionResolverTest.java`
 - `src/test/java/tools/dscode/browser/CdpAdapterTest.java`

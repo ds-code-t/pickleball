@@ -49,15 +49,13 @@ The 3.0.0 retest-fix rounds (R, S) ran only targeted tests on the Linux box and 
 - **Spine R3, Windows only:** `JavaStepHostTest`, `GlueStaticScanTest`, `NodeStepHostTest`, `NodeStepHostTsTest`, `EngineDoesNotSpawnNodeTest`, `JsStepCatalogTest`, `JsStepRunTest`, `PlaywrightTestIngestTest`, `PlaywrightSpecHostTest`, and `PlaywrightSpecIngestLiveTest`.
 - **Spine R4, Windows only:** `VerbDispatchTest`, `McpDirectHotPathTest`, `VerbCatalogTest`, `ElementRecordTest`, `ArgsFileTest`, `AgentEnvelopeStoreTest`, `RouteModifyBodyTest`, `ExecuteStepsPwTest`, `DesktopLaunchTest`, `DesktopScreenshotVerbTest`, and `DesktopLaunch`.
 - **Spine R7, Windows only:** `RunSnapshotTest`, `ReportScriptTest`, `VisualTargetTest`, `PickleballExceptionTest`, `SnapFindIndexTest` (`tools.dscode.common.composite`), `SnapshotRetainTest`, and `CrossStoreTest`.
-- **Spine R8, Windows only:** `WarmClassLoaderTest`, `WarmColdParityTest`, `IncrementalGlueCompileTest`, `ResourceGateTest`, `BrowserVersionResolverTest`, `SeleniumBidiCommandTest`, `DebugPortOwnerTest`, `WarmCdpTest`, and `DesktopTreeCacheTest`.
+- **Spine R8, Windows only:** `WarmClassLoaderTest`, `WarmColdParityTest`, `IncrementalGlueCompileTest`, `ResourceGateTest`, `BrowserVersionResolverTest`, `BrowserCacheAndLocalVersionTest`, `SeleniumBidiCommandTest`, `DebugPortOwnerTest`, `WarmCdpTest`, and `DesktopTreeCacheTest`.
 - **macOS, Safari:** channel `safari` selects Selenium `safaridriver` and the Windows test does not start a process. A live Safari run on macOS has not been executed.
 
 ## Spine R8 production wiring (open, found in R8 verification 2026-11-26)
 
 The R8 classes and their targeted tests are on the branch. These paths are reached only through test hooks today. A follow-up Build owns them.
 
-- **`cdn` cache first:** `BrowserVersionResolver.cachedInstalls()` returns an empty list outside tests, so `cdn` never reads the Playwright browser cache first and `resolve cache-fallback` cannot happen in production.
-- **Local version detection:** registered local installs carry a blank version, so `local` with a `version`, and the `131` / `131.0` / exact / `latest` precision rules, only work with an injected catalog.
 - **One owner per debug port:** `DebugPortOwner.attach` has no production caller (the claim was taken out of `applyDebugPort`). `browser ports` lists owners, but a second real CDP or driver attach to the same port does not fail.
 - **Heap gate on new contexts:** `ResourceGate.admit` has no production caller. Only `spine sample` and `WarmCdp` read the decision, so new snapshot contexts are not moved to a subprocess or refused.
 - **Desktop structure-changed:** `DesktopTree.structureChanged` has no caller. No UI Automation structure-changed event drops a cached window tree.
