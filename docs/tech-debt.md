@@ -52,6 +52,16 @@ The 3.0.0 retest-fix rounds (R, S) ran only targeted tests on the Linux box and 
 - **Spine R8, Windows only:** `WarmClassLoaderTest`, `WarmColdParityTest`, `IncrementalGlueCompileTest`, `ResourceGateTest`, `BrowserVersionResolverTest`, `BrowserCacheAndLocalVersionTest`, `SeleniumBidiCommandTest`, `DebugPortOwnerTest`, `DebugPortAttachTest`, `SnapshotContextGateTest`, `WarmCdpTest`, `DesktopTreeCacheTest`, `WindowsStructureChangedTest`, and `WarmGlueCompilePathTest`.
 - **macOS, Safari:** channel `safari` selects Selenium `safaridriver` and the Windows test does not start a process. A live Safari run on macOS has not been executed.
 
+## Spine R8 fix-back 2 (open, found in fix-back 1 verification 2026-11-26)
+
+1. The heap-gate cold child only sleeps, and the snapshot context keeps running in-process on the application loader, so the warm JVM gets no heap relief.
+2. Incremental glue compile never reaches the scenario: the warm loader is built with an empty URL list, reload runs in the `store run` process, and changed-source hashes are not persisted across processes.
+3. `pickleball bidi` runs in the short-lived CLI JVM, where there is no Selenium session, so `bidi script` and `bidi intercept` never reach the live driver.
+4. The Windows UI Automation structure-changed handler is a PowerShell script block, so the event on a non-PowerShell thread may never write `changed` and the cached tree stays.
+5. Fix-back 1 rewrote the R8 roadmap below the original spec, and a `rebuild` decision does not stop the warm JVM, run the wrapper compile, and start that JVM again.
+6. Configuration, Playwright, agent, and release-note text claim the gate moves work, the warm loader reloads edited glue, and `bidi` reaches the live session before that behavior is delivered.
+7. A successful `cdn` download reports the requested version with a null binary, and a debug-port claim is released only through `PageSurfaces.quitManaged`.
+
 ## Deferred from the 3.0.0 consumer-fixes branch (per Dan, 2026-11-25)
 
 These items stay out of `3.0.0-consumer-fixes`. The roadmap lists them under "Not in scope". P6 records them here. Do not treat a later drive-by as permission to implement them.
