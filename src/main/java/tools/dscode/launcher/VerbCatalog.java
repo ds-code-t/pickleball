@@ -45,6 +45,7 @@ public final class VerbCatalog {
     private static final String DASHBOARD = "tools.dscode.store.dashboard.DashboardCli.execute";
     private static final String CHAT = "tools.dscode.common.agentcontrol.AgentControl.execute";
     private static final String CROSS_STORE = "tools.dscode.launcher.CrossStore.execute";
+    private static final String SPINE = "tools.dscode.launcher.SpineCli.execute";
 
     /**
      * Commands the domengine MCP {@code surfaces} tool lists. That tool is an index of
@@ -195,6 +196,11 @@ public final class VerbCatalog {
         add(rows, "log-tail", "workbench", LOG);
         add(rows, "log tail", "workbench", LOG);
         add(rows, "chat", "workbench", CHAT);
+        add(rows, "spine", "workbench", SPINE);
+        add(rows, "spine start", "workbench", SPINE);
+        add(rows, "spine stop", "workbench", SPINE);
+        add(rows, "spine warm", "workbench", SPINE);
+        add(rows, "spine warm status", "workbench", SPINE);
         add(rows, "cross", "workbench", CROSS_STORE);
         add(rows, "cross note", "workbench", CROSS_STORE);
         add(rows, "cross journal", "workbench", CROSS_STORE);

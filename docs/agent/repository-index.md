@@ -808,6 +808,11 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/engine/runtime/StepRows.java`
 - `src/main/java/tools/dscode/engine/runtime/StepWatchdog.java`
 - `src/main/java/tools/dscode/engine/runtime/VisualTarget.java`
+- `src/main/java/tools/dscode/engine/runtime/WarmClassLoader.java`
+- `src/main/java/tools/dscode/engine/runtime/WarmFlags.java`
+- `src/main/java/tools/dscode/engine/runtime/WarmPackages.java`
+- `src/main/java/tools/dscode/engine/runtime/WarmProcessFile.java`
+- `src/main/java/tools/dscode/engine/runtime/WarmSpine.java`
 - `src/main/java/tools/dscode/engine/source/FileScenarioSource.java`
 - `src/main/java/tools/dscode/engine/source/MemoryScenarioSource.java`
 - `src/main/java/tools/dscode/engine/source/ScenarioSource.java`
@@ -836,6 +841,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/launcher/RunVarOverrides.java`
 - `src/main/java/tools/dscode/launcher/SessionHealthWait.java`
 - `src/main/java/tools/dscode/launcher/SetupCommand.java`
+- `src/main/java/tools/dscode/launcher/SpineCli.java`
 - `src/main/java/tools/dscode/launcher/UrlKeys.java`
 - `src/main/java/tools/dscode/launcher/VerbCatalog.java`
 - `src/main/java/tools/dscode/launcher/VerbDispatch.java`
@@ -1223,6 +1229,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/engine/runtime/StepCeilingTest.java`
 - `src/test/java/tools/dscode/engine/runtime/StepWatchdogTest.java`
 - `src/test/java/tools/dscode/engine/runtime/VisualTargetTest.java`
+- `src/test/java/tools/dscode/engine/runtime/WarmClassLoaderTest.java`
+- `src/test/java/tools/dscode/engine/runtime/WarmColdParityTest.java`
 - `src/test/java/tools/dscode/engine/SpineCucumberImportBanTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureRunnerTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureSteps.java`
@@ -1382,6 +1390,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/store/GlueEditTest.java`
 - `src/test/java/tools/dscode/store/GlueStaticScanTest.java`
 - `src/test/java/tools/dscode/store/HeadMaterializerTest.java`
+- `src/test/java/tools/dscode/store/IncrementalGlueCompileTest.java`
 - `src/test/java/tools/dscode/store/JarHashResetTest.java`
 - `src/test/java/tools/dscode/store/JsStepCatalogTest.java`
 - `src/test/java/tools/dscode/store/LargeFileBranchCopyTest.java`

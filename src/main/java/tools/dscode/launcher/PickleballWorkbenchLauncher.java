@@ -76,6 +76,11 @@ public final class PickleballWorkbenchLauncher {
             if (dashboard != 0) exitProcess(dashboard);
             return;
         }
+        int spine = dispatchSpineIfAny(args, System.out, System.err);
+        if (spine >= 0) {
+            if (spine != 0) exitProcess(spine);
+            return;
+        }
         int cross = dispatchCrossIfAny(args, System.out, System.err);
         if (cross >= 0) {
             if (cross != 0) exitProcess(cross);
@@ -219,6 +224,15 @@ public final class PickleballWorkbenchLauncher {
     static int dispatchDashboardIfAny(String[] args, PrintStream out, PrintStream err) {
         if (!tools.dscode.store.dashboard.DashboardCli.handles(args)) return -1;
         return VerbDispatch.run("dashboard", VerbArgs.capture(args), out, err);
+    }
+
+    /**
+     * Warm spine process. Returns {@code -1} when {@code args} are not a {@code spine} invocation.
+     * Dispatched before {@code cross} and {@code store}.
+     */
+    static int dispatchSpineIfAny(String[] args, PrintStream out, PrintStream err) {
+        if (!SpineCli.handles(args)) return -1;
+        return VerbDispatch.run("spine", VerbArgs.capture(args), out, err);
     }
 
     /**

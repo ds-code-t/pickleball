@@ -7,6 +7,10 @@ import tools.dscode.common.mappings.ParsingMap;
 import tools.dscode.engine.EngineLog;
 import tools.dscode.engine.model.EngineScenario;
 import tools.dscode.engine.model.EngineStep;
+import tools.dscode.engine.runtime.WarmClassLoader;
+import tools.dscode.engine.runtime.WarmFlags;
+import tools.dscode.engine.runtime.WarmPackages;
+import tools.dscode.engine.runtime.WarmSpine;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -50,6 +54,7 @@ public final class ExecutionContext implements AutoCloseable {
     private Phase phase = Phase.READY;
     private Object legacy;
     private Object rootStep;
+    private WarmClassLoader warmLoader;
     private boolean closed;
 
     private ExecutionContext(EngineScenario scenario) {
@@ -63,6 +68,9 @@ public final class ExecutionContext implements AutoCloseable {
         this.parsingMap.getMaps().removeAll(MapConfigurations.MapType.RUN_MAP);
         this.parsingMap.addMaps(nodeMap);
         this.scopes.push(new LinkedHashMap<>());
+        if (WarmFlags.enabled()) {
+            this.warmLoader = WarmSpine.shared().loader(id, new java.net.URL[0], WarmPackages.resolve(null));
+        }
         CURRENT.set(this);
         EngineLog.log(null, "context", id, "open " + this.scenario.name());
     }
@@ -187,11 +195,24 @@ public final class ExecutionContext implements AutoCloseable {
         return rootStep;
     }
 
+    /** The warm loader for this scenario. Null when {@code pkb_warm} is off. Cleared on close. */
+    public WarmClassLoader warmLoader() {
+        return warmLoader;
+    }
+
+    public void holdWarm(WarmClassLoader loader) {
+        this.warmLoader = loader;
+    }
+
     @Override
     public void close() {
         if (closed) return;
         closed = true;
         phase = Phase.CLOSED;
+        if (warmLoader != null) {
+            WarmSpine.shared().detach(id, warmLoader);
+            warmLoader = null;
+        }
         if (CURRENT.get() == this) {
             if (previous == null) CURRENT.remove();
             else CURRENT.set(previous);

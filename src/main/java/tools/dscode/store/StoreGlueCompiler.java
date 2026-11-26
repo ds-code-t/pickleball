@@ -1,5 +1,6 @@
 package tools.dscode.store;
 
+import tools.dscode.engine.EngineLog;
 import tools.dscode.store.sql.Binding;
 
 import javax.tools.JavaCompiler;
@@ -8,10 +9,14 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 /**
@@ -29,7 +34,137 @@ public final class StoreGlueCompiler {
     /** Tests set this to force a missing compiler. Production leaves it null. */
     static volatile Supplier<JavaCompiler> compilerOverride;
 
+    private static final Map<String, Map<String, String>> WARM_HASHES = new ConcurrentHashMap<>();
+    private static final Map<String, Boolean> WARM_STARTED = new ConcurrentHashMap<>();
+
     private StoreGlueCompiler() {
+    }
+
+    /**
+     * One warm compile. The first call for a project may name the wrapper and does not spawn it
+     * unless {@link #warmStart} is asked to run it. A later changed file uses {@code JavaCompiler}.
+     */
+    public static IncrementalDecision warmCompile(Path project, Path javaFile) throws java.io.IOException {
+        Path root = root(project);
+        String projectKey = root.toString();
+        String fileKey = javaFile.toAbsolutePath().normalize().toString();
+        String hash = sha256(Files.readAllBytes(javaFile));
+        Map<String, String> hashes = WARM_HASHES.computeIfAbsent(projectKey, ignored -> new ConcurrentHashMap<>());
+        String previous = hashes.put(fileKey, hash);
+        boolean first = WARM_STARTED.putIfAbsent(projectKey, Boolean.TRUE) == null;
+        if (first) {
+            IncrementalDecision planned = planWarm(root, true);
+            if (!"JavaCompiler".equals(planned.tool())) return planned;
+            return compileIncremental(root, javaFile);
+        }
+        if (previous != null && previous.equals(hash)) return planWarm(root, false);
+        return compileIncremental(root, javaFile);
+    }
+
+    /**
+     * First compile on {@code spine start}. A project with a wrapper records that command.
+     * {@code execute} runs the wrapper once. Later calls do not.
+     */
+    public static IncrementalDecision warmStart(Path project, boolean execute) throws Exception {
+        Path root = root(project);
+        Path marker = root.resolve(".pickleball").resolve("spine").resolve("wrapper-compiled");
+        if (Files.isRegularFile(marker)) return planWarm(root, false);
+        if (!hasJavaSources(root)) return planWarm(root, false);
+        IncrementalDecision planned = planWarm(root, true);
+        if (!"wrapper".equals(planned.tool())) return planned;
+        if (execute) {
+            ProcessBuilder builder = new ProcessBuilder(planned.command());
+            builder.directory(root.toFile());
+            builder.redirectErrorStream(true);
+            Process process = builder.start();
+            int code = process.waitFor();
+            if (code != 0) {
+                throw new IllegalStateException("error: wrapper compile failed\nfix: run the project wrapper and read its log");
+            }
+        }
+        Files.createDirectories(marker.getParent());
+        Files.writeString(marker, planned.commandLine(), StandardCharsets.UTF_8);
+        WARM_STARTED.put(root.toString(), Boolean.TRUE);
+        return planned;
+    }
+
+    /** Command the next warm compile would use. {@code first} may be the project wrapper. */
+    public static IncrementalDecision planWarm(Path project, boolean first) {
+        Path root = root(project);
+        if (first) {
+            List<String> wrapper = StoreRun.compileCommand(root);
+            if (!wrapper.isEmpty()) {
+                return new IncrementalDecision("wrapper", wrapper, false, "first compile");
+            }
+        }
+        return new IncrementalDecision("JavaCompiler", List.of("JavaCompiler"), false, "incremental");
+    }
+
+    /**
+     * Compiles one file with {@code javax.tools.JavaCompiler}. A diagnostic that says
+     * {@code cannot find symbol} or {@code package ... does not exist} is a rebuild decision.
+     * The wrapper command is returned and is not executed.
+     */
+    public static IncrementalDecision compileIncremental(Path project, Path javaFile) throws java.io.IOException {
+        Path root = root(project);
+        JavaCompiler compiler = compiler();
+        if (compiler == null) throw new IllegalStateException(NO_JDK);
+        Path classes = warmClasses(root);
+        Files.createDirectories(classes);
+        List<String> options = new ArrayList<>();
+        options.add("-d");
+        options.add(classes.toAbsolutePath().normalize().toString());
+        String classpath = String.join(java.io.File.pathSeparator, StoreRun.classpathEntries(root, false));
+        if (!classpath.isBlank()) {
+            options.add("-classpath");
+            options.add(classpath + java.io.File.pathSeparator + classes);
+        }
+        javax.tools.StandardJavaFileManager filesManager = compiler.getStandardFileManager(null, Locale.ROOT, StandardCharsets.UTF_8);
+        try (filesManager) {
+            Iterable<? extends javax.tools.JavaFileObject> units = filesManager.getJavaFileObjectsFromPaths(List.of(javaFile));
+            javax.tools.DiagnosticCollector<javax.tools.JavaFileObject> collector = new javax.tools.DiagnosticCollector<>();
+            Boolean ok = compiler.getTask(null, filesManager, collector, options, null, units).call();
+            StringBuilder diagnostics = new StringBuilder();
+            boolean missing = false;
+            for (var diagnostic : collector.getDiagnostics()) {
+                String message = diagnostic.getMessage(Locale.ROOT);
+                diagnostics.append(message).append('\n');
+                String lower = message.toLowerCase(Locale.ROOT);
+                if (lower.contains("cannot find symbol") || lower.contains("does not exist")) missing = true;
+            }
+            if (missing) {
+                List<String> wrapper = StoreRun.compileCommand(root);
+                EngineLog.log(root, "host", "warm", "rebuild");
+                String detail = "rebuild: stop the warm JVM, run the wrapper compile, start again";
+                if (!diagnostics.isEmpty()) detail = detail + "\n" + diagnostics.toString().trim();
+                return new IncrementalDecision("wrapper", wrapper, true, detail);
+            }
+            if (!Boolean.TRUE.equals(ok)) {
+                throw new IllegalStateException("glue compile failed\nfix: " + diagnostics.toString().trim());
+            }
+        }
+        EngineLog.log(root, "host", "warm", "reload");
+        return new IncrementalDecision("JavaCompiler", List.of("JavaCompiler"), false, "incremental");
+    }
+
+    public static Path warmClasses(Path project) {
+        return root(project).resolve(".pickleball").resolve("spine").resolve("classes");
+    }
+
+    /** Tests drop the in-memory warm hashes. */
+    public static void resetWarmState() {
+        WARM_HASHES.clear();
+        WARM_STARTED.clear();
+    }
+
+    public record IncrementalDecision(String tool, List<String> command, boolean rebuild, String detail) {
+        public IncrementalDecision {
+            command = command == null ? List.of() : List.copyOf(command);
+        }
+
+        public String commandLine() {
+            return String.join(" ", command);
+        }
     }
 
     public static int cli(Path project, PrintStream out, PrintStream err) {
@@ -122,6 +257,29 @@ public final class StoreGlueCompiler {
         Supplier<JavaCompiler> override = compilerOverride;
         if (override != null) return override.get();
         return ToolProvider.getSystemJavaCompiler();
+    }
+
+    private static Path root(Path project) {
+        return project == null ? Path.of("").toAbsolutePath().normalize() : project.toAbsolutePath().normalize();
+    }
+
+    private static boolean hasJavaSources(Path root) throws java.io.IOException {
+        for (String dir : List.of("src/main/java", "src/test/java")) {
+            Path source = root.resolve(dir);
+            if (!Files.isDirectory(source)) continue;
+            try (var walk = Files.walk(source)) {
+                if (walk.anyMatch(file -> Files.isRegularFile(file) && file.toString().endsWith(".java"))) return true;
+            }
+        }
+        return false;
+    }
+
+    private static String sha256(byte[] body) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(body));
+        } catch (Exception failure) {
+            throw new IllegalStateException("error: glue hash failed", failure);
+        }
     }
 
     private static List<Row> editedJava(Path project) throws Exception {

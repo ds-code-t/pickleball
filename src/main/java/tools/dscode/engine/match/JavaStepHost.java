@@ -1,10 +1,18 @@
 package tools.dscode.engine.match;
 
+import tools.dscode.engine.context.ExecutionContext;
+import tools.dscode.engine.runtime.WarmClassLoader;
+import tools.dscode.engine.runtime.WarmFlags;
+import tools.dscode.engine.runtime.WarmPackages;
+import tools.dscode.engine.runtime.WarmSpine;
 import tools.dscode.store.StoreDatabase;
+import tools.dscode.store.StoreGlueCompiler;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.nio.file.Path;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -14,7 +22,8 @@ import java.util.List;
 
 /**
  * Java step definitions. The method is the one named on the {@code step_definitions} row.
- * The application classloader loads it. {@code WarmClassLoader} arrives in R8 and is not used here.
+ * {@code pkb_warm=off} (the default) uses the application classloader.
+ * {@code pkb_warm=on} uses {@link WarmClassLoader} for consumer glue packages.
  */
 public final class JavaStepHost implements ForeignStepHost {
     public JavaStepHost() {
@@ -43,8 +52,7 @@ public final class JavaStepHost implements ForeignStepHost {
             throw new IllegalStateException("error: " + row.sourcePath() + " is not a Java glue path"
                     + "\nfix: store glue show " + row.sourcePath());
         }
-        ClassLoader loader = JavaStepHost.class.getClassLoader();
-        if (loader == null) loader = ClassLoader.getSystemClassLoader();
+        ClassLoader loader = selectLoader(className, project);
         Class<?> type;
         try {
             type = Class.forName(className, true, loader);
@@ -78,6 +86,33 @@ public final class JavaStepHost implements ForeignStepHost {
         } catch (ReflectiveOperationException failure) {
             throw new IllegalStateException("error: " + className + "." + method.getName() + " could not be called"
                     + "\nfix: store glue show " + row.sourcePath(), failure);
+        }
+    }
+
+    /** Application loader when warm is off. {@link WarmClassLoader} when warm is on. */
+    public static ClassLoader selectLoader(String className, Path project) {
+        ClassLoader application = JavaStepHost.class.getClassLoader();
+        if (application == null) application = ClassLoader.getSystemClassLoader();
+        if (!WarmFlags.enabled()) return application;
+        ExecutionContext context = ExecutionContext.current();
+        String snapshot = context == null ? "live" : context.id();
+        WarmClassLoader warm = WarmSpine.shared().loader(snapshot, warmUrls(project), WarmPackages.resolve(project));
+        if (context != null) context.holdWarm(warm);
+        return warm;
+    }
+
+    private static URL[] warmUrls(Path project) {
+        List<URL> urls = new ArrayList<>();
+        addUrl(urls, StoreGlueCompiler.warmClasses(project));
+        return urls.toArray(URL[]::new);
+    }
+
+    private static void addUrl(List<URL> urls, Path directory) {
+        if (directory == null || !java.nio.file.Files.isDirectory(directory)) return;
+        try {
+            urls.add(directory.toUri().toURL());
+        } catch (MalformedURLException ignored) {
+            // A classes directory that is not a URL is skipped. The parent loader still sees the classpath.
         }
     }
 

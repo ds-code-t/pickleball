@@ -225,6 +225,11 @@ MCP-only count: 0
 | short-log | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | show-run | workbench | cli | tools.dscode.launcher.WorkbenchSessionCommands.run |
 | snap | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
+| spine | workbench | cli | tools.dscode.launcher.SpineCli.execute |
+| spine start | workbench | cli | tools.dscode.launcher.SpineCli.execute |
+| spine stop | workbench | cli | tools.dscode.launcher.SpineCli.execute |
+| spine warm | workbench | cli | tools.dscode.launcher.SpineCli.execute |
+| spine warm status | workbench | cli | tools.dscode.launcher.SpineCli.execute |
 | spotlight | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | start | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | status | workbench | cli | tools.dscode.launcher.WorkbenchSessionCommands.run |

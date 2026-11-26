@@ -1,6 +1,7 @@
 package tools.dscode.store;
 
 import tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner;
+import tools.dscode.engine.runtime.WarmProcessFile;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -102,7 +103,7 @@ public final class StoreRun {
         }
         boolean reused = workerAlive(root, Files.readString(state(root).resolve(FINGERPRINT)).trim());
         if (!reused) startWorker(root);
-        List<String> properties = runProperties(dashD);
+        List<String> properties = coldUnlessSpine(root, dashD);
         String response = send(root, runRequest(root, properties), Duration.ofMinutes(10));
         int exit = exitCode(response);
         String body = body(response);
@@ -312,6 +313,17 @@ public final class StoreRun {
             }
         }
         return extra;
+    }
+
+    /**
+     * {@code store run} stays cold unless the spine warm JVM is already up.
+     * An explicit {@code -Dpkb_warm=on} is dropped when {@code warm.json} has no live pid.
+     */
+    public static List<String> coldUnlessSpine(Path project, List<String> extra) {
+        List<String> properties = new ArrayList<>(runProperties(extra));
+        if (WarmProcessFile.alive(project)) return List.copyOf(properties);
+        properties.removeIf(token -> token.startsWith("-Dpkb_warm=") || token.startsWith("-Dpkb_warm_packages="));
+        return List.copyOf(properties);
     }
 
     public static List<String> runProperties(List<String> extra) {
