@@ -53,9 +53,11 @@ MCP-only count: 0
 | desktop attach | domengine | cli | dev.domengine.cli.DomEngineMain.dispatch |
 | desktop click | domengine | cli | dev.domengine.cli.DomEngineMain.dispatch |
 | desktop close | domengine | cli | dev.domengine.cli.DomEngineMain.dispatch |
+| desktop launch | domengine | cli | dev.domengine.cli.DomEngineMain.dispatch |
 | desktop list | domengine | cli | dev.domengine.cli.DomEngineMain.dispatch |
 | desktop query | domengine | cli | dev.domengine.cli.DomEngineMain.dispatch |
 | desktop resolve | domengine | cli | dev.domengine.cli.DomEngineMain.dispatch |
+| desktop screenshot | domengine | cli | dev.domengine.cli.DomEngineMain.dispatch |
 | desktop snapshot | domengine | cli | dev.domengine.cli.DomEngineMain.dispatch |
 | desktop type | domengine | cli | dev.domengine.cli.DomEngineMain.dispatch |
 | desktop walk | domengine | cli | dev.domengine.cli.DomEngineMain.dispatch |

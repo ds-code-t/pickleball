@@ -1012,6 +1012,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/browser/proto/ConsumerFixesP2TabTest.java`
 - `src/test/java/tools/dscode/browser/proto/ConsumerFixesP3ProtoTest.java`
 - `src/test/java/tools/dscode/browser/proto/OwnStorageFilterTest.java`
+- `src/test/java/tools/dscode/browser/proto/RouteModifyBodyTest.java`
 - `src/test/java/tools/dscode/browser/proto/SourceMapsTest.java`
 - `src/test/java/tools/dscode/browser/ProtocolSelectorPlaywrightTest.java`
 - `src/test/java/tools/dscode/browser/ProtocolSelectorTest.java`
@@ -1254,6 +1255,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/EmulateLiveTest.java`
 - `src/test/java/tools/dscode/launcher/EngineCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/ErrorsLiveTest.java`
+- `src/test/java/tools/dscode/launcher/ExecuteStepsPwTest.java`
 - `src/test/java/tools/dscode/launcher/FallbackLoggedTest.java`
 - `src/test/java/tools/dscode/launcher/FieldReportRegressionTest.java`
 - `src/test/java/tools/dscode/launcher/FormFillKindTest.java`
@@ -1890,6 +1892,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/conform/LiveConformance.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/AtSpi.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/DesktopAnnotations.java`
+- `dom-engine/src/main/java/dev/domengine/desktop/DesktopLaunch.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/DesktopScreenshot.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/DesktopTree.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/DesktopXPathAccel.java`
@@ -1977,8 +1980,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/CliWireShapeTest.java`
 - `dom-engine/src/test/java/dev/domengine/ConformanceSuiteTest.java`
 - `dom-engine/src/test/java/dev/domengine/ConsumerFixesP3QueryTest.java`
+- `dom-engine/src/test/java/dev/domengine/desktop/DesktopLaunchTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/DesktopOneMatchTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/DesktopScreenshotTest.java`
+- `dom-engine/src/test/java/dev/domengine/desktop/DesktopScreenshotVerbTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/DesktopSnapshotTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/DesktopXPathAccelTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/GridDriversTest.java`

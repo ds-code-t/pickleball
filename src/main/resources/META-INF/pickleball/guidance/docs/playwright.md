@@ -69,4 +69,6 @@ State that lives in the Playwright client (routes, tracing, the dialog policy, a
 | mouse | `move --x --y`, `down`, `up`, `click --x --y`, `wheel --dx --dy`, `drag --from=<selector> --to=<selector>` or `--x --y --x2 --y2` |
 | run | `--steps=<file or JSON array>` |
 
+`net-route --action=modify` sends `rule.body` as the continued request body: Playwright `Route.ResumeOptions.setPostData`, CDP `Fetch.continueRequest` field `postData` (a plain string, not the base64 body `fulfill` uses), and BiDi `network.continueRequest` body `{type:string, value}`. Headers stay merged. A null body keeps the header-only continue. `fulfill` still sets the response body.
+
 Limits over `connectOverCDP`: emulation, storage state, and HAR recording apply to a new context that pickleball creates in the attached browser, not to the page you already had open, and that context closes when the call ends. Video recording needs Playwright's ffmpeg build, which pickleball never downloads, so `pw video` returns `error: video recording is not available over connectOverCDP here ...` with a fix pointing to `pw trace` and `pw screenshot`. Device names come from the playwright-core inside the driver-bundle, read with its bundled Node.
