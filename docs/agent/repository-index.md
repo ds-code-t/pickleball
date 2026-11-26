@@ -1044,6 +1044,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/browser/ScriptedSocket.java`
 - `src/test/java/tools/dscode/browser/SeleniumBidiCommandTest.java`
 - `src/test/java/tools/dscode/browser/SeleniumBidiEventsLiveTest.java`
+- `src/test/java/tools/dscode/browser/SeleniumBidiLiveSessionTest.java`
 - `src/test/java/tools/dscode/browser/SurfaceAssetsTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/AgentDataFoundationTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/AgentLiveFixTest.java`

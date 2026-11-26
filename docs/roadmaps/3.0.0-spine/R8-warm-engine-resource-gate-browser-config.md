@@ -137,8 +137,8 @@ Adapter choice after resolution: `safari` uses Selenium `safaridriver`. `chrome`
 
 Opt-in verbs, off unless `browser.selenium.bidi: on` or `pkb_selenium_bidi=on`:
 
-- `bidi script` in new class `tools.dscode.browser.SeleniumBidiCommands`
-- `bidi intercept` for a Selenium response-body replacement. Playwright sessions do not use it.
+- `bidi script` in `tools.dscode.browser.SeleniumBidiCommands` evaluates on the live Selenium session (`script.evaluate`).
+- `bidi intercept` replaces a Selenium response body through `network.provideResponse` after a `responseStarted` intercept. Playwright sessions refuse it.
 - `bidi grid-attach --url=` through `DriverConstruction`
 
 Event subscriptions stay the five already in `SeleniumBidiEvents` (`onConsoleEntry`, `onJavaScriptException`, `onBeforeRequestSent`, `onResponseCompleted`, `onFetchError`), still gated by `pkb_scenario_events=on`. Do not add events.

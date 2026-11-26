@@ -56,7 +56,6 @@ The 3.0.0 retest-fix rounds (R, S) ran only targeted tests on the Linux box and 
 
 The R8 classes and their targeted tests are on the branch. These paths are reached only through test hooks today. A follow-up Build owns them.
 
-- **BiDi script and intercept:** no production code binds `SeleniumBidiCommands` to a live Selenium session, so `bidi script` and `bidi intercept` always report no session. `bidi intercept` passes the body to the script call and does not replace a response body.
 - **Hold JVM flags:** `spine start` passes only `-cp` to the hold JVM. `-Dpkb_warm`, `-Dpkb_heap_*`, and endpoint properties set on the starting JVM do not reach it. Only `PKB_WARM` and the other environment variables do.
 
 ## Deferred from the 3.0.0 consumer-fixes branch (per Dan, 2026-11-25)

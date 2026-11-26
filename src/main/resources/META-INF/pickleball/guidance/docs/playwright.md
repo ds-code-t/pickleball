@@ -37,6 +37,8 @@ Firefox attaches only over WebDriver BiDi when it was started with its remote ag
 
 Safety: no injection into other processes. Discovery reads only `DevToolsActivePort` and endpoint metadata in the current user's own browser profile dirs, never cookies, passwords, or another OS user's files, and probes only 127.0.0.1. A non-local host is used only when you pass it explicitly. Every attach is logged to `.pickleball/logs/attach.log` with the endpoint redacted (query tokens and user info become `<redacted>`).
 
+`bidi script` and `bidi intercept` stay off unless `pkb_selenium_bidi=on` or `browser.selenium.bidi: on`. `bidi script` evaluates on the live Selenium session. `bidi intercept` replaces a Selenium response body through `network.provideResponse`. A Playwright session refuses that verb. Recording stays `pw codegen`.
+
 ## Selenium and Playwright on the same browser
 
 `BackendHandoff.toPlaywright(driver)` returns the Playwright `Page` for the WebDriver's current URL over the driver's own CDP endpoint. `BackendHandoff.toSelenium(connection, page)` attaches a ChromeDriver with `debuggerAddress` and switches to that page's window; `BackendHandoff.release(driver)` ends it and the browser keeps running. Nothing restarts. Carried over: the browser process, tabs and pages, cookies, storage, and the default context. Not carried over: Playwright route handlers, init scripts, bindings, and listeners (they live in the Playwright client), and Selenium implicit waits, timeouts, and window-handle bookkeeping (they live in the WebDriver session).

@@ -2,7 +2,18 @@ package tools.dscode.browser;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.bidi.HasBiDi;
+import org.openqa.selenium.bidi.module.Network;
+import org.openqa.selenium.bidi.module.Script;
+import org.openqa.selenium.bidi.network.AddInterceptParameters;
+import org.openqa.selenium.bidi.network.BytesValue;
+import org.openqa.selenium.bidi.network.InterceptPhase;
+import org.openqa.selenium.bidi.network.ProvideResponseParameters;
+import org.openqa.selenium.bidi.script.ContextTarget;
+import org.openqa.selenium.bidi.script.EvaluateParameters;
 import org.openqa.selenium.remote.RemoteWebDriver;
+import tools.dscode.common.agentcontrol.AgentControl;
 import tools.dscode.common.driver.DriverConstruction;
 
 import java.io.PrintStream;
@@ -14,6 +25,8 @@ import java.util.Locale;
 /**
  * Opt-in Selenium BiDi verbs: {@code bidi script}, {@code bidi intercept}, and {@code bidi grid-attach}.
  * Off unless {@code pkb_selenium_bidi=on} or {@code browser.selenium.bidi: on}.
+ * {@code bidi script} evaluates on the live Selenium session. {@code bidi intercept} replaces the
+ * response body through {@code network.provideResponse}. A Playwright session refuses intercept.
  * Event names stay the five in {@link SeleniumBidiEvents}. Recording stays {@code pw codegen}.
  */
 public final class SeleniumBidiCommands {
@@ -104,31 +117,73 @@ public final class SeleniumBidiCommands {
     }
 
     private static int script(List<String> tokens, PrintStream stdout, PrintStream stderr) {
+        String source = flag(tokens, "--source");
         ScriptSession current = session;
-        if (current == null) {
+        if (current != null) {
+            current.script(source);
+            stdout.println("bidi script");
+            return 0;
+        }
+        WebDriver driver = liveSelenium();
+        if (driver == null) {
             stderr.println("error: no Selenium session for bidi script");
             stderr.println("fix: launch a Selenium browser with pkb_selenium_bidi=on");
             return 1;
         }
-        current.script(flag(tokens, "--source"));
+        String context = driver.getWindowHandle();
+        if (context == null || context.isBlank()) {
+            stderr.println("error: no browsing context for bidi script");
+            stderr.println("fix: launch a Selenium browser with pkb_selenium_bidi=on");
+            return 1;
+        }
+        Script module = new Script(driver);
+        module.evaluateFunction(new EvaluateParameters(new ContextTarget(context), source, false));
         stdout.println("bidi script");
         return 0;
     }
 
     private static int intercept(List<String> tokens, PrintStream stderr) {
+        String body = flag(tokens, "--body");
         ScriptSession current = session;
-        if (current == null) {
+        WebDriver driver = AgentControl.scenarioDriver();
+        if (current != null && current.playwright()) return playwrightRefusal(stderr);
+        if (playwrightSession(driver)) return playwrightRefusal(stderr);
+        if (current != null && !(driver instanceof HasBiDi)) {
+            current.script(body);
+            return 0;
+        }
+        if (!(driver instanceof HasBiDi)) {
             stderr.println("error: no Selenium session for bidi intercept");
             stderr.println("fix: launch a Selenium browser with pkb_selenium_bidi=on");
             return 1;
         }
-        if (current.playwright()) {
-            stderr.println("error: bidi intercept is a Selenium response-body replacement");
-            stderr.println("fix: use a Selenium session; Playwright sessions do not use bidi intercept");
-            return 2;
-        }
-        current.script(flag(tokens, "--body"));
+        Network network = new Network(driver);
+        network.addIntercept(new AddInterceptParameters(InterceptPhase.RESPONSE_STARTED));
+        network.onResponseStarted(details -> network.provideResponse(
+                new ProvideResponseParameters(details.getRequest().getRequestId())
+                        .statusCode(200)
+                        .body(new BytesValue(BytesValue.Type.STRING, body))));
         return 0;
+    }
+
+    /** The registered Selenium driver when it supports BiDi. The test-hook session is not consulted. */
+    private static WebDriver liveSelenium() {
+        WebDriver driver = AgentControl.scenarioDriver();
+        return driver instanceof HasBiDi ? driver : null;
+    }
+
+    /** A registered driver that is not a Selenium BiDi session while the protocol is Playwright. */
+    private static boolean playwrightSession(WebDriver driver) {
+        if (driver == null || driver instanceof HasBiDi) return false;
+        String protocol = BrowserProtocols.setting("pkb_protocol");
+        if (protocol != null && "playwright".equalsIgnoreCase(protocol.trim())) return true;
+        return driver.getClass().getName().toLowerCase(Locale.ROOT).contains("playwright");
+    }
+
+    private static int playwrightRefusal(PrintStream stderr) {
+        stderr.println("error: bidi intercept is a Selenium response-body replacement");
+        stderr.println("fix: use a Selenium session; Playwright sessions do not use bidi intercept");
+        return 2;
     }
 
     private static int gridAttach(List<String> tokens, PrintStream stdout, PrintStream stderr) throws RuntimeException {
