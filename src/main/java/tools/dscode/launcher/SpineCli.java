@@ -23,7 +23,14 @@ import java.util.concurrent.TimeUnit;
  * This class does not own a session verb.
  */
 public final class SpineCli {
+    /** Tests run the hold body in this JVM and do not spawn {@code java}. */
+    static volatile boolean inlineHoldForTests;
+
     private SpineCli() {
+    }
+
+    static void resetForTests() {
+        inlineHoldForTests = false;
     }
 
     public static boolean handles(String[] args) {
@@ -32,6 +39,7 @@ public final class SpineCli {
 
     public static void main(String[] args) throws Exception {
         if (args != null && args.length > 0 && "hold".equals(args[0])) {
+            WarmCdp.open(Path.of("").toAbsolutePath().normalize());
             Thread.sleep(Long.MAX_VALUE);
             return;
         }
@@ -47,6 +55,8 @@ public final class SpineCli {
                        spine sample [--json] [--project=<dir>]
                 spine start is opt-in. It writes .pickleball/spine/warm.json with pid and started-at.
                 pkb_warm defaults to off. CI and mvn test stay cold. Do not run spine start in CI.
+                When pkb_warm=on and the heap gate returns allow, the hold JVM keeps one CDP connection.
+                spine stop closes that connection. refuse does not open it.
                 store run without a running warm JVM stays cold.
                 """;
     }
@@ -126,6 +136,7 @@ public final class SpineCli {
 
     private static int stop(Path project, PrintStream stdout, PrintStream stderr) {
         WarmSpine.shared().stopChildren();
+        WarmCdp.close();
         Optional<WarmProcessFile.Record> record = WarmProcessFile.read(project);
         if (record.isEmpty()) {
             stdout.println("warm=off");
@@ -133,7 +144,14 @@ public final class SpineCli {
             return 0;
         }
         long pid = record.get().pid();
-        if (pid > 0 && pid != ProcessHandle.current().pid()) ProcessTree.kill(pid);
+        if (pid == ProcessHandle.current().pid()) {
+            WarmProcessFile.delete(project);
+            EngineLog.log(project, "host", "warm", "stop");
+            stdout.println("warm=off");
+            stdout.println("pid=");
+            return 0;
+        }
+        if (pid > 0) ProcessTree.kill(pid);
         if (WarmProcessFile.processAlive(pid)) {
             stderr.println("error: warm JVM " + pid + " did not stop");
             stderr.println("fix: spine stop");
@@ -169,6 +187,10 @@ public final class SpineCli {
         builder.directory(project.toFile());
         builder.redirectOutput(dir.resolve("warm.out.log").toFile());
         builder.redirectError(dir.resolve("warm.err.log").toFile());
+        if (inlineHoldForTests) {
+            WarmCdp.open(project);
+            return ProcessHandle.current().pid();
+        }
         Process process = builder.start();
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
         while (System.nanoTime() < deadline) {

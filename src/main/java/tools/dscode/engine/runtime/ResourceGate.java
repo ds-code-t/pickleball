@@ -22,6 +22,7 @@ public final class ResourceGate {
     public static final String REFUSED = "error: heap gate refused a new context\nfix: spine sample";
 
     private static volatile Supplier<Reading> injected;
+    private static volatile Decision injectedDecision;
 
     private ResourceGate() {
     }
@@ -47,6 +48,36 @@ public final class ResourceGate {
 
     public static void clearInjected() {
         injected = null;
+        injectedDecision = null;
+    }
+
+    /** Tests force the next warm-CDP decision. Production leaves this unset. */
+    public static void injectDecision(Decision decision) {
+        injectedDecision = decision;
+    }
+
+    /**
+     * Decision for the warm CDP hold. An injected decision wins. Otherwise this is
+     * {@link #report(Path, String)} for snapshot {@code warm-cdp}.
+     */
+    public static Decision decisionNow(Path project) {
+        Decision forced = injectedDecision;
+        if (forced != null) return forced;
+        return report(project, "warm-cdp").decision();
+    }
+
+    /**
+     * True when storing {@code additionalBytes} stays under {@code pkb_heap_refuse_percent}.
+     * A tree at or over that line is not cached.
+     */
+    public static boolean allowCache(long additionalBytes) {
+        Reading reading = sample();
+        long extra = additionalBytes < 0 ? 0 : additionalBytes;
+        if (reading.heapMax() <= 0) return true;
+        if (reading.heapUsed() > Long.MAX_VALUE - extra) return false;
+        int refuse = integer("pkb_heap_refuse_percent", "PKB_HEAP_REFUSE_PERCENT", 85);
+        long percent = ((reading.heapUsed() + extra) * 100L) / reading.heapMax();
+        return percent < refuse;
     }
 
     public static Reading sample() {

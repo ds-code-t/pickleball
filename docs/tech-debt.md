@@ -49,7 +49,7 @@ The 3.0.0 retest-fix rounds (R, S) ran only targeted tests on the Linux box and 
 - **Spine R3, Windows only:** `JavaStepHostTest`, `GlueStaticScanTest`, `NodeStepHostTest`, `NodeStepHostTsTest`, `EngineDoesNotSpawnNodeTest`, `JsStepCatalogTest`, `JsStepRunTest`, `PlaywrightTestIngestTest`, `PlaywrightSpecHostTest`, and `PlaywrightSpecIngestLiveTest`.
 - **Spine R4, Windows only:** `VerbDispatchTest`, `McpDirectHotPathTest`, `VerbCatalogTest`, `ElementRecordTest`, `ArgsFileTest`, `AgentEnvelopeStoreTest`, `RouteModifyBodyTest`, `ExecuteStepsPwTest`, `DesktopLaunchTest`, `DesktopScreenshotVerbTest`, and `DesktopLaunch`.
 - **Spine R7, Windows only:** `RunSnapshotTest`, `ReportScriptTest`, `VisualTargetTest`, `PickleballExceptionTest`, `SnapFindIndexTest` (`tools.dscode.common.composite`), `SnapshotRetainTest`, and `CrossStoreTest`.
-- **Spine R8, Windows only:** `WarmClassLoaderTest`, `WarmColdParityTest`, `IncrementalGlueCompileTest`, `ResourceGateTest`, `BrowserVersionResolverTest`, `SeleniumBidiCommandTest`, and `DebugPortOwnerTest`.
+- **Spine R8, Windows only:** `WarmClassLoaderTest`, `WarmColdParityTest`, `IncrementalGlueCompileTest`, `ResourceGateTest`, `BrowserVersionResolverTest`, `SeleniumBidiCommandTest`, `DebugPortOwnerTest`, `WarmCdpTest`, and `DesktopTreeCacheTest`.
 - **macOS, Safari:** channel `safari` selects Selenium `safaridriver` and the Windows test does not start a process. A live Safari run on macOS has not been executed.
 
 ## Deferred from the 3.0.0 consumer-fixes branch (per Dan, 2026-11-25)
@@ -58,7 +58,6 @@ These items stay out of `3.0.0-consumer-fixes`. The roadmap lists them under "No
 
 | Item | Why it is deferred |
 |---|---|
-| 6.3.6 | Warm PW/CDP at start. |
 | 6.5.1 | Structured chat refs/actions. |
 | 6.5.2 | "Point" button. |
 | 6.5.3 | Typed card answers. |
@@ -66,4 +65,3 @@ These items stay out of `3.0.0-consumer-fixes`. The roadmap lists them under "No
 | 6.5.6 | Progress card. |
 | 6.5.7 | Overlay read receipts. |
 | 6.6.4 | Runtime injection on attached windows. Only the "fail clearly" part is in P3. |
-| 6.7.3 | UIA tree cache. |

@@ -685,6 +685,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/launcher/UrlKeys.java`
 - `src/main/java/tools/dscode/launcher/VerbCatalog.java`
 - `src/main/java/tools/dscode/launcher/VerbDispatch.java`
+- `src/main/java/tools/dscode/launcher/WarmCdp.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchAgentCommands.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchCliErrors.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchCliFlags.java`
@@ -1184,6 +1185,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/VirtualizedScrollTest.java`
 - `src/test/java/tools/dscode/launcher/VisibleFlagTest.java`
 - `src/test/java/tools/dscode/launcher/WaitLaneLiveTest.java`
+- `src/test/java/tools/dscode/launcher/WarmCdpTest.java`
 - `src/test/java/tools/dscode/launcher/WarmJvmGlueTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchAgentCommandsTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchAgentUsabilityTest.java`
@@ -1853,6 +1855,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/desktop/DesktopScreenshotTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/DesktopScreenshotVerbTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/DesktopSnapshotTest.java`
+- `dom-engine/src/test/java/dev/domengine/desktop/DesktopTreeCacheTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/DesktopXPathAccelTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/GridDriversTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/LiveDesktopSnapshotTest.java`

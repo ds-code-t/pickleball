@@ -25,6 +25,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Supplier;
 
 /**
  * Desktop accessibility tree. {@code --fixture} replays a recorded tree on every OS.
@@ -36,6 +38,11 @@ public final class DesktopTree {
     private static final ConcurrentHashMap<String, Session> SESSIONS = new ConcurrentHashMap<>();
     /** Fixture path and which file a directory sequence has already loaded. */
     private static final ConcurrentHashMap<String, FixtureCursor> FIXTURES = new ConcurrentHashMap<>();
+    /** One tree per attached window id while {@code pkb_warm=on}. */
+    private static final ConcurrentHashMap<String, DomNode> WINDOW_CACHE = new ConcurrentHashMap<>();
+    private static final List<String> CACHE_NOTES = new CopyOnWriteArrayList<>();
+    private static volatile long heapUsedForTests = -1;
+    private static volatile long heapMaxForTests = -1;
 
     private record FixtureCursor(Path path, int step) {
     }
@@ -171,7 +178,131 @@ public final class DesktopTree {
     public static void resetForTests() {
         SESSIONS.clear();
         FIXTURES.clear();
+        WINDOW_CACHE.clear();
+        CACHE_NOTES.clear();
+        heapUsedForTests = -1;
+        heapMaxForTests = -1;
         AtSpi.useSessionBusForTests(null);
+    }
+
+    /** Tests supply the heap reading the local refuse line uses when ResourceGate is absent. */
+    public static void useHeapForTests(long used, long max) {
+        heapUsedForTests = used;
+        heapMaxForTests = max;
+    }
+
+    /** Lines recorded when {@code pkb_engine_log} names {@code gate}. */
+    public static List<String> cacheNotesForTests() {
+        return List.copyOf(CACHE_NOTES);
+    }
+
+    /** Drops the cached tree for one window. A structure-changed event calls this. */
+    public static void structureChanged(String windowId) {
+        if (windowId == null || windowId.isBlank()) return;
+        WINDOW_CACHE.remove(windowId);
+    }
+
+    /**
+     * Returns the cached tree for {@code windowId} when warm is on and the gate allows the store.
+     * {@code pkb_warm=off} reads through. A tree that would cross the refuse line is not stored.
+     * {@code declaredBytes} below zero means the loaded tree's own size.
+     */
+    public static DomNode cachedTree(String windowId, long declaredBytes, Supplier<DomNode> load) {
+        String key = windowId == null ? "" : windowId;
+        if (!warmOn()) {
+            note("cache miss");
+            return load.get();
+        }
+        DomNode cached = WINDOW_CACHE.get(key);
+        if (cached != null) {
+            note("cache hit");
+            return cached;
+        }
+        DomNode fresh = load.get();
+        long bytes = declaredBytes >= 0 ? declaredBytes : byteSize(fresh);
+        if (!admit(bytes)) {
+            note("cache refuse");
+            return fresh;
+        }
+        if (fresh != null && !key.isBlank()) WINDOW_CACHE.put(key, fresh);
+        note("cache miss");
+        return fresh;
+    }
+
+    private static DomNode captureLive(String window) {
+        DomNode fresh = NativeDesktop.capture(window);
+        fresh.linkParents();
+        DomNode.renumber(fresh);
+        return fresh;
+    }
+
+    private static boolean warmOn() {
+        String raw = System.getProperty("pkb_warm");
+        if (raw == null || raw.isBlank()) raw = System.getenv("PKB_WARM");
+        if (raw == null || raw.isBlank()) return false;
+        return switch (raw.trim().toLowerCase(Locale.ROOT)) {
+            case "on", "true", "yes", "1" -> true;
+            default -> false;
+        };
+    }
+
+    private static void note(String message) {
+        String raw = System.getProperty("pkb_engine_log");
+        if (raw == null || raw.isBlank()) raw = System.getenv("PKB_ENGINE_LOG");
+        if (raw != null && !raw.isBlank()) {
+            String value = raw.trim().toLowerCase(Locale.ROOT);
+            if ("all".equals(value) || "on".equals(value) || "true".equals(value) || value.contains("gate")) {
+                CACHE_NOTES.add(message);
+            }
+        }
+        try {
+            Class<?> log = Class.forName("tools.dscode.engine.EngineLog");
+            log.getMethod("log", java.nio.file.Path.class, String.class, String.class, String.class)
+                    .invoke(null, java.nio.file.Path.of("").toAbsolutePath(), "gate", "desktop", message);
+        } catch (ReflectiveOperationException ignored) {
+            // dom-engine tests read cacheNotesForTests. The pickleball log is optional here.
+        }
+    }
+
+    private static boolean admit(long declaredBytes) {
+        try {
+            Class<?> gate = Class.forName("tools.dscode.engine.runtime.ResourceGate");
+            Object value = gate.getMethod("allowCache", long.class).invoke(null, declaredBytes);
+            if (value instanceof Boolean allowed) return allowed;
+        } catch (ClassNotFoundException ignored) {
+            // The dom-engine test JVM does not load pickleball. The local line matches allowCache.
+        } catch (ReflectiveOperationException ignored) {
+            return false;
+        }
+        return localAdmit(declaredBytes);
+    }
+
+    private static boolean localAdmit(long declaredBytes) {
+        long max = heapMaxForTests >= 0 ? heapMaxForTests : Runtime.getRuntime().maxMemory();
+        long used = heapUsedForTests >= 0 ? heapUsedForTests : Math.max(0, Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory());
+        int refuse = 85;
+        String raw = System.getProperty("pkb_heap_refuse_percent");
+        if (raw == null || raw.isBlank()) raw = System.getenv("PKB_HEAP_REFUSE_PERCENT");
+        if (raw != null && !raw.isBlank()) {
+            try {
+                refuse = Integer.parseInt(raw.trim());
+            } catch (NumberFormatException ignored) {
+                refuse = 85;
+            }
+        }
+        if (max <= 0) return true;
+        long extra = declaredBytes < 0 ? 0 : declaredBytes;
+        if (used > Long.MAX_VALUE - extra) return false;
+        return ((used + extra) * 100L) / max < refuse;
+    }
+
+    private static long byteSize(DomNode node) {
+        if (node == null) return 0;
+        long bytes = 128;
+        if (node.children != null) {
+            for (DomNode child : node.children) bytes += byteSize(child);
+        }
+        return bytes;
     }
 
     public static DomNode project(JsonNode json) {
@@ -273,9 +404,11 @@ public final class DesktopTree {
     public static ObjectNode walk(String id) {
         Session session = require(id);
         if (session.live) {
-            DomNode fresh = NativeDesktop.capture(session.window);
-            fresh.linkParents();
-            DomNode.renumber(fresh);
+            String window = session.window == null || session.window.isBlank() ? session.id : session.window;
+            String captureName = session.window;
+            DomNode fresh = warmOn()
+                    ? cachedTree(window, -1, () -> captureLive(captureName))
+                    : captureLive(captureName);
             session = new Session(session.id, "live", fresh, true, session.platform, session.window, session.sequence + 1);
             SESSIONS.put(id, session);
         } else {
