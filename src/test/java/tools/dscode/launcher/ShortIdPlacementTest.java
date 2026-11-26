@@ -53,7 +53,7 @@ class ShortIdPlacementTest {
         assertEquals(0, found.exit(), found.body().toString());
         @SuppressWarnings("unchecked")
         Map<String, Object> row = ((java.util.List<Map<String, Object>>) found.body().get("hits")).get(0);
-        String id = String.valueOf(row.get("id"));
+        String id = String.valueOf(row.get("handle"));
         assertTrue(id.matches("s\\d+\\.h\\d+"), id);
         assertEquals("Save", String.valueOf(row.get("name")));
         String placed = TargetVerb.placementHandle(id);
@@ -87,7 +87,7 @@ class ShortIdPlacementTest {
         Capture found = run("find", "--target=browser:auto", "--query=Save", "--run-id=short-live");
         assertEquals(0, found.code, found.err + found.out);
         JsonNode save = JSON.readTree(found.out).path("items").get(0);
-        String id = save.path("id").asText();
+        String id = save.path("handle").asText();
         assertTrue(id.matches("s\\d+\\.h\\d+"), found.out);
         assertEquals("Save", save.path("name").asText(), found.out);
         for (String[] verb : new String[][]{
@@ -112,7 +112,7 @@ class ShortIdPlacementTest {
 
         Capture keep = run("find", "--target=browser:auto", "--query=Keep", "--run-id=short-live");
         assertEquals(0, keep.code, keep.err + keep.out);
-        String keepId = JSON.readTree(keep.out).path("items").get(0).path("id").asText();
+        String keepId = JSON.readTree(keep.out).path("items").get(0).path("handle").asText();
         Capture labeled = run("label", "--text=Kept", "--handle=" + keepId, "--run-id=short-live");
         assertEquals(0, labeled.code, labeled.err + labeled.out);
         assertFalse((labeled.out + labeled.err).contains("unknown handle"), labeled.out);

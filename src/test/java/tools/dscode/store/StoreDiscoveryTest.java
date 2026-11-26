@@ -67,7 +67,7 @@ class StoreDiscoveryTest {
         assertTrue(status.out.contains("skipped 0"), status.out);
         assertFalse(status.out.contains("sample features/shot.png"), status.out);
         Capture json = run("store", "status", "--json", "--project=" + project);
-        JsonNode node = JSON.readTree(json.out);
+        JsonNode node = StoreJson.read(json.out);
         assertEquals(0, node.get("skipped").asInt());
         assertEquals(0, node.get("skipSamples").size());
     }
@@ -114,7 +114,7 @@ class StoreDiscoveryTest {
         assertTrue(status.out.contains("sample features/shot.png exclude **/*.png"), status.out);
         assertTrue(status.out.contains("sample features/noise.dat binary null byte"), status.out);
         Capture json = run("store", "status", "--json", "--project=" + project);
-        JsonNode node = JSON.readTree(json.out);
+        JsonNode node = StoreJson.read(json.out);
         assertEquals(3, node.get("skipped").asInt());
         assertEquals("features/controls.dat", node.get("skipSamples").get(0).get("path").asText());
         assertEquals("binary content", node.get("skipSamples").get(0).get("reason").asText());
@@ -128,7 +128,7 @@ class StoreDiscoveryTest {
         Capture status = run("store", "status", "--json", "--project=" + project);
         assertEquals(0, status.code, status.err);
         assertTrue(status.out.contains("\"database\":\"missing\""), status.out);
-        JsonNode node = JSON.readTree(status.out);
+        JsonNode node = StoreJson.read(status.out);
         assertEquals(0, node.get("skipped").asInt());
         assertEquals(0, node.get("skipSamples").size());
         assertFalse(Files.exists(StorePaths.database(project)));
@@ -144,7 +144,7 @@ class StoreDiscoveryTest {
         Capture status = run("store", "status", "--json", "--project=" + project);
         assertEquals(0, status.code, status.err);
         assertTrue(status.out.contains("\"database\":\"missing\""), status.out);
-        JsonNode node = JSON.readTree(status.out);
+        JsonNode node = StoreJson.read(status.out);
         assertEquals(1, node.get("skipped").asInt());
         assertEquals("features/shot.png", node.get("skipSamples").get(0).get("path").asText());
         assertTrue(node.get("skipSamples").get(0).get("reason").asText().contains("png"), node.toString());

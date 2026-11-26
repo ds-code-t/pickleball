@@ -150,7 +150,7 @@ public final class StoreBrowser {
         String trimmed = body == null ? "" : body.trim();
         if (!trimmed.startsWith("{")) return List.copyOf(names);
         try {
-            JsonNode root = JSON.readTree(trimmed);
+            JsonNode root = document(JSON.readTree(trimmed));
             JsonNode array = root.get("sandboxes");
             if (array != null && array.isArray()) {
                 for (JsonNode node : array) {
@@ -273,13 +273,30 @@ public final class StoreBrowser {
                 "--step=" + step.trim(), "--confirm", "--json");
     }
 
+    /**
+     * Store and domengine JSON is an agent envelope. The previous object is the one {@code items} entry.
+     * A body that is not that envelope is unchanged.
+     */
+    public static JsonNode document(JsonNode root) {
+        if (root != null && root.isObject()
+                && root.path("v").asInt(-1) == 1
+                && root.has("op")
+                && root.has("items")
+                && root.get("items").isArray()
+                && root.get("items").size() == 1
+                && root.get("items").get(0).isObject()) {
+            return root.get("items").get(0);
+        }
+        return root;
+    }
+
     /** Human lines for a CLI body. JSON becomes labels. Other text is kept. */
     public static List<String> labels(String body) {
         String trimmed = body == null ? "" : body.trim();
         if (trimmed.isEmpty()) return List.of("none");
         if (!trimmed.startsWith("{")) return textLabels(trimmed);
         try {
-            JsonNode root = JSON.readTree(trimmed);
+            JsonNode root = document(JSON.readTree(trimmed));
             if (root.has("files") && root.get("files").isArray()) return arrayLabels(root.get("files"), StoreBrowser::fileLabel, "Files");
             if (root.has("features") && root.get("features").isArray()) return arrayLabels(root.get("features"), StoreBrowser::featureLabel, "Features");
             if (root.has("steps") && root.get("steps").isArray()) return arrayLabels(root.get("steps"), StoreBrowser::stepLabel, "Steps");
@@ -302,7 +319,7 @@ public final class StoreBrowser {
         String trimmed = body == null ? "" : body.trim();
         if (!trimmed.startsWith("{")) return body == null ? "" : body;
         try {
-            JsonNode root = JSON.readTree(trimmed);
+            JsonNode root = document(JSON.readTree(trimmed));
             if (root.has("text")) {
                 return root.get("text").isNull() ? "" : root.get("text").asText();
             }
@@ -316,7 +333,7 @@ public final class StoreBrowser {
         String trimmed = body == null ? "" : body.trim();
         if (!trimmed.startsWith("{")) return false;
         try {
-            JsonNode root = JSON.readTree(trimmed);
+            JsonNode root = document(JSON.readTree(trimmed));
             return root.has("text") && root.get("text").isNull();
         } catch (Exception failure) {
             return false;

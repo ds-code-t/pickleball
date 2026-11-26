@@ -212,6 +212,7 @@ public final class AgentEnvelope {
             line.append(" [ref=").append(ref).append("]");
         }
         appendField(line, item, "id");
+        if (item.path("id").asText("").isBlank()) appendField(line, item, "handle");
         appendField(line, item, "visible");
         appendField(line, item, "enabled");
         appendField(line, item, "interactive");

@@ -50,7 +50,7 @@ class SandboxMergeConflictTest {
 
         Capture failed = cli("store", "sandbox", "merge", "left", "--json", "--project=" + project);
         assertEquals(1, failed.code, failed.out + failed.err);
-        JsonNode node = JSON.readTree(failed.out);
+        JsonNode node = StoreJson.read(failed.out);
         assertFalse(node.get("ok").asBoolean());
         assertEquals("sandbox merge", node.get("command").asText());
         assertEquals("left", node.get("sandbox").asText());
@@ -104,7 +104,7 @@ class SandboxMergeConflictTest {
         Capture branch = cli("store", "sandbox", "merge", "left", "--policy=branch-wins", "--json",
                 "--project=" + project);
         assertEquals(0, branch.code, branch.err + branch.out);
-        JsonNode node = JSON.readTree(branch.out);
+        JsonNode node = StoreJson.read(branch.out);
         assertTrue(node.get("ok").asBoolean());
         assertEquals("branch", node.get("conflicts").get(0).get("resolution").asText());
         assertEquals("branch-body\n", text("features/a.txt"));
@@ -112,7 +112,7 @@ class SandboxMergeConflictTest {
         Capture idle = cli("store", "sandbox", "merge", "left", "--policy=branch-wins", "--json",
                 "--project=" + project);
         assertEquals(0, idle.code, idle.err + idle.out);
-        assertEquals(0, JSON.readTree(idle.out).get("wouldApply").asInt());
+        assertEquals(0, StoreJson.read(idle.out).get("wouldApply").asInt());
 
         assertEquals(0, cli("store", "sandbox", "create", "right", "--mode=copy", "--project=" + project).code);
         assertEquals(0, cli("store", "file", "put", "--path=features/a.txt", "--text=other-body\n",
@@ -125,14 +125,14 @@ class SandboxMergeConflictTest {
         Capture main = cli("store", "sandbox", "merge", "right", "--policy=main-wins", "--json",
                 "--project=" + project);
         assertEquals(0, main.code, main.err + main.out);
-        assertEquals("main", JSON.readTree(main.out).get("conflicts").get(0).get("resolution").asText());
+        assertEquals("main", StoreJson.read(main.out).get("conflicts").get(0).get("resolution").asText());
         assertEquals(new String(kept, StandardCharsets.UTF_8), text("features/a.txt"));
         assertEquals("side\n", text("features/side.txt"));
         Capture again = cli("store", "sandbox", "merge", "right", "--policy=main-wins", "--json",
                 "--project=" + project);
         assertEquals(0, again.code, again.err + again.out);
-        assertEquals(0, JSON.readTree(again.out).get("wouldApply").asInt());
-        assertEquals(0, JSON.readTree(again.out).get("applied").asInt());
+        assertEquals(0, StoreJson.read(again.out).get("wouldApply").asInt());
+        assertEquals(0, StoreJson.read(again.out).get("applied").asInt());
         assertEquals("kept-main\n", text("features/a.txt"));
 
         assertEquals(0, cli("store", "sandbox", "create", "same", "--mode=copy", "--project=" + project).code);
@@ -142,7 +142,7 @@ class SandboxMergeConflictTest {
                 "--project=" + project).code);
         Capture converged = cli("store", "sandbox", "merge", "same", "--json", "--project=" + project);
         assertEquals(0, converged.code, converged.err + converged.out);
-        JsonNode same = JSON.readTree(converged.out);
+        JsonNode same = StoreJson.read(converged.out);
         assertTrue(same.get("converged").asInt() >= 1, converged.out);
         assertEquals(0, same.get("conflicts").size());
         assertEquals("both\n", text("features/b.txt"));

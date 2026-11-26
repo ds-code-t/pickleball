@@ -64,7 +64,7 @@ class GlueEditTest {
                 "--text=" + literal, "--json", "--project=" + project);
         assertEquals(0, ok.code, ok.err);
         assertTrue(Files.exists(project.resolve("src/test/java/sample/Steps.java")));
-        assertTrue(JSON.readTree(ok.out).get("message").asText().contains("no project wrapper"), ok.out);
+        assertTrue(StoreJson.read(ok.out).get("message").asText().contains("no project wrapper"), ok.out);
     }
 
     @Test
@@ -93,7 +93,7 @@ class GlueEditTest {
         Capture failed = run("store", "glue", "put", "--path=src/test/java/sample/Steps.java",
                 "--text=" + source, "--json", "--project=" + project);
         assertEquals(0, failed.code, failed.err);
-        assertTrue(JSON.readTree(failed.out).get("message").asText().contains("prior worker kept"), failed.out);
+        assertTrue(StoreJson.read(failed.out).get("message").asText().contains("prior worker kept"), failed.out);
         assertEquals("old", Files.readString(state.resolve("glue.fingerprint")).trim());
         assertTrue(Files.exists(state.resolve("warm.txt")));
 
@@ -101,7 +101,7 @@ class GlueEditTest {
         Capture ok = run("store", "glue", "put", "--path=src/test/java/sample/Steps.java",
                 "--text=" + source.replace("ready", "set"), "--json", "--project=" + project);
         assertEquals(0, ok.code, ok.err);
-        assertTrue(JSON.readTree(ok.out).get("message").asText().contains("worker restarted"), ok.out);
+        assertTrue(StoreJson.read(ok.out).get("message").asText().contains("worker restarted"), ok.out);
         assertFalse(Files.exists(state.resolve("warm.txt")));
         String fingerprint = Files.readString(state.resolve("glue.fingerprint")).trim();
         assertFalse(fingerprint.isBlank());
@@ -113,12 +113,12 @@ class GlueEditTest {
         Capture js = run("store", "glue", "put", "--path=glue/js/steps.js",
                 "--text=export function ready() {}\n", "--json", "--project=" + project);
         assertEquals(0, js.code, js.err);
-        assertTrue(JSON.readTree(js.out).get("message").asText().contains("js/ts step definitions refreshed"), js.out);
+        assertTrue(StoreJson.read(js.out).get("message").asText().contains("js/ts step definitions refreshed"), js.out);
         Capture ts = run("store", "glue", "put", "--path=glue/js/steps.ts",
                 "--text=export function ready(): void {}\n", "--json", "--project=" + project);
         assertEquals(0, ts.code, ts.err);
         Capture listed = run("store", "glue", "list", "--json", "--project=" + project);
-        String items = JSON.readTree(listed.out).get("items").toString();
+        String items = StoreJson.read(listed.out).get("items").toString();
         assertTrue(items.contains("glue/js/steps.js"), items);
         assertTrue(items.contains("glue/js/steps.ts"), items);
         assertFalse(Files.exists(project.resolve(".pickleball/store/sandboxes/main/worker/glue.fingerprint")));
@@ -143,7 +143,7 @@ class GlueEditTest {
         Capture removed = run("store", "glue", "remove", "--path=" + path,
                 "--confirm", "--json", "--project=" + project);
         assertEquals(0, removed.code, removed.err);
-        var body = JSON.readTree(removed.out);
+        var body = StoreJson.read(removed.out);
         assertTrue(body.get("ok").asBoolean(), removed.out);
         assertEquals("glue", body.get("family").asText());
         assertEquals("remove", body.get("action").asText());
@@ -160,7 +160,7 @@ class GlueEditTest {
                 "--confirm", "--json", "--project=" + project);
         assertEquals(1, again.code, again.out + again.err);
         assertTrue(again.err.contains("not found"), again.err);
-        assertFalse(JSON.readTree(again.out).get("ok").asBoolean(), again.out);
+        assertFalse(StoreJson.read(again.out).get("ok").asBoolean(), again.out);
     }
 
     private static Capture run(String... args) {

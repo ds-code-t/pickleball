@@ -63,6 +63,12 @@ class StoreBrowserTest {
                 """;
         assertEquals("untracked DB edit on features/pay.feature", StoreBrowser.labels(conflicts).get(0));
         assertEquals(List.of("Conflicts: none"), StoreBrowser.labels("{\"conflicts\":[]}"));
+        assertEquals(List.of("Conflicts: none"), StoreBrowser.labels(
+                "{\"v\":1,\"ok\":true,\"op\":\"store conflicts\",\"items\":[{\"conflicts\":[]}]}"));
+        assertEquals("Feature: Pay\n", StoreBrowser.editableText(
+                "{\"v\":1,\"ok\":true,\"op\":\"store features show\",\"items\":[{\"text\":\"Feature: Pay\\n\"}]}"));
+        assertEquals(List.of("main", "left"), StoreBrowser.sandboxNames(
+                "{\"v\":1,\"ok\":true,\"op\":\"store sandbox\",\"items\":[{\"sandboxes\":[{\"name\":\"left\"}]}]}"));
 
         assertEquals(
                 List.of("Entity Customer 7 version 3"),

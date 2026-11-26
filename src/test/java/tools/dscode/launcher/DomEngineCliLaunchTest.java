@@ -1,5 +1,7 @@
 package tools.dscode.launcher;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
@@ -12,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DomEngineCliLaunchTest {
     @Test
-    void launcherForwardsDomengineAndLeavesOtherCommandsAlone() {
+    void launcherForwardsDomengineAndLeavesOtherCommandsAlone() throws Exception {
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
         int code = PickleballWorkbenchLauncher.dispatchDomEngineIfAny(
@@ -21,7 +23,16 @@ class DomEngineCliLaunchTest {
                 new PrintStream(stderr, true, StandardCharsets.UTF_8)
         );
         assertEquals(0, code, stderr.toString(StandardCharsets.UTF_8));
-        assertTrue(stdout.toString(StandardCharsets.UTF_8).contains("3.0.0"), stdout.toString(StandardCharsets.UTF_8));
+        String text = stdout.toString(StandardCharsets.UTF_8);
+        assertTrue(text.contains("3.0.0"), text);
+        JsonNode envelope = new ObjectMapper().readTree(text);
+        assertEquals(1, envelope.path("v").asInt(), text);
+        assertEquals("domengine version", envelope.path("op").asText(), text);
+        assertFalse(envelope.has("command"), text);
+        assertFalse(envelope.has("count"), text);
+        assertFalse(envelope.has("total"), text);
+        assertFalse(envelope.has("rows"), text);
+        assertEquals("3.0.0", envelope.path("items").path(0).path("version").asText(), text);
         assertEquals(-1, PickleballWorkbenchLauncher.dispatchDomEngineIfAny(
                 new String[]{"engine", "help"},
                 new PrintStream(new ByteArrayOutputStream()),

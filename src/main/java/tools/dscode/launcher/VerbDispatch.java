@@ -30,8 +30,19 @@ public final class VerbDispatch {
         String name = verb == null ? "" : verb.trim();
         Map<String, String> use = flags == null ? new LinkedHashMap<>() : new LinkedHashMap<>(flags);
         String[] argv = argvFor(name, use);
+        boolean mentioned = ArgsFiles.mentions(argv);
+        try {
+            ArgsFiles.Expansion expansion = ArgsFiles.expand(argv);
+            argv = expansion.argv();
+            if (expansion.fromFile()) mentioned = true;
+        } catch (IllegalArgumentException failure) {
+            Path project = projectOf(use, argv);
+            EngineLog.log(project, "dispatch", name.isBlank() ? "-" : name, "file=" + (mentioned ? "yes" : "no"));
+            stderr.println(failure.getMessage());
+            return 2;
+        }
         Path project = projectOf(use, argv);
-        boolean fromFile = use.containsKey("args-file") || "yes".equalsIgnoreCase(use.get("file"));
+        boolean fromFile = mentioned || use.containsKey("args-file") || "yes".equalsIgnoreCase(use.get("file"));
         EngineLog.log(project, "dispatch", name.isBlank() ? "-" : name, "file=" + (fromFile ? "yes" : "no"));
         if (argv.length == 0 || argv[0] == null || argv[0].isBlank()) {
             stderr.println("error: missing verb");

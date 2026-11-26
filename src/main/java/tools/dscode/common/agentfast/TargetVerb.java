@@ -555,7 +555,7 @@ public final class TargetVerb {
             remember(runId, page.session);
             Map<String, Object> body = base("find", "cdp", "browser", target);
             body.put("docVersion", version);
-            body.put("hits", rows);
+            body.put("hits", ElementRecord.list(rows, args.get("fields")));
             body.put("ref", rows.get(0).get("ref"));
             if (args.get("scroll-search") != null) body.put("scrollSearch", true);
             markBudget(body, args);
@@ -576,7 +576,7 @@ public final class TargetVerb {
         List<Map<String, Object>> rows = publish(runId, "desktop", session.id(), version, hits, query);
         Map<String, Object> body = base("find", "desktop", "desktop", target);
         body.put("docVersion", version);
-        body.put("hits", rows);
+        body.put("hits", ElementRecord.list(rows, args.get("fields")));
         body.put("ref", rows.get(0).get("ref"));
         body.put("session", session.id());
         body.put("applied", session.live());
@@ -1014,7 +1014,7 @@ public final class TargetVerb {
                 putEntered(body, runId, page.session.connection());
                 putShadow(body, node);
                 putMask(body, mask);
-                putReadBack(body, node, true);
+                putReadBack(body, node, true, args);
                 return ok(body);
             }
             if (effect.quiet()) {
@@ -1035,7 +1035,7 @@ public final class TargetVerb {
                     putEntered(failed.body(), runId, page.session.connection());
                     putShadow(failed.body(), node);
                     putMask(failed.body(), mask);
-                    putReadBack(failed.body(), node, true);
+                    putReadBack(failed.body(), node, true, args);
                     return failed;
                 }
                 Map<String, Object> body = base("act", effect.used(), "browser", target);
@@ -1051,7 +1051,7 @@ public final class TargetVerb {
                 putEntered(body, runId, page.session.connection());
                 putShadow(body, node);
                 putMask(body, mask);
-                putReadBack(body, node, true);
+                putReadBack(body, node, true, args);
                 return ok(body);
             }
             if (!effect.applied()) {
@@ -1087,7 +1087,7 @@ public final class TargetVerb {
             putEntered(body, runId, page.session.connection());
             putShadow(body, node);
             putMask(body, mask);
-            putReadBack(body, node, true);
+            putReadBack(body, node, true, args);
             return ok(body);
         } finally {
             page.release();
@@ -1427,7 +1427,7 @@ public final class TargetVerb {
         DesktopTree.Session snapped = after;
         putAutoSnap(body, args, project, runId, autoBefore, () -> compactDesktop(snapped, runId));
         stampDesktop(body, after);
-        putReadBack(body, node, true);
+        putReadBack(body, node, true, args);
         return ok(body);
     }
 
@@ -1471,7 +1471,7 @@ public final class TargetVerb {
         DesktopTree.Session snapped = after;
         putAutoSnap(body, args, project, runId, autoBefore, () -> compactDesktop(snapped, runId));
         stampDesktop(body, after);
-        putReadBack(body, node, true);
+        putReadBack(body, node, true, args);
         return ok(body);
     }
 
@@ -2082,7 +2082,29 @@ public final class TargetVerb {
         if (box != null) BOXES.put(key, box);
     }
 
-    private static void putReadBack(Map<String, Object> body, DomNode node, boolean settled) {
+    private static Map<String, Object> elementSource(DomNode node) {
+        Map<String, Object> raw = new LinkedHashMap<>();
+        if (node == null) return raw;
+        raw.put("role", role(node));
+        raw.put("name", name(node));
+        raw.put("tag", node.tag());
+        raw.put("backendNodeId", node.backendNodeId);
+        raw.put("handle", node.backendNodeId);
+        String frame = node.frameId == null || node.frameId.isBlank() ? node.framePath : node.frameId;
+        raw.put("frame", frame);
+        if (node.hasBox) {
+            raw.put("x", node.x);
+            raw.put("y", node.y);
+            raw.put("width", node.width);
+            raw.put("height", node.height);
+        }
+        return raw;
+    }
+
+    private static void putReadBack(Map<String, Object> body, DomNode node, boolean settled, Map<String, String> args) {
+        if ("act".equals(String.valueOf(body.get("op"))) && node != null) {
+            body.put("element", ElementRecord.from(elementSource(node), args == null ? null : args.get("fields")));
+        }
         boolean visible = node != null && node.displayed && !node.states.contains("hidden");
         boolean enabled = node != null && !node.states.contains("disabled") && !node.attributes.containsKey("disabled");
         Object reason = body.get("reason");
@@ -4405,20 +4427,21 @@ public final class TargetVerb {
             boolean alwaysFull,
             Map<String, String> args
     ) {
-        List<Map<String, Object>> objects = new ArrayList<>(SnapView.filter(rows, args));
+        List<Map<String, Object>> filtered = new ArrayList<>(SnapView.filter(rows, args));
         int lineBudget = SnapView.lineBudget(args);
         boolean truncated = false;
-        if (objects.size() > lineBudget) {
-            objects = new ArrayList<>(objects.subList(0, lineBudget));
+        if (filtered.size() > lineBudget) {
+            filtered = new ArrayList<>(filtered.subList(0, lineBudget));
             truncated = true;
         }
+        List<Map<String, Object>> objects = ElementRecord.list(filtered, args == null ? null : args.get("fields"));
         body.put("lines", objects);
         int byteBudget = SnapView.byteBudget(args);
         body.put("replyBudget", byteBudget);
         body.put("format", "json");
-        if (!objects.isEmpty()) {
-            body.put("ref", objects.get(0).get("ref"));
-            body.put("id", objects.get(0).get("id"));
+        if (!filtered.isEmpty()) {
+            body.put("ref", filtered.get(0).get("ref"));
+            body.put("id", filtered.get(0).get("id"));
         }
         List<String> all = sectioned(SnapView.matching(rows, args), args);
         if (truncated) body.put("truncated", true);

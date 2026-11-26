@@ -66,8 +66,8 @@ class FileEditTest {
         Files.writeString(project.resolve("configs/browser.yaml"), "browser: chrome\npassword: hunter2\n");
         Capture shown = run("store", "file", "show", "--path=configs/browser.yaml", "--json", "--project=" + project);
         assertEquals(0, shown.code, shown.err);
-        assertTrue(JSON.readTree(shown.out).get("text").asText().contains("~MASK"), shown.out);
-        assertFalse(JSON.readTree(shown.out).get("text").asText().contains("hunter2"), shown.out);
+        assertTrue(StoreJson.read(shown.out).get("text").asText().contains("~MASK"), shown.out);
+        assertFalse(StoreJson.read(shown.out).get("text").asText().contains("hunter2"), shown.out);
     }
 
     @Test
@@ -80,7 +80,7 @@ class FileEditTest {
         Capture put = run("store", "file", "put", "--path=configs/app.yaml",
                 "--text=browser: edge\n", "--json", "--project=" + project);
         assertEquals(0, put.code, put.err);
-        assertTrue(JSON.readTree(put.out).get("dbEdited").asBoolean());
+        assertTrue(StoreJson.read(put.out).get("dbEdited").asBoolean());
         assertEquals("browser: chrome\n", Files.readString(project.resolve("configs/app.yaml")));
         Files.writeString(project.resolve("configs/app.yaml"), "browser: disk\n");
         Capture conflict = run("store", "file", "delete", "--path=configs/app.yaml", "--confirm", "--json", "--project=" + project);

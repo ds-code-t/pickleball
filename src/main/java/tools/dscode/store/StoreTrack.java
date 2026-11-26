@@ -227,12 +227,18 @@ public final class StoreTrack {
             values.add(pattern);
             sql.append(" OR EXISTS (SELECT 1 FROM scenario_tags st JOIN scenarios sc ON sc.file_path = st.file_path AND sc.ord = st.scenario_ord WHERE ");
             sql.append(taggedScenario("scenario_key"));
+            sql.append(examplesTagStaysOnItsBlock());
             sql.append(" AND st.tag = ?)");
+            values.add(pattern);
+            values.add(pattern);
             values.add(token);
             sql.append(" OR (kind = 'run' AND run_id IN (SELECT e.run_id FROM scenario_executions e JOIN scenario_tags st ON 1 = 1");
             sql.append(" JOIN scenarios sc ON sc.file_path = st.file_path AND sc.ord = st.scenario_ord WHERE ");
             sql.append(taggedScenario("e.scenario_key"));
+            sql.append(examplesTagStaysOnItsBlock());
             sql.append(" AND st.tag = ?))");
+            values.add(pattern);
+            values.add(pattern);
             values.add(token);
             sql.append(")");
         }
@@ -281,6 +287,19 @@ public final class StoreTrack {
                 + " AND CAST(substr(" + key + ", length(sc.file_path) + 2) AS INTEGER) >= sc.line"
                 + " AND CAST(substr(" + key + ", length(sc.file_path) + 2) AS INTEGER) < COALESCE("
                 + "(SELECT MIN(nx.line) FROM scenarios nx WHERE nx.file_path = sc.file_path AND nx.line > sc.line), 2147483647)";
+    }
+
+    /**
+     * {@code scenario_tags} also stores an Examples tag. That tag matches its block,
+     * which {@link #taggedExamples} already covers. It does not match the rest of the outline
+     * unless the scenario itself carries the tag.
+     */
+    private static String examplesTagStaysOnItsBlock() {
+        return " AND NOT EXISTS (SELECT 1 FROM example_blocks eb_only WHERE eb_only.file_path = st.file_path"
+                + " AND eb_only.scenario_ord = st.scenario_ord"
+                + " AND (' ' || eb_only.tags || ' ') LIKE ? ESCAPE '\\'"
+                + " AND NOT EXISTS (SELECT 1 FROM scenarios sc_own WHERE sc_own.file_path = st.file_path"
+                + " AND sc_own.ord = st.scenario_ord AND (' ' || sc_own.tags || ' ') LIKE ? ESCAPE '\\'))";
     }
 
     private static String taggedExamples(String key) {

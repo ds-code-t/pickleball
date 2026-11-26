@@ -49,7 +49,7 @@ class ChangesCliTest {
     void filtersPagesAndOmitsRawContent() throws Exception {
         Capture missing = cli("store", "changes", "--json", "--project=" + project);
         assertEquals(0, missing.code, missing.err);
-        assertEquals(0, JSON.readTree(missing.out).get("count").asInt());
+        assertEquals(0, StoreJson.read(missing.out).get("count").asInt());
 
         Files.createDirectories(project.resolve("notes"));
         Files.writeString(project.resolve("notes/a.txt"), "one\n");
@@ -64,30 +64,30 @@ class ChangesCliTest {
 
         Capture all = cli("store", "changes", "--json", "--project=" + project);
         assertEquals(0, all.code, all.err);
-        JsonNode rows = JSON.readTree(all.out).get("rows");
+        JsonNode rows = StoreJson.read(all.out).get("rows");
         assertTrue(rows.size() >= 2, all.out);
         assertFalse(all.out.contains(SECRET), all.out);
         assertFalse(all.out.contains("\"old\""), all.out);
         assertFalse(all.out.contains("\"new\""), all.out);
         long first = rows.get(0).get("seq").asLong();
-        assertEquals("main", JSON.readTree(all.out).get("sandbox").asText());
+        assertEquals("main", StoreJson.read(all.out).get("sandbox").asText());
 
         Capture page = cli("store", "changes", "--limit=1", "--json", "--project=" + project);
-        assertEquals(1, JSON.readTree(page.out).get("count").asInt());
-        assertEquals(first, JSON.readTree(page.out).get("rows").get(0).get("seq").asLong());
+        assertEquals(1, StoreJson.read(page.out).get("count").asInt());
+        assertEquals(first, StoreJson.read(page.out).get("rows").get(0).get("seq").asLong());
         Capture rest = cli("store", "changes", "--since=" + first, "--json", "--project=" + project);
-        for (JsonNode row : JSON.readTree(rest.out).get("rows")) {
+        for (JsonNode row : StoreJson.read(rest.out).get("rows")) {
             assertTrue(row.get("seq").asLong() > first, rest.out);
         }
         Capture files = cli("store", "changes", "--table=files", "--json", "--project=" + project);
-        for (JsonNode row : JSON.readTree(files.out).get("rows")) {
+        for (JsonNode row : StoreJson.read(files.out).get("rows")) {
             assertEquals("files", row.get("table").asText());
         }
         assertTrue(files.out.contains("notes/b.txt"), files.out);
 
         Capture sandbox = cli("store", "changes", "--sandbox=alpha", "--table=files", "--json", "--project=" + project);
         assertEquals(0, sandbox.code, sandbox.err);
-        assertEquals("alpha", JSON.readTree(sandbox.out).get("sandbox").asText());
+        assertEquals("alpha", StoreJson.read(sandbox.out).get("sandbox").asText());
         assertTrue(sandbox.out.contains("notes/c.txt"), sandbox.out);
         assertFalse(sandbox.out.contains("notes/b.txt"), sandbox.out);
 

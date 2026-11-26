@@ -150,9 +150,50 @@ public final class PickleballWorkbenchLauncher {
             stderr.print(missingDomEngine(missing));
             return 1;
         }
-        if (result.stdout() != null && !result.stdout().isEmpty()) stdout.print(result.stdout());
+        if (result.stdout() != null && !result.stdout().isEmpty()) {
+            String text = result.stdout();
+            if (desktopQuery(rest)) text = tools.dscode.common.agentfast.ElementRecord.rewriteDesktopQuery(text, fieldsOf(rest));
+            text = tools.dscode.common.agentfast.JsonReply.envelope(text, domEngineOp(rest), projectOf(rest));
+            stdout.print(text);
+        }
         if (result.stderr() != null && !result.stderr().isEmpty()) stderr.print(result.stderr());
         return result.exit();
+    }
+
+    private static boolean desktopQuery(java.util.List<String> rest) {
+        return rest.size() >= 2 && "desktop".equals(rest.get(0)) && "query".equals(rest.get(1));
+    }
+
+    private static String domEngineOp(java.util.List<String> rest) {
+        java.util.List<String> words = new java.util.ArrayList<>();
+        for (String token : rest) {
+            if (token == null || token.startsWith("--")) continue;
+            words.add(token);
+            if (words.size() == 3) break;
+        }
+        return words.isEmpty() ? "domengine" : "domengine " + String.join(" ", words);
+    }
+
+    private static String fieldsOf(java.util.List<String> rest) {
+        for (int index = 0; index < rest.size(); index++) {
+            String token = rest.get(index);
+            if (token == null) continue;
+            if (token.startsWith("--fields=")) return token.substring("--fields=".length());
+            if ("--fields".equals(token) && index + 1 < rest.size()) return rest.get(index + 1);
+        }
+        return null;
+    }
+
+    private static java.nio.file.Path projectOf(java.util.List<String> rest) {
+        for (int index = 0; index < rest.size(); index++) {
+            String token = rest.get(index);
+            if (token == null) continue;
+            if (token.startsWith("--project=")) return java.nio.file.Path.of(token.substring("--project=".length()));
+            if ("--project".equals(token) && index + 1 < rest.size() && rest.get(index + 1) != null) {
+                return java.nio.file.Path.of(rest.get(index + 1));
+            }
+        }
+        return java.nio.file.Path.of("").toAbsolutePath().normalize();
     }
 
     /**

@@ -42,7 +42,7 @@ class StoreEditContractTest {
     void jsonEnvelopeIsStableAndValidationRunsBeforeWrite() throws Exception {
         Capture missing = run("store", "category", "put", "--id=Badge", "--text=", "--json", "--project=" + project);
         assertEquals(1, missing.code, missing.err);
-        JsonNode bad = JSON.readTree(missing.out);
+        JsonNode bad = StoreJson.read(missing.out);
         assertFalse(bad.get("ok").asBoolean());
         assertEquals("category put", bad.get("command").asText());
         assertEquals("category", bad.get("family").asText());
@@ -60,7 +60,7 @@ class StoreEditContractTest {
 
         Capture put = run("store", "category", "put", "--id=Badge", "--text=name: Badge\nbase: //article\n", "--json", "--project=" + project);
         assertEquals(0, put.code, put.err);
-        JsonNode wrote = JSON.readTree(put.out);
+        JsonNode wrote = StoreJson.read(put.out);
         assertTrue(wrote.get("ok").asBoolean());
         assertTrue(wrote.get("applied").asBoolean());
         assertFalse(wrote.get("store").asBoolean());
@@ -71,7 +71,7 @@ class StoreEditContractTest {
 
         Capture listed = run("store", "category", "list", "--json", "--project=" + project);
         assertEquals(0, listed.code, listed.err);
-        assertEquals("Badge", JSON.readTree(listed.out).get("items").get(0).get("id").asText());
+        assertEquals("Badge", StoreJson.read(listed.out).get("items").get(0).get("id").asText());
 
         Capture text = run("store", "category", "list", "--project=" + project);
         assertTrue(text.out.contains("category list 1"), text.out);
@@ -84,7 +84,7 @@ class StoreEditContractTest {
         Files.writeString(project.resolve("configs/app.yaml"), "browser: chrome\n");
         Capture refused = run("store", "file", "delete", "--path=configs/app.yaml", "--json", "--project=" + project);
         assertEquals(StoreEdit.CONFIRM_EXIT, refused.code, refused.err);
-        JsonNode json = JSON.readTree(refused.out);
+        JsonNode json = StoreJson.read(refused.out);
         assertTrue(json.get("confirmRequired").asBoolean());
         assertFalse(json.get("applied").asBoolean());
         assertEquals("confirmation required", json.get("error").asText());
@@ -92,7 +92,7 @@ class StoreEditContractTest {
 
         Capture removed = run("store", "file", "delete", "--path=configs/app.yaml", "--confirm", "--json", "--project=" + project);
         assertEquals(0, removed.code, removed.err);
-        assertTrue(JSON.readTree(removed.out).get("applied").asBoolean());
+        assertTrue(StoreJson.read(removed.out).get("applied").asBoolean());
         assertFalse(Files.exists(project.resolve("configs/app.yaml")));
         assertFalse(Files.exists(StorePaths.database(project)));
     }
@@ -107,7 +107,7 @@ class StoreEditContractTest {
 
         Capture put = run("store", "file", "put", "--path=configs/app.yaml", "--text=browser: edge\n", "--json", "--project=" + project);
         assertEquals(0, put.code, put.err);
-        JsonNode wrote = JSON.readTree(put.out);
+        JsonNode wrote = StoreJson.read(put.out);
         assertTrue(wrote.get("store").asBoolean());
         assertTrue(wrote.get("dbEdited").asBoolean());
         assertEquals("browser: chrome\n", Files.readString(project.resolve("configs/app.yaml")));
@@ -115,14 +115,14 @@ class StoreEditContractTest {
         Files.writeString(project.resolve("configs/app.yaml"), "browser: file\n");
         Capture conflict = run("store", "file", "put", "--path=configs/app.yaml", "--text=browser: both\n", "--json", "--project=" + project);
         assertEquals(1, conflict.code, conflict.err);
-        JsonNode refused = JSON.readTree(conflict.out);
+        JsonNode refused = StoreJson.read(conflict.out);
         assertTrue(refused.get("conflict").asBoolean());
         assertFalse(refused.get("applied").asBoolean());
         assertEquals("browser: file\n", Files.readString(project.resolve("configs/app.yaml")));
 
         Capture forced = run("store", "file", "put", "--path=configs/app.yaml", "--text=browser: forced\n", "--force", "--json", "--project=" + project);
         assertEquals(0, forced.code, forced.err);
-        assertTrue(JSON.readTree(forced.out).get("applied").asBoolean());
+        assertTrue(StoreJson.read(forced.out).get("applied").asBoolean());
     }
 
     @Test
@@ -133,7 +133,7 @@ class StoreEditContractTest {
         Capture add = run("store", "feature", "scenario-add", "--feature=features/pay.feature", "--name=Two",
                 "--text=Given later", "--json", "--project=" + project);
         assertEquals(0, add.code, add.err);
-        JsonNode json = JSON.readTree(add.out);
+        JsonNode json = StoreJson.read(add.out);
         assertEquals("feature scenario-add", json.get("command").asText());
         assertEquals("scenario-add", json.get("action").asText());
         assertTrue(json.get("applied").asBoolean());
@@ -162,7 +162,7 @@ class StoreEditContractTest {
             assertEquals(0, put.code, put.err);
             assertTrue(Files.exists(project.resolve("glue/js/steps.js")));
             Capture listed = run("store", "glue", "list", "--json", "--project=" + project);
-            assertEquals("glue/js/steps.js", JSON.readTree(listed.out).get("items").get(0).get("path").asText());
+            assertEquals("glue/js/steps.js", StoreJson.read(listed.out).get("items").get(0).get("path").asText());
             String log = Files.readString(StorePaths.log(project), StandardCharsets.UTF_8);
             assertTrue(log.contains(" edit glue/js/steps.js sandbox=main put "), log);
             assertTrue(log.charAt(0) == '2', log);

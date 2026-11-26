@@ -54,7 +54,7 @@ class FormatViewTest {
         String printed = AgentEnvelope.renderLines(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(wrapped));
         assertFalse(printed.contains("{\"role\""), printed);
         assertTrue(printed.contains("- button \"Save\""), printed);
-        assertTrue(printed.contains("id=s1.h1"), printed);
+        assertTrue(printed.contains("handle=s1.h1"), printed);
 
         Map<String, Object> find = new LinkedHashMap<>();
         find.put("ok", true);

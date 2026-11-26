@@ -22,10 +22,18 @@ class StoreQueryCliTest {
     Path project;
 
     @Test
-    void missingDatabaseStaysMissing() {
+    void missingDatabaseStaysMissing() throws Exception {
         Capture empty = run("store", "query", "--json", "--project=" + project);
         assertEquals(0, empty.code, empty.err);
-        assertTrue(empty.out.startsWith("{\"command\":\"query\",\"count\":0,\"total\":0,\"limit\":50,\"offset\":0,\"rows\":[]}"), empty.out);
+        JsonNode envelope = JSON.readTree(empty.out);
+        assertEquals(1, envelope.path("v").asInt(), empty.out);
+        assertFalse(envelope.has("command"), empty.out);
+        assertFalse(envelope.has("count"), empty.out);
+        assertFalse(envelope.has("total"), empty.out);
+        assertFalse(envelope.has("rows"), empty.out);
+        JsonNode payload = envelope.path("items").path(0);
+        assertTrue(JSON.writeValueAsString(payload).startsWith(
+                "{\"command\":\"query\",\"count\":0,\"total\":0,\"limit\":50,\"offset\":0,\"rows\":[]}"), empty.out);
         assertFalse(Files.exists(StorePaths.database(project)));
         Capture bad = run("store", "query", "--from=yesterday", "--project=" + project);
         assertEquals(1, bad.code, bad.out);
@@ -80,24 +88,24 @@ class StoreQueryCliTest {
         assertTrue(byEntity.out.indexOf("\"rows\"") < byEntity.out.indexOf("\"at\""), byEntity.out);
         assertTrue(byEntity.out.indexOf("\"at\"") < byEntity.out.indexOf("\"kind\""), byEntity.out);
         assertTrue(byEntity.out.indexOf("\"kind\"") < byEntity.out.indexOf("\"runId\""), byEntity.out);
-        JsonNode rows = JSON.readTree(byEntity.out).path("rows");
+        JsonNode rows = StoreJson.read(byEntity.out).path("rows");
         assertTrue(rows.size() >= 2, byEntity.out);
         assertTrue(rows.toString().contains("\"valueRef\":\"<entity:Account#ada.name>\""), rows.toString());
         assertFalse(rows.toString().contains("\"valueRef\":\"Ada\""), rows.toString());
         assertTrue(rows.toString().contains(definition), rows.toString());
 
         Capture failed = run("store", "query", "--status=FAILED", "--json", "--project=" + project);
-        JsonNode failedRows = JSON.readTree(failed.out).path("rows");
+        JsonNode failedRows = StoreJson.read(failed.out).path("rows");
         assertTrue(failedRows.size() >= 1, failed.out);
         for (JsonNode row : failedRows) assertEquals("FAILED", row.path("status").asText());
 
         Capture defined = run("store", "query", "--step-def=" + definition, "--json", "--project=" + project);
         assertTrue(defined.out.contains(definition), defined.out);
         Capture scenario = run("store", "query", "--scenario=features/pay.feature|2", "--json", "--project=" + project);
-        assertTrue(JSON.readTree(scenario.out).path("total").asInt() >= 2, scenario.out);
+        assertTrue(StoreJson.read(scenario.out).path("total").asInt() >= 2, scenario.out);
         Capture page = run("store", "query", "--scenario=features/pay.feature|2", "--limit=1", "--offset=1", "--json",
                 "--project=" + project);
-        JsonNode paged = JSON.readTree(page.out);
+        JsonNode paged = StoreJson.read(page.out);
         assertEquals(1, paged.path("count").asInt());
         assertTrue(paged.path("total").asInt() > 1, page.out);
     }
@@ -172,24 +180,24 @@ class StoreQueryCliTest {
                 "run-b", "features/other.feature|" + otherLine, "Other", null, null, 1,
                 "other two", otherLine, "PASSED", "2020-01-02T00:00:02Z", "2020-01-02T00:00:03Z"));
 
-        JsonNode feature = JSON.readTree(run("store", "query", "--feature=other.feature", "--json", "--project=" + project).out);
+        JsonNode feature = StoreJson.read(run("store", "query", "--feature=other.feature", "--json", "--project=" + project).out);
         assertEquals(2, feature.path("total").asInt(), feature.toString());
         assertEquals(2, feature.path("count").asInt(), feature.toString());
         assertScoped(feature.path("rows"), "features/other.feature", "features/pay.feature");
 
-        JsonNode tagged = JSON.readTree(run("store", "query", "--tag=@fast", "--json", "--project=" + project).out);
+        JsonNode tagged = StoreJson.read(run("store", "query", "--tag=@fast", "--json", "--project=" + project).out);
         assertEquals(2, tagged.path("total").asInt(), tagged.toString());
         assertEquals(2, tagged.path("count").asInt(), tagged.toString());
         assertScoped(tagged.path("rows"), "features/pay.feature", "features/other.feature");
 
-        JsonNode featureTimeline = JSON.readTree(run("store", "timeline", "--feature=other.feature", "--json", "--project=" + project).out);
+        JsonNode featureTimeline = StoreJson.read(run("store", "timeline", "--feature=other.feature", "--json", "--project=" + project).out);
         assertEquals(4, featureTimeline.path("total").asInt(), featureTimeline.toString());
         assertEquals(4, featureTimeline.path("count").asInt(), featureTimeline.toString());
         assertNoScenario(featureTimeline.path("events"), "features/pay.feature");
         assertEquals(2, countKind(featureTimeline.path("events"), "run"));
         assertEquals(2, countPrefix(featureTimeline.path("events"), "features/other.feature"));
 
-        JsonNode tagTimeline = JSON.readTree(run("store", "timeline", "--tag=@fast", "--json", "--project=" + project).out);
+        JsonNode tagTimeline = StoreJson.read(run("store", "timeline", "--tag=@fast", "--json", "--project=" + project).out);
         assertEquals(4, tagTimeline.path("total").asInt(), tagTimeline.toString());
         assertEquals(4, tagTimeline.path("count").asInt(), tagTimeline.toString());
         assertNoScenario(tagTimeline.path("events"), "features/other.feature");
@@ -206,7 +214,7 @@ class StoreQueryCliTest {
         record("run-a", "features/pay.feature|" + pay, "Pay", null, "pay step", "2020-01-01T00:00:00Z");
         record("run-a", "features/pay.feature|" + refund, "Refund", null, "refund step", "2020-01-01T00:00:02Z");
 
-        JsonNode tagged = JSON.readTree(run("store", "query", "--tag=@fast", "--json", "--project=" + project).out);
+        JsonNode tagged = StoreJson.read(run("store", "query", "--tag=@fast", "--json", "--project=" + project).out);
         assertEquals(1, tagged.path("total").asInt(), tagged.toString());
         assertEquals("features/pay.feature|" + pay, tagged.path("rows").get(0).path("scenarioKey").asText());
         assertFalse(tagged.toString().contains("features/pay.feature|" + refund), tagged.toString());
@@ -223,7 +231,7 @@ class StoreQueryCliTest {
         record("run-a", "features/pay.feature|" + ada, "Pay Bob", 2, "outline row", "2020-01-01T00:00:02Z");
         record("run-a", "features/pay.feature|" + refund, "Refund", null, "refund step", "2020-01-01T00:00:04Z");
 
-        JsonNode tagged = JSON.readTree(run("store", "query", "--tag=@fast", "--json", "--project=" + project).out);
+        JsonNode tagged = StoreJson.read(run("store", "query", "--tag=@fast", "--json", "--project=" + project).out);
         assertEquals(2, tagged.path("total").asInt(), tagged.toString());
         assertFalse(tagged.toString().contains("features/pay.feature|" + refund), tagged.toString());
         assertTrue(tagged.toString().contains("features/pay.feature|" + examples), tagged.toString());
@@ -243,14 +251,14 @@ class StoreQueryCliTest {
         record("run-a", "features/pay.feature|" + bob, "Pay Bob", 3, "bob row", "2020-01-01T00:00:04Z");
         record("run-a", "features/pay.feature|" + refund, "Refund", null, "refund step", "2020-01-01T00:00:06Z");
 
-        JsonNode tagged = JSON.readTree(run("store", "query", "--tag=@extag", "--json", "--project=" + project).out);
+        JsonNode tagged = StoreJson.read(run("store", "query", "--tag=@extag", "--json", "--project=" + project).out);
         assertEquals(2, tagged.path("total").asInt(), tagged.toString());
         assertTrue(tagged.toString().contains("features/pay.feature|" + examples), tagged.toString());
         assertTrue(tagged.toString().contains("features/pay.feature|" + ada), tagged.toString());
         assertFalse(tagged.toString().contains("features/pay.feature|" + bob), tagged.toString());
         assertFalse(tagged.toString().contains("features/pay.feature|" + refund), tagged.toString());
 
-        JsonNode outline = JSON.readTree(run("store", "query", "--tag=@fast", "--json", "--project=" + project).out);
+        JsonNode outline = StoreJson.read(run("store", "query", "--tag=@fast", "--json", "--project=" + project).out);
         assertEquals(3, outline.path("total").asInt(), outline.toString());
         assertTrue(outline.toString().contains("features/pay.feature|" + bob), outline.toString());
         assertFalse(outline.toString().contains("features/pay.feature|" + refund), outline.toString());
@@ -283,17 +291,17 @@ class StoreQueryCliTest {
                 statement.executeUpdate(
                         "INSERT INTO log_entity_links(log_id, entity_type, entity_id) VALUES (last_insert_rowid(), 'Account', 'ada')");
             }
-            JsonNode open = JSON.readTree(run("store", "timeline", "--json", "--project=" + project).out);
+            JsonNode open = StoreJson.read(run("store", "timeline", "--json", "--project=" + project).out);
             assertTrue(countKind(open.path("events"), "log") >= 1, open.toString());
 
-            JsonNode featureRows = JSON.readTree(run("store", "query", "--feature=features/pay.feature", "--json", "--project=" + project).out);
+            JsonNode featureRows = StoreJson.read(run("store", "query", "--feature=features/pay.feature", "--json", "--project=" + project).out);
             assertEquals(0, countKind(featureRows.path("rows"), "log"), featureRows.toString());
             assertTrue(countKind(featureRows.path("rows"), "step") >= 1, featureRows.toString());
 
-            JsonNode tagged = JSON.readTree(run("store", "query", "--tag=@fast", "--json", "--project=" + project).out);
+            JsonNode tagged = StoreJson.read(run("store", "query", "--tag=@fast", "--json", "--project=" + project).out);
             assertEquals(0, countKind(tagged.path("rows"), "log"), tagged.toString());
 
-            JsonNode timeline = JSON.readTree(run("store", "timeline", "--tag=@fast", "--json", "--project=" + project).out);
+            JsonNode timeline = StoreJson.read(run("store", "timeline", "--tag=@fast", "--json", "--project=" + project).out);
             assertEquals(0, countKind(timeline.path("events"), "log"), timeline.toString());
             assertTrue(countKind(timeline.path("events"), "run") >= 1, timeline.toString());
             assertFalse(timeline.toString().contains("\"scenarioKey\":\"features/pay.feature|" + pay + "\",\"stepExecId\":\"\",\"stepText\":\"\""),

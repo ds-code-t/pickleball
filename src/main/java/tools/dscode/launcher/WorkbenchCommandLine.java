@@ -71,7 +71,7 @@ final class WorkbenchCommandLine {
      * {@code /} or {@code \}. Space form must consume that value too, or the
      * path becomes the project and session lookup reports {@code never-started}.
      */
-    private static final Set<String> TRAILING_VALUE_FLAGS = Set.of(
+    static final Set<String> TRAILING_VALUE_FLAGS = Set.of(
             "--text-file", "--text-b64", "--session-file", "--feature", "--run", "--from-here",
             "--stop-after", "--cursor", "--fields", "--config", "--from-run", "--expect",
             "--category", "--status", "--kind", "--scenario", "--html",
@@ -176,6 +176,7 @@ final class WorkbenchCommandLine {
         }
         ALIAS_NOTICES.get().clear();
         args = sessionQueryArgs(normalizeFlags(rewriteLiveStart(args)));
+        args = ArgsFiles.expand(args).argv();
         if (args != null && args.length > 0 && ("ask".equals(args[0]) || "ask-and-wait".equals(args[0]))) {
             args = rejoinChoiceFragments(args);
         }

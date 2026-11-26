@@ -296,7 +296,7 @@ final class TrackingPanel extends JPanel {
         pagePrev = "";
         try {
             if (body.trim().startsWith("{")) {
-                JsonNode root = JSON.readTree(body);
+                JsonNode root = StoreBrowser.document(JSON.readTree(body));
                 pageCursor = root.path("cursor").asText("");
                 pagePrev = root.path("prev").asText("");
                 JsonNode events = root.has("events") ? root.get("events") : root.path("rows");

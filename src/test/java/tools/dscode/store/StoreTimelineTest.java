@@ -33,7 +33,7 @@ class StoreTimelineTest {
         Capture all = run("store", "timeline", "--json", "--project=" + project);
         assertEquals(0, all.code, all.err);
         assertTrue(all.out.indexOf("\"command\"") < all.out.indexOf("\"events\""), all.out);
-        JsonNode events = JSON.readTree(all.out).path("events");
+        JsonNode events = StoreJson.read(all.out).path("events");
         assertTrue(events.size() >= 2, all.out);
         Instant previous = null;
         for (JsonNode event : events) {
@@ -44,22 +44,22 @@ class StoreTimelineTest {
         assertEquals("run", events.get(0).path("kind").asText());
         Capture window = run("store", "timeline", "--from=2020-01-01T00:00:00Z", "--to=2020-01-02T12:00:00Z",
                 "--json", "--project=" + project);
-        JsonNode windowEvents = JSON.readTree(window.out).path("events");
+        JsonNode windowEvents = StoreJson.read(window.out).path("events");
         assertTrue(windowEvents.size() >= 2, window.out);
         for (JsonNode event : windowEvents) {
             Instant at = Instant.parse(event.path("at").asText());
             assertFalse(at.isAfter(Instant.parse("2020-01-02T12:00:00Z")));
         }
-        String cursor = JSON.readTree(all.out).path("cursor").asText();
+        String cursor = StoreJson.read(all.out).path("cursor").asText();
         Capture resume = run("store", "timeline", "--cursor=" + cursor, "--json", "--limit=5", "--project=" + project);
         assertEquals(0, resume.code, resume.err);
-        assertEquals(0, JSON.readTree(resume.out).path("count").asInt(), resume.out);
+        assertEquals(0, StoreJson.read(resume.out).path("count").asInt(), resume.out);
 
         Capture first = run("store", "timeline", "--limit=1", "--json", "--project=" + project);
-        String firstCursor = JSON.readTree(first.out).path("cursor").asText();
-        String firstId = JSON.readTree(first.out).path("events").get(0).path("id").asText();
+        String firstCursor = StoreJson.read(first.out).path("cursor").asText();
+        String firstId = StoreJson.read(first.out).path("events").get(0).path("id").asText();
         Capture rest = run("store", "timeline", "--cursor=" + firstCursor, "--json", "--project=" + project);
-        for (JsonNode event : JSON.readTree(rest.out).path("events")) {
+        for (JsonNode event : StoreJson.read(rest.out).path("events")) {
             assertFalse("run".equals(event.path("kind").asText()) && firstId.equals(event.path("id").asText()), rest.out);
         }
         Capture entity = run("store", "timeline", "--entity=Account#ada", "--json", "--project=" + project);
@@ -79,15 +79,15 @@ class StoreTimelineTest {
                 "three", 5, "PASSED", "2020-01-03T00:00:00Z", "2020-01-03T00:00:01Z"));
         Capture latest = run("store", "timeline", "--latest", "--limit=1", "--json", "--project=" + project);
         assertEquals(0, latest.code, latest.err);
-        JsonNode latestJson = JSON.readTree(latest.out);
+        JsonNode latestJson = StoreJson.read(latest.out);
         assertEquals(1, latestJson.path("count").asInt(), latest.out);
         assertTrue(latestJson.path("offset").asInt() > 0, latest.out);
         assertEquals("three", latestJson.path("events").get(0).path("stepText").asText(), latest.out);
         assertFalse(latestJson.path("prev").asText().isBlank(), latest.out);
-        String cursor = JSON.readTree(run("store", "timeline", "--json", "--project=" + project).out).path("cursor").asText();
+        String cursor = StoreJson.read(run("store", "timeline", "--json", "--project=" + project).out).path("cursor").asText();
         Capture before = run("store", "timeline", "--before=" + cursor, "--limit=1", "--json", "--project=" + project);
         assertEquals(0, before.code, before.err);
-        JsonNode beforeEvents = JSON.readTree(before.out).path("events");
+        JsonNode beforeEvents = StoreJson.read(before.out).path("events");
         assertEquals(1, beforeEvents.size(), before.out);
         assertEquals("two", beforeEvents.get(0).path("stepText").asText(), before.out);
         Capture bad = run("store", "timeline", "--cursor=not-a-cursor", "--project=" + project);
@@ -104,7 +104,7 @@ class StoreTimelineTest {
                     "2020-01-0" + index + "T00:00:00Z", "2020-01-0" + index + "T00:00:01Z"));
         }
         Capture all = run("store", "timeline", "--json", "--limit=50", "--project=" + project);
-        int full = JSON.readTree(all.out).path("total").asInt();
+        int full = StoreJson.read(all.out).path("total").asInt();
         assertTrue(full > 4, all.out);
         String cursor = "";
         int pages = 0;
@@ -113,7 +113,7 @@ class StoreTimelineTest {
             Capture page = cursor.isBlank()
                     ? run("store", "timeline", "--limit=2", "--json", "--project=" + project)
                     : run("store", "timeline", "--cursor=" + cursor, "--limit=2", "--json", "--project=" + project);
-            JsonNode json = JSON.readTree(page.out);
+            JsonNode json = StoreJson.read(page.out);
             assertEquals(full, json.path("total").asInt(), page.out);
             int count = json.path("count").asInt();
             seen += count;
@@ -125,13 +125,13 @@ class StoreTimelineTest {
         assertTrue(pages > 2, "pages=" + pages);
         assertEquals(full, seen);
 
-        String before = JSON.readTree(run("store", "timeline", "--latest", "--limit=2", "--json", "--project=" + project).out)
+        String before = StoreJson.read(run("store", "timeline", "--latest", "--limit=2", "--json", "--project=" + project).out)
                 .path("prev").asText();
         int backPages = 0;
         int backSeen = 0;
         while (backPages < 6 && before != null && !before.isBlank()) {
             Capture page = run("store", "timeline", "--before=" + before, "--limit=2", "--json", "--project=" + project);
-            JsonNode json = JSON.readTree(page.out);
+            JsonNode json = StoreJson.read(page.out);
             assertEquals(full, json.path("total").asInt(), page.out);
             int count = json.path("count").asInt();
             backSeen += count;
@@ -183,12 +183,12 @@ class StoreTimelineTest {
                     runId, "features/other.feature|" + otherLine, "Other", null, null, 1,
                     "other " + runId, otherLine, "PASSED", "2020-01-" + day + "T00:00:02Z", "2020-01-" + day + "T00:00:03Z"));
         }
-        JsonNode feature = JSON.readTree(run("store", "timeline", "--feature=other.feature", "--json", "--project=" + project).out);
+        JsonNode feature = StoreJson.read(run("store", "timeline", "--feature=other.feature", "--json", "--project=" + project).out);
         assertEquals(4, feature.path("total").asInt(), feature.toString());
         for (JsonNode event : feature.path("events")) {
             assertFalse(event.path("scenarioKey").asText().startsWith("features/pay.feature"), feature.toString());
         }
-        JsonNode tagged = JSON.readTree(run("store", "timeline", "--tag=@fast", "--json", "--project=" + project).out);
+        JsonNode tagged = StoreJson.read(run("store", "timeline", "--tag=@fast", "--json", "--project=" + project).out);
         assertEquals(4, tagged.path("total").asInt(), tagged.toString());
         for (JsonNode event : tagged.path("events")) {
             String key = event.path("scenarioKey").asText();
@@ -208,7 +208,7 @@ class StoreTimelineTest {
         record("run-a", "features/pay.feature|" + pay, "Pay", null, "pay step", "2020-01-01T00:00:00Z");
         record("run-a", "features/pay.feature|" + refund, "Refund", null, "refund step", "2020-01-01T00:00:02Z");
 
-        JsonNode tagged = JSON.readTree(run("store", "timeline", "--tag=@fast", "--json", "--project=" + project).out);
+        JsonNode tagged = StoreJson.read(run("store", "timeline", "--tag=@fast", "--json", "--project=" + project).out);
         assertEquals(2, tagged.path("total").asInt(), tagged.toString());
         assertEquals(1, countKind(tagged.path("events"), "run"));
         assertFalse(tagged.toString().contains("features/pay.feature|" + refund), tagged.toString());
@@ -226,7 +226,7 @@ class StoreTimelineTest {
         record("run-a", "features/pay.feature|" + ada, "Pay Bob", 2, "outline row", "2020-01-01T00:00:02Z");
         record("run-a", "features/pay.feature|" + refund, "Refund", null, "refund step", "2020-01-01T00:00:04Z");
 
-        JsonNode tagged = JSON.readTree(run("store", "timeline", "--tag=@fast", "--json", "--project=" + project).out);
+        JsonNode tagged = StoreJson.read(run("store", "timeline", "--tag=@fast", "--json", "--project=" + project).out);
         assertEquals(3, tagged.path("total").asInt(), tagged.toString());
         assertEquals(1, countKind(tagged.path("events"), "run"));
         assertFalse(tagged.toString().contains("features/pay.feature|" + refund), tagged.toString());
@@ -247,7 +247,7 @@ class StoreTimelineTest {
         record("run-a", "features/pay.feature|" + bob, "Pay Bob", 3, "bob row", "2020-01-01T00:00:04Z");
         record("run-a", "features/pay.feature|" + refund, "Refund", null, "refund step", "2020-01-01T00:00:06Z");
 
-        JsonNode tagged = JSON.readTree(run("store", "timeline", "--tag=@extag", "--json", "--project=" + project).out);
+        JsonNode tagged = StoreJson.read(run("store", "timeline", "--tag=@extag", "--json", "--project=" + project).out);
         assertEquals(3, tagged.path("total").asInt(), tagged.toString());
         assertEquals(1, countKind(tagged.path("events"), "run"));
         assertTrue(tagged.toString().contains("features/pay.feature|" + examples), tagged.toString());
@@ -255,7 +255,7 @@ class StoreTimelineTest {
         assertFalse(tagged.toString().contains("features/pay.feature|" + bob), tagged.toString());
         assertFalse(tagged.toString().contains("features/pay.feature|" + refund), tagged.toString());
 
-        JsonNode outline = JSON.readTree(run("store", "timeline", "--tag=@fast", "--json", "--project=" + project).out);
+        JsonNode outline = StoreJson.read(run("store", "timeline", "--tag=@fast", "--json", "--project=" + project).out);
         assertEquals(4, outline.path("total").asInt(), outline.toString());
         assertEquals(1, countKind(outline.path("events"), "run"));
         assertTrue(outline.toString().contains("features/pay.feature|" + bob), outline.toString());
@@ -276,7 +276,7 @@ class StoreTimelineTest {
         assertTrue(retained.out.contains("reports kept"), retained.out);
         assertEquals(png.length, Files.readAllBytes(shot).length);
         Capture after = run("store", "timeline", "--json", "--project=" + project);
-        assertEquals(0, JSON.readTree(after.out).path("total").asInt(), after.out);
+        assertEquals(0, StoreJson.read(after.out).path("total").asInt(), after.out);
     }
 
     private Path writePaySiblings() throws Exception {

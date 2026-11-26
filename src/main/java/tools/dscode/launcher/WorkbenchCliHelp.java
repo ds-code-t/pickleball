@@ -269,7 +269,7 @@ final class WorkbenchCliHelp {
     static String catalog() {
         StringBuilder text = new StringBuilder();
         text.append("Pickleball Workbench. help <command> prints usage. help <flag> prints that flag.\n");
-        text.append("exit 0 ok, 1 failed, 2 usage. --json is one JSON object and no preamble.\n");
+        text.append("exit 0 ok, 1 failed, 2 usage. --json is one agent envelope and no preamble. The previous store or domengine object is items.\n");
         text.append("help is always available on the thin controller jar and does not load Jackson.\n");
         text.append("decide: discover, then plan, then run. plan lists the scenarios. validate checks steps and does not run. run is confirm, or isolate then execute-step.\n");
         text.append("Timing is .pickleball/runs/<id>/launch-timing.txt. A cache hit skips Maven. Stderr timing only when PKB_WORKBENCH_TIMING=1 or -Dpkb_workbench_timing=true.\n");
@@ -286,6 +286,7 @@ final class WorkbenchCliHelp {
         text.append("controller: sync worker-check live-check ui mcp session\n");
         text.append("dashboard: dashboard [--project=<dir>] [--out=<file>] | dashboard query | dashboard xref | dashboard overlap\n");
         text.append("engine: engine help | engine run | engine step | engine inventory [--json]\n");
+        text.append("args: @<file> or --args-file=<file> is a JSON object of flags. An explicit flag wins. Unknown keys fail.\n");
         text.append("all:");
         for (String command : commands()) text.append(' ').append(command);
         text.append('\n');

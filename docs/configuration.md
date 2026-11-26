@@ -332,6 +332,8 @@ pkb_features=, pkb_browser=firefox
 
 The last form intentionally suppresses inherited `pkb_features`. The literal word `null` is ordinary text; it is not a compact-syntax null marker.
 
+To pass verb flags without shell quoting, put a JSON object of flags in `@<file>.json` or `--args-file=<file>`. An explicit flag on the command wins. An unknown key fails with `error:` and `fix:`, and the message does not print the value. The shell quoting table stays in [Iframe-heavy apps](iframe-apps.md).
+
 ## Sealed execution with `pkb_overriderunvars`
 
 `pkb_overriderunvars` is optional sealed input. It is **opt-in**. When compact input is missing/null/blank **and** there are no expanded `pkb_overriderunvars.*` members, sealed is OFF and current resolution is unchanged.

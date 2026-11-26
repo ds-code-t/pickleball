@@ -87,6 +87,8 @@ Every agent call returns one object. Older fields stay (`error`, `lines`, `ref`,
 | `code` | Additive stable code on a failure whose text matches: `E_NOT_FOUND`, `E_AMBIGUOUS`, `E_STALE_REF`, `E_TIER`, `E_UNSUPPORTED_TARGET`, `E_NOT_APPLIED_UNVERIFIED`, or `E_BUDGET`. An existing `E_*` value is kept. A timeout and any other text omit `code`. |
 | `retryable` | `true` for `E_NOT_FOUND`, `E_STALE_REF`, `E_NOT_APPLIED_UNVERIFIED`, and `E_BUDGET`. `false` for the other codes. Omitted when `code` is omitted. |
 
+`store --json` and domengine JSON are this same envelope. The previous JSON object is the one `items` entry. `command`, `count`, `total`, and `rows` are not copied onto the envelope. Callers read `items`. `find`, `snap --format=json`, `act`, and `desktop query` put an element record on the hit: `handle`, `identity` (`chain` array), `role`, `name`, `tag`, `bounds` (`x`, `y`, `width`, `height`), `backendNodeId`, and `frame`. Extra backend fields sit under `extra` and are omitted unless `--fields` names them. The Workbench store and tracking views read that one `items` entry before they label rows.
+
 `--format=lines` prints that same envelope as lines (`v=1 ok=...`, one `state` line, then each item as a readable line, not a raw JSON object, then `next` and `trunc`). `--format=json` returns object items. The default stays JSON of the line strings for snap. A lines view is smaller than the JSON object. A token of letters, digits, and `_./:@+-` is bare. Anything else, including a newline or a non-ASCII character, is a JSON string (`\n`, `\uXXXX`).
 
 ## Persistent controller

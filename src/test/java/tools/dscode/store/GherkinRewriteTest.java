@@ -113,7 +113,7 @@ class GherkinRewriteTest {
         Capture add = run("store", "feature", "scenario-add", "--feature=features/pay.feature", "--name=Two",
                 "--text=Given later", "--json", "--project=" + project);
         assertEquals(0, add.code, add.err);
-        JsonNode json = JSON.readTree(add.out);
+        JsonNode json = StoreJson.read(add.out);
         assertTrue(json.get("applied").asBoolean());
         assertTrue(json.get("dbEdited").asBoolean());
         assertEquals(original, Files.readString(project.resolve("features/pay.feature")));
@@ -163,7 +163,7 @@ class GherkinRewriteTest {
         assertTrue(added.startsWith("# keep me\n"), added);
         assertTrue(added.contains("Scenario: Two"), added);
         assertTrue(added.contains("When later"), added);
-        assertTrue(JSON.readTree(add.out).path("dbEdited").asBoolean(), add.out);
+        assertTrue(StoreJson.read(add.out).path("dbEdited").asBoolean(), add.out);
         assertNotNullParse(added);
 
         Capture modify = run("store", "feature", "scenario-modify", "--feature=features/pay.feature",

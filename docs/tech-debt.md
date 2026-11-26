@@ -69,7 +69,4 @@ These items stay out of `3.0.0-consumer-fixes`. The roadmap lists them under "No
 | 6.7.1 | Desktop launch. |
 | 6.7.3 | UIA tree cache. |
 | 6.7.4 | Desktop screenshot. |
-| 6.8.1 | One reply schema. Breaking. |
-| 6.8.5 | Normalised element record. |
-| 6.8.6 | `@args.json` on every verb. P5 documents the quoting instead. |
 | 6.8.8 | Session journal. |
