@@ -8,6 +8,8 @@ The native engine matches stored rows. `store hydrate` reads each glue annotatio
 
 The Cucumber adapter still dispatches Java glue with Cucumber. That matching lives in `CucumberStepRegistry` under `tools.dscode.engine.adapter.cucumber`. `engine run` and `engine step` stay the native execution verbs.
 
+When Store is on, both engines take the scenario from the stored rows. `PickleballEngine` reads `StoreScenarioSource`. `pkb_engine=cucumber` hydrates, then the JUnit parser and the CLI feature supplier read those same rows through `RowFeatureSupplier`. They do not scan a feature directory and they do not fall back to the file. A missing row is `error:` and `fix: store hydrate`. A scenario with `enabled=0` or `@pkb-ignore` is left out of both engines. `pkb_engine_log=ingest` logs one line per skipped scenario. `pkb_store=false` keeps the file path, and `FeaturePathLoadCache` is that loader.
+
 ## Standard Cucumber behavior remains available
 
 Feature files may continue to use:

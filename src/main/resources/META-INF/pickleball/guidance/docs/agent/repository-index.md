@@ -593,6 +593,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/engine/adapter/cucumber/NativeScenarioRun.java`
 - `src/main/java/tools/dscode/engine/adapter/cucumber/NativeStepTrace.java`
 - `src/main/java/tools/dscode/engine/adapter/cucumber/NativeSuiteExecution.java`
+- `src/main/java/tools/dscode/engine/adapter/cucumber/RowFeatureSupplier.java`
 - `src/main/java/tools/dscode/engine/adapter/cucumber/RunBindings.java`
 - `src/main/java/tools/dscode/engine/adapter/cucumber/SharedStepRun.java`
 - `src/main/java/tools/dscode/engine/adapter/cucumber/StoreRunTracePlugin.java`
@@ -1001,6 +1002,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/engine/match/StepRegistryTest.java`
 - `src/test/java/tools/dscode/engine/NativeDataExecutionTest.java`
 - `src/test/java/tools/dscode/engine/NativeDynamicExecutionTest.java`
+- `src/test/java/tools/dscode/engine/NativeRunUsesStoreOnlyTest.java`
 - `src/test/java/tools/dscode/engine/navfile/NavFileGlue.java`
 - `src/test/java/tools/dscode/engine/parity/DualRunSetupTest.java`
 - `src/test/java/tools/dscode/engine/parity/EchoParityGlue.java`

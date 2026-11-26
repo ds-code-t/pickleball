@@ -13,6 +13,10 @@ public privileged aspect FeaturePathFeatureSupplier_Cache {
                     && this(supplier);
 
     java.util.List around(FeaturePathFeatureSupplier supplier): supply(supplier) {
+        if (tools.dscode.store.StoreConfig.enabled()) {
+            return tools.dscode.engine.adapter.cucumber.RowFeatureSupplier.load(
+                    supplier.featureOptions.getFeaturePaths());
+        }
         Supplier<ClassLoader> classLoader = supplier.featureScanner.classLoaderSupplier;
         return FeaturePathLoadCache.load(
                 supplier.featureOptions.getFeaturePaths(),

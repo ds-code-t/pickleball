@@ -30,7 +30,11 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.function.Consumer;
 
-/** Runs one neutral scenario on the shared step lifecycle. */
+/**
+ * Runs one neutral scenario on the shared step lifecycle.
+ * When Store is on, {@code PickleballEngine} passes the scenario loaded by
+ * {@code StoreScenarioSource}. This class does not read feature files.
+ */
 public final class NativeScenarioRun {
     private static final ThreadLocal<Throwable> FAILURE = new ThreadLocal<>();
 

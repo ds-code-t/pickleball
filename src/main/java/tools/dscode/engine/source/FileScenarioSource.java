@@ -19,6 +19,10 @@ public final class FileScenarioSource implements ScenarioSource {
         this.path = path;
     }
 
+    public Path path() {
+        return path;
+    }
+
     @Override
     public String id() {
         return path == null ? "file" : path.toString();

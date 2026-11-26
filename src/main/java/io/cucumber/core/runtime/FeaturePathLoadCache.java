@@ -28,6 +28,10 @@ import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
 /**
+ * File-only feature loader. The only production caller is a run with
+ * {@code pkb_store=false}. A Store-on run reads rows through
+ * {@code StoreScenarioSource} and does not call this class.
+ *
  * Parses Cucumber features once per JVM for an unchanged path list.
  *
  * Surefire discovers the suite and then discovers it again before execution.

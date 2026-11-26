@@ -14,13 +14,18 @@ import tools.dscode.engine.model.StepArgument;
 import tools.dscode.engine.model.StepResult;
 import tools.dscode.engine.parse.GherkinEngineParser;
 import tools.dscode.engine.runtime.NativeScenarioCatalog;
+import tools.dscode.engine.source.FileScenarioSource;
 import tools.dscode.engine.source.MemoryScenarioSource;
 import tools.dscode.engine.source.ScenarioSource;
 import tools.dscode.engine.source.StepListScenarioSource;
+import tools.dscode.engine.source.StoreScenarioSource;
+import tools.dscode.store.StoreConfig;
+import tools.dscode.store.StorePaths;
 import tools.dscode.common.reporting.logging.Level;
 import tools.dscode.engine.adapter.cucumber.CucumberLane;
 import tools.dscode.testengine.PickleballRunner;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -50,7 +55,7 @@ public final class PickleballEngine {
             }
         }
         registry.scanPackage("tools.dscode.coredefinitions");
-        List<EngineFeature> loaded = source.load();
+        List<EngineFeature> loaded = select(source, settings).load();
         NativeScenarioCatalog.bind(settings.project(), loaded);
         List<ScenarioResult> scenarios = new ArrayList<>();
         boolean topLevel = ExecutionContext.current() == null;
@@ -107,6 +112,18 @@ public final class PickleballEngine {
             created.scan(types.toArray(Class<?>[]::new));
         }
         return created;
+    }
+
+    /**
+     * Store on reads {@link StoreScenarioSource}. An in-memory source stays in
+     * memory. {@code pkb_store=false} keeps {@link FileScenarioSource}.
+     */
+    private static ScenarioSource select(ScenarioSource source, EngineOptions settings) {
+        if (!(source instanceof FileScenarioSource file)) return source;
+        Path project = settings.project();
+        if (project == null || !StoreConfig.enabled(project)) return source;
+        if (file.path() == null) return source;
+        return new StoreScenarioSource(project, StorePaths.display(project, file.path()));
     }
 
     private static ScenarioResult runScenario(EngineScenario scenario, StepRegistry registry, EngineOptions options) {

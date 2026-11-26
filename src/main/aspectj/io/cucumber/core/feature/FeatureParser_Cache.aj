@@ -17,6 +17,12 @@ public aspect FeatureParser_Cache {
                     && args(resource);
 
     Optional around(FeatureParser parser, Resource resource): parse(parser, resource) {
-        return FeaturePathLoadCache.parseResource(resource, () -> proceed(parser, resource));
+        if (!tools.dscode.store.StoreConfig.enabled()) {
+            return FeaturePathLoadCache.parseResource(resource, () -> proceed(parser, resource));
+        }
+        if (!tools.dscode.store.StoreFeatureSource.addressable(resource.getUri())) {
+            return proceed(parser, resource);
+        }
+        return tools.dscode.engine.adapter.cucumber.RowFeatureSupplier.parseStored(resource.getUri());
     }
 }

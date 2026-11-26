@@ -66,7 +66,12 @@ public final class StoreFeatureSource {
         }
     }
 
-    static List<String> keys(URI uri) {
+    /** True when the URI is a project-relative file or classpath feature path. */
+    public static boolean addressable(URI uri) {
+        return !keys(uri).isEmpty();
+    }
+
+    public static List<String> keys(URI uri) {
         if (uri == null || uri.getScheme() == null) return List.of();
         try {
             if ("file".equalsIgnoreCase(uri.getScheme())) {

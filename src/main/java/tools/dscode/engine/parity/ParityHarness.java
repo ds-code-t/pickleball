@@ -3,7 +3,9 @@ package tools.dscode.engine.parity;
 import tools.dscode.engine.EngineOptions;
 import tools.dscode.engine.PickleballEngine;
 import tools.dscode.engine.adapter.cucumber.CucumberAdapterRun;
+import tools.dscode.engine.model.EngineFeature;
 import tools.dscode.engine.model.RunResult;
+import tools.dscode.engine.source.StoreScenarioSource;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -41,6 +43,26 @@ public final class ParityHarness {
         } finally {
             Files.deleteIfExists(copy);
             Files.deleteIfExists(dir);
+        }
+    }
+
+    /**
+     * Runs one hydrated feature from store rows on both engines.
+     * The file may already be gone. Neither side scans a feature directory.
+     */
+    public static List<DualRun.Divergence> compareStored(Path project, String featurePath, Class<?> glue) throws Exception {
+        StoreScenarioSource source = new StoreScenarioSource(project, featurePath);
+        List<EngineFeature> features = source.load();
+        DualRun.begin(glue);
+        try {
+            RunResult adapter = CucumberAdapterRun.run(features, glue == null ? null : glue.getPackageName());
+            DualRun.reset();
+            RunResult nativeResult = PickleballEngine.run(source, EngineOptions.of(glue).project(project));
+            List<DualRun.Divergence> found = new ArrayList<>(DualRun.diff(adapter, nativeResult));
+            found.addAll(returned(adapter, nativeResult));
+            return List.copyOf(found);
+        } finally {
+            DualRun.reset();
         }
     }
 
