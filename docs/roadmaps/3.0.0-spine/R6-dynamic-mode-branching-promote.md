@@ -6,7 +6,7 @@ Requires R1 and R5. Design: `docs/plans/2026-11-25-spine-design.md`. Scoreboard:
 
 Every phase is mandatory and must be completed in full. Nothing in R6 is optional or deferred. Stop only on an honest test failure you cannot fix, or on a hard-rule violation.
 
-Targeted tests only. Do not run `@all`. Windows only. Append new Windows-only class names to `docs/tech-debt.md`. Never weaken, skip, or delete a test. Keep Gherkin. Step annotations stay single string literals. Never run `.\gradlew.bat --stop`.
+Targeted tests only. Do not run `@all`. Windows only. The final full regression after R6 follows [Final regression](final-regression.md): Dan's Windows PC only, no Linux or macOS runs, no GitHub Actions runs. Append new Windows-only class names to `docs/tech-debt.md`. Never weaken, skip, or delete a test. Keep Gherkin. Step annotations stay single string literals. Never run `.\gradlew.bat --stop`.
 
 Fetch and rebase before every push. Push after every green phase. Each git command stands alone. Before every push run `python scripts/sync_consumer_guidance.py` and `python scripts/refresh_agent_index.py`. Update `tools.dscode.browser.SurfaceAssetsTest` only if surface-asset bytes change. R6 should not change them.
 
