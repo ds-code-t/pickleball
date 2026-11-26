@@ -1,2 +1,3 @@
 tools.dscode.engine.match.JavaStepHost
 tools.dscode.launcher.NodeStepHost
+tools.dscode.launcher.PlaywrightSpecHost

@@ -599,6 +599,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/engine/adapter/cucumber/SharedStepRun.java`
 - `src/main/java/tools/dscode/engine/adapter/cucumber/StepFlagBridge.java`
 - `src/main/java/tools/dscode/engine/adapter/cucumber/StoreRunTracePlugin.java`
+- `src/main/java/tools/dscode/engine/adapter/playwright/PlaywrightScenarioRun.java`
+- `src/main/java/tools/dscode/engine/adapter/playwright/PlaywrightTestIngest.java`
 - `src/main/java/tools/dscode/engine/context/ExecutionContext.java`
 - `src/main/java/tools/dscode/engine/EngineCli.java`
 - `src/main/java/tools/dscode/engine/EngineConfig.java`
@@ -653,6 +655,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/launcher/PickleballWorkbenchLauncher.java`
 - `src/main/java/tools/dscode/launcher/PkbMain.java`
 - `src/main/java/tools/dscode/launcher/PlaywrightNode.java`
+- `src/main/java/tools/dscode/launcher/PlaywrightSpecHost.java`
 - `src/main/java/tools/dscode/launcher/ProtoVerbs.java`
 - `src/main/java/tools/dscode/launcher/PwCommand.java`
 - `src/main/java/tools/dscode/launcher/QuietSlf4j.java`
@@ -1006,6 +1009,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/docs/CurrentDocsTest.java`
 - `src/test/java/tools/dscode/engine/adapter/cucumber/CucumberIngestTest.java`
 - `src/test/java/tools/dscode/engine/adapter/NativeSuiteHookTest.java`
+- `src/test/java/tools/dscode/engine/adapter/playwright/PlaywrightTestIngestTest.java`
 - `src/test/java/tools/dscode/engine/adapter/SuiteHookSteps.java`
 - `src/test/java/tools/dscode/engine/context/ExecutionContextTest.java`
 - `src/test/java/tools/dscode/engine/context/RunBindingsTest.java`
@@ -1108,6 +1112,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/PerfLiveTest.java`
 - `src/test/java/tools/dscode/launcher/PickleballWorkbenchLauncherTest.java`
 - `src/test/java/tools/dscode/launcher/PlacementNowTest.java`
+- `src/test/java/tools/dscode/launcher/PlaywrightSpecHostTest.java`
+- `src/test/java/tools/dscode/launcher/PlaywrightSpecIngestLiveTest.java`
 - `src/test/java/tools/dscode/launcher/PolishRoadmapTest.java`
 - `src/test/java/tools/dscode/launcher/PopupVerbCoverageTest.java`
 - `src/test/java/tools/dscode/launcher/PwCommandLiveTest.java`

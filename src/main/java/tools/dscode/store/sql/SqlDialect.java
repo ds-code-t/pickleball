@@ -19,7 +19,7 @@ public final class SqlDialect {
 
     public static final List<String> SOURCE_TABLES = List.of(
             "schema_meta", "files", "provenance", "feature_docs", "scenarios", "example_blocks", "steps",
-            "entities", "step_definitions",
+            "entities", "step_definitions", "fixtures",
             "pins", "deltas", "heads", "head_rows",
             "folders", "scenario_tags", "run_variables");
 
@@ -162,6 +162,16 @@ public final class SqlDialect {
                 parameter_types TEXT NOT NULL DEFAULT '[]',
                 host TEXT NOT NULL DEFAULT 'java',
                 PRIMARY KEY (definition_id)
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS fixtures (
+                name TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                deps TEXT NOT NULL,
+                source TEXT NOT NULL,
+                file_path TEXT NOT NULL,
+                PRIMARY KEY (file_path, name)
             )
             """,
             """
@@ -489,7 +499,7 @@ public final class SqlDialect {
      * A database that already has {@code hydration_spine} still needs columns added
      * by a later build. The full DDL stays on the slow path. This check looks up
      * the newest columns, then {@link #ensureHydrationColumns} when one is missing.
-     * {@code steps.context_scope} and {@code step_definitions.host} are both required.
+     * {@code steps.context_scope}, {@code step_definitions.host}, and the {@code fixtures} table are all required.
      */
     private static void ensureAdditiveOnReady(SqlSession session) throws SQLException {
         if (additiveColumnsPresent(session)) return;
@@ -504,7 +514,9 @@ public final class SqlDialect {
             return "context_scope".equals(session.scalar(
                     "SELECT name FROM pragma_table_info('steps') WHERE name = ?", "context_scope"))
                     && "host".equals(session.scalar(
-                    "SELECT name FROM pragma_table_info('step_definitions') WHERE name = ?", "host"));
+                    "SELECT name FROM pragma_table_info('step_definitions') WHERE name = ?", "host"))
+                    && "fixtures".equals(session.scalar(
+                    "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'fixtures'"));
         } catch (SQLException ignored) {
             return false;
         }
@@ -559,6 +571,16 @@ public final class SqlDialect {
         addColumn(session, "steps", "until_mode", "TEXT");
         addColumn(session, "steps", "context_mode", "TEXT");
         addColumn(session, "steps", "context_scope", "TEXT");
+        session.script("""
+                CREATE TABLE IF NOT EXISTS fixtures (
+                    name TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    deps TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    file_path TEXT NOT NULL,
+                    PRIMARY KEY (file_path, name)
+                )
+                """);
     }
 
     private static void addColumn(SqlSession session, String table, String column, String definition) throws SQLException {

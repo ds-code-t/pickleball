@@ -12,6 +12,16 @@ The host and the script exchange one JSON object per line. A step may call `reso
 
 Node runs erasable TypeScript. `enum`, `namespace`, and parameter properties fail at load with `fix: keep the TypeScript erasable`. There is no TypeScript compiler package in this phase. `pkb_engine_log=host` logs spawn, load, invoke, and the call name. It does not log a secret return value. The engine package does not reference `NodeStepHost`, `PlaywrightNode`, or `step-host.mjs`.
 
+## Spec ingest
+
+`*.spec.ts` and `*.spec.js` that discovery already stored become scenario rows on `store hydrate`. The original file bytes stay on `files`. They are not rewritten as Gherkin. Each `test()` is one scenario whose keyword is `Playwright` and whose name is the test title. `test.describe("name")` is that scenario's description. The step text is the source line, trimmed. `test.beforeEach`, `test.afterEach`, `test.beforeAll`, and `test.afterAll` are attached to each test in that describe. `test.only` and `test.skip` are tests. `test.use` is left as source.
+
+`test.extend` writes `fixtures` rows. `kind` is `option` when the value has `option: true`, `auto` when it has `auto: true`, and `fixture` otherwise. The built-in names `page`, `context`, and `browser` are rows with `kind=builtin` and empty source. They are definitions, not live instances. `deps` is the comma-separated names from the first `{...}` that contains no colon. An existing store gains the `fixtures` table on open. `store_schema` stays 1. `step_definitions.host` and `language` for a `test()` body are `playwright`. The pattern is the test title.
+
+The page is created when the scenario runs. `PlaywrightSpecHost` in `tools.dscode.launcher` joins a browser that is already listening (`pkb_cdp_endpoint`, then `PKB_CDP_ENDPOINT`) with `chromium().connectOverCDP`. When neither is set, it starts local Chrome through the existing driver construction and attaches to that port. It does not download a browser. `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` stays set. The spine stores the handle string `playwright.page`. The Playwright page object stays in the host. The host runs `page.goto` and `page.navigate` as navigation, `.textContent(` as locator text, and `toHaveTitle` as a title check. Any other line fails with `error: unrecognized playwright step` and `fix: use page.goto, locator textContent, or toHaveTitle`.
+
+`pkb_engine_log=ingest` logs `playwright spec <path> tests=<n>`. `pkb_engine_log=host` logs the verb name (`goto`, `textContent`, or `toHaveTitle`), not the return value and not the URL. Specs require the store. `pkb_store=false` still reads Gherkin files only. The engine package does not reference `PlaywrightSpecHost`, `PlaywrightNode`, `step-host.mjs`, or `com.microsoft.playwright`.
+
 ## Attach to a running browser
 
 `attach` is the one entry point. `attach --target=browser:cdp=<ws>` works as before. The route flags below resolve to a browser websocket and then run that same join, so the attached browser is a normal live target: pass the printed `--target=browser:cdp=<ws>` to `snap`, `find`, `act`, `panel-open`, and the collab verbs. Routes, in the order to try them:

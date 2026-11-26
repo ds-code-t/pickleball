@@ -1,6 +1,7 @@
 package tools.dscode.store;
 
 import tools.dscode.engine.adapter.cucumber.CucumberIngest;
+import tools.dscode.engine.adapter.playwright.PlaywrightTestIngest;
 import tools.dscode.store.sql.SqlDialect;
 
 import java.io.IOException;
@@ -176,6 +177,7 @@ public final class StoreHydrator {
                     var prior = CucumberIngest.snapshot(connection);
                     StoreStepCatalog.refresh(connection, project, now);
                     CucumberIngest.Counts ingest = CucumberIngest.apply(connection, project, prior);
+                    PlaywrightTestIngest.apply(connection, project);
                     notices.addAll(ingest.notices());
                     translated = ingest.translated();
                     failed = ingest.failed();
@@ -234,7 +236,7 @@ public final class StoreHydrator {
     private static void wipeSourceRows(java.sql.Connection connection) throws java.sql.SQLException {
         for (String table : List.of(
                 "files", "feature_docs", "scenarios", "example_blocks", "steps", "entities",
-                "step_definitions", "head_rows", "deltas", "heads", "folders", "scenario_tags", "run_variables")) {
+                "step_definitions", "fixtures", "head_rows", "deltas", "heads", "folders", "scenario_tags", "run_variables")) {
             try (var statement = connection.prepareStatement("DELETE FROM " + table)) {
                 statement.executeUpdate();
             }

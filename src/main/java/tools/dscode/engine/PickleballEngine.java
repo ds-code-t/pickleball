@@ -24,6 +24,8 @@ import tools.dscode.store.StoreConfig;
 import tools.dscode.store.StorePaths;
 import tools.dscode.common.reporting.logging.Level;
 import tools.dscode.engine.adapter.cucumber.CucumberLane;
+import tools.dscode.engine.adapter.playwright.PlaywrightScenarioRun;
+import tools.dscode.engine.adapter.playwright.PlaywrightTestIngest;
 import tools.dscode.testengine.PickleballRunner;
 
 import java.nio.file.Path;
@@ -70,7 +72,7 @@ public final class PickleballEngine {
         try {
             runLease = tools.dscode.store.StoreExecution.RunLease.open(topLevel);
             for (EngineFeature feature : loaded) {
-                EngineFeature expanded = GherkinEngineParser.expand(feature);
+                EngineFeature expanded = playwright(feature) ? feature : GherkinEngineParser.expand(feature);
                 for (EngineScenario scenario : expanded.scenarios()) {
                     if (!settings.scenarioName().isBlank() && !scenario.name().contains(settings.scenarioName())) continue;
                     scenarios.add(runScenario(scenario, registry, settings));
@@ -148,7 +150,17 @@ public final class PickleballEngine {
         return new StoreScenarioSource(project, StorePaths.display(project, file.path()));
     }
 
+    private static boolean playwright(EngineFeature feature) {
+        for (EngineScenario scenario : feature.scenarios()) {
+            if (PlaywrightTestIngest.KEYWORD.equals(scenario.keyword())) return true;
+        }
+        return false;
+    }
+
     private static ScenarioResult runScenario(EngineScenario scenario, StepRegistry registry, EngineOptions options) {
+        if (PlaywrightTestIngest.KEYWORD.equals(scenario.keyword())) {
+            return PlaywrightScenarioRun.run(scenario);
+        }
         return tools.dscode.engine.adapter.cucumber.NativeScenarioRun.run(scenario, registry, options);
     }
 

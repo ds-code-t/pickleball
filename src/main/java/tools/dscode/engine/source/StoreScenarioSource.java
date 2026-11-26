@@ -1,6 +1,7 @@
 package tools.dscode.engine.source;
 
 import tools.dscode.engine.EngineLog;
+import tools.dscode.engine.adapter.playwright.PlaywrightTestIngest;
 import tools.dscode.engine.model.EngineFeature;
 import tools.dscode.engine.parse.GherkinEngineParser;
 import tools.dscode.store.StoreDatabase;
@@ -86,6 +87,11 @@ public final class StoreScenarioSource implements ScenarioSource {
     public List<EngineFeature> load() {
         if (project == null || !StorePaths.ready(project)) throw missing(featurePath);
         try {
+            if (featurePath != null && PlaywrightTestIngest.isSpec(featurePath)) {
+                EngineFeature spec = PlaywrightTestIngest.loadFeature(project, featurePath);
+                if (spec == null) throw missing(featurePath);
+                return List.of(spec);
+            }
             List<EngineFeature> features = new ArrayList<>();
             boolean found = false;
             for (StoreQuery.FeatureSummary summary : StoreQuery.features(project)) {
@@ -96,6 +102,14 @@ public final class StoreScenarioSource implements ScenarioSource {
                 String text = executableText(project, summary.path(), detail.text());
                 if (text == null) continue;
                 features.add(GherkinEngineParser.parse("store:" + summary.path(), text));
+            }
+            if (featurePath == null || !featurePath.endsWith(".feature")) {
+                for (String path : PlaywrightTestIngest.specPaths(project)) {
+                    if (!matches(path)) continue;
+                    found = true;
+                    EngineFeature spec = PlaywrightTestIngest.loadFeature(project, path);
+                    if (spec != null && !spec.scenarios().isEmpty()) features.add(spec);
+                }
             }
             if (featurePath != null && !found) throw missing(featurePath);
             return List.copyOf(features);
