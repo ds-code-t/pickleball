@@ -1939,6 +1939,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/desktop/MacAccessibility.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/NativeDesktop.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/PageSourceTree.java`
+- `dom-engine/src/main/java/dev/domengine/desktop/WindowsStructureEvents.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/WindowsUia.java`
 - `dom-engine/src/main/java/dev/domengine/EngineInfo.java`
 - `dom-engine/src/main/java/dev/domengine/image/TemplateMatch.java`
@@ -2031,6 +2032,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/desktop/LiveDesktopTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/MacAccessibilityScriptTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/WaylandDetectionTest.java`
+- `dom-engine/src/test/java/dev/domengine/desktop/WindowsStructureChangedTest.java`
 - `dom-engine/src/test/java/dev/domengine/DocumentWalkFixtureTest.java`
 - `dom-engine/src/test/java/dev/domengine/EngineLogTest.java`
 - `dom-engine/src/test/java/dev/domengine/FakeCdp.java`

@@ -175,7 +175,7 @@ Closes leftovers 6.3.6 and 6.7.3.
 
 **Warm Playwright/CDP.** When `pkb_warm=on` and `ResourceGate` returns `allow`, `spine start` opens one CDP connection to a browser the project config already names, using the existing `PlaywrightConnection` path, and holds it. `pkb_warm=off` does not open it. A `refuse` decision does not open it. The connection is closed on `spine stop`. This is the warm start leftover 6.3.6. It does not run when the gate refuses.
 
-**UIA cache.** `dev.domengine.desktop.DesktopTree` keeps one cached tree per attached window id when `pkb_warm=on`. A structure-changed event drops that window's entry. `pkb_warm=off` does not cache. The cache byte size is checked by `ResourceGate` before insert. A tree that would cross the refuse line is not cached, and the call reads through. `pkb_engine_log=gate` entity `desktop` logs `cache hit`, `cache miss`, or `cache refuse`.
+**UIA cache.** `dev.domengine.desktop.DesktopTree` keeps one cached tree per attached window id when `pkb_warm=on`. Live Windows attach subscribes to the UI Automation structure-changed event for that window. The handler calls `DesktopTree.structureChanged`, which drops that window's entry. Close unsubscribes. A listener that does not start does not fail attach. Other platforms do not subscribe. `pkb_warm=off` does not cache. The cache byte size is checked by `ResourceGate` before insert. A tree that would cross the refuse line is not cached, and the call reads through. `pkb_engine_log=gate` entity `desktop` logs `cache hit`, `cache miss`, or `cache refuse`.
 
 Remove tech-debt rows 6.3.6 and 6.7.3.
 

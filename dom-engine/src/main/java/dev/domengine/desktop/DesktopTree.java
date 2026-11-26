@@ -149,6 +149,7 @@ public final class DesktopTree {
         DomNode.renumber(root);
         Session session = new Session(id, "live", root, true, platform, name);
         SESSIONS.put(id, session);
+        WindowsStructureEvents.start(cacheKey(id, name));
         EngineLog.info("desktop", "attach live " + id + " " + platform + (name.isBlank() ? "" : " " + name));
         return session;
     }
@@ -165,6 +166,11 @@ public final class DesktopTree {
     }
 
     public static ObjectNode close(String id) {
+        Session session = SESSIONS.get(id);
+        if (session == null) throw new CdpException("session not found: " + id);
+        String key = cacheKey(session.id, session.window);
+        WindowsStructureEvents.stop(key);
+        structureChanged(key);
         if (SESSIONS.remove(id) == null) throw new CdpException("session not found: " + id);
         FIXTURES.remove(id);
         dev.domengine.premap.PreMapLookup.forget(id);
@@ -176,6 +182,7 @@ public final class DesktopTree {
     }
 
     public static void resetForTests() {
+        WindowsStructureEvents.stopAll();
         SESSIONS.clear();
         FIXTURES.clear();
         WINDOW_CACHE.clear();
@@ -194,6 +201,12 @@ public final class DesktopTree {
     /** Lines recorded when {@code pkb_engine_log} names {@code gate}. */
     public static List<String> cacheNotesForTests() {
         return List.copyOf(CACHE_NOTES);
+    }
+
+    /** Cache and listener key: the window name, or the session id when the name is blank. */
+    static String cacheKey(String id, String window) {
+        if (window == null || window.isBlank()) return id == null ? "" : id;
+        return window;
     }
 
     /** Drops the cached tree for one window. A structure-changed event calls this. */
@@ -404,7 +417,7 @@ public final class DesktopTree {
     public static ObjectNode walk(String id) {
         Session session = require(id);
         if (session.live) {
-            String window = session.window == null || session.window.isBlank() ? session.id : session.window;
+            String window = cacheKey(session.id, session.window);
             String captureName = session.window;
             DomNode fresh = warmOn()
                     ? cachedTree(window, -1, () -> captureLive(captureName))
