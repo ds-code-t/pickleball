@@ -200,18 +200,23 @@ public final class DomEngineMain {
         return node;
     }
 
+    public static final List<String> COMMANDS = List.of(
+            "version", "capabilities", "session", "attach", "snapshot", "premap", "query", "resolve",
+            "info", "recommend", "validate", "capture", "conform", "log",
+            "click", "type", "scroll", "submit", "key", "dblclick", "contextclick", "drag", "hover", "eval",
+            "screenshot", "observe", "wait", "desktop", "mcp", "serve"
+    );
+    public static final List<String> SESSION_VERBS = List.of(
+            "create", "list", "attach", "close", "join", "log"
+    );
+
     static ObjectNode capabilities() {
         ObjectNode node = Jsons.object();
         node.put("ok", true);
         node.put("name", EngineInfo.NAME);
         node.put("version", EngineInfo.VERSION);
-        array(node, "commands", List.of(
-                "version", "capabilities", "session", "attach", "snapshot", "premap", "query", "resolve",
-                "info", "recommend", "validate", "capture", "conform", "log",
-                "click", "type", "scroll", "submit", "key", "dblclick", "contextclick", "drag", "hover", "eval",
-                "screenshot", "observe", "wait", "desktop", "mcp", "serve"
-        ));
-        array(node, "session_verbs", List.of("create", "list", "attach", "close", "join", "log"));
+        array(node, "commands", COMMANDS);
+        array(node, "session_verbs", SESSION_VERBS);
         ObjectNode observe = node.putObject("observe");
         observe.put("events", true);
         observe.put("source", "cdp-session");

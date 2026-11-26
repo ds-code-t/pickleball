@@ -15,6 +15,13 @@ import java.util.List;
  * database when one is missing.
  */
 public final class StoreCli {
+    public static final List<String> COMMANDS = List.of(
+            "help", "migrate", "sandbox", "changes", "status", "hydrate", "extract", "hydrate-out",
+            "history", "entity", "feature", "category", "file", "glue", "files", "features",
+            "scenario", "scenarios", "step", "steps", "conflicts", "pin", "delta", "head",
+            "enable", "tag", "var", "query", "timeline", "retain", "run", "run-classpath"
+    );
+
     private StoreCli() {
     }
 

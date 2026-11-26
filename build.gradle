@@ -1153,6 +1153,9 @@ allprojects {
         if (System.getProperty('pkb.update.golden') == 'true') {
             task.systemProperty('pkb.update.golden', 'true')
         }
+        if (System.getProperty('pkb.update.verb-inventory') == 'true') {
+            task.systemProperty('pkb.update.verb-inventory', 'true')
+        }
         def consoleDir = task.project.layout.buildDirectory.dir("test-console/${task.name}")
         task.systemProperty('pkb.test.console.dir', consoleDir.get().asFile.absolutePath)
         task.doFirst {

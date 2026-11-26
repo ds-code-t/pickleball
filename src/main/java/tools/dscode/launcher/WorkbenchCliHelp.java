@@ -285,6 +285,7 @@ final class WorkbenchCliHelp {
         text.append("retrieval: query runs | query get | query query | query search | query props | query errors | query tail\n");
         text.append("controller: sync worker-check live-check ui mcp session\n");
         text.append("dashboard: dashboard [--project=<dir>] [--out=<file>] | dashboard query | dashboard xref | dashboard overlap\n");
+        text.append("engine: engine help | engine run | engine step | engine inventory [--json]\n");
         text.append("all:");
         for (String command : commands()) text.append(' ').append(command);
         text.append('\n');

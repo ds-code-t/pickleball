@@ -11,6 +11,8 @@ import tools.dscode.engine.source.FileScenarioSource;
 import tools.dscode.engine.source.ScenarioSource;
 
 import java.io.PrintStream;
+import tools.dscode.launcher.VerbCatalog;
+
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,6 +21,8 @@ import java.util.List;
  * Native engine CLI. Gradle, Workbench, and MCP only forward here.
  */
 public final class EngineCli {
+    public static final List<String> COMMANDS = List.of("help", "run", "step", "inventory");
+
     private EngineCli() {
     }
 
@@ -53,6 +57,7 @@ public final class EngineCli {
                 }
                 case "run" -> run(tokens, stdout, stderr);
                 case "step" -> step(tokens, stdout, stderr);
+                case "inventory" -> inventory(tokens, stdout);
                 default -> {
                     stderr.println("error: Unknown engine command: " + command);
                     stderr.println("fix: engine help");
@@ -71,12 +76,30 @@ public final class EngineCli {
                 Usage: engine help
                 Usage: engine run [--project=<dir>] [--text=<gherkin>] [--file=<path>] [--steps=<line>] [--glue=<class>] [--name=<scenario>] [--store] [--sandbox=<name>] [--feature=<path>]
                 Usage: engine step --text=<step> [--definition=<id>] [--argument=<text>] [--glue=<class>] [--project=<dir>]
+                Usage: engine inventory [--project=<dir>] [--json]
+                engine inventory prints the verb catalog. --json is one agent envelope. The rows are items. The mcp-only count is 0.
                 The engine runs steps without Cucumber. --text and --steps do not read a feature file.
                 --store reads feature bytes from the Store store at .pickleball/store/data. --glue is a glue class name.
                 Workbench, MCP, and Gradle forward this command and do not run steps themselves.
                 Logging: pkb_engine_log=run (or all). pkb_engine_log_entity limits lines. pkb_engine_log_max_bytes caps .pickleball/engine/engine.log.
                 The JUnit suite uses the native engine unless pkb_engine=cucumber (else PKB_ENGINE, else engine.properties mode=cucumber). pkb_engine=cucumber keeps the adapter.
                 """;
+    }
+
+    private static int inventory(List<String> tokens, PrintStream out) {
+        if (wantsJson(tokens)) {
+            out.println(VerbCatalog.json(project(tokens)));
+            return 0;
+        }
+        out.print(VerbCatalog.table());
+        return 0;
+    }
+
+    private static boolean wantsJson(List<String> tokens) {
+        for (String token : tokens) {
+            if ("--json".equals(token) || "--json=true".equals(token)) return true;
+        }
+        return false;
     }
 
     private static int run(List<String> tokens, PrintStream out, PrintStream err) throws Exception {

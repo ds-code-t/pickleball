@@ -1,6 +1,7 @@
 {
   "version": "2.1.18",
   "source": "src/main/java/tools/dscode/launcher/WorkbenchCommandLine.java",
+  "engine": ["help", "inventory", "run", "step"],
   "commands": {
     "forwarded": [
       "isolate",
