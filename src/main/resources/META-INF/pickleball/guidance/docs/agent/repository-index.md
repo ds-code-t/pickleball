@@ -64,6 +64,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/optional-installs.md`
 - `docs/pickleball-workbench-player.md`
 - `docs/pickleball-workbench.md`
+- `docs/plans/2026-11-25-spine-design.md`
+- `docs/plans/2026-11-25-sqlite-spine-plan.md`
 - `docs/playwright.md`
 - `docs/README.md`
 - `docs/release-notes.md`
