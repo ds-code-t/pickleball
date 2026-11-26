@@ -250,7 +250,7 @@ public final class PickleballWorkbenchLauncher {
      * Every verb except help. Help must not reference this method: its bytecode
      * names the agent and session command classes.
      */
-    private static void dispatch(String[] args) {
+    static void dispatch(String[] args) {
         WorkbenchCommandLine.Parsed parsed;
         try {
             parsed = WorkbenchCommandLine.parse(args);
@@ -384,16 +384,31 @@ public final class PickleballWorkbenchLauncher {
 
     /**
      * Bare {@code ui} starts the Node renderer in this JVM and does not extract the controller.
+     * A subcommand such as {@code ui page} stays on {@link VerbDispatch}.
      * {@code ui --ops} is the catalog batch and stays on {@link VerbDispatch}.
      */
-    private static boolean controllerUiWithoutOps(String command, String[] args) {
+    static boolean controllerUiWithoutOps(String command, String[] args) {
         if (!"ui".equals(command)) return false;
         if (args == null) return true;
         for (String token : args) {
-            if (token == null) continue;
+            if (token == null || token.isBlank()) continue;
             if ("--ops".equals(token) || token.startsWith("--ops=")) return false;
+            if (token.startsWith("-")) continue;
+            if ("ui".equals(token)) continue;
+            if (isUiPathToken(token)) continue;
+            return false;
         }
         return true;
+    }
+
+    /** A project path is not a {@code ui} subcommand. {@code page} is. */
+    private static boolean isUiPathToken(String token) {
+        if (token.indexOf('/') >= 0 || token.indexOf('\\') >= 0 || token.indexOf(':') >= 0) return true;
+        try {
+            return Files.isDirectory(Path.of(token));
+        } catch (RuntimeException failure) {
+            return false;
+        }
     }
 
     /**

@@ -2,7 +2,7 @@
 
 ## 3.0.0
 
-Spine R5 fix-back 1. The workbench UI license allow-list is MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, and the public domain. `Unlicense` and `CC0-1.0` are refused.
+Spine R5 fix-back 1. The workbench UI license allow-list is MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, and the public domain. `Unlicense` and `CC0-1.0` are refused. `pickleball ui page` writes the generated page through launcher dispatch and does not open the renderer. Bare `pickleball ui` still opens the Node renderer. `ui --ops` stays the catalog batch.
 
 Spine R5 P5. `lease take --target=ui|browser|both` records one holder for that session and target. A second take fails with `error:` and `fix:`. `lease release` clears it. The renderer Lease button calls that verb. `input block --on` blocks mouse and keyboard and fails while inject is off with `fix: inject on`. `input block --off` clears the block. `ui page` writes `.pickleball/workbench-ui/generated/<session>/<name>.html` when every quoted route is a catalog verb. The renderer serves that page only for the session token. `spine session end` deletes the page and the lease.
 

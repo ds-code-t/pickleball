@@ -1177,6 +1177,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/TargetAgnosticApiTest.java`
 - `src/test/java/tools/dscode/launcher/TargetCoverageTest.java`
 - `src/test/java/tools/dscode/launcher/TwoActorRecipeLiveTest.java`
+- `src/test/java/tools/dscode/launcher/UiPageDispatchTest.java`
 - `src/test/java/tools/dscode/launcher/VerbCatalogTest.java`
 - `src/test/java/tools/dscode/launcher/VerbDispatchTest.java`
 - `src/test/java/tools/dscode/launcher/VersionSwitchTest.java`
