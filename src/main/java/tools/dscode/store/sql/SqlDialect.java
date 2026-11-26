@@ -19,7 +19,8 @@ public final class SqlDialect {
 
     public static final List<String> SOURCE_TABLES = List.of(
             "schema_meta", "files", "provenance", "feature_docs", "scenarios", "example_blocks", "steps",
-            "entities", "step_definitions");
+            "entities", "step_definitions",
+            "pins", "deltas", "heads", "head_rows");
 
     public static final List<String> RUN_STATE_TABLES = List.of(
             "runs", "run_logs", "scenario_executions", "step_executions", "entity_usages",
@@ -152,6 +153,44 @@ public final class SqlDialect {
                 hydrated_at TEXT NOT NULL,
                 removed INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY (definition_id)
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS pins (
+                id INTEGER PRIMARY KEY,
+                commit_sha TEXT NOT NULL,
+                committed_at TEXT NOT NULL,
+                dirty INTEGER NOT NULL,
+                CHECK (id = 1)
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS deltas (
+                seq INTEGER PRIMARY KEY AUTOINCREMENT,
+                at TEXT NOT NULL,
+                actor TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                expensive INTEGER NOT NULL DEFAULT 0
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS heads (
+                head_id TEXT PRIMARY KEY,
+                built_at TEXT,
+                stale INTEGER NOT NULL,
+                through_seq INTEGER NOT NULL,
+                jar_hash TEXT NOT NULL DEFAULT ''
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS head_rows (
+                head_id TEXT NOT NULL,
+                tbl TEXT NOT NULL,
+                pk TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                tombstone INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (head_id, tbl, pk)
             )
             """);
 
@@ -429,6 +468,8 @@ public final class SqlDialect {
         }
         session.update("INSERT OR IGNORE INTO _pkb_actor(id, name) VALUES (1, '')");
         if (!triggerExists(session, "files_pkb_insert")) installChangeLog(session);
+        session.update(UPSERT_META, "universal_entity", "1");
+        session.update(UPSERT_META, "delta_window", "100");
     }
 
     private static String readStoreSchema(SqlSession session) {
@@ -453,12 +494,14 @@ public final class SqlDialect {
         }
     }
 
-    /** Schema 1 with the changelog trigger. A newer version never takes this path. */
+    /** Schema 1 with the changelog trigger and the universal-entity marker. */
     private static boolean schemaReady(SqlSession session) {
         String current = readStoreSchema(session);
         if (!"1".equals(current)) return false;
         try {
-            return triggerExists(session, "files_pkb_insert");
+            if (!triggerExists(session, "files_pkb_insert")) return false;
+            return "1".equals(session.scalar(
+                    "SELECT value FROM schema_meta WHERE `key` = 'universal_entity'"));
         } catch (SQLException ignored) {
             return false;
         }

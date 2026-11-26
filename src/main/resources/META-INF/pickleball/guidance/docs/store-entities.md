@@ -59,3 +59,24 @@ store entity use Account ada --operation=write --value-ref=<password:qaDb>
 `store entity export` is `store extract` limited to `store-entities/`. It writes the stored file bytes. Those bytes stay the original file, comments included, until `store entity put`. A put stores the canonical form (`type`, `id`, `version`, and a compact payload with sorted keys) and export writes that. If the file was not edited in the database, the original bytes stay. If both the file and the database changed since the last sync, export prints `conflict: <path>` and does not overwrite. `--force` overwrites the file from the stored bytes. A deleted unedited file is not recreated.
 
 `store entity put` updates the database only. It uses the same write as `store feature put`: `db_edited` is set, `last_synced_hash` stays, and the entity row is replaced in that transaction. Export is what changes the file.
+
+## Pin, deltas, and head
+
+The same source database keeps one commit pin, an append-only delta log, and a flattened head. `store_schema` stays 1. Opening the store writes `schema_meta` keys `universal_entity=1` and `delta_window=100`.
+
+```
+store pin show
+store delta list [--limit=N]
+store delta undo
+store delta redo
+store head show
+store head rebuild
+```
+
+`store pin show` prints `commit`, `committedAt`, and `dirty`. The commit sha comes from the same git read as hydrate. An empty git directory stores an empty sha and dirty 0. A dirty tree stores dirty 1. `store status` still warns once when git provenance is empty.
+
+`store delta list` prints `deltas N` and then `seq <seq> <kind> <table> <pk>`. It does not print the payload. Kinds in this phase are `put`, `delete`, `undo`, and `redo`. `store delta undo` appends an inverse of the delta at `delta_cursor` and leaves that row in the log. `store delta redo` appends a copy of the delta that undo inverted. Undo or redo with nothing to apply exits 1.
+
+`schema_meta` key `delta_cursor` is the seq the head currently reflects. A cheap append writes the delta and flattens it into `head_rows` in the same transaction. `expensive=1` sets `heads.stale=1` and waits. `store status` and the end of `store hydrate` call `HeadMaterializer.quiet`, which flattens a stale head. `store head show` rebuilds when the head is stale. `store head rebuild` replays the remaining deltas. An unchanged source row stays in its own table until a delta names it. A tombstone hides the parent row. After a flatten, more than 100 stored deltas are folded into the head and those oldest delta rows are deleted in the same transaction. A run does not read the head yet.
+
+`pkb_store_log=pin,delta` logs pin, head, append, undo, redo, and fold lines. The lines are date-stamped, name the sandbox, and do not include the payload. Workbench, Gradle, and MCP only forward these commands.

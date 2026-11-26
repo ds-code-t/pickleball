@@ -167,6 +167,10 @@ public final class StoreHydrator {
                         ? git.commit() : "unknown";
                 SqlDialect.commitHydrate(connection, sha, git.available() && git.dirty());
             }
+            if (!options.dryRun()) {
+                HeadMaterializer.quiet(connection, project);
+                UniversalEntity.refreshPin(connection, project);
+            }
             StoreLog.log(project, "hydrate", "files",
                     (options.dryRun() ? "dry-run " : "") + "inserted=" + inserted + " updated=" + updated
                             + " ignored=" + ignored);

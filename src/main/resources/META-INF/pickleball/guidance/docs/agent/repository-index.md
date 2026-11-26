@@ -681,10 +681,12 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/store/dashboard/DashboardSnapshot.java`
 - `src/main/java/tools/dscode/store/dashboard/DashboardSource.java`
 - `src/main/java/tools/dscode/store/dashboard/SqliteDashboardSource.java`
+- `src/main/java/tools/dscode/store/DeltaLog.java`
 - `src/main/java/tools/dscode/store/EditRules.java`
 - `src/main/java/tools/dscode/store/FileRules.java`
 - `src/main/java/tools/dscode/store/GherkinRewrite.java`
 - `src/main/java/tools/dscode/store/GlueRules.java`
+- `src/main/java/tools/dscode/store/HeadMaterializer.java`
 - `src/main/java/tools/dscode/store/LegacyNames.java`
 - `src/main/java/tools/dscode/store/ProjectElementCategories.java`
 - `src/main/java/tools/dscode/store/RunCatalog.java`
@@ -735,6 +737,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/store/StoreSources.java`
 - `src/main/java/tools/dscode/store/StoreStepCatalog.java`
 - `src/main/java/tools/dscode/store/StoreTrack.java`
+- `src/main/java/tools/dscode/store/UniversalEntity.java`
 - `src/main/java/tools/dscode/testengine/DynamicEngineDiscoveryRequest.java`
 - `src/main/java/tools/dscode/testengine/DynamicSuiteBootstrap.java`
 - `src/main/java/tools/dscode/testengine/DynamicSuiteConfigUtils.java`
@@ -1132,11 +1135,13 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/store/CategoryEditTest.java`
 - `src/test/java/tools/dscode/store/ChangesCliTest.java`
 - `src/test/java/tools/dscode/store/dashboard/DashboardTest.java`
+- `src/test/java/tools/dscode/store/DeltaWindowTest.java`
 - `src/test/java/tools/dscode/store/EmbeddedStoreOpenTest.java`
 - `src/test/java/tools/dscode/store/EntityResolutionTest.java`
 - `src/test/java/tools/dscode/store/FileEditTest.java`
 - `src/test/java/tools/dscode/store/GherkinRewriteTest.java`
 - `src/test/java/tools/dscode/store/GlueEditTest.java`
+- `src/test/java/tools/dscode/store/HeadMaterializerTest.java`
 - `src/test/java/tools/dscode/store/LargeFileBranchCopyTest.java`
 - `src/test/java/tools/dscode/store/LargeFileReferenceTest.java`
 - `src/test/java/tools/dscode/store/LegacyNamesTest.java`
@@ -1210,6 +1215,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/store/StoreStepDefinitionCatalogTest.java`
 - `src/test/java/tools/dscode/store/StoreTestProcesses.java`
 - `src/test/java/tools/dscode/store/StoreTimelineTest.java`
+- `src/test/java/tools/dscode/store/UniversalEntityTest.java`
 - `src/test/java/tools/dscode/store/usage/LookupProbe.java`
 - `src/test/java/tools/dscode/testengine/CucumberNameFilterTest.java`
 - `src/test/java/tools/dscode/testengine/CucumberPluginPublishTest.java`

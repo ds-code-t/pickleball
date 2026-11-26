@@ -4,6 +4,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
@@ -85,6 +86,9 @@ public final class StoreCli {
                 case "scenario", "scenarios" -> scenarios(project, tokens, json(tokens), stdout, stderr);
                 case "step", "steps" -> steps(project, tokens, json(tokens), stdout, stderr);
                 case "conflicts" -> conflicts(project, json(tokens), stdout, stderr);
+                case "pin" -> pinCommand(project, tokens, stdout, stderr);
+                case "delta" -> deltaCommand(project, tokens, stdout, stderr);
+                case "head" -> headCommand(project, tokens, stdout, stderr);
                 case "query" -> trackCommand(project, tokens, false, stdout, stderr);
                 case "timeline" -> trackCommand(project, tokens, true, stdout, stderr);
                 case "retain" -> retainCommand(project, tokens, stdout, stderr);
@@ -147,6 +151,12 @@ public final class StoreCli {
                 Usage: store sandbox merge <name> [--policy=fail|branch-wins|main-wins] [--dry-run] [--drop] [--json] [--project=<dir>]
                 Usage: store changes [--sandbox=<name>] [--since=<seq>] [--table=<t>] [--limit=<n>] [--json] [--project=<dir>]
                 Usage: store status [--project=<dir>] [--json]
+                Usage: store pin show [--json] [--project=<dir>]
+                Usage: store delta list [--limit=N] [--json] [--project=<dir>]
+                Usage: store delta undo [--json] [--project=<dir>]
+                Usage: store delta redo [--json] [--project=<dir>]
+                Usage: store head show [--json] [--project=<dir>]
+                Usage: store head rebuild [--json] [--project=<dir>]
                 Usage: store hydrate [--project=<dir>] [--path=<relative>] [--force] [--dry-run]
                 Usage: store extract [--project=<dir>] [--path=<relative>] [--force]
                 Usage: store history list [--project=<dir>]
@@ -179,6 +189,7 @@ public final class StoreCli {
                 Files stay the source of truth. The working copy is .pickleball/store/main.db and is gitignored. Opening it starts no process and downloads nothing.
                 sandbox merge compares _pkb_base, the sandbox, and main by hash. The default policy fail writes nothing when any key conflicts, prints a text table, and saves sandboxes/<name>/merge-<time>.json. branch-wins and main-wins resolve those keys. One transaction applies the chosen rows, rebuilds derived feature rows, and re-baselines the sandbox. --dry-run writes nothing. --drop drops the sandbox after a successful merge. store changes lists the _pkb_changes rows for the bound database. --since and --limit page by sequence. pkb_store_changes_days (default 14) is how long store retain and sandbox prune keep those rows. Set pkb_store_log=merge,changes to log them.
                 status and hydrate --dry-run do not create a database when it is missing.
+                store pin show prints the commit pin (commit sha, time, and dirty). An empty git directory stores an empty sha and dirty 0. store delta list prints the append-only log. store delta undo appends an inverse delta and does not delete the undone row. store delta redo appends a copy of the delta that undo inverted. store head show prints the flattened head and rebuilds it when it is stale. store head rebuild replays the remaining deltas. After a flatten, more than 100 deltas are folded into the head and those delta rows are deleted. Set pkb_store_log=pin,delta to log pin, head, append, undo, redo, and fold lines.
                 hydrate copies features, configs, calls, components, resource maps, templates, and store-entities/*.entity files.
                 A .feature file also stores scenarios, steps, tags, docstrings, and data tables. The original bytes stay in the file row.
                 Unchanged content hashes are skipped. --force rewrites the database rows from files.
@@ -343,6 +354,8 @@ public final class StoreCli {
             return 1;
         }
         try (StoreDatabase database = StoreDatabase.open(project)) {
+            HeadMaterializer.quiet(database.connection(), project);
+            UniversalEntity.refreshPin(database.connection(), project);
             int version = database.schemaVersion();
             int files = count(database, "SELECT COUNT(*) FROM files");
             int scenarios = count(database, "SELECT COUNT(*) FROM scenarios");
@@ -651,6 +664,119 @@ public final class StoreCli {
         } catch (Exception failure) {
             err.println("error: " + failure.getMessage());
             err.println("fix: store steps list");
+            return 1;
+        }
+    }
+
+    private static int pinCommand(Path project, List<String> tokens, PrintStream stdout, PrintStream stderr) {
+        String verb = action(tokens);
+        if (!"show".equals(verb)) {
+            stderr.println("error: Unknown Store pin command: " + (verb.isEmpty() ? "pin" : verb));
+            stderr.println("fix: store pin show");
+            return 2;
+        }
+        try (StoreDatabase database = StoreDatabase.open(project)) {
+            UniversalEntity.Pin pin = UniversalEntity.refreshPin(database.connection(), project);
+            if (json(tokens)) {
+                stdout.println("{\"commitSha\":\"" + jsonEscape(pin.commitSha())
+                        + "\",\"committedAt\":\"" + jsonEscape(pin.committedAt())
+                        + "\",\"dirty\":" + pin.dirty() + "}");
+            } else {
+                stdout.println("commit " + pin.commitSha());
+                stdout.println("committedAt " + pin.committedAt());
+                stdout.println("dirty " + (pin.dirty() ? 1 : 0));
+            }
+            return 0;
+        } catch (Exception failure) {
+            stderr.println("error: " + failure.getMessage());
+            stderr.println("fix: store pin show");
+            return 1;
+        }
+    }
+
+    private static int deltaCommand(Path project, List<String> tokens, PrintStream stdout, PrintStream stderr) {
+        String verb = action(tokens);
+        if (!"list".equals(verb) && !"undo".equals(verb) && !"redo".equals(verb)) {
+            stderr.println("error: Unknown Store delta command: " + (verb.isEmpty() ? "delta" : verb));
+            stderr.println("fix: store delta list");
+            return 2;
+        }
+        try (StoreDatabase database = StoreDatabase.open(project)) {
+            Connection connection = database.connection();
+            if ("list".equals(verb)) {
+                int limit = integer(option(tokens, "--limit="), 100);
+                List<DeltaLog.Delta> deltas = DeltaLog.list(connection, limit);
+                if (json(tokens)) {
+                    StringBuilder body = new StringBuilder();
+                    body.append("{\"deltas\":[");
+                    for (int index = 0; index < deltas.size(); index++) {
+                        DeltaLog.Delta delta = deltas.get(index);
+                        if (index > 0) body.append(',');
+                        body.append("{\"seq\":").append(delta.seq())
+                                .append(",\"kind\":\"").append(jsonEscape(delta.kind()))
+                                .append("\",\"table\":\"").append(jsonEscape(delta.table()))
+                                .append("\",\"pk\":\"").append(jsonEscape(delta.pk()))
+                                .append("\"}");
+                    }
+                    body.append("]}");
+                    stdout.println(body);
+                } else {
+                    stdout.println("deltas " + deltas.size());
+                    for (DeltaLog.Delta delta : deltas) {
+                        stdout.println("seq " + delta.seq() + " " + delta.kind() + " "
+                                + delta.table() + " " + delta.pk());
+                    }
+                }
+                return 0;
+            }
+            long seq = "undo".equals(verb)
+                    ? DeltaLog.undo(connection, project)
+                    : DeltaLog.redo(connection, project);
+            if (json(tokens)) stdout.println("{\"seq\":" + seq + ",\"kind\":\"" + verb + "\"}");
+            else stdout.println(verb + " seq=" + seq);
+            return 0;
+        } catch (Exception failure) {
+            stderr.println("error: " + failure.getMessage());
+            stderr.println("fix: store delta list");
+            return 1;
+        }
+    }
+
+    private static int headCommand(Path project, List<String> tokens, PrintStream stdout, PrintStream stderr) {
+        String verb = action(tokens);
+        if (!"show".equals(verb) && !"rebuild".equals(verb)) {
+            stderr.println("error: Unknown Store head command: " + (verb.isEmpty() ? "head" : verb));
+            stderr.println("fix: store head show");
+            return 2;
+        }
+        try (StoreDatabase database = StoreDatabase.open(project)) {
+            Connection connection = database.connection();
+            if ("rebuild".equals(verb) || UniversalEntity.headStale(connection)) {
+                HeadMaterializer.rebuild(connection, project);
+            }
+            boolean stale = UniversalEntity.headStale(connection);
+            long through = UniversalEntity.cursor(connection);
+            String jar = UniversalEntity.text(connection,
+                    "SELECT jar_hash FROM heads WHERE head_id = ?", UniversalEntity.HEAD_ID);
+            if (jar == null) jar = "";
+            String rawRows = UniversalEntity.text(connection,
+                    "SELECT COUNT(*) FROM head_rows WHERE head_id = ?", UniversalEntity.HEAD_ID);
+            int rows = rawRows == null ? 0 : Integer.parseInt(rawRows.trim());
+            if (json(tokens)) {
+                stdout.println("{\"headId\":\"" + UniversalEntity.HEAD_ID + "\",\"stale\":" + stale
+                        + ",\"through\":" + through + ",\"jar\":\"" + jsonEscape(jar)
+                        + "\",\"rows\":" + rows + "}");
+            } else {
+                stdout.println("head " + UniversalEntity.HEAD_ID);
+                stdout.println("stale " + (stale ? 1 : 0));
+                stdout.println("through " + through);
+                stdout.println("jar " + jar);
+                stdout.println("rows " + rows);
+            }
+            return 0;
+        } catch (Exception failure) {
+            stderr.println("error: " + failure.getMessage());
+            stderr.println("fix: store head show");
             return 1;
         }
     }
