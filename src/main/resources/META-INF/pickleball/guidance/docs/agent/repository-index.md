@@ -1223,6 +1223,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/store/SandboxMergeTimingTest.java`
 - `src/test/java/tools/dscode/store/SandboxPromoteTest.java`
 - `src/test/java/tools/dscode/store/ScenarioTagTableTest.java`
+- `src/test/java/tools/dscode/store/SnapshotRetainTest.java`
 - `src/test/java/tools/dscode/store/spike/EmbeddedMultiProcessTest.java`
 - `src/test/java/tools/dscode/store/spike/EmbeddedNativeProbe.java`
 - `src/test/java/tools/dscode/store/spike/EmbeddedStoreSpikeTest.java`

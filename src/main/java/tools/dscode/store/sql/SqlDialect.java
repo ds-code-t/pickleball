@@ -26,7 +26,8 @@ public final class SqlDialect {
     public static final List<String> RUN_STATE_TABLES = List.of(
             "runs", "run_logs", "scenario_executions", "step_executions", "entity_usages",
             "log_entity_links", "artifacts", "sandboxes",
-            "run_snapshots", "run_snapshot_entities", "run_attributes", "snap_find_index");
+            "run_snapshots", "run_snapshot_entities", "run_attributes", "snap_find_index",
+            "delta_archive");
 
     /** The eleven {@code setAutoCommit(false)} sites, plus the schema commit. */
     public static final List<String> TRANSACTIONS = List.of(
@@ -399,6 +400,15 @@ public final class SqlDialect {
                 backend_node_id TEXT,
                 PRIMARY KEY (run_id, handle),
                 FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS delta_archive (
+                seq INTEGER PRIMARY KEY,
+                at TEXT,
+                kind TEXT,
+                payload_json TEXT,
+                head_id TEXT
             )
             """);
 

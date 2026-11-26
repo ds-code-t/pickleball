@@ -167,7 +167,7 @@ public final class StoreCli {
                 Usage: store delta undo [--json] [--project=<dir>]
                 Usage: store delta redo [--json] [--project=<dir>]
                 Usage: store head show [--json] [--project=<dir>]
-                Usage: store head rebuild [--json] [--project=<dir>]
+                Usage: store head rebuild [--from-archive=<seq>] [--json] [--project=<dir>]
                 Usage: store enable <feature|scenario|step|definition|folder> <id> --on|--off [--json] [--project=<dir>]
                 Usage: store tag add|remove --feature=<path> --scenario=<ord-or-name> --tag=<tag> [--json] [--project=<dir>]
                 Usage: store var list [--json] [--project=<dir>]
@@ -212,7 +212,7 @@ public final class StoreCli {
                 store sandbox create defaults to --mode=cow. The child records schema_meta sandbox_mode=cow and _pkb_branch parent. Edits are deltas in that child. A delete is a tombstone. --mode=copy is an independent database with no parent. store sandbox promote requires --logs=clear|archive. --to=parent writes one expensive delta per changed head row on the parent. --to=top walks parents until main. Promote onto main syncs those files through store extract and skips a both-sides conflict. Promote onto another sandbox does not touch the working tree. --logs=clear deletes that sandbox's run_logs rows. --logs=archive leaves them and prefixes runs.note with archived. Set pkb_store_log=sandbox to log create and promote. The log names the sandbox and does not include payloads.
                 sandbox merge compares _pkb_base, the sandbox, and main by hash. The default policy fail writes nothing when any key conflicts, prints a text table, and saves sandboxes/<name>/merge-<time>.json. branch-wins and main-wins resolve those keys. One transaction applies the chosen rows, rebuilds derived feature rows, and re-baselines the sandbox. --dry-run writes nothing. --drop drops the sandbox after a successful merge. store changes lists the _pkb_changes rows for the bound database. --since and --limit page by sequence. pkb_store_changes_days (default 14) is how long store retain and sandbox prune keep those rows. Set pkb_store_log=merge,changes to log them.
                 status and hydrate --dry-run do not create a database when it is missing.
-                store pin show prints the commit pin (commit sha, time, and dirty). An empty git directory stores an empty sha and dirty 0. store delta list prints the append-only log. store delta undo appends an inverse delta and does not delete the undone row. store delta redo appends a copy of the delta that undo inverted. store head show prints the flattened head and rebuilds it when it is stale. store head rebuild replays the remaining deltas. After a flatten, more than 100 deltas are folded into the head and those delta rows are deleted. A tracked run freezes that head id and the enabled entity hashes in runstate.db and does not copy source.db. Set pkb_store_log=pin,delta to log pin, head, append, undo, redo, fold, and snapshot lines. The snapshot log entity is the run id.
+                store pin show prints the commit pin (commit sha, time, and dirty). An empty git directory stores an empty sha and dirty 0. store delta list prints the append-only log. store delta undo appends an inverse delta and does not delete the undone row. store delta redo appends a copy of the delta that undo inverted. store head show prints the flattened head and rebuilds it when it is stale. store head rebuild replays the remaining deltas. After a flatten, more than 100 deltas are copied to delta_archive in runstate.db and removed from the source deltas table. store head rebuild --from-archive replays one archived seq and refuses a seq that is still in the live window. A tracked run freezes that head id and the enabled entity hashes in runstate.db and does not copy source.db. Set pkb_store_log=pin,delta to log pin, head, append, undo, redo, fold, and snapshot lines. The snapshot log entity is the run id.
                 store status prints reused, rehydrated, and the first 12 characters of the code-source jar hash. A jar hash change deletes source rows and hydrates them again. It does not open runstate.db. Unchanged content hashes increment reused. Inserts and updates increment rehydrated. store enable turns a feature, scenario, step, definition, or folder on or off. Off on a feature, scenario, or folder writes @pkb-ignore through the feature edit path. On removes only that tag. A both-sides edit is refused. Bad Gherkin rolls back. Files outside the feature and glue roots stay in the database with enabled 0. files.norm_path uses backslashes and a lowercase drive letter on Windows. store tag add and remove write scenario_tags in the same transaction as the scenario text. store query --tag still matches scenarios.tags and also matches scenario_tags. store var list, set, and enable read and write run_variables. var set on main writes the properties file back. A sandbox var set updates that database only. A cleartext secret is rejected. Set pkb_store_log=enable to log toggles. The log does not include variable values.
                 hydrate copies features, configs, calls, components, resource maps, templates, and store-entities/*.entity files.
                 A .feature file also stores scenarios, steps, tags, docstrings, and data tables. The original bytes stay in the file row.
@@ -270,7 +270,7 @@ public final class StoreCli {
     private static int retainCommand(Path project, List<String> tokens, PrintStream out, PrintStream err) {
         try {
             int days = integer(option(tokens, "--days="), StoreHistory.days());
-            int maxBytes = integer(option(tokens, "--max-bytes="), StoreHistory.maxBytes());
+            long maxBytes = whole(option(tokens, "--max-bytes="), StoreHistory.maxBytes());
             StoreHistory.RetainResult result = StoreHistory.retain(project, days, maxBytes);
             out.println(result.line());
             boolean present = StorePaths.ready(project);
@@ -816,6 +816,35 @@ public final class StoreCli {
             stderr.println("fix: store head show");
             return 2;
         }
+        String fromArchive = option(tokens, "--from-archive=");
+        if (fromArchive != null && !"rebuild".equals(verb)) {
+            stderr.println("error: --from-archive belongs on store head rebuild");
+            stderr.println("fix: store head rebuild --from-archive=<seq>");
+            return 2;
+        }
+        if (fromArchive != null) {
+            long seq;
+            try {
+                seq = Long.parseLong(fromArchive.trim());
+            } catch (NumberFormatException failure) {
+                stderr.println("error: archive seq must be a positive integer");
+                stderr.println("fix: store head rebuild --from-archive=<seq>");
+                return 1;
+            }
+            try (StoreDatabase database = StoreDatabase.open(project)) {
+                HeadMaterializer.rebuildFromArchive(database.connection(), project, seq);
+                stdout.println("archive seq=" + seq + " head " + UniversalEntity.HEAD_ID);
+                return 0;
+            } catch (Exception failure) {
+                String message = failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
+                if (message.startsWith("error:")) stderr.println(message);
+                else {
+                    stderr.println("error: " + message);
+                    stderr.println("fix: store head rebuild --from-archive=<seq>");
+                }
+                return 1;
+            }
+        }
         try (StoreDatabase database = StoreDatabase.open(project)) {
             Connection connection = database.connection();
             if ("rebuild".equals(verb) || UniversalEntity.headStale(connection)) {
@@ -1307,7 +1336,7 @@ public final class StoreCli {
                 }
                 case "retain" -> {
                     int days = integer(option(tokens, "--days="), StoreHistory.days());
-                    int maxBytes = integer(option(tokens, "--max-bytes="), StoreHistory.maxBytes());
+                    long maxBytes = whole(option(tokens, "--max-bytes="), StoreHistory.maxBytes());
                     StoreHistory.RetainResult result = StoreHistory.retain(project, days, maxBytes);
                     out.println(result.line());
                     boolean present = StorePaths.ready(project);
@@ -1362,6 +1391,15 @@ public final class StoreCli {
         if (raw == null || raw.isBlank()) return fallback;
         try {
             return Integer.parseInt(raw.trim());
+        } catch (NumberFormatException failure) {
+            throw new IllegalArgumentException("expected an integer: " + raw);
+        }
+    }
+
+    private static long whole(String raw, long fallback) {
+        if (raw == null || raw.isBlank()) return fallback;
+        try {
+            return Long.parseLong(raw.trim());
         } catch (NumberFormatException failure) {
             throw new IllegalArgumentException("expected an integer: " + raw);
         }
