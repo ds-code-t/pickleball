@@ -1,25 +1,18 @@
 # Tech debt
 
-This page lists behavior that is not a feature. Do not document it as syntax.
+This page lists behavior that is not a feature. Do not document an open item as syntax. A heading marked closed describes behavior that shipped.
 
-## Unused step ceiling fields
+## Step ceilings (closed, spine R2 P3)
 
-`StepBase.stepMaxIterations` and `StepBase.stepTimeoutSeconds` are never assigned. A block `until` uses the run-wide `pkb_stepRepeatMaxCount` and `pkb_stepMaxTime` values. An element `wait` uses `pkb_stepMaxTime` only. There is no per-step ceiling. Do not read those fields as one.
+`steps.max_iterations` and `steps.timeout_seconds` are nullable integers. Hydrate leaves them untouched. A null column keeps the run-wide `pkb_stepRepeatMaxCount` and `pkb_stepMaxTime`. When a row sets them, the native runner and the Cucumber adapter assign `StepBase.stepMaxIterations` and `StepBase.stepTimeoutSeconds`. A block `until`, an inline `until`, and `RETRY:` use that cap. An element `wait` still uses the run-wide time cap only. A null column is not read as zero.
 
-## Hung step watchdog
+## Hung step watchdog (closed, spine R2 P3)
 
-A non-repeating step never samples `pkb_stepMaxTime`. Only a block `until` and an element `wait` do. There is no watchdog that fails one hung non-repeating step. One should check about once a minute and fail that step. A hung Selenium call on the step thread may keep running after the watchdog fires.
+`StepWatchdog` is a daemon started by `NativeScenarioRun` and stopped in a `finally` before scenario cleanup. Every 60 seconds it looks at the current non-repeating step. When that step's `timeout_seconds`, or `pkb_stepMaxTime` when the column is null, has been exceeded, the step fails with `error: step exceeded its time cap` and `fix: raise timeout_seconds or pkb_stepMaxTime`. The watchdog does not interrupt the step thread. A hung driver call may still be running. A repeating `until` is not double-failed. `pkb_engine_log=watchdog` logs each sample and each fire. The entity is the scenario name. The log stays off unless that capability is named.
 
-## Accepted steps that do nothing
+## Scenario flag steps (closed, spine R2 P3)
 
-The parser and glue accept these steps. Their methods are empty. They do not change which later steps run. Do not document them or use them as features until they are implemented:
-
-- `RETRY:`
-- `IGNORE FAILURES`
-- `LOG FAILURES BUT CONTINUE SCENARIO`
-- `RUN IF SCENARIO FINISHED`
-
-`ALWAYS RUN` and `RUN IF SCENARIO PASSING` also accept an optional ` AND IGNORE FAILURES` suffix. `RUN IF SCENARIO PASSING` also accepts an optional ` AND SCENARIO FINISHED` suffix. The runner stores the whole line. That text is not the bare flag, so the suffix does not apply `ALWAYS RUN` or `RUN IF SCENARIO PASSING` and does not change failure handling.
+`RETRY:`, `IGNORE FAILURES`, `LOG FAILURES BUT CONTINUE SCENARIO`, and `RUN IF SCENARIO FINISHED` change which steps run and how a failure is recorded. `FlagSteps` and `GeneralSteps.retryStep` call `StepFlags.applyFromPhrase`. Hydrate writes the matching columns on `steps`. `IGNORE FAILURES` and `LOG FAILURES BUT CONTINUE SCENARIO` as their own steps mark the following step. A suffix `AND IGNORE FAILURES` marks that same step. `AND SCENARIO FINISHED` on `RUN IF SCENARIO PASSING` sets both passing and finished. `RUN IF SCENARIO FINISHED` runs after the scenario outcome is known. `RETRY:` runs the remainder again until it passes or the repeat cap is hit. The cap is `max_iterations` when set, otherwise `pkb_stepRepeatMaxCount`.
 
 ## Unsupported context words
 
@@ -37,9 +30,9 @@ There is no syntax that means "any parent context". `PhraseData.context` and `Ph
 
 A phrase cannot opt out of `ALL_CONTEXTS` or pin `Loading` to the inherited `in` / `from` / `for` context. A future flag would be read only by `ElementMatch.searchesAllContexts()`.
 
-## Inline until
+## Inline until (closed, spine R2 P3)
 
-A mid-line or comma `until`, and a period-ending `until`, do not loop. They act as a one-time `if` or do nothing. Only a block `until` ending in `:` or `?` with nested steps loops. `runUntilOperation` is not that runtime path.
+A mid-line `until`, a comma `until`, and a period-ending `until` loop while the condition is true. `PhraseData.runUntilOperation` is that loop. It stops at `max_iterations` or `timeout_seconds` when the step row sets them, and at `pkb_stepRepeatMaxCount` or `pkb_stepMaxTime` when those columns are null. A block `until` ending in `:` or `?` keeps the nested-step loop and honors the same per-step ceiling. An assertion-chain member is the condition check and does not start that inline loop.
 
 ## Deferred Linux and macOS tests (per Dan, 2026-11-24)
 

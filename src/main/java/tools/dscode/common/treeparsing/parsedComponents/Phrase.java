@@ -172,14 +172,23 @@ public final class Phrase extends PhraseData {
         getElementMatches().forEach(e -> {
             if (e.elementTypes.contains(ElementType.HTML_TYPE)) e.contextWrapper = new ContextWrapper(e);
         });
-        if (isOperationPhrase) {
+        // A block until ending in ':' or '?' stays on the nested-step loop.
+        // Its condition is an assertion-chain member, and that chain rewrites
+        // the terminator to a comma before this method runs. Looping here
+        // would spend the repeat cap on the check and never run the body.
+        if (untilPhrase
+                && assertionChainMembership == null
+                && (termination == null || (termination != ':' && termination != '?'))) {
+            prepareDataElementValues();
+            runUntilOperation();
+        } else if (isOperationPhrase) {
             prepareDataElementValues();
             runOperation();
         } else if (phraseType == PhraseType.CONTEXT) {
             processContextPhrase();
         }
     }
-    private void prepareDataElementValues() {
+    void prepareDataElementValues() {
         for (ElementMatch element : getElementMatches()) {
             if (!element.elementTypes.contains(ElementType.DATA_TYPE)) {
                 continue;

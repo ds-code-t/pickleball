@@ -304,6 +304,7 @@ public final class StoreGherkin {
             }
         }
         CucumberIngest.syncTags(connection, path);
+        CucumberIngest.syncStepFlags(connection, path);
         StoreLog.log(project, "parse", path, "scenarios=" + document.scenarios().size());
     }
 

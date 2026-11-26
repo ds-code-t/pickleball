@@ -2,6 +2,7 @@ package tools.dscode.engine.adapter.cucumber;
 
 import tools.dscode.engine.EngineLog;
 import tools.dscode.engine.match.PatternMatcher;
+import tools.dscode.engine.runtime.StepFlags;
 import tools.dscode.store.StoreLog;
 import tools.dscode.store.StorePaths;
 import tools.dscode.store.StoreRunVariables;
@@ -11,6 +12,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -81,6 +83,7 @@ public final class CucumberIngest {
         applyGluePackages(connection);
         reaffirmFiles(connection);
         syncAllTags(connection);
+        syncAllStepFlags(connection);
         StoreRunVariables.copyNamed(connection, project, "pkb_callpath", "pkb_componentpath");
         StoreLog.log(project, "hydrate", "ingest", "translated=" + translated + " failed=" + failed);
         return new Counts(translated, failed, notices);
@@ -278,6 +281,70 @@ public final class CucumberIngest {
                 off.executeUpdate();
             }
         }
+    }
+
+    /** Writes flag, retry, and until columns for one feature. Ceilings are left untouched. */
+    public static void syncStepFlags(Connection connection, String path) throws SQLException {
+        if (connection == null || path == null || path.isBlank()) return;
+        record Row(int scenario, int ord, String text) {
+        }
+        List<Row> rows = new ArrayList<>();
+        try (PreparedStatement read = connection.prepareStatement(
+                "SELECT scenario_ord, ord, text FROM steps WHERE file_path = ? ORDER BY scenario_ord, ord")) {
+            read.setString(1, path);
+            try (ResultSet result = read.executeQuery()) {
+                while (result.next()) {
+                    rows.add(new Row(result.getInt(1), result.getInt(2), result.getString(3)));
+                }
+            }
+        }
+        boolean ignoreNext = false;
+        boolean logNext = false;
+        int scenario = Integer.MIN_VALUE;
+        try (PreparedStatement update = connection.prepareStatement("""
+                UPDATE steps SET retry = ?, ignore_failures = ?, log_failures_continue = ?,
+                    run_if_finished = ?, always_run = ?, run_if_passing = ?, run_if_failed = ?,
+                    run_if_hard_failed = ?, run_if_soft_failed = ?, until_mode = ?
+                WHERE file_path = ? AND scenario_ord = ? AND ord = ?
+                """)) {
+            for (Row row : rows) {
+                if (row.scenario != scenario) {
+                    ignoreNext = false;
+                    logNext = false;
+                    scenario = row.scenario;
+                }
+                StepFlags.Parsed parsed = StepFlags.parse(row.text);
+                int ignore = parsed.ignoreFailures() || ignoreNext ? 1 : 0;
+                int log = parsed.logFailuresContinue() || logNext ? 1 : 0;
+                ignoreNext = parsed.ignoreOnNext();
+                logNext = parsed.logOnNext();
+                update.setInt(1, parsed.retry() ? 1 : 0);
+                update.setInt(2, ignore);
+                update.setInt(3, log);
+                update.setInt(4, parsed.runIfFinished() ? 1 : 0);
+                update.setInt(5, parsed.alwaysRun() ? 1 : 0);
+                update.setInt(6, parsed.runIfPassing() ? 1 : 0);
+                update.setInt(7, parsed.runIfFailed() ? 1 : 0);
+                update.setInt(8, parsed.runIfHardFailed() ? 1 : 0);
+                update.setInt(9, parsed.runIfSoftFailed() ? 1 : 0);
+                if (parsed.untilMode() == null) update.setNull(10, Types.VARCHAR);
+                else update.setString(10, parsed.untilMode());
+                update.setString(11, path);
+                update.setInt(12, row.scenario);
+                update.setInt(13, row.ord);
+                update.executeUpdate();
+            }
+        }
+    }
+
+    private static void syncAllStepFlags(Connection connection) throws SQLException {
+        List<String> paths = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT DISTINCT file_path FROM steps");
+             ResultSet rows = statement.executeQuery()) {
+            while (rows.next()) paths.add(rows.getString(1));
+        }
+        for (String path : paths) syncStepFlags(connection, path);
     }
 
     private static void syncAllTags(Connection connection) throws SQLException {

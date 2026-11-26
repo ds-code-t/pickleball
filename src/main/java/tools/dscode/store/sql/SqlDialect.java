@@ -515,6 +515,18 @@ public final class SqlDialect {
         addColumn(session, "steps", "enabled", "INTEGER NOT NULL DEFAULT 1");
         addColumn(session, "step_definitions", "enabled", "INTEGER NOT NULL DEFAULT 1");
         addColumn(session, "step_definitions", "parameter_types", "TEXT NOT NULL DEFAULT '[]'");
+        addColumn(session, "steps", "max_iterations", "INTEGER");
+        addColumn(session, "steps", "timeout_seconds", "INTEGER");
+        addColumn(session, "steps", "retry", "INTEGER NOT NULL DEFAULT 0");
+        addColumn(session, "steps", "ignore_failures", "INTEGER NOT NULL DEFAULT 0");
+        addColumn(session, "steps", "log_failures_continue", "INTEGER NOT NULL DEFAULT 0");
+        addColumn(session, "steps", "run_if_finished", "INTEGER NOT NULL DEFAULT 0");
+        addColumn(session, "steps", "always_run", "INTEGER NOT NULL DEFAULT 0");
+        addColumn(session, "steps", "run_if_passing", "INTEGER NOT NULL DEFAULT 0");
+        addColumn(session, "steps", "run_if_failed", "INTEGER NOT NULL DEFAULT 0");
+        addColumn(session, "steps", "run_if_hard_failed", "INTEGER NOT NULL DEFAULT 0");
+        addColumn(session, "steps", "run_if_soft_failed", "INTEGER NOT NULL DEFAULT 0");
+        addColumn(session, "steps", "until_mode", "TEXT");
     }
 
     private static void addColumn(SqlSession session, String table, String column, String definition) throws SQLException {

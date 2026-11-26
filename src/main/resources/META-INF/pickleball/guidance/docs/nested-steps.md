@@ -1,6 +1,6 @@
 # Nested Steps
 
-> **Working feature example:** [`nested-and-block-conditionals.feature`](../maven-consumer-project/src/test/resources/features/nested-and-block-conditionals.feature) demonstrates nested child steps, inherited conditions, and scoped page context. [`area-b-control-flow.feature`](../maven-consumer-project/src/test/resources/features/area-b-control-flow.feature) pins colon and question-mark parents, `::` / `:::`, a falsy middle level, same-level `if` / `else if` / `else`, block `until`, markers, and a table or doc string on a colon child. [`step-state-elements.feature`](../maven-consumer-project/src/test/resources/features/step-state-elements.feature) pins Step Repetition and Step Duration.
+> **Working feature example:** [`nested-and-block-conditionals.feature`](../maven-consumer-project/src/test/resources/features/nested-and-block-conditionals.feature) demonstrates nested child steps, inherited conditions, and scoped page context. [`area-b-control-flow.feature`](../maven-consumer-project/src/test/resources/features/area-b-control-flow.feature) pins colon and question-mark parents, `::` / `:::`, a falsy middle level, same-level `if` / `else if` / `else`, block `until`, inline `until`, `RETRY:`, `IGNORE FAILURES`, `LOG FAILURES BUT CONTINUE SCENARIO`, `RUN IF SCENARIO FINISHED`, markers, and a table or doc string on a colon child. [`step-state-elements.feature`](../maven-consumer-project/src/test/resources/features/step-state-elements.feature) pins Step Repetition and Step Duration.
 
 Nested steps make the parent-and-child structure of a scenario explicit. They are useful for conditions, scoped page sections, and multi-step branches.
 
@@ -88,7 +88,9 @@ A default `---startstep` / `---endstep` pair, or a custom marker such as `---are
 
 ## `until`
 
-Only a block `until` loops. The parent must end in `:` or `?`. A failing pass runs the body. The pass that finds the condition true stops and does not run the body again.
+A block `until` ends in `:` or `?`. A failing pass runs the nested body. The pass that finds the condition true stops and does not run the body again.
+
+A mid-line `until`, a comma `until`, and a period-ending `until` also loop, while the condition is true. The phrases after that `until` on the same line run on each pass. A falsy condition does not run them. `PhraseData.runUntilOperation` is that loop. The 400 millisecond pause between passes belongs to the block form.
 
 ```gherkin
 * , until the Step Repetition is 3:
@@ -101,7 +103,7 @@ Only a block `until` loops. The parent must end in `:` or `?`. A failing pass ru
 
 Scenario-end teardown that is not a loop ceiling uses `ALWAYS RUN` or a Cucumber `@After` hook. A registered object's `cleanup` property also runs at scenario end, including after a hard or soft failure. See [Registered objects](object-registration.md) and [Log and assert steps](log-and-assert-steps.md).
 
-Hitting `pkb_stepRepeatMaxCount` (default 100) or `pkb_stepMaxTime` (default 60 minutes) hard-fails the Cucumber scenario. The message names the setting, for example `Step exceeded pkb_stepMaxTime (5m)` or `Until loop exhausted pkb_stepRepeatMaxCount`. A following `ALWAYS RUN` sibling still runs. The clock is checked before the loop sleeps, and the sleep is only the time left, capped at 400 milliseconds. That 400 milliseconds is the pause between passes, not a cap on the whole pass. The condition, the step, logging, and diagnostic work sit outside the pause, so one pass can take longer than 400 milliseconds. Those ceilings are run-wide. The run-var limit always hard-fails; a longer Gherkin time can't extend it. Zero and negative are defined in [Repeat ceilings](configuration.md#repeat-ceilings). Names the parser treats specially are listed in [Reserved element names](reserved-element-names.md).
+Hitting `pkb_stepRepeatMaxCount` (default 100) or `pkb_stepMaxTime` (default 60 minutes) hard-fails the scenario. The message names the setting, for example `Step exceeded pkb_stepMaxTime (5m)` or `Until loop exhausted pkb_stepRepeatMaxCount`. A following `ALWAYS RUN` sibling still runs. The clock is checked before the loop sleeps, and the sleep is only the time left, capped at 400 milliseconds. That 400 milliseconds is the pause between block-until passes, not a cap on the whole pass. The condition, the step, logging, and diagnostic work sit outside the pause, so one pass can take longer than 400 milliseconds. A stored step row may set `max_iterations` and `timeout_seconds`. A null column keeps the run-wide cap. When the row's cap fires, the message names `max_iterations` or `timeout_seconds`. The run-var limit still hard-fails; a longer Gherkin time can't extend it. Zero and negative are defined in [Repeat ceilings](configuration.md#repeat-ceilings). Names the parser treats specially are listed in [Reserved element names](reserved-element-names.md).
 
 `times` repeats the action and stops on the first throw. It does not continue after a failure. See [Dynamic Steps](dynamic-steps.md).
 

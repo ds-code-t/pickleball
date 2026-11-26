@@ -321,7 +321,9 @@ public class GeneralSteps extends CoreSteps {
 
     @Given("^RETRY:.*$")
     public static void retryStep() {
-// placeholder for retry
+        io.cucumber.core.runner.StepExtension step = io.cucumber.core.runner.GlobalState.getRunningStep();
+        String text = step == null ? "" : step.getUnmodifiedText();
+        tools.dscode.engine.runtime.StepFlags.applyFromPhrase(text);
     }
 
 

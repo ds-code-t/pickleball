@@ -47,9 +47,11 @@ import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static io.cucumber.core.runner.GlobalState.pickleballLog;
 import static io.cucumber.core.runner.StepLogic.stepCloner;
 import tools.dscode.engine.adapter.cucumber.NativeStepTrace;
+import tools.dscode.engine.runtime.StepWatchdog;
 import static org.junit.jupiter.api.Assertions.fail;
 import static tools.dscode.common.GlobalConstants.ALWAYS_RUN;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_FAILED;
+import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_FINISHED;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_HARD_FAILED;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_PASSING;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_SOFT_FAILED;
@@ -58,6 +60,7 @@ import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN;
 import static tools.dscode.common.assertions.AssertionChain.copyAssertionChainToNewPhrase;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
+import static tools.dscode.common.reporting.logging.LogForwarder.logError;
 import static tools.dscode.common.reporting.logging.LogForwarder.logSkip;
 import static tools.dscode.common.reporting.logging.LogForwarder.setDefaultEntry;
 import static tools.dscode.common.treeparsing.preparsing.ParsedLine.createParsedLine;
@@ -387,9 +390,14 @@ public class CurrentScenarioState extends ScenarioMapping {
     public void scenarioRunCleanUp() {
         RuntimeException failure = null;
         try {
-            finishAgentSurfaces();
+            runFinishedSteps();
         } catch (RuntimeException thrown) {
             failure = thrown;
+        }
+        try {
+            finishAgentSurfaces();
+        } catch (RuntimeException thrown) {
+            if (failure == null) failure = thrown;
         } finally {
             try {
                 runConfiguredObjectCleanups();
@@ -503,6 +511,10 @@ public class CurrentScenarioState extends ScenarioMapping {
 
         if (endCurrentScenario)
             return;
+        if (stepExtension.parentStep != null) {
+            if (stepExtension.parentStep.ignoreStepFailure) stepExtension.ignoreStepFailure = true;
+            if (stepExtension.parentStep.logFailuresContinue) stepExtension.logFailuresContinue = true;
+        }
         if (isUnselectedBlockChild(stepExtension)) {
             stepExtension.skipped = true;
             logSkip("Skipping Step: " + stepExtension.getStepText());
@@ -537,6 +549,7 @@ public class CurrentScenarioState extends ScenarioMapping {
         // steps must do the same before shouldRun, or ALWAYS RUN is skipped
         // after a hard failure and its inline child never exists.
         tools.dscode.engine.adapter.cucumber.SharedStepRun.bindGlue(stepExtension);
+        tools.dscode.engine.adapter.cucumber.StepFlagBridge.applyStored(stepExtension);
 
         if (!shouldRun(stepExtension)) {
             stepExtension.skipped = true;
@@ -561,6 +574,12 @@ public class CurrentScenarioState extends ScenarioMapping {
                 }
             }
         }
+        if (stepExtension.watchdogFailed) {
+            Throwable cap = stepExtension.result != null && stepExtension.result.getError() != null
+                    ? stepExtension.result.getError()
+                    : new RuntimeException("error: step exceeded its time cap\nfix: raise timeout_seconds or pkb_stepMaxTime");
+            stepExtension.result = new Result(Status.FAILED, Duration.between(startTime, Instant.now()), cap);
+        }
         setDefaultEntry(scenarioLog);
         if (!stepExtension.lineData.inheritancePhrases.isEmpty())
             stepExtension.inheritancePhrase = stepExtension.lineData.inheritancePhrases.getFirst();
@@ -577,14 +596,27 @@ public class CurrentScenarioState extends ScenarioMapping {
         }
 
         if (throwable != null) {
-            if (SoftExceptionInterface.class.isAssignableFrom(throwable.getClass())) {
+            if (stepExtension.watchdogFailed) {
+                if (!isScenarioHardFail) {
+                    recordHardFailure(throwable);
+                    scenarioLog.fail("SCENARIO FAILED: " + throwable.getMessage());
+                }
+            } else if (stepExtension.ignoreStepFailure || stepExtension.captureFailure) {
+                stepExtension.capturedError = throwable;
+                stepExtension.result = new Result(Status.PASSED, Duration.between(startTime, Instant.now()), null);
+            } else if (stepExtension.logFailuresContinue) {
+                stepExtension.capturedError = throwable;
+                logError(throwable.getMessage() == null ? "step failed" : throwable.getMessage());
+                stepExtension.result = new Result(Status.PASSED, Duration.between(startTime, Instant.now()), null);
+            } else if (SoftExceptionInterface.class.isAssignableFrom(throwable.getClass())) {
                 isScenarioSoftFail = true;
                 stepFailures.add(throwable);
+                scenarioLog.fail("SCENARIO FAILED: " + throwable.getMessage());
             } else {
                 recordHardFailure(throwable);
                 isScenarioSoftFail = false;
+                scenarioLog.fail("SCENARIO FAILED: " + throwable.getMessage());
             }
-            scenarioLog.fail("SCENARIO FAILED: " + throwable.getMessage());
         }
 
         if (stepExtension.hasFinalizerAction()
@@ -646,22 +678,16 @@ public class CurrentScenarioState extends ScenarioMapping {
                     Instant cloneStartTime = null;
                     boolean timingThisLoop = UntilPassTiming.requested() && !UntilPassTiming.active();
                     if (timingThisLoop) UntilPassTiming.start();
+                    StepWatchdog.markRepeating(true);
                     try {
                         while (true) {
-                            boolean overTime = untilCapReached(cloneStartTime);
-                            boolean overCount = !overTime && StepData.repetitionLimitReached(
-                                    cloneRunCount,
-                                    StepData.effectiveMaxIterations()
-                            );
-                            if (overTime || overCount) {
+                            String limit = untilStopMessage(stepExtension, cloneStartTime, cloneRunCount);
+                            if (limit != null) {
                                 StepExtension failedStep = cloneUntilPass(inheritancePhrase, stepExtension);
+                                copyCeilings(stepExtension, failedStep);
                                 failedStep.runCount = cloneRunCount;
                                 failedStep.startTime = cloneStartTime;
-                                failedStep.checkGlobalMax();
-                                String limit = overTime
-                                        ? StepData.stepMaxTimeExceededMessage()
-                                        : "Until loop exhausted pkb_stepRepeatMaxCount "
-                                                + StepData.effectiveMaxIterations();
+                                if (limit.contains("pkb_step")) failedStep.checkGlobalMax();
                                 exhaustedUntil = new RuntimeException(
                                         limit
                                                 + " for step '"
@@ -676,6 +702,7 @@ public class CurrentScenarioState extends ScenarioMapping {
                                 try (UntilPassTiming.Scope ignoredClone = UntilPassTiming.open("clone")) {
                                     clonedStep = cloneUntilPass(inheritancePhrase, stepExtension);
                                 }
+                                copyCeilings(stepExtension, clonedStep);
                                 clonedStep.runCount = cloneRunCount;
                                 clonedStep.startTime = cloneStartTime;
                                 clonedStep.overridePhrase = inheritancePhrase.clonePhrase(
@@ -704,16 +731,15 @@ public class CurrentScenarioState extends ScenarioMapping {
                                         waitMilliseconds(pause);
                                     }
                                 }
-                                overTime = clonedStep.reachedGlobalMaxDuration();
-                                overCount = !overTime && clonedStep.reachedGlobalMaxRepetition();
-                                if (overTime || overCount) {
-                                    clonedStep.checkGlobalMax();
-                                    String limit = overTime
-                                            ? StepData.stepMaxTimeExceededMessage()
-                                            : "Until loop exhausted pkb_stepRepeatMaxCount "
-                                                    + StepData.effectiveMaxIterations();
+                                String pausedLimit = untilStopMessage(
+                                        clonedStep,
+                                        clonedStep.startTime,
+                                        clonedStep.runCount
+                                );
+                                if (pausedLimit != null) {
+                                    if (pausedLimit.contains("pkb_step")) clonedStep.checkGlobalMax();
                                     exhaustedUntil = new RuntimeException(
-                                            limit
+                                            pausedLimit
                                                     + " for step '"
                                                     + clonedStep.getStepText()
                                                     + "'"
@@ -731,6 +757,7 @@ public class CurrentScenarioState extends ScenarioMapping {
                             }
                         }
                     } finally {
+                        StepWatchdog.markRepeating(false);
                         if (timingThisLoop) {
                             UntilPassTiming.publish();
                             UntilPassTiming.stop();
@@ -757,13 +784,31 @@ public class CurrentScenarioState extends ScenarioMapping {
     }
 
     /**
-     * Same cap as {@link StepData#reachedGlobalMaxDuration()} without cloning
-     * a pass that is already over the limit.
+     * Global caps win when they fire, including when a step column reaches the
+     * same boundary. A null column leaves the run-wide cap in force.
      */
-    private static boolean untilCapReached(Instant startTime) {
-        Duration cap = StepData.effectiveTimeout();
-        if (cap == null || cap.isNegative() || startTime == null) return false;
-        return Duration.between(startTime, Instant.now()).compareTo(cap) > 0;
+    private static String untilStopMessage(StepExtension owner, Instant start, int completed) {
+        Duration globalCap = StepData.effectiveTimeout();
+        boolean globalTime = start != null && globalCap != null && !globalCap.isNegative()
+                && Duration.between(start, Instant.now()).compareTo(globalCap) > 0;
+        Duration stepCap = owner == null ? null : owner.stepTimeoutSeconds;
+        boolean stepTime = start != null && stepCap != null && !stepCap.isNegative()
+                && Duration.between(start, Instant.now()).compareTo(stepCap) > 0;
+        if (globalTime) return StepData.stepMaxTimeExceededMessage();
+        if (stepTime) return "Step exceeded timeout_seconds (" + stepCap.getSeconds() + "s)";
+        int globalMax = StepData.effectiveMaxIterations();
+        boolean globalCount = StepData.repetitionLimitReached(completed, globalMax);
+        Integer stepMax = owner == null ? null : owner.stepMaxIterations;
+        boolean stepCount = stepMax != null && StepData.repetitionLimitReached(completed, stepMax);
+        if (globalCount) return "Until loop exhausted pkb_stepRepeatMaxCount " + globalMax;
+        if (stepCount) return "Until loop exhausted max_iterations " + stepMax;
+        return null;
+    }
+
+    private static void copyCeilings(StepExtension from, StepExtension to) {
+        if (from == null || to == null) return;
+        to.stepMaxIterations = from.stepMaxIterations;
+        to.stepTimeoutSeconds = from.stepTimeoutSeconds;
     }
 
     /**
@@ -839,6 +884,32 @@ public class CurrentScenarioState extends ScenarioMapping {
     private boolean isScenarioHardFail = false;
     private boolean isScenarioSoftFail = false;
     private boolean isScenarioComplete = false;
+    private final List<StepExtension> deferredFinishedSteps = new ArrayList<>();
+    private boolean runningFinishedSteps;
+
+    /**
+     * Runs steps marked {@code RUN IF SCENARIO FINISHED} after the scenario
+     * outcome is known. A second call does nothing.
+     */
+    public void runFinishedSteps() {
+        if (runningFinishedSteps || deferredFinishedSteps.isEmpty()) return;
+        runningFinishedSteps = true;
+        try {
+            for (StepExtension step : new ArrayList<>(deferredFinishedSteps)) {
+                step.skipped = false;
+                StepBase savedNext = step.nextSibling;
+                step.nextSibling = null;
+                try {
+                    runStep(step);
+                } finally {
+                    step.nextSibling = savedNext;
+                }
+            }
+        } finally {
+            runningFinishedSteps = false;
+            deferredFinishedSteps.clear();
+        }
+    }
 
     public static void endTest() {
         getCurrentScenarioState().isScenarioComplete = true;
@@ -937,6 +1008,13 @@ public class CurrentScenarioState extends ScenarioMapping {
     }
 
     public boolean shouldRun(StepExtension stepExtension) {
+        boolean finished = stepExtension.stepFlags.contains(RUN_IF_SCENARIO_FINISHED);
+        if (finished && !runningFinishedSteps) {
+            if (!deferredFinishedSteps.contains(stepExtension)) {
+                deferredFinishedSteps.add(stepExtension);
+            }
+            return false;
+        }
 
         if (stepExtension.parentStep == null)
             return true;
@@ -955,6 +1033,9 @@ public class CurrentScenarioState extends ScenarioMapping {
 
         if (stepExtension.stepFlags.contains(RUN_IF_SCENARIO_PASSING))
             return !isScenarioFailed();
+
+        if (finished)
+            return true;
 
 //        return !stepExtension.skipped;
         return !isScenarioComplete();

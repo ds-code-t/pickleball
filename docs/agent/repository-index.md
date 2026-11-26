@@ -761,6 +761,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/engine/adapter/cucumber/RowFeatureSupplier.java`
 - `src/main/java/tools/dscode/engine/adapter/cucumber/RunBindings.java`
 - `src/main/java/tools/dscode/engine/adapter/cucumber/SharedStepRun.java`
+- `src/main/java/tools/dscode/engine/adapter/cucumber/StepFlagBridge.java`
 - `src/main/java/tools/dscode/engine/adapter/cucumber/StoreRunTracePlugin.java`
 - `src/main/java/tools/dscode/engine/context/ExecutionContext.java`
 - `src/main/java/tools/dscode/engine/EngineCli.java`
@@ -793,6 +794,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/engine/resolve/ScenarioResolver.java`
 - `src/main/java/tools/dscode/engine/runtime/NativeScenarioCatalog.java`
 - `src/main/java/tools/dscode/engine/runtime/NoopGlueMode.java`
+- `src/main/java/tools/dscode/engine/runtime/StepFlags.java`
+- `src/main/java/tools/dscode/engine/runtime/StepRows.java`
+- `src/main/java/tools/dscode/engine/runtime/StepWatchdog.java`
 - `src/main/java/tools/dscode/engine/source/FileScenarioSource.java`
 - `src/main/java/tools/dscode/engine/source/MemoryScenarioSource.java`
 - `src/main/java/tools/dscode/engine/source/ScenarioSource.java`
@@ -1178,6 +1182,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/engine/PickleballEngineTest.java`
 - `src/test/java/tools/dscode/engine/resolve/ResolutionParityTest.java`
 - `src/test/java/tools/dscode/engine/resolve/ScenarioResolverTest.java`
+- `src/test/java/tools/dscode/engine/runtime/StepCeilingTest.java`
+- `src/test/java/tools/dscode/engine/runtime/StepWatchdogTest.java`
 - `src/test/java/tools/dscode/engine/SpineCucumberImportBanTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureRunnerTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureSteps.java`

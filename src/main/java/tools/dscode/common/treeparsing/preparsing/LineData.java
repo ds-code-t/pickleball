@@ -59,6 +59,12 @@ public abstract class LineData implements Cloneable {
         currentStep.logAndIgnore =
                 inheritedConditionalState < 1
                         || (parentStep != null && parentStep.logAndIgnore);
+        if (parentStep != null && parentStep.ignoreStepFailure) {
+            currentStep.ignoreStepFailure = true;
+        }
+        if (parentStep != null && parentStep.logFailuresContinue) {
+            currentStep.logFailuresContinue = true;
+        }
 
         if(inheritedPhrase != null) {
             inheritedPhrase.setPhraseParsingMap(currentStep.getStepParsingMap());

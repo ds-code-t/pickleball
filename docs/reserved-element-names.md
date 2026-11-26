@@ -56,7 +56,7 @@ Saving Step Duration stores `java.time.Duration.toString()`, an ISO-8601 duratio
 * , ensure "<elapsed>" matches "PT.*S"
 ```
 
-`pkb_stepRepeatMaxCount` caps a block `until`. `pkb_stepMaxTime` caps every block `until` and every element `wait`. An element `wait` does not use the count. They are run-wide. There is no per-step ceiling. See [Repeat ceilings](configuration.md#repeat-ceilings).
+`pkb_stepRepeatMaxCount` caps a block `until` and an inline `until`. `pkb_stepMaxTime` caps every block `until`, every inline `until`, and every element `wait`. An element `wait` does not use the count. They are the run-wide defaults. A stored step row may set `max_iterations` and `timeout_seconds`, and a null column keeps these defaults. See [Repeat ceilings](configuration.md#repeat-ceilings).
 
 ## Data Elements
 

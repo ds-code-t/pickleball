@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.argumentToGherkinText;
@@ -42,12 +41,7 @@ import static io.cucumber.core.runner.NPickleStepTestStepFactory.resolvePickleSt
 import static io.cucumber.core.runner.util.TableUtils.DOCSTRING_KEY;
 import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
 import static io.cucumber.core.runner.util.TableUtils.toRowsStringMultimap;
-import static tools.dscode.common.GlobalConstants.ALWAYS_RUN;
 import static tools.dscode.common.GlobalConstants.HARD_ERROR_STEP;
-import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_FAILED;
-import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_HARD_FAILED;
-import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_PASSING;
-import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_SOFT_FAILED;
 import static tools.dscode.common.browseroperations.BrowserAlerts.isPresent;
 import static tools.dscode.common.domoperations.LeanWaits.safeWaitForPageReady;
 import static tools.dscode.common.gherkinoperations.DynamicExecution.getCustomStep;
@@ -69,13 +63,6 @@ public class StepExtension extends StepData {
     private String pendingInlineChild;
     private static final Pattern FLAG_STEP_WITH_INLINE = Pattern.compile(
             "^(RUN IF SCENARIO HARD FAILED|RUN IF SCENARIO SOFT FAILED|RUN IF SCENARIO FAILED|RUN IF SCENARIO PASSING|ALWAYS RUN)\\s*:\\s*(.*)$"
-    );
-    private static final Set<String> BARE_FLAG_STEPS = Set.of(
-            ALWAYS_RUN,
-            RUN_IF_SCENARIO_PASSING,
-            RUN_IF_SCENARIO_FAILED,
-            RUN_IF_SCENARIO_HARD_FAILED,
-            RUN_IF_SCENARIO_SOFT_FAILED
     );
 
     public StepExtension(
@@ -158,6 +145,20 @@ public class StepExtension extends StepData {
         this.isCoreConditionalStep = false;
     }
 
+    /** Gherkin line for a Cucumber frame. Native frames return 0. */
+    public int gherkinLine() {
+        if (pickleStepTestStep == null) return 0;
+        try {
+            Object raw = pickleStepTestStep.getStep();
+            if (raw instanceof io.cucumber.core.gherkin.Step gherkin) {
+                return gherkin.getLine();
+            }
+        } catch (RuntimeException ignored) {
+            return 0;
+        }
+        return 0;
+    }
+
     /** Binds a glue method discovered by the native registry. Cucumber frames already have one. */
     public void attachNativeMethod(java.lang.reflect.Method bound) {
         method = bound;
@@ -190,13 +191,10 @@ public class StepExtension extends StepData {
         isFlagStep = true;
         String text = getUnmodifiedText();
         text = text == null ? "" : text.trim();
-        if (BARE_FLAG_STEPS.contains(text)) {
-            stepFlags.add(text);
-            return;
-        }
+        tools.dscode.engine.runtime.StepFlags.Parsed parsed = tools.dscode.engine.runtime.StepFlags.parse(text);
+        tools.dscode.engine.adapter.cucumber.StepFlagBridge.applyToFrame(this, parsed);
         Matcher flagMatcher = FLAG_STEP_WITH_INLINE.matcher(text);
         if (flagMatcher.matches()) {
-            stepFlags.add(flagMatcher.group(1));
             String inline = flagMatcher.group(2).trim();
             if (!inline.isEmpty()) {
                 if (getCurrentScenarioState() != null) {
@@ -205,9 +203,7 @@ public class StepExtension extends StepData {
                     pendingInlineChild = inline;
                 }
             }
-            return;
         }
-        stepFlags.add(text);
     }
 
     private void attachPendingInlineChild() {

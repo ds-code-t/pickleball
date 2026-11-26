@@ -23,7 +23,11 @@ import tools.dscode.engine.model.ScenarioResult;
 import tools.dscode.engine.model.Status;
 import tools.dscode.common.GlobalConstants;
 import tools.dscode.engine.model.StepResult;
+import tools.dscode.engine.runtime.StepFlags;
+import tools.dscode.engine.runtime.StepWatchdog;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.IdentityHashMap;
@@ -110,6 +114,9 @@ public final class NativeScenarioRun {
             for (io.cucumber.core.runner.StepBase child : new ArrayList<>(root.childSteps)) {
                 if (child instanceof StepExtension extension) roots.add(extension);
             }
+            StepWatchdog watchdog = StepWatchdog.start(
+                    options == null ? null : options.project(),
+                    new HungSample(state, scenario.name()));
             Throwable hookFailure = null;
             try {
                 try {
@@ -150,6 +157,7 @@ public final class NativeScenarioRun {
                         NativeStepTrace.record(frame);
                         state.recordHardFailure(thrown);
                     } finally {
+                        applyFollowingFlags(frame, savedNext);
                         String trackedStatus;
                         try {
                             trackedStatus = storeStatus(frame, seen, tracedFrom);
@@ -192,6 +200,7 @@ public final class NativeScenarioRun {
                 }
                 }
             } finally {
+                watchdog.close();
                 try {
                     if (registry != null) registry.fire("after", scenario.tags(), SharedStepRun.instances(context));
                 } catch (Throwable thrown) {
@@ -259,6 +268,52 @@ public final class NativeScenarioRun {
     }
 
     private record Seen(EngineStep step, StepExtension frame) {
+    }
+
+    /** The native loop detaches the next sibling while a step runs. Carry following-step flags across that gap. */
+    private static void applyFollowingFlags(StepExtension frame, StepBase savedNext) {
+        if (!(savedNext instanceof StepExtension next) || frame == null) return;
+        StepFlags.Parsed parsed = StepFlags.parse(frame.getUnmodifiedText());
+        if (parsed.ignoreOnNext()) next.ignoreStepFailure = true;
+        if (parsed.logOnNext()) next.logFailuresContinue = true;
+    }
+
+    private static final class HungSample implements StepWatchdog.Sample {
+        private final CurrentScenarioState state;
+        private final String name;
+
+        private HungSample(CurrentScenarioState state, String name) {
+            this.state = state;
+            this.name = name;
+        }
+
+        @Override
+        public String scenario() {
+            return name;
+        }
+
+        @Override
+        public Duration cap() {
+            StepExtension step = state.getCurrentStep();
+            if (step == null) return null;
+            if (step.stepTimeoutSeconds != null) return step.stepTimeoutSeconds;
+            return io.cucumber.core.runner.StepData.effectiveTimeout();
+        }
+
+        @Override
+        public Instant started() {
+            StepExtension step = state.getCurrentStep();
+            return step == null ? null : step.startTime;
+        }
+
+        @Override
+        public void fail(String message) {
+            StepExtension step = state.getCurrentStep();
+            if (step == null || step.watchdogFailed) return;
+            step.watchdogFailed = true;
+            step.result = new Result(io.cucumber.plugin.event.Status.FAILED, Duration.ZERO, new RuntimeException(message));
+            state.recordHardFailure(step.result.getError());
+        }
     }
 
     /**

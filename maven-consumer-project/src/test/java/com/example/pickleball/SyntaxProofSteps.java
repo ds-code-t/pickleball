@@ -63,6 +63,15 @@ public class SyntaxProofSteps {
                 .incrementAndGet());
     }
 
+    @Given("^fail until branch \"([^\"]*)\" reaches \"([^\"]*)\"$")
+    public static void failUntilBranchReaches(String name, String target) {
+        int count = Integer.parseInt(countBranch(name));
+        int needed = Integer.parseInt(target);
+        if (count < needed) {
+            throw new RuntimeException("branch " + name + " is " + count + " not " + needed);
+        }
+    }
+
     @Given("^branch count \"([^\"]*)\" equals \"([^\"]*)\"$")
     public void branchCountEquals(String name, String expected) {
         String actual = Integer.toString(branchCounts().getOrDefault(name, new AtomicInteger()).get());

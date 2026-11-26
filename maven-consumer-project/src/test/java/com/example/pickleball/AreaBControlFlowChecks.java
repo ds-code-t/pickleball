@@ -303,6 +303,94 @@ public class AreaBControlFlowChecks {
         }
     }
 
+    @Test
+    void retryRunsTheActionAgainAfterTheFirstFailure() {
+        CurrentScenarioState state = requireScenario();
+        StepExtension previous = state.getCurrentStep();
+        try {
+            StepExtension retry = observedStep("RETRY: fail until branch \"areaBRetryJava\" reaches \"2\"");
+            StepExtension check = observedStep("branch count \"areaBRetryJava\" equals \"2\"");
+            chain(state, retry, check);
+            state.runStep(retry);
+            assertFalse(state.isScenarioFailed());
+        } finally {
+            restoreScenario(state, previous);
+        }
+    }
+
+    @Test
+    void ignoreFailuresKeepsTheFollowingStepFromFailing() {
+        CurrentScenarioState state = requireScenario();
+        StepExtension previous = state.getCurrentStep();
+        try {
+            StepExtension ignore = observedStep("IGNORE FAILURES");
+            StepExtension fail = observedStep("FAIL: area b ignored");
+            StepExtension save = observedStep(", save \"kept\" as \"areaBIgnoreJava\"");
+            chain(state, ignore, fail, save);
+            state.runStep(ignore);
+            assertSaved("areaBIgnoreJava", "kept");
+            assertFalse(state.isScenarioFailed());
+        } finally {
+            restoreScenario(state, previous);
+        }
+    }
+
+    @Test
+    void logFailuresContinueKeepsTheScenarioGoing() {
+        CurrentScenarioState state = requireScenario();
+        StepExtension previous = state.getCurrentStep();
+        try {
+            StepExtension log = observedStep("LOG FAILURES BUT CONTINUE SCENARIO");
+            StepExtension fail = observedStep("FAIL: area b logged");
+            StepExtension save = observedStep(", save \"kept\" as \"areaBLogJava\"");
+            chain(state, log, fail, save);
+            state.runStep(log);
+            assertSaved("areaBLogJava", "kept");
+            assertFalse(state.isScenarioFailed());
+        } finally {
+            restoreScenario(state, previous);
+        }
+    }
+
+    @Test
+    void andIgnoreFailuresAppliesToThatStep() {
+        CurrentScenarioState state = requireScenario();
+        StepExtension previous = state.getCurrentStep();
+        try {
+            StepExtension flag = flagWithNestedChild(
+                    "ALWAYS RUN AND IGNORE FAILURES",
+                    "FAIL: area b suffix ignored"
+            );
+            flag.parentStep = previous;
+            state.runStep(flag);
+            assertFalse(state.isScenarioFailed());
+        } finally {
+            restoreScenario(state, previous);
+        }
+    }
+
+    @Test
+    void runIfScenarioFinishedRunsAfterTheOutcomeIsKnown() {
+        CurrentScenarioState state = requireScenario();
+        StepExtension previous = state.getCurrentStep();
+        try {
+            save("before", "areaBFinishedJava");
+            StepExtension finished = flagWithNestedChild(
+                    "RUN IF SCENARIO FINISHED",
+                    ", save \"after\" as \"areaBFinishedJava\""
+            );
+            finished.parentStep = previous;
+            state.runStep(finished);
+            assertSaved("areaBFinishedJava", "before");
+            save("ready", "areaBFinishedJava");
+            state.runFinishedSteps();
+            assertSaved("areaBFinishedJava", "after");
+            assertFalse(state.isScenarioFailed());
+        } finally {
+            restoreScenario(state, previous);
+        }
+    }
+
     private static void save(String value, String key) {
         ControlCallResult<Object> result = DynamicControl.executeStep(
                 ", save \"" + value + "\" as \"" + key + "\""

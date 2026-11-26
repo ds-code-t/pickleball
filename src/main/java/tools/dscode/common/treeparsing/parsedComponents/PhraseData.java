@@ -64,6 +64,8 @@ public abstract class PhraseData extends PassedData {
 //    public boolean repeatRootPhrase = false;
 //    public List<PhraseData> repeatedChain = new ArrayList<>();
     public boolean untilPhrase = false;
+    /** Completed inline-until passes. The ceiling is checked before the next pass. */
+    public int untilPasses;
 
 //    public boolean runAssertionChain = false;
 
@@ -574,14 +576,127 @@ public abstract class PhraseData extends PassedData {
 
     public void runUntilOperation() {
         OperationsInterface operation = actionOperation != null ? actionOperation : assertionOperation;
-        settleBeforeBrowserAction(operation);
-        if (operation == null) {
+        if (!untilPhrase && operation == null) {
             throw unknownWord();
         }
-        operation.execute(this);
-        if (result.failed()) {
-            throw new RuntimeException("operation '" + operation + "' failed", result.error());
+        List<PhraseData> body = commaBody();
+        tools.dscode.engine.runtime.StepWatchdog.markRepeating(true);
+        try {
+            while (true) {
+                String stop = untilCeilingMessage();
+                if (stop != null) {
+                    throw new RuntimeException(stop + " for step '" + (text == null ? "" : text) + "'");
+                }
+                if (!untilCondition()) {
+                    break;
+                }
+                untilPasses++;
+                for (PhraseData part : body) {
+                    part.evaluationsResolved = false;
+                    if (part instanceof Phrase phrase) {
+                        phrase.executePhrase();
+                        phrase.resolveResults();
+                    }
+                }
+            }
+        } finally {
+            tools.dscode.engine.runtime.StepWatchdog.markRepeating(false);
+            if (!body.isEmpty()) {
+                PhraseData after = body.get(body.size() - 1).getNextPhrase();
+                setNextPhrase(after);
+                if (after != null) {
+                    after.setPreviousPhrase(this);
+                }
+            }
         }
+    }
+
+    private List<PhraseData> commaBody() {
+        List<PhraseData> body = new ArrayList<>();
+        if (termination == null || termination != ',') {
+            return body;
+        }
+        PhraseData previous = this;
+        PhraseData cursor = getNextPhrase();
+        while (cursor != null && previous.termination != null && previous.termination == ',') {
+            body.add(cursor);
+            previous = cursor;
+            cursor = cursor.getNextPhrase();
+        }
+        return body;
+    }
+
+    private boolean untilCondition() {
+        if (runningStep() == null) {
+            return literalTruthy();
+        }
+        // The assertion chain was built from the first resolution. Drop it so
+        // each pass reads the current reference, including a value this loop saved.
+        evaluationsResolved = false;
+        assertionChain = null;
+        resolveForExecution();
+        if (this instanceof Phrase phrase) {
+            phrase.prepareDataElementValues();
+        }
+        runOperation();
+        if (result == null || result.value() == null) {
+            return literalTruthy();
+        }
+        resolveResults();
+        return phraseConditionalMode > 0;
+    }
+
+    private boolean literalTruthy() {
+        boolean truthy = false;
+        if (booleanValues != null && !booleanValues.isEmpty()) {
+            truthy = true;
+            for (ValueWrapper value : booleanValues) {
+                if (value == null || !value.isTruthy()) {
+                    truthy = false;
+                    break;
+                }
+            }
+        } else {
+            String source = body == null || body.isBlank()
+                    ? (resolvedText == null ? "" : resolvedText)
+                    : body;
+            truthy = tools.dscode.common.evaluations.AviatorUtil.isStringTruthy(source);
+        }
+        phraseConditionalMode = truthy ? 1 : -1;
+        result = new tools.dscode.common.treeparsing.parsedComponents.phraseoperations.Attempt.Result(truthy, null);
+        return truthy;
+    }
+
+    /**
+     * Global caps win when they fire, including when a step column reaches the
+     * same boundary. A null column leaves the run-wide cap in force.
+     */
+    private String untilCeilingMessage() {
+        io.cucumber.core.runner.StepExtension step = runningStep();
+        java.time.Instant start = step == null ? null : step.startTime;
+        java.time.Duration globalCap = io.cucumber.core.runner.StepData.effectiveTimeout();
+        boolean globalTime = start != null && globalCap != null && !globalCap.isNegative()
+                && java.time.Duration.between(start, java.time.Instant.now()).compareTo(globalCap) > 0;
+        java.time.Duration stepCap = step == null ? null : step.stepTimeoutSeconds;
+        boolean stepTime = start != null && stepCap != null && !stepCap.isNegative()
+                && java.time.Duration.between(start, java.time.Instant.now()).compareTo(stepCap) > 0;
+        if (globalTime) {
+            return io.cucumber.core.runner.StepData.stepMaxTimeExceededMessage();
+        }
+        if (stepTime) {
+            return "Step exceeded timeout_seconds (" + stepCap.getSeconds() + "s)";
+        }
+        int globalMax = io.cucumber.core.runner.StepData.effectiveMaxIterations();
+        boolean globalCount = globalMax >= 0 && untilPasses >= globalMax;
+        Integer stepMax = step == null ? null : step.stepMaxIterations;
+        boolean stepCount = stepMax != null && stepMax >= 0 && untilPasses >= stepMax;
+        if (globalCount) {
+            return "Until loop exhausted pkb_stepRepeatMaxCount " + globalMax;
+        }
+        if (stepCount) {
+            return "Until loop exhausted max_iterations " + stepMax;
+        }
+        return null;
     }
 
     Boolean previouslyResolvedBoolean = null;

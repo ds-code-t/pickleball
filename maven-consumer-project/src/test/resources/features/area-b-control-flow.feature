@@ -114,10 +114,10 @@ Feature: Area B control flow
     * , ensure "<areaBUntilFlag>" equals "done"
 
   @all @area-b @area-b-inline-until
-  Scenario: An inline until is a one-shot if
-    * , save "untouched" as "areaBInlineUntil"
+  Scenario: An inline until loops while the condition is true
+    * , save "" as "areaBInlineUntil"
     * , save "untouched" as "areaBInlineUntilNo"
-    * , until "abc", save "once" as "areaBInlineUntil"
+    * , until "<areaBInlineUntil>" equals "", save "once" as "areaBInlineUntil"
     * , until "", save "again" as "areaBInlineUntilNo"
     * , ensure "<areaBInlineUntil>" equals "once"
     * , ensure "<areaBInlineUntilNo>" equals "untouched"
@@ -129,15 +129,38 @@ Feature: Area B control flow
     * , ensure "<areaBTimes>" equals "tick"
     * , ensure "<areaBTimesCount>" equals "3"
 
-  @all @area-b @area-b-flags
-  Scenario: RETRY and unimplemented flag steps are passing no-ops
-    * , save "untouched" as "areaBAfterFlags"
-    * RETRY: not implemented
+  @all @area-b @area-b-retry
+  Scenario: RETRY runs the action again when the first attempt fails
+    * RETRY: fail until branch "areaBRetry" reaches "2"
+    * branch count "areaBRetry" equals "2"
+
+  @all @area-b @area-b-ignore-failures
+  Scenario: IGNORE FAILURES keeps the following step from failing the scenario
     * IGNORE FAILURES
+    * FAIL: area b ignored
+    * , save "continued" as "areaBIgnored"
+    * , ensure "<areaBIgnored>" equals "continued"
+
+  @all @area-b @area-b-log-failures
+  Scenario: LOG FAILURES BUT CONTINUE SCENARIO keeps going
     * LOG FAILURES BUT CONTINUE SCENARIO
+    * FAIL: area b logged
+    * , save "continued" as "areaBLogged"
+    * , ensure "<areaBLogged>" equals "continued"
+
+  @all @area-b @area-b-ignore-suffix
+  Scenario: AND IGNORE FAILURES applies to that step
+    * ALWAYS RUN AND IGNORE FAILURES
+      : * FAIL: area b suffix ignored
+    * , save "continued" as "areaBSuffix"
+    * , ensure "<areaBSuffix>" equals "continued"
+
+  @all @area-b @area-b-finished
+  Scenario: RUN IF SCENARIO FINISHED runs after the scenario body
+    * , save "before" as "areaBFinished"
     * RUN IF SCENARIO FINISHED
-    * , save "continued" as "areaBAfterFlags"
-    * , ensure "<areaBAfterFlags>" equals "continued"
+      : * , ensure "<areaBFinished>" equals "ready"
+    * , save "ready" as "areaBFinished"
 
   @all @area-b @area-b-end-scenario
   Scenario: END SCENARIO skips the rest of the scenario

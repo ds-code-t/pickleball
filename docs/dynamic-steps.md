@@ -274,7 +274,7 @@ A step that is only a comma, `* ,`, has no phrase. It fails the step with a clea
 
 `3 times` repeats that action. `save "tick" as "key" 3 times` stores the same value three times. The repeat stops on the first throw. Later repetitions do not run.
 
-An element `wait` polls until the element is present, or until a loading element is gone. It then continues. The hard-fail cap is the run-wide `pkb_stepMaxTime` (default 60 minutes), the same clock as a block `until`. An element `wait` does not use `pkb_stepRepeatMaxCount`. There is no per-step ceiling and no poll-count cap. When `pkb_stepMaxTime` is hit, the step hard-fails the scenario. The message names the setting, for example `Step exceeded pkb_stepMaxTime (5m)`. It does not poll forever.
+An element `wait` polls until the element is present, or until a loading element is gone. It then continues. The hard-fail cap is the run-wide `pkb_stepMaxTime` (default 60 minutes), the same clock as a block `until`. An element `wait` does not use `pkb_stepRepeatMaxCount` and does not use a step row's `max_iterations`. A stored `timeout_seconds` is the per-step cap for `until` and for the hung-step watchdog. An element `wait` still uses the run-wide time cap. There is no poll-count cap. When `pkb_stepMaxTime` is hit, the step hard-fails the scenario. The message names the setting, for example `Step exceeded pkb_stepMaxTime (5m)`. It does not poll forever.
 
 A Gherkin time on that wait is a soft limit. Either order is the same:
 

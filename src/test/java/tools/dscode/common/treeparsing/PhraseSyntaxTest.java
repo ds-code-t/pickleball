@@ -1,5 +1,6 @@
 package tools.dscode.common.treeparsing;
 
+import io.cucumber.core.runner.StepData;
 import org.junit.jupiter.api.Test;
 import tools.dscode.common.treeparsing.parsedComponents.Phrase;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
@@ -59,6 +60,29 @@ class PhraseSyntaxTest {
         assertTrue(message.contains("displayed"), message);
         assertFalse(message.contains("\"operation\" is null"), message);
         assertTrue(error instanceof IllegalArgumentException);
+    }
+
+    @Test
+    void midLineUntilLoopsUntilTheRepeatCap() {
+        assertUntilLoops(',');
+    }
+
+    @Test
+    void periodUntilLoopsUntilTheRepeatCap() {
+        assertUntilLoops('.');
+    }
+
+    private static void assertUntilLoops(char termination) {
+        Integer previous = StepData.overrideMaxIterations(2);
+        try {
+            LineData line = new SaveLine("until \"go\"");
+            Phrase until = new Phrase("until \"go\"", termination, line, null, false);
+            RuntimeException exhausted = assertThrows(RuntimeException.class, until::runUntilOperation);
+            assertEquals(2, until.untilPasses);
+            assertTrue(exhausted.getMessage().contains("pkb_stepRepeatMaxCount"), exhausted.getMessage());
+        } finally {
+            StepData.restoreMaxIterations(previous);
+        }
     }
 
     private static final class SaveLine extends LineData {

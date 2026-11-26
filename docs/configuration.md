@@ -626,13 +626,13 @@ The warm JVM used by a classpath-cache hit stays up across separate CLI commands
 
 ## Repeat ceilings
 
-`pkb_stepMaxTime` (default 60 minutes) is the hard-fail time cap for every block `until` and every element `wait`. `pkb_stepRepeatMaxCount` (default 100) is the repeat-count cap for a block `until` only. An element `wait` does not use the count. They are run-wide run vars, read once when the step runtime loads. Resolved names are `pkb_stepmaxtime` and `pkb_steprepeatmaxcount`. There is no per-step ceiling. Workbench `--step-timeout` and `--run-timeout` are not these settings. They apply only to a live Workbench command and record `TIMEOUT`. See [Pickleball Workbench](pickleball-workbench.md).
+`pkb_stepMaxTime` (default 60 minutes) is the hard-fail time cap for every block `until`, every inline `until`, and every element `wait`. `pkb_stepRepeatMaxCount` (default 100) is the repeat-count cap for a block `until`, an inline `until`, and `RETRY:`. An element `wait` does not use the count. They are run-wide run vars, read once when the step runtime loads. Resolved names are `pkb_stepmaxtime` and `pkb_steprepeatmaxcount`. A stored step row may set `max_iterations` and `timeout_seconds`. Hydrate does not fill those two columns from the step text and does not clear a value already stored. A null column keeps the run-wide default. When the row's cap is the one that fires, the message names it: `Until loop exhausted max_iterations N` or `Step exceeded timeout_seconds (Ns)`. When the run-wide cap fires, the message still names `pkb_stepRepeatMaxCount` or `pkb_stepMaxTime`. Workbench `--step-timeout` and `--run-timeout` are not these settings. They apply only to a live Workbench command and record `TIMEOUT`. See [Pickleball Workbench](pickleball-workbench.md).
 
 A bare `pkb_stepMaxTime` integer is minutes. A unit is accepted, such as `90s` or `2 minutes`. The failure names the setting, for example `Step exceeded pkb_stepMaxTime (5m)`.
 
 `pkb_stepRepeatMaxTime` still works as a deprecated alias. A bare integer is seconds. Using it logs a warning: `pkb_stepRepeatMaxTime is deprecated. Use pkb_stepMaxTime (minutes, or a unit such as 90s).` If both are set, `pkb_stepMaxTime` wins and the warning is still logged. When neither is set, the cap is 60 minutes.
 
-A positive count N allows exactly N passes of a block `until`. The check before the next pass sees how many passes have already finished.
+A positive count N allows exactly N passes of a block `until` and of an inline `until`. The check before the next pass sees how many passes have already finished. An inline `until` loops while the condition is true. A falsy condition does not run the phrases that follow it on that line.
 
 ```gherkin
 * , until the Step Repetition is 3:

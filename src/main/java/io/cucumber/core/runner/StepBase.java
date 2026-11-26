@@ -34,6 +34,17 @@ public abstract class StepBase implements Cloneable {
     public boolean isPreRunFailStep;
     public boolean isCoreConditionalStep;
     public boolean logAndIgnore = false;
+    /** Following-step or suffix flag. A failure is logged and the step stays passed. */
+    public boolean ignoreStepFailure = false;
+    /** Following-step flag. The error is logged and the scenario continues. */
+    public boolean logFailuresContinue = false;
+    /** A retry attempt keeps its error without failing the scenario. */
+    public boolean captureFailure = false;
+    public Throwable capturedError;
+    public boolean retryHandled = false;
+    /** Set by {@code StepWatchdog}. A later success must not clear this failure. */
+    public boolean watchdogFailed = false;
+    public String untilMode;
     public boolean isClone = false;
     public List<StepBase> clones = new ArrayList<>();
     protected boolean runMethodDirectly = false;
@@ -136,6 +147,12 @@ public abstract class StepBase implements Cloneable {
      * flags such as ALWAYS RUN control scenario-state execution rather than
      * Cucumber definition behavior.</p>
      */
+    /** Null leaves the run-wide cap. A set value is the per-step ceiling. */
+    public void assignCeilings(Integer maxIterations, Integer timeoutSeconds) {
+        if (maxIterations != null) stepMaxIterations = maxIterations;
+        if (timeoutSeconds != null) stepTimeoutSeconds = Duration.ofSeconds(timeoutSeconds);
+    }
+
     public void addStepFlags(String... flags) {
         if (flags == null) {
             return;
