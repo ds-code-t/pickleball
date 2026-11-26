@@ -49,7 +49,7 @@ class StoreSandboxWorkerTest {
                 """);
         assertEquals(0, cli("store", "hydrate", "--project=" + project).code);
         StoreScope.clear();
-        assertEquals(0, cli("store", "sandbox", "create", "alpha", "--project=" + project).code);
+        assertEquals(0, cli("store", "sandbox", "create", "alpha", "--mode=copy", "--project=" + project).code);
         StoreScope.clear();
         String fingerprint = StoreRun.glueFingerprint(project);
         Files.createDirectories(StoreRun.workerDirectory(project));

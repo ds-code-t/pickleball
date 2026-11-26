@@ -67,6 +67,7 @@ public final class HeadMaterializer {
      * The caller owns the transaction.
      */
     static void applyPending(Connection connection, Path project) throws SQLException {
+        CowSandbox.seedParentHead(connection, project);
         long cursor = UniversalEntity.cursor(connection);
         List<DeltaLog.Delta> pending = DeltaLog.after(connection, cursor);
         for (DeltaLog.Delta delta : pending) {

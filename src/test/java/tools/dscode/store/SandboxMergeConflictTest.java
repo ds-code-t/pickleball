@@ -34,7 +34,7 @@ class SandboxMergeConflictTest {
     @Test
     void failWritesNothingAndTheReportHasHashesOnly() throws Exception {
         seed();
-        assertEquals(0, cli("store", "sandbox", "create", "left", "--project=" + project).code);
+        assertEquals(0, cli("store", "sandbox", "create", "left", "--mode=copy", "--project=" + project).code);
         assertEquals(0, cli("store", "file", "put", "--path=features/a.txt",
                 "--text=" + SECRET + "\n", "--sandbox=left", "--project=" + project).code);
         assertEquals(0, cli("store", "file", "put", "--path=features/a.txt",
@@ -93,7 +93,7 @@ class SandboxMergeConflictTest {
     @Test
     void branchWinsAndMainWinsAndConvergedAndDeleteVersusModify() throws Exception {
         seed();
-        assertEquals(0, cli("store", "sandbox", "create", "left", "--project=" + project).code);
+        assertEquals(0, cli("store", "sandbox", "create", "left", "--mode=copy", "--project=" + project).code);
         assertEquals(0, cli("store", "file", "put", "--path=features/a.txt", "--text=branch-body\n",
                 "--sandbox=left", "--project=" + project).code);
         assertEquals(0, cli("store", "file", "put", "--path=features/extra.txt", "--text=from-branch\n",
@@ -114,7 +114,7 @@ class SandboxMergeConflictTest {
         assertEquals(0, idle.code, idle.err + idle.out);
         assertEquals(0, JSON.readTree(idle.out).get("wouldApply").asInt());
 
-        assertEquals(0, cli("store", "sandbox", "create", "right", "--project=" + project).code);
+        assertEquals(0, cli("store", "sandbox", "create", "right", "--mode=copy", "--project=" + project).code);
         assertEquals(0, cli("store", "file", "put", "--path=features/a.txt", "--text=other-body\n",
                 "--sandbox=right", "--project=" + project).code);
         assertEquals(0, cli("store", "file", "put", "--path=features/side.txt", "--text=side\n",
@@ -135,7 +135,7 @@ class SandboxMergeConflictTest {
         assertEquals(0, JSON.readTree(again.out).get("applied").asInt());
         assertEquals("kept-main\n", text("features/a.txt"));
 
-        assertEquals(0, cli("store", "sandbox", "create", "same", "--project=" + project).code);
+        assertEquals(0, cli("store", "sandbox", "create", "same", "--mode=copy", "--project=" + project).code);
         assertEquals(0, cli("store", "file", "put", "--path=features/b.txt", "--text=both\n",
                 "--sandbox=same", "--project=" + project).code);
         assertEquals(0, cli("store", "file", "put", "--path=features/b.txt", "--text=both\n",
@@ -147,7 +147,7 @@ class SandboxMergeConflictTest {
         assertEquals(0, same.get("conflicts").size());
         assertEquals("both\n", text("features/b.txt"));
 
-        assertEquals(0, cli("store", "sandbox", "create", "cut", "--project=" + project).code);
+        assertEquals(0, cli("store", "sandbox", "create", "cut", "--mode=copy", "--project=" + project).code);
         assertEquals(0, cli("store", "file", "delete", "--path=features/b.txt", "--confirm",
                 "--sandbox=cut", "--project=" + project).code);
         assertEquals(0, cli("store", "file", "put", "--path=features/b.txt", "--text=main-still\n",

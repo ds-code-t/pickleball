@@ -1,5 +1,6 @@
 package tools.dscode.store;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -107,6 +108,12 @@ public final class StoreContent {
                 StoreEntities.store(connection, project, normalized, body);
             }
         }
+        if (CowSandbox.isCow(connection)) {
+            String before = existing == null || existing.raw() == null
+                    ? null : new String(existing.raw(), StandardCharsets.UTF_8);
+            String after = new String(body, StandardCharsets.UTF_8);
+            DeltaLog.append(connection, project, DeltaLog.PUT, "files", normalized, before, after, false);
+        }
         return row;
     }
 
@@ -139,20 +146,28 @@ public final class StoreContent {
         if (StorePaths.ready(project)) {
             try (StoreDatabase database = StoreDatabase.open(project)) {
                 Connection connection = database.connection();
+                if (CowSandbox.isCow(connection)) {
+                    connection.setAutoCommit(false);
+                    try {
+                        boolean tombstone = CowSandbox.tombstoneFile(connection, project, path);
+                        if (tombstone) {
+                            removed = deleteProjections(connection, path) || true;
+                        }
+                        connection.commit();
+                    } catch (SQLException | RuntimeException failure) {
+                        connection.rollback();
+                        throw failure;
+                    } finally {
+                        connection.setAutoCommit(true);
+                    }
+                    if (removed) {
+                        StoreLog.log(project, "edit", path, "delete tombstone");
+                    }
+                    return removed;
+                }
                 connection.setAutoCommit(false);
                 try {
-                    for (String sql : java.util.List.of(
-                            "DELETE FROM steps WHERE file_path = ?",
-                            "DELETE FROM scenarios WHERE file_path = ?",
-                            "DELETE FROM feature_docs WHERE file_path = ?",
-                            "DELETE FROM entities WHERE source_file = ?",
-                            "DELETE FROM files WHERE path = ?"
-                    )) {
-                        try (java.sql.PreparedStatement statement = connection.prepareStatement(sql)) {
-                            statement.setString(1, path);
-                            if (statement.executeUpdate() > 0) removed = true;
-                        }
-                    }
+                    removed = deleteProjections(connection, path);
                     connection.commit();
                 } catch (SQLException | RuntimeException failure) {
                     connection.rollback();
@@ -169,6 +184,23 @@ public final class StoreContent {
         }
         if (removed) {
             StoreLog.log(project, "edit", path, "delete");
+        }
+        return removed;
+    }
+
+    private static boolean deleteProjections(Connection connection, String path) throws SQLException {
+        boolean removed = false;
+        for (String sql : java.util.List.of(
+                "DELETE FROM steps WHERE file_path = ?",
+                "DELETE FROM scenarios WHERE file_path = ?",
+                "DELETE FROM feature_docs WHERE file_path = ?",
+                "DELETE FROM entities WHERE source_file = ?",
+                "DELETE FROM files WHERE path = ?"
+        )) {
+            try (java.sql.PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setString(1, path);
+                if (statement.executeUpdate() > 0) removed = true;
+            }
         }
         return removed;
     }

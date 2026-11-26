@@ -50,7 +50,7 @@ class SandboxMergeTest {
         String synced = scalar(Binding.main(),
                 "SELECT last_synced_hash FROM files WHERE path = ?", "features/pay.feature");
         assertFalse(synced == null || synced.isBlank(), synced);
-        assertEquals(0, cli("store", "sandbox", "create", "alpha", "--project=" + project).code);
+        assertEquals(0, cli("store", "sandbox", "create", "alpha", "--mode=copy", "--project=" + project).code);
 
         Capture edited = cli("store", "feature", "put", "features/pay.feature",
                 "--text=Feature: Pay\n  Scenario: Ada\n    * INFO: amount is 9\n",
@@ -137,7 +137,7 @@ class SandboxMergeTest {
         StoreFiles.Row before = file(Binding.main(), "features/shot.bin");
         assertTrue(before.binaryRef(), "expected a reference");
         String synced = before.lastSyncedHash() == null ? "" : before.lastSyncedHash();
-        assertEquals(0, cli("store", "sandbox", "create", "bins", "--project=" + project).code);
+        assertEquals(0, cli("store", "sandbox", "create", "bins", "--mode=copy", "--project=" + project).code);
         byte[] changed = "owned-bytes".getBytes(StandardCharsets.UTF_8);
         StoreScope.clear();
         StoreScope.bind(Binding.sandbox("bins"));

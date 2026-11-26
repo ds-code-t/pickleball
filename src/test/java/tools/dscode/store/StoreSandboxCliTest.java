@@ -31,6 +31,8 @@ class StoreSandboxCliTest {
     void helpNamesMainAndVacuum() {
         String help = StoreCli.help();
         assertTrue(help.contains("sandbox create <name> [--from=main]"), help);
+        assertTrue(help.contains("--mode=cow|copy"), help);
+        assertTrue(help.contains("sandbox promote <name> --to=parent|top --logs=clear|archive"), help);
         assertFalse(help.contains("--from=<commit>"), help);
         assertTrue(help.contains("--vacuum"), help);
     }

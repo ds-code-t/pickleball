@@ -109,3 +109,15 @@ store conflicts choose <relative-path> --keep=db|file
 ```
 
 `store conflicts show` prints the file text and the database text. A secret field is shown as the stored reference (`<password:name>`, `<entity:Type#id.field>`, or `~MASK;`). `store conflicts choose --keep=db` writes the database bytes to the file and sets `last_synced_hash` to that hash. `--keep=file` replaces the database row from the file and clears `db_edited`. The side that was not kept is written to `.pickleball/store/discarded/<utc-timestamp>-<path>`, with `/` and `\` turned into `_`. The start id for this JVM is `.pickleball/store/discarded/session`, and each discarded file has a sibling marker of the same name plus `.start`. The next store command deletes a discarded file older than 24 hours and any discarded file whose marker names a different JVM. There is no merge. `store sandbox merge` is unchanged. `pkb_store_log=conflict` logs the path, the choice, and the discarded file name. It does not log the body. Workbench, Gradle, and MCP only forward these commands.
+
+## Copy-on-write sandboxes
+
+`store sandbox create <name>` defaults to `--mode=cow`. The file is still `.pickleball/store/sandboxes/<name>/source.db`. `schema_meta` key `sandbox_mode` is `cow`. `_pkb_branch` key `parent` is the parent sandbox name, or `main` when the sandbox is created from main. The child does not receive a copy of the parent file bytes, and create does not extract. An edit writes a `files` delta in the child. A delete writes a tombstone delta and leaves the working-tree file in place. The child head is the parent head, then those deltas. The parent database is opened on its own connection. It is not attached.
+
+`--mode=copy` is the independent database. It records no `parent` key. `SandboxIndependenceTest` covers that mode.
+
+```
+store sandbox promote <name> --to=parent|top --logs=clear|archive
+```
+
+`--logs` is required. `--to=parent` writes one expensive delta per changed head row onto the parent, then sets `schema_meta` `head_promoted=1` on the child. `--to=top` walks parents until `main`. Promote onto `main` syncs the changed file rows through `store extract`. A both-sides conflict is reported and that file is left as it is. Promote onto another sandbox does not touch the working tree. `--logs=clear` deletes `run_logs` rows for that sandbox name and leaves the `runs` row. `--logs=archive` leaves the log rows and prefixes `runs.note` with `archived`. `pkb_store_log=sandbox` logs create and promote. The line names the sandbox and does not include payloads. Workbench, Gradle, and MCP only forward these commands.

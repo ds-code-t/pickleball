@@ -839,6 +839,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/registry/GlobalRegistry.java`
 - `src/main/java/tools/dscode/release/WorkingTreeDiffHash.java`
 - `src/main/java/tools/dscode/store/CategoryRules.java`
+- `src/main/java/tools/dscode/store/CowSandbox.java`
 - `src/main/java/tools/dscode/store/dashboard/DashboardCli.java`
 - `src/main/java/tools/dscode/store/dashboard/DashboardHistory.java`
 - `src/main/java/tools/dscode/store/dashboard/DashboardHtml.java`
@@ -1302,6 +1303,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/store/CategoryEditTest.java`
 - `src/test/java/tools/dscode/store/ChangesCliTest.java`
 - `src/test/java/tools/dscode/store/ConflictChoiceTest.java`
+- `src/test/java/tools/dscode/store/CowSandboxTest.java`
 - `src/test/java/tools/dscode/store/dashboard/DashboardTest.java`
 - `src/test/java/tools/dscode/store/DeltaWindowTest.java`
 - `src/test/java/tools/dscode/store/EmbeddedStoreOpenTest.java`
@@ -1328,6 +1330,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/store/SandboxMergeConflictTest.java`
 - `src/test/java/tools/dscode/store/SandboxMergeTest.java`
 - `src/test/java/tools/dscode/store/SandboxMergeTimingTest.java`
+- `src/test/java/tools/dscode/store/SandboxPromoteTest.java`
 - `src/test/java/tools/dscode/store/ScenarioTagTableTest.java`
 - `src/test/java/tools/dscode/store/spike/EmbeddedMultiProcessTest.java`
 - `src/test/java/tools/dscode/store/spike/EmbeddedNativeProbe.java`

@@ -149,7 +149,8 @@ public final class StoreCli {
     public static String help() {
         return """
                 Usage: store migrate [--dry-run] [--remove-legacy] [--project=<dir>]
-                Usage: store sandbox create <name> [--from=main] [--owner=<id>] [--ttl=<duration>] [--project=<dir>]
+                Usage: store sandbox create <name> [--from=main] [--mode=cow|copy] [--owner=<id>] [--ttl=<duration>] [--project=<dir>]
+                Usage: store sandbox promote <name> --to=parent|top --logs=clear|archive [--json] [--project=<dir>]
                 Usage: store sandbox list [--json] [--project=<dir>]
                 Usage: store sandbox use <name> [--project=<dir>]
                 Usage: store sandbox diff <name> [--table=<t>] [--json] [--project=<dir>]
@@ -202,6 +203,7 @@ public final class StoreCli {
                 Usage: store run [--project=<dir>] [--dry-run] [--tags=<expr>] [--name=<text>] [--glue=<packages>] [--sandbox=<name>] [--engine]
                 Usage: store run-classpath --out=<file> [--project=<dir>]
                 Files stay the source of truth. The working copy is .pickleball/store/main.db and is gitignored. Opening it starts no process and downloads nothing.
+                store sandbox create defaults to --mode=cow. The child records schema_meta sandbox_mode=cow and _pkb_branch parent. Edits are deltas in that child. A delete is a tombstone. --mode=copy is an independent database with no parent. store sandbox promote requires --logs=clear|archive. --to=parent writes one expensive delta per changed head row on the parent. --to=top walks parents until main. Promote onto main syncs those files through store extract and skips a both-sides conflict. Promote onto another sandbox does not touch the working tree. --logs=clear deletes that sandbox's run_logs rows. --logs=archive leaves them and prefixes runs.note with archived. Set pkb_store_log=sandbox to log create and promote. The log names the sandbox and does not include payloads.
                 sandbox merge compares _pkb_base, the sandbox, and main by hash. The default policy fail writes nothing when any key conflicts, prints a text table, and saves sandboxes/<name>/merge-<time>.json. branch-wins and main-wins resolve those keys. One transaction applies the chosen rows, rebuilds derived feature rows, and re-baselines the sandbox. --dry-run writes nothing. --drop drops the sandbox after a successful merge. store changes lists the _pkb_changes rows for the bound database. --since and --limit page by sequence. pkb_store_changes_days (default 14) is how long store retain and sandbox prune keep those rows. Set pkb_store_log=merge,changes to log them.
                 status and hydrate --dry-run do not create a database when it is missing.
                 store pin show prints the commit pin (commit sha, time, and dirty). An empty git directory stores an empty sha and dirty 0. store delta list prints the append-only log. store delta undo appends an inverse delta and does not delete the undone row. store delta redo appends a copy of the delta that undo inverted. store head show prints the flattened head and rebuilds it when it is stale. store head rebuild replays the remaining deltas. After a flatten, more than 100 deltas are folded into the head and those delta rows are deleted. Set pkb_store_log=pin,delta to log pin, head, append, undo, redo, and fold lines.

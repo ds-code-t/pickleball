@@ -26,7 +26,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-/** {@code pickleball store sandbox}. Each sandbox is its own SQLite file. Nothing in it points at main. */
+/**
+ * {@code pickleball store sandbox}. The default create mode is copy-on-write.
+ * {@code --mode=copy} is an independent database and does not record a parent.
+ */
 public final class StoreSandbox {
     private StoreSandbox() {
     }
@@ -44,9 +47,10 @@ public final class StoreSandbox {
                 case "drop" -> drop(project, tokens, out);
                 case "prune" -> prune(project, tokens, out);
                 case "merge" -> merge(project, tokens, json, out);
+                case "promote" -> CowSandbox.promote(project, tokens, out, err);
                 default -> {
                     err.println("error: Unknown Store sandbox command: " + action);
-                    err.println("fix: store sandbox create|list|use|diff|extract|drop|prune|merge");
+                    err.println("fix: store sandbox create|list|use|diff|extract|drop|prune|merge|promote");
                     yield 2;
                 }
             };
@@ -69,16 +73,25 @@ public final class StoreSandbox {
         String ttl = suppliedTtl == null || suppliedTtl.isBlank() ? "24h" : suppliedTtl;
         parseDuration(ttl);
         String mode = value(tokens, "--mode=");
-        if (mode != null && !mode.isBlank() && !"copy".equals(mode)) {
+        if (mode == null || mode.isBlank()) mode = "cow";
+        if (!"cow".equals(mode) && !"copy".equals(mode)) {
             throw new IllegalArgumentException(
-                    "sandbox --mode must be copy\nfix: store sandbox create " + name + " --mode=copy");
+                    "sandbox --mode must be cow or copy\nfix: store sandbox create " + name + " --mode=cow");
         }
         String from = value(tokens, "--from=");
-        if (from != null && !from.isBlank() && !"main".equals(from)) {
+        if (from == null || from.isBlank()) from = "main";
+        if ("copy".equals(mode) && !"main".equals(from)) {
             throw new IllegalArgumentException(
                     "sandbox --from must be main\nfix: store sandbox create " + name
                             + " from main, or extract a sandbox and hydrate it");
         }
+        if ("cow".equals(mode) && !"main".equals(from)
+                && !Files.isRegularFile(StorePaths.sandboxDatabase(project, from))) {
+            throw new IllegalArgumentException(
+                    "sandbox --from must be main or an existing sandbox\nfix: store sandbox create " + name
+                            + " --from=main");
+        }
+        if (!"main".equals(from)) Binding.sandbox(from);
         if (Files.isRegularFile(StorePaths.sandboxDatabase(project, name))) {
             throw new IllegalStateException("sandbox already exists: " + name + "\nfix: store sandbox list");
         }
@@ -93,11 +106,15 @@ public final class StoreSandbox {
             if (Files.isRegularFile(StorePaths.sandboxDatabase(project, name))) {
                 throw new IllegalStateException("sandbox already exists: " + name + "\nfix: store sandbox list");
             }
-            try (SqlStore store = SqlStore.open(project, Binding.main())) {
-                store.createBranch(name, meta);
+            if ("copy".equals(mode)) {
+                try (SqlStore store = SqlStore.open(project, Binding.main())) {
+                    store.createBranch(name, meta);
+                }
+            } else {
+                CowSandbox.create(project, name, from, meta);
             }
         }
-        StoreLog.log(project, "sandbox", name, name, "create owner=" + owner + " ttl=" + ttl);
+        StoreLog.log(project, "sandbox", name, name, "create owner=" + owner + " ttl=" + ttl + " mode=" + mode);
         out.println("sandbox " + name + " branch " + binding.branch());
         return 0;
     }

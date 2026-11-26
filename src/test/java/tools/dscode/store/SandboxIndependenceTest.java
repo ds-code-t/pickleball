@@ -36,9 +36,9 @@ class SandboxIndependenceTest {
                 """);
         assertEquals(0, cli("store", "hydrate", "--project=" + project).code);
         StoreScope.clear();
-        assertEquals(0, cli("store", "sandbox", "create", "alpha", "--project=" + project).code);
+        assertEquals(0, cli("store", "sandbox", "create", "alpha", "--mode=copy", "--project=" + project).code);
         StoreScope.clear();
-        assertEquals(0, cli("store", "sandbox", "create", "beta", "--project=" + project).code);
+        assertEquals(0, cli("store", "sandbox", "create", "beta", "--mode=copy", "--project=" + project).code);
         StoreScope.clear();
         Capture edited = cli("store", "feature", "put", "features/pay.feature",
                 "--text=Feature: Pay\n  Scenario: Ada\n    * INFO: amount is 8\n",
@@ -78,6 +78,11 @@ class SandboxIndependenceTest {
                     "SELECT COUNT(*) FROM _pkb_branch WHERE `key` = 'created_from_commit'")) {
                 assertTrue(commit.next());
                 assertEquals(1, commit.getInt(1), "sandbox does not record the commit it was created from");
+            }
+            try (java.sql.ResultSet parent = statement.executeQuery(
+                    "SELECT COUNT(*) FROM _pkb_branch WHERE `key` = 'parent'")) {
+                assertTrue(parent.next());
+                assertEquals(0, parent.getInt(1), "copy sandbox records a parent");
             }
             try (java.sql.ResultSet base = statement.executeQuery(
                     "SELECT base_hash, location FROM _pkb_base WHERE tbl = 'files' AND pk = 'features/pay.feature'")) {
