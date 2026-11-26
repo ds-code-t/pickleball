@@ -144,8 +144,15 @@ public final class NativeScenarioRun {
                             exampleRow(scenario));
                     int tracedFrom = seen.size();
                     try {
+                        tools.dscode.engine.runtime.VisualTarget.beforeRun(
+                                options == null ? null : options.project(),
+                                scenario.location() == null ? "" : scenario.location().uri(),
+                                stepLine,
+                                stepText,
+                                registry);
                         state.runStep(frame);
                     } catch (Throwable thrown) {
+                        tools.dscode.store.StoreExecution.noteFailure(thrown);
                         context.fail(thrown);
                         if (frame.result == null) {
                             frame.result = new Result(

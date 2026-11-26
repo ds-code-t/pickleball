@@ -28,7 +28,7 @@ Explicit report steps are not suppressed by this setting.
 
 Workbench `discover` / `confirm` / `hint` default to `failed` even though ordinary diagnostic runs default to `all`. Override the Workbench overlay with `--retention=all|failed|none`. That flag does not change this table.
 
-Store run history is a separate store in `.pickleball/store/data`. Store is on by default. `store history` does not delete diagnostic folders and does not read `pkb_reportretention`. Use it when you want a small queryable summary beside this report tree. `--from` copies outcome and counts from a `run-index.json` and does not modify that file.
+The run record is the `run_snapshots` row in `.pickleball/store/runstate.db`. A tracked run freezes the head id and the enabled entity hashes there and does not copy `source.db`. Diagnostic files under `reports/diagnostic-runs` remain. `store history` does not delete those folders and does not read `pkb_reportretention`. `store history show --json` prints the snapshot under `items`. `--from` copies outcome and counts from a `run-index.json` and does not modify that file.
 
 ## Diagnostic layout
 
@@ -225,6 +225,8 @@ failureSite.definition
 ```
 
 Failures without a stable structured site deliberately use the class/message-only fallback. Signatures are investigation aids, not permanent identifiers or proof of one root cause.
+
+`exception_clusters` is a SQL view over failed runs. It groups `exception.signature`, `exception.scope`, and the hour of `runs.started_at`. No model is trained. `store report write` writes a `.pkb.json` report script of step references and artifact paths. `store report export --html` writes the read-only dashboard. `store diff` reports `break` when a definition is in only one of two runs.
 
 ## Scenario identity
 

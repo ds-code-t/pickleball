@@ -34,8 +34,16 @@ public final class StepRows {
             boolean runIfSoftFailed,
             String untilMode,
             String contextMode,
-            String contextScope
+            String contextScope,
+            String visualRef
     ) {
+    }
+
+    /** Artifact id on the step row. Null when the column, the row, or the store is missing. */
+    public static String visualRef(Path project, String path, int line) {
+        Stored row = find(project, path, line);
+        if (row == null || row.visualRef() == null || row.visualRef().isBlank()) return null;
+        return row.visualRef();
     }
 
     /** Text flags, with a stored row overlaid when one matches the line. */
@@ -65,7 +73,7 @@ public final class StepRows {
              PreparedStatement statement = session.connection().prepareStatement("""
                      SELECT max_iterations, timeout_seconds, retry, ignore_failures, log_failures_continue,
                             run_if_finished, always_run, run_if_passing, run_if_failed, run_if_hard_failed,
-                            run_if_soft_failed, until_mode, file_path, context_mode, context_scope
+                            run_if_soft_failed, until_mode, file_path, context_mode, context_scope, visual_ref
                      FROM steps
                      WHERE line = ?
                        AND (file_path = ? OR replace(file_path, '\\', '/') LIKE ?)
@@ -103,7 +111,8 @@ public final class StepRows {
                 rows.getInt(11) != 0,
                 rows.getString(12),
                 rows.getString(14),
-                rows.getString(15));
+                rows.getString(15),
+                rows.getString(16));
     }
 
     private static Integer integer(ResultSet rows, int index) throws SQLException {

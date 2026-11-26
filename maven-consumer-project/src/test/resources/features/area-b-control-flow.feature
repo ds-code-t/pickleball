@@ -393,3 +393,8 @@ Feature: Area B control flow
   Scenario: A JavaScript defineStep saves a value the next step reads
     * I count 2 for the js step
     * , ensure "<jsStepCount>" equals "2"
+
+  @all @area-b @area-b-record-entity
+  Scenario: Record a business entity during a tracked step
+    * RECORD ENTITY: "Ada" as Account#ada
+    * , ensure "<recordedAccount>" equals "Account#ada"

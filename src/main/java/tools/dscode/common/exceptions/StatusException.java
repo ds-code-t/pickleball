@@ -1,6 +1,6 @@
 package tools.dscode.common.exceptions;
 
-public class StatusException extends RuntimeException implements PickleBallExceptionInterface {
+public class StatusException extends PickleballException {
 
     public StatusException() {
         super();

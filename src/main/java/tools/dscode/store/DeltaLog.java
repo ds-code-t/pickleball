@@ -15,8 +15,8 @@ import java.util.List;
 
 /**
  * Append-only delta log. Undo appends an inverse and leaves the undone row.
- * Redo appends a copy of the delta that undo inverted. Folding deletes rows
- * only after {@link HeadMaterializer} has their effect in the head.
+ * Redo appends a copy of the delta that undo inverted. Folding copies rows into
+ * {@code delta_archive} only after {@link HeadMaterializer} has their effect in the head.
  */
 public final class DeltaLog {
     public static final String PUT = "put";
@@ -168,29 +168,38 @@ public final class DeltaLog {
         return node.toString();
     }
 
-    private static Delta read(ResultSet rows) throws SQLException {
-        long seq = rows.getLong(1);
-        String at = rows.getString(2);
-        String actor = rows.getString(3);
-        String kind = rows.getString(4);
-        String json = rows.getString(5);
-        boolean expensive = rows.getInt(6) != 0;
+    static Delta readPayload(long seq, String at, String kind, String json) throws SQLException {
         try {
             JsonNode node = MAPPER.readTree(json == null ? "{}" : json);
             return new Delta(
                     seq,
                     at,
-                    actor,
+                    "",
                     kind,
                     node.path("tbl").asText(""),
                     node.path("pk").asText(""),
                     textOrNull(node.get("before")),
                     textOrNull(node.get("after")),
                     node.path("undoOf").asLong(0L),
-                    expensive);
+                    false);
         } catch (com.fasterxml.jackson.core.JsonProcessingException failure) {
             throw new SQLException("delta payload is not json: seq " + seq, failure);
         }
+    }
+
+    private static Delta read(ResultSet rows) throws SQLException {
+        Delta parsed = readPayload(rows.getLong(1), rows.getString(2), rows.getString(4), rows.getString(5));
+        return new Delta(
+                parsed.seq(),
+                parsed.at(),
+                rows.getString(3),
+                parsed.kind(),
+                parsed.table(),
+                parsed.pk(),
+                parsed.before(),
+                parsed.after(),
+                parsed.undoOf(),
+                rows.getInt(6) != 0);
     }
 
     private static String textOrNull(JsonNode node) {

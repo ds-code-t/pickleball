@@ -40,6 +40,8 @@ A scenario step receives that resolved field only when Store is on. With Store o
 
 With Store on, a missing database row is read from `store-entities/<Type>/<id>.entity` when that file is present. Resolution does not create a database when no tracked step is active. During a tracked step, that read inserts `entity_usages` with operation `read`. `value_ref` is the secret reference when the field holds one (`<password:qaDb>` or `~MASK;`). Otherwise it is `<entity:Type#id.field>`. The resolved cleartext is not stored. `store entity use <type> <id>` records `write` or `mention` (or `read`) on `--step` or the active step. A `--value-ref` that is not a reference is stored as `~MASK;`.
 
+`RECORD ENTITY: "<value>" as Type#id` writes the entity, a mention usage, and a `run_snapshot_entities` row for the tracked step. It does not run object construction, post-actions, or cleanup. A value that fails the secret check is stored as `~MASK;`. The step saves `recordedAccount` as `Type#id` when a scenario map is open. The consumer scenario is `@area-b-record-entity`.
+
 ## CLI
 
 Workbench, MCP, and Gradle forward these to the same CLI. There is no separate entity implementation.
@@ -77,7 +79,7 @@ store head rebuild
 
 `store delta list` prints `deltas N` and then `seq <seq> <kind> <table> <pk>`. It does not print the payload. Kinds in this phase are `put`, `delete`, `undo`, and `redo`. `store delta undo` appends an inverse of the delta at `delta_cursor` and leaves that row in the log. `store delta redo` appends a copy of the delta that undo inverted. Undo or redo with nothing to apply exits 1.
 
-`schema_meta` key `delta_cursor` is the seq the head currently reflects. A cheap append writes the delta and flattens it into `head_rows` in the same transaction. `expensive=1` sets `heads.stale=1` and waits. `store status` and the end of `store hydrate` call `HeadMaterializer.quiet`, which flattens a stale head. `store head show` rebuilds when the head is stale. `store head rebuild` replays the remaining deltas. An unchanged source row stays in its own table until a delta names it. A tombstone hides the parent row. After a flatten, more than 100 stored deltas are folded into the head and those oldest delta rows are deleted in the same transaction. A run does not read the head yet.
+`schema_meta` key `delta_cursor` is the seq the head currently reflects. A cheap append writes the delta and flattens it into `head_rows` in the same transaction. `expensive=1` sets `heads.stale=1` and waits. `store status` and the end of `store hydrate` call `HeadMaterializer.quiet`, which flattens a stale head. `store head show` rebuilds when the head is stale. `store head rebuild` replays the remaining deltas. An unchanged source row stays in its own table until a delta names it. A tombstone hides the parent row. After a flatten, more than 100 stored deltas are copied to `delta_archive` in `runstate.db` and removed from the source `deltas` table. `store head rebuild --from-archive=<seq>` replays one archived delta and refuses a seq that is still in the live window. A tracked run freezes the head id and the enabled entity hashes in `runstate.db` and does not copy `source.db`. `store history show --json` prints that snapshot under `items`.
 
 `pkb_store_log=pin,delta` logs pin, head, append, undo, redo, and fold lines. The lines are date-stamped, name the sandbox, and do not include the payload. Workbench, Gradle, and MCP only forward these commands.
 

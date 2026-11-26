@@ -44,6 +44,7 @@ public final class VerbCatalog {
     private static final String LOG = "tools.dscode.common.composite.DomLogCli.execute";
     private static final String DASHBOARD = "tools.dscode.store.dashboard.DashboardCli.execute";
     private static final String CHAT = "tools.dscode.common.agentcontrol.AgentControl.execute";
+    private static final String CROSS_STORE = "tools.dscode.launcher.CrossStore.execute";
 
     /**
      * Commands the domengine MCP {@code surfaces} tool lists. That tool is an index of
@@ -194,6 +195,10 @@ public final class VerbCatalog {
         add(rows, "log-tail", "workbench", LOG);
         add(rows, "log tail", "workbench", LOG);
         add(rows, "chat", "workbench", CHAT);
+        add(rows, "cross", "workbench", CROSS_STORE);
+        add(rows, "cross note", "workbench", CROSS_STORE);
+        add(rows, "cross journal", "workbench", CROSS_STORE);
+        add(rows, "cross link", "workbench", CROSS_STORE);
         List<Row> list = new ArrayList<>(rows.values());
         list.sort(Comparator.comparing(Row::name));
         return list;

@@ -19,21 +19,36 @@ import java.util.Map;
  * {@code browser-events}, {@code observe}, {@code log} tail, {@code domengine session log},
  * {@code chat}, and {@code record}. {@code --once} drops {@code --follow} before the
  * verb runs, so that call returns. There is no socket transport.</p>
+ *
+ * <p>After each verb, {@link CrossStore#journal} writes one session-journal row (verb and
+ * args hash) unless {@code pkb_journal=off}. A journal failure does not change the exit code.</p>
  */
 public final class VerbDispatch {
     private VerbDispatch() {
     }
 
     public static int run(String verb, Map<String, String> flags, PrintStream out, PrintStream err) {
+        PrintStream stderr = err == null ? System.err : err;
+        String[][] journaled = new String[1][];
+        int code = execute(verb, flags, out, stderr, journaled);
+        CrossStore.journal(journaled[0], code, stderr);
+        return code;
+    }
+
+    /** The verb body. {@link #run} writes one cross-store journal row after it returns. */
+    private static int execute(String verb, Map<String, String> flags, PrintStream out, PrintStream err,
+                               String[][] journaled) {
         PrintStream stdout = out == null ? System.out : out;
         PrintStream stderr = err == null ? System.err : err;
         String name = verb == null ? "" : verb.trim();
         Map<String, String> use = flags == null ? new LinkedHashMap<>() : new LinkedHashMap<>(flags);
         String[] argv = argvFor(name, use);
+        journaled[0] = argv;
         boolean mentioned = ArgsFiles.mentions(argv);
         try {
             ArgsFiles.Expansion expansion = ArgsFiles.expand(argv);
             argv = expansion.argv();
+            journaled[0] = argv;
             if (expansion.fromFile()) mentioned = true;
         } catch (IllegalArgumentException failure) {
             Path project = projectOf(use, argv);
@@ -54,6 +69,7 @@ public final class VerbDispatch {
         if ("engine".equals(family)) return tools.dscode.engine.EngineCli.execute(argv, stdout, stderr);
         if ("domengine".equals(family)) return PickleballWorkbenchLauncher.runDomEngine(argv, stdout, stderr);
         if ("dashboard".equals(family)) return tools.dscode.store.dashboard.DashboardCli.execute(argv, stdout, stderr);
+        if ("cross".equals(family)) return CrossStore.execute(argv, stdout, stderr);
         if ("log".equals(family) || "log-tail".equals(family)) {
             return tools.dscode.common.composite.DomLogCli.execute(argv, stdout, stderr);
         }

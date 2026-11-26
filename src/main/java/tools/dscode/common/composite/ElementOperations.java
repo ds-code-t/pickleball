@@ -17,6 +17,7 @@ import tools.dscode.browser.ProtocolSelector;
 import tools.dscode.browser.SeleniumAdapter;
 import tools.dscode.common.domoperations.KeyParser;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
+import tools.dscode.store.SnapFindIndex;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -199,6 +200,10 @@ public final class ElementOperations {
     }
 
     public static List<WebElement> findElements(SearchContext context, By by) {
+        if (SnapFindIndex.consult(by)) {
+            SnapFindIndex.countIndexHit();
+            return List.of();
+        }
         FINDS.incrementAndGet();
         if (by == null) return List.of();
         if (unattachedDriver(context)) {

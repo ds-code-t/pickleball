@@ -23,8 +23,9 @@ import java.util.regex.Pattern;
  * out of an existing {@code run-index.json}.
  */
 public final class StoreHistory {
-    public static final int DEFAULT_DAYS = 30;
-    public static final int DEFAULT_MAX_BYTES = 1_048_576;
+    public static final int DEFAULT_DAYS = 14;
+    /** Two gibibytes. Distinct from {@code pkb_store_changes_days}. */
+    public static final long DEFAULT_MAX_BYTES = 2_147_483_648L;
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final Pattern RUN_ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,127}");
 
@@ -263,7 +264,7 @@ public final class StoreHistory {
         }
     }
 
-    public static RetainResult retain(Path project, int days, int maxBytes) throws SQLException {
+    public static RetainResult retain(Path project, int days, long maxBytes) throws SQLException {
         if (days < 0) throw new IllegalArgumentException("history days must be zero or greater");
         if (maxBytes < 0) throw new IllegalArgumentException("history max bytes must be zero or greater");
         if (!StorePaths.ready(project)) return new RetainResult(0, 0);
@@ -287,6 +288,7 @@ public final class StoreHistory {
                     removed++;
                 }
                 int trimmed = StoreChanges.trim(connection, StoreChanges.days());
+                HeadMaterializer.archiveOverflow(connection, project);
                 connection.commit();
                 int remaining = load(connection).size();
                 StoreLog.log(project, "history", "runs", "retain removed=" + removed);
@@ -302,11 +304,19 @@ public final class StoreHistory {
     }
 
     public static int days() {
-        return positive(setting("pkb_store_history_days", "PKB_STORE_HISTORY_DAYS"), DEFAULT_DAYS);
+        String retain = setting("pkb_store_retain_days", "PKB_STORE_RETAIN_DAYS");
+        if (retain != null && !retain.isBlank()) return positive(retain, DEFAULT_DAYS);
+        String legacy = setting("pkb_store_history_days", "PKB_STORE_HISTORY_DAYS");
+        if (legacy != null && !legacy.isBlank()) return positive(legacy, DEFAULT_DAYS);
+        return DEFAULT_DAYS;
     }
 
-    public static int maxBytes() {
-        return positive(setting("pkb_store_history_max_bytes", "PKB_STORE_HISTORY_MAX_BYTES"), DEFAULT_MAX_BYTES);
+    public static long maxBytes() {
+        String retain = setting("pkb_store_retain_bytes", "PKB_STORE_RETAIN_BYTES");
+        if (retain != null && !retain.isBlank()) return positiveLong(retain, DEFAULT_MAX_BYTES);
+        String legacy = setting("pkb_store_history_max_bytes", "PKB_STORE_HISTORY_MAX_BYTES");
+        if (legacy != null && !legacy.isBlank()) return positiveLong(legacy, DEFAULT_MAX_BYTES);
+        return DEFAULT_MAX_BYTES;
     }
 
     private static List<Run> load(Connection connection) throws SQLException {
@@ -326,8 +336,8 @@ public final class StoreHistory {
         }
     }
 
-    private static int bytes(Connection connection) throws SQLException {
-        int total = 0;
+    private static long bytes(Connection connection) throws SQLException {
+        long total = 0;
         try (PreparedStatement statement = connection.prepareStatement("SELECT note, scenario FROM runs");
              ResultSet rows = statement.executeQuery()) {
             while (rows.next()) {
@@ -396,6 +406,16 @@ public final class StoreHistory {
         if (raw == null || raw.isBlank()) return fallback;
         try {
             int parsed = Integer.parseInt(raw.trim());
+            return parsed < 0 ? fallback : parsed;
+        } catch (NumberFormatException failure) {
+            return fallback;
+        }
+    }
+
+    private static long positiveLong(String raw, long fallback) {
+        if (raw == null || raw.isBlank()) return fallback;
+        try {
+            long parsed = Long.parseLong(raw.trim());
             return parsed < 0 ? fallback : parsed;
         } catch (NumberFormatException failure) {
             return fallback;

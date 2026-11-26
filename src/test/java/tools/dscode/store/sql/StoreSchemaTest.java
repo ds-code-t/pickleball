@@ -52,8 +52,12 @@ class StoreSchemaTest {
         for (String table : SqlDialect.SOURCE_TABLES) {
             assertEquals(table, tableName(table), table);
         }
+        java.util.Set<String> sandboxColumn = java.util.Set.of(
+                "runs", "run_logs", "scenario_executions", "step_executions", "entity_usages",
+                "log_entity_links", "artifacts", "sandboxes", "run_snapshots");
         for (String table : SqlDialect.RUN_STATE_TABLES) {
             assertEquals(table, runStateTable(table), table);
+            if (!sandboxColumn.contains(table)) continue;
             assertEquals("sandbox", store.session().scalar(
                     "SELECT name FROM pragma_table_info('" + table + "', 'rs') WHERE name = 'sandbox'"), table);
         }

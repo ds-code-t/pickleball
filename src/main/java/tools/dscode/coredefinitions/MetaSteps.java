@@ -23,4 +23,9 @@ public class MetaSteps  extends CoreSteps {
 
     }
 
+    @Given("^MARK ENVIRONMENT: \"([^\"]*)\"$")
+    public static void markEnvironment(String text) {
+        tools.dscode.store.ExceptionCluster.markEnvironment(text);
+    }
+
 }

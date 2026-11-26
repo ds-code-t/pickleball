@@ -44,6 +44,10 @@ MCP-only count: 0
 | controller-start | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | controller-status | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | controller-stop | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
+| cross | workbench | cli | tools.dscode.launcher.CrossStore.execute |
+| cross journal | workbench | cli | tools.dscode.launcher.CrossStore.execute |
+| cross link | workbench | cli | tools.dscode.launcher.CrossStore.execute |
+| cross note | workbench | cli | tools.dscode.launcher.CrossStore.execute |
 | csp | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | dashboard | workbench | cli | tools.dscode.store.dashboard.DashboardCli.execute |
 | dashboard overlap | workbench | cli | tools.dscode.store.dashboard.DashboardCli.execute |
@@ -233,6 +237,7 @@ MCP-only count: 0
 | store changes | store | cli | tools.dscode.store.StoreCli.execute |
 | store conflicts | store | cli | tools.dscode.store.StoreCli.execute |
 | store delta | store | cli | tools.dscode.store.StoreCli.execute |
+| store diff | store | cli | tools.dscode.store.StoreCli.execute |
 | store enable | store | cli | tools.dscode.store.StoreCli.execute |
 | store entity | store | cli | tools.dscode.store.StoreCli.execute |
 | store extract | store | cli | tools.dscode.store.StoreCli.execute |
@@ -249,6 +254,7 @@ MCP-only count: 0
 | store migrate | store | cli | tools.dscode.store.StoreCli.execute |
 | store pin | store | cli | tools.dscode.store.StoreCli.execute |
 | store query | store | cli | tools.dscode.store.StoreCli.execute |
+| store report | store | cli | tools.dscode.store.StoreCli.execute |
 | store retain | store | cli | tools.dscode.store.StoreCli.execute |
 | store run | store | cli | tools.dscode.store.StoreCli.execute |
 | store run-classpath | store | cli | tools.dscode.store.StoreCli.execute |

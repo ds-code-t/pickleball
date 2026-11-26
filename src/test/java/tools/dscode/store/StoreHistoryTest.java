@@ -87,6 +87,35 @@ class StoreHistoryTest {
     }
 
     @Test
+    void retainDaysDefaultToFourteenWhenUnset() {
+        String retain = System.getProperty("pkb_store_retain_days");
+        String legacy = System.getProperty("pkb_store_history_days");
+        String changes = System.getProperty("pkb_store_changes_days");
+        String bytes = System.getProperty("pkb_store_retain_bytes");
+        String legacyBytes = System.getProperty("pkb_store_history_max_bytes");
+        try {
+            System.clearProperty("pkb_store_retain_days");
+            System.clearProperty("pkb_store_history_days");
+            System.clearProperty("pkb_store_retain_bytes");
+            System.clearProperty("pkb_store_history_max_bytes");
+            System.setProperty("pkb_store_changes_days", "3");
+            assertEquals(14, StoreHistory.days());
+            assertEquals(2_147_483_648L, StoreHistory.maxBytes());
+            System.setProperty("pkb_store_retain_days", "9");
+            assertEquals(9, StoreHistory.days());
+            System.clearProperty("pkb_store_retain_days");
+            System.setProperty("pkb_store_history_days", "21");
+            assertEquals(21, StoreHistory.days());
+        } finally {
+            restore("pkb_store_retain_days", retain);
+            restore("pkb_store_history_days", legacy);
+            restore("pkb_store_changes_days", changes);
+            restore("pkb_store_retain_bytes", bytes);
+            restore("pkb_store_history_max_bytes", legacyBytes);
+        }
+    }
+
+    @Test
     void cleartextSecretInHistoryIsRejected() throws Exception {
         Capture rejected = run("store", "history", "record", "secret-run",
                 "--note=password=hunter2", "--project=" + project);
