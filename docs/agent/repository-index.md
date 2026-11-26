@@ -954,6 +954,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/browser/PlaywrightAdapterTest.java`
 - `src/test/java/tools/dscode/browser/PlaywrightCdpLiveTest.java`
 - `src/test/java/tools/dscode/browser/proto/ConsumerFixesP2TabTest.java`
+- `src/test/java/tools/dscode/browser/proto/ConsumerFixesP3ProtoTest.java`
 - `src/test/java/tools/dscode/browser/proto/OwnStorageFilterTest.java`
 - `src/test/java/tools/dscode/browser/proto/SourceMapsTest.java`
 - `src/test/java/tools/dscode/browser/ProtocolSelectorPlaywrightTest.java`
@@ -990,6 +991,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentfast/ActHonestyTest.java`
 - `src/test/java/tools/dscode/common/agentfast/CompactReplyTest.java`
 - `src/test/java/tools/dscode/common/agentfast/ConsumerFixesP2FindTest.java`
+- `src/test/java/tools/dscode/common/agentfast/ConsumerFixesP3ViewTest.java`
 - `src/test/java/tools/dscode/common/agentfast/FallbackRunCapTest.java`
 - `src/test/java/tools/dscode/common/agentfast/FormatViewTest.java`
 - `src/test/java/tools/dscode/common/agentfast/HostLanesTest.java`
@@ -1162,6 +1164,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/ConfirmTest.java`
 - `src/test/java/tools/dscode/launcher/ConsumerFixesFrameLiveTest.java`
 - `src/test/java/tools/dscode/launcher/ConsumerFixesP2CliTest.java`
+- `src/test/java/tools/dscode/launcher/ConsumerFixesP3CliTest.java`
+- `src/test/java/tools/dscode/launcher/ConsumerFixesP3LiveTest.java`
 - `src/test/java/tools/dscode/launcher/ConsumerReadyCliTest.java`
 - `src/test/java/tools/dscode/launcher/ContextLiveTest.java`
 - `src/test/java/tools/dscode/launcher/ControllerReliabilityTest.java`
@@ -1870,6 +1874,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/CliSurfaceTest.java`
 - `dom-engine/src/test/java/dev/domengine/CliWireShapeTest.java`
 - `dom-engine/src/test/java/dev/domengine/ConformanceSuiteTest.java`
+- `dom-engine/src/test/java/dev/domengine/ConsumerFixesP3QueryTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/DesktopOneMatchTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/DesktopScreenshotTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/DesktopSnapshotTest.java`

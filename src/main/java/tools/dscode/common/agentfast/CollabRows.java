@@ -112,12 +112,21 @@ public final class CollabRows {
 
     private static void collect(DomNode node, List<DomNode> out, int depth) {
         if (node == null || depth > 200) return;
-        if (!attr(node, "data-pkb-msg-id").isEmpty() || node.attributes.containsKey("data-pkb-msg-id")) {
-            out.add(node);
+        boolean message = !attr(node, "data-pkb-msg-id").isEmpty() || node.attributes.containsKey("data-pkb-msg-id");
+        if (depth > 0 && hiddenContainer(node) && !message) return;
+        if (message) {
+            if (!hiddenContainer(node)) out.add(node);
             return;
         }
         for (DomNode shadow : node.shadowRoots) collect(shadow, out, depth + 1);
         for (DomNode child : node.children) collect(child, out, depth + 1);
+    }
+
+    /** A collapsed or hidden container. The document root is not one, so depth 0 still walks. */
+    private static boolean hiddenContainer(DomNode node) {
+        if (node.attributes.containsKey("hidden") || node.states.contains("hidden") || node.states.contains("collapsed")) return true;
+        if ("false".equals(node.attributes.get("aria-expanded"))) return true;
+        return !node.displayed && !node.computed.isEmpty();
     }
 
     private static StringBuilder text(DomNode node, StringBuilder out) {

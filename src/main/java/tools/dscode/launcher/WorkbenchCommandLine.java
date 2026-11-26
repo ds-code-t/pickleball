@@ -234,6 +234,7 @@ final class WorkbenchCommandLine {
         List<String> splitTags = new ArrayList<>();
         Path project = null;
         List<String> rest = new ArrayList<>();
+        List<String> positionals = new ArrayList<>();
         for (int index = 1; index < args.length; index++) {
             String token = args[index];
             if (token == null) continue;
@@ -600,12 +601,18 @@ final class WorkbenchCommandLine {
                 }
                 continue;
             }
-            if (project == null && looksLikeProject(token)) {
-                project = Path.of(token).toAbsolutePath().normalize();
-                continue;
+            if (project == null && acceptsAsProject(command, token)) {
+                try {
+                    project = Path.of(token).toAbsolutePath().normalize();
+                    continue;
+                } catch (java.nio.file.InvalidPathException ignored) {
+                    // An illegal path is a leftover token, not a project directory.
+                }
             }
             rest.add(token);
+            positionals.add(token);
         }
+        rejectUnknownPositionals(command, positionals);
         rejectSplitTags(tags, splitTags);
         if (project == null) project = cwd;
         if (tagsFile != null) {
@@ -1019,10 +1026,13 @@ final class WorkbenchCommandLine {
         return lower.startsWith("-d") || token.contains("/") || token.contains("\\");
     }
 
+    /**
+     * An existing directory, or {@code .} / {@code ..}. A slash in the token is not enough:
+     * {@code chat-send} used to create {@code Case\ menu} because every slash token was a project.
+     */
     private static boolean looksLikeProject(String token) {
         if (token == null || token.isBlank()) return false;
         if (".".equals(token) || "..".equals(token)) return true;
-        if (token.contains("/") || token.contains("\\")) return true;
         try {
             return Files.isDirectory(Path.of(token));
         } catch (java.nio.file.InvalidPathException failure) {
@@ -1030,5 +1040,33 @@ final class WorkbenchCommandLine {
             // An illegal path is not a project directory, so the token stays a choice.
             return false;
         }
+    }
+
+    /** {@code record} and {@code selftest} still take a scratch directory that does not exist yet. */
+    private static final Set<String> DIRECTORY_ARGUMENT_VERBS = Set.of("record", "selftest");
+
+    /**
+     * Verbs whose leftover words are arguments, not unknown positionals.
+     * {@code export-guidance} and {@code help} return before this check.
+     */
+    private static final Set<String> POSITIONAL_COMMANDS = Set.of(
+            "pw", "setup", "optional-install", "optional-uninstall", "call",
+            "query", "history-query", "execute-step", "status", "selftest", "record"
+    );
+
+    private static boolean acceptsAsProject(String command, String token) {
+        if (looksLikeProject(token)) return true;
+        if (token == null || !DIRECTORY_ARGUMENT_VERBS.contains(command)) return false;
+        return token.contains("/") || token.contains("\\");
+    }
+
+    private static void rejectUnknownPositionals(String command, List<String> positionals) {
+        if (positionals == null || positionals.isEmpty()) return;
+        if (isForwardedCommand(command) || POSITIONAL_COMMANDS.contains(command)) return;
+        String token = positionals.get(0);
+        throw cliError(
+                "unknown positional \"" + token + "\"",
+                "Drop that token. See help " + command + "."
+        );
     }
 }

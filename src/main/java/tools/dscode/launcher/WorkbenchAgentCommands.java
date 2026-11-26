@@ -1948,14 +1948,18 @@ public final class WorkbenchAgentCommands {
             err.println(several.getMessage());
             return 2;
         }
-        if (session.isEmpty()) {
-            err.println(WorkbenchCliHelp.structured("start a session first", "isolate, then retry this command."));
-            return 2;
-        }
         String op = category == null || category.isBlank() ? "inspect-page" : "find-element";
         String query = flag(parsed, "--query");
         if (query != null && !query.isBlank() && "find-element".equals(commandOf(parsed))) {
             op = "find-element";
+        }
+        if (session.isEmpty()) {
+            if (tools.dscode.control.protocol.LiveHostFile.read(parsed.project()).isPresent()) {
+                err.println(WorkbenchCliHelp.structured(op + " needs an isolate worker", "isolate, then retry " + op));
+                return 2;
+            }
+            err.println(WorkbenchCliHelp.structured("start a session first", "isolate, then retry this command."));
+            return 2;
         }
         try {
             WorkbenchSessionCommands.SessionState state = session.get();
@@ -2188,6 +2192,7 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "ttl");
         copyFlag(args, parsed, "ops");
         copyFlag(args, parsed, "verbose");
+        if (hasFlag(parsed, "--verbose") && !args.containsKey("verbose")) args.put("verbose", "true");
         copyFlag(args, parsed, "chat-after");
         copyFlag(args, parsed, "component");
         copyFlag(args, parsed, "mode");
@@ -2214,6 +2219,8 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "world");
         copyFlag(args, parsed, "clip");
         copyFlag(args, parsed, "frame");
+        String await = flag(parsed, "--await");
+        if (await != null) args.put("await", await.isBlank() ? "true" : await);
         copyFlag(args, parsed, "enter");
         copyFlag(args, parsed, "kinds");
         copyFlag(args, parsed, "fixture");
@@ -2451,7 +2458,13 @@ public final class WorkbenchAgentCommands {
             return WorkbenchCliHelp.structured("no live browser", "run start --url= --browser=");
         }
         if ("stale_ref".equals(text)) {
-            return WorkbenchCliHelp.structured("stale_ref", "run snap (or find) again for a fresh ref");
+            return WorkbenchCliHelp.structured("stale_ref", "pass --refind=chain");
+        }
+        if (text.startsWith("unknown field ")) {
+            return WorkbenchCliHelp.structured(text, "Pass one of the known names.");
+        }
+        if ("timeout".equals(text) || text.contains("timeout is milliseconds") || text.contains("--timeout")) {
+            return WorkbenchCliHelp.structured(text, "pass --timeout=<ms>");
         }
         return WorkbenchCliHelp.usageError(text, command);
     }

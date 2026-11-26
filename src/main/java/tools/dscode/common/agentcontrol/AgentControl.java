@@ -153,6 +153,12 @@ public final class AgentControl {
         tools.dscode.common.agentfast.AgentCursor.absorb(op, values);
         String humanRefusal = HumanLock.check(project, runId, op, values, agentId);
         if (humanRefusal != null) return timed(refusal(humanRefusal), started, project, runId, op);
+        String attached = attachedRefusal(op, runId, values);
+        if (attached != null) {
+            Result failed = fail(2, attached);
+            failed.body().put("fix", (op == null ? "that verb" : op) + " serves the start host or the isolate worker");
+            return timed(failed, started, project, runId, op);
+        }
         try {
             Optional<Result> routed = AgentSurfaceRouter.route(project, runId, op, values, agentId);
             if (routed.isPresent()) return timed(routed.get(), started, project, runId, op);
@@ -279,7 +285,7 @@ public final class AgentControl {
         String full = tools.dscode.common.agentfast.SessionIds.expand(id);
         if (full == null) {
             Result failed = fail(1, "unknown ref");
-            failed.body().put("fix", "run snap (or find) again for a fresh ref");
+            failed.body().put("fix", "pass --refind=chain");
             return failed;
         }
         Map<String, Object> body = ok("Expanded ref.");
@@ -1496,7 +1502,8 @@ public final class AgentControl {
                 look
         );
         placed.put("ok", true);
-        stampSeen(placed, args.get("handle"), runId);
+        stampSeen(placed, probeId(placed, args.get("handle")), runId);
+        leanPlacement(placed, args);
         if (present(at)) placed.put("at", at.trim());
         if (present(block) && Boolean.parseBoolean(block.trim())) placed.put("block", true);
         return new Result(0, placed);
@@ -1564,13 +1571,64 @@ public final class AgentControl {
                 args
         );
         placed.put("ok", true);
-        stampSeen(placed, args.get("anchor") != null ? args.get("anchor") : args.get("handle"), runId);
+        stampSeen(placed, probeId(placed, args.get("anchor") != null ? args.get("anchor") : args.get("handle")), runId);
+        leanPlacement(placed, args);
         if ("arrow".equals(kind)) placed.put("direction", args.get("direction") == null ? "" : args.get("direction"));
         if ("step".equals(kind)) placed.put("number", Integer.parseInt(args.get("number").trim()));
         if ("magnifier".equals(kind)) placed.put("zoom", args.get("zoom"));
         if ("spotlight".equals(kind)) placed.put("dim", args.get("dim"));
         if (present(args.get("block")) && Boolean.parseBoolean(args.get("block").trim())) placed.put("block", true);
         return new Result(0, placed);
+    }
+
+    private static final java.util.Set<String> ATTACHED_VERBS = java.util.Set.of(
+            "overlay", "chat-send", "panel-open",
+            "pin", "toast", "checklist", "status",
+            "label", "border", "arrow", "step-badge", "magnifier", "spotlight"
+    );
+
+    /**
+     * Collaboration draws on the start host or the isolate worker.
+     * An attached desktop, CDP URL, or other browser is unsupported.
+     */
+    public static String attachedRefusal(String op, String runId, Map<String, String> values) {
+        if (op == null || !ATTACHED_VERBS.contains(op)) return null;
+        String target = values == null ? null : values.get("target");
+        if (target == null || target.isBlank() || target.startsWith("ref:")) return null;
+        String text = target.trim();
+        if ("auto".equals(text) || "page".equals(text) || "popup".equals(text) || "native".equals(text)) return null;
+        if ("browser:auto".equals(text)) return null;
+        if (runId != null && !runId.isBlank() && (text.equals("browser:" + runId) || text.startsWith("browser:" + runId + "/"))) {
+            return null;
+        }
+        if (!text.startsWith("browser:") && !text.startsWith("desktop:") && !text.contains("://")) return null;
+        return "unsupported on attached target";
+    }
+
+    /** The painted placement id, so a short anchor handle is not reported lost. */
+    private static String probeId(Map<String, Object> placed, String fallback) {
+        Object id = placed == null ? null : placed.get("id");
+        if (id != null && !String.valueOf(id).isBlank()) return String.valueOf(id);
+        return fallback;
+    }
+
+    /** Default placement replies keep id, kind, visible, rect, and overlaps. {@code --verbose} restores the rest. */
+    public static void leanPlacement(Map<String, Object> placed, Map<String, String> args) {
+        if (placed == null) return;
+        if (!placed.containsKey("rect")) {
+            Map<String, Object> rect = new java.util.LinkedHashMap<>();
+            rect.put("x", placed.get("x"));
+            rect.put("y", placed.get("y"));
+            rect.put("width", placed.get("width"));
+            rect.put("height", placed.get("height"));
+            placed.put("rect", rect);
+        }
+        boolean verbose = args != null && truth(args.get("verbose"));
+        if (!verbose) {
+            placed.remove("sha256");
+            placed.remove("summary");
+            placed.remove("guidance");
+        }
     }
 
     /** visible, hidden, and lost describe the target. overlaps names placements on the page now. */
@@ -1762,6 +1820,15 @@ public final class AgentControl {
               for (var j = 0; j < all.length; j++) {
                 if (all[j].shadowRoot) addRoot(all[j].shadowRoot);
               }
+              var controls = root.querySelectorAll('button, a, input, select, textarea, [role="button"], [role="link"], [role="checkbox"], [role="textbox"]');
+              for (var c = 0; c < controls.length; c++) {
+                var control = controls[c];
+                if (control.closest && control.closest('[data-pkb-agent],[data-pkb-layer],[data-pkb-meta]')) continue;
+                var box = control.getBoundingClientRect();
+                if (box.width < 1 || box.height < 1) continue;
+                var snippet = ((control.getAttribute('aria-label') || control.innerText || control.tagName || '') + '').replace(/\\s+/g, ' ').trim().slice(0, 24);
+                out.push({id: 'control:' + String(control.tagName || 'el').toLowerCase() + ':' + (snippet || String(c)), x: box.left, y: box.top, w: box.width, h: box.height, card: false});
+              }
             }
             addRoot(document);
             return out;
@@ -1816,10 +1883,36 @@ public final class AgentControl {
      * {@code display:none} stays hidden with no reason, so the older flag reply does not grow a new cause.
      */
     private static final String SEEN_SCRIPT = """
-            var h = arguments[0];
-            var el = document.querySelector('[data-pkb-handle="' + CSS.escape(h) + '"]');
-            if (!el) el = document.getElementById(h);
-            if (!el) return {lost:true, visible:false, hidden:true};
+            var h = String(arguments[0] || '');
+            var seen = new Set();
+            function find(root) {
+              if (!root || seen.has(root) || !root.querySelectorAll) return null;
+              seen.add(root);
+              var nodes = root.querySelectorAll('[data-pkb-id]');
+              for (var i = 0; i < nodes.length; i++) {
+                var hit = nodes[i];
+                if (hit.getAttribute('data-pkb-id') !== h) continue;
+                if (hit.parentElement && hit.parentElement.getAttribute('data-pkb-id') === h) continue;
+                return hit;
+              }
+              var handles = root.querySelectorAll('[data-pkb-handle]');
+              for (var k = 0; k < handles.length; k++) {
+                if (handles[k].getAttribute('data-pkb-handle') === h) return handles[k];
+              }
+              if (root.getElementById) {
+                var byId = root.getElementById(h);
+                if (byId) return byId;
+              }
+              var all = root.querySelectorAll('*');
+              for (var j = 0; j < all.length; j++) {
+                if (!all[j].shadowRoot) continue;
+                var inner = find(all[j].shadowRoot);
+                if (inner) return inner;
+              }
+              return null;
+            }
+            var el = find(document);
+            if (!el || (el.isConnected === false)) return {lost:true, visible:false, hidden:true};
             var style = getComputedStyle(el);
             if (style.display === 'none' || style.visibility === 'hidden' || el.hidden) {
               return {lost:false, visible:false, hidden:true};

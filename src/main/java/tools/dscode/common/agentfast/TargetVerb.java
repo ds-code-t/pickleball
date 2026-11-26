@@ -445,6 +445,10 @@ public final class TargetVerb {
             String message = failure.getMessage() == null ? "failed" : failure.getMessage();
             if (message.contains("not found")) return fail(verb, "not found");
             if (message.contains("timeout")) return fail(verb, "timeout");
+            if (message.contains("query requires")) {
+                if ("act".equals(verb) || "upload".equals(verb)) return fail(verb, "act requires --query or --ref");
+                if ("find".equals(verb)) return fail(verb, "find requires --query");
+            }
             return fail(verb, message);
         } catch (RuntimeException failure) {
             String message = failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
@@ -531,6 +535,8 @@ public final class TargetVerb {
                 hits = searched.hits();
                 capped = searched.capped();
             }
+            hits = new ArrayList<>(hits);
+            hits.removeIf(TargetVerb::hiddenInput);
             if (hits.isEmpty()) {
                 Outcome missed = fail("find", "not found");
                 if (capped != null) missed.body().put("scrollSearch", capped);
@@ -543,7 +549,7 @@ public final class TargetVerb {
             if (!roleName.isBlank()) stampRoleNames(rows, hits, blank(args.get("name")));
             String exposure = exposureOf(args);
             if (exposure == null) return fail("find", "exposure is human or full");
-            if ("human".equals(exposure)) rows.removeIf(row -> Boolean.FALSE.equals(row.get("visible")));
+            if ("human".equals(exposure)) rows.removeIf(row -> !humanKeeps(row));
             if (rows.isEmpty()) return fail("find", "not found");
             CollabRows.narrow(rows, blank(args.get("include")));
             remember(runId, page.session);
@@ -836,6 +842,10 @@ public final class TargetVerb {
         String ref = blank(args.get("ref"));
         if (ref.isBlank() && "ref".equals(target.kind())) ref = target.raw();
         if (ref.isBlank() && SessionIds.expand(blank(args.get("query"))) != null) ref = blank(args.get("query"));
+        if (ref.isBlank() && blank(args.get("query")).isBlank() && blank(args.get("identity")).isBlank()
+                && blank(args.get("purpose")).isBlank()) {
+            return fail("act", "act requires --query or --ref");
+        }
         Hit hit = ref.isBlank() ? null : requireHit(ref);
         if (hit != null && "desktop".equals(hit.kind)) return actDesktop(project, runId, hit, args);
         if ("desktop".equals(target.kind())) return actDesktop(project, runId, target, args);
@@ -1544,8 +1554,9 @@ public final class TargetVerb {
             List<Map<String, Object>> rows = publish(runId, "browser", page.session.id, version, shown, "", page.session.connection());
             String exposure = exposureOf(args);
             if (exposure == null) return fail("snap", "exposure is human or full");
-            if ("human".equals(exposure)) rows.removeIf(row -> Boolean.FALSE.equals(row.get("visible")));
-            rows.addAll(CollabRows.messages(shownRoot, 5));
+            String panelState = panelPending(page.session.connection());
+            if ("human".equals(exposure)) rows.removeIf(row -> !humanKeeps(row));
+            if (!"collapsed".equals(panelState)) rows.addAll(CollabRows.messages(shownRoot, 5));
             CollabRows.narrow(rows, blank(args.get("include")));
             String since = blank(args.get("since"));
             Map<String, Object> sinceDiff = since.isBlank() ? null : SnapSince.since(since, rows);
@@ -1565,7 +1576,6 @@ public final class TargetVerb {
             }
             List<Object> recent = CollabRows.trail(root);
             if (!recent.isEmpty()) body.put("recent", recent);
-            String panelState = panelPending(page.session.connection());
             if (!panelState.isBlank()) body.put("panel", panelState);
             body.put("mode", mode);
             body.put("docVersion", version);
@@ -2233,7 +2243,12 @@ public final class TargetVerb {
             ObjectNode params = Jsons.object();
             params.put("expression", expr);
             params.put("returnByValue", true);
-            String session = enteredSession(page.session.connection(), runId);
+            if (awaitRequested(args.get("await"))) params.put("awaitPromise", true);
+            String frameArg = blank(args.get("frame"));
+            String session = frameArg.isBlank()
+                    ? enteredSession(page.session.connection(), runId)
+                    : FrameCoverage.sessionId(page.session.connection(), frameArg);
+            if (session == null || session.isBlank()) session = enteredSession(page.session.connection(), runId);
             if ("pkb".equals(world)) {
                 int context = session.isBlank()
                         ? pkbContext(page.session.connection())
@@ -3358,7 +3373,7 @@ public final class TargetVerb {
 
     private static Outcome staleRef(String op) {
         Outcome missed = fail(op, "stale_ref");
-        missed.body().put("fix", "run snap (or find) again for a fresh ref");
+        missed.body().put("fix", "pass --refind=chain");
         return missed;
     }
 
@@ -4122,7 +4137,7 @@ public final class TargetVerb {
             for (DomNode shadow : node.shadowRoots) walkInteractive(shadow, depthLeft, hits);
             return;
         }
-        if (interactiveNode(node)) hits.add(node);
+        if (interactiveNode(node) && !hiddenInput(node)) hits.add(node);
         if (depthLeft == 0) return;
         int next = depthLeft < 0 ? -1 : depthLeft - 1;
         for (DomNode child : node.children) walkInteractive(child, next, hits);
@@ -4296,7 +4311,9 @@ public final class TargetVerb {
                 CHAINS.put(ref, chain);
                 CHAINS.put(shortId, chain);
             }
-            boolean visible = node.displayed && !node.states.contains("hidden") && !hiddenByAncestor(node);
+            boolean visible = layoutVisible(node);
+            boolean collapsed = collapsedRow(node);
+            if ("Open agent panel".equals(name(node)) && agentPanelOpen(node)) visible = false;
             boolean enabled = !node.states.contains("disabled") && !node.attributes.containsKey("disabled");
             String roleName = role(node);
             String tag = node.tag();
@@ -4310,6 +4327,7 @@ public final class TargetVerb {
             row.put("name", name(node));
             row.put("handle", node.backendNodeId);
             row.put("visible", visible);
+            if (collapsed) row.put("collapsed", true);
             row.put("enabled", enabled);
             row.put("interactive", interactive);
             row.put("frame", frame);
@@ -4428,6 +4446,7 @@ public final class TargetVerb {
         if (priority) {
             ordered.sort(java.util.Comparator.comparingInt(TargetVerb::priorityRank));
         }
+        SnapView.requireFields(SnapView.fieldNames(args), ordered);
         Map<String, List<String>> groups = new LinkedHashMap<>();
         for (Map<String, Object> row : ordered) {
             String key = byType
@@ -4607,6 +4626,62 @@ public final class TargetVerb {
      * A node under a {@code display:none}, {@code hidden}, or otherwise undisplayed ancestor (through shadow hosts)
      * is not visible even though its own computed style is. A minimized panel hides its card this way.
      */
+    /** Human find keeps a collapsed control so the row can say {@code visible=false}. */
+    static boolean humanKeeps(Map<String, Object> row) {
+        if (row == null) return false;
+        if (Boolean.TRUE.equals(row.get("collapsed"))) return true;
+        return !Boolean.FALSE.equals(row.get("visible"));
+    }
+
+    static boolean hiddenInput(DomNode node) {
+        if (node == null || !"input".equals(node.tag())) return false;
+        return "hidden".equalsIgnoreCase(attr(node, "type"));
+    }
+
+    /** Layout visibility: the node's own hidden, display, visibility, and box, plus ancestors. */
+    static boolean layoutVisible(DomNode node) {
+        if (node == null) return false;
+        if (node.attributes.containsKey("hidden") || node.states.contains("hidden")) return false;
+        if (hiddenByAncestor(node)) return false;
+        String style = node.attributes.getOrDefault("style", "").toLowerCase(java.util.Locale.ROOT).replace(" ", "");
+        if (style.contains("display:none") || style.contains("visibility:hidden") || style.contains("visibility:collapse")) return false;
+        if (!node.computed.isEmpty() || node.hasBox || node.boxRead) return Displayed.isDisplayed(node);
+        return node.displayed;
+    }
+
+    static boolean collapsedRow(DomNode node) {
+        for (DomNode cursor = node; cursor != null; cursor = cursor.parent) {
+            if (cursor.states.contains("collapsed")) return true;
+            if ("false".equals(cursor.attributes.get("aria-expanded"))) return true;
+        }
+        return false;
+    }
+
+    private static boolean agentPanelOpen(DomNode node) {
+        DomNode root = node;
+        while (root != null && root.parent != null) root = root.parent;
+        return panelSectionOpen(root, 0);
+    }
+
+    private static boolean panelSectionOpen(DomNode node, int depth) {
+        if (node == null || depth > 40) return false;
+        if (node.attributes.containsKey("data-pkb-panel")) {
+            if (node.attributes.containsKey("hidden") || node.states.contains("hidden")) return false;
+            if (!node.displayed && !node.computed.isEmpty()) return false;
+            return true;
+        }
+        for (DomNode child : node.children) if (panelSectionOpen(child, depth + 1)) return true;
+        for (DomNode shadow : node.shadowRoots) if (panelSectionOpen(shadow, depth + 1)) return true;
+        return false;
+    }
+
+    private static boolean awaitRequested(String raw) {
+        if (raw == null) return false;
+        if (raw.isBlank()) return true;
+        String value = raw.trim().toLowerCase(java.util.Locale.ROOT);
+        return "true".equals(value) || "1".equals(value) || "yes".equals(value);
+    }
+
     static boolean hiddenByAncestor(DomNode node) {
         int hops = 0;
         for (DomNode up = node == null ? null : node.parent; up != null && hops++ < 200; up = up.parent) {

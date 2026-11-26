@@ -484,12 +484,34 @@ final class ConsumerReadyCommands {
         if (bidi == null) bidi = tools.dscode.browser.BrowserProtocols.setting("pkb_bidi_endpoint");
         if (cdp == null && bidi == null) {
             out.println("protocols=none (no browser attached; fix: start or attach a browser, or pass --cdp-endpoint= / --bidi-endpoint=)");
+            out.println("protocols.start=none");
+            printWorkerProtocols(project, out);
             return;
         }
         tools.dscode.browser.BrowserProtocols protocols = tools.dscode.browser.BrowserProtocols.probe(cdp, bidi);
         out.println("protocols=" + protocols.summary() + (full ? "" : " (doctor --protocols for the capability table)"));
+        out.println("protocols.start=" + protocols.summary());
+        printWorkerProtocols(project, out);
         if (full) protocols.table().forEach(line -> out.println("protocol." + line));
         if (full) hostRoutes(project, out);
+    }
+
+    /** The isolate worker's Selenium debugger, labelled separately from the start host. */
+    private static void printWorkerProtocols(Path project, java.io.PrintStream out) {
+        java.util.Optional<tools.dscode.control.protocol.LiveBridgeFile.Bridge> bridge =
+                tools.dscode.control.protocol.LiveBridgeFile.read(project);
+        if (bridge.isEmpty()) return;
+        String address = tools.dscode.control.protocol.SessionDescriptorWriter.read(project, bridge.get().sessionId())
+                .map(tools.dscode.control.protocol.SessionDescriptor::cdpDebuggerAddress)
+                .orElse(null);
+        String summary = "unknown:classic";
+        if (address != null && !address.isBlank()) {
+            String probe = address.startsWith("http") || address.startsWith("ws") ? address : "http://" + address;
+            tools.dscode.browser.BrowserProtocols worker = tools.dscode.browser.BrowserProtocols.probe(probe, null);
+            worker.live(tools.dscode.browser.BrowserProtocols.Backend.CLASSIC, "selenium", address);
+            summary = worker.summary();
+        }
+        out.println("protocols.worker=" + summary);
     }
 
     /** E5: routes, mocks and overrides held by this project's protocol host (none when no host runs). */

@@ -241,7 +241,10 @@ public final class AgentEnvelope {
         boolean held = worker || tools.dscode.control.protocol.LeaseClock.fresh(project);
         state.put("browser", up ? "up" : "down");
         Object frame = body.get("frame");
-        state.put("frame", frame == null || String.valueOf(frame).isBlank() ? "top" : String.valueOf(frame));
+        String frameText = frame == null || String.valueOf(frame).isBlank() ? "top" : String.valueOf(frame);
+        boolean desktop = "desktop".equals(String.valueOf(body.get("kind"))) || "desktop".equals(String.valueOf(body.get("used")));
+        if (desktop && !"top".equals(frameText) && !frameText.startsWith("desktop:")) frameText = "desktop:" + frameText;
+        state.put("frame", frameText);
         state.put("lease", held ? "held" : "none");
         return state;
     }
@@ -374,7 +377,7 @@ public final class AgentEnvelope {
     }
 
     private static String fixFor(String code, String op) {
-        if ("stale_ref".equals(code)) return "run snap (or find) again for a fresh ref";
+        if ("stale_ref".equals(code)) return "pass --refind=chain";
         if ("ambiguous".equals(code)) return "pass --ref or a tighter --query";
         if (code != null && code.contains("no live browser")) return "run start --url= --browser=";
         return "help " + (op == null || op.isBlank() ? "snap" : op);

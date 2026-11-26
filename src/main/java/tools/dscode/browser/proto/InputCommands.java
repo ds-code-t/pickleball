@@ -75,7 +75,26 @@ final class InputCommands {
         return true;
     }
 
+    /** {@code --text} and {@code --at} with no {@code --actions} is one {@code Input.insertText}. */
+    static boolean oneInsertText(Map<String, String> flags) {
+        if (flags == null) return false;
+        String actions = flags.get("actions");
+        if (actions != null && !actions.isBlank()) return false;
+        String text = flags.get("text");
+        String at = flags.get("at");
+        return text != null && !text.isBlank() && at != null && !at.isBlank();
+    }
+
+    static Map<String, Object> insertTextParams(String text) {
+        return Map.of("text", text == null ? "" : text);
+    }
+
     static ObjectNode input(ProtoHost host, Map<String, String> f) throws Exception {
+        if (oneInsertText(f)) {
+            CdpSession.Target target = ContextCommands.target(host, f);
+            host.cdp().send(target.sessionId, "Input.insertText", insertTextParams(f.get("text")));
+            return ProtoJson.obj().put("op", "input").put("via", "cdp").put("at", f.get("at")).put("calls", 1);
+        }
         boolean release = f.containsKey("release") && !f.containsKey("actions");
         JsonNode chain = release ? null : chain(host, f.get("actions"));
         String via = f.get("via");

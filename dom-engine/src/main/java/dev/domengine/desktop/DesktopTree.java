@@ -397,8 +397,12 @@ public final class DesktopTree {
     private static Selected select(String id, Map<String, String> flags, boolean act) {
         rejectBrowserOnly(flags);
         Session session = require(id);
-        Map<String, String> queryFlags = flagsForQuery(flags);
-        JsonNode found = Query.run(session.root, withSession(session, flags));
+        Map<String, String> queryFlags = actionQuery(flags);
+        boolean pinned = flags != null && flags.get("node-id") != null && !flags.get("node-id").isBlank();
+        if (act && !pinned && Query.pipelineOf(queryFlags) == null) {
+            throw new CdpException("act requires --query or --ref");
+        }
+        JsonNode found = Query.run(session.root, withSession(session, queryFlags));
         JsonNode nodes = found.get("nodes");
         double[] viewport = viewport(session.root);
         BoxCaps caps = BoxCaps.fromFlags(flags);
@@ -455,6 +459,16 @@ public final class DesktopTree {
         }
         if (role == null || role.isBlank()) return Set.of();
         return Set.of(role);
+    }
+
+    /** Type and click payloads are not a query. {@code --text} on the query verb stays a text stage. */
+    private static Map<String, String> actionQuery(Map<String, String> flags) {
+        Map<String, String> copy = flags == null ? new LinkedHashMap<>() : new LinkedHashMap<>(flags);
+        copy.remove("text");
+        copy.remove("append");
+        copy.remove("value");
+        copy.remove("kind");
+        return flagsForQuery(copy);
     }
 
     private static Map<String, String> flagsForQuery(Map<String, String> flags) {

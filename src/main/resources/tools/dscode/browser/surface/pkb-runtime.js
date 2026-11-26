@@ -560,6 +560,27 @@
     return Math.min(Math.max(value, low), high);
   }
 
+  function controlBoxes() {
+    var nodes = document.querySelectorAll('button, a, input, select, textarea, [role="button"], [role="link"], [role="checkbox"], [role="textbox"]');
+    var boxes = [];
+    for (var i = 0; i < nodes.length; i++) {
+      var el = nodes[i];
+      if (el.closest && el.closest('[data-pkb-agent],[data-pkb-layer],[data-pkb-meta]')) continue;
+      var b = el.getBoundingClientRect();
+      if (b.width < 1 || b.height < 1) continue;
+      boxes.push(b);
+    }
+    return boxes;
+  }
+
+  function hitsControl(x, y, w, h, boxes) {
+    for (var i = 0; i < boxes.length; i++) {
+      var b = boxes[i];
+      if (x < b.right && x + w > b.left && y < b.bottom && y + h > b.top) return true;
+    }
+    return false;
+  }
+
   function beside(r, w, h, at, vp) {
     var gap = 10;
     var order = ['right', 'left', 'bottom', 'top'];
@@ -570,8 +591,22 @@
       bottom: {x: clamp(r.left, 4, vp.w - w - 4), y: r.bottom + gap, fits: r.bottom + gap + h <= vp.h - 4},
       top: {x: clamp(r.left, 4, vp.w - w - 4), y: r.top - gap - h, fits: r.top - gap - h >= 4}
     };
+    var controls = controlBoxes();
+    var fallback = null;
     for (var i = 0; i < order.length; i++) {
-      if (spots[order[i]].fits) return {x: spots[order[i]].x, y: spots[order[i]].y, side: order[i]};
+      var spot = spots[order[i]];
+      if (!spot.fits) continue;
+      if (!hitsControl(spot.x, spot.y, w, h, controls)) return {x: spot.x, y: spot.y, side: order[i]};
+      if (!fallback) fallback = {x: spot.x, y: spot.y, side: order[i]};
+    }
+    if (fallback) {
+      var nudged = {x: fallback.x, y: fallback.y, side: fallback.side};
+      for (var n = 0; n < 8; n++) {
+        if (!hitsControl(nudged.x, nudged.y, w, h, controls)) return nudged;
+        nudged.y += h + gap;
+        if (nudged.y + h > vp.h - 4) break;
+      }
+      return fallback;
     }
     return {x: spots[order[0]].x, y: spots[order[0]].y, side: order[0]};
   }

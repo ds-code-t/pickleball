@@ -291,9 +291,27 @@ final class ContextCommands {
         return "true".equals(value) || "1".equals(value) || "yes".equals(value);
     }
 
+    /** The tab whose URL contains {@code page}. A miss names the missing substring. */
+    static String tabForPage(java.util.List<CdpSession.Target> pages, String page) {
+        if (page == null || page.isBlank()) {
+            throw new IllegalArgumentException("error: tab-activate needs --id=<tab id> or --page=<url substring>\nfix: context-list shows the tab ids and urls");
+        }
+        if (pages != null) {
+            for (CdpSession.Target target : pages) {
+                String url = target.url == null ? "" : target.url;
+                if (url.contains(page) && target.targetId != null && !target.targetId.isBlank()) return target.targetId;
+            }
+        }
+        throw new IllegalArgumentException("error: no tab url contains \"" + page + "\"\nfix: context-list shows the tab urls");
+    }
+
     static ObjectNode tabActivate(ProtoHost host, Map<String, String> f) {
-        String id = f.getOrDefault("id", "");
-        if (id.isBlank()) throw new IllegalArgumentException("error: tab-activate needs --id=<tab id>\nfix: context-list shows the tab ids");
+        String raw = f.getOrDefault("id", "");
+        if (raw.isBlank() && f.get("page") != null && !f.get("page").isBlank()) {
+            raw = tabForPage(host.cdp().pages(), f.get("page"));
+        }
+        if (raw.isBlank()) throw new IllegalArgumentException("error: tab-activate needs --id=<tab id> or --page=<url substring>\nfix: context-list shows the tab ids and urls");
+        String id = raw;
         BrowserProtocols.Served<String> served = host.protocols().serve("tabs", f.get("via"), backend -> {
             switch (backend) {
                 case BIDI -> host.bidiModules().activate(id);
