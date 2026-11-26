@@ -33,7 +33,15 @@ class WorkbenchUiServerTest {
 
             String code = exchange(handle.port(), request("GET", "/scenarios?t=" + handle.token(), "127.0.0.1"));
             assertTrue(status(code).startsWith("HTTP/1.1 200"), status(code));
-            assertTrue(code.contains("monaco"), code);
+            assertTrue(code.contains("id=\"monaco\""), code);
+
+            String loader = exchange(handle.port(), request(
+                    "GET",
+                    "/node_modules/monaco-editor/min/vs/loader.js?t=" + handle.token(),
+                    "127.0.0.1"));
+            assertTrue(status(loader).startsWith("HTTP/1.1 200"), status(loader));
+            assertTrue(loader.contains("Released under the MIT license"), loader);
+            assertTrue(loader.contains("AMDLoader"), loader);
         }
     }
 
