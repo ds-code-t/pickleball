@@ -6,6 +6,7 @@ const token = process.env.PKB_UI_TOKEN || "";
 const root = process.env.PKB_UI_ROOT || import.meta.dirname;
 const hostFile = process.env.PKB_UI_HOST || "";
 const bridgePort = process.env.PKB_UI_BRIDGE_PORT || "";
+const project = process.env.PKB_UI_PROJECT || "";
 const pageFile = root + "/" + "pages/index.html";
 
 function same(left, right) {
@@ -80,17 +81,63 @@ function forward(verb, args, requestToken) {
     });
 }
 
+function safePart(value) {
+    return /^[A-Za-z0-9._-]+$/.test(value);
+}
+
+function serveGenerated(req, res, url, name) {
+    const prefix = "/" + "ui" + "/";
+    if (req.method !== "GET" || !name.startsWith(prefix)) return false;
+    const parts = name.slice(prefix.length).split("/");
+    if (parts.length !== 2 || !safePart(parts[0]) || !safePart(parts[1])) {
+        send(res, 404, "not found\n");
+        return true;
+    }
+    const session = parts[0];
+    const page = parts[1];
+    let expected = "";
+    if (project) {
+        const sessionFile = path.join(project, ".pickleball", "workbench-ui", "sessions", session + ".json");
+        try {
+            const node = JSON.parse(fs.readFileSync(sessionFile, "utf8"));
+            expected = String(node.token || "");
+        } catch (failure) {
+            expected = "";
+        }
+    }
+    const query = url.searchParams.get("t") || "";
+    const header = req.headers["x-pkb-ui-token"] || "";
+    const presented = query || String(header);
+    if (!expected || !same(presented, expected)) {
+        send(res, 401, "unauthorized\n");
+        return true;
+    }
+    const file = path.resolve(path.join(project, ".pickleball", "workbench-ui", "generated", session, page + ".html"));
+    const base = path.resolve(path.join(project, ".pickleball", "workbench-ui", "generated", session));
+    if (file !== base && !file.startsWith(base + path.sep)) {
+        send(res, 404, "not found\n");
+        return true;
+    }
+    if (!fs.existsSync(file) || !fs.statSync(file).isFile()) {
+        send(res, 404, "not found\n");
+        return true;
+    }
+    send(res, 200, fs.readFileSync(file, "utf8"), "text/html; charset=utf-8");
+    return true;
+}
+
 const server = http.createServer((req, res) => {
     const url = new URL(req.url || "/", "http://127.0.0.1");
     if (!hostOk(req.headers.host)) {
         send(res, 403, "forbidden\n");
         return;
     }
+    const name = url.pathname;
+    if (serveGenerated(req, res, url, name)) return;
     if (!presentedToken(req, url)) {
         send(res, 401, "unauthorized\n");
         return;
     }
-    const name = url.pathname;
     if (req.method === "GET" && (name === "/" || name === "/scenarios" || name === "/globals" || name === "/data" || name === "/sql")) {
         send(res, 200, fs.readFileSync(pageFile), "text/html; charset=utf-8");
         return;

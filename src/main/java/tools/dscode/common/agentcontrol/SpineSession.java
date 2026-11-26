@@ -48,6 +48,7 @@ public final class SpineSession {
         node.put("mutate", "sibling");
         node.put("layer", useAgent);
         node.put("inputBlocked", false);
+        node.put("token", HexFormat.of().formatHex(random(16)));
         node.put("overlay", "");
         ObjectNode agents = node.putObject("agents");
         agents.putObject(useAgent).put("layer", useAgent);
@@ -62,13 +63,33 @@ public final class SpineSession {
         Files.deleteIfExists(file(project, id));
         String current = current(project);
         if (id.equals(current)) Files.deleteIfExists(defaultFile(project));
-        Path generated = project.resolve(".pickleball").resolve("workbench-ui").resolve("generated").resolve(id);
-        if (Files.isDirectory(generated)) {
-            try (var walk = Files.walk(generated)) {
-                List<Path> paths = walk.sorted((left, right) -> right.compareTo(left)).toList();
-                for (Path path : paths) Files.deleteIfExists(path);
-            }
+        Path root = project == null ? Path.of("") : project;
+        Path ui = root.resolve(".pickleball").resolve("workbench-ui");
+        deleteTree(ui.resolve("generated").resolve(id));
+        deleteTree(ui.resolve("leases").resolve(id));
+    }
+
+    /** The session id, or the missing-session error when that file is absent. */
+    public static String required(Path project, String sessionId) {
+        return require(project, sessionId);
+    }
+
+    public static boolean inputBlocked(Path project, String sessionId) {
+        try {
+            String id = resolve(project, sessionId);
+            if (id == null) return false;
+            ObjectNode node = load(project, id);
+            return node != null && node.path("inputBlocked").asBoolean(false);
+        } catch (IOException failure) {
+            return false;
         }
+    }
+
+    public static void setInputBlocked(Path project, String sessionId, boolean on) throws IOException {
+        String id = require(project, sessionId);
+        ObjectNode node = loadRequired(project, id);
+        node.put("inputBlocked", on);
+        write(project, id, node);
     }
 
     public static String current(Path project) {
@@ -235,6 +256,14 @@ public final class SpineSession {
 
     private static Path defaultFile(Path project) {
         return directory(project).resolve("default");
+    }
+
+    private static void deleteTree(Path directory) throws IOException {
+        if (directory == null || !Files.isDirectory(directory)) return;
+        try (var walk = Files.walk(directory)) {
+            List<Path> paths = walk.sorted((left, right) -> right.compareTo(left)).toList();
+            for (Path path : paths) Files.deleteIfExists(path);
+        }
     }
 
     private static byte[] random(int size) {

@@ -49,7 +49,7 @@ final class WorkbenchCommandLine {
             "selftest",
             "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame", "upload", "navigate",
             "ask-and-wait", "answer-wait", "wait-any", "pin", "toast", "checklist", "ui", "inject", "spine",
-            "chat", "point", "progress",
+            "chat", "point", "progress", "lease",
             "ref", "controller-start", "controller-stop", "controller-status", "controller-ping",
             "help"
     );
@@ -81,7 +81,7 @@ final class WorkbenchCommandLine {
             "--budget", "--strict", "--rank", "--scroll-search", "--duration", "--expr",
             "--world", "--clip", "--frame", "--kinds", "--fixture", "--enter", "--items",
             "--args-file", "--file", "--url-key", "--size", "--hold", "--pick", "--until",
-            "--session", "--mutate",
+            "--session", "--mutate", "--name", "--html-file",
             "--text", "--type", "--prompt", "--options", "--pct", "--label", "--action",
             "--x", "--y", "--handle"
     );
@@ -1060,7 +1060,7 @@ final class WorkbenchCommandLine {
     private static final Set<String> POSITIONAL_COMMANDS = Set.of(
             "pw", "setup", "optional-install", "optional-uninstall", "call",
             "query", "history-query", "execute-step", "status", "selftest", "record",
-            "inject", "spine", "chat"
+            "inject", "spine", "chat", "lease", "input"
     );
 
     private static boolean acceptsAsProject(String command, String token) {

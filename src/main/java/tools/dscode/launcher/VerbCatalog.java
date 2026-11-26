@@ -204,6 +204,10 @@ public final class VerbCatalog {
         add(rows, "chat send", "workbench", AGENT);
         add(rows, "chat list", "workbench", AGENT);
         add(rows, "spine session", "workbench", AGENT);
+        add(rows, "lease take", "workbench", AGENT);
+        add(rows, "lease release", "workbench", AGENT);
+        add(rows, "input block", "workbench", AGENT);
+        add(rows, "ui page", "workbench", AGENT);
         add(rows, "cross", "workbench", CROSS_STORE);
         add(rows, "cross note", "workbench", CROSS_STORE);
         add(rows, "cross journal", "workbench", CROSS_STORE);
@@ -265,6 +269,18 @@ public final class VerbCatalog {
         int dot = first.lastIndexOf('.');
         if (dot > 0 && ASSET_EXTENSIONS.contains(first.substring(dot + 1).toLowerCase(Locale.ROOT))) return true;
         return verbNames().contains(first);
+    }
+
+    /** Quoted routes in one HTML page that are not a catalog verb, a static page, or an asset. */
+    public static List<String> outsideCatalog(String html) {
+        List<String> found = new ArrayList<>();
+        if (html == null || html.isBlank()) return found;
+        Matcher matcher = QUOTED_ROUTE.matcher(html);
+        while (matcher.find()) {
+            String path = matcher.group(2);
+            if (!routeAllowed(path)) found.add(path);
+        }
+        return found;
     }
 
     /** Quoted routes under {@code root} that are not a catalog verb, a static page, or an asset. */

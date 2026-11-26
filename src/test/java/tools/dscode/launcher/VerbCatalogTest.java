@@ -139,6 +139,12 @@ class VerbCatalogTest {
         assertTrue(forbidden.isEmpty(), forbidden.toString());
     }
 
+    @Test
+    void generatedHtmlOutsideTheCatalogFails() {
+        assertFalse(VerbCatalog.outsideCatalog("<script>fetch(\"/not-a-verb\")</script>").isEmpty());
+        assertTrue(VerbCatalog.outsideCatalog("<script>fetch(\"/store\", {method:\"POST\"})</script>").isEmpty());
+    }
+
     private static Set<String> names(List<VerbCatalog.Row> rows) {
         TreeSet<String> names = new TreeSet<>();
         for (VerbCatalog.Row row : rows) names.add(row.name());

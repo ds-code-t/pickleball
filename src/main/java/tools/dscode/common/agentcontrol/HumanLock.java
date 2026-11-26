@@ -129,4 +129,13 @@ public final class HumanLock {
             return false;
         }
     }
+
+    /** Mouse and keyboard block for one spine session. A clean session ({@code inject=off}) is refused by the CLI. */
+    public static void blockInput(Path project, String sessionId, boolean on) throws IOException {
+        SpineSession.setInputBlocked(project, sessionId, on);
+    }
+
+    public static boolean inputBlocked(Path project, String sessionId) {
+        return SpineSession.inputBlocked(project, sessionId);
+    }
 }

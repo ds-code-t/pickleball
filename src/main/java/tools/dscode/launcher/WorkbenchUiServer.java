@@ -83,6 +83,7 @@ public final class WorkbenchUiServer {
         builder.environment().put("PKB_UI_ROOT", assets.toString());
         builder.environment().put("PKB_UI_HOST", hostFile.toString());
         builder.environment().put("PKB_UI_BRIDGE_PORT", Integer.toString(bridgePort));
+        builder.environment().put("PKB_UI_PROJECT", project.toAbsolutePath().normalize().toString());
         builder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
         builder.redirectError(ProcessBuilder.Redirect.DISCARD);
         Process process = builder.start();

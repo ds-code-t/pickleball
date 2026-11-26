@@ -220,6 +220,15 @@ public final class WorkbenchAgentCommands {
             return ProtoVerbs.run(args, parsed.project(), safeOut, safeErr);
         }
         try {
+            if ("input".equals(parsed.command()) && "block".equals(word(parsed, 0))) {
+                return inputBlock(parsed, safeOut, safeErr);
+            }
+            if ("lease".equals(parsed.command())) {
+                return leaseCommand(parsed, safeOut, safeErr);
+            }
+            if ("ui".equals(parsed.command()) && hasToken(parsed.forwarded(), "page")) {
+                return uiPage(parsed, safeOut, safeErr);
+            }
             return switch (parsed.command()) {
                 case "session-mode" -> sessionMode(parsed, safeOut, safeErr);
                 case "inject" -> injectSession(parsed, safeOut, safeErr);
@@ -415,6 +424,120 @@ public final class WorkbenchAgentCommands {
             err.print(WorkbenchCliHelp.structured("spine session failed: " + failure.getMessage(), "spine session new"));
             return 1;
         }
+    }
+
+    private static int leaseCommand(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        try {
+            String action = word(parsed, 0);
+            if (!"take".equals(action) && !"release".equals(action)) {
+                err.println("error: lease needs take or release\nfix: lease take --target=ui|browser|both --session=<id>");
+                return 2;
+            }
+            String session = flag(parsed, "--session");
+            String target = flag(parsed, "--target");
+            String id = tools.dscode.common.agentcontrol.SpineSession.required(parsed.project(), session);
+            String agent = holder(parsed);
+            if ("take".equals(action)) {
+                tools.dscode.common.agentcontrol.UiLease.take(parsed.project(), id, target, agent);
+            } else {
+                tools.dscode.common.agentcontrol.UiLease.release(parsed.project(), id, target);
+            }
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("ok", true);
+            body.put("session", id);
+            body.put("target", target == null ? "" : target.trim());
+            body.put("holder", agent);
+            return printEnvelope(parsed.project(), id, agent, "lease " + action, body, out);
+        } catch (IllegalArgumentException failure) {
+            err.println(failure.getMessage());
+            return 2;
+        } catch (IOException failure) {
+            err.print(WorkbenchCliHelp.structured("lease failed: " + failure.getMessage(), "lease take --target=ui|browser|both --session=<id>"));
+            return 1;
+        }
+    }
+
+    private static int inputBlock(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        try {
+            boolean on = hasFlag(parsed.forwarded(), "--on");
+            boolean off = hasFlag(parsed.forwarded(), "--off");
+            if (on == off) {
+                err.println("error: input block needs --on or --off\nfix: input block --session=<id> --on");
+                return 2;
+            }
+            String session = flag(parsed, "--session");
+            String id = tools.dscode.common.agentcontrol.SpineSession.required(parsed.project(), session);
+            if (on && !tools.dscode.common.agentcontrol.SpineSession.injectEnabled(parsed.project(), id)) {
+                err.println("error: input block needs an injected session\nfix: inject on");
+                return 2;
+            }
+            tools.dscode.common.agentcontrol.HumanLock.blockInput(parsed.project(), id, on);
+            tools.dscode.browser.BrowserLog.info("facade", (on ? "input block on " : "input block off ") + id);
+            String agent = holder(parsed);
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("ok", true);
+            body.put("session", id);
+            body.put("inputBlocked", on);
+            return printEnvelope(parsed.project(), id, agent, "input block", body, out);
+        } catch (IllegalArgumentException failure) {
+            err.println(failure.getMessage());
+            return 2;
+        } catch (IOException failure) {
+            err.print(WorkbenchCliHelp.structured("input block failed: " + failure.getMessage(), "inject on"));
+            return 1;
+        }
+    }
+
+    private static int uiPage(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        try {
+            String session = flag(parsed, "--session");
+            String id = tools.dscode.common.agentcontrol.SpineSession.required(parsed.project(), session);
+            String pageName = parsed.name();
+            if (pageName == null || pageName.isBlank()) pageName = flag(parsed, "--name");
+            if (pageName == null || pageName.isBlank() || pageName.indexOf('/') >= 0 || pageName.indexOf('\\') >= 0 || pageName.contains("..")) {
+                err.println("error: ui page needs --name\nfix: ui page --session=<id> --name=<name> --html-file=<path>");
+                return 2;
+            }
+            String htmlFlag = flag(parsed, "--html-file");
+            if (htmlFlag == null || htmlFlag.isBlank()) {
+                err.println("error: ui page needs --html-file\nfix: ui page --session=<id> --name=<name> --html-file=<path>");
+                return 2;
+            }
+            Path htmlPath = Path.of(htmlFlag);
+            if (!htmlPath.isAbsolute()) htmlPath = parsed.project().resolve(htmlPath);
+            if (!Files.isRegularFile(htmlPath)) {
+                err.println("error: html file is missing\nfix: ui page --session=<id> --name=<name> --html-file=<path>");
+                return 2;
+            }
+            String html = Files.readString(htmlPath, StandardCharsets.UTF_8);
+            List<String> outside = VerbCatalog.outsideCatalog(html);
+            if (!outside.isEmpty()) {
+                err.println("error: generated page calls a URL outside the catalog (" + outside.get(0) + ")\n"
+                        + "fix: post only to a catalog verb");
+                return 2;
+            }
+            Path written = parsed.project().resolve(".pickleball").resolve("workbench-ui").resolve("generated").resolve(id).resolve(pageName + ".html");
+            Files.createDirectories(written.getParent());
+            Files.writeString(written, html, StandardCharsets.UTF_8);
+            tools.dscode.engine.EngineLog.log(parsed.project(), "host", "ui", "page " + pageName);
+            String agent = holder(parsed);
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("ok", true);
+            body.put("session", id);
+            body.put("name", pageName);
+            return printEnvelope(parsed.project(), id, agent, "ui page", body, out);
+        } catch (IllegalArgumentException failure) {
+            err.println(failure.getMessage());
+            return 2;
+        } catch (IOException failure) {
+            err.print(WorkbenchCliHelp.structured("ui page failed: " + failure.getMessage(), "ui page --session=<id> --name=<name> --html-file=<path>"));
+            return 1;
+        }
+    }
+
+    private static String holder(WorkbenchCommandLine.Parsed parsed) {
+        String agent = agentIdOf(parsed);
+        return agent == null || agent.isBlank() ? tools.dscode.common.agentcontrol.SpineSession.DEFAULT_AGENT : agent;
     }
 
     private static int chat(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
@@ -892,6 +1015,14 @@ public final class WorkbenchAgentCommands {
         }
         json.append("]\n");
         return json.toString();
+    }
+
+    private static boolean hasToken(String[] args, String token) {
+        if (args == null || token == null) return false;
+        for (String arg : args) {
+            if (token.equals(arg)) return true;
+        }
+        return false;
     }
 
     private static boolean hasFlag(String[] args, String flag) {

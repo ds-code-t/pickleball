@@ -31,7 +31,7 @@ public final class VerbTiers {
             "frame", "from-here", "gc-runs", "gc-versions", "guide", "guide-back", "guide-done", "guide-next",
             "highlight", "hint", "history", "history-query", "history-summary", "html-cleanup", "html-insert",
             "html-remove", "html-replace", "html-write", "inbox", "inject", "insert-step", "inspect-page", "isolate", "kill",
-            "label", "launch", "live-check", "magnifier", "mcp", "navigate", "note", "observe", "open-run",
+            "label", "launch", "lease", "live-check", "magnifier", "mcp", "navigate", "note", "observe", "open-run",
             "open-scenario", "open-window", "overlay", "overlay-poll", "overlay-remove", "panel-close", "panel-open",
             "panel-state", "pause", "pin", "plan", "play", "point", "popup-close", "popup-open", "popup-status", "post", "progress", "pw",
             "presence", "query", "record", "ref", "refresh", "relaunch-with-debug", "resolve-runvars", "save", "selftest", "session",

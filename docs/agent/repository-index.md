@@ -410,6 +410,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentcontrol/SurfaceBox.java`
 - `src/main/java/tools/dscode/common/agentcontrol/UiBatch.java`
 - `src/main/java/tools/dscode/common/agentcontrol/UiCatalog.java`
+- `src/main/java/tools/dscode/common/agentcontrol/UiLease.java`
 - `src/main/java/tools/dscode/common/agentcontrol/UiState.java`
 - `src/main/java/tools/dscode/common/agentcontrol/VisualKinds.java`
 - `src/main/java/tools/dscode/common/agentcontrol/WindowRegistry.java`
@@ -1296,6 +1297,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/InputLiveTest.java`
 - `src/test/java/tools/dscode/launcher/JsFallbackHonestyTest.java`
 - `src/test/java/tools/dscode/launcher/JsStepRunTest.java`
+- `src/test/java/tools/dscode/launcher/LeaseAndBlockTest.java`
 - `src/test/java/tools/dscode/launcher/MaskQuietTest.java`
 - `src/test/java/tools/dscode/launcher/McpDirectHotPathTest.java`
 - `src/test/java/tools/dscode/launcher/MonitorLiveTest.java`

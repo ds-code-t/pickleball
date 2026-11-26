@@ -19,6 +19,7 @@ pre { white-space: pre-wrap; }
 <header>
 <h1 id="title">Pickleball</h1>
 <label>Branch <select id="branch"></select></label>
+<button id="lease" type="button">Lease</button>
 </header>
 <nav>
 <a href="/scenarios">Scenarios</a>
@@ -134,6 +135,10 @@ document.getElementById("save-definition").addEventListener("click", async funct
 });
 document.getElementById("point").addEventListener("click", async function () {
     const result = await callStore(["--x=0", "--y=0"], "point");
+    document.getElementById("scenario-body").textContent = (result.out || "") + (result.err || "");
+});
+document.getElementById("lease").addEventListener("click", async function () {
+    const result = await callStore(["take", "--target=ui"], "lease");
     document.getElementById("scenario-body").textContent = (result.out || "") + (result.err || "");
 });
 document.getElementById("run-sql").addEventListener("click", async function () {

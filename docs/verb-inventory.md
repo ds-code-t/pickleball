@@ -153,12 +153,16 @@ MCP-only count: 0
 | inbox | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | inject | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | input | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
+| input block | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | insert-step | workbench | cli | tools.dscode.launcher.WorkbenchSessionCommands.run |
 | inspect-page | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | isolate | cross | cli | tools.dscode.launcher.WorkbenchSessionCommands.run |
 | kill | workbench | cli | tools.dscode.launcher.WorkbenchSessionCommands.run |
 | label | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | launch | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
+| lease | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
+| lease release | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
+| lease take | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | live-check | workbench | cli | tools.dscode.launcher.VerbDispatch.run |
 | log | workbench | cli | tools.dscode.common.composite.DomLogCli.execute |
 | log tail | workbench | stream | tools.dscode.common.composite.DomLogCli.execute |
@@ -282,6 +286,7 @@ MCP-only count: 0
 | tabs | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | toast | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | ui | cross | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
+| ui page | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | ui-apply | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | ui-catalog | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | ui-poll | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |

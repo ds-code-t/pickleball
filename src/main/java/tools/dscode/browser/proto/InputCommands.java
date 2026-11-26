@@ -12,6 +12,7 @@ import com.microsoft.playwright.options.MouseButton;
 import tools.dscode.browser.BrowserProtocols;
 import tools.dscode.browser.BrowserProtocols.Backend;
 import tools.dscode.browser.UnsupportedProtocolOperation;
+import tools.dscode.common.agentcontrol.HumanLock;
 
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -90,6 +91,10 @@ final class InputCommands {
     }
 
     static ObjectNode input(ProtoHost host, Map<String, String> f) throws Exception {
+        String session = f == null ? null : f.get("session");
+        if (HumanLock.inputBlocked(host.project(), session)) {
+            throw new IllegalArgumentException("error: mouse and keyboard input is blocked\nfix: input block --off");
+        }
         if (oneInsertText(f)) {
             CdpSession.Target target = ContextCommands.target(host, f);
             host.cdp().send(target.sessionId, "Input.insertText", insertTextParams(f.get("text")));

@@ -2,6 +2,8 @@
 
 ## 3.0.0
 
+Spine R5 P5. `lease take --target=ui|browser|both` records one holder for that session and target. A second take fails with `error:` and `fix:`. `lease release` clears it. The renderer Lease button calls that verb. `input block --on` blocks mouse and keyboard and fails while inject is off with `fix: inject on`. `input block --off` clears the block. `ui page` writes `.pickleball/workbench-ui/generated/<session>/<name>.html` when every quoted route is a catalog verb. The renderer serves that page only for the session token. `spine session end` deletes the page and the lease.
+
 Spine R5 P4. Scenarios open definition loads Monaco from `META-INF/pickleball/workbench-ui/`. Save calls `store glue put`. Node does not write the file. A failed put shows the CLI `error` and `fix` in the page. `workbenchUi` runs `npm ci` at build time with the driver-bundle Node and a checksum-pinned npm CLI. `pkb_npm_registry` is `npm --registry`. The packaged modules are `monaco-editor` (MIT) and `typescript` (Apache-2.0). A disallowed license fails the build. The end user does not run npm and does not install Node.
 
 Spine R5 P3. Chat starts with `spine session new`, before a scenario. The default channel is that session id. `pkb_chat_channel=run` restores the single `run` channel. `chat-send` with no channel still stores `run`. `chat send --ref= --action=` stores both fields. `chat list` is one shot. `chat --follow` is the stream. `point` records a row and calls highlight. `ask --type=text|choice|confirm` stores a card with no live page, and a choice that is not in `--options` is rejected. `ui-poll` returns `type` and `value`. `progress --pct` accepts 0 through 100. Overlay receipts keep `read_at` null until the ack, and `overlay-poll` returns that field.
