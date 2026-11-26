@@ -570,7 +570,33 @@ public final class WorkbenchAgentCommands {
                 long wait = followWaitMs(flag(parsed, "--timeout"));
                 if (flag(parsed, "--timeout") == null) wait = 10_000L;
                 long end = System.nanoTime() + wait * 1_000_000L;
-                while (System.nanoTime() < end) Thread.sleep(250L);
+                String resolved = tools.dscode.common.agentcontrol.ChatChannel.resolve(parsed.project(), channel);
+                java.util.Set<String> seen = new java.util.HashSet<>();
+                while (true) {
+                    if (Thread.currentThread().isInterrupted()) {
+                        throw new InterruptedException("chat follow interrupted");
+                    }
+                    List<Map<String, Object>> messages = tools.dscode.common.agentcontrol.ChatChannel.list(
+                            parsed.project(), runId, channel);
+                    for (Map<String, Object> message : messages) {
+                        Object id = message.get("id");
+                        String key = resolved + "\n" + (id == null ? "" : id.toString());
+                        if (!seen.add(key)) continue;
+                        Map<String, Object> one = new LinkedHashMap<>();
+                        one.put("channel", resolved);
+                        one.put("message", message);
+                        printEnvelope(parsed.project(), runId, agent, "chat", one, out);
+                        if (out != null) out.flush();
+                    }
+                    long remaining = end - System.nanoTime();
+                    if (remaining <= 0) break;
+                    Thread.sleep(Math.min(50L, Math.max(1L, remaining / 1_000_000L)));
+                }
+                Map<String, Object> done = new LinkedHashMap<>();
+                done.put("channel", resolved);
+                done.put("follow", "end");
+                done.put("printed", seen.size());
+                return printEnvelope(parsed.project(), runId, agent, "chat", done, out);
             }
             List<Map<String, Object>> messages = tools.dscode.common.agentcontrol.ChatChannel.list(
                     parsed.project(), runId, channel);

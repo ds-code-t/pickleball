@@ -49,7 +49,7 @@ The 3.0.0 retest-fix rounds (R, S) ran only targeted tests on the Linux box and 
 - **Spine R3, Windows only:** `JavaStepHostTest`, `GlueStaticScanTest`, `NodeStepHostTest`, `NodeStepHostTsTest`, `EngineDoesNotSpawnNodeTest`, `JsStepCatalogTest`, `JsStepRunTest`, `PlaywrightTestIngestTest`, `PlaywrightSpecHostTest`, and `PlaywrightSpecIngestLiveTest`.
 - **Spine R4, Windows only:** `VerbDispatchTest`, `McpDirectHotPathTest`, `VerbCatalogTest`, `ElementRecordTest`, `ArgsFileTest`, `AgentEnvelopeStoreTest`, `RouteModifyBodyTest`, `ExecuteStepsPwTest`, `DesktopLaunchTest`, `DesktopScreenshotVerbTest`, and `DesktopLaunch`.
 - **Spine R7, Windows only:** `RunSnapshotTest`, `ReportScriptTest`, `VisualTargetTest`, `PickleballExceptionTest`, `SnapFindIndexTest` (`tools.dscode.common.composite`), `SnapshotRetainTest`, and `CrossStoreTest`.
-- **Spine R5, Windows only:** `WorkbenchUiServerTest`, `StoreSqlReadOnlyTest`, `InjectSessionTest`, `SessionAddressTest`, `ChatChannelTest`, `AskProgressPointTest`, `WorkbenchUiLicenseTest`, `LeaseAndBlockTest`, and `UiPageDispatchTest`.
+- **Spine R5, Windows only:** `WorkbenchUiServerTest`, `StoreSqlReadOnlyTest`, `InjectSessionTest`, `SessionAddressTest`, `ChatChannelTest`, `AskProgressPointTest`, `WorkbenchUiLicenseTest`, `LeaseAndBlockTest`, `UiPageDispatchTest`, and `ChatFollowStreamTest`.
 
 ## Deferred from the 3.0.0 consumer-fixes branch (per Dan, 2026-11-25)
 
@@ -67,7 +67,6 @@ These items stay out of `3.0.0-consumer-fixes`. The roadmap lists them under "No
 3. `open-window` falls through from playback `NODE` to `startUi`, which starts the controller `ui` that prints a line and exits, so the Node renderer never opens on that run.
 4. `inject on` only writes a JSON flag, attach consumes `target.hashCode()`, and mutate and layer ids are labels, so the sibling overlay, `RuntimeInstall`, per-agent layers, and reload re-emit do not run.
 5. `OverlayReceipts.record` and `ack`, and `AskCards.answer`, have no production caller, so `overlay-poll` never receives `read_at` and a typed ask answer never reaches `ui-poll`.
-6. `chat --follow` sleeps the timeout and prints one list instead of emitting each new message as it arrives.
 7. `lease take` and `lease release` use `UiLease`, a file lock nothing else consults, instead of `WorkbenchControlLease` and `LeaseHold`, so the holder does not gate the protected controls.
 8. `input block --on` only makes the agent's own `input` verb refuse and does not block human mouse and keyboard on the page.
 9. `VerbCatalog.outsideCatalog` only checks quoted paths that start with `/`, and a generated page cannot call `/store` because that route requires the main UI token.

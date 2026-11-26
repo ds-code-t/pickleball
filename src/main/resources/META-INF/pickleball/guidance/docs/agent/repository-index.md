@@ -1090,6 +1090,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/BrowserLostRunIdTest.java`
 - `src/test/java/tools/dscode/launcher/BrowserProtocolsLiveTest.java`
 - `src/test/java/tools/dscode/launcher/BrowserStateTest.java`
+- `src/test/java/tools/dscode/launcher/ChatFollowStreamTest.java`
 - `src/test/java/tools/dscode/launcher/ClickOnceTest.java`
 - `src/test/java/tools/dscode/launcher/CliForwardToWorkerTest.java`
 - `src/test/java/tools/dscode/launcher/ClosedShadowResolveTest.java`
