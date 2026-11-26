@@ -75,6 +75,11 @@ public final class PickleballWorkbenchLauncher {
             if (dashboard != 0) exitProcess(dashboard);
             return;
         }
+        int cross = dispatchCrossIfAny(args, System.out, System.err);
+        if (cross >= 0) {
+            if (cross != 0) exitProcess(cross);
+            return;
+        }
         int store = dispatchStoreIfAny(args, System.out, System.err);
         if (store >= 0) {
             if (store != 0) exitProcess(store);
@@ -82,6 +87,7 @@ public final class PickleballWorkbenchLauncher {
         }
         if (WorkbenchCliHelp.isHelpRequest(args)) {
             int code = WorkbenchCliHelp.answer(args, System.out, System.err);
+            CrossStore.journal(args, code, System.err);
             if (code != 0) exitProcess(code);
             return;
         }
@@ -94,7 +100,9 @@ public final class PickleballWorkbenchLauncher {
      */
     static int dispatchEngineIfAny(String[] args, PrintStream out, PrintStream err) {
         if (!tools.dscode.engine.EngineCli.handles(args)) return -1;
-        return tools.dscode.engine.EngineCli.execute(args, out, err);
+        int code = tools.dscode.engine.EngineCli.execute(args, out, err);
+        CrossStore.journal(args, code, err);
+        return code;
     }
 
     /** Test hook. Production resolves {@code DomEngineMain.dispatch} on the first domengine call, not in {@code <clinit>}. */
@@ -140,10 +148,12 @@ public final class PickleballWorkbenchLauncher {
             result = invokeDomEngine(rest);
         } catch (NoClassDefFoundError | ExceptionInInitializerError missing) {
             stderr.print(missingDomEngine(missing));
+            CrossStore.journal(args, 1, stderr);
             return 1;
         }
         if (result.stdout() != null && !result.stdout().isEmpty()) stdout.print(result.stdout());
         if (result.stderr() != null && !result.stderr().isEmpty()) stderr.print(result.stderr());
+        CrossStore.journal(args, result.exit(), stderr);
         return result.exit();
     }
 
@@ -153,7 +163,9 @@ public final class PickleballWorkbenchLauncher {
      */
     static int dispatchLogIfAny(String[] args, PrintStream out, PrintStream err) {
         if (!tools.dscode.common.composite.DomLogCli.handles(args)) return -1;
-        return tools.dscode.common.composite.DomLogCli.execute(args, out, err);
+        int code = tools.dscode.common.composite.DomLogCli.execute(args, out, err);
+        CrossStore.journal(args, code, err);
+        return code;
     }
 
     /**
@@ -162,7 +174,20 @@ public final class PickleballWorkbenchLauncher {
      */
     static int dispatchDashboardIfAny(String[] args, PrintStream out, PrintStream err) {
         if (!tools.dscode.store.dashboard.DashboardCli.handles(args)) return -1;
-        return tools.dscode.store.dashboard.DashboardCli.execute(args, out, err);
+        int code = tools.dscode.store.dashboard.DashboardCli.execute(args, out, err);
+        CrossStore.journal(args, code, err);
+        return code;
+    }
+
+    /**
+     * Cross-cutting notes, journal, and links. Returns {@code -1} when
+     * {@code args} are not a {@code cross} invocation. Dispatched before store.
+     */
+    static int dispatchCrossIfAny(String[] args, PrintStream out, PrintStream err) {
+        if (!CrossStore.handles(args)) return -1;
+        int code = CrossStore.execute(args, out, err);
+        CrossStore.journal(args, code, err);
+        return code;
     }
 
     /**
@@ -172,7 +197,15 @@ public final class PickleballWorkbenchLauncher {
      */
     static int dispatchStoreIfAny(String[] args, PrintStream out, PrintStream err) {
         if (!tools.dscode.store.StoreCli.handles(args)) return -1;
-        return tools.dscode.store.StoreCli.execute(args, out, err);
+        int code = tools.dscode.store.StoreCli.execute(args, out, err);
+        CrossStore.journal(args, code, err);
+        return code;
+    }
+
+    /** Journal one completed Workbench verb, then stop the process when it failed. */
+    private static void finish(String[] args, int code) {
+        CrossStore.journal(args, code, System.err);
+        if (code != 0) exitProcess(code);
     }
 
     /**
@@ -186,12 +219,12 @@ public final class PickleballWorkbenchLauncher {
             for (String notice : WorkbenchCommandLine.aliasNotices()) System.err.println(notice);
         } catch (IllegalArgumentException failure) {
             System.err.println(failure.getMessage());
-            exitProcess(2);
+            finish(args, 2);
             return;
         }
         Integer rejected = rejectUnknown(parsed, System.err);
         if (rejected != null) {
-            exitProcess(rejected);
+            finish(args, rejected);
             return;
         }
         Path project = parsed.project() != null
@@ -207,11 +240,11 @@ public final class PickleballWorkbenchLauncher {
         } catch (InterruptedException failure) {
             Thread.currentThread().interrupt();
             System.err.println("Pickleball Workbench launcher was interrupted.");
-            exitProcess(1);
+            finish(args, 1);
             return;
         } catch (IOException failure) {
             System.err.println("Could not hop to the pinned Pickleball jar: " + failure.getMessage());
-            exitProcess(1);
+            finish(args, 1);
             return;
         }
 
@@ -225,26 +258,26 @@ public final class PickleballWorkbenchLauncher {
             try {
                 java.util.OptionalInt hopped = controllerHop(args);
                 if (hopped.isPresent()) {
-                    if (hopped.getAsInt() != 0) exitProcess(hopped.getAsInt());
+                    finish(args, hopped.getAsInt());
                     return;
                 }
             } catch (Exception failure) {
                 String message = failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
                 System.err.println("error: " + message);
                 System.err.println("fix: controller-start");
-                exitProcess(1);
+                finish(args, 1);
                 return;
             }
         }
 
         if (WorkbenchCommandLine.isAgentCoreCommand(parsed.command()) && !controllerUiWithoutOps(parsed.command(), args)) {
             int exitCode = WorkbenchAgentCommands.run(args, System.out, System.err);
-            if (exitCode != 0) exitProcess(exitCode);
+            finish(args, exitCode);
             return;
         }
         if (WorkbenchCommandLine.isSessionClientCommand(parsed.command())) {
             int exitCode = WorkbenchSessionCommands.run(args, System.out, System.err);
-            if (exitCode != 0) exitProcess(exitCode);
+            finish(args, exitCode);
             return;
         }
 
@@ -260,14 +293,14 @@ public final class PickleballWorkbenchLauncher {
                     .inheritIO()
                     .start();
             int exitCode = process.waitFor();
-            if (exitCode != 0) exitProcess(exitCode);
+            finish(args, exitCode);
         } catch (InterruptedException failure) {
             Thread.currentThread().interrupt();
             System.err.println("Pickleball Workbench launcher was interrupted.");
-            exitProcess(1);
+            finish(args, 1);
         } catch (RuntimeException | IOException failure) {
             System.err.println("Could not launch Pickleball Workbench: " + failure.getMessage());
-            exitProcess(1);
+            finish(args, 1);
         }
     }
 

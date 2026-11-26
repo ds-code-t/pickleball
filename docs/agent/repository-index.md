@@ -816,6 +816,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/launcher/BrowserAttach.java`
 - `src/main/java/tools/dscode/launcher/CompositeCommands.java`
 - `src/main/java/tools/dscode/launcher/ConsumerReadyCommands.java`
+- `src/main/java/tools/dscode/launcher/CrossStore.java`
 - `src/main/java/tools/dscode/launcher/LeaseHold.java`
 - `src/main/java/tools/dscode/launcher/NodeStepHost.java`
 - `src/main/java/tools/dscode/launcher/OcrSetup.java`
@@ -1247,6 +1248,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/ContextLiveTest.java`
 - `src/test/java/tools/dscode/launcher/ControllerReliabilityTest.java`
 - `src/test/java/tools/dscode/launcher/ControllerUtf8Test.java`
+- `src/test/java/tools/dscode/launcher/CrossStoreTest.java`
 - `src/test/java/tools/dscode/launcher/DesktopSameVerbTest.java`
 - `src/test/java/tools/dscode/launcher/DoctorTest.java`
 - `src/test/java/tools/dscode/launcher/DomEngineCliLaunchTest.java`
