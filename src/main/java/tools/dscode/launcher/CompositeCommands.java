@@ -3,6 +3,7 @@ package tools.dscode.launcher;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import tools.dscode.common.agentfast.AgentEnvelope;
+import tools.dscode.control.protocol.VerbArgs;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -164,11 +165,64 @@ final class CompositeCommands {
     private record StepReply(int exit, String error, String frame, String text) {
     }
 
+    /** A line whose first token is {@code pw}. It is not Gherkin. */
+    static boolean pwLine(String text) {
+        if (text == null) return false;
+        String trimmed = text.stripLeading();
+        return "pw".equals(trimmed) || trimmed.startsWith("pw ") || trimmed.startsWith("pw\t");
+    }
+
+    /** A Gherkin step line. Other lines stay CLI verbs. */
+    static boolean gherkinLine(String text) {
+        if (text == null) return false;
+        String trimmed = text.stripLeading();
+        return trimmed.startsWith("Given ")
+                || trimmed.startsWith("When ")
+                || trimmed.startsWith("Then ")
+                || trimmed.startsWith("And ")
+                || trimmed.startsWith("But ")
+                || trimmed.startsWith("* ");
+    }
+
+    /**
+     * Runs one {@code pw} line through {@link VerbDispatch}, which reaches {@link PwCommand}.
+     * The project path is a positional so {@code pw} does not attach to another directory.
+     */
+    static int dispatchPw(Path project, String runId, String text, PrintStream out, PrintStream err) {
+        String body = text == null ? "" : text.stripLeading();
+        if (body.startsWith("pw")) body = body.substring(2).stripLeading();
+        List<String> tokens = new ArrayList<>();
+        if (!body.isBlank()) {
+            for (String part : body.split("\\s+")) {
+                if (!part.isBlank()) tokens.add(part);
+            }
+        }
+        if (project != null) tokens.add(project.toAbsolutePath().normalize().toString());
+        Map<String, String> flags = new LinkedHashMap<>();
+        if (!tokens.isEmpty()) flags.put(VerbArgs.ARGS, String.join("\n", tokens));
+        if (runId != null && !runId.isBlank()) flags.put("run-id", runId);
+        return VerbDispatch.run("pw", flags, out, err);
+    }
+
     /**
      * One step uses the same launcher path as typing the verb: page verbs post
      * to the live worker, and {@code doctor} stays in this process.
+     * A {@code pw} line goes through {@link PwCommand}. A Gherkin line stays on that runner.
      */
     private static StepReply runStep(WorkbenchCommandLine.Parsed parsed, String runId, Step step) {
+        if (step.args != null && "pw".equals(step.op) && step.args.containsKey("line")) {
+            ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+            ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+            int code = dispatchPw(
+                    parsed.project(),
+                    runId,
+                    step.args.get("line"),
+                    new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                    new PrintStream(stderr, true, StandardCharsets.UTF_8)
+            );
+            return reply(code, stdout, stderr);
+        }
+        if (gherkinStep(step)) return runGherkin(gherkinText(step));
         Map<String, String> args = new LinkedHashMap<>();
         if (step.args != null) args.putAll(step.args);
         String verb = verbOf(step.op == null ? "" : step.op, args);
@@ -191,6 +245,10 @@ final class CompositeCommands {
                 new PrintStream(stdout, true, StandardCharsets.UTF_8),
                 new PrintStream(stderr, true, StandardCharsets.UTF_8)
         );
+        return reply(code, stdout, stderr);
+    }
+
+    private static StepReply reply(int code, ByteArrayOutputStream stdout, ByteArrayOutputStream stderr) {
         String printed = stdout.toString(StandardCharsets.UTF_8).trim();
         String error = "";
         String frame = "";
@@ -224,6 +282,48 @@ final class CompositeCommands {
         return new StepReply(code, error, frame, text);
     }
 
+    private static boolean gherkinStep(Step step) {
+        if (step == null || step.op == null) return false;
+        if ("gherkin".equals(step.op)) return true;
+        if (gherkinLine(step.op)) return true;
+        String rest = step.args == null ? "" : step.args.getOrDefault("text", "");
+        return gherkinLine((step.op + " " + rest).trim());
+    }
+
+    private static String gherkinText(Step step) {
+        if (step.args != null && step.args.get("line") != null) return step.args.get("line");
+        String rest = step.args == null ? "" : step.args.getOrDefault("text", "");
+        if (rest == null || rest.isBlank()) return step.op;
+        return (step.op + " " + rest).trim();
+    }
+
+    /**
+     * The Gherkin runner lives in the control API, which depends on this project,
+     * so the launcher calls it by name the same way {@link WorkbenchValidate} does.
+     */
+    private static StepReply runGherkin(String line) {
+        String text = line == null ? "" : line;
+        try {
+            Class<?> type = Class.forName("tools.dscode.control.api.DynamicControl");
+            Object result = type.getMethod("executeStep", String.class).invoke(null, text);
+            if (Boolean.TRUE.equals(result.getClass().getMethod("successful").invoke(result))) {
+                return new StepReply(0, "", "", "");
+            }
+            Object failure = result.getClass().getMethod("error").invoke(result);
+            String message = "step failed";
+            if (failure != null) {
+                Object value = failure.getClass().getMethod("message").invoke(failure);
+                if (value != null && !value.toString().isBlank()) message = value.toString();
+            }
+            return new StepReply(1, message, "", "");
+        } catch (ReflectiveOperationException failure) {
+            Throwable cause = failure.getCause() == null ? failure : failure.getCause();
+            String message = cause.getMessage();
+            if (message == null || message.isBlank()) message = "step failed";
+            return new StepReply(1, message, "", "");
+        }
+    }
+
     private static List<Step> steps(String text) throws java.io.IOException {
         String raw = text == null ? "" : text.trim();
         if (raw.isEmpty()) throw new IllegalArgumentException("execute-steps file is empty");
@@ -246,6 +346,18 @@ final class CompositeCommands {
         for (String line : raw.split("\\R")) {
             String trimmed = line.trim();
             if (trimmed.isEmpty() || trimmed.startsWith("#")) continue;
+            if (pwLine(trimmed)) {
+                Map<String, String> args = new LinkedHashMap<>();
+                args.put("line", trimmed);
+                steps.add(new Step("pw", args));
+                continue;
+            }
+            if (gherkinLine(trimmed)) {
+                Map<String, String> args = new LinkedHashMap<>();
+                args.put("line", trimmed);
+                steps.add(new Step("gherkin", args));
+                continue;
+            }
             int space = trimmed.indexOf(' ');
             if (space < 0) steps.add(new Step(trimmed, Map.of()));
             else {

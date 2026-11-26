@@ -126,7 +126,7 @@ Lineage and coordination metadata survive controlled execution but are excluded 
 
 ### Linux desktop control
 
-Linux desktop control is AT-SPI plus `xdotool` on X11 or Xvfb only. Wayland is unsupported: a Wayland-only session (`WAYLAND_DISPLAY` set and `DISPLAY` unset, or `XDG_SESSION_TYPE=wayland` without `DISPLAY`) fails `desktop attach --live` with `error: Wayland session detected; desktop control needs X11 or Xvfb (set DISPLAY)` and a `fix:` line. Xwayland with `DISPLAY` set is allowed. `grim` screenshots are not a supported desktop-control path.
+Linux desktop control is AT-SPI plus `xdotool` on X11 or Xvfb only. Wayland is unsupported: a Wayland-only session (`WAYLAND_DISPLAY` set and `DISPLAY` unset, or `XDG_SESSION_TYPE=wayland` without `DISPLAY`) fails `desktop attach --live` with `error: Wayland session detected; desktop control needs X11 or Xvfb (set DISPLAY)` and a `fix:` line. Xwayland with `DISPLAY` set is allowed. `desktop launch --exe=<path> --name=<window>` starts that process and attaches on Windows. Any other OS exits 2 with `error: desktop launch is implemented for Windows` and `fix: run this verb on Windows`. `desktop screenshot --name=<window> [--out=<file>]` reads the window rectangle from Windows UI Automation. `grim` screenshots are not a supported desktop-control path.
 
 
 ### Desktop drivers (opt-in)

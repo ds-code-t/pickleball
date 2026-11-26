@@ -28,7 +28,10 @@ class DesktopScreenshotTest {
     @Test
     void commandsMatchThePlatform() {
         DesktopScreenshot.Rect rect = new DesktopScreenshot.Rect(1, 2, 3, 4);
-        assertEquals(List.of("grim", "-g", "1,2 3x4", "-"), DesktopScreenshot.command("linux", "wayland", rect));
+        CdpException wayland = assertThrows(CdpException.class, () -> DesktopScreenshot.command("linux", "wayland", rect));
+        assertTrue(wayland.getMessage().contains("Wayland session detected"), wayland.getMessage());
+        assertTrue(wayland.getMessage().contains("fix:"), wayland.getMessage());
+        assertFalse(wayland.getMessage().toLowerCase().contains("grim"), wayland.getMessage());
         assertEquals(
                 List.of("import", "-window", "root", "-crop", "3x4+1+2", "png:-"),
                 DesktopScreenshot.command("linux", "x11", rect)

@@ -47,6 +47,7 @@ The 3.0.0 retest-fix rounds (R, S) ran only targeted tests on the Linux box and 
 - **Spine R1, Windows only:** `UniversalEntityTest`, `DeltaWindowTest`, `HeadMaterializerTest`, `JarHashResetTest`, `EnabledFlagTest`, `ScenarioTagTableTest`, `RunVariableSyncTest`, `PkbIgnoreRoundTripTest`, `ConflictChoiceTest`, `CowSandboxTest`, and `SandboxPromoteTest`.
 - **Spine R2, Windows only:** `PatternMatcherParityTest`, `CucumberIngestTest`, `SpineCucumberImportBanTest`, `NativeRunUsesStoreOnlyTest`, `StepWatchdogTest`, `StepCeilingTest`, `PhraseContextIngestTest`, `ExistsConditionTest`, `AnyParentContextTest`, `PhraseLocalContextTest`, and `BetweenRelationTest`.
 - **Spine R3, Windows only:** `JavaStepHostTest`, `GlueStaticScanTest`, `NodeStepHostTest`, `NodeStepHostTsTest`, `EngineDoesNotSpawnNodeTest`, `JsStepCatalogTest`, `JsStepRunTest`, `PlaywrightTestIngestTest`, `PlaywrightSpecHostTest`, and `PlaywrightSpecIngestLiveTest`.
+- **Spine R4, Windows only:** `DesktopLaunchTest`, `DesktopScreenshotVerbTest`, and `DesktopLaunch`.
 
 ## Deferred from the 3.0.0 consumer-fixes branch (per Dan, 2026-11-25)
 
@@ -64,9 +65,5 @@ These items stay out of `3.0.0-consumer-fixes`. The roadmap lists them under "No
 | 6.5.6 | Progress card. |
 | 6.5.7 | Overlay read receipts. |
 | 6.6.4 | Runtime injection on attached windows. Only the "fail clearly" part is in P3. |
-| 6.6.5 | Body-modify mocks. |
-| 6.6.6 | `pw` steps in execute-steps. The `pw` fix itself is in P2. |
-| 6.7.1 | Desktop launch. |
 | 6.7.3 | UIA tree cache. |
-| 6.7.4 | Desktop screenshot. |
 | 6.8.8 | Session journal. |

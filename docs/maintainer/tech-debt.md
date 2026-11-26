@@ -38,5 +38,5 @@ Items #5–#10 stay deferred. Do not implement them in 2.1.18.
 ## Wayland desktop control (unsupported)
 
 - Linux desktop control is AT-SPI plus `xdotool` on X11 or Xvfb. A Wayland-only session is refused at live attach (`NativeDesktop.waylandRefusal`).
-- `grim` screenshots exist in `DesktopScreenshot` for Wayland capture only; they are not a desktop-control path.
+- Wayland capture is refused in `DesktopScreenshot`. The `fix:` does not name a Wayland capture tool. `grim` is not a supported path. Windows `desktop screenshot` reads the window rectangle from `WindowsUia`.
 - Fix direction if Wayland support is ever wanted: a portal-based input path (libei or the RemoteDesktop portal), which needs user consent per session.

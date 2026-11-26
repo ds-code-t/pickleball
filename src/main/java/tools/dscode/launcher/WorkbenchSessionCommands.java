@@ -692,14 +692,17 @@ public final class WorkbenchSessionCommands {
             PrintStream err,
             HttpClient http
     ) {
-        Integer refused = refusedDriver(parsed, err);
-        if (refused != null) return refused;
         String text = flags.text;
         if (flags.quoteWarning != null && !flags.quoteWarning.isBlank()) err.println(flags.quoteWarning);
         if (text == null || text.isBlank()) {
             err.print(WorkbenchCliHelp.usageError("missing gherkin", "execute-step"));
             return 2;
         }
+        if (CompositeCommands.pwLine(text)) {
+            return CompositeCommands.dispatchPw(parsed.project(), parsed.coordination().runId(), text, out, err);
+        }
+        Integer refused = refusedDriver(parsed, err);
+        if (refused != null) return refused;
         SessionState state = requireSession(parsed, http);
         Map<String, Object> body = commandBody(parsed, flags);
         body.put("text", text);

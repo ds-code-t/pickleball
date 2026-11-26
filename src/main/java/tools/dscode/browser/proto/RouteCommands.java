@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Route;
 import com.microsoft.playwright.WebSocketRoute;
+import tools.dscode.browser.BrowserLog;
 import tools.dscode.browser.BrowserProtocols;
 import tools.dscode.browser.BidiModules;
 import tools.dscode.browser.RpcChannel;
@@ -545,11 +546,7 @@ final class RouteCommands {
                     route.fulfill(o);
                 }
                 case "abort" -> route.abort();
-                case "modify" -> {
-                    Map<String, String> merged = new LinkedHashMap<>(route.request().headers());
-                    merged.putAll(rule.headers);
-                    route.resume(new Route.ResumeOptions().setHeaders(merged));
-                }
+                case "modify" -> route.resume(playwrightResume(route.request().headers(), rule));
                 default -> route.resume();
             }
         };
@@ -560,6 +557,72 @@ final class RouteCommands {
         });
         host.pw().listening(true);
         host.stateMap().put("route.pw.handler", handler);
+    }
+
+    /**
+     * Playwright continue for {@code modify}. Headers stay merged. {@code rule.body} is post data
+     * when it is not null, including an empty string. A null body stays header-only.
+     */
+    static Route.ResumeOptions playwrightResume(Map<String, String> requestHeaders, Rule rule) {
+        Map<String, String> merged = new LinkedHashMap<>();
+        if (requestHeaders != null) merged.putAll(requestHeaders);
+        if (rule.headers != null) merged.putAll(rule.headers);
+        Route.ResumeOptions options = new Route.ResumeOptions().setHeaders(merged);
+        if (rule.body != null) {
+            options.setPostData(rule.body);
+            logModifyBody(rule.body);
+        }
+        return options;
+    }
+
+    /**
+     * CDP {@code Fetch.continueRequest} for {@code modify}. Header names merge without case.
+     * {@code postData} is the plain request body, not the base64 response body {@code fulfill} sends.
+     */
+    static Map<String, Object> cdpContinue(String requestId, Map<String, String> requestHeaders, Rule rule) {
+        Map<String, String> merged = new LinkedHashMap<>();
+        if (requestHeaders != null) merged.putAll(requestHeaders);
+        if (rule.headers != null) {
+            rule.headers.forEach((key, value) -> {
+                merged.keySet().removeIf(name -> name.equalsIgnoreCase(key));
+                merged.put(key, value);
+            });
+        }
+        List<Map<String, String>> list = new ArrayList<>();
+        merged.forEach((key, value) -> list.add(Map.of("name", key, "value", value)));
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("requestId", requestId);
+        payload.put("headers", list);
+        if (rule.body != null) {
+            payload.put("postData", rule.body);
+            logModifyBody(rule.body);
+        }
+        return payload;
+    }
+
+    /**
+     * BiDi {@code network.continueRequest} overrides for {@code modify}. The request id is added by
+     * {@link BidiModules#continueRequest}. The body is {@code {type:string, value}} when present.
+     */
+    static Map<String, Object> bidiContinue(JsonNode requestHeaders, Map<String, String> extraHeaders, Rule rule) {
+        Map<String, String> extra = extraHeaders == null ? Map.of() : extraHeaders;
+        if (rule.headers != null && !rule.headers.isEmpty()) extra = merge(extra, rule.headers);
+        JsonNode headers = requestHeaders != null && requestHeaders.isArray()
+                ? requestHeaders
+                : com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.arrayNode();
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("headers", bidiHeaders(headers, extra));
+        if (rule.body != null) {
+            payload.put("body", Map.of("type", "string", "value", rule.body));
+            logModifyBody(rule.body);
+        }
+        return payload;
+    }
+
+    /** Byte length only. The body itself is not written. */
+    private static void logModifyBody(String body) {
+        int bytes = body.getBytes(StandardCharsets.UTF_8).length;
+        BrowserLog.info("playwright", "modify body-bytes=" + bytes);
     }
 
     static List<Map<String, ?>> bidiHeaders(JsonNode headers, Map<String, String> extra) {
@@ -613,7 +676,7 @@ final class RouteCommands {
                         }
                         case "abort" -> host.bidiModules().failRequest(request);
                         case "modify" -> host.bidiModules().continueRequest(request,
-                                Map.of("headers", bidiHeaders(params.path("request").path("headers"), merge(s.extraHeaders, rule.headers))));
+                                bidiContinue(params.path("request").path("headers"), s.extraHeaders, rule));
                         default -> host.bidiModules().continueRequest(request, null);
                     }
                 });
@@ -685,15 +748,9 @@ final class RouteCommands {
                             }
                             case "abort" -> cdp.send(sessionId, "Fetch.failRequest", Map.of("requestId", id, "errorReason", "BlockedByClient"));
                             case "modify" -> {
-                                Map<String, String> merged = new LinkedHashMap<>();
-                                params.path("request").path("headers").fields().forEachRemaining(e -> merged.put(e.getKey(), e.getValue().asText()));
-                                rule.headers.forEach((k, v) -> {
-                                    merged.keySet().removeIf(name -> name.equalsIgnoreCase(k));
-                                    merged.put(k, v);
-                                });
-                                List<Map<String, String>> list = new ArrayList<>();
-                                merged.forEach((k, v) -> list.add(Map.of("name", k, "value", v)));
-                                cdp.send(sessionId, "Fetch.continueRequest", Map.of("requestId", id, "headers", list));
+                                Map<String, String> requestHeaders = new LinkedHashMap<>();
+                                params.path("request").path("headers").fields().forEachRemaining(e -> requestHeaders.put(e.getKey(), e.getValue().asText()));
+                                cdp.send(sessionId, "Fetch.continueRequest", cdpContinue(id, requestHeaders, rule));
                             }
                             default -> cdp.send(sessionId, "Fetch.continueRequest", Map.of("requestId", id));
                         }

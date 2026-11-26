@@ -243,7 +243,8 @@ public final class DesktopTree {
     }
 
     public static final List<String> VERBS = List.of(
-            "list", "attach", "walk", "query", "resolve", "close", "click", "type", "snapshot"
+            "list", "attach", "walk", "query", "resolve", "close", "click", "type", "snapshot",
+            "launch", "screenshot"
     );
 
     public static ObjectNode list() {

@@ -53,6 +53,7 @@ public final class DesktopScreenshot {
         String family = os == null ? osFamily() : os;
         String kind = session == null ? "" : session;
         if ("linux".equals(family) && kind.isBlank()) kind = sessionType(environment);
+        if ("linux".equals(family) && "wayland".equals(kind)) throw wayland();
         Attempt taken = attemptNative(family, kind, rect, used);
         if (taken.shot != null && !denied(family, taken.shot.png, taken.detail)) return taken.shot;
         if ("macos".equals(family) && taken.shot != null && denied(family, taken.shot.png, taken.detail)) {
@@ -75,16 +76,14 @@ public final class DesktopScreenshot {
         }
         throw new CdpException(
                 "error: desktop screenshot failed\n"
-                        + "fix: Install grim on Wayland, ImageMagick import or xwd on X11, or capture on a display.");
+                        + "fix: Install ImageMagick import or xwd on X11, or capture on a display. Wayland is unsupported.");
     }
 
     static List<String> command(String os, String session, Rect rect) {
         String family = os == null ? "" : os;
         if ("windows".equals(family)) return List.of("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", windowsScript(rect));
         if ("macos".equals(family)) return macCommand(rect, "screen.png");
-        if ("wayland".equals(session)) {
-            return List.of("grim", "-g", rect.x + "," + rect.y + " " + rect.width + "x" + rect.height, "-");
-        }
+        if ("wayland".equals(session)) throw wayland();
         return List.of(
                 "import", "-window", "root", "-crop",
                 rect.width + "x" + rect.height + "+" + rect.x + "+" + rect.y, "png:-"
@@ -316,6 +315,12 @@ public final class DesktopScreenshot {
         thread.setDaemon(true);
         thread.start();
         return thread;
+    }
+
+    private static CdpException wayland() {
+        return new CdpException(
+                "error: Wayland session detected; desktop control needs X11 or Xvfb (set DISPLAY)\n"
+                        + "fix: log in to an X11 session, run under Xwayland with DISPLAY set, or start Xvfb (Xvfb :99 & export DISPLAY=:99).");
     }
 
     private static boolean displayAvailable(String os, Map<String, String> env) {

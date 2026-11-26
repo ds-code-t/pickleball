@@ -2,6 +2,7 @@
   "version": "2.1.18",
   "source": "src/main/java/tools/dscode/launcher/WorkbenchCommandLine.java",
   "engine": ["help", "inventory", "run", "step"],
+  "desktop": ["attach", "click", "close", "launch", "list", "query", "resolve", "screenshot", "snapshot", "type", "walk"],
   "commands": {
     "forwarded": [
       "isolate",

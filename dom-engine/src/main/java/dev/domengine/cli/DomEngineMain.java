@@ -411,6 +411,60 @@ public final class DomEngineMain {
         );
     }
 
+    private static CliResult desktopLaunch(Map<String, String> flags) {
+        String refused = dev.domengine.desktop.DesktopLaunch.refusalFor(System.getProperty("os.name"));
+        if (refused != null) return error(2, "usage", refused);
+        String exe = required(flags, "exe");
+        String name = required(flags, "name");
+        Process process;
+        try {
+            process = dev.domengine.desktop.DesktopLaunch.start(Path.of(exe));
+        } catch (Exception failure) {
+            String message = failure.getMessage() == null ? "desktop launch failed" : failure.getMessage();
+            return error(1, "failed", "desktop launch failed: " + message);
+        }
+        try {
+            dev.domengine.desktop.DesktopTree.Session attached = dev.domengine.desktop.DesktopLaunch.attachWhenVisible(
+                    name, java.time.Duration.ofSeconds(60), process);
+            com.fasterxml.jackson.databind.node.ObjectNode node = Jsons.object();
+            node.put("ok", true);
+            node.put("id", attached.id());
+            node.put("window", attached.window());
+            node.put("pid", process.pid());
+            node.put("backend", attached.backend());
+            node.put("live", attached.live());
+            return CliResult.ok(Jsons.pretty(node));
+        } catch (CdpException failure) {
+            dev.domengine.desktop.DesktopLaunch.destroy(process);
+            String message = failure.getMessage() == null ? "desktop launch failed" : failure.getMessage();
+            return error(1, codeFor(message), message);
+        }
+    }
+
+    private static CliResult desktopScreenshot(Map<String, String> flags) {
+        String name = required(flags, "name");
+        dev.domengine.desktop.DesktopScreenshot.Rect rect = dev.domengine.desktop.DesktopLaunch.windowRect(name);
+        if (rect == null) {
+            throw new CdpException("error: screenshot rect is empty\nfix: Pass a window or screen rectangle with a positive size.");
+        }
+        dev.domengine.desktop.DesktopScreenshot.Shot shot = dev.domengine.desktop.DesktopScreenshot.capture(rect);
+        String out = flags.get("out");
+        Path file = out == null || out.isBlank() ? Path.of("screenshot.png") : Path.of(out);
+        try {
+            dev.domengine.desktop.DesktopLaunch.writePng(file, shot.png());
+        } catch (java.io.IOException failure) {
+            throw new CdpException("desktop screenshot: " + failure.getMessage());
+        }
+        com.fasterxml.jackson.databind.node.ObjectNode node = Jsons.object();
+        node.put("ok", true);
+        node.put("path", file.toString());
+        node.put("bytes", shot.png() == null ? 0 : shot.png().length);
+        node.put("width", shot.width());
+        node.put("height", shot.height());
+        node.put("window", name);
+        return CliResult.ok(Jsons.pretty(node));
+    }
+
     private static CliResult desktopSnapshot(Map<String, String> flags) {
         com.fasterxml.jackson.databind.node.ObjectNode json = DesktopTree.snapshot(required(flags, "id"), flags);
         String dir = flags.get("out-dir");
@@ -674,6 +728,8 @@ public final class DomEngineMain {
                 case "click" -> CliResult.ok(Jsons.pretty(DesktopTree.click(required(flags, "id"), flags)));
                 case "type" -> CliResult.ok(Jsons.pretty(DesktopTree.type(required(flags, "id"), flags)));
                 case "snapshot" -> desktopSnapshot(flags);
+                case "launch" -> desktopLaunch(flags);
+                case "screenshot" -> desktopScreenshot(flags);
                 case "close" -> CliResult.ok(Jsons.pretty(DesktopTree.close(required(flags, "id"))));
                 default -> error(2, "usage", "unknown desktop verb: " + verb);
             };
@@ -845,9 +901,11 @@ public final class DomEngineMain {
                   no selector: CDP events the session buffered since attach (network, navigation, console, log)
                   --request keeps Network.requestWillBeSent. --response keeps response and loading rows. * keeps that kind.
                   --follow reads the buffer and returns. It does not leave a process. Default timeout is one read.
-                desktop list|attach|walk|query|resolve|close|click|type|snapshot
+                desktop list|attach|walk|query|resolve|close|click|type|snapshot|launch|screenshot
                   attach --fixture FILE   replays a recorded tree
                   attach --live [--name WINDOW]   Windows UIA, macOS AX, or Linux AT-SPI
+                  launch --exe PATH --name WINDOW   Windows: start the process and attach. Any other OS exits 2
+                  screenshot --name WINDOW [--out file.png]   window rectangle from Windows UI Automation
                   snapshot --id ID [--screenshot file.png] [--out-dir DIR]
                   a fixture snapshot needs --screenshot
                   query and resolve use the same --pipeline, --css, --xpath, and --text as browser query

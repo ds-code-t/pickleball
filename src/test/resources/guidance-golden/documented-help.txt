@@ -155,7 +155,7 @@ Tier: control.
 
 # help execute-steps
 Usage: execute-steps --file=<steps.json> [--stop-on-fail]
-Runs a JSON array of {op,args} or one verb per line. Page verbs post to the live worker when it is up. doctor runs in this process. stopped is true only with --stop-on-fail. A failure without that flag says steps failed.
+Runs a JSON array of {op,args} or one verb per line. A line whose first token is pw runs through PwCommand. A Given, When, Then, And, But, or * line stays on the Gherkin runner. Other lines stay verbs. Page verbs post to the live worker when it is up. doctor runs in this process. stopped is true only with --stop-on-fail. A failure without that flag says steps failed.
 Tier: control.
 
 # help export-guidance
@@ -361,6 +361,12 @@ Tier: control.
 # help print
 Usage: print [--out=<file.pdf>] [--tab=<id> | --page=<url substring>] [--via=auto|playwright|bidi|cdp]
 Prints the page to PDF (Playwright page.pdf, BiDi browsingContext.print, CDP Page.printToPDF). --out defaults to .pickleball/runs/<run>/print-<ms>.pdf. Control tier.
+Tier: control.
+
+# help pw
+Usage: pw <area> <action> [--flags] [--target=browser:cdp=<ws> | --cdp-endpoint=<channel|url>]
+       pw run --steps=<file or JSON array of {area, action, flags}>
+Areas: page (list new goto close front reload title eval), context (list new close), storage (save load --path=), route (fulfill abort continue clear --pattern=), har (record replay --path=), wait (--for=load|domcontentloaded|networkidle|url|response|request|selector --match=), locator (count click fill text value hover check select --selector=), trace (start stop --out=), video (--dir= --url=), screenshot (--out= [--selector=] [--full-page=true]), download (--click= --dir=), upload (--selector= --path=), dialog (accept dismiss [--prompt-text=] [--click=]), emulate (--viewport=WxH --device= --geolocation=lat,lon --locale= --timezone= --color-scheme= --offline --user-agent= --permissions= --url=), tabs (list switch --index=), frames (list switch --frame-name=), keyboard (press --keys= type --text= down up), mouse (move down up click wheel drag). Playwright attaches over CDP to the live or named browser and never launches or downloads one. pw works with or without a project directory. --area= and --action= name the verb, and a project path is not an area. pw run --steps= resolves a relative file from the project and checks that the file exists before it connects. Routes, tracing, dialog policy, and emulated contexts last for one pw call; chain them with pw run.
 Tier: control.
 
 # help query
