@@ -31,7 +31,7 @@ public final class WorkbenchUiPackager {
     static final String NPM_SHA256 = "5cd1e5ab971ea6333f910bc2d50700167c5ef4e66da279b2a3efc874c6b116e4";
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final Set<String> ALLOWED = Set.of(
-            "MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Unlicense", "CC0-1.0"
+            "MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC"
     );
     private static final Set<String> BANNED = Set.of("react", "react-dom", "electron", "tsx", "axe-core", "express");
 

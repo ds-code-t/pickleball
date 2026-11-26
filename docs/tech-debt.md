@@ -78,5 +78,4 @@ These items stay out of `3.0.0-consumer-fixes`. The roadmap lists them under "No
 13. `VerbDispatch` does not require `--session=<id>` or a default session created by `spine session new`.
 14. `store sql` enforces read-only with a text check only, and `--text` filtering runs after the 200-row cap.
 15. `docs/pickleball-workbench.md` and the `AgentHop` comment still describe Swing as the current window, lease, editor, and bare `ui`.
-16. `WorkbenchUiPackager.ALLOWED` and `WorkbenchUiLicenseTest` allow `Unlicense` and `CC0-1.0`, which the design license list does not name.
 17. Packaging must keep `monaco-editor` (MIT) and `typescript` (Apache-2.0), with no added packages, second Node, or runtime download.

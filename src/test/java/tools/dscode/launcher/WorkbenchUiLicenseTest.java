@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class WorkbenchUiLicenseTest {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final Set<String> ALLOWED = Set.of(
-            "MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Unlicense", "CC0-1.0");
+            "MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC");
     private static final Set<String> BANNED = Set.of(
             "react", "react-dom", "electron", "tsx", "axe-core", "express");
     private static final String PREFIX = "META-INF/pickleball/workbench-ui/";
@@ -45,6 +45,14 @@ class WorkbenchUiLicenseTest {
         Set<String> direct = new HashSet<>();
         lock.path("packages").path("").path("dependencies").fieldNames().forEachRemaining(direct::add);
         assertEquals(Set.of("monaco-editor", "typescript"), direct);
+        assertFalse(WorkbenchUiPackager.allowed("Unlicense"));
+        assertFalse(WorkbenchUiPackager.allowed("CC0-1.0"));
+        assertTrue(WorkbenchUiPackager.allowed("public domain"));
+        assertTrue(WorkbenchUiPackager.allowed("MIT"));
+        assertTrue(WorkbenchUiPackager.allowed("Apache-2.0"));
+        assertTrue(WorkbenchUiPackager.allowed("BSD-2-Clause"));
+        assertTrue(WorkbenchUiPackager.allowed("BSD-3-Clause"));
+        assertTrue(WorkbenchUiPackager.allowed("ISC"));
 
         JsonNode packages = lock.path("packages");
         Iterator<String> keys = packages.fieldNames();

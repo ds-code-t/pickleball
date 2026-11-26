@@ -2,6 +2,8 @@
 
 ## 3.0.0
 
+Spine R5 fix-back 1. The workbench UI license allow-list is MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, and the public domain. `Unlicense` and `CC0-1.0` are refused.
+
 Spine R5 P5. `lease take --target=ui|browser|both` records one holder for that session and target. A second take fails with `error:` and `fix:`. `lease release` clears it. The renderer Lease button calls that verb. `input block --on` blocks mouse and keyboard and fails while inject is off with `fix: inject on`. `input block --off` clears the block. `ui page` writes `.pickleball/workbench-ui/generated/<session>/<name>.html` when every quoted route is a catalog verb. The renderer serves that page only for the session token. `spine session end` deletes the page and the lease.
 
 Spine R5 P4. Scenarios open definition loads Monaco from `META-INF/pickleball/workbench-ui/`. Save calls `store glue put`. Node does not write the file. A failed put shows the CLI `error` and `fix` in the page. `workbenchUi` runs `npm ci` at build time with the driver-bundle Node and a checksum-pinned npm CLI. `pkb_npm_registry` is `npm --registry`. The packaged modules are `monaco-editor` (MIT) and `typescript` (Apache-2.0). A disallowed license fails the build. The end user does not run npm and does not install Node.
