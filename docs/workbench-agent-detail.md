@@ -2,6 +2,8 @@
 
 Moved out of the first-read guide. Read `docs/consumer-agent-guide.md` first. This file keeps the longer notes. Each rule in the first-read guide is stated once there.
 
+Iframe lookup, typing, shell quoting, the capability matrix, and expected timings are in [Iframe-heavy apps](iframe-apps.md).
+
 # Pickleball Consumer Agent Guide
 
 This is the canonical AI-agent contract for projects that consume Pickleball as a Maven dependency.

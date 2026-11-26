@@ -56,6 +56,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/dynamic-steps.md`
 - `docs/experimental-features.md`
 - `docs/getting-started.md`
+- `docs/iframe-apps.md`
 - `docs/java-values.md`
 - `docs/key-parser-dsl.md`
 - `docs/log-and-assert-steps.md`

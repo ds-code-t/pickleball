@@ -14,6 +14,7 @@ When these docs are materialized from the Maven dependency with Workbench `expor
 
 ## Browser scenarios
 
+- [Iframe-heavy apps](iframe-apps.md) — frame lookup, typing, shell quoting, the capability matrix, and expected timings.
 - [Dynamic steps](dynamic-steps.md) — describe page elements, actions, assertions, values, contexts, and phrase chains directly in Gherkin.
 - [Custom element definitions](custom-element-definitions.md) — optionally add project-specific element names without placing selectors in feature files.
 - [Reserved element names](reserved-element-names.md) — Step Repetition, Step Duration, Data Elements, time, Match, Loading, and browser or window names. Any other name is HTML.

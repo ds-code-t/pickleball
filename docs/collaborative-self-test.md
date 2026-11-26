@@ -284,6 +284,9 @@ Start and attach in this order. This avoids the start race and the notes-file de
 2. Only then does the helper attach: `session-mode --human=on --run-id=<helper>`, then a first `snap`. `session-mode --human=on` with no `--run-id` still locks the default run id and warns: `warning: the human lock applies to the default run id`, with `fix: --run-id=<helper>`. Pass the helper's run id so the lock does not cover the agent's calls.
 3. Each side writes its notes to its own file. Neither side waits on the other's notes file.
 4. Neither side starts a second `start` while the first one is still running.
+5. Every later call from that actor repeats its `--run-id`. A call that omits `--run-id` is the default run id (`session`). That lock is not the helper's lock and it is not the agent's lock.
+
+Frame lookup, quoting, and expected timings are in [Iframe-heavy apps](iframe-apps.md).
 
 Polling cadence:
 
