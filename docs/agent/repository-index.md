@@ -1373,6 +1373,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/WorkbenchSpeedCacheTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchStructuredErrorTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchTagFallbackTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchUiJarAssetsTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchUiLicenseTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchUiServerTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchValidateTest.java`

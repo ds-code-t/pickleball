@@ -12,16 +12,28 @@ import tools.dscode.engine.EngineLog;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.Comparator;
+import java.util.Enumeration;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
+import java.util.stream.Stream;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -40,6 +52,8 @@ public final class WorkbenchUiServer {
     private static final Pattern PORT = Pattern.compile("\"port\"\\s*:\\s*(\\d+)");
     private static final Pattern TOKEN = Pattern.compile("\"token\"\\s*:\\s*\"([0-9a-fA-F]+)\"");
     private static final SecureRandom RANDOM = new SecureRandom();
+    private static final Object EXPLODE = new Object();
+    private static final String ASSET_PREFIX = "META-INF/pickleball/workbench-ui/";
 
     private WorkbenchUiServer() {
     }
@@ -59,7 +73,7 @@ public final class WorkbenchUiServer {
     }
 
     public static Handle start(Path project) throws IOException {
-        Path assets = assets();
+        Path assets = assets(project);
         if (assets == null || !Files.isRegularFile(assets.resolve("server.mjs"))) {
             throw new IOException("error: workbench renderer assets are missing\nfix: run the workbenchUi Gradle task");
         }
@@ -84,6 +98,7 @@ public final class WorkbenchUiServer {
         builder.environment().put("PKB_UI_HOST", hostFile.toString());
         builder.environment().put("PKB_UI_BRIDGE_PORT", Integer.toString(bridgePort));
         builder.environment().put("PKB_UI_PROJECT", project.toAbsolutePath().normalize().toString());
+        builder.environment().put("NODE_PATH", assets.resolve("node_modules").toString());
         builder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
         builder.redirectError(ProcessBuilder.Redirect.DISCARD);
         Process process = builder.start();
@@ -241,8 +256,8 @@ public final class WorkbenchUiServer {
         }
     }
 
-    static Path assets() {
-        URL resource = WorkbenchUiServer.class.getClassLoader().getResource("META-INF/pickleball/workbench-ui/server.mjs");
+    static Path assets(Path project) throws IOException {
+        URL resource = WorkbenchUiServer.class.getClassLoader().getResource(ASSET_PREFIX + "server.mjs");
         if (resource != null && "file".equals(resource.getProtocol())) {
             try {
                 return Path.of(resource.toURI()).getParent();
@@ -250,9 +265,111 @@ public final class WorkbenchUiServer {
                 return null;
             }
         }
+        if (resource != null && "jar".equals(resource.getProtocol())) {
+            Path exploded = explode(project, resource);
+            if (exploded != null) return exploded;
+        }
         Path local = Path.of("workbench-ui");
         if (Files.isRegularFile(local.resolve("server.mjs"))) return local.toAbsolutePath().normalize();
         return null;
+    }
+
+    /**
+     * Copies {@code META-INF/pickleball/workbench-ui/} out of the jar that contains it.
+     * The directory name is the SHA-256 of that jar. A matching marker is reused.
+     */
+    private static Path explode(Path project, URL resource) throws IOException {
+        Path jarPath = jarFile(resource);
+        if (jarPath == null || !Files.isRegularFile(jarPath)) return null;
+        String hash = sha256(jarPath);
+        Path root = project.resolve(".pickleball").resolve("workbench-ui").resolve("assets");
+        Files.createDirectories(root);
+        Path dest = root.resolve(hash);
+        Path marker = dest.resolve(".pkb-ui-assets");
+        Path lock = root.resolve(hash + ".lock");
+        synchronized (EXPLODE) {
+            try (FileChannel channel = FileChannel.open(lock, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
+                try (FileLock ignored = channel.lock()) {
+                    if (Files.isRegularFile(marker)
+                            && hash.equals(Files.readString(marker, StandardCharsets.UTF_8).trim())
+                            && Files.isRegularFile(dest.resolve("server.mjs"))) {
+                        return dest;
+                    }
+                    deleteTree(dest);
+                    Files.createDirectories(dest);
+                    try (JarFile jar = new JarFile(jarPath.toFile())) {
+                        Enumeration<JarEntry> entries = jar.entries();
+                        while (entries.hasMoreElements()) {
+                            JarEntry entry = entries.nextElement();
+                            String name = entry.getName().replace('\\', '/');
+                            if (!name.startsWith(ASSET_PREFIX)) continue;
+                            String relative = name.substring(ASSET_PREFIX.length());
+                            if (relative.isEmpty()) continue;
+                            Path out = safe(dest, relative);
+                            if (entry.isDirectory() || relative.endsWith("/")) {
+                                Files.createDirectories(out);
+                                continue;
+                            }
+                            if (out.getParent() != null) Files.createDirectories(out.getParent());
+                            try (InputStream in = jar.getInputStream(entry)) {
+                                Files.copy(in, out, StandardCopyOption.REPLACE_EXISTING);
+                            }
+                        }
+                    }
+                    if (!Files.isRegularFile(dest.resolve("server.mjs"))) return null;
+                    Files.writeString(marker, hash + "\n", StandardCharsets.UTF_8);
+                    return dest;
+                }
+            }
+        }
+    }
+
+    private static Path jarFile(URL resource) {
+        String external = resource.toExternalForm();
+        int bang = external.indexOf("!/");
+        if (!external.startsWith("jar:") || bang < 0) return null;
+        try {
+            return Path.of(URI.create(external.substring("jar:".length(), bang)));
+        } catch (IllegalArgumentException failure) {
+            return null;
+        }
+    }
+
+    private static Path safe(Path dest, String relative) throws IOException {
+        Path out = dest.resolve(relative).normalize();
+        if (!out.startsWith(dest.normalize())) {
+            throw new IOException("error: workbench renderer asset path is outside the tree\nfix: run the workbenchUi Gradle task");
+        }
+        return out;
+    }
+
+    private static String sha256(Path file) throws IOException {
+        MessageDigest digest;
+        try {
+            digest = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException failure) {
+            throw new IOException("error: SHA-256 is not available\nfix: use a Java 21 runtime", failure);
+        }
+        try (InputStream in = Files.newInputStream(file)) {
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = in.read(buffer)) >= 0) {
+                if (read > 0) digest.update(buffer, 0, read);
+            }
+        }
+        byte[] raw = digest.digest();
+        StringBuilder text = new StringBuilder(raw.length * 2);
+        for (byte value : raw) text.append(String.format("%02x", value));
+        return text.toString();
+    }
+
+    private static void deleteTree(Path root) throws IOException {
+        if (!Files.exists(root)) return;
+        try (Stream<Path> walk = Files.walk(root)) {
+            for (Path path : walk.sorted(Comparator.reverseOrder()).toList()) {
+                Files.deleteIfExists(path);
+            }
+        }
     }
 
     private static Path nodeBinary() {
