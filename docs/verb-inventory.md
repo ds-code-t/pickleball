@@ -17,9 +17,15 @@ MCP-only count: 0
 | attach | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | audit | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | audits | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
+| bidi | workbench | cli | tools.dscode.browser.SeleniumBidiCommands.execute |
+| bidi grid-attach | workbench | cli | tools.dscode.browser.SeleniumBidiCommands.execute |
+| bidi intercept | workbench | cli | tools.dscode.browser.SeleniumBidiCommands.execute |
+| bidi script | workbench | cli | tools.dscode.browser.SeleniumBidiCommands.execute |
 | border | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | bridge | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | bridge-health | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
+| browser | workbench | cli | tools.dscode.browser.BrowserPorts.execute |
+| browser ports | workbench | cli | tools.dscode.browser.BrowserPorts.execute |
 | browser-events | workbench | stream | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | call | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | capture | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |

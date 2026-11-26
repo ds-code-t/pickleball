@@ -19,7 +19,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * Toggleable, per-entity, date-stamped, size-capped log for the browser facade.
  * Off unless {@code pkb_browser_log} or {@code PKB_BROWSER_LOG} names an entity
  * ({@code facade}, {@code selector}, {@code selenium}, {@code cdp}, {@code bidi},
- * {@code playwright}, {@code fallback}) or {@code all}.
+ * {@code playwright}, {@code fallback}, {@code resolve}) or {@code all}.
  * A protocol fallback is one WARN per run and reason even when the entity log is off,
  * unless {@code pkb_browser_fallback_log} is {@code off}. {@code info} lowers that line to INFO.
  * One file rolls at 1 MiB.

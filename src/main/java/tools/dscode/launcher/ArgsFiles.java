@@ -202,7 +202,8 @@ public final class ArgsFiles {
     private static boolean openFamily(String command) {
         return "store".equals(command) || "engine".equals(command) || "domengine".equals(command)
                 || "dashboard".equals(command) || "log".equals(command) || "log-tail".equals(command)
-                || "cross".equals(command) || "spine".equals(command);
+                || "cross".equals(command) || "spine".equals(command)
+                || "bidi".equals(command) || "browser".equals(command);
     }
 
     private static String fileToken(String token, String[] args, int index) {

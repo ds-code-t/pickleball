@@ -81,6 +81,16 @@ public final class PickleballWorkbenchLauncher {
             if (spine != 0) exitProcess(spine);
             return;
         }
+        int bidi = dispatchBidiIfAny(args, System.out, System.err);
+        if (bidi >= 0) {
+            if (bidi != 0) exitProcess(bidi);
+            return;
+        }
+        int browser = dispatchBrowserIfAny(args, System.out, System.err);
+        if (browser >= 0) {
+            if (browser != 0) exitProcess(browser);
+            return;
+        }
         int cross = dispatchCrossIfAny(args, System.out, System.err);
         if (cross >= 0) {
             if (cross != 0) exitProcess(cross);
@@ -233,6 +243,18 @@ public final class PickleballWorkbenchLauncher {
     static int dispatchSpineIfAny(String[] args, PrintStream out, PrintStream err) {
         if (!SpineCli.handles(args)) return -1;
         return VerbDispatch.run("spine", VerbArgs.capture(args), out, err);
+    }
+
+    /** Selenium BiDi verbs. Returns {@code -1} when {@code args} are not a {@code bidi} invocation. */
+    static int dispatchBidiIfAny(String[] args, PrintStream out, PrintStream err) {
+        if (!tools.dscode.browser.SeleniumBidiCommands.handles(args)) return -1;
+        return VerbDispatch.run("bidi", VerbArgs.capture(args), out, err);
+    }
+
+    /** Debug-port list. Returns {@code -1} when {@code args} are not a {@code browser} invocation. */
+    static int dispatchBrowserIfAny(String[] args, PrintStream out, PrintStream err) {
+        if (!tools.dscode.browser.BrowserPorts.handles(args)) return -1;
+        return VerbDispatch.run("browser", VerbArgs.capture(args), out, err);
     }
 
     /**

@@ -46,6 +46,8 @@ public final class VerbCatalog {
     private static final String CHAT = "tools.dscode.common.agentcontrol.AgentControl.execute";
     private static final String CROSS_STORE = "tools.dscode.launcher.CrossStore.execute";
     private static final String SPINE = "tools.dscode.launcher.SpineCli.execute";
+    private static final String BIDI = "tools.dscode.browser.SeleniumBidiCommands.execute";
+    private static final String BROWSER_PORTS = "tools.dscode.browser.BrowserPorts.execute";
 
     /**
      * Commands the domengine MCP {@code surfaces} tool lists. That tool is an index of
@@ -202,6 +204,12 @@ public final class VerbCatalog {
         add(rows, "spine stop", "workbench", SPINE);
         add(rows, "spine warm", "workbench", SPINE);
         add(rows, "spine warm status", "workbench", SPINE);
+        add(rows, "bidi", "workbench", BIDI);
+        add(rows, "bidi script", "workbench", BIDI);
+        add(rows, "bidi intercept", "workbench", BIDI);
+        add(rows, "bidi grid-attach", "workbench", BIDI);
+        add(rows, "browser", "workbench", BROWSER_PORTS);
+        add(rows, "browser ports", "workbench", BROWSER_PORTS);
         add(rows, "cross", "workbench", CROSS_STORE);
         add(rows, "cross note", "workbench", CROSS_STORE);
         add(rows, "cross journal", "workbench", CROSS_STORE);

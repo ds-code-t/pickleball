@@ -14,6 +14,7 @@ import org.openqa.selenium.edge.EdgeDriver;
 import org.openqa.selenium.edge.EdgeDriverService;
 import org.openqa.selenium.edge.EdgeOptions;
 import tools.dscode.browser.BrowserFacade;
+import tools.dscode.browser.BrowserVersionResolver;
 import tools.dscode.browser.ProtocolSelector;
 import tools.dscode.common.agentcontrol.AgentDriverHooks;
 import tools.dscode.common.agentcontrol.AgentLaunch;
@@ -110,6 +111,7 @@ public final class DriverConstruction {
     private static final String EDGE_OPTIONS_CAPABILITY = "ms:edgeOptions";
 
     public static RemoteWebDriver createDriver(ObjectNode configuration) throws Exception {
+        BrowserVersionResolver.prepare(configuration);
         ObjectNode config = requireConfiguration(configuration);
         String browserName = resolveBrowserName(config);
         ObjectNode driver = getDriverSection(config);
@@ -120,11 +122,13 @@ public final class DriverConstruction {
     }
 
     public static RemoteWebDriver createLocalDriver(ObjectNode configuration) throws Exception {
+        BrowserVersionResolver.prepare(configuration);
         ObjectNode config = requireConfiguration(configuration);
         return createLocalDriver(resolveBrowserName(config), getDriverSection(config), config);
     }
 
     public static RemoteWebDriver createRemoteDriver(ObjectNode configuration) throws Exception {
+        BrowserVersionResolver.prepare(configuration);
         ObjectNode config = requireConfiguration(configuration);
         return createRemoteDriver(resolveBrowserName(config), getDriverSection(config), config, "Driver remoteUrl not found");
     }
@@ -760,7 +764,10 @@ public final class DriverConstruction {
     }
 
     public static String resolveBrowserName(ObjectNode fullConfiguration) {
-        String browserName = trimToNull(fullConfiguration.path("browser").asText(null));
+        JsonNode browser = fullConfiguration.path("browser");
+        String browserName = browser.isObject()
+                ? trimToNull(browser.path("channel").asText(null))
+                : trimToNull(browser.asText(null));
         if (browserName == null) {
             browserName = trimToNull(fullConfiguration.path("browserName").asText(null));
         }
@@ -836,11 +843,17 @@ public final class DriverConstruction {
         if (portNode.isMissingNode()) {
             portNode = fullConfiguration.path("browser");
         }
+        if (portNode.isObject()) {
+            portNode = portNode.path("channel");
+        }
         if (portNode.isMissingNode()) {
             throw new RuntimeException("Failed to set debugging port. Cannot find debuggingPort, _pathKey, or browser.");
         }
 
-        String token = trimToNull(portNode.asText());
+        String token = trimToNull(portNode.asText(null));
+        if (token == null) {
+            throw new RuntimeException("Failed to set debugging port. Cannot find debuggingPort, _pathKey, or browser.");
+        }
         return 9000 + (Math.abs(token.toLowerCase(Locale.ROOT).hashCode()) % 1000);
     }
 

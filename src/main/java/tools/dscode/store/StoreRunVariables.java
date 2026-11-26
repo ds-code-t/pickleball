@@ -58,6 +58,12 @@ public final class StoreRunVariables {
         }
     }
 
+    /** Stores {@code frame_policy} from the browser config. Absent and unknown values are {@code top}. */
+    public static void storeFramePolicy(Connection connection, Path project) throws SQLException {
+        String policy = tools.dscode.browser.BrowserVersionResolver.framePolicy(project);
+        upsert(connection, "frame_policy", policy, "browser-config", "");
+    }
+
     static int sync(Connection connection, Path project) throws IOException, SQLException {
         Map<String, Assigned> found = new LinkedHashMap<>();
         for (String relative : PROPERTY_FILES) readProperties(project, relative, found);

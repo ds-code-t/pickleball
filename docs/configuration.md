@@ -135,15 +135,44 @@ Linux desktop control is AT-SPI plus `xdotool` on X11 or Xvfb only. Wayland is u
 
 ### Playwright backend
 
-Playwright for Java 1.65.1 (Apache-2.0) and its `driver-bundle` (Apache-2.0, with a bundled Node.js under the Node.js license) are normal dependencies in the published POM. They are not inside pickleball's jar. Pickleball never downloads Playwright browsers: it creates Playwright with `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`, never runs `install`, and only attaches with `chromium().connectOverCDP(...)`. Set `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` yourself too if your own code uses Playwright.
+Playwright for Java 1.65.1 (Apache-2.0) and its `driver-bundle` (Apache-2.0, with a bundled Node.js under the Node.js license) are normal dependencies in the published POM. They are not inside pickleball's jar. The default is still no browser download: Playwright is created with `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` and attaches with `chromium().connectOverCDP(...)`. `browser.source` of `cdn` or `any` may download through Playwright's installer. `local`, a blank source, and a missing browser block do not. Set `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` yourself too if your own code uses Playwright outside those two sources.
 
-- `pkb_protocol=playwright` (property, then env `PKB_PROTOCOL`) makes the protocol selector attach Playwright to the browser pickleball launched. Unset keeps the existing CDP, BiDi, and Selenium choice. When Playwright cannot attach, the selector logs one WARN per reason and falls back.
+- `pkb_protocol=playwright` (property, then env `PKB_PROTOCOL`) makes the protocol selector attach Playwright to the browser pickleball launched when the config has no `browser.channel`. Unset keeps the existing CDP, BiDi, and Selenium choice. When Playwright cannot attach and no `browser.channel` selected Playwright, the selector logs one WARN per reason and falls back. When `browser.channel` resolved to Playwright, that failure is `error:` and `fix:` and does not open Selenium.
 - `pkb_cdp_endpoint` (property, then env `PKB_CDP_ENDPOINT`) is an existing CDP endpoint (`http://127.0.0.1:<port>` or a `ws://` browser URL). It wins over the launched driver's own endpoint.
 - With no endpoint, the Playwright connection fails with `error: no CDP endpoint for Playwright ...` and a `fix:` line. No browser is launched.
 - Playwright attaches to Chromium-family browsers (Chrome, Edge, Chromium, Electron) only.
 - Attaching to a browser you already run (channel, Playwright Extension, endpoints, discovery, relaunch) and the Selenium/Playwright hand-off are in [Playwright](playwright.md).
 
 Consumer download size: the three Playwright artifacts on the runtime classpath are 232,943,839 bytes (about 233 MB: `playwright` 687,401, `driver` 3,309,493, `driver-bundle` 228,946,945). The `driver-bundle` jar carries Node for every platform. Pickleball's own jar did not grow from the dependency.
+
+### Browser block
+
+A browser config may keep `browser` as a string (`browser: chrome`). That string is the Selenium browser name. It does not select Playwright. The shared `CHROME_HEADLESS` files keep that string and set `source: local`, which is the local Selenium Chrome adapter those scenarios already use and which never downloads.
+
+Set `browser` to a map when you want the version ladder or Playwright. `browser.channel` of `chrome`, `msedge`, `chromium`, `firefox`, or `webkit` selects Playwright. `safari` selects Selenium `safaridriver`. `pkb_protocol=selenium` forces Selenium even when a channel is set. A Playwright connect failure then fails with `error:` and `fix:` and does not open Selenium. Configs with no `browser.channel` keep today's `pkb_protocol` behavior, including the quiet fallback.
+
+```
+browser:
+  channel: chrome
+  version: ""
+  source: local
+  headless: true
+  viewport: { width: 1280, height: 720 }
+  userAgent: ""
+  arguments: []
+  framePolicy: top
+  selenium:
+    gridUrl: ""
+    bidi: off
+  playwright:
+    connectOverCdp: true
+```
+
+`source` is `local`, `cdn`, or `any`. Blank source and a missing browser block keep today's no-download path. `local` uses a registered install (on Windows, the Chrome and Edge locations already probed for the driver) and does not read the Playwright browser cache. A miss fails with `error:` and `fix:` and does not download. `cdn` uses the Playwright cache, then Playwright's installer. If that install cannot be reached and a cached build exists, the cache is used and the resolve log says `resolve cache-fallback`. `any` tries `local`, then `cdn`. `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` stays set unless source is `cdn` or `any`. `pkb_browser_cdn_host` sets `PLAYWRIGHT_DOWNLOAD_HOST` for that download. `BrowserLog` entity `resolve` logs the requested version, the source, and the resolved version. It does not log a download URL.
+
+`version` precision: `131` is any 131 build, `131.0` is the newest patch of that minor, `131.0.6778.69` is that build, and `latest` is the highest the source allows. `local` with no version is any local browser of that channel. `local` with a version is that version or a failure.
+
+`framePolicy` is `top` (the default), `iframe`, or `all`. `top` does not change finds. Ingest stores the value as `frame_policy` in `run_variables`. `browser.selenium.bidi: on` enables the `bidi` verbs. `browser ports` lists debug-port owners. A second attach to the same port fails.
 
 ### Browser protocols
 
@@ -154,7 +183,7 @@ Pickleball reaches a browser through four backends and picks one per capability:
 | `pkb_bidi` | on | Selenium Chrome, Edge, and Firefox sessions ask for `webSocketUrl=true`, so a BiDi socket is open beside CDP. `false`, `off`, `no`, or `0` turns it off. A driver that rejects the capability is retried once without it (one WARN per run). A project `driver.capabilities.webSocketUrl` value wins. |
 | `pkb_bidi_endpoint` | unset | An existing BiDi WebSocket (`ws://.../session/<id>`) for `doctor --protocols` and protocol verbs. |
 | `pkb_cdp_endpoint` | unset | An existing CDP endpoint (see the Playwright backend). |
-| `pkb_protocol` | unset | `playwright` puts Playwright first in the fallback order. |
+| `pkb_protocol` | unset | `playwright` puts Playwright first when the config has no `browser.channel`. `selenium` forces Selenium when a channel is set. A channel of `chrome`, `msedge`, `chromium`, `firefox`, or `webkit` resolves to Playwright and does not fall back. `safari` uses Selenium. |
 | `pkb_browser_events` | on | `off` keeps no browser event rows and writes no spill file. See [Browser events](browser-events.md). |
 | `pkb_browser_events_kinds` | all | Comma list of event kinds the protocol host keeps. |
 | `pkb_browser_events_max_kb` | 8192 | Spill cap per file; the full file rotates once to `.1`. |
@@ -509,6 +538,8 @@ Missing or blank `pkb_configpath` uses the classpath resource root `configs`. Pi
 | `pkb_heap_subprocess_percent` | `70` | Heap percent where a new snapshot context leaves the warm JVM. Below this line the context stays in-process. At or above it, a free `pkb_worker_pool` slot starts a cold subprocess. Property then env `PKB_HEAP_SUBPROCESS_PERCENT`. A value that is not an integer stays the default |
 | `pkb_heap_refuse_percent` | `85` | Heap percent where a full pool refuses the context. The warm spine does not take that work in-process. The error is `error: heap gate refused a new context` and `fix: spine sample`. A free pool slot still starts a cold subprocess. Property then env `PKB_HEAP_REFUSE_PERCENT` |
 | `pkb_worker_pool` | `1` | How many cold subprocess JVMs may be alive. They use the project wrapper classpath and do not inherit the warm loader. `spine stop` returns the pool to zero. Property then env `PKB_WORKER_POOL` |
+| `pkb_selenium_bidi` | off | `on` enables `bidi script`, `bidi intercept`, and `bidi grid-attach`. The same switch is `browser.selenium.bidi: on` in the browser config. Unset stays off. Property then env `PKB_SELENIUM_BIDI`. Scenario events stay the five names gated by `pkb_scenario_events` |
+| `pkb_browser_cdn_host` | unset | Host for a `cdn` or `any` browser download. Sets `PLAYWRIGHT_DOWNLOAD_HOST` for that path only. The resolve log does not print the host. Property then env `PKB_BROWSER_CDN_HOST` |
 | `pkb_direct_control_provider` | blank, `composite`, or a path | blank is off. `composite` attaches the DOM engine using the provider order in [Direct-control handoff](direct-control-handoff.md). Any other value is a path |
 | `pkb_composite_log` | `off`, `all`, or `location,adapter,session,element,fallback,batch,state,position,snapshot` | CLI-first adapter log. Unset is off. `batch` or `all` writes one TRACE line per describe and no per-element line: `TRACE batch mode=<composite, selenium-batch, or selenium-legacy> selector=<by> nodes=<count> durationMs=<n>`. `state` or `all` writes one `TRACE state snapshot miss fallback` line only when a state check has no snapshot. `adapter` or `all` writes the verb, snapshot, scan, wait, nest, and live lines. `element` or `all` writes `INFO element find selenium unattached` when a primary engine has not joined that WebDriver and the find uses Selenium. `position` or `all` writes `TRACE position apply size=<n> position=<p> selection=<s> kept=<k> durationMs=<ms>` when a find keeps a 1-based index, `last`, or `every`. `snapshot` or `all` writes `INFO snapshot` for a page snapshot. A Selenium page fallback always prints one `WARN snapshot fallback selenium reason=no-adapter` or `WARN snapshot fallback selenium reason=adapter-error:...` line per run and reason, even when this log is off. One date-stamped file, 1 MiB cap |
 | `pkb_composite_log_dir` | directory | log directory. Default is the temp directory `pickleball-composite-logs` |

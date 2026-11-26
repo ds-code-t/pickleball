@@ -21,8 +21,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Playwright over CDP only (D12). Playwright is created with {@code PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1}, never runs
- * {@code install}, and never launches a browser: it joins an existing Chromium with
+ * Playwright over CDP only (D12). Playwright is created with {@code PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1}
+ * unless {@code browser.source} is {@code cdn} or {@code any}. It never launches a browser: it joins an existing Chromium with
  * {@code chromium().connectOverCDP(endpoint)}. The endpoint is, in order, the explicit argument, the
  * {@code pkb_cdp_endpoint} property, env {@code PKB_CDP_ENDPOINT}, then the CDP endpoint of the Chrome pickleball
  * launched (its WebDriver {@code se:cdp} / {@code debuggerAddress}). With none, {@link #connect} fails with
@@ -79,7 +79,7 @@ public final class PlaywrightConnection implements AutoCloseable {
         synchronized (OPEN) {
             current = OPEN.get(key);
             if (current != null && current.browser.isConnected()) return current;
-            Playwright playwright = Playwright.create(new Playwright.CreateOptions().setEnv(DRIVER_ENV));
+            Playwright playwright = Playwright.create(new Playwright.CreateOptions().setEnv(BrowserVersionResolver.playwrightEnv()));
             try {
                 Browser browser = playwright.chromium().connectOverCDP(key, new BrowserType.ConnectOverCDPOptions().setTimeout(15_000));
                 BrowserLog.info("playwright", "connectOverCDP " + redact(key));

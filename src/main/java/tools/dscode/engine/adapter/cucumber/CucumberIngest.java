@@ -86,6 +86,7 @@ public final class CucumberIngest {
         syncAllTags(connection);
         syncAllStepFlags(connection);
         StoreRunVariables.copyNamed(connection, project, "pkb_callpath", "pkb_componentpath");
+        StoreRunVariables.storeFramePolicy(connection, project);
         StoreLog.log(project, "hydrate", "ingest", "translated=" + translated + " failed=" + failed);
         return new Counts(translated, failed, notices);
     }

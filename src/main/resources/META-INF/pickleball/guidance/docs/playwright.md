@@ -1,6 +1,6 @@
 # Playwright backend and attaching to a running browser
 
-Playwright for Java 1.65.1 (Apache-2.0) and its `driver-bundle` (Apache-2.0, with a bundled Node.js under the Node.js license) are normal dependencies of pickleball. They are not inside pickleball's jar. Pickleball never downloads Playwright browsers: Playwright is created with `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`, `install` is never run, and Playwright only joins a browser that is already running, with `chromium().connectOverCDP(...)`. Configuration is in [Configuration](configuration.md#playwright-backend).
+Playwright for Java 1.65.1 (Apache-2.0) and its `driver-bundle` (Apache-2.0, with a bundled Node.js under the Node.js license) are normal dependencies of pickleball. They are not inside pickleball's jar. The default remains no browser download: Playwright is created with `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` and only joins a browser that is already running, with `chromium().connectOverCDP(...)`. `browser.source` of `cdn` or `any` may download through Playwright's installer. `local`, a blank source, and a missing browser block do not. When `browser.channel` resolved to Playwright, a connect failure fails with `error:` and `fix:` and does not open Selenium. Configs with no `browser.channel` keep the quiet fallback. Configuration is in [Configuration](configuration.md#playwright-backend).
 
 ## Step definitions
 

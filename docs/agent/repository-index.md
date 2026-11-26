@@ -338,9 +338,12 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/browser/BindingListener.java`
 - `src/main/java/tools/dscode/browser/BrowserFacade.java`
 - `src/main/java/tools/dscode/browser/BrowserLog.java`
+- `src/main/java/tools/dscode/browser/BrowserPorts.java`
 - `src/main/java/tools/dscode/browser/BrowserProtocols.java`
 - `src/main/java/tools/dscode/browser/BrowserReport.java`
+- `src/main/java/tools/dscode/browser/BrowserVersionResolver.java`
 - `src/main/java/tools/dscode/browser/CdpAdapter.java`
+- `src/main/java/tools/dscode/browser/DebugPortOwner.java`
 - `src/main/java/tools/dscode/browser/DomMutations.java`
 - `src/main/java/tools/dscode/browser/DriverEndpoints.java`
 - `src/main/java/tools/dscode/browser/FrameNode.java`
@@ -379,6 +382,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/browser/ProtocolSockets.java`
 - `src/main/java/tools/dscode/browser/RpcChannel.java`
 - `src/main/java/tools/dscode/browser/SeleniumAdapter.java`
+- `src/main/java/tools/dscode/browser/SeleniumBidiCommands.java`
 - `src/main/java/tools/dscode/browser/SeleniumBidiEvents.java`
 - `src/main/java/tools/dscode/browser/SurfaceAssets.java`
 - `src/main/java/tools/dscode/browser/UnsupportedProtocolOperation.java`
@@ -1018,7 +1022,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/browser/BidiAdapterTest.java`
 - `src/test/java/tools/dscode/browser/BidiModulesTest.java`
 - `src/test/java/tools/dscode/browser/BrowserProtocolsTest.java`
+- `src/test/java/tools/dscode/browser/BrowserVersionResolverTest.java`
 - `src/test/java/tools/dscode/browser/CdpAdapterTest.java`
+- `src/test/java/tools/dscode/browser/DebugPortOwnerTest.java`
 - `src/test/java/tools/dscode/browser/DomMutationsTest.java`
 - `src/test/java/tools/dscode/browser/FacadeContractTest.java`
 - `src/test/java/tools/dscode/browser/JsErrorGateLiveTest.java`
@@ -1032,6 +1038,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/browser/ProtocolSelectorPlaywrightTest.java`
 - `src/test/java/tools/dscode/browser/ProtocolSelectorTest.java`
 - `src/test/java/tools/dscode/browser/ScriptedSocket.java`
+- `src/test/java/tools/dscode/browser/SeleniumBidiCommandTest.java`
 - `src/test/java/tools/dscode/browser/SeleniumBidiEventsLiveTest.java`
 - `src/test/java/tools/dscode/browser/SurfaceAssetsTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/AgentDataFoundationTest.java`
