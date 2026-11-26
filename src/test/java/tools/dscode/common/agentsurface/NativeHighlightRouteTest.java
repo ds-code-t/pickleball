@@ -21,6 +21,7 @@ class NativeHighlightRouteTest {
         try {
             var result = AgentSurfaceRouter.route(project, "nat", "highlight", Map.of(
                     "target", "native", "query", "role=button name=Save", "text", "Save"), "a").orElseThrow();
+            assertEquals("sibling", result.body().get("mutate"));
             assertEquals(8, result.body().get("x"));
             assertEquals(30, result.body().get("width"));
             if (Boolean.FALSE.equals(result.body().get("drawn"))) assertEquals("headless", result.body().get("reason"));
@@ -30,6 +31,13 @@ class NativeHighlightRouteTest {
         } finally {
             NativeHighlight.queries = query -> "{}";
         }
+    }
+
+    @Test
+    void explicitDomMutateStaysOnTheHighlightRoute() {
+        var result = AgentSurfaceRouter.route(project, "nat", "highlight", Map.of(
+                "target", "native", "x", "1", "y", "2", "width", "3", "height", "4", "mutate", "dom"), "a").orElseThrow();
+        assertEquals("dom", result.body().get("mutate"));
     }
 
     @Test

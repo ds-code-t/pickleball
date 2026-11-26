@@ -149,6 +149,7 @@ MCP-only count: 0
 | html-replace | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | html-write | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | inbox | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
+| inject | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | input | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | insert-step | workbench | cli | tools.dscode.launcher.WorkbenchSessionCommands.run |
 | inspect-page | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
@@ -225,6 +226,8 @@ MCP-only count: 0
 | short-log | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | show-run | workbench | cli | tools.dscode.launcher.WorkbenchSessionCommands.run |
 | snap | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
+| spine | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
+| spine session | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | spotlight | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | start | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | status | workbench | cli | tools.dscode.launcher.WorkbenchSessionCommands.run |

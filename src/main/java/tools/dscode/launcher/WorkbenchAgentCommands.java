@@ -222,6 +222,8 @@ public final class WorkbenchAgentCommands {
         try {
             return switch (parsed.command()) {
                 case "session-mode" -> sessionMode(parsed, safeOut, safeErr);
+                case "inject" -> injectSession(parsed, safeOut, safeErr);
+                case "spine" -> spineSession(parsed, safeOut, safeErr);
                 case "setup" -> SetupCommand.run(parsed, safeOut, safeErr);
                 case "relaunch-with-debug" -> RelaunchWithDebug.run(parsed, safeOut, safeErr);
                 case "pw", "cdp" -> PwCommand.run(args, parsed.project(), safeOut, safeErr);
@@ -352,6 +354,82 @@ public final class WorkbenchAgentCommands {
             err.println("fix: controller-start");
             return 1;
         }
+    }
+
+    private static int injectSession(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        try {
+            String mode = word(parsed, 0);
+            if (!"on".equals(mode) && !"off".equals(mode)) {
+                err.print(WorkbenchCliHelp.structured("inject needs on or off", "inject on --session=<id>"));
+                return 2;
+            }
+            String session = flag(parsed, "--session");
+            tools.dscode.common.agentcontrol.SpineSession.setInject(parsed.project(), session, "on".equals(mode));
+            Map<String, Object> body = tools.dscode.common.agentcontrol.SpineSession.envelope(
+                    parsed.project(), session, agentIdOf(parsed), "inject");
+            out.println(JSON.writeValueAsString(body));
+            return 0;
+        } catch (IllegalArgumentException failure) {
+            err.println(failure.getMessage());
+            return 2;
+        } catch (IOException failure) {
+            err.print(WorkbenchCliHelp.structured("inject failed: " + failure.getMessage(), "spine session new"));
+            return 1;
+        }
+    }
+
+    private static int spineSession(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        try {
+            String action = word(parsed, 1);
+            if (!"session".equals(word(parsed, 0)) || action == null) {
+                err.print(WorkbenchCliHelp.structured("spine session needs new, show, or end", "spine session new"));
+                return 2;
+            }
+            String session = flag(parsed, "--session");
+            String agent = agentIdOf(parsed);
+            if ("new".equals(action)) {
+                tools.dscode.common.agentcontrol.SpineSession.create(parsed.project(), agent);
+                session = null;
+            } else if ("end".equals(action)) {
+                Map<String, Object> ended = tools.dscode.common.agentcontrol.SpineSession.envelope(
+                        parsed.project(), session, agent, "spine session");
+                tools.dscode.common.agentcontrol.SpineSession.end(parsed.project(), session);
+                ended.put("ended", true);
+                out.println(JSON.writeValueAsString(ended));
+                return 0;
+            } else if (!"show".equals(action)) {
+                err.print(WorkbenchCliHelp.structured("spine session needs new, show, or end", "spine session new"));
+                return 2;
+            }
+            Map<String, Object> body = tools.dscode.common.agentcontrol.SpineSession.envelope(
+                    parsed.project(), session, agent, "spine session");
+            out.println(JSON.writeValueAsString(body));
+            return 0;
+        } catch (IllegalArgumentException failure) {
+            err.println(failure.getMessage());
+            return 2;
+        } catch (IOException failure) {
+            err.print(WorkbenchCliHelp.structured("spine session failed: " + failure.getMessage(), "spine session new"));
+            return 1;
+        }
+    }
+
+    /** Positional words after the command, skipping flags and the project path. */
+    private static String word(WorkbenchCommandLine.Parsed parsed, int index) {
+        String[] args = parsed.forwarded();
+        if (args == null) return null;
+        int seen = 0;
+        String project = parsed.project() == null ? "" : parsed.project().toString();
+        for (String token : args) {
+            if (token == null || token.isBlank() || token.startsWith("--")) continue;
+            if (token.equals(parsed.command())) continue;
+            if (!project.isBlank() && (token.equals(project) || Path.of(token).toAbsolutePath().normalize().toString().equals(project))) {
+                continue;
+            }
+            if (seen == index) return token;
+            seen++;
+        }
+        return null;
     }
 
     private static int exportGuidance(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
@@ -2214,6 +2292,7 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "chat-after");
         copyFlag(args, parsed, "component");
         copyFlag(args, parsed, "mode");
+        copyFlag(args, parsed, "mutate");
         copyFlag(args, parsed, "kind");
         copyFlag(args, parsed, "condition");
         copyFlag(args, parsed, "timeout");

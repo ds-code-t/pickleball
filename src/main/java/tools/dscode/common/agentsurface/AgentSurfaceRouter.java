@@ -207,26 +207,34 @@ public final class AgentSurfaceRouter {
             body.put("ok", true);
             body.put("target", "native");
             body.put("op", op);
-            return new AgentControl.Result(0, body);
+            return nativeResult(body, args);
         }
         if ("overlay".equals(op)) {
             Map<String, Object> body = NativeOverlay.show(project, runId, args);
             body.put("ok", true);
             body.put("target", "native");
             body.put("op", op);
-            return new AgentControl.Result(0, body);
+            return nativeResult(body, args);
         }
         if (VisualKinds.command(op)) {
             Map<String, Object> body = NativeVisual.show(project, runId, VisualKinds.kind(op), args);
             body.put("ok", true);
             body.put("target", "native");
             body.put("op", op);
-            return new AgentControl.Result(0, body);
+            return nativeResult(body, args);
         }
         Map<String, Object> body = NativeHighlight.show(project, runId, args);
         body.put("ok", true);
         body.put("target", "native");
         body.put("op", op);
+        return nativeResult(body, args);
+    }
+
+    /** Blank {@code --mutate} is the sibling overlay. {@code dom} stays the direct highlight path. */
+    private static AgentControl.Result nativeResult(Map<String, Object> body, Map<String, String> args) {
+        String mutate = args == null ? null : args.get("mutate");
+        if (mutate == null || mutate.isBlank()) mutate = "sibling";
+        body.put("mutate", mutate.trim());
         return new AgentControl.Result(0, body);
     }
 

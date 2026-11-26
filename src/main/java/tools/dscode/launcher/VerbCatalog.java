@@ -201,6 +201,7 @@ public final class VerbCatalog {
         add(rows, "log-tail", "workbench", LOG);
         add(rows, "log tail", "workbench", LOG);
         add(rows, "chat", "workbench", CHAT);
+        add(rows, "spine session", "workbench", AGENT);
         add(rows, "cross", "workbench", CROSS_STORE);
         add(rows, "cross note", "workbench", CROSS_STORE);
         add(rows, "cross journal", "workbench", CROSS_STORE);

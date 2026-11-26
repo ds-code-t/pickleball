@@ -154,10 +154,18 @@ public final class AgentControl {
         String humanRefusal = HumanLock.check(project, runId, op, values, agentId);
         if (humanRefusal != null) return timed(refusal(humanRefusal), started, project, runId, op, agentId);
         String attached = attachedRefusal(op, runId, values);
-        if (attached != null) {
+        if (attached != null && !SpineSession.injectEnabled(project, values.get("session"))) {
             Result failed = fail(2, attached);
             failed.body().put("fix", (op == null ? "that verb" : op) + " serves the start host or the isolate worker");
             return timed(failed, started, project, runId, op, agentId);
+        }
+        if (attached != null) {
+            try {
+                SpineSession.attach(project, values.get("session"), values.get("target"));
+            } catch (Exception failure) {
+                Result failed = fail(1, failure.getMessage() == null ? "inject failed" : failure.getMessage());
+                return timed(failed, started, project, runId, op, agentId);
+            }
         }
         try {
             Optional<Result> routed = AgentSurfaceRouter.route(project, runId, op, values, agentId);

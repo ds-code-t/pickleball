@@ -41,7 +41,7 @@ public final class AgentEnvelope {
         if (copy.get("v") instanceof Number number && number.intValue() == VERSION && copy.get("state") instanceof Map) {
             long ms = longValue(copy.get("elapsedMs"), longValue(copy.get("ms"), 0));
             copy.put("ms", ms);
-            copy.put("state", state(copy, project, runId));
+            copy.put("state", state(copy, project, runId, agentId));
             stampIdentity(copy, verb, runId, agentId);
             if (Boolean.FALSE.equals(copy.get("ok"))) stampErrorCode(copy);
             return copy;
@@ -53,7 +53,7 @@ public final class AgentEnvelope {
         copy.put("ok", ok);
         copy.put("op", verb);
         copy.put("ms", ms);
-        copy.put("state", state(copy, project, runId));
+        copy.put("state", state(copy, project, runId, agentId));
         copy.put("sum", sum(copy, verb, ok));
         if (copy.get("chatNext") == null) {
             Object messages = copy.get("messages");
@@ -230,17 +230,29 @@ public final class AgentEnvelope {
         line.append(' ').append(key).append('=').append(LineView.token(value));
     }
 
+    private static String text(Object value) {
+        if (value == null) return "";
+        String text = String.valueOf(value).trim();
+        return text.isBlank() || "null".equals(text) ? "" : text;
+    }
+
     private static String scalar(JsonNode value) {
         if (value == null || value.isNull()) return "";
         if (value.isTextual()) return value.asText("");
         return value.asText("");
     }
 
-    private static Map<String, Object> state(Map<String, Object> body, Path project, String runId) {
+    private static Map<String, Object> state(Map<String, Object> body, Path project, String runId, String agentId) {
         Map<String, Object> state = new LinkedHashMap<>();
         Object session = body.get("session");
         state.put("session", session == null || String.valueOf(session).isBlank()
                 ? (runId == null ? "" : runId) : String.valueOf(session));
+        String agent = text(body.get("agent"));
+        if (agent.isBlank()) agent = agentId == null || agentId.isBlank() ? "agent-1" : agentId.trim();
+        String layer = text(body.get("layer"));
+        if (layer.isBlank()) layer = agent;
+        state.put("agent", agent);
+        state.put("layer", layer);
         boolean worker = tools.dscode.control.protocol.BrowserPresence.workerUp(project);
         boolean up = tools.dscode.control.protocol.BrowserPresence.browserUp(project);
         boolean held = worker || tools.dscode.control.protocol.LeaseClock.fresh(project);

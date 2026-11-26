@@ -48,7 +48,7 @@ final class WorkbenchCommandLine {
             "screenshot",
             "selftest",
             "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame", "upload", "navigate",
-            "ask-and-wait", "answer-wait", "wait-any", "pin", "toast", "checklist", "ui",
+            "ask-and-wait", "answer-wait", "wait-any", "pin", "toast", "checklist", "ui", "inject", "spine",
             "ref", "controller-start", "controller-stop", "controller-status", "controller-ping",
             "help"
     );
@@ -79,7 +79,8 @@ final class WorkbenchCommandLine {
             "--mode", "--condition", "--timeout", "--ref", "--value", "--snap", "--within", "--depth",
             "--budget", "--strict", "--rank", "--scroll-search", "--duration", "--expr",
             "--world", "--clip", "--frame", "--kinds", "--fixture", "--enter", "--items",
-            "--args-file", "--file", "--url-key", "--size", "--hold", "--pick", "--until"
+            "--args-file", "--file", "--url-key", "--size", "--hold", "--pick", "--until",
+            "--session", "--mutate"
     );
 
     private WorkbenchCommandLine() {
@@ -1055,7 +1056,8 @@ final class WorkbenchCommandLine {
      */
     private static final Set<String> POSITIONAL_COMMANDS = Set.of(
             "pw", "setup", "optional-install", "optional-uninstall", "call",
-            "query", "history-query", "execute-step", "status", "selftest", "record"
+            "query", "history-query", "execute-step", "status", "selftest", "record",
+            "inject", "spine"
     );
 
     private static boolean acceptsAsProject(String command, String token) {
