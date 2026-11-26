@@ -95,6 +95,7 @@ public final class JavaStepHost implements ForeignStepHost {
         if (application == null) application = ClassLoader.getSystemClassLoader();
         if (!WarmFlags.enabled()) return application;
         ExecutionContext context = ExecutionContext.current();
+        if (context != null && context.subprocess()) return application;
         String snapshot = context == null ? "live" : context.id();
         WarmClassLoader warm = WarmSpine.shared().loader(snapshot, warmUrls(project), WarmPackages.resolve(project));
         if (context != null) context.holdWarm(warm);
