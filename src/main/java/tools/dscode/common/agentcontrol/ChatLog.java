@@ -19,7 +19,7 @@ final class ChatLog {
     private ChatLog() {
     }
 
-    record Message(String id, String at, String source, String agent, String channel, String text, String pageId) {
+    record Message(String id, String at, String source, String agent, String channel, String text, String pageId, String ref, String action) {
     }
 
     static Message send(Path project, String runId, String channel, String source, String agent, String text) throws IOException {
@@ -27,6 +27,10 @@ final class ChatLog {
     }
 
     static Message send(Path project, String runId, String channel, String source, String agent, String text, String pageId) throws IOException {
+        return send(project, runId, channel, source, agent, text, pageId, "", "");
+    }
+
+    static Message send(Path project, String runId, String channel, String source, String agent, String text, String pageId, String ref, String action) throws IOException {
         String useChannel = channel == null || channel.isBlank() ? "run" : channel;
         String useSource = normalizeSource(source);
         if (text == null || text.isBlank()) throw new IllegalArgumentException("missing text");
@@ -44,7 +48,9 @@ final class ChatLog {
                         agent == null ? "" : agent,
                         useChannel,
                         text,
-                        pageId == null ? "" : pageId.trim()
+                        pageId == null ? "" : pageId.trim(),
+                        ref == null ? "" : ref.trim(),
+                        action == null ? "" : action.trim()
                 );
                 java.util.Map<String, Object> stored = new LinkedHashMap<>();
                 stored.put("id", message.id());
@@ -53,6 +59,8 @@ final class ChatLog {
                 stored.put("agent", message.agent());
                 stored.put("channel", message.channel());
                 stored.put("text", message.text());
+                stored.put("ref", message.ref());
+                stored.put("action", message.action());
                 if (!message.pageId().isBlank()) stored.put("pageId", message.pageId());
                 AgentStore.appendCapped(chat, AgentStore.JSON.writeValueAsString(stored));
                 CompositeLog.info("chat", "send source=" + useSource + " channel=" + useChannel + " agent=" + message.agent() + " id=" + message.id());
@@ -93,7 +101,9 @@ final class ChatLog {
                     node.path("agent").asText(""),
                     node.path("channel").asText(channel),
                     node.path("text").asText(""),
-                    node.path("pageId").asText("")
+                    node.path("pageId").asText(""),
+                    node.path("ref").asText(""),
+                    node.path("action").asText("")
             ));
         }
         return messages;
@@ -161,6 +171,8 @@ final class ChatLog {
         map.put("agent", message.agent());
         map.put("channel", message.channel());
         map.put("text", message.text());
+        map.put("ref", message.ref() == null ? "" : message.ref());
+        map.put("action", message.action() == null ? "" : message.action());
         if (message.pageId() != null && !message.pageId().isBlank()) map.put("pageId", message.pageId());
         return map;
     }

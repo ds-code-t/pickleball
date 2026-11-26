@@ -26,7 +26,9 @@ MCP-only count: 0
 | capture-scenario | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | capture-steps | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | cdp | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
-| chat | workbench | stream | tools.dscode.common.agentcontrol.AgentControl.execute |
+| chat | workbench | stream | tools.dscode.launcher.WorkbenchAgentCommands.run |
+| chat list | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
+| chat send | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | chat-history | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | chat-poll | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | chat-read | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
@@ -195,12 +197,14 @@ MCP-only count: 0
 | pin | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | plan | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | play | workbench | cli | tools.dscode.launcher.WorkbenchSessionCommands.run |
+| point | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | popup-close | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | popup-open | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | popup-status | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | post | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | presence | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | print | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
+| progress | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | pw | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | query | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | record | workbench | stream | tools.dscode.launcher.WorkbenchAgentCommands.run |

@@ -1,6 +1,7 @@
 package tools.dscode.common.agentsurface;
 
 import tools.dscode.common.agentcontrol.AgentControl;
+import tools.dscode.common.agentcontrol.OverlayReceipts;
 import tools.dscode.common.agentcontrol.PopupSurfaceBridge;
 import tools.dscode.common.agentcontrol.VisualKinds;
 import tools.dscode.control.protocol.AgentSurfaceEnd;
@@ -10,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -128,7 +130,8 @@ public final class AgentSurfaceRouter {
             return new AgentControl.Result(0, body);
         }
         if ("overlay-poll".equals(op)) {
-            List<Map<String, Object>> events = PopupSurfaceBridge.pollInput(project, runId);
+            List<Map<String, Object>> events = new ArrayList<>(PopupSurfaceBridge.pollInput(project, runId));
+            OverlayReceipts.merge(project, args.get("session"), events);
             Map<String, Object> body = ok("Forwarded overlay clicks and form inputs.");
             body.put("count", events.size());
             body.put("events", events);

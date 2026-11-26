@@ -435,7 +435,8 @@ public final class AgentControl {
             ChatCursor.arm(project, runId, args.get("channel"));
         }
         ChatLog.Message message = ChatLog.send(
-                project, runId, args.get("channel"), args.get("source"), agentId, args.get("text")
+                project, runId, args.get("channel"), args.get("source"), agentId, args.get("text"),
+                "", args.get("ref"), args.get("action")
         );
         Map<String, Object> body = ok("Chat message stored for this run channel.");
         body.put("message", ChatLog.toMap(message));
@@ -746,6 +747,7 @@ public final class AgentControl {
     }
 
     private static Result ask(Path project, String runId, Map<String, String> args) throws Exception {
+        if (present(args.get("type"))) return typedAsk(project, args);
         if (!present(args.get("say"))) return fail(2, "ask requires --say=<question>");
         Map<String, Object> spec = new LinkedHashMap<>();
         spec.put("id", present(args.get("id")) ? args.get("id").trim() : "q" + ASK_SEQ.incrementAndGet());
@@ -771,6 +773,26 @@ public final class AgentControl {
         Map<String, Object> body = ok("Question shown on the page; the answer arrives as an answer event in overlay-poll.");
         body.put("op", "ask");
         body.putAll(AgentStore.JSON.readValue(reply, Map.class));
+        return new Result(0, body);
+    }
+
+    /** A card with no live page. {@code choice} answers must be one of {@code --options}. */
+    private static Result typedAsk(Path project, Map<String, String> args) throws Exception {
+        String type = args.get("type").trim().toLowerCase(java.util.Locale.ROOT);
+        if (!type.equals("text") && !type.equals("choice") && !type.equals("confirm")) {
+            return fail(2, "ask --type is text, choice, or confirm");
+        }
+        String prompt = present(args.get("prompt")) ? args.get("prompt").trim() : present(args.get("say")) ? args.get("say").trim() : "";
+        if (prompt.isBlank()) return fail(2, "ask --type requires --prompt");
+        List<String> options = choiceList(present(args.get("options")) ? args.get("options") : args.get("choices"));
+        if ("choice".equals(type) && options.isEmpty()) return fail(2, "ask --type=choice requires --options");
+        if ("confirm".equals(type) && options.isEmpty()) options = List.of("yes", "no");
+        String id = present(args.get("id")) ? args.get("id").trim() : "";
+        Map<String, Object> card = AskCards.open(project, args.get("session"), id, type, prompt, options);
+        Map<String, Object> body = ok("Question card stored. ui-poll returns type and value after the answer.");
+        body.put("op", "ask");
+        body.put("session", card.get("session"));
+        body.putAll(card);
         return new Result(0, body);
     }
 
@@ -2159,7 +2181,8 @@ public final class AgentControl {
 
     private static Result overlayPoll(Path project, String runId, Map<String, String> args) throws Exception {
         if (!present(args.get("after"))) {
-            List<Map<String, Object>> events = PageSurfaces.pollInput(project, runId);
+            List<Map<String, Object>> events = new ArrayList<>(PageSurfaces.pollInput(project, runId));
+            mergeReceipts(project, args, events);
             markConsumed(events);
             Map<String, Object> body = ok("Forwarded overlay clicks and form inputs.");
             body.put("count", events.size());
@@ -2172,15 +2195,21 @@ public final class AgentControl {
         } catch (NumberFormatException failure) {
             return fail(2, "overlay-poll --after must be a whole number (the next value from the last poll)");
         }
-        List<Map<String, Object>> all = PageSurfaces.pollInput(project, runId);
+        List<Map<String, Object>> all = new ArrayList<>(PageSurfaces.pollInput(project, runId));
+        mergeReceipts(project, args, all);
         List<Map<String, Object>> events = after <= 0 ? all
-                : after >= all.size() ? List.of() : List.copyOf(all.subList(after, all.size()));
+                : after >= all.size() ? new ArrayList<>() : new ArrayList<>(all.subList(after, all.size()));
         markConsumed(events);
         Map<String, Object> body = ok("Overlay events after the cursor.");
         body.put("count", events.size());
         body.put("events", events);
         body.put("next", all.size());
         return new Result(0, body);
+    }
+
+    /** Overlay rows gain {@code read_at}. Null until {@link OverlayReceipts#ack} runs. */
+    private static void mergeReceipts(Path project, Map<String, String> args, List<Map<String, Object>> events) {
+        OverlayReceipts.merge(project, args == null ? null : args.get("session"), events);
     }
 
     private static void markConsumed(List<Map<String, Object>> events) {

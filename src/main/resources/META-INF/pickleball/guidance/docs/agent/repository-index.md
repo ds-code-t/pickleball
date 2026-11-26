@@ -222,6 +222,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentcontrol/AgentLaunch.java`
 - `src/main/java/tools/dscode/common/agentcontrol/AgentStore.java`
 - `src/main/java/tools/dscode/common/agentcontrol/AnswerRecovery.java`
+- `src/main/java/tools/dscode/common/agentcontrol/AskCards.java`
+- `src/main/java/tools/dscode/common/agentcontrol/ChatChannel.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ChatCursor.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ChatHead.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ChatLog.java`
@@ -230,8 +232,11 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentcontrol/HumanValue.java`
 - `src/main/java/tools/dscode/common/agentcontrol/LaunchTemplates.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ObserveEvents.java`
+- `src/main/java/tools/dscode/common/agentcontrol/OverlayReceipts.java`
 - `src/main/java/tools/dscode/common/agentcontrol/PageSurfaces.java`
+- `src/main/java/tools/dscode/common/agentcontrol/PointLog.java`
 - `src/main/java/tools/dscode/common/agentcontrol/PopupSurfaceBridge.java`
+- `src/main/java/tools/dscode/common/agentcontrol/ProgressCard.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ReadMarks.java`
 - `src/main/java/tools/dscode/common/agentcontrol/RecordSelftest.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ScenarioCapture.java`
@@ -868,7 +873,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/browser/SurfaceAssetsTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/AgentDataFoundationTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/AgentLiveFixTest.java`
+- `src/test/java/tools/dscode/common/agentcontrol/AskProgressPointTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/BindingEventTest.java`
+- `src/test/java/tools/dscode/common/agentcontrol/ChatChannelTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/ChatCursorTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/ChatLockChild.java`
 - `src/test/java/tools/dscode/common/agentcontrol/ConsumerFixesP2WaitTest.java`

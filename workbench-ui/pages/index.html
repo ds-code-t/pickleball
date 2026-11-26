@@ -44,6 +44,7 @@ pre { white-space: pre-wrap; }
 <h2>Raw SQL</h2>
 <label>Query <textarea id="query">SELECT 1</textarea></label>
 <button id="run-sql" type="button">Run</button>
+<button id="point" type="button">Point</button>
 <pre id="sql-body"></pre>
 </section>
 </main>
@@ -54,11 +55,11 @@ document.querySelectorAll("a").forEach(function (link) {
     const href = link.getAttribute("href");
     if (href && location.search && href.indexOf("?") < 0) link.setAttribute("href", href + location.search);
 });
-async function callStore(args) {
+async function callStore(args, verb) {
     const response = await fetch("/store" + location.search, {
         method: "POST",
         headers: { "content-type": "application/json", "x-pkb-ui-token": token },
-        body: JSON.stringify({ args: args })
+        body: JSON.stringify({ verb: verb || "store", args: args })
     });
     return response.json();
 }
@@ -80,6 +81,10 @@ document.getElementById("search").addEventListener("change", async function () {
     const args = ["query", "--json"];
     if (text) args.push("--text=" + text);
     const result = await callStore(args);
+    document.getElementById("scenario-body").textContent = (result.out || "") + (result.err || "");
+});
+document.getElementById("point").addEventListener("click", async function () {
+    const result = await callStore(["--x=0", "--y=0"], "point");
     document.getElementById("scenario-body").textContent = (result.out || "") + (result.err || "");
 });
 document.getElementById("run-sql").addEventListener("click", async function () {

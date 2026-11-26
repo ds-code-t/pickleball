@@ -87,14 +87,16 @@ const server = http.createServer((req, res) => {
         req.on("data", (chunk) => chunks.push(chunk));
         req.on("end", async () => {
             let args = [];
+            let verb = "store";
             try {
                 const body = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
                 if (Array.isArray(body.args)) args = body.args.map((item) => String(item));
+                if (body && typeof body.verb === "string" && body.verb.trim()) verb = body.verb.trim();
             } catch (failure) {
                 send(res, 400, JSON.stringify({ code: 2, out: "", err: "error: ui body is not json\nfix: send args\n" }));
                 return;
             }
-            const result = await forward("store", args, token);
+            const result = await forward(verb, args, token);
             send(res, 200, result, "application/json; charset=utf-8");
         });
         return;

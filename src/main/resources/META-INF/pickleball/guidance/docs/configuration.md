@@ -728,6 +728,7 @@ There is no sql-server. `pickleball store sandbox create <name>` (`--owner`, `--
 | Key | Default | Meaning |
 |---|---|---|
 | `pkb_agent_popup` | `auto` | `off` keeps today's page behaviour. `auto` uses the popup for a desktop session and the page when a browser page is open. `always` also mirrors chat, and sends handle-less HTML and overlays, to the popup during a browser session. `false`/`no`/`0` mean `off`. `true`/`on`/`1` mean `always`. |
+| `pkb_chat_channel` | `session` | Channel for `chat send` when `--channel` is omitted. `session` uses the spine session id. `run` keeps one channel named `run`. Property, then env `PKB_CHAT_CHANNEL`. |
 | `pkb_agent_popup_browser` | unset | First browser probe. Then `PKB_AGENT_POPUP_BROWSER`, then `DOMENGINE_CHROME`, then the per-OS install list. |
 | `pkb_agent_popup_headless` | false | Adds `--headless=new` for tests and CI. |
 | `pkb_agent_popup_no_sandbox` | false | Adds `--no-sandbox` from the first launch. Unset, the host adds it only after a launch that exits with a sandbox error. |

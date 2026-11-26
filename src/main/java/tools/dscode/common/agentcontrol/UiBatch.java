@@ -289,6 +289,7 @@ final class UiBatch {
                     body.put("choice", matched);
                     body.put("applied", true);
                 }
+                attachAnswer(project, args, body);
                 body.put("next", events.body().get("next"));
                 List<?> raw = chat.exit() == 0 && chat.body().get("messages") instanceof List<?> list ? list : List.of();
                 if (!raw.isEmpty() && raw.get(raw.size() - 1) instanceof Map<?, ?> last && last.get("id") != null) {
@@ -300,6 +301,15 @@ final class UiBatch {
             }
             tools.dscode.common.agentfast.PushWake.await(wakeSeen, 250, deadline);
         }
+    }
+
+    /** A stored typed card. {@code type} and {@code value} stay on the poll body. */
+    private static void attachAnswer(Path project, Map<String, String> args, Map<String, Object> body) {
+        Map<String, Object> card = AskCards.answered(project, args == null ? null : args.get("session"));
+        if (card == null) return;
+        if (body.get("type") == null) body.put("type", card.get("type"));
+        if (body.get("value") == null) body.put("value", card.get("value"));
+        if (body.get("id") == null) body.put("id", card.get("id"));
     }
 
     /** The clicked label for this question id, or null when this batch is a different event. */

@@ -224,6 +224,9 @@ public final class WorkbenchAgentCommands {
                 case "session-mode" -> sessionMode(parsed, safeOut, safeErr);
                 case "inject" -> injectSession(parsed, safeOut, safeErr);
                 case "spine" -> spineSession(parsed, safeOut, safeErr);
+                case "chat" -> chat(parsed, safeOut, safeErr);
+                case "point" -> point(parsed, safeOut, safeErr);
+                case "progress" -> progress(parsed, safeOut, safeErr);
                 case "setup" -> SetupCommand.run(parsed, safeOut, safeErr);
                 case "relaunch-with-debug" -> RelaunchWithDebug.run(parsed, safeOut, safeErr);
                 case "pw", "cdp" -> PwCommand.run(args, parsed.project(), safeOut, safeErr);
@@ -412,6 +415,130 @@ public final class WorkbenchAgentCommands {
             err.print(WorkbenchCliHelp.structured("spine session failed: " + failure.getMessage(), "spine session new"));
             return 1;
         }
+    }
+
+    private static int chat(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        try {
+            String action = word(parsed, 0);
+            String runId = spineRunId(parsed);
+            String agent = agentIdOf(parsed);
+            String channel = flag(parsed, "--channel");
+            if ("send".equals(action)) {
+                String text = parsed.coordination() == null ? null : parsed.coordination().text();
+                if (text == null || text.isBlank()) text = flag(parsed, "--text");
+                if (text == null || text.isBlank()) {
+                    err.print(WorkbenchCliHelp.structured("chat send requires --text", "chat send --text=<message>"));
+                    return 2;
+                }
+                Map<String, Object> message = tools.dscode.common.agentcontrol.ChatChannel.send(
+                        parsed.project(), runId, channel, text, flag(parsed, "--ref"), flag(parsed, "--action"), agent);
+                Map<String, Object> body = new LinkedHashMap<>();
+                body.put("channel", message.get("channel"));
+                body.put("ref", message.get("ref"));
+                body.put("action", message.get("action"));
+                body.put("message", message);
+                return printEnvelope(parsed.project(), runId, agent, "chat", body, out);
+            }
+            if (action != null && !"list".equals(action)) {
+                err.print(WorkbenchCliHelp.structured("chat needs send, list, or --follow", "chat list"));
+                return 2;
+            }
+            if (hasFlag(parsed, "--follow")) {
+                long wait = followWaitMs(flag(parsed, "--timeout"));
+                if (flag(parsed, "--timeout") == null) wait = 10_000L;
+                long end = System.nanoTime() + wait * 1_000_000L;
+                while (System.nanoTime() < end) Thread.sleep(250L);
+            }
+            List<Map<String, Object>> messages = tools.dscode.common.agentcontrol.ChatChannel.list(
+                    parsed.project(), runId, channel);
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("channel", tools.dscode.common.agentcontrol.ChatChannel.resolve(parsed.project(), channel));
+            body.put("messages", messages);
+            return printEnvelope(parsed.project(), runId, agent, "chat", body, out);
+        } catch (IllegalArgumentException failure) {
+            err.println(failure.getMessage());
+            return 2;
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            err.print(WorkbenchCliHelp.structured("chat follow interrupted", "chat list"));
+            return 1;
+        } catch (IOException failure) {
+            err.print(WorkbenchCliHelp.structured("chat failed: " + failure.getMessage(), "chat list"));
+            return 1;
+        }
+    }
+
+    private static int point(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        try {
+            String handle = flag(parsed, "--handle");
+            String x = flag(parsed, "--x");
+            String y = flag(parsed, "--y");
+            boolean hasHandle = handle != null && !handle.isBlank();
+            boolean hasPoint = x != null && !x.isBlank() && y != null && !y.isBlank();
+            if (!hasHandle && !hasPoint) {
+                err.print(WorkbenchCliHelp.structured(
+                        "point needs --handle or --x and --y",
+                        "point --session=<id> --handle=<id>"));
+                return 2;
+            }
+            String session = flag(parsed, "--session");
+            String runId = spineRunId(parsed);
+            String agent = agentIdOf(parsed);
+            Map<String, Object> row = tools.dscode.common.agentcontrol.PointLog.record(
+                    parsed.project(), session, handle, x, y);
+            Map<String, String> args = new LinkedHashMap<>();
+            if (hasHandle) args.put("handle", handle);
+            if (x != null && !x.isBlank()) args.put("x", x);
+            if (y != null && !y.isBlank()) args.put("y", y);
+            if (session != null && !session.isBlank()) args.put("session", session);
+            AgentControl.Result painted = AgentControl.execute(
+                    parsed.project(), runId, "highlight", args, List.of(), agent);
+            Map<String, Object> body = new LinkedHashMap<>(row);
+            body.put("highlighted", painted.exit() == 0);
+            return printEnvelope(parsed.project(), runId, agent, "point", body, out);
+        } catch (IllegalArgumentException failure) {
+            err.println(failure.getMessage());
+            return 2;
+        } catch (IOException failure) {
+            err.print(WorkbenchCliHelp.structured("point failed: " + failure.getMessage(), "point --handle=<id>"));
+            return 1;
+        }
+    }
+
+    private static int progress(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        try {
+            String session = flag(parsed, "--session");
+            String runId = spineRunId(parsed);
+            String agent = agentIdOf(parsed);
+            Map<String, Object> card = tools.dscode.common.agentcontrol.ProgressCard.write(
+                    parsed.project(), session, flag(parsed, "--pct"), flag(parsed, "--label"));
+            return printEnvelope(parsed.project(), runId, agent, "progress", new LinkedHashMap<>(card), out);
+        } catch (IllegalArgumentException failure) {
+            err.println(failure.getMessage());
+            return 2;
+        } catch (IOException failure) {
+            err.print(WorkbenchCliHelp.structured("progress failed: " + failure.getMessage(), "progress --pct=0"));
+            return 1;
+        }
+    }
+
+    private static String spineRunId(WorkbenchCommandLine.Parsed parsed) {
+        String runId = parsed.coordination() == null ? null : parsed.coordination().runId();
+        return runId == null || runId.isBlank() ? "session" : runId;
+    }
+
+    private static int printEnvelope(
+            Path project,
+            String runId,
+            String agent,
+            String op,
+            Map<String, Object> body,
+            PrintStream out
+    ) throws IOException {
+        Map<String, Object> stamped = tools.dscode.common.agentfast.AgentEnvelope.apply(
+                body, 0, op, project, runId, agent);
+        out.println(JSON.writeValueAsString(stamped));
+        return 0;
     }
 
     /** Positional words after the command, skipping flags and the project path. */
@@ -2283,6 +2410,11 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "scroll");
         copyFlag(args, parsed, "say");
         copyFlag(args, parsed, "choices");
+        copyFlag(args, parsed, "prompt");
+        copyFlag(args, parsed, "options");
+        copyFlag(args, parsed, "pct");
+        copyFlag(args, parsed, "label");
+        copyFlag(args, parsed, "action");
         copyFlag(args, parsed, "sensitive");
         copyFlag(args, parsed, "scope");
         copyFlag(args, parsed, "ttl");
