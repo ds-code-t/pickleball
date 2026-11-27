@@ -28,7 +28,9 @@ import java.util.concurrent.TimeUnit;
  * Fast path for {@code store run}. A warm JVM holds the cached classpath and
  * executes with the same engine as a normal run, with {@code pkb_store=true}
  * so feature bytes come from the database. Java glue is fingerprinted by size
- * and modification time. A change compiles once and restarts that JVM.
+ * and modification time. An incremental {@code JavaCompiler} compile keeps the
+ * worker and rewrites its fingerprint so the next scenario reloads the class.
+ * A wrapper compile or a rebuild stops that worker.
  */
 public final class StoreRun {
     public static final String CACHE = "classpath.cache";
@@ -79,8 +81,11 @@ public final class StoreRun {
                         false, elapsed(started), plan);
             }
             Files.createDirectories(state(root));
-            Files.writeString(state(root).resolve(FINGERPRINT), glueFingerprint(root), StandardCharsets.UTF_8);
-            stop(root);
+            String fingerprint = glueFingerprint(root);
+            Files.writeString(state(root).resolve(FINGERPRINT), fingerprint, StandardCharsets.UTF_8);
+            StoreLog.log(root, "run", "compile", "tool=" + compiled.tool() + " detail=" + oneLine(compiled.detail()));
+            if (!compiled.rebuild() && "JavaCompiler".equals(compiled.tool())) retargetWarm(root, fingerprint);
+            else stop(root);
             plan = plan(root);
         } else {
             Files.createDirectories(state(root));
@@ -130,6 +135,26 @@ public final class StoreRun {
         String body = body(response);
         StoreLog.log(root, "run", "worker", (reused ? "reused " : "started ") + "exit=" + exit);
         return new Outcome(exit, body, "", reused, elapsed(started), plan);
+    }
+
+    /** Keeps a live worker and records the fingerprint the next run will match. */
+    private static void retargetWarm(Path root, String fingerprint) {
+        Path file = state(root).resolve(WARM);
+        if (!Files.isRegularFile(file)) return;
+        try {
+            Warm warm = readWarm(file);
+            if (ProcessHandle.of(warm.pid()).isEmpty()) return;
+            Files.writeString(file,
+                    warm.pid() + "\n" + warm.port() + "\n" + fingerprint + "\n",
+                    StandardCharsets.UTF_8);
+        } catch (Exception ignored) {
+            // A warm file that cannot be read starts a new worker.
+        }
+    }
+
+    private static String oneLine(String detail) {
+        if (detail == null || detail.isEmpty()) return "";
+        return detail.replace('\r', ' ').replace('\n', ' ').trim();
     }
 
     public static void stop(Path project) {
