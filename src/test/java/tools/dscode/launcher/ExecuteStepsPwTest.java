@@ -3,6 +3,7 @@ package tools.dscode.launcher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.browser.PlaywrightConnection;
+import tools.dscode.common.agentcontrol.SpineSession;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -22,6 +23,7 @@ class ExecuteStepsPwTest {
     void pwLineRunsPwCommandAndGherkinStaysOnTheRunner() throws Exception {
         String previous = System.getProperty(PlaywrightConnection.ENDPOINT_PROPERTY);
         System.clearProperty(PlaywrightConnection.ENDPOINT_PROPERTY);
+        SpineSession.create(temp, "agent-1");
         try {
             Path file = temp.resolve("steps.txt");
             Files.writeString(file, """
@@ -51,6 +53,7 @@ class ExecuteStepsPwTest {
     void executeStepPwDoesNotRequireAGherkinSession() throws Exception {
         String previous = System.getProperty(PlaywrightConnection.ENDPOINT_PROPERTY);
         System.clearProperty(PlaywrightConnection.ENDPOINT_PROPERTY);
+        SpineSession.create(temp, "agent-1");
         try {
             Path file = temp.resolve("one.txt");
             Files.writeString(file, "pw page title");

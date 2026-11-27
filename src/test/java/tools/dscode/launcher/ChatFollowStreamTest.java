@@ -3,6 +3,7 @@ package tools.dscode.launcher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.common.agentcontrol.ChatChannel;
+import tools.dscode.common.agentcontrol.SpineSession;
 import tools.dscode.control.protocol.VerbArgs;
 
 import java.io.ByteArrayOutputStream;
@@ -31,6 +32,7 @@ class ChatFollowStreamTest {
                 "chat", "--follow", "--timeout=2", "--channel=gap6",
                 project.toAbsolutePath().toString()
         };
+        SpineSession.create(project, "agent-1");
         AtomicInteger code = new AtomicInteger(-1);
         Thread follower = new Thread(() -> code.set(VerbDispatch.run("chat", VerbArgs.capture(argv), out, err)), "chat-follow");
         follower.start();

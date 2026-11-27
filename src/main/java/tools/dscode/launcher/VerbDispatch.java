@@ -22,6 +22,11 @@ import java.util.Map;
  *
  * <p>After each verb, {@link CrossStore#journal} writes one session-journal row (verb and
  * args hash) unless {@code pkb_journal=off}. A journal failure does not change the exit code.</p>
+ *
+ * <p>Every call needs {@code --session=<id>} or the default session written by
+ * {@code spine session new}. A missing file exits 2 with {@code error: missing session}
+ * and {@code fix: spine session new}. {@code spine session new} is the call that creates it.
+ * Dispatch does not create a session.</p>
  */
 public final class VerbDispatch {
     private VerbDispatch() {
@@ -56,13 +61,21 @@ public final class VerbDispatch {
             stderr.println(failure.getMessage());
             return 2;
         }
-        Path project = projectOf(use, argv);
+        Path project = resolveProject(use, argv);
         boolean fromFile = mentioned || use.containsKey("args-file") || "yes".equalsIgnoreCase(use.get("file"));
         EngineLog.log(project, "dispatch", name.isBlank() ? "-" : name, "file=" + (fromFile ? "yes" : "no"));
         if (argv.length == 0 || argv[0] == null || argv[0].isBlank()) {
             stderr.println("error: missing verb");
             stderr.println("fix: pickleball help");
             return 2;
+        }
+        if (!createsSession(argv)) {
+            try {
+                tools.dscode.common.agentcontrol.SpineSession.required(project, sessionId(use, argv));
+            } catch (IllegalArgumentException failure) {
+                stderr.println(failure.getMessage());
+                return 2;
+            }
         }
         String family = argv[0].trim();
         if ("store".equals(family)) return tools.dscode.store.StoreCli.execute(argv, stdout, stderr);
@@ -166,6 +179,63 @@ public final class VerbDispatch {
     private static boolean truthy(String value) {
         return value != null && ("true".equalsIgnoreCase(value.trim()) || value.isBlank()
                 || "1".equals(value.trim()) || "yes".equalsIgnoreCase(value.trim()));
+    }
+
+    /** {@code --project} wins. A workbench positional path is the project when that flag is absent. */
+    private static Path resolveProject(Map<String, String> flags, String[] argv) {
+        if (namedProject(flags, argv)) return projectOf(flags, argv);
+        Path positional = WorkbenchCommandLine.positionalProject(argv);
+        if (positional != null) return positional;
+        return projectOf(flags, argv);
+    }
+
+    private static boolean namedProject(Map<String, String> flags, String[] argv) {
+        String named = flags == null ? null : flags.get("project");
+        if (named != null && !named.isBlank()) return true;
+        if (argv == null) return false;
+        for (int index = 0; index < argv.length; index++) {
+            String token = argv[index];
+            if (token == null) continue;
+            if (token.startsWith("--project=") || "--project".equals(token)) return true;
+        }
+        return false;
+    }
+
+    /** Blank means the default session. An explicit id must name a session file. */
+    private static String sessionId(Map<String, String> flags, String[] argv) {
+        String named = flags == null ? null : flags.get("session");
+        if (named != null && !named.isBlank()) return named.trim();
+        if (argv == null) return null;
+        for (int index = 0; index < argv.length; index++) {
+            String token = argv[index];
+            if (token == null) continue;
+            if (token.startsWith("--session=")) {
+                String value = token.substring("--session=".length()).trim();
+                return value.isEmpty() ? null : value;
+            }
+            if ("--session".equals(token) && index + 1 < argv.length && argv[index + 1] != null
+                    && !argv[index + 1].startsWith("--")) {
+                String value = argv[index + 1].trim();
+                return value.isEmpty() ? null : value;
+            }
+        }
+        return null;
+    }
+
+    /** {@code spine session new} is the call that creates the session this gate requires. */
+    private static boolean createsSession(String[] argv) {
+        if (argv == null || argv.length < 3 || argv[0] == null || !"spine".equals(argv[0].trim())) return false;
+        boolean session = false;
+        for (int index = 1; index < argv.length; index++) {
+            String token = argv[index];
+            if (token == null || token.isBlank() || token.startsWith("--")) continue;
+            if (!session) {
+                session = "session".equals(token);
+                continue;
+            }
+            return "new".equals(token);
+        }
+        return false;
     }
 
     private static Path projectOf(Map<String, String> flags, String[] argv) {

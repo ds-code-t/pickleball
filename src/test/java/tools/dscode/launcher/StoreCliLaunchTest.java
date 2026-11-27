@@ -2,6 +2,7 @@ package tools.dscode.launcher;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.common.agentcontrol.SpineSession;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -18,7 +19,8 @@ class StoreCliLaunchTest {
     Path project;
 
     @Test
-    void launcherRoutesStoreBeforeWorkbenchDispatch() {
+    void launcherRoutesStoreBeforeWorkbenchDispatch() throws Exception {
+        SpineSession.create(project, "agent-1");
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
         int code = PickleballWorkbenchLauncher.dispatchStoreIfAny(
@@ -29,7 +31,7 @@ class StoreCliLaunchTest {
         assertEquals(0, code, stderr.toString(StandardCharsets.UTF_8));
         String out = stdout.toString(StandardCharsets.UTF_8);
         assertTrue(out.contains("Store database missing: .pickleball/store/main.db"), out);
-        assertFalse(Files.exists(project.resolve(".pickleball")));
+        assertFalse(Files.exists(project.resolve(".pickleball").resolve("store").resolve("main.db")));
         assertEquals(-1, PickleballWorkbenchLauncher.dispatchStoreIfAny(
                 new String[] {"help"},
                 new PrintStream(new ByteArrayOutputStream()),

@@ -2,6 +2,7 @@ package tools.dscode.launcher;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.common.agentcontrol.SpineSession;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -18,6 +19,7 @@ class DomLogCliLaunchTest {
 
     @Test
     void launcherListsHistoryWithoutRewritingIt() throws Exception {
+        SpineSession.create(project, "agent-1");
         Path history = project.resolve(".pickleball").resolve("history.log");
         Files.createDirectories(history.getParent());
         Files.writeString(history, "keep-history\n");
@@ -42,7 +44,7 @@ class DomLogCliLaunchTest {
 
         ByteArrayOutputStream helpOut = new ByteArrayOutputStream();
         assertEquals(0, PickleballWorkbenchLauncher.dispatchLogIfAny(
-                new String[] {"log", "help"},
+                new String[] {"log", "help", "--project=" + project},
                 new PrintStream(helpOut, true, StandardCharsets.UTF_8),
                 new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8)
         ));

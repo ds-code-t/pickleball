@@ -5,6 +5,7 @@ import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.common.agentcontrol.SpineSession;
 import tools.dscode.common.runtime.ProcessTrees;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.VerbArgs;
@@ -47,6 +48,7 @@ class OpenWindowRendererTest {
         Files.createDirectories(run.resolve("config"));
         Files.writeString(run.resolve("record.json"), "{\"runId\":\"alpha\",\"marker\":\"ALPHA-RECORD\"}\n");
         Files.writeString(run.resolve("alpha.log"), "ALPHA-RECORD\n");
+        SpineSession.create(project, "agent-1");
         long pid = -1;
         try (CliNode cli = CliNode.start(project)) {
             Result opened = dispatch("open-window", "--run-id=alpha", "--agent=agent-1");

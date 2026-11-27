@@ -2,6 +2,7 @@ package tools.dscode.launcher;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.common.agentcontrol.SpineSession;
 import tools.dscode.control.protocol.VerbArgs;
 
 import java.io.ByteArrayOutputStream;
@@ -66,6 +67,7 @@ class ArgsFileTest {
         Files.writeString(file, "{\"not-a-flag\":\"" + SECRET + "\"}", StandardCharsets.UTF_8);
         String previous = System.getProperty("pkb_engine_log");
         System.setProperty("pkb_engine_log", "dispatch");
+        SpineSession.create(project, "agent-1");
         try {
             Map<String, String> flags = new LinkedHashMap<>();
             flags.put("project", project.toString());

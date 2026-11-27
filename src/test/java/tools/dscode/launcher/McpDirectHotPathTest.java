@@ -3,6 +3,7 @@ package tools.dscode.launcher;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.common.agentcontrol.SpineSession;
 import tools.dscode.control.bridge.ControlBridgeBootstrap;
 import tools.dscode.control.protocol.ControlBridgeDescriptor;
 import tools.dscode.control.protocol.LiveBridgeFile;
@@ -34,6 +35,7 @@ class McpDirectHotPathTest {
     @Test
     void storeStatusMatchesVerbDispatchOnTheDirectTransport() throws Exception {
         System.clearProperty(McpTransport.PROPERTY);
+        SpineSession.create(project, "agent-1");
         assertTrue(McpTransport.direct());
         Path session = project.resolve("bridge-session");
         String token = "r4-direct-token";

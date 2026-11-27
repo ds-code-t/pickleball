@@ -2,6 +2,7 @@ package tools.dscode.launcher;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.common.agentcontrol.SpineSession;
 import tools.dscode.control.protocol.McpTransport;
 import tools.dscode.control.protocol.VerbArgs;
 
@@ -25,6 +26,7 @@ class VerbDispatchTest {
 
     @Test
     void storeStatusJsonRunsInProcess() throws Exception {
+        SpineSession.create(project, "agent-1");
         var before = liveChildren();
         ByteArrayOutputStream outBytes = new ByteArrayOutputStream();
         ByteArrayOutputStream errBytes = new ByteArrayOutputStream();
@@ -85,6 +87,7 @@ class VerbDispatchTest {
         String previous = System.getProperty("pkb_engine_log");
         try {
             System.setProperty("pkb_engine_log", "dispatch");
+            SpineSession.create(project, "agent-1");
             Map<String, String> flags = new LinkedHashMap<>();
             flags.put(VerbArgs.ARGS, "status");
             flags.put("json", "true");

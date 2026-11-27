@@ -2,6 +2,7 @@ package tools.dscode.launcher;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.common.agentcontrol.SpineSession;
 import tools.dscode.common.agentfast.AgentEnvelope;
 import tools.dscode.common.agentfast.PushChannel;
 
@@ -90,6 +91,7 @@ class HousekeepingRoadmapTest {
 
     @Test
     void logTailFollowReturnsInProcess() throws Exception {
+        SpineSession.create(temp, "agent-1");
         Path history = temp.resolve(".pickleball").resolve("history.log");
         Files.createDirectories(history.getParent());
         Files.writeString(history, "tail-line\n");

@@ -4,6 +4,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.common.agentcontrol.SpineSession;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -66,22 +67,23 @@ class CrossStoreTest {
 
         Path project = temp.resolve("notes-project");
         Files.createDirectories(project);
+        SpineSession.create(project, "agent-1");
         Invocation added = cross("cross", "note", "add", "--agent=ada", "--text=r7-note-kept", "--project=" + project);
         assertEquals(0, added.code, added.err);
         assertTrue(added.out.contains("note "), added.out);
         assertTrue(Files.isRegularFile(db));
 
-        Invocation listed = cross("cross", "note", "list", "--agent=ada");
+        Invocation listed = cross("cross", "note", "list", "--agent=ada", "--project=" + project);
         assertEquals(0, listed.code, listed.err);
         assertTrue(listed.out.contains("r7-note-kept"), listed.out);
 
-        Invocation json = cross("cross", "note", "list", "--json");
+        Invocation json = cross("cross", "note", "list", "--json", "--project=" + project);
         assertEquals(0, json.code, json.err);
         assertTrue(json.out.contains("\"body\":\"r7-note-kept\""), json.out);
 
         Invocation link = cross("cross", "link", "add", "--commit=abc123def", "--head=current", "--run=run-r7", "--project=" + project);
         assertEquals(0, link.code, link.err);
-        Invocation links = cross("cross", "link", "list");
+        Invocation links = cross("cross", "link", "list", "--project=" + project);
         assertEquals(0, links.code, links.err);
         assertTrue(links.out.contains("abc123def"), links.out);
         assertTrue(links.out.contains("current"), links.out);
@@ -99,6 +101,7 @@ class CrossStoreTest {
     void secretBodyIsRefused() throws Exception {
         Path project = temp.resolve("secret-project");
         Files.createDirectories(project);
+        SpineSession.create(project, "agent-1");
         Invocation refused = cross(
                 "cross", "note", "add", "--agent=ada", "--text=password=hunter2", "--project=" + project
         );
@@ -113,7 +116,7 @@ class CrossStoreTest {
                 "cross", "note", "add", "--agent=ada", "--text=password=~MASK;", "--project=" + project
         );
         assertEquals(0, reference.code, reference.err);
-        Invocation listed = cross("cross", "note", "list");
+        Invocation listed = cross("cross", "note", "list", "--project=" + project);
         assertTrue(listed.out.contains("~MASK;"), listed.out);
         assertFalse(dump(temp.resolve("cross.db")).contains("hunter2"));
     }
@@ -122,6 +125,7 @@ class CrossStoreTest {
     void storeStatusWritesAJournalRowWithoutTheFlagText() throws Exception {
         Path project = temp.resolve("pkb-r7-path-marker");
         Files.createDirectories(project);
+        SpineSession.create(project, "agent-1");
         System.setProperty("pkb_agent_id", "agent-r7");
         System.setProperty("pkb_session_id", "session-r7");
         String[] args = {
@@ -135,7 +139,7 @@ class CrossStoreTest {
                 new PrintStream(stderr, true, StandardCharsets.UTF_8)
         );
         assertEquals(0, code, stderr.toString(StandardCharsets.UTF_8));
-        assertFalse(Files.exists(project.resolve(".pickleball")));
+        assertFalse(Files.exists(project.resolve(".pickleball").resolve("store").resolve("main.db")));
         Path db = temp.resolve("cross.db");
         assertTrue(Files.isRegularFile(db));
         String stored = dump(db);
@@ -160,6 +164,7 @@ class CrossStoreTest {
         System.setProperty("pkb_journal", "off");
         Path project = temp.resolve("quiet-project");
         Files.createDirectories(project);
+        SpineSession.create(project, "agent-1");
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
         int code = PickleballWorkbenchLauncher.dispatchStoreIfAny(
                 new String[] {"store", "status", "--project=" + project},
@@ -168,18 +173,22 @@ class CrossStoreTest {
         );
         assertEquals(0, code, stderr.toString(StandardCharsets.UTF_8));
         assertFalse(Files.exists(temp.resolve("cross.db")));
-        assertFalse(Files.exists(project.resolve(".pickleball")));
+        assertFalse(Files.exists(project.resolve(".pickleball").resolve("store").resolve("main.db")));
     }
 
     @Test
     void deletingTheProjectLeavesTheNote() throws Exception {
         Path project = temp.resolve("gone-project");
         Files.createDirectories(project);
+        SpineSession.create(project, "agent-1");
         Invocation added = cross("cross", "note", "add", "--agent=ada", "--text=r7-note-survives", "--project=" + project);
         assertEquals(0, added.code, added.err);
         deleteTree(project);
         assertFalse(Files.exists(project));
-        Invocation listed = cross("cross", "note", "list");
+        Path reader = temp.resolve("reader");
+        Files.createDirectories(reader);
+        SpineSession.create(reader, "agent-1");
+        Invocation listed = cross("cross", "note", "list", "--project=" + reader);
         assertEquals(0, listed.code, listed.err);
         assertTrue(listed.out.contains("r7-note-survives"), listed.out);
         assertTrue(Files.isRegularFile(temp.resolve("cross.db")));
@@ -189,6 +198,7 @@ class CrossStoreTest {
     void journalRetainDaysZeroDropsTheRow() throws Exception {
         Path project = temp.resolve("retain-project");
         Files.createDirectories(project);
+        SpineSession.create(project, "agent-1");
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
         int status = PickleballWorkbenchLauncher.dispatchStoreIfAny(
                 new String[] {"store", "status", "--project=" + project},

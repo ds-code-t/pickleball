@@ -1077,6 +1077,32 @@ final class WorkbenchCommandLine {
             "inject", "spine", "chat", "lease", "input"
     );
 
+    /**
+     * A positional project path for a workbench verb when {@code --project} is absent.
+     * Store, engine, domengine, dashboard, cross, and log keep {@code --project} only.
+     */
+    static Path positionalProject(String[] argv) {
+        if (argv == null || argv.length == 0 || argv[0] == null || argv[0].isBlank()) return null;
+        String command = argv[0].trim();
+        if (!isKnownCommand(command)) return null;
+        for (int index = 1; index < argv.length; index++) {
+            String token = argv[index];
+            if (token == null || token.isBlank()) continue;
+            if (takesSeparateValue(token) && index + 1 < argv.length && !isFlag(argv[index + 1])) {
+                index++;
+                continue;
+            }
+            if (isFlag(token)) continue;
+            if (!acceptsAsProject(command, token)) continue;
+            try {
+                return Path.of(token).toAbsolutePath().normalize();
+            } catch (java.nio.file.InvalidPathException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
     private static boolean acceptsAsProject(String command, String token) {
         if (token == null || token.isBlank()) return false;
         // A bare pw area (page, run, ...) stays a word even when a directory of that name exists.
