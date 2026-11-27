@@ -41,6 +41,12 @@ Each item needs a test that fails before the fix and passes after. The test must
 - Workbench isolation holds. No new npm packages. No browser download.
 - Docs describe only what is implemented: rewrite `docs/pickleball-workbench.md` (dynamic mode, discard on exit) and the R6 release-note paragraph in place.
 - Add a tech-debt section `Spine R6 fix-back 1 (open)` with one line per item in the first commit and remove each line as it closes.
+- In that same first commit, also add a separate tech-debt section `Spine R6 follow-ups (open, 2026-11-27)` that logs these five known non-blocker caveats from the R6 verification. They are recorded, not fixed, in this fix-back; leave the section in place when you finish (do not remove these lines unless an item above happens to close one, and then say so on the scoreboard):
+  - Help printing: `EngineCli`, `SpineCli`, `BrowserPorts`, and `SeleniumBidiCommands` print help when any argument is exactly `help`, `--help`, or `-h`, so for example `engine step --text=x help` prints help instead of running. The `VerbDispatch` session gate itself stays exact.
+  - Promote flatten: `HeadMaterializer.flatten` in `CowSandbox.promote` now also changes R1 `store sandbox promote`, which flattens the destination head immediately instead of leaving it to a later materialization.
+  - The `store branch` and `engine map` verbs are tested in-JVM through `VerbDispatch`, not in a separate CLI JVM (`PickleballWorkbenchLauncher` main).
+  - No end-to-end `engine run --sandbox=<fork>` test of the pre-step hook; `PreStepHookTest` binds the fork with `StoreScope.bind` and calls `NativeScenarioRun` directly.
+  - The page only offers `store branch link ... --off`; there is no `--on` control.
 - Add a `Fix-back 1` section to `docs/maintainer/3.0.0-spine/R6-scoreboard.md` with a SHA, the before failure, and pass counts per item.
 - Push after every change. Before every push, each command on its own (do not chain with `&&`, `;`, or a pipe):
 
@@ -58,4 +64,4 @@ git push origin HEAD:3.0.0-spine
 
 ## Finish
 
-You are done when both items are green, the tech-debt section is gone, the scoreboard has the Fix-back 1 rows, the working tree is clean, and `origin/3.0.0-spine` equals your HEAD. Then STOP and report the head commit SHA and the Fix-back 1 table.
+You are done when both items are green, the `Spine R6 fix-back 1 (open)` tech-debt section is gone, the `Spine R6 follow-ups (open, 2026-11-27)` section is present, the scoreboard has the Fix-back 1 rows, the working tree is clean, and `origin/3.0.0-spine` equals your HEAD. Then STOP and report the head commit SHA and the Fix-back 1 table.
