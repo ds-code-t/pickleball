@@ -47,7 +47,11 @@ public final class EngineCli {
         for (int index = 1; index < args.length; index++) {
             if (args[index] != null) tokens.add(args[index]);
         }
-        String command = tokens.isEmpty() ? "help" : tokens.get(0);
+        if (tokens.isEmpty() || tokens.stream().anyMatch(EngineCli::isHelp)) {
+            stdout.print(help());
+            return 0;
+        }
+        String command = tokens.get(0);
         if (command.startsWith("--")) command = "run";
         try {
             return switch (command) {
@@ -69,6 +73,10 @@ public final class EngineCli {
             stderr.println("fix: engine help");
             return 1;
         }
+    }
+
+    private static boolean isHelp(String token) {
+        return "help".equals(token) || "--help".equals(token) || "-h".equals(token);
     }
 
     public static String help() {

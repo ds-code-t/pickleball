@@ -61,6 +61,7 @@ public final class SpineCli {
                 When pkb_warm=on and the heap gate returns allow, the hold JVM keeps one CDP connection.
                 spine stop closes that connection. refuse does not open it.
                 store run without a running warm JVM stays cold.
+                spine help runs with no session. spine start, stop, warm status, and sample still need one.
                 """;
     }
 
@@ -76,7 +77,7 @@ public final class SpineCli {
         for (int index = 1; index < args.length; index++) {
             if (args[index] != null) tokens.add(args[index]);
         }
-        if (tokens.isEmpty() || isHelp(tokens.get(0))) {
+        if (tokens.isEmpty() || tokens.stream().anyMatch(SpineCli::isHelp)) {
             stdout.print(help());
             return 0;
         }

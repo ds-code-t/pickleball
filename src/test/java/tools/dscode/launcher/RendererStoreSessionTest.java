@@ -45,22 +45,36 @@ class RendererStoreSessionTest {
     @Test
     @Timeout(value = 120, unit = TimeUnit.SECONDS)
     void pagesLoadAndGlueRoundTripsWithASession() throws Exception {
+        ByteArrayOutputStream helpOut = new ByteArrayOutputStream();
         ByteArrayOutputStream helpErr = new ByteArrayOutputStream();
         int help = VerbDispatch.run(
                 "engine",
                 VerbArgs.capture(new String[] {"engine", "help", project.toAbsolutePath().toString()}),
-                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                new PrintStream(helpOut, true, StandardCharsets.UTF_8),
                 new PrintStream(helpErr, true, StandardCharsets.UTF_8));
-        assertEquals(2, help, helpErr.toString(StandardCharsets.UTF_8));
-        assertTrue(helpErr.toString(StandardCharsets.UTF_8).contains("error: missing session"), helpErr.toString(StandardCharsets.UTF_8));
+        String helpText = helpOut.toString(StandardCharsets.UTF_8) + helpErr.toString(StandardCharsets.UTF_8);
+        assertEquals(0, help, helpText);
+        assertTrue(helpText.contains("Usage: engine help"), helpText);
+        assertFalse(helpText.contains("error: missing session"), helpText);
+        ByteArrayOutputStream versionOut = new ByteArrayOutputStream();
         ByteArrayOutputStream versionErr = new ByteArrayOutputStream();
         int version = VerbDispatch.run(
                 "domengine",
-                VerbArgs.capture(new String[] {"domengine", "version", project.toAbsolutePath().toString()}),
-                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                VerbArgs.capture(new String[] {"domengine", "version", "--project=" + project.toAbsolutePath()}),
+                new PrintStream(versionOut, true, StandardCharsets.UTF_8),
                 new PrintStream(versionErr, true, StandardCharsets.UTF_8));
-        assertEquals(2, version, versionErr.toString(StandardCharsets.UTF_8));
-        assertTrue(versionErr.toString(StandardCharsets.UTF_8).contains("error: missing session"), versionErr.toString(StandardCharsets.UTF_8));
+        String versionText = versionOut.toString(StandardCharsets.UTF_8) + versionErr.toString(StandardCharsets.UTF_8);
+        assertEquals(0, version, versionText);
+        assertTrue(versionText.contains("version"), versionText);
+        assertFalse(versionText.contains("error: missing session"), versionText);
+        ByteArrayOutputStream statusErr = new ByteArrayOutputStream();
+        int status = VerbDispatch.run(
+                "store",
+                VerbArgs.capture(new String[] {"store", "status", project.toAbsolutePath().toString()}),
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                new PrintStream(statusErr, true, StandardCharsets.UTF_8));
+        assertEquals(2, status, statusErr.toString(StandardCharsets.UTF_8));
+        assertTrue(statusErr.toString(StandardCharsets.UTF_8).contains("error: missing session"), statusErr.toString(StandardCharsets.UTF_8));
 
         Files.writeString(project.resolve("store.properties"), "enabled=false\n", StandardCharsets.UTF_8);
         Path glue = project.resolve(GLUE);

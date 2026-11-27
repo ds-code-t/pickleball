@@ -27,7 +27,7 @@ public final class BrowserPorts {
         for (int index = 1; index < args.length; index++) {
             if (args[index] != null) tokens.add(args[index]);
         }
-        if (tokens.isEmpty() || isHelp(tokens.get(0))) {
+        if (tokens.isEmpty() || tokens.stream().anyMatch(BrowserPorts::isHelp)) {
             stdout.print(help());
             return 0;
         }

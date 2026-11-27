@@ -7,8 +7,10 @@ import java.io.PrintStream;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * One in-process entry for a CLI verb. The launcher and {@code POST /v1/verb} both call
@@ -24,11 +26,24 @@ import java.util.Map;
  * args hash) unless {@code pkb_journal=off}. A journal failure does not change the exit code.</p>
  *
  * <p>Every call needs {@code --session=<id>} or the default session written by
- * {@code spine session new}. A missing file exits 2 with {@code error: missing session}
- * and {@code fix: spine session new}. {@code spine session new} is the call that creates it.
- * Dispatch does not create a session.</p>
+ * {@code spine session new}, except the keys in {@link #SESSION_EXEMPT}. A missing file
+ * exits 2 with {@code error: missing session} and {@code fix: spine session new}.
+ * {@code spine session new} is the call that creates it. Dispatch does not create a session.
+ * Dan, 2026-11-26 ({@code prompts/build-3.0.0-spine-R6.md} phase P0): {@code engine help},
+ * {@code domengine version}, family help, and plain {@code export-guidance} are exempt.
+ * {@code export-guidance --warm} is not.</p>
  */
 public final class VerbDispatch {
+    /**
+     * Dan, 2026-11-26. {@code prompts/build-3.0.0-spine-R6.md} phase P0.
+     * Exact command keys that skip the session gate. {@code spine session new} stays on
+     * {@link #createsSession}. {@code export-guidance --warm} is absent: that path starts
+     * a controller and still needs a session. Only the families named here, plus
+     * {@code domengine version} and plain {@code export-guidance}. A verb that merely
+     * contains {@code help} is not exempt.
+     */
+    public static final Set<String> SESSION_EXEMPT = sessionExemptKeys();
+
     private VerbDispatch() {
     }
 
@@ -69,7 +84,7 @@ public final class VerbDispatch {
             stderr.println("fix: pickleball help");
             return 2;
         }
-        if (!createsSession(argv)) {
+        if (!sessionExempt(argv)) {
             try {
                 tools.dscode.common.agentcontrol.SpineSession.required(project, sessionId(use, argv));
             } catch (IllegalArgumentException failure) {
@@ -237,6 +252,70 @@ public final class VerbDispatch {
             return "session".equals(token);
         }
         return false;
+    }
+
+    /**
+     * {@code spine session new}, or one exact key in {@link #SESSION_EXEMPT}.
+     * {@code --warm} blocks the exemption so {@code export-guidance --warm} still needs a session.
+     */
+    private static boolean sessionExempt(String[] argv) {
+        if (createsSession(argv)) return true;
+        if (argv == null) return false;
+        for (String token : argv) {
+            if (token == null) continue;
+            if ("--warm".equals(token) || token.startsWith("--warm=")) return false;
+        }
+        String key = exemptKey(argv);
+        return key != null && SESSION_EXEMPT.contains(key);
+    }
+
+    /** Positionals joined, with {@code --help} or {@code -h} kept. Paths and other flags drop out. */
+    private static String exemptKey(String[] argv) {
+        List<String> positionals = new ArrayList<>();
+        boolean helpFlag = false;
+        boolean shortHelp = false;
+        for (String token : argv) {
+            if (token == null || token.isBlank()) continue;
+            if ("--help".equals(token)) {
+                helpFlag = true;
+                continue;
+            }
+            if ("-h".equals(token)) {
+                shortHelp = true;
+                continue;
+            }
+            if (token.startsWith("--")) continue;
+            if (token.indexOf('/') >= 0 || token.indexOf('\\') >= 0 || token.indexOf(':') >= 0) continue;
+            positionals.add(token);
+        }
+        if (positionals.isEmpty()) return null;
+        if ("export-guidance".equals(positionals.get(0))) return "export-guidance";
+        String key = String.join(" ", positionals);
+        if (helpFlag && !key.endsWith(" help") && !key.endsWith(" --help")) return key + " --help";
+        if (shortHelp && !key.endsWith(" -h") && !key.endsWith(" help")) return key + " -h";
+        return key;
+    }
+
+    /**
+     * The allow-list. Forms are {@code <family> help}, {@code <family> --help},
+     * {@code <family> -h}, {@code help <family>}, {@code --help <family>}, and {@code -h <family>}.
+     */
+    private static Set<String> sessionExemptKeys() {
+        List<String> families = List.of(
+                "store", "engine", "domengine", "dashboard", "cross",
+                "spine", "bidi", "browser", "log", "log-tail");
+        Set<String> keys = new LinkedHashSet<>();
+        for (String family : families) {
+            keys.add(family + " help");
+            keys.add(family + " --help");
+            keys.add(family + " -h");
+            keys.add("help " + family);
+            keys.add("--help " + family);
+            keys.add("-h " + family);
+        }
+        keys.add("domengine version");
+        keys.add("export-guidance");
+        return Set.copyOf(keys);
     }
 
     /** {@code spine session new} is the call that creates the session this gate requires. */

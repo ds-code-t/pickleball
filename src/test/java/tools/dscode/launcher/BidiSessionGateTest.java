@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * {@code bidi script}, {@code bidi intercept}, and {@code bidi grid-attach}
- * use the same session rule as every other dispatched verb.
+ * need a session. {@code bidi help} is exempt (Dan, 2026-11-26).
  */
 class BidiSessionGateTest {
     @TempDir
@@ -23,7 +23,11 @@ class BidiSessionGateTest {
         assertMissing(LauncherCli.run(project, args, "bidi", "script", "--source=1"));
         assertMissing(LauncherCli.run(project, args, "bidi", "intercept", "--all"));
         assertMissing(LauncherCli.run(project, args, "bidi", "grid-attach", "--url=http://127.0.0.1:9"));
-        assertMissing(LauncherCli.run(project, args, "bidi", "help"));
+        LauncherCli.Capture help = LauncherCli.run(project, args, "bidi", "help");
+        String text = help.out() + help.err();
+        assertEquals(0, help.code(), text);
+        assertTrue(text.contains("Usage: bidi"), text);
+        assertTrue(text.contains("bidi help is exempt"), text);
     }
 
     @Test

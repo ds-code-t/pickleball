@@ -97,7 +97,7 @@ public final class SeleniumBidiCommands {
         for (int index = 1; index < args.length; index++) {
             if (args[index] != null) tokens.add(args[index]);
         }
-        if (tokens.isEmpty() || isHelp(tokens.get(0))) {
+        if (tokens.isEmpty() || tokens.stream().anyMatch(SeleniumBidiCommands::isHelp)) {
             stdout.print(help());
             return 0;
         }
@@ -133,7 +133,7 @@ public final class SeleniumBidiCommands {
                        bidi intercept off --id=<id>
                        bidi grid-attach --url=<remote>
                 bidi script, bidi intercept, and bidi grid-attach need --session or the default session.
-                bidi help uses that same rule. A missing session exits 2.
+                bidi help is exempt (Dan, 2026-11-26). A missing session on those three exits 2.
                 fix: spine session new
                 Off unless pkb_selenium_bidi=on or browser.selenium.bidi: on.
                 Events stay onConsoleEntry, onJavaScriptException, onBeforeRequestSent, onResponseCompleted, and onFetchError.

@@ -253,7 +253,8 @@ public final class PickleballWorkbenchLauncher {
      * Selenium BiDi verbs. Returns {@code -1} when {@code args} are not a {@code bidi} invocation.
      * The session gate in {@link VerbDispatch} runs first. {@code script} and {@code intercept}
      * then hop to the JVM that holds the driver. {@code grid-attach} stays in this process.
-     * {@code bidi help} uses that same session rule.
+     * {@code bidi help} is exempt (Dan, 2026-11-26). {@code script}, {@code intercept}, and
+     * {@code grid-attach} still need a session.
      */
     static int dispatchBidiIfAny(String[] args, PrintStream out, PrintStream err) {
         if (args == null || args.length == 0 || args[0] == null || !"bidi".equals(args[0].trim())) return -1;
