@@ -149,7 +149,9 @@ public final class DesktopTree {
         DomNode.renumber(root);
         Session session = new Session(id, "live", root, true, platform, name);
         SESSIONS.put(id, session);
-        WindowsStructureEvents.start(cacheKey(id, name));
+        if (warmOn()) {
+            WindowsStructureEvents.start(cacheKey(id, name), name);
+        }
         EngineLog.info("desktop", "attach live " + id + " " + platform + (name.isBlank() ? "" : " " + name));
         return session;
     }
