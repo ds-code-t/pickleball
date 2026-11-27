@@ -1156,6 +1156,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/OptInSetupTest.java`
 - `src/test/java/tools/dscode/launcher/OptionalAddonsLiveTest.java`
 - `src/test/java/tools/dscode/launcher/OverlapTest.java`
+- `src/test/java/tools/dscode/launcher/PageJvmRouteTest.java`
 - `src/test/java/tools/dscode/launcher/PerfLiveTest.java`
 - `src/test/java/tools/dscode/launcher/PickleballWorkbenchLauncherTest.java`
 - `src/test/java/tools/dscode/launcher/PlacementNowTest.java`
