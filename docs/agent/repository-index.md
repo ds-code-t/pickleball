@@ -1215,6 +1215,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/coredefinitions/XmlTableCellFeatureTest.java`
 - `src/test/java/tools/dscode/coredefinitions/XmlTableCellTest.java`
 - `src/test/java/tools/dscode/docs/CurrentDocsTest.java`
+- `src/test/java/tools/dscode/docs/SpineR8FixBack2DocsTest.java`
 - `src/test/java/tools/dscode/engine/adapter/cucumber/CucumberIngestTest.java`
 - `src/test/java/tools/dscode/engine/adapter/NativeSuiteHookTest.java`
 - `src/test/java/tools/dscode/engine/adapter/playwright/PlaywrightTestIngestTest.java`

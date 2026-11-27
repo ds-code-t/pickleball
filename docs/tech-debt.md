@@ -52,10 +52,6 @@ The 3.0.0 retest-fix rounds (R, S) ran only targeted tests on the Linux box and 
 - **Spine R8, Windows only:** `WarmClassLoaderTest`, `WarmColdParityTest`, `IncrementalGlueCompileTest`, `ResourceGateTest`, `BrowserVersionResolverTest`, `BrowserCacheAndLocalVersionTest`, `SeleniumBidiCommandTest`, `DebugPortOwnerTest`, `DebugPortAttachTest`, `SnapshotContextGateTest`, `WarmCdpTest`, `DesktopTreeCacheTest`, `WindowsStructureChangedTest`, `WarmGlueCompilePathTest`, `SubprocessStepTest`, `WarmGlueScenarioTest`, `BidiCliSessionTest`, `WindowsStructureLiveTest`, `WarmRebuildRestartTest`, `CdnDownloadRereadTest`, and `DebugPortQuitTest`.
 - **macOS, Safari:** channel `safari` selects Selenium `safaridriver` and the Windows test does not start a process. A live Safari run on macOS has not been executed.
 
-## Spine R8 fix-back 2 (open, found in fix-back 1 verification 2026-11-26)
-
-6. Configuration, Playwright, agent, and release-note text claim the gate moves work, the warm loader reloads edited glue, and `bidi` reaches the live session before that behavior is delivered.
-
 ## Deferred from the 3.0.0 consumer-fixes branch (per Dan, 2026-11-25)
 
 These items stay out of `3.0.0-consumer-fixes`. The roadmap lists them under "Not in scope". P6 records them here. Do not treat a later drive-by as permission to implement them.
