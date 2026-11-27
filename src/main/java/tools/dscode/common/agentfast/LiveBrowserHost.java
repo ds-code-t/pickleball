@@ -279,6 +279,26 @@ public final class LiveBrowserHost {
             }
             CompositeRuntime.joinBrowser(session.cdp);
             installSurfaceNow(session);
+            session.connection().addEventListener(event -> {
+                if (!"Page.loadEventFired".equals(event.path("method").asText(""))) return;
+                Thread replay = new Thread(() -> {
+                    for (int attempt = 0; attempt < 8; attempt++) {
+                        try {
+                            Thread.sleep(150);
+                        } catch (InterruptedException interrupted) {
+                            Thread.currentThread().interrupt();
+                            return;
+                        }
+                        try {
+                            AgentControl.replayAfterNavigation();
+                        } catch (RuntimeException ignored) {
+                            // The next attempt runs after the new document is ready.
+                        }
+                    }
+                }, "pkb-surface-replay");
+                replay.setDaemon(true);
+                replay.start();
+            });
             return true;
         } catch (RuntimeException failure) {
             System.err.println("error: page attach " + failure.getMessage());

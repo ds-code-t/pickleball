@@ -125,11 +125,17 @@ public final class SpineSession {
     }
 
     public static void setInject(Path project, String sessionId, boolean on, String agent) throws IOException {
+        setInject(project, sessionId, on, agent, null);
+    }
+
+    public static void setInject(Path project, String sessionId, boolean on, String agent, String mutate) throws IOException {
         String id = require(project, sessionId);
         ObjectNode node = loadRequired(project, id);
         node.put("inject", on);
         if (on) {
-            if (node.path("mutate").asText("").isBlank()) node.put("mutate", "sibling");
+            String mode = mutate == null || mutate.isBlank() ? node.path("mutate").asText("") : mutate.trim();
+            if (mode.isBlank()) mode = "sibling";
+            node.put("mutate", mode);
             node.put("overlay", "sibling");
         } else {
             node.put("overlay", "");

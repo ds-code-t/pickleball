@@ -49,7 +49,7 @@ The 3.0.0 retest-fix rounds (R, S) ran only targeted tests on the Linux box and 
 - **Spine R3, Windows only:** `JavaStepHostTest`, `GlueStaticScanTest`, `NodeStepHostTest`, `NodeStepHostTsTest`, `EngineDoesNotSpawnNodeTest`, `JsStepCatalogTest`, `JsStepRunTest`, `PlaywrightTestIngestTest`, `PlaywrightSpecHostTest`, and `PlaywrightSpecIngestLiveTest`.
 - **Spine R4, Windows only:** `VerbDispatchTest`, `McpDirectHotPathTest`, `VerbCatalogTest`, `ElementRecordTest`, `ArgsFileTest`, `AgentEnvelopeStoreTest`, `RouteModifyBodyTest`, `ExecuteStepsPwTest`, `DesktopLaunchTest`, `DesktopScreenshotVerbTest`, and `DesktopLaunch`.
 - **Spine R7, Windows only:** `RunSnapshotTest`, `ReportScriptTest`, `VisualTargetTest`, `PickleballExceptionTest`, `SnapFindIndexTest` (`tools.dscode.common.composite`), `SnapshotRetainTest`, and `CrossStoreTest`.
-- **Spine R5, Windows only:** `WorkbenchUiServerTest`, `StoreSqlReadOnlyTest`, `InjectSessionTest`, `SessionAddressTest`, `ChatChannelTest`, `AskProgressPointTest`, `WorkbenchUiLicenseTest`, `LeaseAndBlockTest`, `UiPageDispatchTest`, `ChatFollowStreamTest`, `WorkbenchUiJarAssetsTest`, `GeneratedPageAccessTest`, `OpenWindowRendererTest`, `LeaseGateTest`, `InjectLivePageTest`, `OverlayReceiptAskTest`, `InputBlockLivePageTest`, `WorkbenchPagesTest`, `SessionRequiredTest`, and `NodeDesignDocsTest`.
+- **Spine R5, Windows only:** `WorkbenchUiServerTest`, `StoreSqlReadOnlyTest`, `InjectSessionTest`, `SessionAddressTest`, `ChatChannelTest`, `AskProgressPointTest`, `WorkbenchUiLicenseTest`, `LeaseAndBlockTest`, `UiPageDispatchTest`, `ChatFollowStreamTest`, `WorkbenchUiJarAssetsTest`, `GeneratedPageAccessTest`, `OpenWindowRendererTest`, `LeaseGateTest`, `InjectLivePageTest`, `OverlayReceiptAskTest`, `InputBlockLivePageTest`, `WorkbenchPagesTest`, `SessionRequiredTest`, `NodeDesignDocsTest`, and `PageJvmRouteTest`.
 
 ## Deferred from the 3.0.0 consumer-fixes branch (per Dan, 2026-11-25)
 
@@ -67,7 +67,6 @@ The `typescript` npm package is pinned in `workbench-ui/package.json` and packed
 
 ## Spine R5 fix-back 2 (open)
 
-1. `inject`, `input block`, and `lease` run in the short-lived CLI JVM, so the overlay, the input shield, and the lease never reach the JVM that holds the page.
 2. A click on a shown overlay returns early in `ours(node)`, so `overlay-poll` never receives the runtime event that sets `read_at`.
 3. `WorkbenchRendererHost` ignores `--run-id` and `--agent-id`, and `show-run` answers `SHOWN` without loading that run into the Node renderer.
 4. The Node renderer posts `/store` with no session, so a fresh project fails the session rule before a page can read or save glue.

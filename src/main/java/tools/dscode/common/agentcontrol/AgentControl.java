@@ -36,6 +36,11 @@ public final class AgentControl {
     private AgentControl() {
     }
 
+    /** Re-draws stored layers after the live page navigates. The host calls this off the CDP reader thread. */
+    public static void replayAfterNavigation() {
+        PageSurfaces.replayAfterNavigation();
+    }
+
     public static void cleanup() {
         AgentDriverHooks.releaseUnowned();
         AgentDriverHooks.quit();
@@ -272,6 +277,10 @@ public final class AgentControl {
                     yield new Result(outcome.exit(), outcome.body());
                 }
                 case "ref" -> expandRef(values);
+                case "inject" -> injectLive(project, values, agentId);
+                case "input-block" -> inputBlockLive(project, values, agentId);
+                case "lease" -> leaseLive(project, values, agentId);
+                case "input" -> inputLive(project, values);
                 case "highlight" -> highlight(project, runId, values);
                 case "unhighlight" -> unhighlight(project, runId, values);
                 case "overlay" -> overlay(project, runId, values);
@@ -291,6 +300,124 @@ public final class AgentControl {
                 default -> fail(2, "unknown agent command: " + op);
             };
         }
+    }
+
+    private static Result injectLive(Path project, Map<String, String> values, String agentId) throws IOException {
+        String mode = values.get("mode");
+        if (!"on".equals(mode) && !"off".equals(mode)) {
+            return refusal("error: inject needs on or off\nfix: inject on --session=<id>");
+        }
+        String agent = liveAgent(values, agentId);
+        SpineSession.setInject(project, values.get("session"), "on".equals(mode), agent, values.get("mutate"));
+        Map<String, Object> body = SpineSession.envelope(project, values.get("session"), agent, "inject");
+        stampLiveFrame(body);
+        return new Result(0, body);
+    }
+
+    private static Result inputBlockLive(Path project, Map<String, String> values, String agentId) throws IOException {
+        boolean on = "true".equals(values.get("on"));
+        boolean off = "true".equals(values.get("off"));
+        if (on == off) {
+            return refusal("error: input block needs --on or --off\nfix: input block --session=<id> --on");
+        }
+        String session = SpineSession.required(project, values.get("session"));
+        if (on && !SpineSession.injectEnabled(project, session)) {
+            return refusal("error: input block needs an injected session\nfix: inject on");
+        }
+        HumanLock.blockInput(project, session, on);
+        Map<String, Object> body = ok(on ? "input block on" : "input block off");
+        body.put("session", session);
+        body.put("inputBlocked", on);
+        body.put("agent", liveAgent(values, agentId));
+        stampLiveFrame(body);
+        return new Result(0, body);
+    }
+
+    private static Result leaseLive(Path project, Map<String, String> values, String agentId) throws IOException {
+        String action = values.get("action");
+        if (!"take".equals(action) && !"release".equals(action)) {
+            return refusal("error: lease needs take or release\nfix: lease take --target=ui|browser|both --session=<id>");
+        }
+        String target = values.get("target");
+        String holder = liveAgent(values, agentId);
+        String session;
+        try {
+            session = SpineSession.required(project, values.get("session"));
+            if ("take".equals(action)) {
+                UiLease.take(project, session, target, holder);
+                String use = target == null ? "" : target.trim();
+                if ("browser".equals(use) || "both".equals(use)) {
+                    tools.dscode.control.protocol.LeaseClock.armHold(project, "hold");
+                }
+            } else {
+                UiLease.release(project, session, target);
+            }
+        } catch (IllegalArgumentException failure) {
+            String message = failure.getMessage();
+            if (message == null || !message.contains("fix:")) {
+                message = "error: lease failed\nfix: lease take --target=ui|browser|both --session=<id>";
+            }
+            return refusal(message);
+        }
+        Map<String, Object> body = ok("lease " + action);
+        body.put("session", session);
+        body.put("target", target == null ? "" : target.trim());
+        body.put("holder", holder);
+        stampLiveFrame(body);
+        return new Result(0, body);
+    }
+
+    /** Agent {@code input --text} types on the live page, inside the shield pass when one is up. */
+    private static Result inputLive(Path project, Map<String, String> values) {
+        String text = values.get("text");
+        if (text == null || text.isBlank()) {
+            return refusal("error: input needs --text\nfix: input --text=<keys> --session=<id>");
+        }
+        WebDriver page = tools.dscode.common.agentfast.LiveBrowserHost.page();
+        if (!(page instanceof tools.dscode.common.agentfast.LiveChromeDriver driver)) {
+            return fail(1, "error: no live page\nfix: start --url= --browser=");
+        }
+        String session = values.get("session");
+        boolean blocked = HumanLock.inputBlocked(project, session);
+        if (blocked) HumanLock.passAgentInput(project, session);
+        try {
+            driver.executeScript("if(document.body){document.body.setAttribute('tabindex','-1');document.body.focus();}");
+            for (int index = 0; index < text.length(); index++) {
+                String key = String.valueOf(text.charAt(index));
+                Map<String, Object> down = new LinkedHashMap<>();
+                down.put("type", "keyDown");
+                down.put("key", key);
+                down.put("text", key);
+                driver.executeCdpCommand("Input.dispatchKeyEvent", down);
+                Map<String, Object> up = new LinkedHashMap<>();
+                up.put("type", "keyUp");
+                up.put("key", key);
+                driver.executeCdpCommand("Input.dispatchKeyEvent", up);
+            }
+        } finally {
+            if (blocked) HumanLock.restoreInputBlock(project, session);
+        }
+        Map<String, Object> body = ok("input");
+        body.put("text", text);
+        stampLiveFrame(body);
+        return new Result(0, body);
+    }
+
+    private static String liveAgent(Map<String, String> values, String agentId) {
+        String named = values == null ? null : values.get("agent");
+        if (named != null && !named.isBlank()) return named.trim();
+        if (agentId != null && !agentId.isBlank()) return agentId.trim();
+        return SpineSession.DEFAULT_AGENT;
+    }
+
+    /** A frame id from this process's browser. {@code live} means the page JVM handled the call. */
+    private static void stampLiveFrame(Map<String, Object> body) {
+        if (body == null) return;
+        Object existing = body.get("frame");
+        if (existing instanceof String text && !text.isBlank()) return;
+        String frame = liveFrame();
+        if ((frame == null || frame.isBlank()) && tools.dscode.common.agentfast.LiveBrowserHost.page() != null) frame = "live";
+        if (frame != null && !frame.isBlank()) body.put("frame", frame);
     }
 
     private static Result expandRef(Map<String, String> args) {

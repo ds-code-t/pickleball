@@ -1660,15 +1660,86 @@ final class PageSurfaces {
         Map<String, Object> spec = new LinkedHashMap<>();
         spec.put("on", on);
         if (pass != null && !pass.isBlank()) spec.put("pass", pass);
+        boolean agentPass = "agent".equals(pass);
         for (Managed page : managed()) {
             try {
                 driver = page.driver;
                 runtimeCall("inputBlock", spec, true);
+                mainWorldShield(page.driver, on, agentPass);
             } catch (RuntimeException failure) {
                 BrowserLog.warnOnce("input-block", "input block skipped: " + failure.getMessage());
             }
         }
     }
+
+    /**
+     * Re-reads the session after a navigation in this JVM and draws the stored layers again.
+     * The preload installs the runtime, so a missing-runtime replay does not run on its own.
+     */
+    static void replayAfterNavigation() {
+        if (injectProject == null) return;
+        for (Managed page : managed()) {
+            try {
+                driver = page.driver;
+                runtimeCall("state", Map.of(), true);
+                replayStored(page.driver);
+            } catch (RuntimeException failure) {
+                BrowserLog.warnOnce("inject-replay", "replay skipped: " + failure.getMessage());
+            }
+        }
+    }
+
+    /** Capture listeners in the page world. Isolated-world stopPropagation does not cover CDP input. */
+    private static void mainWorldShield(WebDriver web, boolean on, boolean pass) {
+        if (!(web instanceof JavascriptExecutor executor)) return;
+        try {
+            executor.executeScript(MAIN_WORLD_SHIELD, on, pass);
+        } catch (RuntimeException failure) {
+            BrowserLog.warnOnce("input-block", "main-world shield skipped: " + failure.getMessage());
+        }
+    }
+
+    private static final String MAIN_WORLD_SHIELD = """
+            var on = arguments[0] === true;
+            var pass = arguments[1] === true;
+            var root = document.documentElement || document.body;
+            if (!root) return;
+            var types = ['keydown','keyup','keypress','mousedown','mouseup','click','pointerdown','wheel'];
+            var shield = document.querySelector('[data-pkb-input-block]');
+            if (!on) {
+              if (shield && shield.parentNode) shield.parentNode.removeChild(shield);
+              if (window.__pkbMainBlock) {
+                for (var i = 0; i < types.length; i++) window.removeEventListener(types[i], window.__pkbMainBlock, true);
+                window.__pkbMainBlock = null;
+              }
+              root.removeAttribute('data-pkb-agent-acting');
+              return;
+            }
+            if (!shield) {
+              shield = document.createElement('div');
+              shield.setAttribute('data-pkb-input-block', 'human');
+              shield.setAttribute('data-pkb-meta', 'true');
+              shield.setAttribute('tabindex', '0');
+              shield.style.cssText = 'position:fixed;inset:0;z-index:2147483646;background:transparent;';
+              root.appendChild(shield);
+            }
+            if (!window.__pkbMainBlock) {
+              window.__pkbMainBlock = function (event) {
+                var until = root.getAttribute('data-pkb-agent-acting');
+                if (until && Date.now() < Number(until)) return;
+                event.preventDefault();
+                event.stopPropagation();
+              };
+              for (var n = 0; n < types.length; n++) window.addEventListener(types[n], window.__pkbMainBlock, true);
+            }
+            if (pass) {
+              shield.style.setProperty('pointer-events', 'none', 'important');
+              root.setAttribute('data-pkb-agent-acting', String(Date.now() + 1500));
+            } else {
+              shield.style.setProperty('pointer-events', 'auto', 'important');
+              root.removeAttribute('data-pkb-agent-acting');
+            }
+            """;
 
     public static void applyInject(Path project, String session, String agent, boolean on) {
         injectProject = project;
@@ -1752,6 +1823,7 @@ final class PageSurfaces {
                             block.put("on", true);
                             block.put("pass", "human");
                             invoke(web, "inputBlock", block);
+                            mainWorldShield(web, true, false);
                         }
                         if (!node.path("inject").asBoolean(false)) continue;
                         JsonNode agents = node.path("agents");

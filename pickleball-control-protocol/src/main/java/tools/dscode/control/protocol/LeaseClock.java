@@ -31,6 +31,31 @@ public final class LeaseClock {
         }
     }
 
+    /**
+     * Arms the worker pause hold the same way {@code lease take} does for
+     * {@code browser} and {@code both}. {@code hold} and {@code forever} do not expire.
+     */
+    public static void armHold(Path project, String raw) throws IOException {
+        if (project == null) return;
+        String hold = raw == null || raw.isBlank() ? "hold" : raw.trim();
+        Path marker = project.resolve(".pickleball").resolve("workbench").resolve("pause-hold");
+        Files.createDirectories(marker.getParent());
+        Files.writeString(marker, hold + "\n");
+        Path file = project.resolve(".pickleball").resolve("live-browser").resolve("hold.json");
+        Files.createDirectories(file.getParent());
+        long now = System.currentTimeMillis();
+        boolean forever = "hold".equalsIgnoreCase(hold) || "forever".equalsIgnoreCase(hold);
+        long leaseSeconds = 3600L;
+        long expires = forever ? Long.MAX_VALUE : now + leaseSeconds * 1000L;
+        String json = "{\"hold\":\"" + jsonEscape(hold) + "\",\"leaseSeconds\":" + leaseSeconds
+                + ",\"forever\":" + forever + ",\"armedAt\":" + now + ",\"expires\":" + expires + "}\n";
+        Files.writeString(file, json);
+    }
+
+    private static String jsonEscape(String value) {
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
+    }
+
     /** An unexpired hold. {@code 0} and {@code none} are not held. */
     public static boolean fresh(Path project) {
         String left = left(project);

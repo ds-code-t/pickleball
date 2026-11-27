@@ -219,6 +219,8 @@ public final class WorkbenchAgentCommands {
         if ("upload".equals(parsed.command()) && java.util.Arrays.stream(args).anyMatch(a -> a.startsWith("--via=") || a.equals("--on-dialog"))) {
             return ProtoVerbs.run(args, parsed.project(), safeOut, safeErr);
         }
+        Integer live = forwardLiveControl(parsed, safeOut, safeErr);
+        if (live != null) return live;
         try {
             if ("input".equals(parsed.command()) && "block".equals(word(parsed, 0))) {
                 return inputBlock(parsed, safeOut, safeErr);
@@ -366,6 +368,85 @@ public final class WorkbenchAgentCommands {
             err.println("fix: controller-start");
             return 1;
         }
+    }
+
+    /**
+     * {@code inject}, {@code input block}, {@code lease}, and agent {@code input}
+     * run in the JVM that holds the page when a live bridge is up. No bridge keeps
+     * the local handlers, including protocol {@code input}.
+     */
+    private static Integer forwardLiveControl(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        String command = parsed.command();
+        String op;
+        Map<String, String> args = new LinkedHashMap<>();
+        if ("inject".equals(command)) {
+            op = "inject";
+            String mode = word(parsed, 0);
+            if (mode != null) args.put("mode", mode);
+            String mutate = flag(parsed, "--mutate");
+            if (mutate != null && !mutate.isBlank()) args.put("mutate", mutate);
+        } else if ("lease".equals(command)) {
+            op = "lease";
+            String action = word(parsed, 0);
+            if (action != null) args.put("action", action);
+            String target = flag(parsed, "--target");
+            if (target != null) args.put("target", target);
+        } else if ("input".equals(command) && "block".equals(word(parsed, 0))) {
+            op = "input-block";
+            if (hasFlag(parsed.forwarded(), "--on")) args.put("on", "true");
+            if (hasFlag(parsed.forwarded(), "--off")) args.put("off", "true");
+        } else if ("input".equals(command)) {
+            op = "input";
+            String text = parsed.coordination() == null ? null : parsed.coordination().text();
+            if (text == null || text.isBlank()) text = flag(parsed, "--text");
+            if (text != null) args.put("text", text);
+            String actions = flag(parsed, "--actions");
+            if (actions != null) args.put("actions", actions);
+        } else {
+            return null;
+        }
+        String session = flag(parsed, "--session");
+        if (session != null && !session.isBlank()) args.put("session", session);
+        String agent = holder(parsed);
+        args.put("agent", agent);
+        java.util.Optional<tools.dscode.control.protocol.LiveBridgeFile.Bridge> bridge =
+                pageTargetFor(parsed.project(), session, op, args);
+        if (bridge.isEmpty()) return null;
+        tools.dscode.common.agentfast.AgentForward.Posted posted = tools.dscode.common.agentfast.AgentForward.post(
+                bridge.get(),
+                op,
+                args,
+                List.of(),
+                parsed.project(),
+                boundRunId(parsed),
+                agent
+        );
+        if (posted.error() != null && !posted.error().isBlank()) {
+            err.println(posted.error());
+            return posted.exit() == 0 ? 1 : posted.exit();
+        }
+        String printed = tools.dscode.common.agentfast.AgentEnvelope.ensure(
+                tools.dscode.common.agentfast.ReplyFields.restamp(posted.bodyJson(), 0),
+                op,
+                0,
+                parsed.project(),
+                boundRunId(parsed)
+        );
+        out.println(QuietWarnings.dropNoise(printed));
+        if (posted.exit() != 0) {
+            String error = "agent command failed";
+            try {
+                var node = JSON.readTree(posted.bodyJson() == null ? "{}" : posted.bodyJson());
+                if (node.has("error") && !node.get("error").isNull()) error = node.get("error").asText(error);
+                if (node.has("fix") && !node.get("fix").isNull() && !error.contains("fix:")) {
+                    error = error + "\nfix: " + node.get("fix").asText();
+                }
+            } catch (java.io.IOException ignored) {
+                // The body is already printed.
+            }
+            err.print(failureLine(error, op));
+        }
+        return posted.exit();
     }
 
     private static int injectSession(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
