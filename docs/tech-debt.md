@@ -2,6 +2,13 @@
 
 This page lists behavior that is not a feature. Do not document an open item as syntax. A heading marked closed describes behavior that shipped.
 
+## Spine R8 fix-back 3 (open)
+
+1. The heap-gate child runs each step as its own engine run, so one scenario's glue and scenario state do not carry across that scenario's steps.
+2. `StoreRun.execute` stops the warm worker after an incremental glue compile, so the long-lived worker never reloads the new class in place.
+3. `DriverConstruction` releases the debug-port claim on a single-window close, and a cdn cache read-back can use a different version than the one requested or downloaded without saying so.
+4. Docs still describe a per-step child run, a worker restart after every incremental compile, and a debug-port release on quit or close.
+
 ## Step ceilings (closed, spine R2 P3)
 
 `steps.max_iterations` and `steps.timeout_seconds` are nullable integers. Hydrate leaves them untouched. A null column keeps the run-wide `pkb_stepRepeatMaxCount` and `pkb_stepMaxTime`. When a row sets them, the native runner and the Cucumber adapter assign `StepBase.stepMaxIterations` and `StepBase.stepTimeoutSeconds`. A block `until`, an inline `until`, and `RETRY:` use that cap. An element `wait` still uses the run-wide time cap only. A null column is not read as zero.
