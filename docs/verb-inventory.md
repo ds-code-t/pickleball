@@ -122,6 +122,7 @@ MCP-only count: 0
 | engine | engine | cli | tools.dscode.engine.EngineCli.execute |
 | engine help | engine | cli | tools.dscode.engine.EngineCli.execute |
 | engine inventory | engine | cli | tools.dscode.engine.EngineCli.execute |
+| engine map | engine | cli | tools.dscode.engine.EngineCli.execute |
 | engine run | engine | cli | tools.dscode.engine.EngineCli.execute |
 | engine step | engine | cli | tools.dscode.engine.EngineCli.execute |
 | entity-lookup | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |

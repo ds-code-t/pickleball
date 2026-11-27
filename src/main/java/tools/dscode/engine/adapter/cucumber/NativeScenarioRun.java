@@ -144,7 +144,12 @@ public final class NativeScenarioRun {
                             stepLine,
                             exampleRow(scenario));
                     int tracedFrom = seen.size();
+                    tools.dscode.engine.runtime.PreStepHook.Applied hooked = null;
                     try {
+                        hooked = tools.dscode.engine.runtime.PreStepHook.apply(
+                                options == null ? null : options.project(),
+                                index + 1,
+                                state.getParsingMap());
                         tools.dscode.engine.runtime.VisualTarget.beforeRun(
                                 options == null ? null : options.project(),
                                 scenario.location() == null ? "" : scenario.location().uri(),
@@ -165,6 +170,7 @@ public final class NativeScenarioRun {
                         NativeStepTrace.record(frame);
                         state.recordHardFailure(thrown);
                     } finally {
+                        tools.dscode.engine.runtime.PreStepHook.clear(state.getParsingMap(), hooked);
                         applyFollowingFlags(frame, savedNext);
                         String trackedStatus;
                         try {

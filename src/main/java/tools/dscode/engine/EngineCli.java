@@ -21,7 +21,7 @@ import java.util.List;
  * Native engine CLI. Gradle, Workbench, and MCP only forward here.
  */
 public final class EngineCli {
-    public static final List<String> COMMANDS = List.of("help", "run", "step", "inventory");
+    public static final List<String> COMMANDS = List.of("help", "run", "step", "inventory", "map");
 
     private EngineCli() {
     }
@@ -62,6 +62,7 @@ public final class EngineCli {
                 case "run" -> run(tokens, stdout, stderr);
                 case "step" -> step(tokens, stdout, stderr);
                 case "inventory" -> inventory(tokens, stdout);
+                case "map" -> EngineMap.execute(project(tokens), tokens, stdout, stderr);
                 default -> {
                     stderr.println("error: Unknown engine command: " + command);
                     stderr.println("fix: engine help");
@@ -85,6 +86,8 @@ public final class EngineCli {
                 Usage: engine run [--project=<dir>] [--text=<gherkin>] [--file=<path>] [--steps=<line>] [--glue=<class>] [--name=<scenario>] [--store] [--sandbox=<name>] [--feature=<path>]
                 Usage: engine step --text=<step> [--definition=<id>] [--argument=<text>] [--glue=<class>] [--project=<dir>]
                 Usage: engine inventory [--project=<dir>] [--json]
+                Usage: engine map show --run=<id> --step=<ord> [--sandbox=<name>] [--json]
+                Usage: engine map set --run=<id> --step=<ord> --key=<k> --value=<v> [--sandbox=<name>]
                 engine inventory prints the verb catalog. --json is one agent envelope. The rows are items. The mcp-only count is 0.
                 The engine runs steps without Cucumber. --text and --steps do not read a feature file.
                 --store reads feature bytes from the Store store at .pickleball/store/data. --glue is a glue class name.

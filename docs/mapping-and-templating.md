@@ -4,6 +4,10 @@
 
 Pickleball maps values into `NodeMap` scopes and resolves them later through templates such as `<customer.name>`.
 
+## Pre-step hook
+
+On a fork, `engine map set --run=<id> --step=<ord> --key=<k> --value=<v>` writes a `kind=map` delta. `NativeScenarioRun` applies those deltas in `PreStepHook` immediately before that step. The step and its children see the keys. The parent step and later steps that are not descendants do not. The hook reads the fork deltas. It does not read the Node page. A secret key refuses a cleartext value. `engine map show` prints `~MASK;` for a secret and labels the view with `boundRun` and `boundStep`. `pkb_engine_log=match` logs `pre-step hook keys=<n>` and does not log the values.
+
 A value substituted into step text may contain line breaks. `* INFO: body=<Page.RESPONSE.body>` still runs when that body is multi-line HTML or JSON. Pickleball escapes those breaks while it builds the temporary `memory:/single.feature`, then restores them on the step text, so they are not parsed as new Gherkin steps. A one-line value is unchanged. A Windows path and a path that contains spaces are preserved. A multi-line DocString or data table argument is a separate value and is unchanged. See [Log and assert steps](log-and-assert-steps.md).
 
 ## Supported mapping steps

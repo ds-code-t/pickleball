@@ -283,7 +283,7 @@ public final class StoreEdit {
 
     private static void refreshScriptCatalog(Path project, String relative, byte[] body) throws SQLException {
         String normal = relative.replace('\\', '/');
-        if (!normal.endsWith(".js") && !normal.endsWith(".ts")) return;
+        if (!normal.endsWith(".js") && !normal.endsWith(".ts") && !normal.endsWith(".java")) return;
         if (!isGluePath(normal)) return;
         try (StoreDatabase database = StoreDatabase.open(project)) {
             Connection connection = database.connection();

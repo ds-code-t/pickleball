@@ -22,6 +22,14 @@ button { margin-right: 8px; }
 <label>Branch <select id="branch"></select></label>
 <label>From run <input id="fork-run" type="text"></label>
 <button id="fork" type="button">Fork</button>
+<label>Logs <select id="promote-logs"><option value="">Choose</option><option value="clear">clear</option><option value="archive">archive</option></select></label>
+<label>To <select id="promote-to"><option value="parent">parent</option><option value="top">top</option></select></label>
+<button id="promote" type="button">Promote</button>
+<label>Parent <input id="link-parent" type="text"></label>
+<button id="link-off" type="button">Unlink</button>
+<label>File <input id="tree-file" type="text" value="notes.txt"></label>
+<button id="tree" type="button">History</button>
+<div id="tree-body"></div>
 <label>Search <input id="search" type="text"></label>
 <button id="lease" type="button">Lease</button>
 <label>Answer <input id="ask-id" type="text"><input id="ask-value" type="text">
@@ -32,6 +40,9 @@ button { margin-right: 8px; }
 <a href="/globals">Globals</a>
 <a href="/data">Data</a>
 <a href="/sql">Raw SQL</a>
+<button id="tab-map" type="button" hidden>Map</button>
+<button id="tab-logs" type="button" hidden>Logs</button>
+<button id="tab-screenshots" type="button" hidden>Screenshots</button>
 </nav>
 <main>
 <section id="scenarios">
@@ -68,6 +79,23 @@ button { margin-right: 8px; }
 <button id="run-sql" type="button">Run</button>
 <pre id="sql-body"></pre>
 </section>
+<section id="map" hidden>
+<h2>Map</h2>
+<label>Step <input id="map-step" type="text" value="1"></label>
+<label>Key <input id="map-key" type="text"></label>
+<label>Value <input id="map-value" type="text"></label>
+<button id="map-show" type="button">Show</button>
+<button id="map-set" type="button">Set</button>
+<pre id="map-body"></pre>
+</section>
+<section id="logs" hidden>
+<h2>Logs</h2>
+<pre id="logs-body"></pre>
+</section>
+<section id="screenshots" hidden>
+<h2>Screenshots</h2>
+<pre id="screenshots-body"></pre>
+</section>
 </main>
 <script>
 const token = new URLSearchParams(location.search).get("t") || "";
@@ -95,8 +123,19 @@ async function callStore(args, verb) {
     return response.json();
 }
 function show(id) {
-    ["scenarios", "globals", "data", "sql"].forEach(function (name) {
+    ["scenarios", "globals", "data", "sql", "map", "logs", "screenshots"].forEach(function (name) {
         document.getElementById(name).hidden = name !== id;
+    });
+}
+function sandboxArg() {
+    if (!shownBranch || shownBranch === "main") return [];
+    return ["--sandbox=" + shownBranch];
+}
+function revealDynamic() {
+    const run = document.getElementById("fork-run").value || "";
+    const on = run.length > 0 || (shownBranch && shownBranch !== "main") || (forkName && forkName.length > 0);
+    ["tab-map", "tab-logs", "tab-screenshots"].forEach(function (name) {
+        document.getElementById(name).hidden = !on;
     });
 }
 function pageId() {
@@ -162,6 +201,7 @@ function paint(name) {
     document.getElementById("title").textContent = shownBranch;
     document.title = shownBranch;
     if (palette.length) document.documentElement.style.setProperty("--accent", colorFor(shownBranch, palette));
+    revealDynamic();
 }
 function definitionMatches(source, stepText) {
     if (!stepText) return false;
@@ -224,7 +264,7 @@ async function setEditor(path, value) {
 }
 document.getElementById("open-definition").addEventListener("click", async function () {
     const path = document.getElementById("definition-path").value;
-    const result = await callStore(["glue", "show", "--path=" + path, "--json"]);
+    const result = await callStore(["glue", "show", "--path=" + path, "--json"].concat(sandboxArg()));
     const message = document.getElementById("definition-message");
     showCli(message, result);
     try {
@@ -236,7 +276,7 @@ document.getElementById("open-definition").addEventListener("click", async funct
 document.getElementById("save-definition").addEventListener("click", async function () {
     const path = document.getElementById("definition-path").value;
     const text = definitionEditor ? definitionEditor.getValue() : "";
-    const result = await callStore(["glue", "put", "--path=" + path, "--text=" + text]);
+    const result = await callStore(["glue", "put", "--path=" + path, "--text=" + text].concat(sandboxArg()));
     showCli(document.getElementById("definition-message"), result);
 });
 document.getElementById("point").addEventListener("click", async function () {
@@ -268,6 +308,48 @@ async function runSql() {
     document.getElementById("sql-body").textContent = (result.out || "") + (result.err || "");
 }
 document.getElementById("run-sql").addEventListener("click", runSql);
+document.getElementById("fork-run").addEventListener("input", revealDynamic);
+function selectedRun() {
+    return document.getElementById("fork-run").value || "";
+}
+async function loadMap() {
+    const run = selectedRun();
+    const step = document.getElementById("map-step").value || "1";
+    const result = await callStore(["map", "show", "--run=" + run, "--step=" + step, "--json"].concat(sandboxArg()), "engine");
+    document.getElementById("map-body").textContent = (result.out || "") + (result.err || "");
+}
+document.getElementById("tab-map").addEventListener("click", function () { show("map"); loadMap(); });
+document.getElementById("map-show").addEventListener("click", loadMap);
+document.getElementById("map-set").addEventListener("click", async function () {
+    const run = selectedRun();
+    const step = document.getElementById("map-step").value || "1";
+    const key = document.getElementById("map-key").value;
+    const value = document.getElementById("map-value").value;
+    const result = await callStore(["map", "set", "--run=" + run, "--step=" + step, "--key=" + key, "--value=" + value].concat(sandboxArg()), "engine");
+    showCli(document.getElementById("map-body"), result);
+});
+async function loadTimeline(target, artifactsOnly) {
+    const run = selectedRun();
+    const args = ["timeline", "--json"];
+    if (run) args.push("--run=" + run);
+    const result = await callStore(args.concat(sandboxArg()));
+    if (!artifactsOnly) {
+        target.textContent = (result.out || "") + (result.err || "");
+        return;
+    }
+    const body = payload(result.out || "");
+    const events = body && Array.isArray(body.events) ? body.events : [];
+    const shots = events.filter(function (event) { return event.kind === "artifact"; });
+    target.textContent = JSON.stringify(shots);
+}
+document.getElementById("tab-logs").addEventListener("click", function () {
+    show("logs");
+    loadTimeline(document.getElementById("logs-body"), false);
+});
+document.getElementById("tab-screenshots").addEventListener("click", function () {
+    show("screenshots");
+    loadTimeline(document.getElementById("screenshots-body"), true);
+});
 async function loadFiles(text) {
     const args = ["files", "list", "--json"];
     if (text) args.push("--text=" + text);
@@ -328,7 +410,7 @@ async function expandStep(step) {
     let matched = "";
     let source = "";
     for (let index = 0; index < paths.length; index++) {
-        const shown = await callStore(["glue", "show", "--path=" + paths[index], "--json"]);
+        const shown = await callStore(["glue", "show", "--path=" + paths[index], "--json"].concat(sandboxArg()));
         const text = glueText(shown.out || "");
         if (!matched && definitionMatches(text, step.text || "")) {
             matched = paths[index];
@@ -372,6 +454,38 @@ document.getElementById("branch").addEventListener("change", function () {
     const name = document.getElementById("branch").value;
     callStore(["sandbox", "use", name]);
     paint(name);
+});
+document.getElementById("promote").addEventListener("click", async function () {
+    const logs = document.getElementById("promote-logs").value;
+    if (logs !== "clear" && logs !== "archive") return;
+    const name = shownBranch && shownBranch !== "main" ? shownBranch : forkName;
+    if (!name || name === "main") return;
+    const to = document.getElementById("promote-to").value || "parent";
+    const result = await callStore(["branch", "promote", name, "--to=" + to, "--logs=" + logs, "--json"]);
+    document.getElementById("scenario-body").textContent = (result.out || "") + (result.err || "");
+});
+document.getElementById("link-off").addEventListener("click", async function () {
+    const name = shownBranch && shownBranch !== "main" ? shownBranch : forkName;
+    const parent = document.getElementById("link-parent").value || "";
+    if (!name || !parent) return;
+    const result = await callStore(["branch", "link", name, "--parent=" + parent, "--off"]);
+    document.getElementById("scenario-body").textContent = (result.out || "") + (result.err || "");
+});
+document.getElementById("tree").addEventListener("click", async function () {
+    const file = document.getElementById("tree-file").value || "";
+    const result = await callStore(["branch", "tree", "--file=" + file, "--json"]);
+    const body = payload(result.out || "");
+    const rows = body && Array.isArray(body.rows) ? body.rows : [];
+    const host = document.getElementById("tree-body");
+    host.textContent = "";
+    rows.forEach(function (row) {
+        const details = document.createElement("details");
+        const summary = document.createElement("summary");
+        summary.textContent = (row.branch || "") + " " + (row.kind || "");
+        details.appendChild(summary);
+        host.appendChild(details);
+    });
+    if (!rows.length) host.textContent = (result.out || "") + (result.err || "");
 });
 document.getElementById("fork").addEventListener("click", async function () {
     const run = document.getElementById("fork-run").value || "";

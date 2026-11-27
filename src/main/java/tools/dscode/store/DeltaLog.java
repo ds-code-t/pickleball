@@ -24,6 +24,7 @@ public final class DeltaLog {
     public static final String UNDO = "undo";
     public static final String REDO = "redo";
     public static final String FORK = "fork";
+    public static final String MAP = "map";
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -94,6 +95,87 @@ public final class DeltaLog {
         } finally {
             if (own) connection.setAutoCommit(true);
         }
+    }
+
+    /**
+     * A map edit on a fork. The payload names the run, the step ordinal, and the key.
+     * The log line names the branch and the key count is the caller's concern.
+     * The value is stored and is not written to the log.
+     */
+    public static long map(Connection connection, Path project, String branchName, String run, int step, String key,
+                           String value) throws SQLException {
+        if (branchName == null || branchName.isBlank() || run == null || run.isBlank()
+                || key == null || key.isBlank() || step < 1) {
+            throw new IllegalArgumentException("delta needs a table and a primary key");
+        }
+        boolean own = connection.getAutoCommit();
+        if (own) connection.setAutoCommit(false);
+        try {
+            ObjectNode node = MAPPER.createObjectNode();
+            node.put("tbl", "map");
+            node.put("pk", run + "\u001f" + step + "\u001f" + key);
+            node.putNull("before");
+            node.put("after", value == null ? "" : value);
+            node.put("run", run);
+            node.put("step", step);
+            node.put("key", key);
+            long seq = UniversalEntity.insert(connection, """
+                    INSERT INTO deltas(at, actor, kind, payload_json, expensive)
+                    VALUES (?, ?, ?, ?, ?)
+                    """, Instant.now().toString(), actor(connection), MAP, node.toString(), 0);
+            HeadMaterializer.applyPending(connection, project);
+            if (own) connection.commit();
+            StoreLog.log(project, "delta", branchName, branchName,
+                    "append seq=" + seq + " kind=" + MAP + " pk=" + key + " expensive=0");
+            return seq;
+        } catch (SQLException | RuntimeException failure) {
+            if (own) connection.rollback();
+            throw failure;
+        } finally {
+            if (own) connection.setAutoCommit(true);
+        }
+    }
+
+    /** Map edits on this database, oldest first. */
+    public static List<MapEdit> mapEdits(Connection connection) throws SQLException {
+        List<MapEdit> rows = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT seq, payload_json FROM deltas WHERE kind = ? ORDER BY seq ASC")) {
+            statement.setString(1, MAP);
+            try (ResultSet result = statement.executeQuery()) {
+                while (result.next()) {
+                    JsonNode node = MAPPER.readTree(result.getString(2) == null ? "{}" : result.getString(2));
+                    String after = textOrNull(node.get("after"));
+                    rows.add(new MapEdit(
+                            result.getLong(1),
+                            node.path("run").asText(""),
+                            node.path("step").asInt(0),
+                            node.path("key").asText(""),
+                            after == null ? "" : after));
+                }
+            }
+        } catch (com.fasterxml.jackson.core.JsonProcessingException failure) {
+            throw new SQLException("delta payload is not json", failure);
+        }
+        return rows;
+    }
+
+    /** The source run named by the first fork delta, or blank when this database has none. */
+    public static String forkSource(Connection connection) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT payload_json FROM deltas WHERE kind = ? ORDER BY seq ASC LIMIT 1")) {
+            statement.setString(1, FORK);
+            try (ResultSet result = statement.executeQuery()) {
+                if (!result.next()) return "";
+                JsonNode node = MAPPER.readTree(result.getString(1) == null ? "{}" : result.getString(1));
+                return node.path("fromRun").asText("");
+            }
+        } catch (com.fasterxml.jackson.core.JsonProcessingException failure) {
+            throw new SQLException("delta payload is not json", failure);
+        }
+    }
+
+    public record MapEdit(long seq, String run, int step, String key, String value) {
     }
 
     public static long undo(Connection connection, Path project) throws SQLException {
