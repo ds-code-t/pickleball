@@ -25,7 +25,26 @@ public final class DebugPortOwner {
     private static final Map<Object, Integer> DRIVERS = new IdentityHashMap<>();
     private static final ThreadLocal<Integer> PENDING = new ThreadLocal<>();
 
+    static {
+        Runtime.getRuntime().addShutdownHook(new Thread(DebugPortOwner::releaseAll, "pkb-debug-port-release"));
+    }
+
     private DebugPortOwner() {
+    }
+
+    /** JVM shutdown. Releases every claim still held by a driver or a port. */
+    static void releaseAll() {
+        List<Object> drivers;
+        List<Integer> ports;
+        List<String> owners;
+        synchronized (OWNERS) {
+            drivers = new ArrayList<>(DRIVERS.keySet());
+            ports = new ArrayList<>(OWNERS.keySet());
+            owners = new ArrayList<>();
+            for (Integer port : ports) owners.add(OWNERS.get(port));
+        }
+        for (Object driver : drivers) releaseDriver(driver);
+        for (int index = 0; index < ports.size(); index++) release(ports.get(index), owners.get(index));
     }
 
     public static void resetForTests() {

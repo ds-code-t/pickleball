@@ -20,13 +20,18 @@ import tools.dscode.browser.ProtocolSelector;
 import tools.dscode.common.agentcontrol.AgentDriverHooks;
 import tools.dscode.common.agentcontrol.AgentLaunch;
 import tools.dscode.common.composite.CompositeRuntime;
+import org.openqa.selenium.remote.Command;
+import org.openqa.selenium.remote.CommandExecutor;
+import org.openqa.selenium.remote.DriverCommand;
 import org.openqa.selenium.remote.RemoteWebDriver;
+import org.openqa.selenium.remote.Response;
 import org.openqa.selenium.remote.http.ClientConfig;
 import org.openqa.selenium.remote.service.DriverService;
 
 import tools.dscode.common.coordination.AgentCoordination;
 
 import java.io.ByteArrayOutputStream;
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.File;
 import java.io.OutputStream;
@@ -356,10 +361,68 @@ public final class DriverConstruction {
      * opened here. Agent direct access uses {@link tools.dscode.browser.AgentProtocolController}.
      */
     public static RemoteWebDriver ready(RemoteWebDriver driver) {
-        AgentDriverHooks.ready(driver);
-        CompositeRuntime.attach(driver);
-        scriptedProtocol(driver);
+        RemoteWebDriver watched = watchQuit(driver);
+        AgentDriverHooks.ready(watched);
+        CompositeRuntime.attach(watched);
+        scriptedProtocol(watched);
+        return watched;
+    }
+
+    /**
+     * Quit and close on this same driver release the debug-port claim.
+     * {@link AgentDriverHooks#ready} binds this instance, and {@code quit()} sends
+     * {@link DriverCommand#QUIT} through the executor installed here.
+     */
+    private static RemoteWebDriver watchQuit(RemoteWebDriver driver) {
+        if (driver == null) return null;
+        CommandExecutor delegate = driver.getCommandExecutor();
+        if (delegate == null || delegate instanceof QuitReleasingExecutor) return driver;
+        setCommandExecutor(driver, new QuitReleasingExecutor(driver, delegate));
         return driver;
+    }
+
+    /** {@link RemoteWebDriver#setCommandExecutor} is protected. The built driver is that class. */
+    private static void setCommandExecutor(RemoteWebDriver driver, CommandExecutor executor) {
+        try {
+            java.lang.reflect.Method method = RemoteWebDriver.class.getDeclaredMethod(
+                    "setCommandExecutor", CommandExecutor.class);
+            method.setAccessible(true);
+            method.invoke(driver, executor);
+        } catch (ReflectiveOperationException | RuntimeException failure) {
+            throw new IllegalStateException(
+                    "error: debug port cannot watch driver quit\n"
+                            + "fix: DriverConstruction.ready installs the quit hook on the built driver",
+                    failure);
+        }
+    }
+
+    /** Releases the bound driver after a successful quit or close, then closes the real executor. */
+    private static final class QuitReleasingExecutor implements CommandExecutor, Closeable {
+        private final RemoteWebDriver driver;
+        private final CommandExecutor delegate;
+
+        private QuitReleasingExecutor(RemoteWebDriver driver, CommandExecutor delegate) {
+            this.driver = driver;
+            this.delegate = delegate;
+        }
+
+        @Override
+        public Response execute(Command command) throws IOException {
+            Response response = delegate.execute(command);
+            if (command != null && releasesDebugPort(command.getName())) {
+                DebugPortOwner.releaseDriver(driver);
+            }
+            return response;
+        }
+
+        @Override
+        public void close() throws IOException {
+            if (delegate instanceof Closeable closeable) closeable.close();
+        }
+
+        private static boolean releasesDebugPort(String name) {
+            return DriverCommand.QUIT.equals(name) || DriverCommand.CLOSE.equals(name);
+        }
     }
 
     /**

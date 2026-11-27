@@ -249,8 +249,9 @@ public final class BrowserVersionResolver {
             downloadFailure = failure;
         }
         if (downloaded != null) {
-            logResolve(block.version, source, downloaded.version);
-            return new Resolution(channel, shown(downloaded.version), source, adapterOf(block), downloaded.binary);
+            Install installed = installedAfterDownload(channel, block.version, downloaded);
+            logResolve(block.version, source, installed.version);
+            return new Resolution(channel, shown(installed.version), source, adapterOf(block), installed.binary);
         }
         Install fallback = best(cachedInstalls(channel), channel, "");
         if (fallback != null) {
@@ -261,6 +262,20 @@ public final class BrowserVersionResolver {
         String detail = downloadFailure == null ? "no build" : "cdn unreachable";
         throw failed("error: no " + channel + " browser for source " + source + " (" + detail + ")",
                 "fix: cache that browser or set browser.source: local");
+    }
+
+    /**
+     * A finished download is read back from the Playwright cache.
+     * The returned install keeps the real version and binary. A cache miss keeps the download result.
+     */
+    private static Install installedAfterDownload(String channel, String requested, Install downloaded) {
+        Install cached = best(cachedInstalls(channel), channel, requested);
+        if (cached == null || cached.binary == null) {
+            Install any = best(cachedInstalls(channel), channel, "");
+            if (any != null && any.binary != null) cached = any;
+        }
+        if (cached != null && cached.binary != null) return cached;
+        return downloaded;
     }
 
     private static Install download(String channel, String version) {
