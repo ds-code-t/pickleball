@@ -15,7 +15,7 @@ First-run rows are filled when that command finishes. Final-run rows are the gre
 | Command | Run | Total | Passed | Failed | Skipped | Duration | Head | Report timestamp |
 |---|---|---:|---:|---:|---:|---|---|---|
 | `.\gradlew.bat :test --console=plain` | first | 2096 | 1986 | 103 | 7 | 1h 27m 50s | 4383ed02e | 2026-11-27T08:00Z–09:24Z |
-| `.\gradlew.bat :test --console=plain` | final | | | | | | | |
+| `.\gradlew.bat :test --console=plain` | final | 2116 | 2109 | 0 | 7 | 1h 30m 53s | 1309439a7 | 2026-11-27T21:54:02Z–23:24:30Z |
 | `.\gradlew.bat :dom-engine:test --console=plain` | first | | | | | | | |
 | `.\gradlew.bat :dom-engine:test --console=plain` | final | | | | | | | |
 | `.\gradlew.bat :pickleball-workbench:test --console=plain` | first | | | | | | | |
@@ -43,7 +43,7 @@ Maven-local wait: checked before the focused re-run. `tasklist` showed only java
 
 The first `:test` ran on head `4383ed02e`. The working tree already held uncommitted fixes. The test JVM compiled before those edits, so this row is the committed head.
 
-Root `:test` skips (7), all pre-existing assumptions:
+Root `:test` skips (7), same on the first run and the final run, all pre-existing assumptions:
 
 | Class | Count | Reason |
 |---|---:|---|
@@ -69,7 +69,7 @@ Root `:test` skips (7), all pre-existing assumptions:
 | ScenarioObjectHookTest | run id `warm-first` is already finished | in-process `WorkbenchDirectRun` left `pkb_run_id` set | a1c51714f | WorkbenchWarmFallbackTest.inProcessRunRestoresThePreviousRunId; ScenarioObjectHookTest | fail | pass (same 10-test batch, 2026-11-27) |
 | StoreSandboxPruneTest | `store run --sandbox=linbox` exit 1, no scenario lines | a cow child stores no parent file bytes, and the run read only the child | a1c51714f | StoreSandboxPruneTest | fail | pass (focused with WarmWorkerReloadTest, BUILD SUCCESSFUL, 1m 2s, 2026-11-27) |
 | WarmWorkerReloadTest | second mark stayed `1` after a classpath prepend, and the first run was undefined before that | `.pickleball/spine/classes` on the worker application classpath pinned `glue.Mark`; the warm loader was not used for `StepRegistry.bind` | a1c51714f | WarmWorkerReloadTest | fail | pass (same focused run, 1m 2s, 2026-11-27) |
-| SuiteDualRunTest.consumerFeaturesMatch and serviceCallExecutionMatches on 7380c4407 | adapter FAILED, native PASSED. `consumerFeaturesMatch`: 8 features diverged. `serviceCallExecutionMatches`: 366 divergences. Full `:test` on that head: 2116 completed, 2 failed, 7 skipped, 1h 30m 52s | A jar-hash hydrate at suite start ran before the test created `src/test/resources/calls`, wiped leftover call rows, and stored 0 files because this repo has no default hydrate directory. The adapter then missed the call library | 2e032ba68 | SuiteDualRunTest.serviceCallExecutionMatches and consumerFeaturesMatch call `hydrateCallLibrary` after the link | fail (head 7380c4407) | pass (class XML start 2026-11-27T20:45:35.181Z, 12 tests, 0 failures, 3866.224s; serviceCallExecutionMatches 23.085s; consumerFeaturesMatch 3586.704s; BUILD SUCCESSFUL in 1h 4m 42s) |
+| SuiteDualRunTest.consumerFeaturesMatch and serviceCallExecutionMatches on 7380c4407 | adapter FAILED, native PASSED. `consumerFeaturesMatch`: 8 features diverged. `serviceCallExecutionMatches`: 366 divergences. Full `:test` on that head: 2116 completed, 2 failed, 7 skipped, 1h 30m 52s | A jar-hash hydrate at suite start ran before the test created `src/test/resources/calls`, wiped leftover call rows, and stored 0 files because this repo has no default hydrate directory. The adapter then missed the call library | 2e032ba68 | SuiteDualRunTest.serviceCallExecutionMatches and consumerFeaturesMatch call `hydrateCallLibrary` after the link | fail (head 7380c4407) | pass (class XML start 2026-11-27T20:45:35.181Z, 12 tests, 0 failures, 3866.224s; serviceCallExecutionMatches 23.085s; consumerFeaturesMatch 3586.704s; BUILD SUCCESSFUL in 1h 4m 42s). Full `:test` on 1309439a7: 2116 tests, 0 failures, 7 skipped |
 
 ## Sweep
 
