@@ -61,6 +61,10 @@ These items stay out of `3.0.0-consumer-fixes`. The roadmap lists them under "No
 | 6.3.6 | Warm PW/CDP at start. |
 | 6.7.3 | UIA tree cache. |
 
+## TypeScript package in the Workbench UI bundle (reinvestigate, per Dan, 2026-11-26)
+
+The `typescript` npm package is pinned in `workbench-ui/package.json` and packed into the jar next to `monaco-editor`, but nothing loads it today. Monaco has its own TypeScript language service, and `.ts` step definitions run through `NodeStepHost` on Node's built-in type stripping. Dan chose to keep it for now. Later, decide whether to drop it (smaller jar, one fewer pinned version) or use it as a fallback that converts `.ts` step files Node's type stripping cannot run (enums, namespaces, parameter properties, decorators) to plain JavaScript first.
+
 ## Spine R5 production wiring (open, found in R5 verification 2026-11-26)
 
 13. `VerbDispatch` does not require `--session=<id>` or a default session created by `spine session new`.
