@@ -1372,6 +1372,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/WorkbenchLaunchOutputContractTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchLaunchTimingTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchOneShotLaunchTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchPagesTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchPointerContractTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchRunReportsTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchSessionCommandsTest.java`

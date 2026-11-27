@@ -6,19 +6,21 @@
 <style>
 :root { --accent: #1f6feb; }
 body { margin: 0; font-family: "Segoe UI", sans-serif; color: #1a1a1a; }
-header { padding: 12px 16px; border-bottom: 4px solid var(--accent); display: flex; gap: 16px; align-items: center; }
+header { padding: 12px 16px; border-bottom: 4px solid var(--accent); display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
 nav { display: flex; gap: 12px; padding: 8px 16px; background: #f4f6f8; }
 nav a { color: var(--accent); font-weight: 600; }
 main { padding: 16px; }
 label { display: block; margin: 8px 0; }
 textarea { width: 100%; min-height: 80px; }
 pre { white-space: pre-wrap; }
+button { margin-right: 8px; }
 </style>
 </head>
 <body>
 <header>
 <h1 id="title">Pickleball</h1>
 <label>Branch <select id="branch"></select></label>
+<label>Search <input id="search" type="text"></label>
 <button id="lease" type="button">Lease</button>
 <label>Answer <input id="ask-id" type="text"><input id="ask-value" type="text">
 <button id="ask-answer" type="button">Answer</button></label>
@@ -32,16 +34,26 @@ pre { white-space: pre-wrap; }
 <main>
 <section id="scenarios">
 <h2>Scenarios</h2>
-<label>Search <input id="search" type="text"></label>
 <label>Definition <input id="definition-path" type="text"></label>
 <button id="open-definition" type="button">open definition</button>
 <button id="save-definition" type="button">Save definition</button>
 <div id="monaco" style="height: 240px; border: 1px solid #ccc"></div>
 <pre id="definition-message"></pre>
+<label>Session <input id="point-session" type="text"></label>
+<label>Handle <input id="point-handle" type="text"></label>
+<label>X <input id="point-x" type="text"></label>
+<label>Y <input id="point-y" type="text"></label>
+<button id="point" type="button">Point</button>
+<div id="scenario-list"></div>
+<div id="step-list"></div>
+<pre id="definition-list"></pre>
 <pre id="scenario-body"></pre>
 </section>
 <section id="globals">
 <h2>Globals</h2>
+<label>Name <input id="var-name" type="text"></label>
+<label>Value <input id="var-value" type="text"></label>
+<button id="var-set" type="button">Set</button>
 <pre id="globals-body"></pre>
 </section>
 <section id="data">
@@ -52,7 +64,6 @@ pre { white-space: pre-wrap; }
 <h2>Raw SQL</h2>
 <label>Query <textarea id="query">SELECT 1</textarea></label>
 <button id="run-sql" type="button">Run</button>
-<button id="point" type="button">Point</button>
 <pre id="sql-body"></pre>
 </section>
 </main>
@@ -83,9 +94,86 @@ function pageId() {
     if (path === "/sql") return "sql";
     return "scenarios";
 }
+function payload(out) {
+    let parsed;
+    try { parsed = JSON.parse(out); } catch (failure) { return null; }
+    if (parsed && Array.isArray(parsed.items) && parsed.items.length) return parsed.items[0];
+    return parsed;
+}
+function glueText(out) {
+    const body = payload(out);
+    if (body && typeof body.text === "string") return body.text;
+    return "";
+}
+function showCli(target, result) {
+    const body = payload(result.out || "");
+    const parts = [];
+    if (result.err) parts.push(result.err);
+    if (body && body.error) parts.push(body.error);
+    if (body && body.fix) parts.push(body.fix);
+    if (!parts.length) parts.push(result.out || "");
+    target.textContent = parts.join("\n");
+}
+function cellsOf(row) {
+    if (Array.isArray(row)) return row.map(function (cell) { return cell == null ? "" : String(cell); });
+    if (row && typeof row === "object") {
+        return Object.keys(row).map(function (key) { return row[key] == null ? "" : String(row[key]); });
+    }
+    return [row == null ? "" : String(row)];
+}
+function keepRow(row, text) {
+    if (!text) return true;
+    const cells = cellsOf(row);
+    if (text.indexOf("exact:") === 0) {
+        const want = text.substring("exact:".length);
+        return cells.some(function (cell) { return cell === want; });
+    }
+    const joined = cells.join("\t");
+    if (text.indexOf("re:") === 0) {
+        try { return new RegExp(text.substring("re:".length)).test(joined); }
+        catch (failure) { return false; }
+    }
+    return joined.indexOf(text) >= 0;
+}
+function filterDocument(out, text, key) {
+    const body = payload(out);
+    if (!body || !Array.isArray(body[key])) return out || "";
+    return JSON.stringify(body[key].filter(function (row) { return keepRow(row, text); }));
+}
+function editorLanguage(path) {
+    if (path.endsWith(".ts")) return "typescript";
+    if (path.endsWith(".js")) return "javascript";
+    return "java";
+}
+function paint(name) {
+    document.getElementById("title").textContent = name;
+    document.title = name;
+    let hash = 0;
+    for (let index = 0; index < name.length; index++) hash = (hash + name.charCodeAt(index)) % accents.length;
+    document.documentElement.style.setProperty("--accent", accents[hash]);
+}
+function definitionMatches(source, stepText) {
+    if (!stepText) return false;
+    return source.indexOf('"' + stepText + '"') >= 0
+        || source.indexOf("'" + stepText + "'") >= 0
+        || source.indexOf("`" + stepText + "`") >= 0;
+}
 show(pageId());
 document.getElementById("search").addEventListener("change", async function () {
     const text = document.getElementById("search").value;
+    const page = pageId();
+    if (page === "data") {
+        await loadFiles(text);
+        return;
+    }
+    if (page === "globals") {
+        await loadVars(text);
+        return;
+    }
+    if (page === "sql") {
+        await runSql();
+        return;
+    }
     const args = ["query", "--json"];
     if (text) args.push("--text=" + text);
     const result = await callStore(args);
@@ -108,23 +196,28 @@ function loadMonaco() {
         document.body.appendChild(script);
     });
 }
+async function setEditor(path, value) {
+    await loadMonaco();
+    const name = editorLanguage(path);
+    if (!definitionEditor) {
+        definitionEditor = window.monaco.editor.create(document.getElementById("monaco"), {
+            value: value,
+            language: name,
+            automaticLayout: true
+        });
+        return;
+    }
+    definitionEditor.setValue(value);
+    const model = definitionEditor.getModel ? definitionEditor.getModel() : null;
+    if (model && window.monaco.editor.setModelLanguage) window.monaco.editor.setModelLanguage(model, name);
+}
 document.getElementById("open-definition").addEventListener("click", async function () {
     const path = document.getElementById("definition-path").value;
     const result = await callStore(["glue", "show", "--path=" + path, "--json"]);
     const message = document.getElementById("definition-message");
-    message.textContent = (result.err || "") + (result.out || "");
+    showCli(message, result);
     try {
-        await loadMonaco();
-        const value = result.out || "";
-        if (!definitionEditor) {
-            definitionEditor = window.monaco.editor.create(document.getElementById("monaco"), {
-                value: value,
-                language: path.endsWith(".ts") ? "typescript" : "java",
-                automaticLayout: true
-            });
-        } else {
-            definitionEditor.setValue(value);
-        }
+        await setEditor(path, glueText(result.out || ""));
     } catch (failure) {
         message.textContent = (message.textContent || "") + "\nmonaco did not load";
     }
@@ -133,10 +226,17 @@ document.getElementById("save-definition").addEventListener("click", async funct
     const path = document.getElementById("definition-path").value;
     const text = definitionEditor ? definitionEditor.getValue() : "";
     const result = await callStore(["glue", "put", "--path=" + path, "--text=" + text]);
-    document.getElementById("definition-message").textContent = (result.err || "") + (result.out || "");
+    showCli(document.getElementById("definition-message"), result);
 });
 document.getElementById("point").addEventListener("click", async function () {
-    const result = await callStore(["--x=0", "--y=0"], "point");
+    const session = document.getElementById("point-session").value;
+    const handle = document.getElementById("point-handle").value;
+    const x = document.getElementById("point-x").value;
+    const y = document.getElementById("point-y").value;
+    const args = ["--session=" + session];
+    if (handle) args.push("--handle=" + handle);
+    else args.push("--x=" + x, "--y=" + y);
+    const result = await callStore(args, "point");
     document.getElementById("scenario-body").textContent = (result.out || "") + (result.err || "");
 });
 document.getElementById("lease").addEventListener("click", async function () {
@@ -149,45 +249,127 @@ document.getElementById("ask-answer").addEventListener("click", async function (
     const result = await callStore(["--id=" + id, "--value=" + value], "ask-answer");
     document.getElementById("scenario-body").textContent = (result.out || "") + (result.err || "");
 });
-document.getElementById("run-sql").addEventListener("click", async function () {
+async function runSql() {
     const args = ["sql", "--query=" + document.getElementById("query").value, "--json"];
     const text = document.getElementById("search").value;
     if (text) args.push("--text=" + text);
     const result = await callStore(args);
     document.getElementById("sql-body").textContent = (result.out || "") + (result.err || "");
+}
+document.getElementById("run-sql").addEventListener("click", runSql);
+async function loadFiles(text) {
+    const args = ["files", "list", "--json"];
+    if (text) args.push("--text=" + text);
+    const result = await callStore(args);
+    document.getElementById("data-body").textContent = filterDocument(result.out || "", text, "files");
+}
+async function loadVars(text) {
+    const args = ["var", "list", "--json"];
+    if (text) args.push("--text=" + text);
+    const result = await callStore(args);
+    document.getElementById("globals-body").textContent = filterDocument(result.out || "", text, "vars");
+}
+document.getElementById("var-set").addEventListener("click", async function () {
+    const name = document.getElementById("var-name").value;
+    const value = document.getElementById("var-value").value;
+    const result = await callStore(["var", "set", name, value]);
+    showCli(document.getElementById("definition-message"), result);
+    await loadVars(document.getElementById("search").value);
 });
+function renderScenarios(out) {
+    const body = payload(out);
+    const scenarios = body && Array.isArray(body.scenarios) ? body.scenarios : [];
+    const list = document.getElementById("scenario-list");
+    list.textContent = "";
+    scenarios.forEach(function (scenario) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = (scenario.keyword || "Scenario") + " " + (scenario.name || "");
+        button.addEventListener("click", async function () { await expandScenario(scenario); });
+        list.appendChild(button);
+    });
+}
+async function expandScenario(scenario) {
+    const feature = scenario.path || "";
+    const which = scenario.ord != null ? String(scenario.ord) : (scenario.name || "");
+    const result = await callStore(["steps", "list", "--json", "--feature=" + feature, "--scenario=" + which]);
+    const body = payload(result.out || "");
+    const steps = body && Array.isArray(body.steps) ? body.steps : [];
+    const list = document.getElementById("step-list");
+    list.textContent = "";
+    steps.forEach(function (step) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = (step.keyword || "") + " " + (step.text || "");
+        button.addEventListener("click", async function () { await expandStep(step); });
+        list.appendChild(button);
+    });
+    document.getElementById("scenario-body").textContent = (result.out || "") + (result.err || "");
+}
+async function expandStep(step) {
+    const listed = await callStore(["glue", "list", "--json"]);
+    const body = payload(listed.out || "");
+    const items = body && Array.isArray(body.items) ? body.items : [];
+    const paths = items.map(function (item) { return item.path || ""; }).filter(function (path) {
+        return path.endsWith(".java") || path.endsWith(".js") || path.endsWith(".ts");
+    });
+    document.getElementById("definition-list").textContent = paths.join("\n");
+    let matched = "";
+    let source = "";
+    for (let index = 0; index < paths.length; index++) {
+        const shown = await callStore(["glue", "show", "--path=" + paths[index], "--json"]);
+        const text = glueText(shown.out || "");
+        if (!matched && definitionMatches(text, step.text || "")) {
+            matched = paths[index];
+            source = text;
+        }
+    }
+    if (!matched) return;
+    document.getElementById("definition-path").value = matched;
+    try {
+        await setEditor(matched, source);
+    } catch (failure) {
+        document.getElementById("definition-message").textContent += "\nmonaco did not load";
+    }
+}
 callStore(["sandbox", "list", "--json"]).then(function (result) {
     const body = result.out || "";
-    document.getElementById("scenario-body").textContent = body;
-    let name = "main";
-    const match = body.match(/"name"\s*:\s*"([^"]+)"/);
-    if (match) name = match[1];
+    const parsed = payload(body);
+    const rows = parsed && Array.isArray(parsed.sandboxes) ? parsed.sandboxes : [];
+    let names = rows.map(function (row) { return row.name; }).filter(Boolean);
+    if (!names.length) {
+        const pattern = /"name"\s*:\s*"([^"]+)"/g;
+        let match;
+        while ((match = pattern.exec(body))) names.push(match[1]);
+    }
     const select = document.getElementById("branch");
-    const option = document.createElement("option");
-    option.value = name;
-    option.textContent = name;
-    select.appendChild(option);
-    document.getElementById("title").textContent = name;
-    document.title = name;
-    let hash = 0;
-    for (let index = 0; index < name.length; index++) hash = (hash + name.charCodeAt(index)) % accents.length;
-    document.documentElement.style.setProperty("--accent", accents[hash]);
+    select.textContent = "";
+    names.forEach(function (name) {
+        const option = document.createElement("option");
+        option.value = name;
+        option.textContent = name;
+        select.appendChild(option);
+    });
+    let current = names[0] || "main";
+    rows.forEach(function (row) {
+        if (row.inUse && row.name) current = row.name;
+    });
+    select.value = current;
+    paint(current);
 });
 document.getElementById("branch").addEventListener("change", function () {
     const name = document.getElementById("branch").value;
     callStore(["sandbox", "use", name]);
-    document.getElementById("title").textContent = name;
-    document.title = name;
+    paint(name);
 });
 callStore(["scenarios", "list", "--json"]).then(function (result) {
-    if (result.out) document.getElementById("scenario-body").textContent = result.out;
+    if (result.out) {
+        renderScenarios(result.out);
+        document.getElementById("scenario-body").textContent = result.out;
+    }
 });
-callStore(["var", "list", "--json"]).then(function (result) {
-    document.getElementById("globals-body").textContent = (result.out || "") + (result.err || "");
-});
-callStore(["files", "list", "--json"]).then(function (result) {
-    document.getElementById("data-body").textContent = (result.out || "") + (result.err || "");
-});
+loadVars("");
+loadFiles("");
 </script>
 </body>
 </html>
