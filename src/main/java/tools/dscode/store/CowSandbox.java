@@ -154,6 +154,11 @@ public final class CowSandbox {
                 DeltaLog.append(connection, project, kind, change.table(), change.pk(), before, after, true);
                 deltas++;
             }
+            // The append stays expensive. Flatten so the destination head matches
+            // the promoted payload before this command returns.
+            if (deltas > 0) {
+                HeadMaterializer.flatten(connection, project);
+            }
         }
         if (!sync.isEmpty()) {
             Binding remembered = StoreScope.current();

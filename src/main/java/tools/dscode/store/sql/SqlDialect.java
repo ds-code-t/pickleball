@@ -562,7 +562,7 @@ public final class SqlDialect {
      * A database that already has {@code hydration_spine} still needs columns added
      * by a later build. The full DDL stays on the slow path. This check looks up
      * the newest columns, then {@link #ensureHydrationColumns} when one is missing.
-     * {@code steps.context_scope}, {@code steps.visual_ref}, {@code step_definitions.host}, the {@code fixtures} table, and {@code pins.head_id} are all required.
+     * {@code steps.context_scope}, {@code steps.visual_ref}, {@code step_definitions.host}, the {@code fixtures} table, {@code pins.head_id}, and the {@code branch_parents} table are all required.
      */
     private static void ensureAdditiveOnReady(SqlSession session) throws SQLException {
         if (additiveColumnsPresent(session)) return;
@@ -583,7 +583,9 @@ public final class SqlDialect {
                     && "fixtures".equals(session.scalar(
                     "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'fixtures'"))
                     && "head_id".equals(session.scalar(
-                    "SELECT name FROM pragma_table_info('pins') WHERE name = ?", "head_id"));
+                    "SELECT name FROM pragma_table_info('pins') WHERE name = ?", "head_id"))
+                    && "branch_parents".equals(session.scalar(
+                    "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'branch_parents'"));
         } catch (SQLException ignored) {
             return false;
         }
@@ -640,6 +642,13 @@ public final class SqlDialect {
         addColumn(session, "steps", "context_scope", "TEXT");
         addColumn(session, "steps", "visual_ref", "TEXT");
         addColumn(session, "pins", "head_id", "TEXT NOT NULL DEFAULT ''");
+        session.script("""
+                CREATE TABLE IF NOT EXISTS branch_parents (
+                    name TEXT PRIMARY KEY,
+                    parent_name TEXT,
+                    linked INTEGER NOT NULL DEFAULT 0
+                )
+                """);
         session.script("""
                 CREATE TABLE IF NOT EXISTS fixtures (
                     name TEXT NOT NULL,

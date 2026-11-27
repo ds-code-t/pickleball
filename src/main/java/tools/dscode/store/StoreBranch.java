@@ -6,6 +6,7 @@ import tools.dscode.store.sql.SqlStore;
 import tools.dscode.store.sql.SqliteOpen;
 
 import java.io.PrintStream;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -13,6 +14,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -20,7 +22,8 @@ import java.util.Map;
 
 /**
  * {@code store branch}. Fork copies a finished run's pin into a cow sandbox.
- * Discard deletes an empty fork. Promote, link, and tree are later phases.
+ * Discard deletes an empty fork. Promote calls {@link CowSandbox#promote}.
+ * Link stores optional parent metadata. Tree lists deltas for one file.
  * The page posts these verbs. It does not open SQLite.
  */
 public final class StoreBranch {
@@ -33,6 +36,9 @@ public final class StoreBranch {
             return switch (action) {
                 case "fork" -> fork(project, tokens, out, err);
                 case "discard" -> discard(project, tokens, out, err);
+                case "promote" -> CowSandbox.promote(project, tokens, out, err);
+                case "link" -> link(project, tokens, out, err);
+                case "tree" -> tree(project, tokens, out, err);
                 default -> {
                     err.println("error: Unknown Store branch command: " + (action.isEmpty() ? "branch" : action));
                     err.println("fix: store branch fork --from-run=<runId> [--name=<name>]");
@@ -135,6 +141,104 @@ public final class StoreBranch {
         return StoreSandbox.execute(project, drop, out, err);
     }
 
+    private static int link(Path project, List<String> tokens, PrintStream out, PrintStream err) throws Exception {
+        String name = tokens.size() < 3 || tokens.get(2).startsWith("--") ? "" : tokens.get(2);
+        String parent = option(tokens, "--parent=");
+        boolean on = tokens.contains("--on");
+        boolean off = tokens.contains("--off");
+        if (name.isBlank() || parent == null || parent.isBlank() || on == off) {
+            err.println("error: branch link needs <name> --parent=<other> --on|--off");
+            err.println("fix: store branch link <name> --parent=<other> --on|--off");
+            return 2;
+        }
+        if (!Files.isRegularFile(StorePaths.sandboxDatabase(project, name))) {
+            err.println("error: unknown sandbox " + name);
+            err.println("fix: store branch fork --from-run=<runId> --name=" + name);
+            return 2;
+        }
+        Binding binding = Binding.sandbox(name);
+        int linked = on ? 1 : 0;
+        try (SqlStore store = SqlStore.open(project, binding)) {
+            Connection connection = store.session().connection();
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO branch_parents(name, parent_name, linked)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(name) DO UPDATE SET parent_name = excluded.parent_name, linked = excluded.linked
+                    """)) {
+                statement.setString(1, name);
+                statement.setString(2, parent);
+                statement.setInt(3, linked);
+                statement.executeUpdate();
+            }
+            if (!connection.getAutoCommit()) connection.commit();
+            try (Statement statement = connection.createStatement()) {
+                statement.execute("PRAGMA wal_checkpoint(TRUNCATE)");
+            }
+        } finally {
+            SqlConnections.closeBranch(project, binding.branch());
+        }
+        out.println("link " + name);
+        out.println("parent " + parent);
+        out.println("linked " + linked);
+        return 0;
+    }
+
+    private static int tree(Path project, List<String> tokens, PrintStream out, PrintStream err) throws Exception {
+        String file = option(tokens, "--file=");
+        if (file == null || file.isBlank()) {
+            err.println("error: branch tree needs --file=<relative>");
+            err.println("fix: store branch tree --file=<relative>");
+            return 2;
+        }
+        String relative = StorePaths.normalizeRelative(file);
+        List<Hit> hits = new ArrayList<>();
+        Path sandboxes = StorePaths.root(project).resolve("sandboxes");
+        if (Files.isDirectory(sandboxes)) {
+            try (DirectoryStream<Path> dirs = Files.newDirectoryStream(sandboxes)) {
+                for (Path dir : dirs) {
+                    if (!Files.isDirectory(dir)) continue;
+                    Path database = dir.resolve("source.db");
+                    if (Files.isRegularFile(database)) {
+                        collect(database, dir.getFileName().toString(), relative, hits);
+                    }
+                }
+            }
+        }
+        if (Files.isRegularFile(StorePaths.mainDatabase(project))) {
+            collect(StorePaths.mainDatabase(project), "main", relative, hits);
+        }
+        hits.sort(Comparator.comparing(Hit::at).reversed().thenComparing(Comparator.comparingLong(Hit::seq).reversed()));
+        if (tokens.contains("--json")) {
+            StringBuilder body = new StringBuilder();
+            body.append("{\"file\":\"").append(escape(relative)).append("\",\"rows\":[");
+            for (int index = 0; index < hits.size(); index++) {
+                if (index > 0) body.append(',');
+                Hit hit = hits.get(index);
+                body.append("{\"branch\":\"").append(escape(hit.branch()))
+                        .append("\",\"kind\":\"").append(escape(hit.kind()))
+                        .append("\",\"seq\":").append(hit.seq()).append('}');
+            }
+            body.append("]}");
+            out.println(body);
+            return 0;
+        }
+        out.println("file " + relative);
+        for (Hit hit : hits) {
+            out.println("branch " + hit.branch() + " kind=" + hit.kind() + " seq=" + hit.seq());
+        }
+        return 0;
+    }
+
+    private static void collect(Path database, String branch, String file, List<Hit> hits) throws Exception {
+        try (Connection connection = SqliteOpen.open(database)) {
+            for (DeltaLog.Delta delta : DeltaLog.after(connection, 0L)) {
+                if (delta == null || delta.pk() == null || !file.equals(delta.pk())) continue;
+                String at = delta.at() == null ? "" : delta.at();
+                hits.add(new Hit(at, delta.seq(), branch, delta.kind() == null ? "" : delta.kind()));
+            }
+        }
+    }
+
     /**
      * Lowercase run id, other characters become hyphens, at most 48 characters.
      * A leading digit is prefixed so the sandbox name matches {@link Binding}.
@@ -199,5 +303,8 @@ public final class StoreBranch {
     }
 
     private record RunPin(String commit, String head, String sandbox) {
+    }
+
+    private record Hit(String at, long seq, String branch, String kind) {
     }
 }

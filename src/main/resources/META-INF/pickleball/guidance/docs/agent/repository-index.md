@@ -620,6 +620,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/engine/EngineCli.java`
 - `src/main/java/tools/dscode/engine/EngineConfig.java`
 - `src/main/java/tools/dscode/engine/EngineLog.java`
+- `src/main/java/tools/dscode/engine/EngineMap.java`
 - `src/main/java/tools/dscode/engine/EngineOptions.java`
 - `src/main/java/tools/dscode/engine/match/AmbiguousMatchException.java`
 - `src/main/java/tools/dscode/engine/match/ForeignStepHost.java`
@@ -650,6 +651,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/engine/resolve/ScenarioResolver.java`
 - `src/main/java/tools/dscode/engine/runtime/NativeScenarioCatalog.java`
 - `src/main/java/tools/dscode/engine/runtime/NoopGlueMode.java`
+- `src/main/java/tools/dscode/engine/runtime/PreStepHook.java`
 - `src/main/java/tools/dscode/engine/runtime/ResourceGate.java`
 - `src/main/java/tools/dscode/engine/runtime/SnapshotChannel.java`
 - `src/main/java/tools/dscode/engine/runtime/SnapshotContextWorker.java`
@@ -1103,6 +1105,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/engine/PickleballEngineTest.java`
 - `src/test/java/tools/dscode/engine/resolve/ResolutionParityTest.java`
 - `src/test/java/tools/dscode/engine/resolve/ScenarioResolverTest.java`
+- `src/test/java/tools/dscode/engine/runtime/PreStepHookTest.java`
 - `src/test/java/tools/dscode/engine/runtime/ResourceGateTest.java`
 - `src/test/java/tools/dscode/engine/runtime/SnapshotContextGateTest.java`
 - `src/test/java/tools/dscode/engine/runtime/StepCeilingTest.java`
@@ -1287,6 +1290,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/ScenarioObjectTest.java`
 - `src/test/java/tools/dscode/store/AgentEnvelopeStoreTest.java`
 - `src/test/java/tools/dscode/store/BranchForkTest.java`
+- `src/test/java/tools/dscode/store/BranchTreeTest.java`
 - `src/test/java/tools/dscode/store/CategoryEditTest.java`
 - `src/test/java/tools/dscode/store/ChangesCliTest.java`
 - `src/test/java/tools/dscode/store/ConflictChoiceTest.java`
@@ -1297,6 +1301,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/store/EnabledFlagTest.java`
 - `src/test/java/tools/dscode/store/EntityResolutionTest.java`
 - `src/test/java/tools/dscode/store/FileEditTest.java`
+- `src/test/java/tools/dscode/store/ForkGluePutTest.java`
 - `src/test/java/tools/dscode/store/GherkinRewriteTest.java`
 - `src/test/java/tools/dscode/store/GlueEditTest.java`
 - `src/test/java/tools/dscode/store/GlueStaticScanTest.java`
