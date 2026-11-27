@@ -6,7 +6,7 @@ Requires R1 and R2. R5 and R6 may already be on the branch. This roadmap does no
 
 Every phase is mandatory and must be completed in full. Nothing in R7 is optional or deferred. Stop only on an honest test failure you cannot fix, or on a hard-rule violation.
 
-Targeted tests only until P4 is green. Do not run the full regression here. That is the last phase of R8. Windows only. Append new Windows-only class names to `docs/tech-debt.md`.
+Targeted tests only until P4 is green. The end-of-work regression is the short (Chrome + Windows) tier in [Regression tiers](final-regression.md). It runs only after every roadmap and fix is done and verified with targeted tests. The full tier runs only when Dan asks. Windows only. Append new Windows-only class names to `docs/tech-debt.md`.
 
 Never weaken, skip, or delete a test. Keep Gherkin. Step annotations stay single string literals. Never run `.\gradlew.bat --stop`. `store_schema` stays 1. `cross_schema` starts at 1.
 

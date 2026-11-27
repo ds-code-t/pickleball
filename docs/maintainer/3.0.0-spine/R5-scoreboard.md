@@ -1,6 +1,6 @@
 # R5 scoreboard — workbench one control plane
 
-Roadmap: `docs/roadmaps/3.0.0-spine/R5-workbench-one-control-plane.md`. Design: `docs/plans/2026-11-25-spine-design.md`. Branch `3.0.0-spine`. Every phase is mandatory. Windows only. Targeted tests per phase. Full regression is the last phase of R8, not this roadmap. Dan approves the design's Distribution and licensing section before P4 packages npm modules.
+Roadmap: `docs/roadmaps/3.0.0-spine/R5-workbench-one-control-plane.md`. Design: `docs/plans/2026-11-25-spine-design.md`. Branch `3.0.0-spine`. Every phase is mandatory. Windows only. Targeted tests per phase. The end-of-work regression is the short (Chrome + Windows) tier in `docs/roadmaps/3.0.0-spine/final-regression.md`, not this roadmap. The full tier runs only when Dan asks. Dan approves the design's Distribution and licensing section before P4 packages npm modules.
 
 | Phase | Items | Status | SHAs | CI | Targeted tests run (filters, pass/fail) | Windows live repro | Notes / blockers |
 |---|---|---|---|---|---|---|---|

@@ -6,7 +6,7 @@ Requires R1 on the same branch. Design: `docs/plans/2026-11-25-spine-design.md`.
 
 Every phase is mandatory and must be completed in full. Nothing in R2 is optional or deferred. Stop only on an honest test failure you cannot fix, or on a hard-rule violation.
 
-Targeted tests only. Full regression waits until the end of R8. Windows only. Append new Windows-only class names to the Linux and macOS section of `docs/tech-debt.md`. Do not delete that section.
+Targeted tests only. The end-of-work regression is the short (Chrome + Windows) tier in [Regression tiers](final-regression.md). It runs only after every roadmap and fix is done and verified with targeted tests. The full tier runs only when Dan asks. Windows only. Append new Windows-only class names to the Linux and macOS section of `docs/tech-debt.md`. Do not delete that section.
 
 Never weaken, skip, or delete a test. Keep Gherkin syntax. Step annotations stay single string literals. Never run `.\gradlew.bat --stop`. When a phase removes an empty method body, the consumer scenario that used to assert "this does nothing" must be updated to the new real behavior in the same change. That is not a weakened assertion. It is the behavior the leftover asked for.
 

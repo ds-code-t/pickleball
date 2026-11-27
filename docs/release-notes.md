@@ -2,6 +2,8 @@
 
 ## 3.0.0
 
+Regression tiers. The 3.0.0-spine regression plan (the maintainer roadmap page for regression tiers) defines two tiers. The full tier covers every suite, browser, and platform and runs only when Dan explicitly asks. The short tier is Chrome on Windows. It runs only at the end of all work, after every phase and fix has passed its targeted tests. Failures from either tier are fixed in one batch, and the tier runs again only after all the targeted fix tests pass together. Before this, one Windows-only final regression ran after R6.
+
 Cow sandbox runs. A run bound to a copy-on-write sandbox does not auto-hydrate that child. The child has no jar hash of its own and does not hold parent file bytes, so a full hydrate would delete the child's feature put and parse the on-disk file. Discovery keeps the child row. A file read with no child row uses the parent file unless the child deleted the path. An explicit `store hydrate` is unchanged. Main and a `--mode=copy` sandbox still auto-hydrate.
 
 Retry results. A `RETRY` attempt stays inside that step. The native result keeps the `RETRY` line and does not add a step for the attempt. Cucumber does not emit a finish event for the attempt, so the two engines list the same step. The attempt does not take a `FAIL ERROR` id, so a later undefined step keeps the same id on both engines.

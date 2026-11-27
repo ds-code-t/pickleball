@@ -1,6 +1,6 @@
 # R6 scoreboard — dynamic mode, branching, and promote
 
-Roadmap: `docs/roadmaps/3.0.0-spine/R6-dynamic-mode-branching-promote.md`. Design: `docs/plans/2026-11-25-spine-design.md`. Branch `3.0.0-spine`. Every phase is mandatory. Windows only. Targeted tests per phase. The full regression runs once, after R6, on Dan's Windows PC (`docs/roadmaps/3.0.0-spine/final-regression.md`). It is not a phase of this roadmap.
+Roadmap: `docs/roadmaps/3.0.0-spine/R6-dynamic-mode-branching-promote.md`. Design: `docs/plans/2026-11-25-spine-design.md`. Branch `3.0.0-spine`. Every phase is mandatory. Windows only. Targeted tests per phase. The end-of-work regression is the short (Chrome + Windows) tier in `docs/roadmaps/3.0.0-spine/final-regression.md`, not this roadmap. The full tier runs only when Dan asks. It is not a phase of this roadmap.
 
 Promote verb: the R1 storage primitive stays `store sandbox promote <name> --to=parent|top --logs=clear|archive`. R6 `store branch promote` calls that same path. `store sandbox promote` stays. There is no second implementation.
 

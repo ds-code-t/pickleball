@@ -6,11 +6,11 @@ Requires R1, R3, R4, and R7. Design: `docs/plans/2026-11-25-spine-design.md`. Sc
 
 Every phase is mandatory and must be completed in full. Nothing in R8 is optional or deferred except the Linux and macOS execution of tests, which stays in `docs/tech-debt.md`. Stop only on an honest test failure you cannot fix, or on a hard-rule violation.
 
-P1, P2, and P3 run targeted tests only. P4 runs those targeted tests and then the full Windows regression described at the bottom of P4. Do not run the full regression before P4 is otherwise green. Do not run Linux or macOS agents.
+P1, P2, and P3 run targeted tests only. P4 runs those targeted tests. The end-of-work regression is the short (Chrome + Windows) tier in [Regression tiers](final-regression.md). It runs only after every roadmap and fix is done and verified with targeted tests. The full tier runs only when Dan asks. Do not run Linux or macOS agents.
 
 Never weaken, skip, or delete a test. Keep Gherkin. Step annotations stay single string literals. Never run `.\gradlew.bat --stop`.
 
-Fetch and rebase before every push. Push after every green phase, including after the full regression if you had to fix it. Each git command stands alone. Before every push run `python scripts/sync_consumer_guidance.py` and `python scripts/refresh_agent_index.py`. Update `tools.dscode.browser.SurfaceAssetsTest` if surface-asset bytes change.
+Fetch and rebase before every push. Push after every green phase, and after each batch of regression fixes. Each git command stands alone. Before every push run `python scripts/sync_consumer_guidance.py` and `python scripts/refresh_agent_index.py`. Update `tools.dscode.browser.SurfaceAssetsTest` if surface-asset bytes change.
 
 `pkb_warm` defaults to `off`. A test that wants the warm JVM sets it. CI and `mvn test` stay cold unless a test sets the flag.
 
@@ -167,7 +167,7 @@ Create `src/test/java/tools/dscode/browser/DebugPortOwnerTest.java`. Two attache
 .\gradlew.bat :test --tests tools.dscode.browser.BrowserVersionResolverTest --tests tools.dscode.browser.SeleniumBidiCommandTest --tests tools.dscode.browser.DebugPortOwnerTest --console=plain
 ```
 
-## P4 — Warm CDP, UIA cache, and the full regression
+## P4 — Warm CDP, UIA cache, and the end-of-work regression
 
 ### Functionality
 
@@ -190,29 +190,9 @@ Create `dom-engine/src/test/java/dev/domengine/desktop/DesktopTreeCacheTest.java
 .\gradlew.bat :dom-engine:test --tests dev.domengine.desktop.DesktopTreeCacheTest --console=plain
 ```
 
-### Full regression
+### End-of-work regression
 
-Run this only after the targeted tests above pass. Windows only. Record pass and fail counts on the R8 scoreboard. A failure stops the roadmap until it is fixed honestly. Do not delete the failing test.
-
-```
-.\gradlew.bat :test --console=plain
-.\gradlew.bat :dom-engine:test --console=plain
-.\gradlew.bat :pickleball-workbench:test --console=plain
-.\gradlew.bat :pickleball-control-protocol:test --console=plain
-.\gradlew.bat :pickleball-control-api:test --console=plain
-.\gradlew.bat publishToMavenLocal
-.\maven-consumer-project\mvnw.cmd -f maven-consumer-project\pom.xml -U test -Dpkb_runvars.pkb_browser=CHROME_HEADLESS -Dpkb_runvars.pkb_tags=@all
-```
-
-`@all` is allowed here because this is the end of the last roadmap, not a workbench migration check. Phases before this one do not run `@all`.
-
-Also run:
-
-```
-python scripts/verify_agent_contract.py
-python scripts/refresh_agent_index.py --check
-python scripts/sync_consumer_guidance.py --check
-```
+R8 P4 does not run a regression of its own. The end-of-work regression is the short (Chrome + Windows) tier in [Regression tiers](final-regression.md), run after every roadmap and fix is done and verified. Its counts go in `docs/maintainer/3.0.0-spine/final-regression-scoreboard.md`. Failures are fixed in one batch, as that file describes. Do not delete a failing test. The full tier runs only when Dan asks. The exact commands for both tiers, including the agent-contract and `--check` scripts, are in that file.
 
 Append every new Windows-only live class from R1 through R8 that did not run on Linux or macOS to the existing section in `docs/tech-debt.md`. Do not remove the classes that were already listed.
 
@@ -222,4 +202,4 @@ Append every new Windows-only live class from R1 through R8 that did not run on 
 
 ### Done when
 
-The scoreboard rows P1 through P4 are `done`, each with a SHA and a test count. P4's notes include the full-regression counts. The branch is pushed. Linux and macOS were not run.
+The scoreboard rows P1 through P4 are `done`, each with a SHA and a test count. P4's notes point to `docs/maintainer/3.0.0-spine/final-regression-scoreboard.md` for the short-tier regression counts. The branch is pushed. Linux and macOS were not run.

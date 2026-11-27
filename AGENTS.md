@@ -204,6 +204,8 @@ Tests must cover the requested behavior and meaningful compatibility or edge cas
 
 For Workbench, control-protocol, worker bridge, launcher, or nested-payload changes, never use `@all` as migration validation. Run only the smallest affected tags (currently `@control-bridge` and/or `@step-override-bridge`) and set `-Dpkb_runvars.pkb_parallel=80` when the focused environment can safely benefit. Preserve this rule in future Workbench plans and handovers.
 
+Regression has two tiers, set out in `docs/roadmaps/3.0.0-spine/final-regression.md`. The **full** tier covers every suite, every supported browser, Windows, Linux, macOS, the consumer project, and the CI-equivalent checks. Never run it unless Dan explicitly asks for the full regression. The **short** tier is Chrome on Windows, on Dan's PC. It is the default end-of-work regression. Run it only when every roadmap is implemented and every phase and fix has passed its targeted tests. If a tier run fails, fix every failure in one batch where practical and run all the fixes' targeted tests together. Run the tier again only when that whole batch passes. Until then, run targeted tests only.
+
 ### Workbench controller-isolation invariant
 
 Pickleball Workbench is the control plane, not a second Pickleball runtime. The only shared Java boundary is `pickleball-control-protocol`. Workbench must not compile against, resolve, shade, load, or execute the root Pickleball project, `tools.dscode:pickleball`, `pickleball-control-api`, the consumer's classes, or runtime libraries such as Cucumber, Selenium, and REST-assured. Never “fix” a Workbench compilation problem by restoring `implementation project(':')`, `pickleballPublishedElements`, a Pickleball Maven dependency, or core shading.

@@ -6,7 +6,7 @@ Requires R4. Design: `docs/plans/2026-11-25-spine-design.md`. Dan approves the D
 
 Every phase is mandatory and must be completed in full. Nothing in R5 is optional or deferred. The code tab is this roadmap, not a later milestone. Stop only on an honest test failure you cannot fix, or on a hard-rule violation.
 
-Targeted tests only. Do not run consumer `@all`. Phases that touch the control bridge run `@control-bridge` and `@step-override-bridge` only when that phase changes bridge payloads, with `-Dpkb_runvars.pkb_parallel=80`. R5's window is a renderer over existing verbs. It does not change the bridge payload unless a test proves it must. Prefer the in-process CLI tests. Full regression waits until the end of R8. Windows only.
+Targeted tests only. Do not run consumer `@all`. Phases that touch the control bridge run `@control-bridge` and `@step-override-bridge` only when that phase changes bridge payloads, with `-Dpkb_runvars.pkb_parallel=80`. R5's window is a renderer over existing verbs. It does not change the bridge payload unless a test proves it must. Prefer the in-process CLI tests. The end-of-work regression is the short (Chrome + Windows) tier in [Regression tiers](final-regression.md). It runs only after every roadmap and fix is done and verified with targeted tests. The full tier runs only when Dan asks. Windows only.
 
 Never weaken, skip, or delete a test. Keep Gherkin. Step annotations stay single string literals. Never run `.\gradlew.bat --stop`.
 
