@@ -1322,6 +1322,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/OptInSetupTest.java`
 - `src/test/java/tools/dscode/launcher/OptionalAddonsLiveTest.java`
 - `src/test/java/tools/dscode/launcher/OverlapTest.java`
+- `src/test/java/tools/dscode/launcher/OverlayAckLiveTest.java`
 - `src/test/java/tools/dscode/launcher/PageJvmRouteTest.java`
 - `src/test/java/tools/dscode/launcher/PerfLiveTest.java`
 - `src/test/java/tools/dscode/launcher/PickleballWorkbenchLauncherTest.java`
@@ -1336,6 +1337,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/RefLifetimeTest.java`
 - `src/test/java/tools/dscode/launcher/RefWaitTest.java`
 - `src/test/java/tools/dscode/launcher/Release218RecommendationsTest.java`
+- `src/test/java/tools/dscode/launcher/RendererShownRunTest.java`
+- `src/test/java/tools/dscode/launcher/RendererStoreSessionTest.java`
 - `src/test/java/tools/dscode/launcher/RetestFixesLiveTest.java`
 - `src/test/java/tools/dscode/launcher/RouteLiveTest.java`
 - `src/test/java/tools/dscode/launcher/ScreencastLiveTest.java`

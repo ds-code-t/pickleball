@@ -61,11 +61,10 @@ These items stay out of `3.0.0-consumer-fixes`. The roadmap lists them under "No
 | 6.3.6 | Warm PW/CDP at start. |
 | 6.7.3 | UIA tree cache. |
 
+R5 P2 and P3 already removed 6.5.2 Point, 6.5.3 typed card answers, 6.5.7 overlay read receipts, and 6.6.4 runtime injection on attached windows from this table. Point and typed answers live with `AskProgressPointTest` and the spine chat section of `docs/dynamic-control-api.md`. Overlay read receipts live with `OverlayReceiptAskTest` and `OverlayAckLiveTest`. Attached-window injection lives with `InjectLivePageTest` and `PageJvmRouteTest`. This pass does not put those rows back.
+
 ## TypeScript package in the Workbench UI bundle (reinvestigate, per Dan, 2026-11-26)
 
 The `typescript` npm package is pinned in `workbench-ui/package.json` and packed into the jar next to `monaco-editor`, but nothing loads it today. Monaco has its own TypeScript language service, and `.ts` step definitions run through `NodeStepHost` on Node's built-in type stripping. Dan chose to keep it for now. Later, decide whether to drop it (smaller jar, one fewer pinned version) or use it as a fallback that converts `.ts` step files Node's type stripping cannot run (enums, namespaces, parameter properties, decorators) to plain JavaScript first.
 
-## Spine R5 fix-back 2 (open)
-
-7. The fix-back 1 release note says `inject` and `input block` reach a real page through the CLI, and the guides still need a fix-back 2 description of the process boundary.
 
