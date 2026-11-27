@@ -75,7 +75,7 @@ class ConsumerFixesFrameLiveTest {
 
             JsonNode city = awaitRole("textbox", "City");
             assertFalse(city.path("frame").asText("").isBlank(), city.toString());
-            String cityId = city.path("id").asText();
+            String cityId = city.path("handle").asText();
             assertTrue(cityId.matches("s\\d+\\.h\\d+"), city.toString());
 
             Capture typed = run(
@@ -90,7 +90,7 @@ class ConsumerFixesFrameLiveTest {
 
             JsonNode color = awaitRole("combobox", "Color");
             Capture selected = run(
-                    "act", "--target=browser:auto", "--kind=select", "--query=" + color.path("id").asText(),
+                    "act", "--target=browser:auto", "--kind=select", "--query=" + color.path("handle").asText(),
                     "--value=Red", "--run-id=frame-fix");
             assertEquals(0, selected.code, selected.err + selected.out);
             JsonNode selectBody = JSON.readTree(selected.out);
@@ -99,7 +99,7 @@ class ConsumerFixesFrameLiveTest {
             assertEquals("Red", selectBody.path("value").asText(), selected.out);
 
             JsonNode go = awaitRole("button", "Inner Go");
-            String id = go.path("id").asText();
+            String id = go.path("handle").asText();
             assertTrue(id.matches("s\\d+\\.h\\d+"), go.toString());
             assertFalse(go.path("frame").asText("").isBlank(), go.toString());
 

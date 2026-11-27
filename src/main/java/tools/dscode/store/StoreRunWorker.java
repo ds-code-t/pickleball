@@ -74,7 +74,8 @@ public final class StoreRunWorker {
         Path trace = outcomeFile;
         if (trace != null) Files.deleteIfExists(trace);
         List<String> properties = runProperties(incoming, trace, project);
-        int exit = WorkbenchDirectRun.run(project == null ? Path.of("") : Path.of(project), properties);
+        Path root = project == null ? Path.of("") : Path.of(project);
+        int exit = WorkbenchDirectRun.run(root, properties);
         writer.println("EXIT " + exit);
         if (trace != null && Files.isRegularFile(trace)) {
             for (String outcome : Files.readAllLines(trace, StandardCharsets.UTF_8)) {

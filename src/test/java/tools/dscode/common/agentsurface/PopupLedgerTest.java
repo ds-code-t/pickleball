@@ -17,14 +17,13 @@ class PopupLedgerTest {
 
     @Test
     void twoProcessesKeepAMonotonicSequenceAndTheCapRolls() throws Exception {
-        String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
         List<Process> processes = new ArrayList<>();
         for (int i = 0; i < 2; i++) {
-            processes.add(new ProcessBuilder(
-                    java, "-cp", System.getProperty("java.class.path"),
+            processes.add(new ProcessBuilder(tools.dscode.store.StoreTestProcesses.java(List.of(
+                    "-cp", System.getProperty("java.class.path"),
                     "tools.dscode.common.agentsurface.PopupLedger",
                     "--append", project.toString(), "r1", "append"
-            ).start());
+            ))).start());
         }
         for (Process process : processes) {
             assertTrue(process.waitFor(20, TimeUnit.SECONDS));

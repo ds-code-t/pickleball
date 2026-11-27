@@ -86,7 +86,7 @@ That line is the same as:
 | `RUN IF SCENARIO FINISHED` | after the scenario outcome is known, including when the scenario has failed |
 | `RUN IF SCENARIO PASSING AND SCENARIO FINISHED` | after the outcome is known, and only when the scenario has not failed |
 
-`IGNORE FAILURES` as its own step marks the following step. A failure there does not fail the scenario. `LOG FAILURES BUT CONTINUE SCENARIO` marks the following step, logs the failure, and continues. A suffix `AND IGNORE FAILURES` on `ALWAYS RUN` or `RUN IF SCENARIO PASSING` applies to that same step and to a colon child under it. `RETRY:` runs the text after the colon again after a failure until that step passes. The retry count is the step row's `max_iterations` when that column is set, otherwise `pkb_stepRepeatMaxCount`.
+`IGNORE FAILURES` as its own step marks the following step. A failure there is recorded as a passed step and does not fail the scenario. `LOG FAILURES BUT CONTINUE SCENARIO` marks the following step, logs the failure, records a passed step, and continues. A suffix `AND IGNORE FAILURES` on `ALWAYS RUN` or `RUN IF SCENARIO PASSING` applies to that same step and to a colon child under it, and that step is passed on both engines. `RETRY:` runs the text after the colon again after a failure until that step passes. The retry count is the step row's `max_iterations` when that column is set, otherwise `pkb_stepRepeatMaxCount`.
 
 A hard failure marks the scenario complete, so a later step without one of these flags is skipped. A soft failure does not mark the scenario complete, so a later step without a flag still runs. `RUN IF SCENARIO PASSING` uses the same colon and inline forms.
 

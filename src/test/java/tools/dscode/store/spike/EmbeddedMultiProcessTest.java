@@ -49,8 +49,7 @@ class EmbeddedMultiProcessTest {
             // process delete a sibling's sqlitejdbc.dll on Windows.
             Path nativeDir = dir.resolve("sqlite-native-" + worker);
             Files.createDirectories(nativeDir);
-            List<String> command = List.of(
-                    Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+            List<String> command = tools.dscode.store.StoreTestProcesses.java(List.of(
                     "-Dorg.sqlite.tmpdir=" + nativeDir.toAbsolutePath(),
                     "-cp",
                     System.getProperty("java.class.path"),
@@ -58,7 +57,7 @@ class EmbeddedMultiProcessTest {
                     db.toAbsolutePath().toString(),
                     Integer.toString(worker),
                     times.toAbsolutePath().toString(),
-                    Integer.toString(INSERTS));
+                    Integer.toString(INSERTS)));
             children.add(new ProcessBuilder(command).redirectErrorStream(true).start());
         }
         StringBuilder failures = new StringBuilder();

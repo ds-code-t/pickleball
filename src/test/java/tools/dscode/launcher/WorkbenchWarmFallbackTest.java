@@ -36,6 +36,20 @@ class WorkbenchWarmFallbackTest {
     Path temp;
 
     @Test
+    void inProcessRunRestoresThePreviousRunId() {
+        String previous = System.getProperty("pkb_run_id");
+        System.setProperty("pkb_run_id", "keep-me");
+        try {
+            WorkbenchDirectRun.isolate(List.of("-Dpkb_run_id=warm-first"), () ->
+                    assertEquals("warm-first", System.getProperty("pkb_run_id")));
+            assertEquals("keep-me", System.getProperty("pkb_run_id"));
+        } finally {
+            if (previous == null) System.clearProperty("pkb_run_id");
+            else System.setProperty("pkb_run_id", previous);
+        }
+    }
+
+    @Test
     void delayedExitWithoutStartedIsAMissAndWouldRelaunch() throws Exception {
         Attempt attempt = talk(temp.resolve("miss"), Mode.DELAYED_EXIT, 1_500, 400, null);
         assertEquals(WorkbenchSpeed.DirectKind.MISSED, attempt.result.kind());

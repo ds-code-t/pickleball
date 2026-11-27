@@ -43,6 +43,12 @@ class RelationPhraseTest {
                 ElementPhrase.of("Button", "Save").context("inside", "Billing", "Section"));
         expect("(role=region AND text=\"Billing\") >> (role=button AND text=\"Save\")", "nested",
                 ElementPhrase.of("Button", "Save").context("in", "Billing", "Section"));
+        assertEquals(
+                "(role=button AND text=\"Save\") AND between(role=button AND text=\"A\", role=button AND text=\"B\")",
+                SelectorTranslator.phrase(ElementPhrase.of("Button", "Save")
+                        .context("between", "A", "Button")
+                        .anchor("B", "Button")).pipeline()
+        );
     }
 
     private static void expect(String pipeline, String id, ElementPhrase phrase) throws Exception {

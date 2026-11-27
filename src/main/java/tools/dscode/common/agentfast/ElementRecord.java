@@ -14,14 +14,23 @@ import java.util.Set;
 
 /**
  * The only element object. {@code find}, {@code snap}, {@code act}, and desktop query call this.
- * Extra backend fields sit under {@code extra} and are omitted unless {@code --fields} names them.
+ * The eight canonical keys are always present. A row that already has {@code ref}, visibility,
+ * {@code via}, a collaboration key, {@code shadow}, or {@code shadow_path} keeps that key.
+ * Other backend fields sit under {@code extra} and are omitted unless {@code --fields} names them.
  */
 public final class ElementRecord {
     static final List<String> KEYS = List.of(
             "handle", "identity", "role", "name", "tag", "bounds", "backendNodeId", "frame"
     );
+    /** Public row fields copied when the source already has them. Absent keys stay absent. */
+    private static final List<String> ROW_FIELDS = List.of(
+            "ref", "visible", "enabled", "interactive", "via",
+            "value", "checked", "purpose", "badge", "highlight", "guide", "card", "msg",
+            "shadow", "shadow_path"
+    );
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final Set<String> CANONICAL = Set.copyOf(KEYS);
+    private static final Set<String> ROW = Set.copyOf(ROW_FIELDS);
 
     private ElementRecord() {
     }
@@ -44,9 +53,18 @@ public final class ElementRecord {
         record.put("bounds", bounds(raw));
         record.put("backendNodeId", backend(raw));
         record.put("frame", frame(raw));
+        copyPresent(record, raw);
         Map<String, Object> extra = extra(raw, fields);
         if (!extra.isEmpty()) record.put("extra", extra);
         return record;
+    }
+
+    /** Keeps a public field the row already stored. {@code false} is kept. A missing key is not invented. */
+    private static void copyPresent(Map<String, Object> record, Map<String, Object> raw) {
+        for (String key : ROW_FIELDS) {
+            if (!raw.containsKey(key) || raw.get(key) == null) continue;
+            record.put(key, raw.get(key));
+        }
     }
 
     /** Desktop query nodes become records. The rest of the document stays. A non-query document is unchanged. */
@@ -139,7 +157,7 @@ public final class ElementRecord {
         Map<String, Object> extra = new LinkedHashMap<>();
         if (wanted.isEmpty()) return extra;
         for (String name : wanted) {
-            if (CANONICAL.contains(name) || "bounds".equals(name) || "identity".equals(name)) continue;
+            if (CANONICAL.contains(name) || ROW.contains(name) || "bounds".equals(name) || "identity".equals(name)) continue;
             if (!raw.containsKey(name)) continue;
             extra.put(name, raw.get(name));
         }

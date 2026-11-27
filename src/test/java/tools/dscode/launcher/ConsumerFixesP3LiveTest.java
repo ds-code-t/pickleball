@@ -67,7 +67,7 @@ class ConsumerFixesP3LiveTest {
             assertEquals(0, started.code, started.err + started.out);
 
             JsonNode button = awaitRole();
-            String handle = button.path("id").asText();
+            String handle = button.path("handle").asText();
             assertTrue(handle.matches("s\\d+\\.h\\d+"), button.toString());
 
             Capture placed = run(

@@ -20,6 +20,7 @@ import dev.domengine.session.FrameCoverage;
 import dev.domengine.session.SessionEvents;
 import dev.domengine.snapshot.DesktopSnapshotProducer;
 import dev.domengine.tree.DomNode;
+import tools.dscode.store.SnapFindIndex;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -555,12 +556,13 @@ public final class TargetVerb {
             remember(runId, page.session);
             Map<String, Object> body = base("find", "cdp", "browser", target);
             body.put("docVersion", version);
-            body.put("hits", ElementRecord.list(rows, args.get("fields")));
             body.put("ref", rows.get(0).get("ref"));
             if (args.get("scroll-search") != null) body.put("scrollSearch", true);
             markBudget(body, args);
             stamp(body, page.session.connection(), hits.get(0));
+            // Entered-frame replacement mutates the rows. The element records are copied after that.
             putEntered(body, runId, page.session.connection(), rows);
+            body.put("hits", ElementRecord.list(rows, args.get("fields")));
             stampContexts(body, root);
             return ok(body);
         } finally {
@@ -1205,6 +1207,7 @@ public final class TargetVerb {
             boolean stuck = read != null && want == "true".equals(read);
             row.put("value", read == null ? readField(cdp, node) : read);
             row.put("applied", stuck);
+            if (stuck) noteFill(project, runId, node, key, kind, String.valueOf(row.get("value")));
             return row;
         }
         if ("text".equals(kind) && !focusConfirmed(cdp, node)) {
@@ -1236,7 +1239,35 @@ public final class TargetVerb {
         row.put("applied", stuck);
         row.put("verified", stuck);
         if (via != null) row.put("via", via);
+        if (stuck) noteFill(project, runId, node, key, kind, String.valueOf(row.get("value")));
         return row;
+    }
+
+    /**
+     * One interaction row for a field that was applied. Recording can be off.
+     * The id is the element id when the node has one. A password stores {@code filled}.
+     */
+    static void noteFill(Path project, String runId, DomNode node, String key, String kind, String value) {
+        if (project == null || node == null) return;
+        String type = "checkbox".equals(kind) || "radio".equals(kind) ? "check"
+                : "select".equals(kind) ? "select" : "input";
+        Map<String, String> event = new LinkedHashMap<>();
+        event.put("type", type);
+        event.put("kind", type);
+        event.put("event", "interaction");
+        event.put("source", "agent");
+        String id = attr(node, "id");
+        event.put("id", id.isBlank() ? (key == null ? "" : key) : id);
+        if (runId != null && !runId.isBlank()) event.put("sessionId", runId);
+        boolean secret = "password".equalsIgnoreCase(attr(node, "type"))
+                || "true".equals(attr(node, "data-sensitive"));
+        if (secret) {
+            event.put("sensitive", "true");
+            event.put("value", "filled");
+        } else if (value != null) {
+            event.put("value", value);
+        }
+        tools.dscode.common.recording.InteractionLog.accept(project, event);
     }
 
     /** Debounced input rows are sensed this long after the last agent keystroke and still count as the agent's. */
@@ -1552,6 +1583,7 @@ public final class TargetVerb {
             String version = docVersion(page.session.connection());
             List<DomNode> shown = interactive(shownRoot, depth);
             List<Map<String, Object>> rows = publish(runId, "browser", page.session.id, version, shown, "", page.session.connection());
+            SnapFindIndex.indexPublished(project, runId, version, rows);
             String exposure = exposureOf(args);
             if (exposure == null) return fail("snap", "exposure is human or full");
             String panelState = panelPending(page.session.connection());
@@ -1645,6 +1677,7 @@ public final class TargetVerb {
         if ("diff".equals(mode)) session = DesktopTree.reread(session.id());
         String version = "desktop:" + session.sequence();
         List<Map<String, Object>> rows = publish(runId, "desktop", session.id(), version, interactive(session.root()), "");
+        SnapFindIndex.indexPublished(project, runId, version, rows);
         Map<String, Object> body = base("snap", "desktop", "desktop", target);
         body.put("mode", mode);
         body.put("docVersion", version);
@@ -2784,19 +2817,28 @@ public final class TargetVerb {
         if (!inputOff) {
             focusNode(cdp, session, node);
             clearControl(cdp, session, node);
-            if (insertText(cdp, session, wanted) && valueMatches(wanted, controlValue(cdp, node))) {
-                noteWrite("cdp-insertText", wanted, true);
-                return new Effect("cdp", true);
+            if (insertText(cdp, session, wanted)) {
+                String read = typedValue(cdp, session, node, wanted);
+                if (valueMatches(wanted, read)) {
+                    noteWrite("cdp-insertText", read, true);
+                    return new Effect("cdp", true);
+                }
             }
-            if (typeKeys(cdp, session, wanted) && valueMatches(wanted, controlValue(cdp, node))) {
-                noteWrite("cdp-keys", wanted, true);
-                return new Effect("cdp", true);
+            if (typeKeys(cdp, session, wanted)) {
+                String read = typedValue(cdp, session, node, wanted);
+                if (valueMatches(wanted, read)) {
+                    noteWrite("cdp-keys", read, true);
+                    return new Effect("cdp", true);
+                }
             }
             clickCenter(cdp, session, node);
             clearControl(cdp, session, node);
-            if (insertText(cdp, session, wanted) && valueMatches(wanted, controlValue(cdp, node))) {
-                noteWrite("input-chain", wanted, true);
-                return new Effect("cdp", true);
+            if (insertText(cdp, session, wanted)) {
+                String read = typedValue(cdp, session, node, wanted);
+                if (valueMatches(wanted, read)) {
+                    noteWrite("input-chain", read, true);
+                    return new Effect("cdp", true);
+                }
             }
         }
         String read = callOnNode(cdp, session, node, "function(){ this.focus(); this.value=" + jsString(wanted)
@@ -2804,8 +2846,25 @@ public final class TargetVerb {
         String got = controlValue(cdp, node);
         if (got.isBlank() && read != null) got = read;
         boolean ok = valueMatches(wanted, got);
-        noteWrite("input-chain", ok ? wanted : got, ok);
+        noteWrite("input-chain", got.isBlank() ? wanted : got, ok);
         return new Effect(inputOff ? "js" : "cdp", ok);
+    }
+
+    /**
+     * The control's value after typing. A page {@code input} handler may change it
+     * (for example uppercasing). When the raw read is not the typed text, one
+     * {@code input} and {@code change} run so that handler is applied, then the
+     * control is read again.
+     */
+    private static String typedValue(CdpConnection cdp, String session, DomNode node, String wanted) {
+        String read = controlValue(cdp, node);
+        if (wanted.equals(read)) return read;
+        callOnNode(cdp, session, node,
+                "function(){ this.dispatchEvent(new Event('input',{bubbles:true}));"
+                        + " this.dispatchEvent(new Event('change',{bubbles:true})); }");
+        String after = controlValue(cdp, node);
+        if (after != null && !after.isBlank()) return after;
+        return read == null ? "" : read;
     }
 
     private static void noteWrite(String via, String value, boolean verified) {

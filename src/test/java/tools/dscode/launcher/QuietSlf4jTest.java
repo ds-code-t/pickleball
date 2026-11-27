@@ -2,8 +2,11 @@ package tools.dscode.launcher;
 
 import org.junit.jupiter.api.Test;
 
+import tools.dscode.store.StoreTestProcesses;
+
 import java.io.File;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -31,7 +34,8 @@ class QuietSlf4jTest {
     @Test
     void theStartupBindDropsTheNoProviderLines() throws Exception {
         String plain = child("plain");
-        assertTrue(plain.contains("SLF4J: No SLF4J providers"), "the child reproduces the warning: " + plain);
+        assertTrue(plain.contains("No SLF4J providers"), "the child reproduces the warning: " + plain);
+        assertTrue(plain.contains("SLF4J:") || plain.contains("SLF4J("), plain);
         String quiet = child("quiet");
         assertTrue(quiet.contains("done"), quiet);
         assertFalse(quiet.contains("SLF4J"), quiet);
@@ -41,19 +45,30 @@ class QuietSlf4jTest {
     void onlyTheNoProviderLinesAreDropped() {
         assertTrue(QuietSlf4j.noProviderLine("SLF4J: No SLF4J providers were found."));
         assertTrue(QuietSlf4j.noProviderLine("SLF4J: See https://www.slf4j.org/codes.html#noProviders for further details."));
+        assertTrue(QuietSlf4j.noProviderLine("SLF4J(W): No SLF4J providers were found."));
+        assertTrue(QuietSlf4j.noProviderLine("SLF4J(W): Defaulting to no-operation (NOP) logger implementation"));
+        assertTrue(QuietSlf4j.noProviderLine("SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details."));
         assertFalse(QuietSlf4j.noProviderLine("SLF4J: Class path contains multiple SLF4J providers."));
+        assertFalse(QuietSlf4j.noProviderLine("SLF4J(W): Class path contains multiple SLF4J providers."));
     }
 
     private static String child(String mode) throws Exception {
         List<String> keep = new ArrayList<>();
         for (String entry : System.getProperty("java.class.path").split(File.pathSeparator)) {
-            String name = Path.of(entry).getFileName() == null ? "" : Path.of(entry).getFileName().toString();
-            if (name.startsWith("slf4j-api") || entry.replace('\\', '/').contains("/build/classes/java/")) keep.add(entry);
+            if (entry.isBlank()) continue;
+            Path path = Path.of(entry);
+            String name = path.getFileName() == null ? "" : path.getFileName().toString();
+            boolean ownClasses = Files.isDirectory(path) && (
+                    Files.isRegularFile(path.resolve("tools/dscode/launcher/QuietSlf4j.class"))
+                            || Files.isRegularFile(path.resolve("tools/dscode/launcher/QuietSlf4jTest.class")));
+            if (name.startsWith("slf4j-api") || ownClasses) keep.add(entry);
         }
         String classpath = keep.stream().collect(Collectors.joining(File.pathSeparator));
         assertTrue(classpath.contains("slf4j-api"), Arrays.toString(keep.toArray()));
-        String javaBin = Path.of(System.getProperty("java.home"), "bin", "java").toString();
-        Process process = new ProcessBuilder(List.of(javaBin, "-cp", classpath, QuietSlf4jTest.class.getName(), mode))
+        assertTrue(keep.stream().anyMatch(entry -> Files.isRegularFile(
+                Path.of(entry).resolve("tools/dscode/launcher/QuietSlf4jTest.class"))), keep.toString());
+        Process process = new ProcessBuilder(StoreTestProcesses.java(List.of(
+                "-cp", classpath, QuietSlf4jTest.class.getName(), mode)))
                 .redirectErrorStream(true).start();
         assertTrue(process.waitFor(30, TimeUnit.SECONDS), "child finishes");
         String all = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);

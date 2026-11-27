@@ -349,7 +349,7 @@ Gherkin element phrases do not change. The controller `query` string accepts the
 | the `"Save"` Button before the `"Billing"` Section | `(role=button AND text="Save") AND before(role=region AND text="Billing")` |
 | the `"Save"` Button above, below, left of, right of, near, next to, inside, or within the `"Billing"` Section | `(role=button AND text="Save") AND <relation>(role=region AND text="Billing")` (`left of` is `left-of`, `right of` is `right-of`, `next to` is `near`, `within` is `inside`) |
 | the `"Save"` Button following or preceding the `"Billing"` Section | `(role=button AND text="Save") AND after(...)` or `before(...)` |
-| query `css=div AND between(css=#a, css=#b)` | displayed candidates whose centers lie in the box of the two anchor centers. One anchor is an error |
+| query `css=div AND between(css=#a, css=#b)` | displayed candidates whose centers lie in the box of the two anchor centers. A comma separates the two anchor queries, and `AND` inside an anchor stays in that query. `and` separates anchors only when the list has no comma. One anchor is an error |
 | a custom `Product Card` | `(desc="Product Card" AND text=...)` |
 | `first` / `2nd` / `last` / `every 2nd` | one `PositionSelection` after displayed, nesting, and regex. An engine query ordinal uses that same index |
 

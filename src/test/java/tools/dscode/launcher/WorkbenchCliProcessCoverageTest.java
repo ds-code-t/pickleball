@@ -3,9 +3,11 @@ package tools.dscode.launcher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.common.agentcontrol.SpineSession;
 import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.control.protocol.SessionDescriptor;
 import tools.dscode.control.protocol.SessionDescriptorWriter;
+import tools.dscode.store.StoreTestProcesses;
 import tools.dscode.testsupport.PortableProcess;
 
 import java.io.ByteArrayOutputStream;
@@ -39,6 +41,7 @@ class WorkbenchCliProcessCoverageTest {
         Files.writeString(resources.resolve("pickleball.properties"),
                 "pkb_browser=CHROME_HEADLESS\npkb_name=caf\u00e9\npkb_configpath=wd-file:configs\n",
                 StandardCharsets.UTF_8);
+        SpineSession.create(temp, "agent-1");
 
         Run hint = launch("hint", temp.toString());
         assertEquals(0, hint.exit, hint.err);
@@ -81,6 +84,8 @@ class WorkbenchCliProcessCoverageTest {
         Files.createDirectories(two.resolve("src/test/resources"));
         Files.writeString(one.resolve("src/test/resources/pickleball.properties"), "pkb_browser=EDGE\n");
         Files.writeString(two.resolve("src/test/resources/pickleball.properties"), "pkb_browser=CHROME\n");
+        SpineSession.create(one, "agent-1");
+        SpineSession.create(two, "agent-1");
         AtomicReference<Run> left = new AtomicReference<>();
         AtomicReference<Run> right = new AtomicReference<>();
         Thread first = new Thread(() -> left.set(launchUnchecked("hint", one.toString())));
@@ -104,6 +109,7 @@ class WorkbenchCliProcessCoverageTest {
         Path workspace = temp.resolve(".pickleball/runs/stale-1/workspace");
         Files.createDirectories(workspace);
         Files.writeString(workspace.resolve("runvars.properties"), "pkb_glue=\\uZZZZ\n", StandardCharsets.UTF_8);
+        SpineSession.create(temp, "agent-1");
         Run show = launch("workspace-show", temp.toString(), "--run-id=stale-1");
         assertEquals(1, show.exit, show.out + show.err);
         String reported = show.err + show.out;
@@ -119,6 +125,7 @@ class WorkbenchCliProcessCoverageTest {
         Path consumer = Path.of("maven-consumer-project").toAbsolutePath().normalize();
         assertTrue(Files.isRegularFile(consumer.resolve("mvnw")), consumer.toString());
         assertTrue(Files.isRegularFile(consumer.resolve("src/test/resources/pickleball.properties")));
+        SpineSession.ensure(consumer);
 
         Run hint = launch("hint", consumer.toString());
         assertEquals(0, hint.exit, hint.err);
@@ -170,6 +177,7 @@ class WorkbenchCliProcessCoverageTest {
         Path workspace = temp.resolve(".pickleball/runs/stale-2/workspace");
         Files.createDirectories(workspace);
         Files.writeString(workspace.resolve("runvars.properties"), "pkb_browser=CHROME_HEADLESS\n", StandardCharsets.UTF_8);
+        SpineSession.create(temp, "agent-1");
         String before = Files.readString(workspace.resolve("runvars.properties"));
         Run stale = launch("workspace-edit", temp.toString(), "--run-id=stale-2", "--expect=not-the-fingerprint", "--runvar=pkb_browser=EDGE");
         assertEquals(3, stale.exit, stale.err);
@@ -245,6 +253,7 @@ class WorkbenchCliProcessCoverageTest {
                 >"!dir!\\run-index.json" echo({"runId":"!run_id!","outcome":"FAILED","counts":{"failed":1,"errors":0}}\r
                 exit /b 0\r
                 """);
+        SpineSession.create(temp, "agent-1");
 
         Run discover = launch("discover", temp.toString(), "--tags=@boom", "--run-id=ignore-proc");
         assertEquals(1, discover.exit, discover.out + discover.err);
@@ -260,6 +269,7 @@ class WorkbenchCliProcessCoverageTest {
         Path project = temp.resolve("My Projects");
         Files.createDirectories(project.resolve("src/test/resources"));
         Files.writeString(project.resolve("pom.xml"), "<project/>\n");
+        SpineSession.create(project, "agent-1");
         Path wrapper = project.resolve("mvnw.cmd");
         boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
         if (windows) {
@@ -313,14 +323,12 @@ class WorkbenchCliProcessCoverageTest {
     }
 
     private static Run launch(String... args) throws Exception {
-        String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
         List<String> command = new ArrayList<>();
-        command.add(java);
         command.add("-cp");
         command.add(System.getProperty("java.class.path"));
         command.add("tools.dscode.launcher.PickleballWorkbenchLauncher");
         command.addAll(List.of(args));
-        Process process = new ProcessBuilder(command)
+        Process process = new ProcessBuilder(StoreTestProcesses.java(command))
                 .redirectErrorStream(false)
                 .start();
         ByteArrayOutputStream out = new ByteArrayOutputStream();

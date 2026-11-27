@@ -100,7 +100,7 @@ class WorkbenchCliSurfaceCoverageTest {
         assertTrue(WorkbenchCommandLine.isForwardedCommand("ui"));
         assertEquals("run-1", parsed.coordination().runId());
         assertEquals("ada", parsed.coordination().agentId());
-        forwardedFailsClosed("ui");
+        bareUiOpensAndStaysUp();
     }
 
     @Test
@@ -1468,13 +1468,70 @@ class WorkbenchCliSurfaceCoverageTest {
 
     private Capture last;
 
+    /** Bare {@code ui} opens the renderer and stays up. No browser returns {@code warn: no-chromium} and exits 0. */
+    private void bareUiOpensAndStaysUp() throws Exception {
+        String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
+        Process process = new ProcessBuilder(tools.dscode.store.StoreTestProcesses.java(List.of(
+                "-cp", System.getProperty("java.class.path"),
+                "tools.dscode.launcher.PickleballWorkbenchLauncher",
+                "ui", temp.toString()
+        ))).start();
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        Thread stdout = new Thread(() -> {
+            try (var input = process.getInputStream()) {
+                input.transferTo(out);
+            } catch (IOException ignored) {
+                // The process ending closes the pipe.
+            }
+        });
+        Thread stderr = new Thread(() -> {
+            try (var input = process.getErrorStream()) {
+                input.transferTo(err);
+            } catch (IOException ignored) {
+                // The process ending closes the pipe.
+            }
+        });
+        stdout.start();
+        stderr.start();
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+        boolean opened = false;
+        String text = "";
+        try {
+            while (System.nanoTime() < deadline) {
+                text = out.toString(StandardCharsets.UTF_8) + err.toString(StandardCharsets.UTF_8);
+                if (text.contains("http://127.0.0.1") || text.contains("warn: no-chromium")) {
+                    opened = true;
+                    break;
+                }
+                if (!process.isAlive()) break;
+                Thread.sleep(100);
+            }
+            text = out.toString(StandardCharsets.UTF_8) + err.toString(StandardCharsets.UTF_8);
+            if (text.contains("http://127.0.0.1") || text.contains("warn: no-chromium")) opened = true;
+        } finally {
+            process.descendants().forEach(ProcessHandle::destroyForcibly);
+            process.destroyForcibly();
+            process.waitFor(10, TimeUnit.SECONDS);
+            stdout.join(2_000);
+            stderr.join(2_000);
+        }
+        text = out.toString(StandardCharsets.UTF_8) + err.toString(StandardCharsets.UTF_8);
+        assertTrue(opened, text);
+        if (text.contains("warn: no-chromium")) {
+            assertEquals(0, process.exitValue(), text);
+        } else {
+            assertTrue(text.contains("http://127.0.0.1"), text);
+        }
+    }
+
     private void forwardedFailsClosed(String command) throws Exception {
         String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
-        Process process = new ProcessBuilder(
-                java, "-cp", System.getProperty("java.class.path"),
+        Process process = new ProcessBuilder(tools.dscode.store.StoreTestProcesses.java(List.of(
+                "-cp", System.getProperty("java.class.path"),
                 "tools.dscode.launcher.PickleballWorkbenchLauncher",
                 command, temp.toString()
-        ).start();
+        ))).start();
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
         Thread stdout = new Thread(() -> {

@@ -6,7 +6,7 @@ This maintainer-only file is intentionally not linked from the public documentat
 
 ### `between` (shipped, spine R2 P4)
 
-`between` is a Control Engine relation and a leading phrase word. A displayed candidate is kept when its center lies in the axis-aligned box of the two anchor centers. A missing second anchor is an error. `inside`, `within`, `on`, `of`, `near`, `next to`, `following`, and `preceding` are context words. See [Dynamic steps](../dynamic-steps.md).
+`between` is a Control Engine relation and a leading phrase word. A displayed candidate is kept when its center lies in the axis-aligned box of the two anchor centers. A comma separates the two anchor queries, and `AND` inside an anchor stays in that query. `and` separates anchors only when the list has no comma. A missing second anchor is an error. `inside`, `within`, `on`, `of`, `near`, `next to`, `following`, and `preceding` are context words. See [Dynamic steps](../dynamic-steps.md).
 
 ### `in between`
 

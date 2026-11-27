@@ -44,17 +44,36 @@ public final class StoreScenarioSource implements ScenarioSource {
      * and each one is logged under {@code pkb_engine_log=ingest}.
      */
     public static String executableText(Path project, String path, String raw) throws SQLException {
+        return executableText(project, path, raw, false);
+    }
+
+    /**
+     * Same as {@link #executableText(Path, String, String)}. When {@code keepLibrary}
+     * is true, a call or component file that is stored with {@code enabled=0} only
+     * because it is outside the feature root is still returned. {@code @pkb-ignore}
+     * on the file or a scenario still removes that text. A feature run does not
+     * pass true, so those files stay out of the suite.
+     */
+    public static String executableText(Path project, String path, String raw, boolean keepLibrary) throws SQLException {
         if (raw == null) return "";
         String stored = StorePaths.normalizeRelative(path);
+        boolean library = keepLibrary && StorePaths.executionLibrary(stored);
         try (StoreDatabase database = StoreDatabase.open(project);
              PreparedStatement file = database.connection().prepareStatement(
                      "SELECT enabled FROM files WHERE path = ?");
+             PreparedStatement featureTags = database.connection().prepareStatement(
+                     "SELECT tags FROM feature_docs WHERE file_path = ?");
              PreparedStatement scenarios = database.connection().prepareStatement(
                      "SELECT name, line, tags, enabled FROM scenarios WHERE file_path = ? ORDER BY line")) {
             file.setString(1, stored);
             int fileEnabled = 1;
             try (ResultSet rows = file.executeQuery()) {
                 if (rows.next()) fileEnabled = rows.getInt(1);
+            }
+            boolean featureIgnored = false;
+            featureTags.setString(1, stored);
+            try (ResultSet rows = featureTags.executeQuery()) {
+                if (rows.next() && ignored(rows.getString(1))) featureIgnored = true;
             }
             scenarios.setString(1, stored);
             List<Integer> lines = new ArrayList<>();
@@ -68,10 +87,11 @@ public final class StoreScenarioSource implements ScenarioSource {
                     int enabled = rows.getInt(4);
                     lines.add(line);
                     names.add(name);
-                    if (fileEnabled == 0 || enabled == 0 || ignored(tags)) drop.add(line);
+                    boolean disabled = ignored(tags) || (!library && (fileEnabled == 0 || enabled == 0));
+                    if (disabled) drop.add(line);
                 }
             }
-            if (fileEnabled == 0) {
+            if (featureIgnored || (fileEnabled == 0 && !library)) {
                 for (String name : names) logSkip(project, name);
                 return null;
             }

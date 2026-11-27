@@ -330,7 +330,7 @@ public enum AssertionOperations implements OperationsInterface {
 
             phraseData.result = Attempt.run(repetition, 500, () -> {
                 return ValueWrapperCompareReducer.evalElements(
-                        wrapper -> matchesPresent(wrapper.isDisplayed()),
+                        wrapper -> matchesPresent(tools.dscode.common.composite.ElementOperations.displayed(wrapper)),
                         firstElement.getElementWrappers(),
                         modeSet
                 );

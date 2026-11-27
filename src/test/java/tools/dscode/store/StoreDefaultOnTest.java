@@ -108,11 +108,10 @@ class StoreDefaultOnTest {
 
     private Result java(String classpath, List<String> args, String env) throws Exception {
         List<String> command = new ArrayList<>();
-        command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
         command.add("-cp");
         command.add(classpath == null ? System.getProperty("java.class.path") : classpath);
         command.addAll(args);
-        ProcessBuilder builder = new ProcessBuilder(command);
+        ProcessBuilder builder = new ProcessBuilder(StoreTestProcesses.java(command));
         if (env != null) builder.environment().put("PKB_STORE", env);
         else builder.environment().remove("PKB_STORE");
         Process process = builder.start();

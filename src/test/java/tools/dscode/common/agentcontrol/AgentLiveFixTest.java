@@ -13,6 +13,7 @@ import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.remote.RemoteWebDriver;
 import org.openqa.selenium.remote.Response;
 import tools.dscode.common.composite.CompositeRuntime;
+import tools.dscode.store.StoreTestProcesses;
 import tools.dscode.testsupport.StdioFake;
 
 import java.io.BufferedReader;
@@ -243,14 +244,13 @@ class AgentLiveFixTest {
         Files.createDirectories(lock.getParent());
         try (FileChannel channel = FileChannel.open(lock, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
             FileLock held = channel.lock();
-            Process child = new ProcessBuilder(
-                    Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+            Process child = new ProcessBuilder(StoreTestProcesses.java(List.of(
                     "-cp",
                     System.getProperty("java.class.path"),
                     "tools.dscode.common.agentcontrol.ChatLockChild",
                     temp.toString(),
                     "lock"
-            ).redirectErrorStream(true).start();
+            ))).redirectErrorStream(true).start();
             try {
                 BlockingQueue<String> lines = pump(child);
                 String ready = lines.poll(15, TimeUnit.SECONDS);
@@ -2213,24 +2213,22 @@ class AgentLiveFixTest {
     }
 
     private static Process chatChild(Path project, String run) throws IOException {
-        return new ProcessBuilder(
-                Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+        return new ProcessBuilder(StoreTestProcesses.java(List.of(
                 "-cp",
                 System.getProperty("java.class.path"),
                 "tools.dscode.common.agentcontrol.ChatLockChild",
                 project.toString(),
                 run
-        ).redirectErrorStream(true).start();
+        ))).redirectErrorStream(true).start();
     }
 
     private static Process surfaceChild(Path file) throws IOException {
-        return new ProcessBuilder(
-                Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+        return new ProcessBuilder(StoreTestProcesses.java(List.of(
                 "-cp",
                 System.getProperty("java.class.path"),
                 "tools.dscode.common.agentcontrol.SurfaceIdChild",
                 file.toString()
-        ).redirectErrorStream(true).start();
+        ))).redirectErrorStream(true).start();
     }
 
     private static BlockingQueue<String> pump(Process child) {

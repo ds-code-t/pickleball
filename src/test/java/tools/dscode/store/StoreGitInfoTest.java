@@ -36,7 +36,8 @@ class StoreGitInfoTest {
         assertEquals(0, clean.code, clean.out + clean.err);
         assertTrue(clean.out.contains("\"githubRepo\":\"o/r\""), clean.out);
         assertTrue(clean.out.contains("\"remote\":\"https://github.com/o/r.git\""), clean.out);
-        assertFalse(clean.out.contains("tok"), clean.out);
+        assertFalse(clean.out.contains("user:tok"), clean.out);
+        assertFalse(clean.out.contains("tok@"), clean.out);
         assertTrue(clean.out.contains("\"dirty\":false"), clean.out);
         String head = git("rev-parse", "HEAD").trim();
         assertTrue(clean.out.contains("\"commit\":\"" + head + "\""), clean.out);

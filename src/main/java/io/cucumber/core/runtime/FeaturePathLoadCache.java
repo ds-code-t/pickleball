@@ -28,9 +28,9 @@ import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
 /**
- * File-only feature loader. The only production caller is a run with
- * {@code pkb_store=false}. A Store-on run reads rows through
- * {@code StoreScenarioSource} and does not call this class.
+ * File and classpath feature loader. A run with {@code pkb_store=false} always
+ * uses it. A Store-on run uses it for a path the store does not hydrate, and
+ * reads a path under a hydrate root from store rows instead.
  *
  * Parses Cucumber features once per JVM for an unchanged path list.
  *

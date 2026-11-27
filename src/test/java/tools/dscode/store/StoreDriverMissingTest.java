@@ -166,7 +166,13 @@ class StoreDriverMissingTest {
     }
 
     private static Result process(List<String> command) throws Exception {
-        Process process = new ProcessBuilder(command).start();
+        List<String> launched = command;
+        if (!command.isEmpty() && isJavaTool(command.get(0))) {
+            launched = new ArrayList<>();
+            launched.add(command.get(0));
+            launched.add(StoreTestProcesses.argFile(command.subList(1, command.size())));
+        }
+        Process process = new ProcessBuilder(launched).start();
         boolean finished = process.waitFor(60, TimeUnit.SECONDS);
         String out = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
         String err = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
@@ -195,6 +201,11 @@ class StoreDriverMissingTest {
 
     private static String javac() {
         return Path.of(System.getProperty("java.home"), "bin", "javac").toString();
+    }
+
+    private static boolean isJavaTool(String executable) {
+        String name = Path.of(executable).getFileName().toString().toLowerCase(Locale.ROOT);
+        return name.equals("java") || name.equals("java.exe") || name.equals("javac") || name.equals("javac.exe");
     }
 
     private record Result(int code, String out, String err) {

@@ -42,8 +42,13 @@ final class QuietSlf4j {
     }
 
     static boolean noProviderLine(String line) {
-        return line.startsWith("SLF4J: No SLF4J providers were found")
-                || line.startsWith("SLF4J: Defaulting to no-operation (NOP) logger implementation")
-                || (line.startsWith("SLF4J: See ") && line.contains("#noProviders"));
+        String text = line;
+        if (text.startsWith("SLF4J(")) {
+            int end = text.indexOf("): ");
+            if (end > 0) text = "SLF4J: " + text.substring(end + 3);
+        }
+        return text.startsWith("SLF4J: No SLF4J providers were found")
+                || text.startsWith("SLF4J: Defaulting to no-operation (NOP) logger implementation")
+                || (text.startsWith("SLF4J: See ") && text.contains("#noProviders"));
     }
 }

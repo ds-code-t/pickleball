@@ -690,7 +690,7 @@
     [clone].concat(Array.from(clone.querySelectorAll('*'))).forEach(function (el) {
       Array.from(el.attributes || []).forEach(function (a) {
         var n = a.name.toLowerCase();
-        if (n === 'id' || n === 'name' || n === 'for' || n === 'form' || n === 'tabindex' || n.indexOf('on') === 0) el.removeAttribute(a.name);
+        if (n === 'id' || n === 'name' || n === 'for' || n === 'form' || n === 'tabindex' || n === 'data-pkb-seen' || n === 'data-pkb-anchor' || n.indexOf('on') === 0) el.removeAttribute(a.name);
       });
     });
     clone.setAttribute('inert', '');
@@ -803,7 +803,9 @@
       if (!item.anchor || !item.anchor.isConnected) {
         var next = relocate(item.locator);
         if (next) {
+          clearSeen(item.anchor, item.id);
           item.anchor = next;
+          stampSeen(next, item.id);
           item.scrollers = scrollersOf(next);
           observe(item);
           relocated = true;
@@ -1098,9 +1100,30 @@
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(schedule, function () {});
   }
 
+  function seenTokens(node) {
+    if (!node || !node.getAttribute) return [];
+    return (node.getAttribute('data-pkb-seen') || '').split(/\s+/).filter(Boolean);
+  }
+
+  function stampSeen(anchor, id) {
+    if (!anchor || !id || !anchor.setAttribute) return;
+    var tokens = seenTokens(anchor);
+    if (tokens.indexOf(id) < 0) tokens.push(id);
+    anchor.setAttribute('data-pkb-seen', tokens.join(' '));
+  }
+
+  function clearSeen(anchor, id) {
+    if (!anchor || !anchor.getAttribute) return;
+    var tokens = seenTokens(anchor).filter(function (token) { return token !== id; });
+    if (tokens.length) anchor.setAttribute('data-pkb-seen', tokens.join(' '));
+    else anchor.removeAttribute('data-pkb-seen');
+  }
+
   function untrack(id) {
     var item = items.get(id);
     if (!item) return false;
+    clearSeen(item.anchor, id);
+    if (item.host && item.host.removeAttribute) item.host.removeAttribute('data-pkb-anchor');
     items.delete(id);
     if (item.ring) item.ring.remove();
     if (resizeObserver && item.anchor) {
@@ -1120,6 +1143,8 @@
     var at = spec.at || 'auto';
     host.setAttribute('data-pkb-ui', '');
     host.setAttribute('data-pkb-at', at);
+    host.setAttribute('data-pkb-anchor', id);
+    stampSeen(anchor, id);
     if (spec.theme === 'light' || spec.theme === 'dark') host.setAttribute('data-pkb-theme', spec.theme);
     tagTree(host, purposeFor(spec.kind || host.getAttribute('data-pkb-kind') || ''));
     var r = anchor.getBoundingClientRect();

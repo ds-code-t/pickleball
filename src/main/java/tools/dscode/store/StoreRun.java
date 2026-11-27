@@ -133,8 +133,9 @@ public final class StoreRun {
         String response = send(root, runRequest(root, properties), Duration.ofMinutes(10));
         int exit = exitCode(response);
         String body = body(response);
+        String err = exit != 0 && body.isBlank() ? workerSilence(root, response) : "";
         StoreLog.log(root, "run", "worker", (reused ? "reused " : "started ") + "exit=" + exit);
-        return new Outcome(exit, body, "", reused, elapsed(started), plan);
+        return new Outcome(exit, body, err, reused, elapsed(started), plan);
     }
 
     /** Keeps a live worker and records the fingerprint the next run will match. */
@@ -480,18 +481,64 @@ public final class StoreRun {
         return List.copyOf(properties);
     }
 
+    /**
+     * Arguments after the {@code java} executable. The classpath is the raw cache text.
+     * {@code \test} stays a backslash and a t; an {@code @} file of that raw text would make it a tab.
+     */
+    static List<String> workerLaunchArgs(String classpath, String stateDirectory) {
+        List<String> args = new ArrayList<>();
+        args.add("-cp");
+        args.add(classpath == null ? "" : classpath);
+        String box = StoreScope.label(StoreScope.current());
+        if (!"main".equals(box)) args.add("-Dpkb_store_sandbox=" + box);
+        args.add("tools.dscode.store.StoreRunWorker");
+        args.add(stateDirectory == null ? "" : stateDirectory);
+        return args;
+    }
+
+    /** One quoted argument per line. Backslashes are escaped so the launcher keeps them. */
+    static String quoteJavaArg(String value) {
+        StringBuilder quoted = new StringBuilder("\"");
+        String text = value == null ? "" : value;
+        for (int i = 0; i < text.length(); i++) {
+            char ch = text.charAt(i);
+            switch (ch) {
+                case '\\' -> quoted.append("\\\\");
+                case '"' -> quoted.append("\\\"");
+                case '\n' -> quoted.append("\\n");
+                case '\r' -> quoted.append("\\r");
+                case '\t' -> quoted.append("\\t");
+                default -> quoted.append(ch);
+            }
+        }
+        return quoted.append('"').toString();
+    }
+
+    static Path writeLaunchArgs(Path root, List<String> arguments) throws java.io.IOException {
+        Path file = state(root).resolve("java.args");
+        Files.createDirectories(file.getParent());
+        StringBuilder body = new StringBuilder();
+        for (String argument : arguments) body.append(quoteJavaArg(argument)).append('\n');
+        Files.writeString(file, body.toString(), StandardCharsets.UTF_8);
+        return file;
+    }
+
+    private static String classpathForLaunch(Path root) throws java.io.IOException {
+        String body = Files.readString(state(root).resolve(CACHE), StandardCharsets.UTF_8).trim();
+        if (body.length() >= 2 && body.startsWith("\"") && body.endsWith("\"")) {
+            body = body.substring(1, body.length() - 1);
+        }
+        return body;
+    }
+
     private static void startWorker(Path root) throws Exception {
         stop(root);
-        Path cache = state(root).resolve(CACHE);
         String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
-        String box = StoreScope.label(StoreScope.current());
+        List<String> arguments = workerLaunchArgs(classpathForLaunch(root), state(root).toString());
+        Path argsFile = writeLaunchArgs(root, arguments);
         List<String> command = new ArrayList<>();
         command.add(java);
-        if (!"main".equals(box)) command.add("-Dpkb_store_sandbox=" + box);
-        command.add("-cp");
-        command.add("@" + cache.toAbsolutePath().normalize());
-        command.add("tools.dscode.store.StoreRunWorker");
-        command.add(state(root).toString());
+        command.add("@" + argsFile.toAbsolutePath().normalize());
         ProcessBuilder builder = new ProcessBuilder(command);
         builder.directory(root.toFile());
         builder.redirectOutput(state(root).resolve("warm.out.log").toFile());
@@ -556,6 +603,45 @@ public final class StoreRun {
             return 1;
         }
         return process.exitValue();
+    }
+
+    /** A failed run with no scenario lines includes the worker log so the cause is not an empty exit. */
+    private static String workerSilence(Path root, String response) {
+        StringBuilder err = new StringBuilder();
+        boolean exited = false;
+        if (response != null) {
+            for (String line : response.split("\\R")) {
+                if (line.startsWith("EXIT ")) exited = true;
+            }
+        }
+        if (!exited) {
+            err.append("error: store worker closed without EXIT\n");
+            err.append("fix: read the worker log under the sandbox worker directory\n");
+        } else {
+            err.append("error: store run produced no scenario lines\n");
+            err.append("fix: store hydrate, then store run --dry-run\n");
+        }
+        appendTail(err, state(root).resolve("warm.err.log"), "warm.err");
+        appendTail(err, state(root).resolve("warm.out.log"), "warm.out");
+        return err.toString();
+    }
+
+    private static void appendTail(StringBuilder err, Path log, String name) {
+        if (!Files.isRegularFile(log)) return;
+        try {
+            List<String> lines = Files.readAllLines(log, StandardCharsets.UTF_8);
+            int from = Math.max(0, lines.size() - 40);
+            err.append(name).append(":\n");
+            for (int i = from; i < lines.size(); i++) {
+                err.append(lines.get(i)).append('\n');
+                if (err.length() > 4000) {
+                    err.append("...\n");
+                    return;
+                }
+            }
+        } catch (java.io.IOException ignored) {
+            err.append(name).append(": unreadable\n");
+        }
     }
 
     private static int exitCode(String response) {

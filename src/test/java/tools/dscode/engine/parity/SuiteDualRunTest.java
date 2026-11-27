@@ -45,6 +45,50 @@ class SuiteDualRunTest {
     }
 
     @Test
+    void ignoreFailuresMatches() throws Exception {
+        String feature = """
+                Feature: Ignore
+                  Scenario: IGNORE FAILURES keeps the following step from failing the scenario
+                    * IGNORE FAILURES
+                    * FAIL: area b ignored
+                    * , save "continued" as "kept"
+                  Scenario: LOG FAILURES BUT CONTINUE SCENARIO keeps going
+                    * LOG FAILURES BUT CONTINUE SCENARIO
+                    * FAIL: area b logged
+                    * , save "continued" as "kept"
+                  Scenario: AND IGNORE FAILURES applies to that step
+                    * ALWAYS RUN AND IGNORE FAILURES
+                      : * FAIL: area b suffix ignored
+                    * , save "continued" as "kept"
+                """;
+        List<DualRun.Divergence> found = ParityHarness.compare(feature, LogAndAssertSteps.class);
+        assertTrue(found.isEmpty(), found.size() + " " + found);
+    }
+
+    @Test
+    void definedRetryMatches() throws Exception {
+        String feature = """
+                Feature: Defined retry
+                  Scenario: RETRY runs a defined step again
+                    * RETRY: fail until branch "r" reaches "2"
+                    * branch count "r" equals "2"
+                """;
+        List<DualRun.Divergence> found = ParityHarness.compare(feature, SyntaxProofSteps.class);
+        assertTrue(found.isEmpty(), found.size() + " " + found);
+    }
+
+    @Test
+    void retryKeepsTheGherkinLine() throws Exception {
+        String feature = """
+                Feature: Retry line
+                  Scenario: An undefined attempt stays inside the RETRY step
+                    * RETRY: this step is not defined anywhere
+                """;
+        List<DualRun.Divergence> found = ParityHarness.compare(feature, LogAndAssertSteps.class);
+        assertTrue(found.isEmpty(), found.size() + " " + found);
+    }
+
+    @Test
     void areaBMatches() throws Exception {
         List<DualRun.Divergence> found = ParityHarness.compareFeature(
                 Path.of("maven-consumer-project/src/test/resources/features/area-b-control-flow.feature"),
@@ -109,6 +153,33 @@ class SuiteDualRunTest {
                 """;
         List<DualRun.Divergence> found = ParityHarness.compare(feature, SyntaxProofSteps.class);
         assertTrue(found.isEmpty(), found.size() + " " + found);
+    }
+
+    @Test
+    void serviceCallExecutionMatches() throws Exception {
+        Path calls = Path.of("src/test/resources/calls");
+        Path callsTarget = Path.of("maven-consumer-project/src/test/resources/calls").toAbsolutePath().normalize();
+        boolean linkedCalls = false;
+        boolean copiedCalls = false;
+        if (!Files.exists(calls)) {
+            Files.createDirectories(calls.getParent());
+            try {
+                Files.createSymbolicLink(calls, callsTarget);
+                linkedCalls = true;
+            } catch (UnsupportedOperationException | FileSystemException denied) {
+                copyTree(callsTarget, calls);
+                copiedCalls = true;
+            }
+        }
+        try (LocalTestSite site = LocalTestSite.start(8765)) {
+            List<DualRun.Divergence> found = ParityHarness.compareFeature(
+                    Path.of("maven-consumer-project/src/test/resources/features/service-call-execution.feature"),
+                    SyntaxProofSteps.class);
+            assertTrue(found.isEmpty(), found.size() + " " + found.stream().limit(12).toList());
+        } finally {
+            if (copiedCalls) deleteTree(calls);
+            else if (linkedCalls) Files.deleteIfExists(calls);
+        }
     }
 
     @Test

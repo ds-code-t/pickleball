@@ -134,4 +134,20 @@ public final class StorePaths {
         if (path.startsWith("glue/") || "glue".equals(path)) return true;
         return false;
     }
+
+    /**
+     * Call and component files stay enabled 0 so a feature run does not select
+     * them. An explicit calls or component path still loads them.
+     */
+    public static boolean executionLibrary(String storedPath) {
+        String path = storedPath == null ? "" : storedPath.replace('\\', '/');
+        return under(path, "src/test/resources/calls")
+                || under(path, "src/test/resources/component")
+                || under(path, "calls")
+                || under(path, "component");
+    }
+
+    private static boolean under(String path, String root) {
+        return path.equals(root) || path.startsWith(root + "/");
+    }
 }

@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -62,11 +63,10 @@ class LegacyNamesTest {
 
     @Test
     void anOldEnvironmentVariableFailsInAFreshJvm() throws Exception {
-        ProcessBuilder builder = new ProcessBuilder(
-                Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+        ProcessBuilder builder = new ProcessBuilder(StoreTestProcesses.java(List.of(
                 "-cp", System.getProperty("java.class.path"),
                 "tools.dscode.store.StoreCli",
-                "store", "status", "--project=" + project.toAbsolutePath());
+                "store", "status", "--project=" + project.toAbsolutePath())));
         builder.environment().put("PKB_DALTON", "false");
         builder.environment().remove("PKB_STORE");
         Process process = builder.start();

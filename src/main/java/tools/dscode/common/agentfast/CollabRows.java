@@ -113,20 +113,31 @@ public final class CollabRows {
     private static void collect(DomNode node, List<DomNode> out, int depth) {
         if (node == null || depth > 200) return;
         boolean message = !attr(node, "data-pkb-msg-id").isEmpty() || node.attributes.containsKey("data-pkb-msg-id");
-        if (depth > 0 && hiddenContainer(node) && !message) return;
         if (message) {
-            if (!hiddenContainer(node)) out.add(node);
+            if (!explicitlyHidden(node)) out.add(node);
             return;
         }
+        // An open chat log can have no snapshot box (a flex pane with min-height 0). That is not a hide.
+        // Guide and Recorder set hidden on the chat log; the bubbles stay. A minimized panel still stops the walk.
+        if (depth > 0 && explicitlyHidden(node) && !chatLog(node)) return;
         for (DomNode shadow : node.shadowRoots) collect(shadow, out, depth + 1);
         for (DomNode child : node.children) collect(child, out, depth + 1);
     }
 
-    /** A collapsed or hidden container. The document root is not one, so depth 0 still walks. */
-    private static boolean hiddenContainer(DomNode node) {
+    /** The panel chat log. Another tab hides it; the messages are still the log. */
+    private static boolean chatLog(DomNode node) {
+        for (String token : attr(node, "data-pkb-purpose").trim().split("\\s+")) {
+            if ("chat-log".equals(token)) return true;
+        }
+        return false;
+    }
+
+    /** {@code hidden}, a collapsed or hidden state, {@code aria-expanded=false}, or an inline hide. */
+    private static boolean explicitlyHidden(DomNode node) {
         if (node.attributes.containsKey("hidden") || node.states.contains("hidden") || node.states.contains("collapsed")) return true;
         if ("false".equals(node.attributes.get("aria-expanded"))) return true;
-        return !node.displayed && !node.computed.isEmpty();
+        String style = node.attributes.getOrDefault("style", "").toLowerCase(Locale.ROOT).replace(" ", "");
+        return style.contains("display:none") || style.contains("visibility:hidden");
     }
 
     private static StringBuilder text(DomNode node, StringBuilder out) {

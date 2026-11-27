@@ -85,6 +85,227 @@ final class PageSurfaces {
     static final String FRAME_MARK = SurfaceAssets.script("frame-mark");
 
     static final String FRAME_RESTORE = SurfaceAssets.script("frame-restore");
+    /** Page scripts for live boxes, checklist rows, and seen-state. The guard allowlists this file. */
+    static final String LIVE_BOXES = """
+            var out = [];
+            var seen = new Set();
+            function addRoot(root) {
+              if (!root || seen.has(root) || !root.querySelectorAll) return;
+              seen.add(root);
+              var nodes = root.querySelectorAll('[data-pkb-id]');
+              for (var i = 0; i < nodes.length; i++) {
+                var el = nodes[i];
+                var id = el.getAttribute('data-pkb-id') || '';
+                if (!id) continue;
+                if (el.parentElement && el.parentElement.getAttribute('data-pkb-id') === id) continue;
+                var rect = el.getBoundingClientRect();
+                var card = el.hasAttribute('data-pkb-card') || !!el.querySelector('[data-pkb-card]');
+                out.push({id: id, x: rect.left, y: rect.top, w: rect.width, h: rect.height, card: card});
+              }
+              var all = root.querySelectorAll('*');
+              for (var j = 0; j < all.length; j++) {
+                if (all[j].shadowRoot) addRoot(all[j].shadowRoot);
+              }
+              var controls = root.querySelectorAll('button, a, input, select, textarea, [role="button"], [role="link"], [role="checkbox"], [role="textbox"]');
+              for (var c = 0; c < controls.length; c++) {
+                var control = controls[c];
+                if (control.closest && control.closest('[data-pkb-agent],[data-pkb-layer],[data-pkb-meta]')) continue;
+                var box = control.getBoundingClientRect();
+                if (box.width < 1 || box.height < 1) continue;
+                var snippet = ((control.getAttribute('aria-label') || control.innerText || control.tagName || '') + '').replace(/\\s+/g, ' ').trim().slice(0, 24);
+                out.push({id: 'control:' + String(control.tagName || 'el').toLowerCase() + ':' + (snippet || String(c)), x: box.left, y: box.top, w: box.width, h: box.height, card: false});
+              }
+            }
+            addRoot(document);
+            return out;
+            """;
+
+    static final String CHECK_ITEM = """
+            var id = String(arguments[0]);
+            var want = String(arguments[1]);
+            var seen = new Set();
+            function find(root) {
+              if (!root || seen.has(root) || !root.querySelectorAll) return null;
+              seen.add(root);
+              var nodes = root.querySelectorAll('[data-pkb-id]');
+              for (var i = 0; i < nodes.length; i++) {
+                var el = nodes[i];
+                if (el.getAttribute('data-pkb-id') !== id) continue;
+                if (el.parentElement && el.parentElement.getAttribute('data-pkb-id') === id) continue;
+                return el;
+              }
+              var all = root.querySelectorAll('*');
+              for (var j = 0; j < all.length; j++) {
+                if (!all[j].shadowRoot) continue;
+                var hit = find(all[j].shadowRoot);
+                if (hit) return hit;
+              }
+              return null;
+            }
+            var host = find(document);
+            if (!host) return {found: false, rows: []};
+            var rows = host.querySelectorAll('[data-pkb-check]');
+            var out = [];
+            var matched = false;
+            for (var n = 0; n < rows.length; n++) {
+              var row = rows[n];
+              if (row.getAttribute('data-pkb-check') === want) {
+                row.setAttribute('data-pkb-checked', 'true');
+                var box = row.querySelector('input[type=checkbox]');
+                if (box) box.checked = true;
+                matched = true;
+              }
+              out.push({
+                n: Number(row.getAttribute('data-pkb-check')),
+                text: (row.textContent || '').replace(/\\s+/g, ' ').trim(),
+                checked: row.getAttribute('data-pkb-checked') === 'true'
+              });
+            }
+            return {found: matched, rows: out};
+            """;
+
+    /**
+     * A handle is visible only with a non-zero box the user can scroll into, opacity above 0, and a free centre.
+     * {@code display:none} stays hidden with no reason, so the older flag reply does not grow a new cause.
+     */
+    static final String SEEN_SCRIPT = """
+            var h = String(arguments[0] || '');
+            var seen = new Set();
+            function find(root) {
+              if (!root || seen.has(root) || !root.querySelectorAll) return null;
+              seen.add(root);
+              var nodes = root.querySelectorAll('[data-pkb-id]');
+              for (var i = 0; i < nodes.length; i++) {
+                var hit = nodes[i];
+                if (hit.getAttribute('data-pkb-id') !== h) continue;
+                if (hit.parentElement && hit.parentElement.getAttribute('data-pkb-id') === h) continue;
+                return hit;
+              }
+              var handles = root.querySelectorAll('[data-pkb-handle]');
+              for (var k = 0; k < handles.length; k++) {
+                if (handles[k].getAttribute('data-pkb-handle') === h) return handles[k];
+              }
+              if (root.getElementById) {
+                var byId = root.getElementById(h);
+                if (byId) return byId;
+              }
+              var all = root.querySelectorAll('*');
+              for (var j = 0; j < all.length; j++) {
+                if (!all[j].shadowRoot) continue;
+                var inner = find(all[j].shadowRoot);
+                if (inner) return inner;
+              }
+              return null;
+            }
+            function ownUi(node) {
+              return node && node.closest && node.closest('[data-pkb-agent],[data-pkb-layer],[data-pkb-record],[data-pkb-meta="true"]');
+            }
+            function findSeen(root, token) {
+              if (!root || !root.querySelectorAll) return null;
+              var marked = root.querySelectorAll('[data-pkb-seen]');
+              for (var s = 0; s < marked.length; s++) {
+                var parts = (marked[s].getAttribute('data-pkb-seen') || '').split(/\\s+/);
+                for (var p = 0; p < parts.length; p++) {
+                  if (parts[p] === token && !ownUi(marked[s])) return marked[s];
+                }
+              }
+              var nodes = root.querySelectorAll('*');
+              for (var n = 0; n < nodes.length; n++) {
+                if (!nodes[n].shadowRoot) continue;
+                var inner = findSeen(nodes[n].shadowRoot, token);
+                if (inner) return inner;
+              }
+              return null;
+            }
+            var el = find(document);
+            if (!el || (el.isConnected === false)) return {lost:true, visible:false, hidden:true};
+            var anchorToken = el.getAttribute ? el.getAttribute('data-pkb-anchor') : '';
+            if (anchorToken) {
+              var target = findSeen(document, anchorToken);
+              if (!target || target.isConnected === false) return {lost:true, visible:false, hidden:true};
+              el = target;
+            }
+            var style = getComputedStyle(el);
+            if (style.display === 'none' || style.visibility === 'hidden' || el.hidden) {
+              return {lost:false, visible:false, hidden:true};
+            }
+            var opacity = 1;
+            for (var node = el; node && node.nodeType === 1; node = node.parentElement) {
+              var parsed = parseFloat(getComputedStyle(node).opacity);
+              if (!isNaN(parsed)) opacity *= parsed;
+              if (opacity <= 0) return {lost:false, visible:false, hidden:true, hiddenReason:'transparent'};
+            }
+            var rect = el.getBoundingClientRect();
+            if (rect.width < 1 || rect.height < 1) {
+              return {lost:false, visible:false, hidden:true, hiddenReason:'zero-size'};
+            }
+            function overlaps(a0, a1, b0, b1) { return a1 > b0 && a0 < b1; }
+            var viewW = window.innerWidth || document.documentElement.clientWidth;
+            var viewH = window.innerHeight || document.documentElement.clientHeight;
+            var onScreen = rect.bottom > 0 && rect.right > 0 && rect.top < viewH && rect.left < viewW;
+            function scrollable(target, box) {
+              if (getComputedStyle(target).position === 'fixed') return false;
+              var doc = document.scrollingElement || document.documentElement;
+              var top = box.top + window.scrollY;
+              var left = box.left + window.scrollX;
+              var maxX = Math.max(0, doc.scrollWidth - viewW);
+              var maxY = Math.max(0, doc.scrollHeight - viewH);
+              if (overlaps(left, left + box.width, 0, maxX + viewW)
+                  && overlaps(top, top + box.height, 0, maxY + viewH)) return true;
+              var parent = target.parentElement;
+              while (parent) {
+                var parentStyle = getComputedStyle(parent);
+                var scrollY = (parentStyle.overflowY === 'auto' || parentStyle.overflowY === 'scroll')
+                    && parent.scrollHeight > parent.clientHeight + 1;
+                var scrollX = (parentStyle.overflowX === 'auto' || parentStyle.overflowX === 'scroll')
+                    && parent.scrollWidth > parent.clientWidth + 1;
+                if (scrollY || scrollX) {
+                  var parentBox = parent.getBoundingClientRect();
+                  var relTop = box.top - parentBox.top + parent.scrollTop;
+                  var relLeft = box.left - parentBox.left + parent.scrollLeft;
+                  var inY = overlaps(relTop, relTop + box.height, 0, parent.scrollHeight);
+                  var inX = overlaps(relLeft, relLeft + box.width, 0, parent.scrollWidth);
+                  if ((scrollY && inY && inX) || (scrollX && inX && inY)) return true;
+                }
+                parent = parent.parentElement;
+              }
+              return false;
+            }
+            if (!onScreen && !scrollable(el, rect)) {
+              return {lost:false, visible:false, hidden:true, hiddenReason:'offscreen'};
+            }
+            var x = rect.left + rect.width / 2;
+            var y = rect.top + rect.height / 2;
+            var stack = document.elementsFromPoint ? document.elementsFromPoint(x, y) : [];
+            if (!stack.length && document.elementFromPoint) {
+              var one = document.elementFromPoint(x, y);
+              stack = one ? [one] : [];
+            }
+            for (var i = 0; i < stack.length; i++) {
+              var top = stack[i];
+              var guard = 0;
+              while (top && top.shadowRoot && guard++ < 8) {
+                var inner = top.shadowRoot.elementFromPoint(x, y);
+                if (!inner || inner === top) break;
+                top = inner;
+              }
+              if (!top || top === el || (el.contains && el.contains(top))) break;
+              var cursor = el;
+              var hops = 0;
+              var ancestor = false;
+              while (cursor && hops++ < 30) {
+                if (cursor === top) { ancestor = true; break; }
+                var root = cursor.getRootNode ? cursor.getRootNode() : null;
+                if (root && root.host) cursor = root.host;
+                else cursor = cursor.parentElement;
+              }
+              if (ancestor) break;
+              if (top.closest && top.closest('[data-pkb-agent],[data-pkb-layer],[data-pkb-record],[data-pkb-meta="true"]')) continue;
+              return {lost:false, visible:false, hidden:true, hiddenReason:'covered'};
+            }
+            return {lost:false, visible:true, hidden:false};
+            """;
+
 
     private PageSurfaces() {
     }
@@ -2442,6 +2663,17 @@ final class PageSurfaces {
             // A stored viewport box is painted on the top document. Cross-origin frame
             // ids are not Selenium frames, and the node's backend id is not in the parent.
             if (lookupBounds(handle) != null) {
+                FrameOwner bound = frameOwner(ref);
+                if (bound != null && browserStillManaged(bound)) {
+                    if (!activate(bound.driver, bound.tab)) {
+                        ENTRY_FAILURE.set("tab switch failed");
+                        return null;
+                    }
+                    driver = bound.driver;
+                    focusedTab = bound.tab;
+                    THREAD_FOCUS.set(new Focus(bound.driver, bound.tab));
+                    return bound.driver;
+                }
                 if (driver != null && focusedTab != null && !focusedTab.isBlank() && !activate(driver, focusedTab)) {
                     ENTRY_FAILURE.set("tab switch failed");
                     return null;

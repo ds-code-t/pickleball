@@ -9,6 +9,8 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
+import tools.dscode.store.sql.SqliteOpen;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -17,7 +19,12 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /** Read-only Store queries. Missing databases are empty and are not created. */
 public final class StoreQuery {
@@ -107,7 +114,16 @@ public final class StoreQuery {
         if (!databasePresent(project)) return null;
         String path = StorePaths.normalizeRelative(relativePath);
         try (StoreDatabase database = StoreDatabase.open(project)) {
-            StoreFiles.Row row = StoreFiles.find(database.connection(), path);
+            Connection connection = database.connection();
+            StoreFiles.Row row = StoreFiles.find(connection, path);
+            if (row == null && CowSandbox.isCow(connection) && !deletedFiles(connection).contains(path)) {
+                Path parent = CowSandbox.parentFile(project, connection);
+                if (parent != null) {
+                    try (Connection parentConnection = SqliteOpen.openReadOnly(parent)) {
+                        row = StoreFiles.find(parentConnection, path);
+                    }
+                }
+            }
             if (row == null) return null;
             byte[] raw;
             try {
@@ -128,8 +144,38 @@ public final class StoreQuery {
 
     public static List<FeatureSummary> features(Path project) throws SQLException {
         if (!databasePresent(project)) return List.of();
-        try (StoreDatabase database = StoreDatabase.open(project);
-             PreparedStatement statement = database.connection().prepareStatement("""
+        try (StoreDatabase database = StoreDatabase.open(project)) {
+            Connection connection = database.connection();
+            List<FeatureSummary> found = readFeatures(connection);
+            if (!CowSandbox.isCow(connection)) return found;
+            Set<String> present = new LinkedHashSet<>();
+            for (FeatureSummary feature : found) present.add(storedPath(feature.path()));
+            Set<String> deleted = deletedFiles(connection);
+            Path parent = CowSandbox.parentFile(project, connection);
+            if (parent == null) return found;
+            try (Connection parentConnection = SqliteOpen.openReadOnly(parent)) {
+                for (FeatureSummary feature : readFeatures(parentConnection)) {
+                    String path = storedPath(feature.path());
+                    if (present.contains(path) || deleted.contains(path)) continue;
+                    found.add(feature);
+                    present.add(path);
+                }
+            }
+            found.sort(Comparator.comparing(feature -> storedPath(feature.path())));
+            return found;
+        }
+    }
+
+    public static FeatureSummary feature(Path project, String relativePath) throws SQLException {
+        String path = StorePaths.normalizeRelative(relativePath);
+        for (FeatureSummary feature : features(project)) {
+            if (storedPath(feature.path()).equals(path)) return feature;
+        }
+        return null;
+    }
+
+    private static List<FeatureSummary> readFeatures(Connection connection) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
                      SELECT d.file_path, d.keyword, d.name, d.language, d.tags, d.description,
                             (SELECT COUNT(*) FROM scenarios s WHERE s.file_path = d.file_path)
                      FROM feature_docs d
@@ -146,12 +192,27 @@ public final class StoreQuery {
         }
     }
 
-    public static FeatureSummary feature(Path project, String relativePath) throws SQLException {
-        String path = StorePaths.normalizeRelative(relativePath);
-        for (FeatureSummary feature : features(project)) {
-            if (feature.path().equals(path)) return feature;
+    /** Latest {@code files} delete on this connection. A later put brings the parent row back. */
+    private static Set<String> deletedFiles(Connection connection) throws SQLException {
+        Map<String, String> latest = new LinkedHashMap<>();
+        for (DeltaLog.Delta delta : DeltaLog.after(connection, 0)) {
+            if (!"files".equals(delta.table()) || delta.pk() == null) continue;
+            latest.put(storedPath(delta.pk()), delta.kind());
         }
-        return null;
+        Set<String> deleted = new LinkedHashSet<>();
+        for (Map.Entry<String, String> entry : latest.entrySet()) {
+            if (DeltaLog.DELETE.equals(entry.getValue())) deleted.add(entry.getKey());
+        }
+        return deleted;
+    }
+
+    private static String storedPath(String path) {
+        if (path == null || path.isBlank()) return "";
+        try {
+            return StorePaths.normalizeRelative(path);
+        } catch (IllegalArgumentException ignored) {
+            return path.replace('\\', '/');
+        }
     }
 
     public static List<ScenarioRow> scenarios(Path project, String featurePath) throws SQLException {

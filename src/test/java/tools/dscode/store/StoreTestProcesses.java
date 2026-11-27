@@ -18,7 +18,7 @@ import java.util.Locale;
  * go through an argument file because the test classpath is longer than the
  * Windows command line.
  */
-final class StoreTestProcesses {
+public final class StoreTestProcesses {
     private StoreTestProcesses() {
     }
 
@@ -71,16 +71,26 @@ final class StoreTestProcesses {
      * Returns {@code java @argfile}. Everything after the java executable, JVM
      * options, main class, and program arguments, goes in the file.
      */
-    static List<String> java(List<String> arguments) throws IOException {
+    public static List<String> java(List<String> arguments) throws IOException {
+        List<String> command = new ArrayList<>();
+        command.add(javaBin().toString());
+        command.add(argFile(arguments));
+        return command;
+    }
+
+    /**
+     * Writes one quoted argument per line and returns {@code @path}.
+     * The {@code java} launcher and {@code JavaCompiler.run} expand that file.
+     * {@code JavaCompiler.getTask} does not, so an in-process compile passes its
+     * options directly. A long classpath never sits on the Windows command line.
+     */
+    public static String argFile(List<String> arguments) throws IOException {
         Path file = Files.createTempFile("pkb-store-child-", ".args");
         file.toFile().deleteOnExit();
         List<String> lines = new ArrayList<>();
         for (String argument : arguments) lines.add(quote(argument));
         Files.writeString(file, String.join("\n", lines) + "\n", StandardCharsets.UTF_8);
-        List<String> command = new ArrayList<>();
-        command.add(javaBin().toString());
-        command.add("@" + file.toAbsolutePath());
-        return command;
+        return "@" + file.toAbsolutePath();
     }
 
     static Path javaBin() {

@@ -78,7 +78,10 @@ public final class NativeScenarioRun {
         java.util.Set<StepExtension> recorded = java.util.Collections.newSetFromMap(new IdentityHashMap<>());
         Consumer<StepExtension> outerTrace = NativeStepTrace.current();
         NativeStepTrace.listen(frame -> {
-            if (frame == null || !recorded.add(frame)) return;
+            // A RETRY attempt is captureFailure. Cucumber does not emit a finish
+            // event for it, so the result keeps the RETRY line and not the attempt.
+            if (frame == null || frame.captureFailure) return;
+            if (!recorded.add(frame)) return;
             seen.add(new Seen(SharedStepRun.bound(frame), frame));
             if (outerTrace != null) outerTrace.accept(frame);
         });

@@ -161,6 +161,11 @@ class WorkbenchSessionCommandsTest {
         } finally {
             process.destroyForcibly();
             process.waitFor(3, TimeUnit.SECONDS);
+            Thread pump = WorkbenchSessionCommands.logPump(process.pid());
+            if (pump != null) {
+                pump.join(2_000);
+                assertFalse(pump.isAlive(), "session log stayed open");
+            }
         }
     }
 

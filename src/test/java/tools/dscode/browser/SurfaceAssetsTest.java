@@ -95,6 +95,7 @@ class SurfaceAssetsTest {
         String java = Files.readString(source);
         assertFalse(java.contains("var spec = arguments[0]"));
         assertFalse(java.contains("data-pkb-bridge', token"));
+        assertTrue(java.contains("data-pkb-anchor"), "seen script does not follow the placement anchor");
 
         assertThrows(IllegalArgumentException.class, () -> SurfaceAssets.html("chat"));
         assertThrows(IllegalArgumentException.class, () -> SurfaceAssets.html(null));
@@ -127,6 +128,8 @@ class SurfaceAssetsTest {
         assertTrue(runtime.contains("ResizeObserver") && runtime.contains("MutationObserver"), "runtime does not observe resize and mutation");
         assertTrue(runtime.contains("getComputedStyle") && runtime.contains("data-pkb-copy"), "runtime magnifier does not copy the target");
         assertTrue(runtime.contains("translate(-50%, -50%) scale("), "runtime magnifier does not center the copy");
+        assertTrue(runtime.contains("data-pkb-seen"), "runtime does not mark the tracked anchor");
+        assertTrue(runtime.contains("data-pkb-anchor"), "runtime does not point the placement at its anchor");
         assertSame(runtime, SurfaceAssets.script("PKB-RUNTIME"));
     }
 }

@@ -66,6 +66,49 @@ class ElementRecordTest {
     }
 
     @Test
+    void presentRowFieldsStayOnTheRecord() {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("id", "s1.h2");
+        row.put("role", "tab");
+        row.put("name", "Chat");
+        row.put("tag", "button");
+        row.put("ref", "ref:d1:10");
+        row.put("visible", false);
+        row.put("enabled", true);
+        row.put("interactive", true);
+        row.put("via", "coverage");
+        row.put("purpose", "panel,chat-tab");
+        row.put("highlight", "yellow");
+        row.put("shadow", "closed");
+        row.put("shadow_path", "/html[1]/body[1]/div[1]");
+        row.put("widget", "secret-widget");
+        row.put("msg", null);
+
+        Map<String, Object> record = ElementRecord.from(row, "widget,purpose");
+        assertEquals("s1.h2", record.get("handle"));
+        assertEquals("ref:d1:10", record.get("ref"));
+        assertEquals(Boolean.FALSE, record.get("visible"));
+        assertEquals(Boolean.TRUE, record.get("enabled"));
+        assertEquals(Boolean.TRUE, record.get("interactive"));
+        assertEquals("coverage", record.get("via"));
+        assertEquals("panel,chat-tab", record.get("purpose"));
+        assertEquals("yellow", record.get("highlight"));
+        assertEquals("closed", record.get("shadow"));
+        assertEquals("/html[1]/body[1]/div[1]", record.get("shadow_path"));
+        assertFalse(record.containsKey("id"));
+        assertFalse(record.containsKey("msg"));
+        assertFalse(record.containsKey("checked"));
+        assertFalse(record.containsKey("widget"));
+        Map<?, ?> extra = (Map<?, ?>) record.get("extra");
+        assertEquals("secret-widget", extra.get("widget"));
+        assertFalse(extra.containsKey("purpose"));
+        assertFalse(extra.containsKey("visible"));
+        assertFalse(extra.containsKey("via"));
+        assertFalse(extra.containsKey("shadow"));
+        assertFalse(extra.containsKey("shadow_path"));
+    }
+
+    @Test
     void desktopQueryDropsExtraUnlessFieldsNamesIt() {
         String json = """
                 {"ok":true,"nodes":[{"role":"button","name":"Save","widget":"secret-widget","x":1,"y":2,"width":3,"height":4}],"composite":[]}

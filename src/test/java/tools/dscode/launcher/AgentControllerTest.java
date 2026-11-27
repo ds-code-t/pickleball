@@ -10,6 +10,8 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import tools.dscode.store.StoreTestProcesses;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -26,11 +28,10 @@ class AgentControllerTest {
     @Test
     @Timeout(value = 90, unit = TimeUnit.SECONDS)
     void warmVerbsStayUnderHalfASecond() throws Exception {
-        String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
         String classpath = System.getProperty("java.class.path");
-        Process server = new ProcessBuilder(
-                java, "-cp", classpath, "tools.dscode.launcher.PkbMain", "controller-serve", project.toString()
-        ).redirectError(ProcessBuilder.Redirect.DISCARD).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+        Process server = new ProcessBuilder(StoreTestProcesses.java(List.of(
+                "-cp", classpath, "tools.dscode.launcher.PkbMain", "controller-serve", project.toString()
+        ))).redirectError(ProcessBuilder.Redirect.DISCARD).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
         try {
             long deadline = System.nanoTime() + 30_000_000_000L;
             while (!Files.isRegularFile(PkbMain.handleFile(project))) {
@@ -43,7 +44,7 @@ class AgentControllerTest {
             List<Long> samples = new ArrayList<>();
             for (int index = 0; index < 3; index++) {
                 long started = System.nanoTime();
-                Run ping = launch(java, thin, project, "controller-ping", project.toString());
+                Run ping = launch(thin, project, "controller-ping", project.toString());
                 long elapsed = (System.nanoTime() - started) / 1_000_000L;
                 samples.add(elapsed);
                 assertEquals(0, ping.exit, ping.err + ping.out);
@@ -51,11 +52,11 @@ class AgentControllerTest {
                 assertTrue(elapsed < 500, "warm ping " + elapsed + " ms samples=" + samples);
             }
             System.out.println("warm-ping-ms=" + samples);
-            Run help = launch(java, thin, project, "help", "snap");
+            Run help = launch(thin, project, "help", "snap");
             assertEquals(0, help.exit, help.err);
             assertTrue(help.out.contains("Usage: snap"), help.out);
         } finally {
-            launch(java, thinClasspath(classpath), project, "controller-stop", project.toString());
+            launch(thinClasspath(classpath), project, "controller-stop", project.toString());
             server.destroyForcibly();
             server.waitFor(5, TimeUnit.SECONDS);
         }
@@ -125,14 +126,13 @@ class AgentControllerTest {
         return classpath;
     }
 
-    private static Run launch(String java, String classpath, Path dir, String... args) throws Exception {
+    private static Run launch(String classpath, Path dir, String... args) throws Exception {
         List<String> command = new ArrayList<>();
-        command.add(java);
         command.add("-cp");
         command.add(classpath);
         command.add("tools.dscode.launcher.PkbMain");
         command.addAll(List.of(args));
-        Process process = new ProcessBuilder(command).directory(dir.toFile()).start();
+        Process process = new ProcessBuilder(StoreTestProcesses.java(command)).directory(dir.toFile()).start();
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
         Thread stdout = drain(process.getInputStream(), out);

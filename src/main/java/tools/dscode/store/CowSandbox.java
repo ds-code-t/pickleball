@@ -218,13 +218,19 @@ public final class CowSandbox {
         }
     }
 
-    private static boolean parentHasFile(Path project, Connection child, String path) throws SQLException {
+    /** Parent database for a cow child. Missing parents are null. Callers open it themselves and do not ATTACH. */
+    static Path parentFile(Path project, Connection child) throws SQLException {
         String parent = branchValue(child, "parent");
-        if (parent == null || parent.isBlank() || project == null) return false;
-        Path parentFile = "main".equals(parent)
+        if (parent == null || parent.isBlank() || project == null) return null;
+        Path file = "main".equals(parent)
                 ? StorePaths.mainDatabase(project)
                 : StorePaths.sandboxDatabase(project, parent);
-        if (!Files.isRegularFile(parentFile)) return false;
+        return Files.isRegularFile(file) ? file : null;
+    }
+
+    private static boolean parentHasFile(Path project, Connection child, String path) throws SQLException {
+        Path parentFile = parentFile(project, child);
+        if (parentFile == null) return false;
         try (Connection parentConnection = SqliteOpen.open(parentFile);
              PreparedStatement statement = parentConnection.prepareStatement(
                      "SELECT 1 FROM files WHERE path = ?")) {

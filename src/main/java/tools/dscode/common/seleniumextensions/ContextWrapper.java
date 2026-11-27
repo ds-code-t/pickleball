@@ -31,6 +31,7 @@ public class ContextWrapper {
 
     public List<XPathy> paths = new ArrayList<>();
     private final List<SpatialRelation> spatialRelations = new ArrayList<>();
+    private PhraseData betweenPhrase;
 
     public ContextWrapper(ElementMatch elementMatch) {
         this.elementMatch = elementMatch;
@@ -42,11 +43,15 @@ public class ContextWrapper {
         logTrace("getElements: " + elementMatch);
         if (searchContext == null) return new ArrayList<>();
         logTrace("ContextWrapper-elementTerminalXPath " + prettyPrintXPath(elementTerminalXPath));
-        if (spatialRelations.isEmpty()) {
+        if (spatialRelations.isEmpty() && betweenPhrase == null) {
             return getElementListFromSearchContext(searchContext, elementTerminalXPath, elementMatch);
         }
         List<WebElement> candidates = findAll(searchContext, elementTerminalXPath, elementMatch);
         candidates = tools.dscode.common.composite.LookFind.retain(searchContext, candidates, elementMatch);
+        if (betweenPhrase != null) {
+            candidates = tools.dscode.common.composite.BetweenFind.retain(
+                    searchContext, candidates, elementMatch, betweenPhrase);
+        }
         List<WebElement> related = applySpatial(searchContext, candidates);
         return PositionSelection.apply(related, elementMatch);
     }
@@ -57,6 +62,7 @@ public class ContextWrapper {
         SearchContext searchContext = elementMatch.parentPhrase.getSearchContext();
         List<PhraseData> contextList = elementMatch.parentPhrase.getPhraseContextList();
         spatialRelations.clear();
+        betweenPhrase = null;
         logTrace("getFinalSearchContext-contextList: " + contextList);
         logTrace("starting searchContext: " + searchContext);
 
@@ -104,6 +110,8 @@ public class ContextWrapper {
                 if (searchContext == null)
                     break;
 
+            } else if ("between".equals(phraseData.context)) {
+                betweenPhrase = phraseData;
             } else if (isSpatialContext(phraseData.context)) {
                 String anchorXPath = anchorXPath(phraseData);
                 if (anchorXPath != null) {

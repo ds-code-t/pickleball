@@ -164,6 +164,7 @@ public final class SqlDialect {
                 enabled INTEGER NOT NULL DEFAULT 1,
                 parameter_types TEXT NOT NULL DEFAULT '[]',
                 host TEXT NOT NULL DEFAULT 'java',
+                source_pattern TEXT NOT NULL DEFAULT '',
                 PRIMARY KEY (definition_id)
             )
             """,
@@ -562,7 +563,9 @@ public final class SqlDialect {
      * A database that already has {@code hydration_spine} still needs columns added
      * by a later build. The full DDL stays on the slow path. This check looks up
      * the newest columns, then {@link #ensureHydrationColumns} when one is missing.
-     * {@code steps.context_scope}, {@code steps.visual_ref}, {@code step_definitions.host}, the {@code fixtures} table, {@code pins.head_id}, and the {@code branch_parents} table are all required.
+     * {@code steps.context_scope}, {@code steps.visual_ref}, {@code step_definitions.host},
+     * {@code step_definitions.source_pattern}, the {@code fixtures} table, {@code pins.head_id},
+     * and the {@code branch_parents} table are all required.
      */
     private static void ensureAdditiveOnReady(SqlSession session) throws SQLException {
         if (additiveColumnsPresent(session)) return;
@@ -578,6 +581,8 @@ public final class SqlDialect {
                     "SELECT name FROM pragma_table_info('steps') WHERE name = ?", "context_scope"))
                     && "host".equals(session.scalar(
                     "SELECT name FROM pragma_table_info('step_definitions') WHERE name = ?", "host"))
+                    && "source_pattern".equals(session.scalar(
+                    "SELECT name FROM pragma_table_info('step_definitions') WHERE name = ?", "source_pattern"))
                     && "visual_ref".equals(session.scalar(
                     "SELECT name FROM pragma_table_info('steps') WHERE name = ?", "visual_ref"))
                     && "fixtures".equals(session.scalar(
@@ -626,6 +631,7 @@ public final class SqlDialect {
         addColumn(session, "step_definitions", "enabled", "INTEGER NOT NULL DEFAULT 1");
         addColumn(session, "step_definitions", "parameter_types", "TEXT NOT NULL DEFAULT '[]'");
         addColumn(session, "step_definitions", "host", "TEXT NOT NULL DEFAULT 'java'");
+        addColumn(session, "step_definitions", "source_pattern", "TEXT NOT NULL DEFAULT ''");
         addColumn(session, "steps", "max_iterations", "INTEGER");
         addColumn(session, "steps", "timeout_seconds", "INTEGER");
         addColumn(session, "steps", "retry", "INTEGER NOT NULL DEFAULT 0");

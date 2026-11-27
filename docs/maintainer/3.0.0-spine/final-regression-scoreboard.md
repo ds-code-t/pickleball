@@ -14,7 +14,7 @@ First-run rows are filled when that command finishes. Final-run rows are the gre
 
 | Command | Run | Total | Passed | Failed | Skipped | Duration | Head | Report timestamp |
 |---|---|---:|---:|---:|---:|---|---|---|
-| `.\gradlew.bat :test --console=plain` | first | | | | | | | |
+| `.\gradlew.bat :test --console=plain` | first | 2096 | 1986 | 103 | 7 | 1h 27m 50s | 4383ed02e | 2026-11-27T08:00Z–09:24Z |
 | `.\gradlew.bat :test --console=plain` | final | | | | | | | |
 | `.\gradlew.bat :dom-engine:test --console=plain` | first | | | | | | | |
 | `.\gradlew.bat :dom-engine:test --console=plain` | final | | | | | | | |
@@ -39,12 +39,36 @@ First-run rows are filled when that command finishes. Final-run rows are the gre
 
 `mvnw @all` is `.\maven-consumer-project\mvnw.cmd -f maven-consumer-project\pom.xml -U test -Dpkb_runvars.pkb_browser=CHROME_HEADLESS -Dpkb_runvars.pkb_tags=@all`.
 
-Maven-local wait: not yet checked. The wait applies before `publishToMavenLocal` and before `mvnw`.
+Maven-local wait: checked before the focused re-run. `tasklist` showed only java.exe pids 48240 and 50896 (started 2026-11-23). No Gradle publish and no `mvnw`. Wait was 0. `:test` depends on `publishToMavenLocal`, so that focused re-run publishes to the local repository. That publish is not the Part A `publishToMavenLocal` row.
+
+The first `:test` ran on head `4383ed02e`. The working tree already held uncommitted fixes. The test JVM compiled before those edits, so this row is the committed head.
+
+Root `:test` skips (7), all pre-existing assumptions:
+
+| Class | Count | Reason |
+|---|---:|---|
+| `PopupSandboxFallbackTest` | 2 | `the fake browser is a POSIX shell script` (`PopupHost.windows()`) |
+| `LiveFirefoxSnapshotTest` | 1 | `firefox is not on PATH` |
+| `BrowserEventsBidiLiveTest` | 1 | `no Firefox binary on this machine` |
+| `BrowserProtocolsLiveTest` | 1 | `no Firefox binary on this machine` |
+| `DesktopSameVerbTest` | 1 | `AT-SPI tree has no named window for a process id` (live attach returned a tree with no pid and name) |
+| `WorkbenchShellQuotingTest` | 1 | `pwsh is not on PATH` |
 
 ## Failures and fixes
 
 | Test or scenario | Error | Root cause | Fix SHA | Reproducing test | Before | After |
 |---|---|---|---|---|---|---|
+| BetweenLiveFindTest.liveStepFindKeepsTheSaveButtonBetweenTheTwoAnchors | expected `[in]`, was `[]` | `Relations.splitAnchors` split `AND` inside each comma-separated anchor, so both anchors were the first button and the box collapsed to a point | uncommitted, after 4383ed02e | BetweenRelationTest.xmlPageSourceKeepsTheSaveButtonBetweenTheAnchors, BetweenLiveFindTest | fail | pass (3/3 live, 3/3 relation, 2026-11-27) |
+| WorkbenchAgentUsabilityTest.deprecatedFlagAliasesNormalizeToTheCanonicalFlag | golden catalog differed from `WorkbenchCliHelp.catalog()` | `src/test/resources/workbench-help-golden.txt` was the previous 18-line catalog | uncommitted, after 4383ed02e | same method | fail | pass (1/1, XML 2026-11-27T10:52:28.502Z, 0.046s) |
+| SuiteDualRunTest.areaBMatches and ignoreFailuresMatches | adapter scenario FAILED, native PASSED; later undefined steps showed FAIL ERROR ids 3 vs 103 | Cucumber emitted ignore, log-and-continue, and RETRY attempts as failed result steps and burned throwable ids | uncommitted, after 4383ed02e | SuiteDualRunTest.ignoreFailuresMatches, retryKeepsTheGherkinLine, definedRetryMatches, areaBMatches | fail | pass (XML 2026-11-27T15:43:00Z, 5 tests, 0 failures, 58.9s) |
+| SuiteDualRunTest.consumerFeaturesMatch call lookup | `No scenarios matched` for `@%TokenCall` on the Cucumber side | call and component files are stored `enabled=0`, and the adapter treated that as absent while the native engine read the file | uncommitted, after 4383ed02e | CallLibraryScanTest.explicitLibraryPathLoadsWhileAFeatureRunSkipsEnabledZero; SuiteDualRunTest.serviceCallExecutionMatches; SuiteDualRunTest.consumerFeaturesMatch | fail | pass (CallLibraryScanTest 0.424s; service-call feature 26.868s; consumerFeaturesMatch 3643.8s, 0 failures, XML start 2026-11-27T15:46:22Z) |
+| ClosedShadowResolveTest closed-shadow find | expected `closed`, was empty | `ElementRecord` dropped `shadow` and `shadow_path` that the find row already had | uncommitted, after 4383ed02e | ElementRecordTest.presentRowFieldsStayOnTheRecord; ClosedShadowResolveTest | fail | pass (Surefire 2 tests, 0 failures, 7.455s, 2026-11-27) |
+| PlaywrightSpecIngestLiveTest.specOpensTheLocalPage | Gherkin parser rejected `test.describe` | store ownership used `pkb_store_project` or the working directory, so a spec in the engine project stayed on the file loader | uncommitted, after 4383ed02e | StoreFeatureOwnershipTest.theEngineProjectOwnsASpecWhenTheConfiguredProjectIsElsewhere; PlaywrightSpecIngestLiveTest | fail | pass (Surefire 1 test, 0 failures, 1.565s, 2026-11-27) |
+| BrowserEventsLiveTest initialization | `DevToolsActivePort` sharing violation | the test helper read the port file once while Chrome still held it, and the exception left the wait | uncommitted, after 4383ed02e | PlaywrightCdpLiveTest.startChrome retry; BrowserEventsLiveTest | fail | pass (Surefire 5 tests, 0 failures, 7.227s, 2026-11-27) |
+| WorkbenchCliCoverageGateTest | `covers_command_ui` had no behavior token | the real `ui` launch moved into `bareUiOpensAndStaysUp`, and the gate only reads the `covers_*` body | uncommitted, after 4383ed02e | WorkbenchCliCoverageGateTest | fail | pass (focused class, with the 10-test batch, 2026-11-27) |
+| ScenarioObjectHookTest | run id `warm-first` is already finished | in-process `WorkbenchDirectRun` left `pkb_run_id` set | uncommitted, after 4383ed02e | WorkbenchWarmFallbackTest.inProcessRunRestoresThePreviousRunId; ScenarioObjectHookTest | fail | pass (same 10-test batch, 2026-11-27) |
+| StoreSandboxPruneTest | `store run --sandbox=linbox` exit 1, no scenario lines | a cow child stores no parent file bytes, and the run read only the child | uncommitted, after 4383ed02e | StoreSandboxPruneTest | fail | pass (focused with WarmWorkerReloadTest, BUILD SUCCESSFUL, 1m 2s, 2026-11-27) |
+| WarmWorkerReloadTest | second mark stayed `1` after a classpath prepend, and the first run was undefined before that | `.pickleball/spine/classes` on the worker application classpath pinned `glue.Mark`; the warm loader was not used for `StepRegistry.bind` | uncommitted, after 4383ed02e | WarmWorkerReloadTest | fail | pass (same focused run, 1m 2s, 2026-11-27) |
 
 ## Sweep
 
@@ -147,6 +171,14 @@ Known open follow-ups, not passes: `docs/tech-debt.md` sections `Spine merge fol
 
 | Stale reference | File | Fix SHA |
 |---|---|---|
+| R4 roadmap says extra ElementRecord keys go under `extra` unless `--fields`. The shipped record passes those keys through. The roadmap file was not edited. `AGENTS.md` and `docs/release-notes.md` state the shipped behavior. | `docs/roadmaps/3.0.0-spine/R4-cli-mcp-universal-surface-verb-inventory.md` | recorded disagreement, no roadmap edit |
+| Feature-run docs said every `enabled=0` scenario is left out of both engines. An explicit calls or component path still loads those files. | `docs/cucumber-compatibility.md`, `docs/configuration.md`, `docs/store-entities.md`, `docs/release-notes.md` (Spine R2 P2) | uncommitted, after 4383ed02e |
+| Spine R8 merge notes required a session for `bidi help`. `VerbDispatch.SESSION_EXEMPT` includes `bidi help`. | `docs/release-notes.md` | uncommitted, after 4383ed02e |
+| Spine R5 fix-back 2 notes said help, version, and `export-guidance` are not exempt. The 2026-11-26 allow-list exempts them. `export-guidance --warm` still needs a session. | `docs/release-notes.md` | uncommitted, after 4383ed02e |
+| Consumer project guide called `ui .` the Swing player. Bare `ui` opens the Node renderer. | `docs/consumer-project.md` | uncommitted, after 4383ed02e |
+| A cow child with no file row did not supply parent bytes to a run. List and show already included the parent feature. `StoreQuery.file` and `StoreFeatureSource.bytesFor` now read that parent file unless the child deleted the path. | `AGENTS.md`, `docs/configuration.md`, `docs/release-notes.md`, `docs/agent/feature-map.md` | uncommitted, after 4383ed02e |
+| Warm glue reload was described only as putting `.pickleball/spine/classes` on the warm loader. That directory stays off the store worker application classpath. `StepRegistry` loads the class through `JavaStepHost.selectLoader` when `pkb_warm=on`. | `AGENTS.md`, `docs/configuration.md`, `docs/release-notes.md`, `docs/agent/feature-map.md` | uncommitted, after 4383ed02e |
+| An in-process `WorkbenchDirectRun` left `pkb_` system properties set after the launch. The launch snapshots `pkb_` and `cucumber.` properties and restores them when it returns. | `AGENTS.md`, `docs/configuration.md`, `docs/release-notes.md` | uncommitted, after 4383ed02e |
 
 ## Environment and flake log
 

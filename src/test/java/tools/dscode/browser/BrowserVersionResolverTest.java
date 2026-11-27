@@ -2,8 +2,11 @@ package tools.dscode.browser;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -20,6 +23,32 @@ class BrowserVersionResolverTest {
         BrowserVersionResolver.resetForTests();
         BrowserLog.resetForTests();
         System.clearProperty("pkb_browser_log");
+    }
+
+    @Test
+    void configPathPrefixIsADirectoryNotARawPath(@TempDir Path temp) throws Exception {
+        Path configs = temp.resolve("My Projects").resolve("configs");
+        Files.createDirectories(configs);
+        Files.writeString(configs.resolve("CHROME_HEADLESS.yaml"), "framePolicy: iframe\n");
+        String config = System.getProperty("pkb_configpath");
+        String browser = System.getProperty("pkb_browser");
+        System.clearProperty("pkb_browser");
+        try {
+            System.setProperty("pkb_configpath", "wd-file:" + configs.toAbsolutePath());
+            assertEquals("iframe", BrowserVersionResolver.framePolicy(temp));
+            System.setProperty("pkb_configpath", "wd-file:C:\\Users\\Dan\\My Projects\\configs");
+            assertEquals("top", BrowserVersionResolver.framePolicy(temp));
+            System.setProperty("pkb_configpath", "wd-file:configs");
+            assertEquals("top", BrowserVersionResolver.framePolicy(temp));
+        } finally {
+            restore("pkb_configpath", config);
+            restore("pkb_browser", browser);
+        }
+    }
+
+    private static void restore(String key, String value) {
+        if (value == null) System.clearProperty(key);
+        else System.setProperty(key, value);
     }
 
     @Test

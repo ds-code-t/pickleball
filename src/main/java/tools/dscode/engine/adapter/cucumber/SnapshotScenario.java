@@ -1,4 +1,4 @@
-package tools.dscode.engine.runtime;
+package tools.dscode.engine.adapter.cucumber;
 
 import io.cucumber.core.runner.CurrentScenarioState;
 import io.cucumber.core.runner.GlobalState;
@@ -7,8 +7,7 @@ import io.cucumber.plugin.event.Result;
 import tools.dscode.Values;
 import tools.dscode.common.mappings.MappingProcessor;
 import tools.dscode.common.reporting.logging.Entry;
-import tools.dscode.engine.adapter.cucumber.NativeScenarioRun;
-import tools.dscode.engine.adapter.cucumber.SharedStepRun;
+import tools.dscode.engine.runtime.VisualTarget;
 import tools.dscode.engine.context.ExecutionContext;
 import tools.dscode.engine.match.ForeignStepHosts;
 import tools.dscode.engine.match.StepRegistry;
@@ -30,7 +29,7 @@ import java.util.Set;
  * steps reuse the same glue instances and scenario objects. {@link #close()}
  * ends it. The parent still receives one JSON result per step.
  */
-final class SnapshotScenario {
+public final class SnapshotScenario {
     private final Path project;
     private final StepRegistry registry;
     private final CurrentScenarioState state;
@@ -45,7 +44,7 @@ final class SnapshotScenario {
         this.context = context;
     }
 
-    static SnapshotScenario open(Path project, String className) throws Exception {
+    public static SnapshotScenario open(Path project, String className) throws Exception {
         Path root = project == null || project.toString().isBlank()
                 ? Path.of("").toAbsolutePath().normalize()
                 : project.toAbsolutePath().normalize();
@@ -87,7 +86,7 @@ final class SnapshotScenario {
         }
     }
 
-    void include(String className) throws ClassNotFoundException {
+    public void include(String className) throws ClassNotFoundException {
         if (className == null || className.isBlank() || !scanned.add(className)) return;
         Class<?> type = Class.forName(className);
         registry.scan(type);
@@ -97,7 +96,7 @@ final class SnapshotScenario {
         }
     }
 
-    Outcome step(String text, String gherkin) {
+    public Outcome step(String text, String gherkin) {
         EngineStep engineStep = engineStep(text, gherkin);
         StepExtension frame = NativeScenarioRun.frame(engineStep, registry, state);
         context.pushStep(engineStep);
@@ -121,7 +120,7 @@ final class SnapshotScenario {
         return outcome(frame);
     }
 
-    void close() {
+    public void close() {
         if (closed) return;
         closed = true;
         try {
@@ -190,6 +189,6 @@ final class SnapshotScenario {
         return frame.result.getStatus().name();
     }
 
-    record Outcome(boolean ok, String status, String returned, String error) {
+    public record Outcome(boolean ok, String status, String returned, String error) {
     }
 }

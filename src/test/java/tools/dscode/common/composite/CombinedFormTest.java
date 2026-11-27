@@ -53,7 +53,7 @@ class CombinedFormTest {
                 "source=desktop >> image=template=mark.png >> image=ocr~=\"Save\" >> (role=button AND text=\"Save\")",
                 desktop.pipeline());
 
-        ElementPhrase cssOnly = new ElementPhrase(null, null, null, null, null, null, null, null, null, null, "#save", null, null, null, null);
+        ElementPhrase cssOnly = new ElementPhrase(null, null, null, null, null, null, null, null, null, null, "#save", null, null, null, null, null, null);
         CompositeSelector css = SelectorTranslator.phrase(cssOnly);
         assertEquals("#save", css.css());
         assertTrue(css.pipeline() == null, String.valueOf(css.pipeline()));

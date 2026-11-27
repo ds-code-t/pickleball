@@ -2,6 +2,7 @@ package tools.dscode.launcher;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import tools.dscode.common.agentcontrol.SpineSession;
 import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.control.protocol.SessionDescriptorWriter;
 import tools.dscode.control.protocol.Workspace;
@@ -49,6 +50,7 @@ class WorkbenchConsumerScenarioEndToEndTest {
     void discoverRunsARealScenarioAndRecordsThePack() throws Exception {
         assertPublished();
         syncConsumer();
+        SpineSession.ensure(PROJECT);
         String runId = "wb-probe";
         deleteRun(runId);
         try {
@@ -117,6 +119,7 @@ class WorkbenchConsumerScenarioEndToEndTest {
     void realMavenFailureIgnoreStillFailsTheWorkbench() throws Exception {
         assertPublished();
         syncConsumer();
+        SpineSession.ensure(PROJECT);
         String runId = "wb-ignore";
         Path mavenConfig = PROJECT.resolve(".mvn/maven.config");
         byte[] previousConfig = Files.isRegularFile(mavenConfig) ? Files.readAllBytes(mavenConfig) : null;

@@ -136,7 +136,17 @@ public final class SelectorTranslator {
         String context = group(contextClauses(phrase));
         String target = group(targetClauses(phrase, look));
         String relation = relationWord(word);
-        if (relation != null && context != null) {
+        if ("between".equals(relation)) {
+            String second = group(anchorClauses(phrase));
+            if (context != null && second != null) {
+                add(stages, (target == null ? "" : target + " AND ")
+                        + "between(" + unwrap(context) + ", " + unwrap(second) + ")");
+            } else if (context != null) {
+                add(stages, (target == null ? "" : target + " AND ") + "between(" + unwrap(context) + ")");
+            } else {
+                add(stages, target);
+            }
+        } else if (relation != null && context != null) {
             add(stages, (target == null ? "" : target + " AND ") + relation + "(" + unwrap(context) + ")");
         } else switch (word) {
             case "in", "from", "for", "on", "of" -> {
@@ -203,7 +213,9 @@ public final class SelectorTranslator {
     private static boolean hasContext(ElementPhrase phrase) {
         return (phrase.contextWord() != null && !phrase.contextWord().isBlank())
                 || (phrase.contextText() != null && !phrase.contextText().isBlank())
-                || (phrase.contextCategory() != null && !phrase.contextCategory().isBlank());
+                || (phrase.contextCategory() != null && !phrase.contextCategory().isBlank())
+                || (phrase.anchorText() != null && !phrase.anchorText().isBlank())
+                || (phrase.anchorCategory() != null && !phrase.anchorCategory().isBlank());
     }
 
     private static boolean hasImage(ElementPhrase phrase) {
@@ -280,14 +292,22 @@ public final class SelectorTranslator {
     }
 
     private static List<String> contextClauses(ElementPhrase phrase) {
+        return namedClauses(phrase.contextCategory(), phrase.contextText(), phrase.quote());
+    }
+
+    private static List<String> anchorClauses(ElementPhrase phrase) {
+        return namedClauses(phrase.anchorCategory(), phrase.anchorText(), phrase.quote());
+    }
+
+    private static List<String> namedClauses(String category, String text, String quoteStyle) {
         List<String> clauses = new ArrayList<>();
-        String role = role(phrase.contextCategory());
+        String role = role(category);
         if (role != null) clauses.add(role);
-        else if (phrase.contextCategory() != null && !phrase.contextCategory().isBlank()) {
-            clauses.add("desc=" + quote(phrase.contextCategory().trim()));
+        else if (category != null && !category.isBlank()) {
+            clauses.add("desc=" + quote(category.trim()));
         }
-        if (phrase.contextText() != null && !phrase.contextText().isBlank()) {
-            clauses.add("text=" + quote(fold(phrase.contextText().trim(), phrase.quote())));
+        if (text != null && !text.isBlank()) {
+            clauses.add("text=" + quote(fold(text.trim(), quoteStyle)));
         }
         return clauses;
     }

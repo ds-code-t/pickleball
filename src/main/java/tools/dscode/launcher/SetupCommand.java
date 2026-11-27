@@ -88,7 +88,7 @@ final class SetupCommand {
     /** Downloads to a temp file, checks SHA-256 against the pinned value, and only then moves it into {@code dir}. */
     static Path fetchVerified(URI source, String sha256, Path dir) throws IOException {
         Files.createDirectories(dir);
-        String name = Path.of(source.getPath()).getFileName().toString();
+        String name = fileName(source);
         Path partial = Files.createTempFile(dir, name, ".part");
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -109,6 +109,20 @@ final class SetupCommand {
         } finally {
             Files.deleteIfExists(partial);
         }
+    }
+
+    /** A {@code file:} URI on Windows has a path like {@code /C:/...}. {@link Path#of(URI)} accepts that. A URL keeps the last path segment. */
+    private static String fileName(URI source) {
+        if ("file".equals(source.getScheme())) {
+            Path name = Path.of(source).getFileName();
+            if (name == null) throw new IllegalArgumentException("artifact has no file name: " + source);
+            return name.toString();
+        }
+        String path = source.getRawPath() == null ? "" : source.getRawPath();
+        int slash = path.lastIndexOf('/');
+        String name = slash < 0 ? path : path.substring(slash + 1);
+        if (name.isBlank()) throw new IllegalArgumentException("artifact has no file name: " + source);
+        return name;
     }
 
     private static InputStream open(URI source) throws IOException {

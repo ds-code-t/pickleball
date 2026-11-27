@@ -2,7 +2,7 @@
 
 > **Working feature examples:** [`component-scenarios.feature`](../maven-consumer-project/src/test/resources/features/component-scenarios.feature) contains a reusable component. [`reusable-scenario-selection.feature`](../maven-consumer-project/src/test/resources/features/reusable-scenario-selection.feature) demonstrates named selectors, escaped names, ordering, limits, and singular/plural behavior. [`run-step-parameter-variations.feature`](../maven-consumer-project/src/test/resources/features/run-step-parameter-variations.feature) demonstrates the canonical table-driven `RUN` form, mixed run types, and shorthand variations. [`syntax-since-2.1.14.feature`](../maven-consumer-project/src/test/resources/features/syntax-since-2.1.14.feature) demonstrates `RunIf`, `RunBackground`, and inline `DT:::` inheritance. [`scenario-data-references.feature`](../maven-consumer-project/src/test/resources/features/scenario-data-references.feature) demonstrates marker and data-file references.
 
-Component scenarios are reusable, scenario-sized flows. `RUN` is the common dispatcher for regular scenarios, component scenarios, and service calls.
+Component scenarios are reusable, scenario-sized flows. `RUN` is the common dispatcher for regular scenarios, component scenarios, and service calls. A component file is stored with `enabled=0`, so a feature run does not select it. An explicit component path still loads it. `@pkb-ignore` on the file or a scenario still removes that text.
 
 ## Preferred table-driven RUN form
 

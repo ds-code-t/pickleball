@@ -58,6 +58,7 @@ public final class PickleballEngine {
             }
         }
         registry.scanPackage("tools.dscode.coredefinitions");
+        if (settings.glue() != null && !settings.glue().isEmpty()) registry.limitToScanned();
         List<EngineFeature> loaded = select(source, settings).load();
         NativeScenarioCatalog.bind(settings.project(), loaded);
         List<ScenarioResult> scenarios = new ArrayList<>();
@@ -134,6 +135,7 @@ public final class PickleballEngine {
                 if (item instanceof Class<?> type) types.add(type);
             }
             created.scan(types.toArray(Class<?>[]::new));
+            created.limitToScanned();
         }
         return created;
     }
@@ -147,6 +149,11 @@ public final class PickleballEngine {
         Path project = settings.project();
         if (project == null || !StoreConfig.enabled(project)) return source;
         if (file.path() == null) return source;
+        try {
+            if (!tools.dscode.store.StoreFeatureSource.addressable(project, file.path().toUri())) return source;
+        } catch (RuntimeException ignored) {
+            return source;
+        }
         return new StoreScenarioSource(project, StorePaths.display(project, file.path()));
     }
 

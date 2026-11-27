@@ -157,9 +157,15 @@ final class Relations {
         return new Query.Hit(kept, label + "(" + term.anchor() + ") anchors=" + anchors.size() + " matched " + kept.size());
     }
 
+    /**
+     * Two anchor queries. A comma separates them, and {@code AND} inside an
+     * anchor stays in that query. {@code and} separates anchors only when the
+     * list has no comma, as in {@code css=#a and css=#b}.
+     */
     static List<String> splitAnchors(String anchor) {
-        List<String> parts = new ArrayList<>();
         String source = anchor == null ? "" : anchor;
+        boolean comma = topLevelComma(source);
+        List<String> parts = new ArrayList<>();
         StringBuilder current = new StringBuilder();
         int depth = 0;
         char quote = 0;
@@ -189,7 +195,7 @@ final class Relations {
                 addAnchor(parts, current);
                 continue;
             }
-            if (depth == 0 && source.regionMatches(true, i, " and ", 0, 5)) {
+            if (!comma && depth == 0 && source.regionMatches(true, i, " and ", 0, 5)) {
                 addAnchor(parts, current);
                 i += 4;
                 continue;
@@ -198,6 +204,26 @@ final class Relations {
         }
         addAnchor(parts, current);
         return parts;
+    }
+
+    private static boolean topLevelComma(String source) {
+        int depth = 0;
+        char quote = 0;
+        for (int i = 0; i < source.length(); i++) {
+            char c = source.charAt(i);
+            if (quote != 0) {
+                if (c == quote) quote = 0;
+                continue;
+            }
+            if (c == '"' || c == '\'') {
+                quote = c;
+                continue;
+            }
+            if (c == '(') depth++;
+            else if (c == ')' && depth > 0) depth--;
+            else if (depth == 0 && c == ',') return true;
+        }
+        return false;
     }
 
     private static void addAnchor(List<String> parts, StringBuilder current) {

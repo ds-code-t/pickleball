@@ -128,6 +128,8 @@ public final class StoreGit {
 
     public static String stripUserInfo(String remote) {
         if (remote == null || remote.isBlank()) return "";
+        String https = remote.replaceFirst("(?i)^(https?://)[^@\\s]+@", "$1");
+        if (!https.equals(remote)) return https;
         return remote.replaceFirst("://[^/@\\s]+@", "://");
     }
 

@@ -112,6 +112,59 @@ class CowSandboxTest {
         }
     }
 
+    @Test
+    void autoHydrateKeepsAChildFeaturePut() throws Exception {
+        Files.createDirectories(project.resolve("features"));
+        String original = """
+                Feature: Pay
+                  Scenario: Ada
+                    * INFO: amount is 1
+                """;
+        Files.writeString(project.resolve("features/pay.feature"), original);
+        assertEquals(0, cli("store", "hydrate", "--project=" + project).code);
+        StoreScope.clear();
+        assertEquals(0, cli("store", "sandbox", "create", "thin", "--project=" + project).code);
+        StoreScope.clear();
+        String edited = """
+                Feature: Pay
+                  @store-side
+                  Scenario: Left pay
+                    * INFO: amount is 8
+                """;
+        Capture put = cli("store", "feature", "put", "features/pay.feature", "--text=" + edited,
+                "--sandbox=thin", "--project=" + project);
+        assertEquals(0, put.code, put.err);
+        StoreScope.clear();
+        String previousStore = System.getProperty("pkb_store");
+        String previousProject = System.getProperty("pkb_store_project");
+        String previousSandbox = System.getProperty("pkb_store_sandbox");
+        try {
+            System.setProperty("pkb_store", "true");
+            System.setProperty("pkb_store_project", project.toString());
+            System.setProperty("pkb_store_sandbox", "thin");
+            StoreScope.clear();
+            StoreRuntime.reset();
+            StoreRuntime.beforeFeatureLoad();
+            byte[] bytes = StoreFeatureSource.bytesFor(project.resolve("features/pay.feature").toUri());
+            assertTrue(bytes != null, "feature put is missing from the child");
+            String text = new String(bytes, StandardCharsets.UTF_8);
+            assertTrue(text.contains("@store-side"), text);
+            assertTrue(text.contains("Left pay"), text);
+            assertEquals(original, Files.readString(project.resolve("features/pay.feature")));
+        } finally {
+            StoreRuntime.reset();
+            StoreScope.clear();
+            restore("pkb_store", previousStore);
+            restore("pkb_store_project", previousProject);
+            restore("pkb_store_sandbox", previousSandbox);
+        }
+    }
+
+    private static void restore(String key, String value) {
+        if (value == null) System.clearProperty(key);
+        else System.setProperty(key, value);
+    }
+
     private Capture cli(String... args) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();

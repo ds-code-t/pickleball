@@ -2,7 +2,7 @@
 
 > **Working feature examples:** [`service-call-execution.feature`](../maven-consumer-project/src/test/resources/features/service-call-execution.feature) invokes reusable calls. [`run-step-parameter-variations.feature`](../maven-consumer-project/src/test/resources/features/run-step-parameter-variations.feature) demonstrates the canonical table-driven `RUN` form and per-row run types/cardinality. [`reusable-scenario-selection.feature`](../maven-consumer-project/src/test/resources/features/reusable-scenario-selection.feature) covers named and qualified service-call selectors. [`service-call-definitions.feature`](../maven-consumer-project/src/test/resources/calls/service-call-definitions.feature) builds and executes requests.
 
-Pickleball treats service calls as reusable scenarios. `ModularScenarios.java` owns selection and nested-scenario execution. `ServiceCallSteps.java` owns the synchronous convenience wrapper and HTTP execution.
+Pickleball treats service calls as reusable scenarios. `ModularScenarios.java` owns selection and nested-scenario execution. `ServiceCallSteps.java` owns the synchronous convenience wrapper and HTTP execution. A call file is stored with `enabled=0`, so a feature run does not select it. An explicit calls path still loads it. `@pkb-ignore` on the file or a scenario still removes that text.
 
 ## Public service-call steps
 

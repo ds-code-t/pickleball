@@ -17,6 +17,8 @@ import tools.dscode.control.protocol.Workspace;
 import tools.dscode.testengine.WorkspaceSeed;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.PrintStream;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -28,6 +30,7 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -38,6 +41,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * One-shot consumer-JVM client for a long-lived headless Workbench CLI session.
@@ -220,17 +224,47 @@ public final class WorkbenchSessionCommands {
         )), launch.logFile());
     }
 
+    private static final ConcurrentHashMap<Long, Thread> LOG_PUMPS = new ConcurrentHashMap<>();
+
     static Process startDetached(Path project, List<String> command, Path logFile) throws IOException {
         Files.createDirectories(logFile.getParent());
         if (!Files.exists(logFile)) Files.createFile(logFile);
         ProcessBuilder builder = new ProcessBuilder(command);
         builder.directory(project.toFile());
-        builder.redirectOutput(ProcessBuilder.Redirect.appendTo(logFile.toFile()));
-        builder.redirectError(ProcessBuilder.Redirect.appendTo(logFile.toFile()));
+        builder.redirectErrorStream(true);
+        builder.redirectOutput(ProcessBuilder.Redirect.PIPE);
         builder.redirectInput(ProcessBuilder.Redirect.PIPE);
         Process process = builder.start();
         process.getOutputStream().close();
+        Thread pump = new Thread(() -> appendLog(process, logFile), "pkb-session-log");
+        pump.setDaemon(true);
+        pump.start();
+        LOG_PUMPS.put(process.pid(), pump);
+        process.onExit().whenComplete((done, error) -> {
+            try {
+                pump.join(2_000);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            } finally {
+                LOG_PUMPS.remove(process.pid());
+            }
+        });
         return process;
+    }
+
+    /** The thread that copies the child log. Null after that copy has closed the file. */
+    static Thread logPump(long pid) {
+        return LOG_PUMPS.get(pid);
+    }
+
+    /** Copies the child output and closes the file when the child ends, so Windows can delete the log. */
+    private static void appendLog(Process process, Path logFile) {
+        try (InputStream in = process.getInputStream();
+             OutputStream file = Files.newOutputStream(logFile, StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
+            in.transferTo(file);
+        } catch (IOException ignored) {
+            // The child ending closes the pipe. A later reader sees the bytes already written.
+        }
     }
 
     /**

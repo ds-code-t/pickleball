@@ -41,11 +41,9 @@ public final class StoreHashes {
     public static String jarHash() {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            var code = StoreHydrator.class.getProtectionDomain().getCodeSource();
-            Path path = null;
-            if (code != null && code.getLocation() != null) {
-                path = Path.of(code.getLocation().toURI());
-            }
+            java.security.CodeSource code = StoreHydrator.class.getProtectionDomain().getCodeSource();
+            java.net.URL location = code == null ? null : StoreHydrator.class.getProtectionDomain().getCodeSource().getLocation();
+            Path path = location == null ? null : Path.of(location.toURI());
             if (path == null) {
                 digest.update("missing-code-source".getBytes(StandardCharsets.UTF_8));
             } else if (Files.isDirectory(path)) {

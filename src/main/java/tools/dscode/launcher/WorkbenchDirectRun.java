@@ -14,7 +14,9 @@ import tools.dscode.testengine.DynamicSuiteEngine;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Runs the consumer suite on an already-resolved classpath. No Maven and no
@@ -33,7 +35,29 @@ public final class WorkbenchDirectRun {
 
     /** Applies {@code -D} arguments, then one engine launch. Returns the process exit. */
     public static int run(Path project, List<String> dashD) {
-        apply(dashD);
+        int[] code = {1};
+        isolate(dashD, () -> code[0] = launch(project));
+        return code[0];
+    }
+
+    /**
+     * Applies one run's {@code -D} properties and puts the previous {@code pkb_} and
+     * {@code cucumber.} values back when {@code body} returns. An in-process warm
+     * serve must not leave {@code pkb_run_id} for the next test in this JVM.
+     */
+    static void isolate(List<String> dashD, Runnable body) {
+        Map<String, String> savedRun = prefixed("pkb_");
+        Map<String, String> savedCucumber = prefixed("cucumber.");
+        try {
+            apply(dashD);
+            if (body != null) body.run();
+        } finally {
+            replacePrefix("pkb_", savedRun);
+            replacePrefix("cucumber.", savedCucumber);
+        }
+    }
+
+    private static int launch(Path project) {
         Path root = project == null ? Path.of("").toAbsolutePath().normalize() : project.toAbsolutePath().normalize();
         Path tests = root.resolve("target").resolve("test-classes");
         if (!Files.isDirectory(tests)) {
@@ -106,6 +130,24 @@ public final class WorkbenchDirectRun {
     private static void clearPrefix(String prefix) {
         for (Object key : List.copyOf(System.getProperties().keySet())) {
             if (key instanceof String name && name.startsWith(prefix)) System.clearProperty(name);
+        }
+    }
+
+    private static Map<String, String> prefixed(String prefix) {
+        Map<String, String> saved = new LinkedHashMap<>();
+        for (Map.Entry<Object, Object> entry : System.getProperties().entrySet()) {
+            if (entry.getKey() instanceof String name && name.startsWith(prefix) && entry.getValue() != null) {
+                saved.put(name, entry.getValue().toString());
+            }
+        }
+        return saved;
+    }
+
+    private static void replacePrefix(String prefix, Map<String, String> saved) {
+        clearPrefix(prefix);
+        if (saved == null) return;
+        for (Map.Entry<String, String> entry : saved.entrySet()) {
+            System.setProperty(entry.getKey(), entry.getValue());
         }
     }
 }

@@ -289,6 +289,15 @@ public final class SharedStepRun {
     }
 
     private static Result hardError(StepExtension step, Instant start, Throwable cause) {
+        // A RETRY attempt is captureFailure. It is not a result step, so it must
+        // not take a FAIL ERROR id that later undefined steps would display.
+        // The wrapper is not UndefinedStep, so the RETRY line itself stays the
+        // Gherkin text instead of becoming another FAIL ERROR step.
+        if (step.captureFailure) {
+            String original = step.getStepText();
+            return finish(step, Status.FAILED, start,
+                    new RuntimeException("Step: '" + original + "' failed", cause));
+        }
         String original = step.getStepText();
         String message;
         try {

@@ -195,8 +195,10 @@ class OptionalAddonsTest {
 
     @Test
     void devtoolsMcpArgumentsAlwaysTurnOffCruxAndUsageStatistics() {
-        List<String> args = OptionalAddons.devtoolsMcpArgs(Path.of("/n/node"), Path.of("/c/mcp.js"), "http://127.0.0.1:9222");
-        assertEquals(List.of("/n/node", "/c/mcp.js", "--browserUrl=http://127.0.0.1:9222", "--no-performance-crux", "--no-usage-statistics"), args);
+        Path node = Path.of("/n/node");
+        Path entry = Path.of("/c/mcp.js");
+        List<String> args = OptionalAddons.devtoolsMcpArgs(node, entry, "http://127.0.0.1:9222");
+        assertEquals(List.of(node.toString(), entry.toString(), "--browserUrl=http://127.0.0.1:9222", "--no-performance-crux", "--no-usage-statistics"), args);
         assertTrue(OptionalAddons.devtoolsMcpArgs(Path.of("n"), Path.of("e"), "ws://127.0.0.1:9222/devtools/browser/x").contains("--wsEndpoint=ws://127.0.0.1:9222/devtools/browser/x"));
         assertTrue(OptionalAddons.loopback("ws://localhost:1/x"));
         assertFalse(OptionalAddons.loopback("ws://10.0.0.5:9222/x"));

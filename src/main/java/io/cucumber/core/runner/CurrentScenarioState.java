@@ -892,7 +892,8 @@ public class CurrentScenarioState extends ScenarioMapping {
      * outcome is known. A second call does nothing.
      */
     public void runFinishedSteps() {
-        if (runningFinishedSteps || deferredFinishedSteps.isEmpty()) return;
+        // A state allocated without field initializers still has to finish cleanup.
+        if (runningFinishedSteps || deferredFinishedSteps == null || deferredFinishedSteps.isEmpty()) return;
         runningFinishedSteps = true;
         try {
             for (StepExtension step : new ArrayList<>(deferredFinishedSteps)) {
@@ -1010,6 +1011,7 @@ public class CurrentScenarioState extends ScenarioMapping {
     public boolean shouldRun(StepExtension stepExtension) {
         boolean finished = stepExtension.stepFlags.contains(RUN_IF_SCENARIO_FINISHED);
         if (finished && !runningFinishedSteps) {
+            if (deferredFinishedSteps == null) return false;
             if (!deferredFinishedSteps.contains(stepExtension)) {
                 deferredFinishedSteps.add(stepExtension);
             }

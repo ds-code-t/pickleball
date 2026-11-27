@@ -29,6 +29,9 @@ import java.util.Set;
  * {@code spine session new}, except the keys in {@link #SESSION_EXEMPT}. A missing file
  * exits 2 with {@code error: missing session} and {@code fix: spine session new}.
  * {@code spine session new} is the call that creates it. Dispatch does not create a session.
+ * {@code session list}, {@code session info}, {@code session hold}, and {@code session release}
+ * are the descriptor queries. The captured argv still starts with {@code session}, so those
+ * four run here after the gate. A bare {@code session} stays the forwarded controller launch.
  * Dan, 2026-11-26 ({@code prompts/build-3.0.0-spine-R6.md} phase P0): {@code engine help},
  * {@code domengine version}, family help, and plain {@code export-guidance} are exempt.
  * {@code export-guidance --warm} is not.</p>
@@ -112,6 +115,9 @@ public final class VerbDispatch {
         }
         if (WorkbenchCommandLine.isSessionClientCommand(family)) {
             return WorkbenchSessionCommands.run(argv, stdout, stderr);
+        }
+        if (sessionDescriptorQuery(argv)) {
+            return WorkbenchAgentCommands.run(argv, stdout, stderr);
         }
         stderr.println("error: unknown verb " + family);
         stderr.println("fix: pickleball help");
@@ -241,6 +247,17 @@ public final class VerbDispatch {
             }
         }
         return null;
+    }
+
+    /**
+     * {@code session list|info|hold|release} reads or updates the descriptor.
+     * {@link WorkbenchAgentCommands} parses the original argv, which still starts
+     * with {@code session}. A bare {@code session} is not this query.
+     */
+    private static boolean sessionDescriptorQuery(String[] argv) {
+        if (argv == null || argv.length < 2 || argv[0] == null || !"session".equals(argv[0].trim())) return false;
+        String verb = argv[1] == null ? "" : argv[1].trim();
+        return "list".equals(verb) || "info".equals(verb) || "hold".equals(verb) || "release".equals(verb);
     }
 
     /** The first positional after {@code spine} is {@code session}. Warm verbs stay on {@link SpineCli}. */

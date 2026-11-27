@@ -333,7 +333,7 @@ public class StepExtension extends StepData {
                 || definitionFlags.contains(DefinitionFlag._DEBUG_LOGGING)) {
             stepLogLevel = Level.DEBUG;
         }
-        if (!shouldLog()) {
+        if (!shouldLog() || captureFailure) {
             executingPickleStepTestStep.setNoLogging(true);
         }
 

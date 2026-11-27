@@ -251,8 +251,9 @@ class EmbeddedStoreSpikeTest {
             exec(connection, "CREATE TABLE t(n INTEGER)");
             exec(connection, "INSERT INTO t(n) VALUES (1)");
         }
-        Process child = new ProcessBuilder(javaBin(), "-cp", System.getProperty("java.class.path"),
-                EmbeddedNativeProbe.class.getName(), "sleep")
+        Process child = new ProcessBuilder(tools.dscode.store.StoreTestProcesses.java(List.of(
+                "-cp", System.getProperty("java.class.path"),
+                EmbeddedNativeProbe.class.getName(), "sleep")))
                 .redirectErrorStream(true)
                 .start();
         try {
@@ -314,20 +315,15 @@ class EmbeddedStoreSpikeTest {
     }
 
     private static Result java(List<String> args) throws Exception {
-        List<String> command = new ArrayList<>();
-        command.add(javaBin());
-        command.add("-cp");
-        command.add(System.getProperty("java.class.path"));
-        command.addAll(args);
-        Process process = new ProcessBuilder(command).redirectErrorStream(false).start();
+        List<String> launch = new ArrayList<>();
+        launch.add("-cp");
+        launch.add(System.getProperty("java.class.path"));
+        launch.addAll(args);
+        Process process = new ProcessBuilder(tools.dscode.store.StoreTestProcesses.java(launch)).redirectErrorStream(false).start();
         byte[] out = process.getInputStream().readAllBytes();
         byte[] err = process.getErrorStream().readAllBytes();
         int code = process.waitFor();
         return new Result(code, new String(out, StandardCharsets.UTF_8), new String(err, StandardCharsets.UTF_8));
-    }
-
-    private static String javaBin() {
-        return Path.of(System.getProperty("java.home"), "bin", "java").toString();
     }
 
     private static boolean mountNoexec(Path dir) {

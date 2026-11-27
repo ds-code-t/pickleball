@@ -16,7 +16,7 @@ This page lists behavior that is not a feature. Do not document an open item as 
 
 ## Context words (closed, spine R2 P4)
 
-`inside` and `within` use the `inside` lookup. `near` and `next to` use `near` (center distance at most 150). `following` is document order `after`. `preceding` is document order `before`. `on` and `of` use the same lookup as `in`. `between` A `and` B keeps a displayed candidate whose center lies in the axis-aligned box of the two anchor centers. A missing second anchor is an error. A word inside quotes is not a relation. `pkb_engine_log=match` logs `word -> relation` for a translated context word. The log stays off unless that capability is named.
+`inside` and `within` use the `inside` lookup. `near` and `next to` use `near` (center distance at most 150). `following` is document order `after`. `preceding` is document order `before`. `on` and `of` use the same lookup as `in`. `between` A `and` B keeps a displayed candidate whose center lies in the axis-aligned box of the two anchor centers. A comma separates the two anchor queries, and `AND` inside an anchor stays in that query. `and` separates anchors only when the list has no comma. A missing second anchor is an error. A word inside quotes is not a relation. `pkb_engine_log=match` logs `word -> relation` for a translated context word. The log stays off unless that capability is named.
 
 ## Condition word exists (closed, spine R2 P4)
 

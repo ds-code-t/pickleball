@@ -261,6 +261,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/aspectj/io/cucumber/core/runner/TestCase_ConsoleTap.aj`
 - `src/main/aspectj/io/cucumber/core/runner/TestCase_Constructor_StepExtensionsRewrite.aj`
 - `src/main/aspectj/io/cucumber/core/runner/TestCase_ScenarioObjectScope.aj`
+- `src/main/aspectj/io/cucumber/core/runner/TestStep_IgnoredFailure.aj`
 - `src/main/aspectj/io/cucumber/core/runner/TestStepNoLoggingAspect.aj`
 - `src/main/aspectj/io/cucumber/core/runtime/FeaturePathFeatureSupplier_Cache.aj`
 - `src/main/aspectj/io/cucumber/gherkin/EncodingParserLineSwap.aj`
@@ -483,6 +484,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/browseroperations/WindowElement.java`
 - `src/main/java/tools/dscode/common/browseroperations/WindowSafeAccess.java`
 - `src/main/java/tools/dscode/common/browseroperations/WindowSwitch.java`
+- `src/main/java/tools/dscode/common/composite/BetweenFind.java`
 - `src/main/java/tools/dscode/common/composite/CombinedBy.java`
 - `src/main/java/tools/dscode/common/composite/CompositeBinaryLocator.java`
 - `src/main/java/tools/dscode/common/composite/CompositeLog.java`
@@ -780,6 +782,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/engine/adapter/cucumber/RowFeatureSupplier.java`
 - `src/main/java/tools/dscode/engine/adapter/cucumber/RunBindings.java`
 - `src/main/java/tools/dscode/engine/adapter/cucumber/SharedStepRun.java`
+- `src/main/java/tools/dscode/engine/adapter/cucumber/SnapshotScenario.java`
 - `src/main/java/tools/dscode/engine/adapter/cucumber/StepFlagBridge.java`
 - `src/main/java/tools/dscode/engine/adapter/cucumber/StoreRunTracePlugin.java`
 - `src/main/java/tools/dscode/engine/adapter/playwright/PlaywrightScenarioRun.java`
@@ -823,7 +826,6 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/engine/runtime/ResourceGate.java`
 - `src/main/java/tools/dscode/engine/runtime/SnapshotChannel.java`
 - `src/main/java/tools/dscode/engine/runtime/SnapshotContextWorker.java`
-- `src/main/java/tools/dscode/engine/runtime/SnapshotScenario.java`
 - `src/main/java/tools/dscode/engine/runtime/StepFlags.java`
 - `src/main/java/tools/dscode/engine/runtime/StepRows.java`
 - `src/main/java/tools/dscode/engine/runtime/StepWatchdog.java`
@@ -1105,6 +1107,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentcontrol/UiStateTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/UnownedDriverQuitTest.java`
 - `src/test/java/tools/dscode/common/agentfast/ActHonestyTest.java`
+- `src/test/java/tools/dscode/common/agentfast/CollabRowsTest.java`
 - `src/test/java/tools/dscode/common/agentfast/CompactReplyTest.java`
 - `src/test/java/tools/dscode/common/agentfast/ConsumerFixesP2FindTest.java`
 - `src/test/java/tools/dscode/common/agentfast/ConsumerFixesP3ViewTest.java`
@@ -1112,6 +1115,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentfast/ElementRecordTest.java`
 - `src/test/java/tools/dscode/common/agentfast/FallbackRunCapTest.java`
 - `src/test/java/tools/dscode/common/agentfast/FormatViewTest.java`
+- `src/test/java/tools/dscode/common/agentfast/FormFillInteractionTest.java`
 - `src/test/java/tools/dscode/common/agentfast/HostLanesTest.java`
 - `src/test/java/tools/dscode/common/agentfast/LeanReplyTest.java`
 - `src/test/java/tools/dscode/common/agentfast/LiveReplyRulesTest.java`
@@ -1147,6 +1151,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/browseroperations/JavaScriptDialogTest.java`
 - `src/test/java/tools/dscode/common/composite/ActionVerbPlanTest.java`
 - `src/test/java/tools/dscode/common/composite/AllContextsPlanTest.java`
+- `src/test/java/tools/dscode/common/composite/BetweenLiveFindTest.java`
 - `src/test/java/tools/dscode/common/composite/CapabilityProbeTest.java`
 - `src/test/java/tools/dscode/common/composite/CombinedFormTest.java`
 - `src/test/java/tools/dscode/common/composite/CompositeElements.java`
@@ -1285,6 +1290,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/engine/runtime/VisualTargetTest.java`
 - `src/test/java/tools/dscode/engine/runtime/WarmClassLoaderTest.java`
 - `src/test/java/tools/dscode/engine/runtime/WarmColdParityTest.java`
+- `src/test/java/tools/dscode/engine/scenarioclear/FinishedScenarioClearsThreadLocalTest.java`
+- `src/test/java/tools/dscode/engine/scenarioclear/ScenarioStateProbe.java`
 - `src/test/java/tools/dscode/engine/SpineCucumberImportBanTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureRunnerTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureSteps.java`
@@ -1462,6 +1469,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/store/AgentEnvelopeStoreTest.java`
 - `src/test/java/tools/dscode/store/BranchForkTest.java`
 - `src/test/java/tools/dscode/store/BranchTreeTest.java`
+- `src/test/java/tools/dscode/store/CallLibraryScanTest.java`
 - `src/test/java/tools/dscode/store/CategoryEditTest.java`
 - `src/test/java/tools/dscode/store/ChangesCliTest.java`
 - `src/test/java/tools/dscode/store/ConflictChoiceTest.java`
@@ -1523,6 +1531,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/store/StoreEntityUsageTest.java`
 - `src/test/java/tools/dscode/store/StoreExecutionRecordingTest.java`
 - `src/test/java/tools/dscode/store/StoreExtractTest.java`
+- `src/test/java/tools/dscode/store/StoreFeatureOwnershipTest.java`
 - `src/test/java/tools/dscode/store/StoreFileReleaseTest.java`
 - `src/test/java/tools/dscode/store/StoreFoundationTest.java`
 - `src/test/java/tools/dscode/store/StoreFreshCloneTest.java`
@@ -1548,6 +1557,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/store/StoreRunRecordingSpeedTest.java`
 - `src/test/java/tools/dscode/store/StoreRunTest.java`
 - `src/test/java/tools/dscode/store/StoreRunTiming.java`
+- `src/test/java/tools/dscode/store/StoreRunWorkerArgsTest.java`
 - `src/test/java/tools/dscode/store/StoreSandboxBindingTest.java`
 - `src/test/java/tools/dscode/store/StoreSandboxCliTest.java`
 - `src/test/java/tools/dscode/store/StoreSandboxHardenTest.java`

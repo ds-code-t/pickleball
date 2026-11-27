@@ -35,7 +35,7 @@ class StoreRunRecordingSpeedTest {
         String linked;
         try (StoreDatabase database = StoreDatabase.open(project);
              PreparedStatement count = database.connection().prepareStatement(
-                     "SELECT definition_id FROM step_definitions WHERE pattern = 'the total is {int}' AND removed = 0")) {
+                     "SELECT definition_id FROM step_definitions WHERE removed = 0 AND (source_pattern = 'the total is {int}' OR pattern = 'the total is {int}')")) {
             try (var rows = count.executeQuery()) {
                 assertTrue(rows.next(), "definitions were not stored");
                 linked = rows.getString(1);

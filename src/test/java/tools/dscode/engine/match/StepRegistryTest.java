@@ -87,9 +87,10 @@ class StepRegistryTest {
         javax.tools.JavaCompiler compiler = javax.tools.ToolProvider.getSystemJavaCompiler();
         assertTrue(compiler != null, "JDK compiler is required");
         int compiled = compiler.run(null, null, null,
-                "-cp", System.getProperty("java.class.path"),
-                "-d", classes.toString(),
-                source.toString());
+                tools.dscode.store.StoreTestProcesses.argFile(java.util.List.of(
+                        "-cp", System.getProperty("java.class.path"),
+                        "-d", classes.toString(),
+                        source.toString())));
         assertEquals(0, compiled);
         Path jar = dir.resolve("glue.jar");
         try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar))) {

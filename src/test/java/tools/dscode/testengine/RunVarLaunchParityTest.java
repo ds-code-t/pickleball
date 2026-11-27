@@ -3,6 +3,7 @@ package tools.dscode.testengine;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.common.agentcontrol.SpineSession;
 import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.control.protocol.Workspace;
 import tools.dscode.control.protocol.speed.JavaArguments;
@@ -129,6 +130,7 @@ class RunVarLaunchParityTest {
         assertFalse(profile.contains("pkb_browser=from-properties"), profile);
         assertFalse(profile.contains("pkb_hook_marker=from-defaults"), profile);
 
+        SpineSession.create(project, "agent-1");
         Run preview = fork(project, java(baseProperties(outputRoot, project, "both"),
                 PickleballWorkbenchLauncher.class.getName(),
                 List.of("resolve-runvars", project.toString())));
@@ -191,6 +193,7 @@ class RunVarLaunchParityTest {
         Run scenario = fork(project, java(scenarioProps, "tools.dscode.testengine.parity.LaunchObservationMain",
                 List.of(observed.toString()), classpathProps));
         assertEquals(0, scenario.exit, name + "\n" + scenario.text());
+        SpineSession.create(project, "agent-1");
         Run dry = fork(project, java(shared, PickleballWorkbenchLauncher.class.getName(),
                 List.of("resolve-runvars", project.toString()), classpathProps));
         assertEquals(0, dry.exit, name + "\n" + dry.text());

@@ -8,12 +8,20 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.openqa.selenium.By;
+import tools.dscode.common.composite.ElementOperations;
+import tools.dscode.store.SnapFindIndex;
+import tools.dscode.store.StorePaths;
+import tools.dscode.store.sql.SqliteOpen;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -90,6 +98,20 @@ class CompactSnapshotTest {
         assertTrue(line.startsWith("- button \"Save\" [ref=" + ref + "]"), line);
         assertTrue(ref.startsWith("ref:desktop:0:"), ref);
 
+        String version = body.path("docVersion").asText();
+        String previousProject = System.getProperty("pkb_store_project");
+        try {
+            System.setProperty("pkb_store_project", temp.toAbsolutePath().normalize().toString());
+            String handle = indexedHandle(version);
+            SnapFindIndex.resetIndexHitsForTests();
+            ElementOperations.findElements(null, By.id(handle));
+            assertEquals(1, SnapFindIndex.indexHitsForTests(), handle);
+        } finally {
+            SnapFindIndex.clearDocumentVersion();
+            if (previousProject == null) System.clearProperty("pkb_store_project");
+            else System.setProperty("pkb_store_project", previousProject);
+        }
+
         Capture acted = run("act", "--target=" + ref, "--kind=click", "--run-id=snap-desk");
         assertEquals(0, acted.code, acted.err + acted.out);
         JsonNode act = JSON.readTree(acted.out);
@@ -121,6 +143,22 @@ class CompactSnapshotTest {
             if (text.startsWith("- button \"" + name + "\"")) return text;
         }
         throw new AssertionError("no line named " + name + " in " + body);
+    }
+
+    private String indexedHandle(String version) throws Exception {
+        try (Connection connection = SqliteOpen.open(StorePaths.runState(temp));
+             PreparedStatement statement = connection.prepareStatement(
+                     "SELECT handle FROM snap_find_index WHERE run_id = ? AND doc_version = ? AND name = ?")) {
+            statement.setString(1, "snap-desk");
+            statement.setString(2, version);
+            statement.setString(3, "Save");
+            try (ResultSet rows = statement.executeQuery()) {
+                assertTrue(rows.next(), "find index row for " + version);
+                String handle = rows.getString(1);
+                assertFalse(handle == null || handle.isBlank() || handle.contains(":"), handle);
+                return handle;
+            }
+        }
     }
 
     private static String refOn(String line) {

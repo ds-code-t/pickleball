@@ -35,9 +35,9 @@ public final class RowFeatureSupplier {
     }
 
     /**
-     * Store rows apply when Store is on and at least one requested URI is inside
-     * the store project (or the request is empty). A file URI outside that project
-     * is not a row, so the caller keeps the file loader.
+     * Store rows apply when Store is on and at least one requested URI is under a
+     * hydrate root or already stored (or the request is empty). A path outside
+     * those roots stays on the file loader.
      */
     public static boolean usesStore(List<URI> paths) {
         if (!StoreConfig.enabled()) return false;
@@ -78,7 +78,7 @@ public final class RowFeatureSupplier {
             for (String path : chosen) {
                 StoreQuery.FileDetail detail = StoreQuery.file(project, path);
                 if (detail == null || detail.text() == null) throw StoreScenarioSource.missing(path);
-                String text = StoreScenarioSource.executableText(project, path, detail.text());
+                String text = StoreScenarioSource.executableText(project, path, detail.text(), true);
                 if (text == null) continue;
                 byte[] body = text.equals(detail.text())
                         ? text.getBytes(StandardCharsets.UTF_8)
@@ -99,7 +99,8 @@ public final class RowFeatureSupplier {
             List<String> keys = StoreFeatureSource.keys(uri);
             if (keys.isEmpty()) throw StoreScenarioSource.missing(String.valueOf(uri));
             String text = new String(bytes, StandardCharsets.UTF_8);
-            String executable = StoreScenarioSource.executableText(StoreConfig.project(), keys.getFirst(), text);
+            String executable = StoreScenarioSource.executableText(
+                    StoreConfig.project(), keys.getFirst(), text, true);
             if (executable == null) return Optional.empty();
             byte[] body = executable.equals(text) ? bytes : executable.getBytes(StandardCharsets.UTF_8);
             return parseBytes(uri, body);

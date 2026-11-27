@@ -62,8 +62,12 @@ public class PlaywrightCdpLiveTest {
         long deadline = System.currentTimeMillis() + 20_000;
         while (System.currentTimeMillis() < deadline) {
             if (Files.isRegularFile(port)) {
-                List<String> lines = Files.readAllLines(port);
-                if (!lines.isEmpty() && !lines.get(0).isBlank()) return "http://127.0.0.1:" + lines.get(0).trim();
+                try {
+                    List<String> lines = Files.readAllLines(port);
+                    if (!lines.isEmpty() && !lines.get(0).isBlank()) return "http://127.0.0.1:" + lines.get(0).trim();
+                } catch (java.io.IOException locked) {
+                    // Chrome still holds DevToolsActivePort. The wait continues.
+                }
             }
             Thread.sleep(50);
         }

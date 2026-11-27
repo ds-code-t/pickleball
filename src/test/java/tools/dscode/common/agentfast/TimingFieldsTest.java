@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.common.agentcontrol.SpineSession;
 import tools.dscode.control.protocol.LiveBridgeFile;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.launcher.WorkbenchAgentCommands;
@@ -79,11 +80,11 @@ class TimingFieldsTest {
             LiveBridgeFile.write(temp, new LiveBridgeFile.Bridge(
                     "127.0.0.1", port, "token-warm", ProcessHandle.current().pid(), "sess-warm"
             ));
+            SpineSession.create(temp, "agent-1");
             long[] samples = new long[2];
             for (int sample = 0; sample < samples.length; sample++) {
                 long started = System.nanoTime();
-                Process process = new ProcessBuilder(
-                        Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                Process process = new ProcessBuilder(tools.dscode.store.StoreTestProcesses.java(java.util.List.of(
                         "-cp",
                         System.getProperty("java.class.path"),
                         "tools.dscode.launcher.PickleballWorkbenchLauncher",
@@ -91,7 +92,7 @@ class TimingFieldsTest {
                         temp.toString(),
                         "--handle=save",
                         "--preset=yellow"
-                ).redirectErrorStream(true).directory(temp.toFile()).start();
+                ))).redirectErrorStream(true).directory(temp.toFile()).start();
                 String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
                 int code = process.waitFor();
                 samples[sample] = Math.max(0L, (System.nanoTime() - started) / 1_000_000L);
@@ -197,11 +198,11 @@ class TimingFieldsTest {
                 new PrintStream(startErr, true, StandardCharsets.UTF_8)
         );
         assertEquals(0, started, startOut.toString(StandardCharsets.UTF_8) + startErr.toString(StandardCharsets.UTF_8));
+        SpineSession.create(temp, "agent-1");
         long[] samples = new long[3];
         for (int sample = 0; sample < samples.length; sample++) {
             long began = System.nanoTime();
-            Process process = new ProcessBuilder(
-                    Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+            Process process = new ProcessBuilder(tools.dscode.store.StoreTestProcesses.java(java.util.List.of(
                     "-cp",
                     System.getProperty("java.class.path"),
                     "tools.dscode.launcher.PickleballWorkbenchLauncher",
@@ -209,7 +210,7 @@ class TimingFieldsTest {
                     temp.toString(),
                     "--handle=save",
                     "--preset=yellow"
-            ).redirectErrorStream(true).directory(temp.toFile()).start();
+            ))).redirectErrorStream(true).directory(temp.toFile()).start();
             String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
             int code = process.waitFor();
             samples[sample] = Math.max(0L, (System.nanoTime() - began) / 1_000_000L);

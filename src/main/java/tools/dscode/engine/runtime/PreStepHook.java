@@ -1,5 +1,6 @@
 package tools.dscode.engine.runtime;
 
+import tools.dscode.common.mappings.MappingProcessor;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ParsingMap;
 import tools.dscode.engine.EngineLog;
@@ -26,7 +27,7 @@ public final class PreStepHook {
     private PreStepHook() {
     }
 
-    public record Slot(String key, Object previous, boolean had) {
+    public record Slot(NodeMap map, String key, Object previous, boolean had) {
     }
 
     public record Applied(List<Slot> slots) {
@@ -40,29 +41,55 @@ public final class PreStepHook {
             if (project != null && map != null && step > 0 && !StoreScope.current().primary()) {
                 Map<String, String> values = values(project, step);
                 count = values.size();
-                NodeMap runMap = map.getPrimaryRunMap();
-                for (Map.Entry<String, String> entry : values.entrySet()) {
-                    Object previous = runMap.get(entry.getKey());
-                    runMap.put(entry.getKey(), entry.getValue());
-                    slots.add(new Slot(entry.getKey(), previous, previous != null));
+                for (NodeMap target : runMaps(map)) {
+                    for (Map.Entry<String, String> entry : values.entrySet()) {
+                        Object previous = target.get(entry.getKey());
+                        target.put(entry.getKey(), entry.getValue());
+                        slots.add(new Slot(target, entry.getKey(), previous, previous != null));
+                    }
                 }
             }
         } catch (SQLException | IOException | RuntimeException ignored) {
-            count = slots.size();
+            java.util.LinkedHashSet<String> keys = new java.util.LinkedHashSet<>();
+            for (Slot slot : slots) keys.add(slot.key());
+            count = keys.size();
         }
         EngineLog.log(project, "match", "step", "pre-step hook keys=" + count);
         return new Applied(List.copyOf(slots));
     }
 
-    /** Restores the map to the values from before {@link #apply}. */
+    /** Restores every map {@link #apply} wrote, including the shared run map the step reads. */
     public static void clear(ParsingMap map, Applied applied) {
-        if (map == null || applied == null || applied.slots().isEmpty()) return;
-        NodeMap runMap = map.getPrimaryRunMap();
+        if (applied == null || applied.slots().isEmpty()) return;
+        NodeMap fallback = map == null ? null : map.getPrimaryRunMap();
         for (int index = applied.slots().size() - 1; index >= 0; index--) {
             Slot slot = applied.slots().get(index);
-            if (!slot.had()) runMap.getRoot().remove(slot.key());
-            else runMap.put(slot.key(), slot.previous());
+            NodeMap target = slot.map() == null ? fallback : slot.map();
+            if (target == null) continue;
+            if (!slot.had()) target.getRoot().remove(slot.key());
+            else target.put(slot.key(), slot.previous());
         }
+    }
+
+    /**
+     * The scenario map and {@link MappingProcessor#getRunMap()} are different objects
+     * after {@code ExecutionContext} replaces {@code RUN_MAP}. The running step reads the shared one.
+     */
+    private static List<NodeMap> runMaps(ParsingMap map) {
+        List<NodeMap> targets = new ArrayList<>();
+        if (map != null) {
+            NodeMap primary = map.getPrimaryRunMap();
+            if (primary != null) targets.add(primary);
+        }
+        NodeMap shared = MappingProcessor.getRunMap();
+        if (shared != null) {
+            boolean seen = false;
+            for (NodeMap existing : targets) {
+                if (existing == shared) seen = true;
+            }
+            if (!seen) targets.add(shared);
+        }
+        return targets;
     }
 
     private static Map<String, String> values(Path project, int step) throws SQLException, IOException {

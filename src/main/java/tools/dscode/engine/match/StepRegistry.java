@@ -54,6 +54,7 @@ public final class StepRegistry {
     private Path logProject;
     private String preferredDefinition = "";
     private boolean nativeDecided;
+    private boolean catalogLimited;
     private List<GlueStep> nativeSteps;
 
     public StepRegistry() {
@@ -70,6 +71,17 @@ public final class StepRegistry {
         return this;
     }
 
+    /**
+     * A run that named glue classes matches Java store rows only for the classes
+     * it scanned. A native suite that does not call this still uses every enabled row.
+     */
+    public StepRegistry limitToScanned() {
+        this.catalogLimited = true;
+        this.nativeDecided = false;
+        this.nativeSteps = null;
+        return this;
+    }
+
     /** When set, native match keeps only this {@code definition_id}. */
     public StepRegistry prefer(String definitionId) {
         this.preferredDefinition = definitionId == null ? "" : definitionId;
@@ -81,6 +93,7 @@ public final class StepRegistry {
     }
 
     public StepRegistry scan(Class<?>... types) {
+        catalogChanged();
         if (types == null) return this;
         for (Class<?> type : types) {
             if (type == null) continue;
@@ -106,9 +119,9 @@ public final class StepRegistry {
 
     /** Loads every class in a package the same way a Cucumber glue path does. */
     public StepRegistry scanPackage(String packageName) {
+        catalogChanged();
         if (packageName == null || packageName.isBlank()) return this;
-        ClassLoader loader = Thread.currentThread().getContextClassLoader();
-        if (loader == null) loader = StepRegistry.class.getClassLoader();
+        ClassLoader loader = glueLoader(packageName);
         String path = packageName.replace('.', '/');
         try {
             Enumeration<URL> resources = loader.getResources(path);
@@ -327,16 +340,26 @@ public final class StepRegistry {
         try (StoreDatabase database = StoreDatabase.open(logProject)) {
             List<StoreStepCatalog.MatchRow> rows = StoreStepCatalog.matchRows(database.connection());
             if (rows.isEmpty()) return null;
+            java.util.Set<String> scanned = scannedClasses();
             java.util.Set<String> storedClasses = new java.util.HashSet<>();
-            for (StoreStepCatalog.MatchRow row : rows) {
-                String className = className(row.sourcePath());
-                if (className != null) storedClasses.add(className);
-            }
             List<GlueStep> candidates = new ArrayList<>();
             for (StoreStepCatalog.MatchRow row : rows) {
                 if (row.enabled() != 1) continue;
-                candidates.add(define("Given", row.pattern(), bind(row), row.parameterTypes(),
-                        row.id(), row.host(), row.contentHash()));
+                Method method = bind(row);
+                String host = row.host() == null || row.host().isBlank() ? "java" : row.host();
+                boolean javaHost = "java".equalsIgnoreCase(host);
+                if (javaHost && method == null) continue;
+                if (catalogLimited && javaHost && !scannedClass(scanned, method, row.sourcePath())) continue;
+                if (method != null) storedClasses.add(method.getDeclaringClass().getName());
+                String source = className(row.sourcePath());
+                if (source != null) storedClasses.add(source);
+                String pattern = row.pattern();
+                if (javaHost && method != null) {
+                    String live = reflectedRegex(method, pattern);
+                    if (live != null) pattern = live;
+                }
+                candidates.add(define("Given", pattern, method, row.parameterTypes(),
+                        row.id(), host, row.contentHash()));
             }
             for (GlueStep step : steps) {
                 Method method = step.method();
@@ -350,11 +373,48 @@ public final class StepRegistry {
         }
     }
 
+    private void catalogChanged() {
+        nativeDecided = false;
+        nativeSteps = null;
+    }
+
+    private java.util.Set<String> scannedClasses() {
+        java.util.Set<String> scanned = new java.util.HashSet<>();
+        for (GlueStep step : steps) {
+            if (step.method() != null) scanned.add(step.method().getDeclaringClass().getName());
+        }
+        for (Hook hook : hooks) {
+            if (hook.method() != null) scanned.add(hook.method().getDeclaringClass().getName());
+        }
+        return scanned;
+    }
+
+    private static boolean scannedClass(java.util.Set<String> scanned, Method method, String sourcePath) {
+        if (method != null && scanned.contains(method.getDeclaringClass().getName())) return true;
+        String source = className(sourcePath);
+        return source != null && scanned.contains(source);
+    }
+
+    /**
+     * Warm runs load consumer glue from {@code .pickleball/spine/classes}.
+     * That directory stays off the application classpath so the next scenario
+     * can replace the loader and see a recompiled class.
+     */
+    private static ClassLoader glueLoader(String className) {
+        if (tools.dscode.engine.runtime.WarmFlags.enabled()) {
+            Path project = ForeignStepHosts.project();
+            if (project == null) project = tools.dscode.engine.EngineConfig.project();
+            return JavaStepHost.selectLoader(className, project);
+        }
+        ClassLoader loader = Thread.currentThread().getContextClassLoader();
+        if (loader == null) loader = StepRegistry.class.getClassLoader();
+        return loader;
+    }
+
     private static Method bind(StoreStepCatalog.MatchRow row) {
         String className = className(row.sourcePath());
         if (className == null || row.methodName() == null || row.methodName().isBlank()) return null;
-        ClassLoader loader = Thread.currentThread().getContextClassLoader();
-        if (loader == null) loader = StepRegistry.class.getClassLoader();
+        ClassLoader loader = glueLoader(className);
         Class<?> type;
         try {
             type = Class.forName(className, true, loader);
@@ -383,6 +443,34 @@ public final class StepRegistry {
             }
         }
         return null;
+    }
+
+    /**
+     * A catalog row scanned before a unicode escape was decoded still holds the letter
+     * u and four hex digits. The reflected annotation is the character the compiler stored.
+     * A Cucumber expression such as {int} is left to ingest.
+     */
+    private static String reflectedRegex(Method method, String stored) {
+        String first = null;
+        for (Annotation annotation : method.getAnnotations()) {
+            for (Found found : valuesOf(annotation)) {
+                String pattern = found.pattern();
+                if (pattern == null) continue;
+                String trimmed = pattern.stripLeading();
+                if (!(trimmed.startsWith("^") || trimmed.startsWith("(?"))) continue;
+                if (cucumberParameter(trimmed)) continue;
+                if (pattern.equals(stored)) return null;
+                if (first == null) first = pattern;
+            }
+        }
+        return first;
+    }
+
+    private static boolean cucumberParameter(String pattern) {
+        for (int index = 0; index < pattern.length() - 1; index++) {
+            if (pattern.charAt(index) == '{' && Character.isLetter(pattern.charAt(index + 1))) return true;
+        }
+        return false;
     }
 
     private static String className(String sourcePath) {

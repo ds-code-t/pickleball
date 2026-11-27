@@ -5,11 +5,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import dev.domengine.session.BrowserSession;
 
+import tools.dscode.common.resources.PathLists;
+import tools.dscode.common.resources.ResourceLocations;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -718,7 +722,12 @@ public final class BrowserVersionResolver {
         if (!name.endsWith(".yaml") && !name.endsWith(".yml")) name = name + ".yaml";
         String config = BrowserProtocols.setting("pkb_configpath");
         List<Path> candidates = new ArrayList<>();
-        if (config != null && !config.isBlank()) candidates.add(Path.of(config).resolve(name));
+        if (config != null && !config.isBlank()) {
+            for (String part : PathLists.split(config)) {
+                Path dir = configDirectory(part, root);
+                if (dir != null) candidates.add(dir.resolve(name));
+            }
+        }
         candidates.add(root.resolve("src").resolve("test").resolve("resources").resolve("configs").resolve(name));
         candidates.add(root.resolve("configs").resolve(name));
         candidates.add(root.resolve("maven-consumer-project").resolve("src").resolve("test").resolve("resources").resolve("configs").resolve(name));
@@ -726,6 +735,20 @@ public final class BrowserVersionResolver {
             if (Files.isRegularFile(candidate)) return candidate;
         }
         return null;
+    }
+
+    /**
+     * A value {@link Path#of(String)} accepts stays that path, so a relative
+     * {@code configs} folder is unchanged. A prefixed value such as
+     * {@code wd-file:} (including a Windows drive path) is the config directory
+     * from {@link ResourceLocations}. A missing directory is skipped.
+     */
+    private static Path configDirectory(String configured, Path workingDirectory) {
+        try {
+            return Path.of(configured);
+        } catch (InvalidPathException invalid) {
+            return ResourceLocations.existingDirectory(configured, workingDirectory);
+        }
     }
 
     private static String channelForLookup(Block block) {

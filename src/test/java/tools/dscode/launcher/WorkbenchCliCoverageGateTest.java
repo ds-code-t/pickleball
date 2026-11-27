@@ -157,7 +157,8 @@ class WorkbenchCliCoverageGateTest {
                 || body.contains("held(")
                 || body.contains("HeldSession")
                 || body.contains("assertHeld")
-                || body.contains("forwardedFailsClosed");
+                || body.contains("forwardedFailsClosed")
+                || body.contains("bareUiOpensAndStaysUp");
     }
 
     private static List<String> array(JsonNode root, String... path) {
