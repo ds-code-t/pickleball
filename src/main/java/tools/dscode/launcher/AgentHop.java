@@ -36,7 +36,7 @@ final class AgentHop {
         return HOP.contains(command);
     }
 
-    /** Bare {@code ui} stays the Swing controller. {@code ui --ops} hops with the other agent verbs.
+    /** Bare {@code ui} opens the Node renderer in this process. {@code ui --ops} hops with the other agent verbs.
      *  {@code live-stop} / {@code start --stop} stays in this process so it can stop the controller. */
     static boolean shouldHop(String command, String[] args) {
         if (!shouldHop(command)) return false;

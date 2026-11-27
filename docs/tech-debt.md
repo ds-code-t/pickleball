@@ -49,7 +49,7 @@ The 3.0.0 retest-fix rounds (R, S) ran only targeted tests on the Linux box and 
 - **Spine R3, Windows only:** `JavaStepHostTest`, `GlueStaticScanTest`, `NodeStepHostTest`, `NodeStepHostTsTest`, `EngineDoesNotSpawnNodeTest`, `JsStepCatalogTest`, `JsStepRunTest`, `PlaywrightTestIngestTest`, `PlaywrightSpecHostTest`, and `PlaywrightSpecIngestLiveTest`.
 - **Spine R4, Windows only:** `VerbDispatchTest`, `McpDirectHotPathTest`, `VerbCatalogTest`, `ElementRecordTest`, `ArgsFileTest`, `AgentEnvelopeStoreTest`, `RouteModifyBodyTest`, `ExecuteStepsPwTest`, `DesktopLaunchTest`, `DesktopScreenshotVerbTest`, and `DesktopLaunch`.
 - **Spine R7, Windows only:** `RunSnapshotTest`, `ReportScriptTest`, `VisualTargetTest`, `PickleballExceptionTest`, `SnapFindIndexTest` (`tools.dscode.common.composite`), `SnapshotRetainTest`, and `CrossStoreTest`.
-- **Spine R5, Windows only:** `WorkbenchUiServerTest`, `StoreSqlReadOnlyTest`, `InjectSessionTest`, `SessionAddressTest`, `ChatChannelTest`, `AskProgressPointTest`, `WorkbenchUiLicenseTest`, `LeaseAndBlockTest`, `UiPageDispatchTest`, `ChatFollowStreamTest`, `WorkbenchUiJarAssetsTest`, `GeneratedPageAccessTest`, `OpenWindowRendererTest`, `LeaseGateTest`, `InjectLivePageTest`, `OverlayReceiptAskTest`, `InputBlockLivePageTest`, `WorkbenchPagesTest`, and `SessionRequiredTest`.
+- **Spine R5, Windows only:** `WorkbenchUiServerTest`, `StoreSqlReadOnlyTest`, `InjectSessionTest`, `SessionAddressTest`, `ChatChannelTest`, `AskProgressPointTest`, `WorkbenchUiLicenseTest`, `LeaseAndBlockTest`, `UiPageDispatchTest`, `ChatFollowStreamTest`, `WorkbenchUiJarAssetsTest`, `GeneratedPageAccessTest`, `OpenWindowRendererTest`, `LeaseGateTest`, `InjectLivePageTest`, `OverlayReceiptAskTest`, `InputBlockLivePageTest`, `WorkbenchPagesTest`, `SessionRequiredTest`, and `NodeDesignDocsTest`.
 
 ## Deferred from the 3.0.0 consumer-fixes branch (per Dan, 2026-11-25)
 
@@ -65,6 +65,3 @@ These items stay out of `3.0.0-consumer-fixes`. The roadmap lists them under "No
 
 The `typescript` npm package is pinned in `workbench-ui/package.json` and packed into the jar next to `monaco-editor`, but nothing loads it today. Monaco has its own TypeScript language service, and `.ts` step definitions run through `NodeStepHost` on Node's built-in type stripping. Dan chose to keep it for now. Later, decide whether to drop it (smaller jar, one fewer pinned version) or use it as a fallback that converts `.ts` step files Node's type stripping cannot run (enums, namespaces, parameter properties, decorators) to plain JavaScript first.
 
-## Spine R5 production wiring (open, found in R5 verification 2026-11-26)
-
-15. `docs/pickleball-workbench.md` and the `AgentHop` comment still describe Swing as the current window, lease, editor, and bare `ui`.

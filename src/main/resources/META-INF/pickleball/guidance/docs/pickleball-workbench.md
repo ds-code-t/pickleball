@@ -24,7 +24,7 @@ Workbench owns synchronization, `.pickleball/workbench/` disposable state, worke
 
 `pickleball-control-protocol` owns immutable wire records, request/response envelopes, transport constants, capabilities, version/minimum-version negotiation, and JDK-only `.pickleball` layout/store helpers (`PickleballLocalLayout`, `PickleballVersion`, `PickleballArtifactLocator`, `PickleballLocalStore`). Worker-side bridge server/coordinator/bootstrap and all translation to runtime operations remain in Pickleball core.
 
-MCP and Swing are adapters over the same Workbench service seam. They must not introduce a second runtime implementation. A visible UI keeps one Workbench JVM and one consumer worker. An AI agent attaches to that live session through a localhost HTTP JSON facade; it must not start a second Workbench or a second worker. `open-window` posts `open-ui` to a healthy `cli-session`. `open-ui` reports `playback=NODE`. That answer does not start the controller `ui` command and does not start Swing. `open-window` starts a detached pickleball process, `WorkbenchRendererHost`, which runs the Node renderer and writes `.pickleball/workbench/attach.json` with `mode` `ui-attach`. `show-run` posts to that endpoint when the window is already open. `close-window` stops the renderer process. A headless run keeps going. The next `open-window` reuses a healthy window.
+MCP and the Node renderer are adapters over the same Workbench service seam. They must not introduce a second runtime implementation. A visible UI keeps one Workbench JVM and one consumer worker. An AI agent attaches to that live session through a localhost HTTP JSON facade; it must not start a second Workbench or a second worker. `open-window` posts `open-ui` to a healthy `cli-session`. `open-ui` reports `playback=NODE`. That answer does not start the controller `ui` command and does not start Swing. `open-window` starts a detached pickleball process, `WorkbenchRendererHost`, which runs the Node renderer and writes `.pickleball/workbench/attach.json` with `mode` `ui-attach`. `show-run` posts to that endpoint when the window is already open. `close-window` stops the renderer process. A headless run keeps going. The next `open-window` reuses a healthy window.
 
 The canonical worker bridge environment is:
 
@@ -134,7 +134,7 @@ Workbench writes `runs/<id>/workbench/summary.json` and `runs/<id>/workbench/tra
 
 Every action that changes the open session already exists as a launcher command or a command-queue command. The window calls that command. It does not keep a second implementation. Switching the Config tab is only a view change. It shows `.pickleball/runs/<run-id>/config`, the same copy the run reads. Save writes that copy and does not write the project configs. An agent changes those files through the same run directory.
 
-Project sync, starting a run, and any other long load run off the Swing event thread. While that work is in progress the window stays usable and a banner names it (`Syncing the project`, `Starting the run`, `Loading the project`, or the other long load). The banner clears when the work finishes. A failure stays on that banner and names the error. Every split pane can be dragged so one side takes almost the whole window.
+Project sync, starting a run, and any other long load are commands. They do not run inside the Node renderer, so the window stays usable. A failure comes back as `error:` and `fix:`.
 
 | Window action | Command |
 | --- | --- |
@@ -265,7 +265,9 @@ The controller still contains Swing classes that tests construct. Those classes 
 
 ### Player-style layout
 
-The primary workspace is an interactive Gherkin player with a project feature picker:
+The launched window is the Node renderer (Scenarios, Globals, Data, and Raw SQL). The diagram below is the headless live-scenario player the session commands drive. It is not a Swing window.
+
+The primary workspace of that player is an interactive Gherkin document with a project feature picker:
 
 ```text
 +-----------------------------------------------------------------------------------+
@@ -289,7 +291,7 @@ The primary workspace is an interactive Gherkin player with a project feature pi
 
 The left rail is a scenario filter, not a feature-file browser. Primary controls are scenario name (starts with / contains / ends with / full match; default contains; all four are case-insensitive against the Gherkin Scenario / Scenario Outline title), tags the scenario must have (AND), and tags it must not have (NOT). Include/exclude fields accept any number of tags, with or without a leading `@`, split on commas and/or whitespace. Empty include/exclude means no tag constraint. Feature-level tags, optional Rule tags, the scenario/outline's own tags, and Examples tags on an outline are inherited the same way Cucumber does; Workbench parses those tags from the catalog `.feature` files and does not call Cucumber. Feature-file selection is collapsed behind **Filter by feature** (Gherkin Feature name vs file path lives in that panel). Default: no feature filter, so name/tag apply to every catalog scenario in the synchronized project. Scenario Outlines expand to selectable Examples rows. Clicking a result opens the **whole originating `.feature` file** in the editor and sets that scenario (and optional Examples row) as the play target. The caller tab stays pinned; Ctrl+click or **Open target** on a `RUN` / `CALL` / `data:/` step opens the callee in another tab. Below the picker, the **Step definition** panel shows consumer Java glue for the selected step when it can be resolved, or that the line is a Pickleball dynamic step / unmatched reference. A small collapsible **Run vars** panel loads the run workspace `runvars.properties` (boolean-like as toggles, known enums as combos, else text). **Save** writes that file atomically. A change on disk since load warns and is not overwritten. There is no **Apply sealed** control and no sealed snapshot. `pkb_overriderunvars` is deprecated for Workbench. Workbench does not import `PKB_props` / `PickleballProfiles`; resolve stays in core. Workbench does not write `.feature` files unless you use the explicit **Save** control, which writes the editor buffer to the original file.
 
-The center editor is one ordinary Gherkin text document over `LiveScenarioPlayer`. Nested steps use Pickleball's leading-colon grammar: Tab at the start of a line, or while only leading colons/spaces sit before the caret, inserts one extra `:`; Shift-Tab removes one leading `:` if present. Mid-line Tab inserts a single space and does not move focus to another Swing control. Typing the first letters of a Gherkin keyword after optional leading colons/whitespace offers completion for Feature, Rule, Background, Scenario, Scenario Outline, Examples, Given, When, Then, And, But, `*`, and line-start control words IF / ELSE / ELSE-IF. Tab or Enter accepts the selected keyword and inserts a trailing space. When the completion popup is open, Tab accepts the completion; when it is not, Tab at the indent prefix inserts `:`. **Play** runs a derived plan: Feature/Rule Background steps, then the selected scenario's steps, with one selected Examples row substituted. **Step** remains isolated `executeStep`. **From Here** runs the plan from the selected template step. The default demo buffer still has no save path.
+The center editor is one ordinary Gherkin text document over `LiveScenarioPlayer`. Nested steps use Pickleball's leading-colon grammar: Tab at the start of a line, or while only leading colons/spaces sit before the caret, inserts one extra `:`; Shift-Tab removes one leading `:` if present. Mid-line Tab inserts a single space and does not leave the editor. Typing the first letters of a Gherkin keyword after optional leading colons/whitespace offers completion for Feature, Rule, Background, Scenario, Scenario Outline, Examples, Given, When, Then, And, But, `*`, and line-start control words IF / ELSE / ELSE-IF. Tab or Enter accepts the selected keyword and inserts a trailing space. When the completion popup is open, Tab accepts the completion; when it is not, Tab at the indent prefix inserts `:`. **Play** runs a derived plan: Feature/Rule Background steps, then the selected scenario's steps, with one selected Examples row substituted. **Step** remains isolated `executeStep`. **From Here** runs the plan from the selected template step. The default demo buffer still has no save path.
 
 The player bar shows the running Pickleball version next to the project name. The right side is four tabs: Mapping, Terminal, Explorer, and Report. Low-level lifecycle controls stay under **Session**. Existing investigation tools stay under **Tools > Advanced Controls**.
 
@@ -405,26 +407,28 @@ The redesign preserves the underlying existing capabilities:
 - semantic breakpoint list, add, remove, and clear with hook/filter/one-shot/finite-lease controls;
 - clean Workbench shutdown when the window closes.
 
-The Step Override editor sends its source template unchanged to the worker. The source must contain `{{CLASS_NAME}}`; generated class naming, compilation, classloading, rule registration, matching, captures, replacement, and cleanup remain worker-side Pickleball responsibilities. Browser page, screenshot, service-call, event, and breakpoint controls expose existing bridge contracts rather than reimplementing them in Swing.
+The Step Override editor sends its source template unchanged to the worker. The source must contain `{{CLASS_NAME}}`; generated class naming, compilation, classloading, rule registration, matching, captures, replacement, and cleanup remain worker-side Pickleball responsibilities. Browser page, screenshot, service-call, event, and breakpoint controls expose existing bridge contracts rather than reimplementing them in the page.
 
-Synchronization, worker actions, live bridge calls, Mapping operations, event refresh, Step Override actions, browser/screenshot evidence, service calls, and breakpoint actions run off the Swing Event Dispatch Thread. Live controls are enabled only while the Workbench-owned worker is running and paused.
+Synchronization, worker actions, live bridge calls, Mapping operations, event refresh, Step Override actions, browser/screenshot evidence, service calls, and breakpoint actions are commands. They do not block the Node renderer. Live controls are enabled only while the Workbench-owned worker is running and paused.
 
 The UI is intentionally not a project IDE, generic process manager, generic Maven/Gradle task runner, source navigator, or collaboration system. The Live Scenario Editor is a session-scoped Gherkin player/editor, not a workspace file explorer and not an automatic writer of consumer `.feature` files.
 
 ### Watched AI-agent control lease
 
-Workbench owns one control lease for the live session. Swing and MCP/HTTP adapters share it; the lease is not Swing-only state.
+The launched window's Lease button calls `lease take --target=ui`. That file lease is `LeaseHold`, described in the Node renderer section. `lease release` clears the target.
 
-- Holder is `HUMAN` when the UI is up, or `AGENT` after an attached agent requests control.
-- The snapshot also carries the agent display name, `currentAction` banner text, and at most one pending permission request.
+`WorkbenchControlLease` is the controller lease for a watched session. MCP observes it and does not keep a second copy. The Node renderer does not draw a second lease.
 
-While the human holds the lease, Swing play/edit/mapping/save/worker controls stay enabled. Agent mutating calls fail clearly until `workbench_request_control`.
+- Holder is `HUMAN` when the session is up, or `AGENT` after an attached agent requests control.
+- The snapshot also carries the agent display name, `currentAction` text, and at most one pending permission request.
 
-While an agent holds the lease, the human can watch the same window. Play, edit, picker/filter, editor view toggle, Mapping writes, Save, and worker lifecycle controls lock. The WebView editors stay mounted and become read-only; they are not torn down. A banner names the agent and shows `currentAction`. **Take control** stays enabled. Take control returns the lease to `HUMAN`, unlocks Swing, and fails any in-flight agent permission wait so a blocked Save does not write.
+While the human holds the lease, play, edit, mapping, save, and worker commands stay available. Agent mutating calls fail clearly until `workbench_request_control`.
 
-The agent should update `currentAction` as it works. Playhead, Mapping, Terminal, and screenshots follow because the agent uses the same `LiveScenarioPlayer` / worker as the UI. Testing the live scenario (`executeStep`, play, Mapping reads, evidence) is allowed on the agent lease. Copying the live scenario into the original `.feature` is not; that goes through `workbench_request_save` and waits for Allow/Deny in the Swing banner.
+While an agent holds the lease, the person can watch the same Node window. Play, edit, picker, filter, Mapping writes, Save, and worker lifecycle commands lock. **Take control** stays enabled. Take control returns the lease to `HUMAN` and fails any in-flight agent permission wait so a blocked Save does not write.
 
-Human **Save** uses the same service. After a picker scenario was loaded, Swing asks: copy these live steps into file X / scenario Y? Deny writes nothing. The demo buffer stays unsavable.
+The agent should update `currentAction` as it works. Playhead, Mapping, and screenshots follow because the agent uses the same `LiveScenarioPlayer` and worker as the session commands. Testing the live scenario (`executeStep`, play, Mapping reads, evidence) is allowed on the agent lease. Copying the live scenario into the original `.feature` is not; that goes through `workbench_request_save` and waits for Allow or Deny.
+
+Human **Save** of a loaded picker scenario uses the same service. The confirmation asks: copy these live steps into file X / scenario Y? Deny writes nothing. The demo buffer stays unsavable. Definition save in the Node renderer is `store glue put`.
 
 ### Driving a session a person is watching
 
@@ -617,7 +621,7 @@ Controller/runtime failures are returned as MCP tool results with `isError=true`
 
 ## Scope boundary
 
-Workbench MCP and Swing intentionally do not expose a generic IDE or build system. They do not add generic file editing/search, arbitrary process management, generic Maven/Gradle task execution, Gradle Tooling API project browsing, source navigation, collaboration tools, or git checkout/reset of the consumer HEAD. `workbench_go` is the one new navigation tool; it peeks pack copies and does not replace the live buffer.
+Workbench MCP and the Node renderer intentionally do not expose a generic IDE or build system. They do not add generic file editing/search, arbitrary process management, generic Maven/Gradle task execution, Gradle Tooling API project browsing, source navigation, collaboration tools, or git checkout/reset of the consumer HEAD. `workbench_go` is the one new navigation tool; it peeks pack copies and does not replace the live buffer.
 
 ## Dependency and artifact checks
 
@@ -682,7 +686,7 @@ Use the UI-owned worker for runtime checks; do not run `worker-check` or `live-c
 
 ## Regression
 
-For the player state model and Swing/controller behavior:
+For the player state model and the controller:
 
 ```powershell
 .\gradlew.bat :pickleball-workbench:test

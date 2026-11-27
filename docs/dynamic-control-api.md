@@ -190,7 +190,7 @@ Bridge capabilities include:
 - semantic breakpoint management;
 - scenario-scoped Step Override management.
 
-Workbench owns the controller-side protocol client. MCP and Swing access these capabilities through `WorkbenchServices` / `WorkbenchController`; they do not connect to the bridge independently or implement a second runtime. Workbench imports only `tools.dscode.control.protocol.*`; bridge server/coordinator/bootstrap and conversion to runtime objects remain worker-side.
+Workbench owns the controller-side protocol client. MCP accesses these capabilities through `WorkbenchServices` / `WorkbenchController`. The launched window is the Node renderer and calls the same verbs. They do not connect to the bridge independently or implement a second runtime. Workbench imports only `tools.dscode.control.protocol.*`; bridge server/coordinator/bootstrap and conversion to runtime objects remain worker-side.
 
 ## Scenario targeting and finite pauses
 

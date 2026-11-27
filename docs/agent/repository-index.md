@@ -1311,6 +1311,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/MonitorLiveTest.java`
 - `src/test/java/tools/dscode/launcher/NavigateDataFileTest.java`
 - `src/test/java/tools/dscode/launcher/NetLiveTest.java`
+- `src/test/java/tools/dscode/launcher/NodeDesignDocsTest.java`
 - `src/test/java/tools/dscode/launcher/NodeStepHostTest.java`
 - `src/test/java/tools/dscode/launcher/NodeStepHostTsTest.java`
 - `src/test/java/tools/dscode/launcher/NoopGlueModeTest.java`

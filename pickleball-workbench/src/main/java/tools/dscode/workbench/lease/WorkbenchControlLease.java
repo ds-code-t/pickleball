@@ -14,8 +14,8 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
 /**
- * Controller-owned live-control lease. Swing and MCP/HTTP adapters observe this
- * state; they do not keep a second copy.
+ * Controller-owned live-control lease. MCP observes this state. The launched
+ * window is the Node renderer and does not keep a second copy.
  */
 public final class WorkbenchControlLease {
     private static final long PERMISSION_WAIT_NS = TimeUnit.MINUTES.toNanos(30);
