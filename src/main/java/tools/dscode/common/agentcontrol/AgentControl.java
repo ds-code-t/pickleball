@@ -241,6 +241,7 @@ public final class AgentControl {
                 case "guide-back" -> guideMove(project, runId, values, -1);
                 case "guide-done" -> guideDone(project, runId, values);
                 case "ask" -> ask(project, runId, values);
+                case "ask-answer" -> askAnswer(project, runId, values);
                 case "ask-and-wait" -> askAndWait(project, runId, values);
                 case "answer-wait" -> answerWait(project, runId, values);
                 case "wait-any" -> waitAny(project, runId, values);
@@ -774,10 +775,38 @@ public final class AgentControl {
         }
         String reply = PageSurfaces.runtimeCall("ask", spec, true);
         if (reply == null || "null".equals(reply)) return fail(1, "ask did not show on the page");
+        List<String> shownChoices = spec.get("choices") instanceof List<?> listed
+                ? listed.stream().map(String::valueOf).toList()
+                : List.of();
+        AskCards.open(
+                project,
+                args.get("session"),
+                String.valueOf(spec.get("id")),
+                shownChoices.isEmpty() ? "text" : "choice",
+                String.valueOf(spec.get("say")),
+                shownChoices
+        );
         CompositeLog.info("ui", "ask " + reply);
         Map<String, Object> body = ok("Question shown on the page; the answer arrives as an answer event in overlay-poll.");
         body.put("op", "ask");
         body.putAll(AgentStore.JSON.readValue(reply, Map.class));
+        return new Result(0, body);
+    }
+
+    /** Stores the listed choice. A value outside {@code --options} is exit 2. */
+    private static Result askAnswer(Path project, String runId, Map<String, String> args) throws Exception {
+        String session = present(args.get("session")) ? args.get("session") : runId;
+        String id = args.get("id");
+        AskCards.answer(project, session, id, args.get("value"));
+        Map<String, Object> card = AskCards.answered(project, session);
+        Map<String, Object> body = ok("Answer stored. ui-poll returns type and value.");
+        body.put("op", "ask-answer");
+        if (card != null) {
+            body.put("id", card.get("id"));
+            body.put("type", card.get("type"));
+            body.put("value", card.get("value"));
+            body.put("session", card.get("session"));
+        }
         return new Result(0, body);
     }
 
@@ -1686,6 +1715,7 @@ public final class AgentControl {
         leanPlacement(placed, args);
         if (present(at)) placed.put("at", at.trim());
         if (present(block) && Boolean.parseBoolean(block.trim())) placed.put("block", true);
+        OverlayReceipts.record(project, present(args.get("session")) ? args.get("session") : runId, probeId(placed, args.get("handle")));
         return new Result(0, placed);
     }
 
@@ -2187,6 +2217,7 @@ public final class AgentControl {
     private static Result overlayPoll(Path project, String runId, Map<String, String> args) throws Exception {
         if (!present(args.get("after"))) {
             List<Map<String, Object>> events = new ArrayList<>(PageSurfaces.pollInput(project, runId));
+            acceptOverlayInput(project, runId, args, events);
             mergeReceipts(project, args, events);
             markConsumed(events);
             Map<String, Object> body = ok("Forwarded overlay clicks and form inputs.");
@@ -2201,6 +2232,7 @@ public final class AgentControl {
             return fail(2, "overlay-poll --after must be a whole number (the next value from the last poll)");
         }
         List<Map<String, Object>> all = new ArrayList<>(PageSurfaces.pollInput(project, runId));
+        acceptOverlayInput(project, runId, args, all);
         mergeReceipts(project, args, all);
         List<Map<String, Object>> events = after <= 0 ? all
                 : after >= all.size() ? new ArrayList<>() : new ArrayList<>(all.subList(after, all.size()));
@@ -2215,6 +2247,39 @@ public final class AgentControl {
     /** Overlay rows gain {@code read_at}. Null until {@link OverlayReceipts#ack} runs. */
     private static void mergeReceipts(Path project, Map<String, String> args, List<Map<String, Object>> events) {
         OverlayReceipts.merge(project, args == null ? null : args.get("session"), events);
+    }
+
+    /**
+     * A click, read, or ack from the page sets {@code read_at}. An answer event stores the card.
+     * A choice that is not on the card stays on the event and does not fail the poll.
+     */
+    private static void acceptOverlayInput(
+            Path project,
+            String runId,
+            Map<String, String> args,
+            List<Map<String, Object>> events
+    ) throws IOException {
+        if (events == null || events.isEmpty()) return;
+        String session = args == null ? null : args.get("session");
+        if (session == null || session.isBlank()) session = runId;
+        for (Map<String, Object> event : events) {
+            if (event == null) continue;
+            Object id = event.get("id");
+            if (id == null || String.valueOf(id).isBlank()) continue;
+            String type = String.valueOf(event.get("type"));
+            if ("click".equals(type) || "read".equals(type) || "ack".equals(type)) {
+                OverlayReceipts.ack(project, session, String.valueOf(id));
+            } else if ("answer".equals(type)) {
+                Object choice = event.get("choice");
+                if (choice == null) choice = event.get("value");
+                if (choice == null || String.valueOf(choice).isBlank()) continue;
+                try {
+                    AskCards.answer(project, session, String.valueOf(id), String.valueOf(choice));
+                } catch (IllegalArgumentException ignored) {
+                    // Missing card, or a choice outside --options.
+                }
+            }
+        }
     }
 
     private static void markConsumed(List<Map<String, Object>> events) {

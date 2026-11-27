@@ -14,6 +14,7 @@ MCP-only count: 0
 | arrow | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | ask | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | ask-and-wait | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
+| ask-answer | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | attach | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | audit | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | audits | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |

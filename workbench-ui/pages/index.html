@@ -20,6 +20,8 @@ pre { white-space: pre-wrap; }
 <h1 id="title">Pickleball</h1>
 <label>Branch <select id="branch"></select></label>
 <button id="lease" type="button">Lease</button>
+<label>Answer <input id="ask-id" type="text"><input id="ask-value" type="text">
+<button id="ask-answer" type="button">Answer</button></label>
 </header>
 <nav>
 <a href="/scenarios">Scenarios</a>
@@ -139,6 +141,12 @@ document.getElementById("point").addEventListener("click", async function () {
 });
 document.getElementById("lease").addEventListener("click", async function () {
     const result = await callStore(["take", "--target=ui"], "lease");
+    document.getElementById("scenario-body").textContent = (result.out || "") + (result.err || "");
+});
+document.getElementById("ask-answer").addEventListener("click", async function () {
+    const id = document.getElementById("ask-id").value;
+    const value = document.getElementById("ask-value").value;
+    const result = await callStore(["--id=" + id, "--value=" + value], "ask-answer");
     document.getElementById("scenario-body").textContent = (result.out || "") + (result.err || "");
 });
 document.getElementById("run-sql").addEventListener("click", async function () {

@@ -23,7 +23,7 @@ public final class VerbTiers {
     );
 
     private static final Set<String> CONTROL_VERBS = Set.of(
-            "answer-wait", "arrow", "ask", "ask-and-wait", "attach", "border", "bridge-health", "call", "wait-any",
+            "answer-wait", "arrow", "ask", "ask-and-wait", "ask-answer", "attach", "border", "bridge-health", "call", "wait-any",
             "capture-scenario", "capture-steps", "chat", "chat-history", "chat-poll", "chat-send", "chat-turn", "chat_wait",
             "cdp", "checklist", "close-window", "confirm", "controller-ping", "controller-start", "controller-status",
             "controller-stop", "diagnostic-run", "discover", "discover-hint", "entity-lookup", "eval", "events",

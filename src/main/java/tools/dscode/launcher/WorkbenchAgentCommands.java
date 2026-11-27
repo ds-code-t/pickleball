@@ -321,7 +321,7 @@ public final class WorkbenchAgentCommands {
                      "html-write", "html-replace", "html-insert", "html-remove", "html-cleanup",
                      "popup-open", "popup-status", "popup-close",
                      "ui-apply", "ui-poll", "ui-catalog",
-                     "guide", "guide-next", "guide-back", "guide-done", "ask",
+                     "guide", "guide-next", "guide-back", "guide-done", "ask", "ask-answer",
                      "panel-open", "panel-close", "panel-state",
                      "capture-scenario",
                      "capture-steps",

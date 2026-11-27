@@ -40,7 +40,7 @@ final class WorkbenchCommandLine {
             "html-write", "html-replace", "html-insert", "html-remove", "html-cleanup",
             "popup-open", "popup-status", "popup-close",
             "ui-apply", "ui-poll", "ui-catalog", "ui-verify",
-            "guide", "guide-next", "guide-back", "guide-done", "ask",
+            "guide", "guide-next", "guide-back", "guide-done", "ask", "ask-answer",
             "panel-open", "panel-close", "panel-state", "session-mode", "setup", "relaunch-with-debug", "pw", "cdp", "browser-events", "errors", "logpoint", "net", "net-body", "har", "net-route", "net-unroute", "net-block", "net-headers", "net-auth", "ws-route", "net-cache", "security", "csp", "emulate", "clock", "permissions", "context-new", "context-list", "context-close", "tab-new", "tab-activate", "page-history", "print", "storage", "storage-state", "downloads", "dialogs", "drop", "input", "aria-snap", "webauthn", "extension", "webmcp", "perf", "memory", "audits", "sw", "screencast", "share-browser", "optional-install", "optional-uninstall", "optional-list", "audit", "bridge",
             "capture-scenario",
             "capture-steps",

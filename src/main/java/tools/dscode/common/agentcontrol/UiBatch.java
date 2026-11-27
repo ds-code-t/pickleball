@@ -238,6 +238,9 @@ final class UiBatch {
             long wakeSeen = tools.dscode.common.agentfast.PushWake.generation();
             Map<String, String> eventArgs = new LinkedHashMap<>();
             eventArgs.put("after", after);
+            if (args.get("session") != null && !args.get("session").isBlank()) {
+                eventArgs.put("session", args.get("session"));
+            }
             AgentControl.Result events;
             try {
                 events = AgentControl.dispatch(project, runId, "overlay-poll", eventArgs, List.of(), agentId);

@@ -18,7 +18,7 @@ final class AgentHop {
             "html-write", "html-replace", "html-insert", "html-remove", "html-cleanup",
             "popup-open", "popup-status", "popup-close",
             "panel-open", "panel-close", "panel-state", "session-mode",
-            "guide", "guide-next", "guide-back", "guide-done", "ask",
+            "guide", "guide-next", "guide-back", "guide-done", "ask", "ask-answer",
             "ui-apply", "ui-poll", "ui-catalog", "ui-verify",
             "capture-scenario", "capture-steps", "record", "screenshot", "selftest",
             "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame", "upload", "navigate",

@@ -1061,6 +1061,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentcontrol/NoReinjectTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/OverlayFixtures.java`
 - `src/test/java/tools/dscode/common/agentcontrol/OverlayPollCursorTest.java`
+- `src/test/java/tools/dscode/common/agentcontrol/OverlayReceiptAskTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/OverlayRuntimeLiveTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/PersonFeedbackTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/ScriptQualityTest.java`
