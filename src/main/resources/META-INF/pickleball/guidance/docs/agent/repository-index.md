@@ -1343,6 +1343,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/store/usage/LookupProbe.java`
 - `src/test/java/tools/dscode/store/WarmGlueCompilePathTest.java`
 - `src/test/java/tools/dscode/store/WarmGlueScenarioTest.java`
+- `src/test/java/tools/dscode/store/WarmWorkerReloadTest.java`
 - `src/test/java/tools/dscode/testengine/CucumberNameFilterTest.java`
 - `src/test/java/tools/dscode/testengine/CucumberPluginPublishTest.java`
 - `src/test/java/tools/dscode/testengine/DriverDownloadRedactionTest.java`
