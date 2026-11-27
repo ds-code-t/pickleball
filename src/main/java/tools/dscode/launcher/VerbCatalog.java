@@ -211,7 +211,7 @@ public final class VerbCatalog {
         add(rows, "lease release", "workbench", AGENT);
         add(rows, "input block", "workbench", AGENT);
         add(rows, "ui page", "workbench", AGENT);
-        add(rows, "spine", "workbench", SPINE);
+        rows.put("spine", new Row("spine", "workbench", "cli", SPINE));
         add(rows, "spine sample", "workbench", SPINE);
         add(rows, "spine start", "workbench", SPINE);
         add(rows, "spine stop", "workbench", SPINE);

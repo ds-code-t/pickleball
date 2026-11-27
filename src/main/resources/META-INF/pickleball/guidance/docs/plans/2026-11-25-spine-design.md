@@ -187,7 +187,7 @@ Each roadmap lands on its own. Later roadmaps call earlier entry points. They do
 7. **R7** freezes runs into `runstate.db`, adds the report/script file, retention, the cross-cutting store, the find index, and the session journal.
 8. **R8** adds the warm classloader, the resource gate, the browser version ladder, the Selenium Safari leaf, the warm CDP pool, and the UIA cache. Full regression runs once, at the end of R8, on Windows only.
 
-Linux and macOS test gaps stay in `docs/tech-debt.md`. That section is the one item this program does not execute. New Windows-only classes are appended there when a phase adds them. The eight step-engine entries and the nineteen consumer-fixes 6.x entries stay described in `docs/tech-debt.md` until the phase that changes the behavior rewrites that paragraph in place. The index maps every one of them to a phase. None stay unscheduled.
+Linux and macOS test gaps stay on the maintainer tech-debt page, which is not part of the consumer guidance export. That section is the one item this program does not execute. New Windows-only classes are appended there when a phase adds them. The eight step-engine entries and the nineteen consumer-fixes 6.x entries stay described on that same maintainer page until the phase that changes the behavior rewrites that paragraph in place. The index maps every one of them to a phase. None stay unscheduled.
 
 ## CLI-first and logging
 

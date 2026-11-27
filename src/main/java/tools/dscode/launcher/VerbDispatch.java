@@ -83,8 +83,11 @@ public final class VerbDispatch {
         if ("domengine".equals(family)) return PickleballWorkbenchLauncher.runDomEngine(argv, stdout, stderr);
         if ("dashboard".equals(family)) return tools.dscode.store.dashboard.DashboardCli.execute(argv, stdout, stderr);
         if ("cross".equals(family)) return CrossStore.execute(argv, stdout, stderr);
-        if ("spine".equals(family)) return SpineCli.execute(argv, stdout, stderr);
-        if ("bidi".equals(family)) return tools.dscode.browser.SeleniumBidiCommands.execute(argv, stdout, stderr);
+        if ("spine".equals(family)) {
+            if (spineSessionCommand(argv)) return WorkbenchAgentCommands.run(argv, stdout, stderr);
+            return SpineCli.execute(argv, stdout, stderr);
+        }
+        if ("bidi".equals(family)) return BidiSessionForward.run(project, argv, stdout, stderr);
         if ("browser".equals(family)) return tools.dscode.browser.BrowserPorts.execute(argv, stdout, stderr);
         if ("log".equals(family) || "log-tail".equals(family)) {
             return tools.dscode.common.composite.DomLogCli.execute(argv, stdout, stderr);
@@ -223,6 +226,17 @@ public final class VerbDispatch {
             }
         }
         return null;
+    }
+
+    /** The first positional after {@code spine} is {@code session}. Warm verbs stay on {@link SpineCli}. */
+    private static boolean spineSessionCommand(String[] argv) {
+        if (argv == null || argv.length < 2 || argv[0] == null || !"spine".equals(argv[0].trim())) return false;
+        for (int index = 1; index < argv.length; index++) {
+            String token = argv[index];
+            if (token == null || token.isBlank() || token.startsWith("--")) continue;
+            return "session".equals(token);
+        }
+        return false;
     }
 
     /** {@code spine session new} is the call that creates the session this gate requires. */

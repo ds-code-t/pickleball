@@ -34,6 +34,20 @@ public final class RowFeatureSupplier {
     private RowFeatureSupplier() {
     }
 
+    /**
+     * Store rows apply when Store is on and at least one requested URI is inside
+     * the store project (or the request is empty). A file URI outside that project
+     * is not a row, so the caller keeps the file loader.
+     */
+    public static boolean usesStore(List<URI> paths) {
+        if (!StoreConfig.enabled()) return false;
+        if (paths == null || paths.isEmpty()) return true;
+        for (URI uri : paths) {
+            if (uri != null && !StoreFeatureSource.keys(uri).isEmpty()) return true;
+        }
+        return false;
+    }
+
     public static List<Feature> load(List<URI> paths) {
         try {
             StoreRuntime.beforeFeatureLoad();

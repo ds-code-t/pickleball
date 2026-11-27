@@ -1291,6 +1291,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/AskIdTest.java`
 - `src/test/java/tools/dscode/launcher/AutoSnapshotTest.java`
 - `src/test/java/tools/dscode/launcher/BackendHandoffLiveTest.java`
+- `src/test/java/tools/dscode/launcher/BidiSessionGateTest.java`
 - `src/test/java/tools/dscode/launcher/BrowserAttachTest.java`
 - `src/test/java/tools/dscode/launcher/BrowserEventsBidiLiveTest.java`
 - `src/test/java/tools/dscode/launcher/BrowserEventsLiveTest.java`
@@ -1342,6 +1343,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/InputLiveTest.java`
 - `src/test/java/tools/dscode/launcher/JsFallbackHonestyTest.java`
 - `src/test/java/tools/dscode/launcher/JsStepRunTest.java`
+- `src/test/java/tools/dscode/launcher/LauncherCli.java`
 - `src/test/java/tools/dscode/launcher/LeaseAndBlockTest.java`
 - `src/test/java/tools/dscode/launcher/LeaseGateTest.java`
 - `src/test/java/tools/dscode/launcher/MaskQuietTest.java`
@@ -1387,6 +1389,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/ShortIdPlacementTest.java`
 - `src/test/java/tools/dscode/launcher/SnapBudgetTest.java`
 - `src/test/java/tools/dscode/launcher/SnapshotDiffOnActTest.java`
+- `src/test/java/tools/dscode/launcher/SpineCommandCoverageTest.java`
+- `src/test/java/tools/dscode/launcher/SpineHelpMergeTest.java`
+- `src/test/java/tools/dscode/launcher/SpineRouteCliTest.java`
 - `src/test/java/tools/dscode/launcher/StartDrivesPageTest.java`
 - `src/test/java/tools/dscode/launcher/StartHealthMessageTest.java`
 - `src/test/java/tools/dscode/launcher/StartLaunchesBrowserTest.java`

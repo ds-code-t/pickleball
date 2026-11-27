@@ -17,7 +17,7 @@ retrieval: query runs | query get | query query | query search | query props | q
 controller: sync worker-check live-check ui mcp session
 dashboard: dashboard [--project=<dir>] [--out=<file>] | dashboard query | dashboard xref | dashboard overlap
 engine: engine help | engine run | engine step | engine inventory [--json]
-spine: spine start [--project=<dir>] | spine stop | spine warm status | spine sample [--json]
+spine: spine session new|show|end [--session=<id>] [--agent=<id>] | spine start [--project=<dir>] | spine stop | spine warm status | spine sample [--json]
 bidi: bidi script [--source=<javascript>] | bidi intercept (--url=<pattern> | --all) [--body=<text>] [--status=<code>] | bidi intercept off --id=<id> | bidi grid-attach --url=<remote>
 browser: browser ports
 args: @<file> or --args-file=<file> is a JSON object of flags. An explicit flag wins. Unknown keys fail.
@@ -231,7 +231,7 @@ retrieval: query runs | query get | query query | query search | query props | q
 controller: sync worker-check live-check ui mcp session
 dashboard: dashboard [--project=<dir>] [--out=<file>] | dashboard query | dashboard xref | dashboard overlap
 engine: engine help | engine run | engine step | engine inventory [--json]
-spine: spine start [--project=<dir>] | spine stop | spine warm status | spine sample [--json]
+spine: spine session new|show|end [--session=<id>] [--agent=<id>] | spine start [--project=<dir>] | spine stop | spine warm status | spine sample [--json]
 bidi: bidi script [--source=<javascript>] | bidi intercept (--url=<pattern> | --all) [--body=<text>] [--status=<code>] | bidi intercept off --id=<id> | bidi grid-attach --url=<remote>
 browser: browser ports
 args: @<file> or --args-file=<file> is a JSON object of flags. An explicit flag wins. Unknown keys fail.

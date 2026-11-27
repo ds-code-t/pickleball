@@ -237,8 +237,12 @@ public final class PickleballWorkbenchLauncher {
     }
 
     /**
-     * Warm spine process. Returns {@code -1} when {@code args} are not a {@code spine} invocation.
-     * Dispatched before {@code cross} and {@code store}.
+     * Spine verbs. Returns {@code -1} when {@code args} are not a {@code spine} invocation.
+     * Dispatched before {@code bidi}, {@code cross}, and {@code store}.
+     * {@link VerbDispatch} sends {@code spine session} to {@link WorkbenchAgentCommands}
+     * and every other spine verb to {@link SpineCli}, after the session gate.
+     * {@code spine session new} stays exempt. This method does not call {@link SpineCli#execute}
+     * itself, because that would skip the gate.
      */
     static int dispatchSpineIfAny(String[] args, PrintStream out, PrintStream err) {
         if (!SpineCli.handles(args)) return -1;
@@ -247,12 +251,13 @@ public final class PickleballWorkbenchLauncher {
 
     /**
      * Selenium BiDi verbs. Returns {@code -1} when {@code args} are not a {@code bidi} invocation.
-     * {@code script} and {@code intercept} hop to the JVM that holds the driver.
-     * {@code grid-attach} and help stay in this process.
+     * The session gate in {@link VerbDispatch} runs first. {@code script} and {@code intercept}
+     * then hop to the JVM that holds the driver. {@code grid-attach} stays in this process.
+     * {@code bidi help} uses that same session rule.
      */
     static int dispatchBidiIfAny(String[] args, PrintStream out, PrintStream err) {
         if (args == null || args.length == 0 || args[0] == null || !"bidi".equals(args[0].trim())) return -1;
-        return BidiSessionForward.run(Path.of("").toAbsolutePath().normalize(), args, out, err);
+        return VerbDispatch.run("bidi", VerbArgs.capture(args), out, err);
     }
 
     /** Debug-port list. Returns {@code -1} when {@code args} are not a {@code browser} invocation. */

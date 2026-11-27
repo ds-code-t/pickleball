@@ -46,4 +46,24 @@ class UiPageDispatchTest {
                 Files.isRegularFile(project.resolve(".pickleball").resolve("workbench-ui").resolve("host.json")),
                 "ui page started the renderer");
     }
+
+    @Test
+    void launcherOrdersSpineThenBidiThenGenericDispatch() throws Exception {
+        String source = Files.readString(
+                Path.of("src/main/java/tools/dscode/launcher/PickleballWorkbenchLauncher.java"),
+                StandardCharsets.UTF_8);
+        int main = source.indexOf("public static void main");
+        int next = source.indexOf("static int dispatchEngineIfAny", main);
+        String body = source.substring(main, next);
+        int spine = body.indexOf("dispatchSpineIfAny");
+        int bidi = body.indexOf("dispatchBidiIfAny");
+        int generic = body.lastIndexOf("dispatch(args)");
+        assertTrue(spine >= 0 && bidi > spine && generic > bidi, body);
+        assertTrue(PickleballWorkbenchLauncher.controllerUiWithoutOps(
+                "ui", new String[] {"ui"}));
+        assertFalse(PickleballWorkbenchLauncher.controllerUiWithoutOps(
+                "ui", new String[] {"ui", "page"}));
+        assertFalse(PickleballWorkbenchLauncher.controllerUiWithoutOps(
+                "ui", new String[] {"ui", "--ops"}));
+    }
 }

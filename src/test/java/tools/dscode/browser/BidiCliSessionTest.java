@@ -136,6 +136,9 @@ class BidiCliSessionTest {
                 "127.0.0.1", port, "token-test", ProcessHandle.current().pid(), "bidi-cli"
         ));
 
+        Capture session = cli("spine", "session", "new");
+        assertEquals(0, session.code, session.out + session.err);
+
         Capture ran = cli("bidi", "script", "--source=" + post(origin, "script-ran"));
         assertEquals(0, ran.code, ran.out + ran.err);
         assertEquals(List.of("script-ran"), List.copyOf(proofs), ran.out + ran.err);

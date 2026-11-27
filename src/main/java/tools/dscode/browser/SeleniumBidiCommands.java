@@ -132,6 +132,9 @@ public final class SeleniumBidiCommands {
                        bidi intercept (--url=<pattern> | --all) [--body=<text>] [--status=<code>]
                        bidi intercept off --id=<id>
                        bidi grid-attach --url=<remote>
+                bidi script, bidi intercept, and bidi grid-attach need --session or the default session.
+                bidi help uses that same rule. A missing session exits 2.
+                fix: spine session new
                 Off unless pkb_selenium_bidi=on or browser.selenium.bidi: on.
                 Events stay onConsoleEntry, onJavaScriptException, onBeforeRequestSent, onResponseCompleted, and onFetchError.
                 """;
