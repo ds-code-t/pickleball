@@ -28,17 +28,18 @@ public final class UiLease {
         String id = safe(SpineSession.required(project, sessionId));
         String useTarget = target(target, id);
         String name = holder == null || holder.isBlank() ? SpineSession.DEFAULT_AGENT : holder.trim();
-        Path file = file(project, id, useTarget);
-        if (Files.isRegularFile(file)) {
+        String blocking = blocking(project, id, useTarget);
+        if (blocking != null) {
             throw new IllegalArgumentException(
-                    "error: another holder already has the " + useTarget + " lease (" + holderOf(file, name) + ")\n"
-                            + "fix: lease release --target=" + useTarget + " --session=" + id);
+                    "error: another holder already has the " + blocking + " lease ("
+                            + holderOf(file(project, id, blocking), name) + ")\n"
+                            + "fix: lease release --target=" + blocking + " --session=" + id);
         }
         ObjectNode node = JSON.createObjectNode();
         node.put("holder", name);
         node.put("target", useTarget);
         node.put("session", id);
-        write(file, node);
+        write(file(project, id, useTarget), node);
     }
 
     public static void release(Path project, String sessionId, String target) throws IOException {
@@ -51,6 +52,21 @@ public final class UiLease {
                             + "fix: lease take --target=ui|browser|both --session=" + id);
         }
         Files.deleteIfExists(file);
+    }
+
+    /**
+     * {@code both} overlaps {@code ui} and {@code browser}. {@code ui} does not overlap {@code browser}.
+     * The same target still overlaps itself, including a second take by the same holder.
+     */
+    private static String blocking(Path project, String session, String target) {
+        if (Files.isRegularFile(file(project, session, target))) return target;
+        if ("both".equals(target)) {
+            if (Files.isRegularFile(file(project, session, "ui"))) return "ui";
+            if (Files.isRegularFile(file(project, session, "browser"))) return "browser";
+            return null;
+        }
+        if (Files.isRegularFile(file(project, session, "both"))) return "both";
+        return null;
     }
 
     private static String target(String raw, String session) {

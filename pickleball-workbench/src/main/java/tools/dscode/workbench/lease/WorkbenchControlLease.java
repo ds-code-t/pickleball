@@ -1,5 +1,9 @@
 package tools.dscode.workbench.lease;
 
+import java.io.IOException;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -16,6 +20,7 @@ import java.util.function.Consumer;
 public final class WorkbenchControlLease {
     private static final long PERMISSION_WAIT_NS = TimeUnit.MINUTES.toNanos(30);
 
+    private final Path project;
     private final ReentrantLock lock = new ReentrantLock();
     private final Condition permissionAnswered = lock.newCondition();
     private final List<Consumer<WorkbenchControlLeaseSnapshot>> listeners = new CopyOnWriteArrayList<>();
@@ -26,6 +31,14 @@ public final class WorkbenchControlLease {
     private boolean uiAttached;
     private WorkbenchPermissionRequest pendingPermission;
     private WorkbenchPermissionDecision pendingDecision;
+
+    public WorkbenchControlLease() {
+        this(null);
+    }
+
+    public WorkbenchControlLease(Path project) {
+        this.project = project == null ? null : project.toAbsolutePath().normalize();
+    }
 
     public void addListener(Consumer<WorkbenchControlLeaseSnapshot> listener) {
         listeners.add(Objects.requireNonNull(listener, "listener"));
@@ -151,6 +164,29 @@ public final class WorkbenchControlLease {
             requireHolderLocked(caller);
         } finally {
             lock.unlock();
+        }
+        if (caller == WorkbenchLeaseHolder.HUMAN) refuseWhileSpineLeaseHeld();
+    }
+
+    /**
+     * A spine {@code ui} or {@code both} file means an agent holds that control.
+     * The human cannot mutate until {@code lease release}.
+     */
+    private void refuseWhileSpineLeaseHeld() {
+        if (project == null) return;
+        Path leases = project.resolve(".pickleball").resolve("workbench-ui").resolve("leases");
+        if (!Files.isDirectory(leases)) return;
+        try (DirectoryStream<Path> sessions = Files.newDirectoryStream(leases)) {
+            for (Path session : sessions) {
+                if (!Files.isDirectory(session)) continue;
+                if (Files.isRegularFile(session.resolve("ui.json")) || Files.isRegularFile(session.resolve("both.json"))) {
+                    throw new IllegalStateException(
+                            "error: the ui lease is held by another agent\n"
+                                    + "fix: lease release --target=ui --session=" + session.getFileName());
+                }
+            }
+        } catch (IOException failure) {
+            // An unreadable lease directory does not invent a holder.
         }
     }
 

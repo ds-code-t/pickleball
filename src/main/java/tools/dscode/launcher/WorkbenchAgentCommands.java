@@ -438,9 +438,9 @@ public final class WorkbenchAgentCommands {
             String id = tools.dscode.common.agentcontrol.SpineSession.required(parsed.project(), session);
             String agent = holder(parsed);
             if ("take".equals(action)) {
-                tools.dscode.common.agentcontrol.UiLease.take(parsed.project(), id, target, agent);
+                LeaseHold.takeControl(parsed.project(), id, target, agent);
             } else {
-                tools.dscode.common.agentcontrol.UiLease.release(parsed.project(), id, target);
+                LeaseHold.releaseControl(parsed.project(), id, target);
             }
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("ok", true);
@@ -492,6 +492,7 @@ public final class WorkbenchAgentCommands {
         try {
             String session = flag(parsed, "--session");
             String id = tools.dscode.common.agentcontrol.SpineSession.required(parsed.project(), session);
+            LeaseHold.require(parsed.project(), id, "ui", holder(parsed));
             String pageName = parsed.name();
             if (pageName == null || pageName.isBlank()) pageName = flag(parsed, "--name");
             if (pageName == null || pageName.isBlank() || pageName.indexOf('/') >= 0 || pageName.indexOf('\\') >= 0 || pageName.contains("..")) {

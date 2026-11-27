@@ -56,7 +56,7 @@ public final class WorkbenchController implements WorkbenchServices {
         this.live = new WorkbenchLiveSession(this.projectRoot, workerSystemProperties == null ? Map.of() : workerSystemProperties);
         this.player = LiveScenarioPlayer.interactiveBuffer();
         this.playback = new LivePlaybackCoordinator(this.player);
-        this.lease = new WorkbenchControlLease();
+        this.lease = new WorkbenchControlLease(this.projectRoot);
         this.diagnostics = new DiagnosticEvidenceNavigator(this.projectRoot);
     }
 

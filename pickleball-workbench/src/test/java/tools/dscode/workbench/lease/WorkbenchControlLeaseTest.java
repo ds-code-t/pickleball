@@ -1,7 +1,10 @@
 package tools.dscode.workbench.lease;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -123,6 +126,21 @@ class WorkbenchControlLeaseTest {
         );
         assertEquals(WorkbenchPermissionDecision.ALLOW, decision);
         assertFalse(lease.snapshot().uiAttached());
+    }
+
+    @Test
+    void spineUiFileRefusesTheHuman(@TempDir Path project) throws Exception {
+        Path session = project.resolve(".pickleball").resolve("workbench-ui").resolve("leases").resolve("s1");
+        Files.createDirectories(session);
+        Files.writeString(
+                session.resolve("ui.json"),
+                "{\"holder\":\"agent-1\",\"target\":\"ui\",\"session\":\"s1\"}\n",
+                StandardCharsets.UTF_8);
+        WorkbenchControlLease held = new WorkbenchControlLease(project);
+        IllegalStateException denied = assertThrows(IllegalStateException.class, held::requireMutatingAccess);
+        assertTrue(denied.getMessage().contains("error:"));
+        assertTrue(denied.getMessage().contains("fix:"));
+        assertTrue(denied.getMessage().contains("s1"));
     }
 
     private static void waitUntil(java.util.function.BooleanSupplier condition, long timeoutMs)

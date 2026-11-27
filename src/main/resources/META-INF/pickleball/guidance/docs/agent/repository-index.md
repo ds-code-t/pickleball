@@ -1136,6 +1136,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/JsFallbackHonestyTest.java`
 - `src/test/java/tools/dscode/launcher/JsStepRunTest.java`
 - `src/test/java/tools/dscode/launcher/LeaseAndBlockTest.java`
+- `src/test/java/tools/dscode/launcher/LeaseGateTest.java`
 - `src/test/java/tools/dscode/launcher/MaskQuietTest.java`
 - `src/test/java/tools/dscode/launcher/McpDirectHotPathTest.java`
 - `src/test/java/tools/dscode/launcher/MonitorLiveTest.java`
