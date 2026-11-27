@@ -75,3 +75,16 @@ The `typescript` npm package is pinned in `workbench-ui/package.json` and packed
 - Session rule scope for help/version/export-guidance (Dan, 2026-11-26). Exempt: `engine help`, `domengine version`, family help (`store`, `engine`, `domengine`, `dashboard`, `cross`, `spine`, `bidi`, `browser`, `log`, `log-tail`, including `<family> help`, `help <family>`, and `--help` or `-h`), and plain `export-guidance`. The allow-list is `VerbDispatch.SESSION_EXEMPT`. `export-guidance --warm` still needs a session because it starts the controller. `export-guidance <dir>` still treats the output folder as the project for the warm path, so that path is refused until `spine session new` has written a session there.
 - Revisit the session-rule exemption for help/version/export-guidance. Check later whether exempting those commands was right.
 
+## Spine R6 fix-back 1 (open)
+
+- Discard on exit sends two synchronous `XMLHttpRequest`s from `pagehide` (`store delta list`, then `store branch discard`). Current browsers block synchronous XHR during page dismissal, so an empty fork is never discarded.
+- Fork, map show and set, promote, and the branch tree are proven only by grepping `workbench-ui/pages/index.html`. A real browser has not driven those controls through the Node renderer and the `/store` bridge.
+
+## Spine R6 follow-ups (open, 2026-11-27)
+
+- Help printing: `EngineCli`, `SpineCli`, `BrowserPorts`, and `SeleniumBidiCommands` print help when any argument is exactly `help`, `--help`, or `-h`, so for example `engine step --text=x help` prints help instead of running. The `VerbDispatch` session gate itself stays exact.
+- Promote flatten: `HeadMaterializer.flatten` in `CowSandbox.promote` now also changes R1 `store sandbox promote`, which flattens the destination head immediately instead of leaving it to a later materialization.
+- The `store branch` and `engine map` verbs are tested in-JVM through `VerbDispatch`, not in a separate CLI JVM (`PickleballWorkbenchLauncher` main).
+- No end-to-end `engine run --sandbox=<fork>` test of the pre-step hook; `PreStepHookTest` binds the fork with `StoreScope.bind` and calls `NativeScenarioRun` directly.
+- The page only offers `store branch link ... --off`; there is no `--on` control.
+
