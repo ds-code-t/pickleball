@@ -16,10 +16,10 @@ First-run rows are filled when that command finishes. Final-run rows are the gre
 |---|---|---:|---:|---:|---:|---|---|---|
 | `.\gradlew.bat :test --console=plain` | first | 2096 | 1986 | 103 | 7 | 1h 27m 50s | 4383ed02e | 2026-11-27T08:00Z–09:24Z |
 | `.\gradlew.bat :test --console=plain` | final | 2116 | 2109 | 0 | 7 | 1h 30m 53s | 1309439a7 | 2026-11-27T21:54:02Z–23:24:30Z |
-| `.\gradlew.bat :dom-engine:test --console=plain` | first | | | | | | | |
-| `.\gradlew.bat :dom-engine:test --console=plain` | final | | | | | | | |
-| `.\gradlew.bat :pickleball-workbench:test --console=plain` | first | | | | | | | |
-| `.\gradlew.bat :pickleball-workbench:test --console=plain` | final | | | | | | | |
+| `.\gradlew.bat :dom-engine:test --console=plain` | first | 260 | 248 | 0 | 12 | 1m 1s | 4630c638f | 2026-11-27T23:26:19Z–23:27:14Z |
+| `.\gradlew.bat :dom-engine:test --console=plain` | final | 260 | 248 | 0 | 12 | 1m 1s | 4630c638f | 2026-11-27T23:26:19Z–23:27:14Z |
+| `.\gradlew.bat :pickleball-workbench:test --console=plain` | first | 295 | 294 | 1 | 0 | 27s | 4630c638f | before 2026-11-27T23:30:38Z |
+| `.\gradlew.bat :pickleball-workbench:test --console=plain` | final | 295 | 295 | 0 | 0 | 33s | 2995b98fa | 2026-11-27T23:32:19Z–23:32:44Z |
 | `.\gradlew.bat :pickleball-control-protocol:test --console=plain` | first | | | | | | | |
 | `.\gradlew.bat :pickleball-control-protocol:test --console=plain` | final | | | | | | | |
 | `.\gradlew.bat :pickleball-control-api:test --console=plain` | first | | | | | | | |
@@ -54,6 +54,23 @@ Root `:test` skips (7), same on the first run and the final run, all pre-existin
 | `DesktopSameVerbTest` | 1 | `AT-SPI tree has no named window for a process id` (live attach returned a tree with no pid and name) |
 | `WorkbenchShellQuotingTest` | 1 | `pwsh is not on PATH` |
 
+`:dom-engine:test` skips (12), all pre-existing assumptions:
+
+| Class | Count | Reason |
+|---|---:|---|
+| `DesktopXPathAccelTest` | 1 | `no desktop driver is running on this machine` |
+| `GridDriversTest` | 1 | `no FlaUI.WebDriver, NovaWindows, WinAppDriver, or Mac2 driver is running` |
+| `LiveDesktopSnapshotTest` | 1 | `no AT-SPI bus` |
+| `LiveDesktopTest` | 1 | `no AT-SPI bus` |
+| `MacAccessibilityScriptTest` | 1 | `osacompile exists only on macOS` |
+| `WaylandDetectionTest` | 1 | `the attach path refusal is Linux only` |
+| `OnnxOcrRuntimeTest` | 1 | `live OCR skipped: set PKB_OCR_LIVE_DIR` |
+| `ChromeProcessTest` | 3 | `/bin/sh is missing` |
+| `LiveEdgeSnapshotTest` | 1 | `microsoft-edge is not on PATH` |
+| `SnapshotCoverageTest` | 1 | `microsoft-edge is not on PATH` |
+
+The workbench final row used `--rerun-tasks` so Gradle executed the tests on commit `2995b98fa`. The plain command on that commit was `UP-TO-DATE` and `BUILD SUCCESSFUL` in 5s. No workbench tests were skipped.
+
 ## Failures and fixes
 
 | Test or scenario | Error | Root cause | Fix SHA | Reproducing test | Before | After |
@@ -69,6 +86,7 @@ Root `:test` skips (7), same on the first run and the final run, all pre-existin
 | ScenarioObjectHookTest | run id `warm-first` is already finished | in-process `WorkbenchDirectRun` left `pkb_run_id` set | a1c51714f | WorkbenchWarmFallbackTest.inProcessRunRestoresThePreviousRunId; ScenarioObjectHookTest | fail | pass (same 10-test batch, 2026-11-27) |
 | StoreSandboxPruneTest | `store run --sandbox=linbox` exit 1, no scenario lines | a cow child stores no parent file bytes, and the run read only the child | a1c51714f | StoreSandboxPruneTest | fail | pass (focused with WarmWorkerReloadTest, BUILD SUCCESSFUL, 1m 2s, 2026-11-27) |
 | WarmWorkerReloadTest | second mark stayed `1` after a classpath prepend, and the first run was undefined before that | `.pickleball/spine/classes` on the worker application classpath pinned `glue.Mark`; the warm loader was not used for `StepRegistry.bind` | a1c51714f | WarmWorkerReloadTest | fail | pass (same focused run, 1m 2s, 2026-11-27) |
+| WorkbenchMcpRetrievalTest.everyToolDescriptionIsOneShortLine | `workbench_browser_page` description length 175; later `ui` length 164. `expected: <true> but was: <false>`. Module: 295 completed, 1 failed, BUILD FAILED in 27s | Each description gets ` Tier: <tier>.` appended, and the check allows 160 characters on one line. Eight blurbs were already over that cap | 2995b98fa | WorkbenchMcpRetrievalTest.everyToolDescriptionIsOneShortLine | fail (head 4630c638f) | pass (class XML 2026-11-27T23:30:38.673Z, 2 tests, 0 failures, 0.19s). Module on 2995b98fa: 295 tests, 0 failures, 0 skipped, BUILD SUCCESSFUL in 33s |
 | SuiteDualRunTest.consumerFeaturesMatch and serviceCallExecutionMatches on 7380c4407 | adapter FAILED, native PASSED. `consumerFeaturesMatch`: 8 features diverged. `serviceCallExecutionMatches`: 366 divergences. Full `:test` on that head: 2116 completed, 2 failed, 7 skipped, 1h 30m 52s | A jar-hash hydrate at suite start ran before the test created `src/test/resources/calls`, wiped leftover call rows, and stored 0 files because this repo has no default hydrate directory. The adapter then missed the call library | 2e032ba68 | SuiteDualRunTest.serviceCallExecutionMatches and consumerFeaturesMatch call `hydrateCallLibrary` after the link | fail (head 7380c4407) | pass (class XML start 2026-11-27T20:45:35.181Z, 12 tests, 0 failures, 3866.224s; serviceCallExecutionMatches 23.085s; consumerFeaturesMatch 3586.704s; BUILD SUCCESSFUL in 1h 4m 42s). Full `:test` on 1309439a7: 2116 tests, 0 failures, 7 skipped |
 
 ## Sweep
