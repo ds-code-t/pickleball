@@ -133,6 +133,19 @@ public final class HumanLock {
     /** Mouse and keyboard block for one spine session. A clean session ({@code inject=off}) is refused by the CLI. */
     public static void blockInput(Path project, String sessionId, boolean on) throws IOException {
         SpineSession.setInputBlocked(project, sessionId, on);
+        PageSurfaces.applyInputBlock(project, sessionId, on, on ? "human" : "");
+    }
+
+    /** Lets the agent protocol input pass the page shield. The human has no caller for this. */
+    public static void passAgentInput(Path project, String sessionId) {
+        if (!inputBlocked(project, sessionId)) return;
+        PageSurfaces.applyInputBlock(project, sessionId, true, "agent");
+    }
+
+    /** Puts the human shield back after one agent input. */
+    public static void restoreInputBlock(Path project, String sessionId) {
+        if (!inputBlocked(project, sessionId)) return;
+        PageSurfaces.applyInputBlock(project, sessionId, true, "human");
     }
 
     public static boolean inputBlocked(Path project, String sessionId) {

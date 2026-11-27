@@ -92,9 +92,16 @@ final class InputCommands {
 
     static ObjectNode input(ProtoHost host, Map<String, String> f) throws Exception {
         String session = f == null ? null : f.get("session");
-        if (HumanLock.inputBlocked(host.project(), session)) {
-            throw new IllegalArgumentException("error: mouse and keyboard input is blocked\nfix: input block --off");
+        boolean blocked = HumanLock.inputBlocked(host.project(), session);
+        if (blocked) HumanLock.passAgentInput(host.project(), session);
+        try {
+            return dispatchInput(host, f);
+        } finally {
+            if (blocked) HumanLock.restoreInputBlock(host.project(), session);
         }
+    }
+
+    private static ObjectNode dispatchInput(ProtoHost host, Map<String, String> f) throws Exception {
         if (oneInsertText(f)) {
             CdpSession.Target target = ContextCommands.target(host, f);
             host.cdp().send(target.sessionId, "Input.insertText", insertTextParams(f.get("text")));

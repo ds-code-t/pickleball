@@ -3603,10 +3603,58 @@
     return {ok: true, id: id, layer: id};
   }
 
+  var INPUT_BLOCK_TYPES = ['keydown', 'keyup', 'keypress', 'mousedown', 'mouseup', 'click', 'pointerdown', 'wheel'];
+
+  function inputBlockedEvent(event) {
+    if (actingSource() === 'agent') return;
+    var leaf = event.target;
+    if (leaf && leaf.closest && leaf.closest('[data-pkb-ui],[data-pkb-layer]') && !leaf.closest('[data-pkb-input-block]')) return;
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  function inputBlock(spec) {
+    spec = spec || {};
+    var on = spec.on !== false && spec.on !== 'false';
+    var pass = spec.pass === 'agent';
+    var root = document.documentElement || document.body;
+    if (!root) return {ok: false, on: false};
+    var shield = document.querySelector('[data-pkb-input-block]');
+    if (!on) {
+      if (shield && shield.parentNode) shield.parentNode.removeChild(shield);
+      if (window.__pkbInputBlock) {
+        for (var i = 0; i < INPUT_BLOCK_TYPES.length; i++) window.removeEventListener(INPUT_BLOCK_TYPES[i], window.__pkbInputBlock, true);
+        window.__pkbInputBlock = null;
+      }
+      return {ok: true, on: false};
+    }
+    if (!shield) {
+      shield = document.createElement('div');
+      shield.setAttribute('data-pkb-input-block', 'human');
+      shield.setAttribute('data-pkb-meta', 'true');
+      shield.setAttribute('tabindex', '0');
+      shield.style.cssText = 'position:fixed;inset:0;z-index:2147483646;background:transparent;pointer-events:auto;';
+      root.appendChild(shield);
+    }
+    if (!window.__pkbInputBlock) {
+      window.__pkbInputBlock = inputBlockedEvent;
+      for (var n = 0; n < INPUT_BLOCK_TYPES.length; n++) window.addEventListener(INPUT_BLOCK_TYPES[n], window.__pkbInputBlock, true);
+    }
+    if (pass) {
+      shield.style.setProperty('pointer-events', 'none', 'important');
+      root.setAttribute('data-pkb-agent-acting', String(Date.now() + 1500));
+    } else {
+      shield.style.setProperty('pointer-events', 'auto', 'important');
+      root.removeAttribute('data-pkb-agent-acting');
+    }
+    return {ok: true, on: true, pass: pass ? 'agent' : 'human'};
+  }
+
   window.__pkbUi = {
     version: VERSION,
     agentLayer: agentLayer,
     agentMark: agentMark,
+    inputBlock: inputBlock,
     track: track,
     untrack: untrack,
     prune: prune,

@@ -1650,6 +1650,26 @@ final class PageSurfaces {
      * The driver key is {@link System#identityHashCode(Object)}, and the runtime bytes go through
      * {@link RuntimeInstall}.
      */
+    /**
+     * Installs or removes the human mouse and keyboard shield on every managed page.
+     * {@code pass=agent} drops the shield for one agent protocol input.
+     */
+    public static void applyInputBlock(Path project, String session, boolean on, String pass) {
+        injectProject = project;
+        if (session != null && !session.isBlank()) injectSession = session;
+        Map<String, Object> spec = new LinkedHashMap<>();
+        spec.put("on", on);
+        if (pass != null && !pass.isBlank()) spec.put("pass", pass);
+        for (Managed page : managed()) {
+            try {
+                driver = page.driver;
+                runtimeCall("inputBlock", spec, true);
+            } catch (RuntimeException failure) {
+                BrowserLog.warnOnce("input-block", "input block skipped: " + failure.getMessage());
+            }
+        }
+    }
+
     public static void applyInject(Path project, String session, String agent, boolean on) {
         injectProject = project;
         injectSession = session == null ? "" : session;
@@ -1727,6 +1747,12 @@ final class PageSurfaces {
                 try (DirectoryStream<Path> files = Files.newDirectoryStream(sessions, "*.json")) {
                     for (Path file : files) {
                         JsonNode node = AgentStore.JSON.readTree(Files.readString(file));
+                        if (node.path("inputBlocked").asBoolean(false)) {
+                            Map<String, Object> block = new LinkedHashMap<>();
+                            block.put("on", true);
+                            block.put("pass", "human");
+                            invoke(web, "inputBlock", block);
+                        }
                         if (!node.path("inject").asBoolean(false)) continue;
                         JsonNode agents = node.path("agents");
                         if (!agents.isObject()) continue;
