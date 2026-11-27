@@ -53,7 +53,7 @@ public final class AgentSurfaceRouter {
         PopupLog.log(project, runId, "route", runId, name + " target=" + decision.target + " reason=" + decision.reason);
         if ("page".equals(decision.target)) return Optional.empty();
         try {
-            if ("native".equals(decision.target)) return Optional.of(nativeHighlight(project, runId, name, values));
+            if ("native".equals(decision.target)) return Optional.of(nativeHighlight(project, runId, name, values, agentId));
             return Optional.of(popup(project, runId, name, values, agentId, decision));
         } catch (IllegalArgumentException failure) {
             throw failure;
@@ -200,7 +200,7 @@ public final class AgentSurfaceRouter {
         return "";
     }
 
-    private static AgentControl.Result nativeHighlight(Path project, String runId, String op, Map<String, String> args) throws Exception {
+    private static AgentControl.Result nativeHighlight(Path project, String runId, String op, Map<String, String> args, String agentId) throws Exception {
         if ("unhighlight".equals(op) || "overlay-remove".equals(op) || VisualKinds.removal(op)) {
             String fallback = VisualKinds.removal(op) ? NativeVisual.defaultId(VisualKinds.kind(op)) : "native";
             String id = text(args.get("id"), args.get("handle"), fallback);
@@ -210,34 +210,39 @@ public final class AgentSurfaceRouter {
             body.put("ok", true);
             body.put("target", "native");
             body.put("op", op);
-            return nativeResult(body, args);
+            return nativeResult(body, args, agentId);
         }
         if ("overlay".equals(op)) {
             Map<String, Object> body = NativeOverlay.show(project, runId, args);
             body.put("ok", true);
             body.put("target", "native");
             body.put("op", op);
-            return nativeResult(body, args);
+            return nativeResult(body, args, agentId);
         }
         if (VisualKinds.command(op)) {
             Map<String, Object> body = NativeVisual.show(project, runId, VisualKinds.kind(op), args);
             body.put("ok", true);
             body.put("target", "native");
             body.put("op", op);
-            return nativeResult(body, args);
+            return nativeResult(body, args, agentId);
         }
         Map<String, Object> body = NativeHighlight.show(project, runId, args);
         body.put("ok", true);
         body.put("target", "native");
         body.put("op", op);
-        return nativeResult(body, args);
+        return nativeResult(body, args, agentId);
     }
 
-    /** Blank {@code --mutate} is the sibling overlay. {@code dom} stays the direct highlight path. */
-    private static AgentControl.Result nativeResult(Map<String, Object> body, Map<String, String> args) {
+    /** Blank {@code --mutate} draws in the sibling overlay. {@code dom} mutates the node. */
+    private static AgentControl.Result nativeResult(Map<String, Object> body, Map<String, String> args, String agentId) {
         String mutate = args == null ? null : args.get("mutate");
         if (mutate == null || mutate.isBlank()) mutate = "sibling";
-        body.put("mutate", mutate.trim());
+        mutate = mutate.trim();
+        body.put("mutate", mutate);
+        if ("highlight".equals(String.valueOf(body.get("op")))) {
+            String handle = args == null ? "" : text(args.get("handle"), args.get("id"));
+            tools.dscode.common.agentcontrol.AgentControl.drawHighlight(mutate, agentId, handle);
+        }
         return new AgentControl.Result(0, body);
     }
 

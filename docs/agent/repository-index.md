@@ -1053,6 +1053,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentcontrol/ForgetLeavesPanelTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/HumanValueTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/IframeRecordingTest.java`
+- `src/test/java/tools/dscode/common/agentcontrol/InjectLivePageTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/InjectSessionTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/IsolatedWorldTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/LiveChromeCdpTest.java`

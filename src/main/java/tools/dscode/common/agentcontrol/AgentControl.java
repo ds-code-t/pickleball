@@ -137,6 +137,11 @@ public final class AgentControl {
         EventCursor.arm(project, runId, null);
     }
 
+    /** Sibling overlay or direct DOM highlight. Blank mutate is the sibling layer. */
+    public static void drawHighlight(String mutate, String agent, String handle) {
+        PageSurfaces.drawHighlight(mutate, agent, handle);
+    }
+
     public static Result execute(
             Path project,
             String runId,

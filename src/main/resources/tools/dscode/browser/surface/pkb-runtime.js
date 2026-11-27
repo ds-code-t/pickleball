@@ -3574,8 +3574,39 @@
   reattachPops();
   if (window.__pkbRecord === true) armSense();
 
+  function agentLayer(spec) {
+    spec = spec || {};
+    var id = String(spec.id || 'agent-1');
+    var on = spec.on !== false && spec.on !== 'false';
+    var root = document.documentElement || document.body;
+    if (!root) return {ok: false, id: id};
+    var existing = document.querySelector('[data-pkb-agent="' + id.replace(/"/g, '') + '"][data-pkb-layer]');
+    if (!on) {
+      if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+      return {ok: true, id: id, on: false};
+    }
+    if (!existing) {
+      existing = document.createElement('div');
+      existing.setAttribute('data-pkb-agent', id);
+      existing.setAttribute('data-pkb-layer', id);
+      existing.setAttribute('data-pkb-meta', 'true');
+      existing.setAttribute('data-pkb-purpose', 'layer');
+      root.appendChild(existing);
+    }
+    return {ok: true, id: id, on: true};
+  }
+
+  function agentMark(spec) {
+    spec = spec || {};
+    var id = String(spec.id || 'agent-1');
+    agentLayer({id: id, on: true});
+    return {ok: true, id: id, layer: id};
+  }
+
   window.__pkbUi = {
     version: VERSION,
+    agentLayer: agentLayer,
+    agentMark: agentMark,
     track: track,
     untrack: untrack,
     prune: prune,

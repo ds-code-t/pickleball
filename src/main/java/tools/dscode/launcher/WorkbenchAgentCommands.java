@@ -376,7 +376,8 @@ public final class WorkbenchAgentCommands {
                 return 2;
             }
             String session = flag(parsed, "--session");
-            tools.dscode.common.agentcontrol.SpineSession.setInject(parsed.project(), session, "on".equals(mode));
+            boolean enabled = "on".equals(mode);
+            tools.dscode.common.agentcontrol.SpineSession.setInject(parsed.project(), session, enabled, holder(parsed));
             Map<String, Object> body = tools.dscode.common.agentcontrol.SpineSession.envelope(
                     parsed.project(), session, agentIdOf(parsed), "inject");
             out.println(JSON.writeValueAsString(body));

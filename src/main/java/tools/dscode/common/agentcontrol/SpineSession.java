@@ -121,6 +121,10 @@ public final class SpineSession {
     }
 
     public static void setInject(Path project, String sessionId, boolean on) throws IOException {
+        setInject(project, sessionId, on, DEFAULT_AGENT);
+    }
+
+    public static void setInject(Path project, String sessionId, boolean on, String agent) throws IOException {
         String id = require(project, sessionId);
         ObjectNode node = loadRequired(project, id);
         node.put("inject", on);
@@ -132,6 +136,7 @@ public final class SpineSession {
             clearTargets(node);
         }
         write(project, id, node);
+        PageSurfaces.applyInject(project, id, agent, on);
         BrowserLog.info("facade", (on ? "inject on " : "inject off ") + id);
     }
 
@@ -146,11 +151,12 @@ public final class SpineSession {
         String name = target == null || target.isBlank() ? "fixture" : target.trim();
         ObjectNode targets = targets(node);
         ObjectNode row = targets.putObject(name);
-        int key = name.hashCode();
+        org.openqa.selenium.WebDriver web = PageSurfaces.liveDriver();
+        int key = web == null ? 0 : System.identityHashCode(web);
         row.put("key", key);
         row.put("injected", on);
-        if (on) RuntimeInstall.consume(key);
-        else RuntimeInstall.forget(key);
+        if (web != null && on) PageSurfaces.installRuntime(web);
+        else if (key != 0) RuntimeInstall.forget(key);
         write(project, id, node);
     }
 

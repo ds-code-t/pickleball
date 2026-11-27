@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -1624,6 +1625,7 @@ final class PageSurfaces {
                 RuntimeInstall.forget(key);
                 function = isolatedFunction(key, true);
                 value = facade.evaluateIsolated("pkb-surface", function, json);
+                replayStored(web);
             }
             return value == null ? null : String.valueOf(value);
         }
@@ -1635,8 +1637,140 @@ final class PageSurfaces {
             executor.executeScript(RUNTIME);
             RuntimeInstall.consume(key);
             value = executor.executeScript("var raw = arguments[0];" + RUNTIME_CALL, json);
+            replayStored(web);
         }
         return value == null ? null : String.valueOf(value);
+    }
+
+    private static volatile Path injectProject;
+    private static volatile String injectSession = "";
+
+    /**
+     * Installs or removes the sibling overlay layer on every managed page for this session.
+     * The driver key is {@link System#identityHashCode(Object)}, and the runtime bytes go through
+     * {@link RuntimeInstall}.
+     */
+    public static void applyInject(Path project, String session, String agent, boolean on) {
+        injectProject = project;
+        injectSession = session == null ? "" : session;
+        String id = agent == null || agent.isBlank() ? SpineSession.DEFAULT_AGENT : agent.trim();
+        for (Managed page : managed()) {
+            try {
+                driver = page.driver;
+                Map<String, Object> spec = new LinkedHashMap<>();
+                spec.put("id", id);
+                spec.put("on", on);
+                runtimeCall("agentLayer", spec, on);
+            } catch (RuntimeException failure) {
+                BrowserLog.warnOnce("inject-page", "inject skipped: " + failure.getMessage());
+            }
+        }
+    }
+
+    /** Sends {@code pkb-runtime.js} once for this driver. A second call omits the bytes. */
+    public static void installRuntime(WebDriver web) {
+        if (!(web instanceof JavascriptExecutor executor)) return;
+        int key = System.identityHashCode(web);
+        try {
+            if (direct(web) != null) {
+                runtimeCall("agentLayer", Map.of("id", SpineSession.DEFAULT_AGENT, "on", true), true);
+                return;
+            }
+            if (RuntimeInstall.consume(key)) executor.executeScript(RUNTIME);
+        } catch (RuntimeException failure) {
+            RuntimeInstall.forget(key);
+            BrowserLog.warnOnce("inject-page", "runtime skipped: " + failure.getMessage());
+        }
+    }
+
+    /** {@code dom} mutates the node. Any other mode draws in the agent overlay layer. */
+    public static void drawHighlight(String mutate, String agent, String handle) {
+        if (!hasLivePage()) return;
+        WebDriver web = liveDriver();
+        if (!(web instanceof JavascriptExecutor executor)) return;
+        String mode = mutate == null || mutate.isBlank() ? "sibling" : mutate.trim();
+        String layer = agent == null || agent.isBlank() ? SpineSession.DEFAULT_AGENT : agent.trim();
+        try {
+            if ("dom".equals(mode)) {
+                executor.executeScript(
+                        "var id=arguments[0];"
+                                + "var node=document.getElementById(id);"
+                                + "if(node){node.setAttribute('data-pkb-dom','highlight');}"
+                                + "return 'dom';",
+                        handle == null ? "" : handle);
+                return;
+            }
+            executor.executeScript(
+                    "var id=arguments[0];"
+                            + "var host=document.documentElement||document.body;"
+                            + "if(!host) return 'no-root';"
+                            + "var layer=document.createElement('div');"
+                            + "layer.setAttribute('data-pkb-layer', id);"
+                            + "layer.setAttribute('data-pkb-agent', id);"
+                            + "layer.setAttribute('data-pkb-meta','true');"
+                            + "host.appendChild(layer);"
+                            + "return id;",
+                    layer);
+            runtimeCall("agentMark", Map.of("id", layer, "handle", handle == null ? "" : handle), true);
+        } catch (RuntimeException failure) {
+            BrowserLog.warnOnce("inject-page", "highlight skipped: " + failure.getMessage());
+        }
+    }
+
+    /** A new document re-reads the session, the UiState file, and the chat log, then sends them again. */
+    private static void replayStored(WebDriver web) {
+        Path project = injectProject;
+        if (project == null || web == null) return;
+        try {
+            Path sessions = project.resolve(".pickleball").resolve("workbench-ui").resolve("sessions");
+            if (Files.isDirectory(sessions)) {
+                try (DirectoryStream<Path> files = Files.newDirectoryStream(sessions, "*.json")) {
+                    for (Path file : files) {
+                        JsonNode node = AgentStore.JSON.readTree(Files.readString(file));
+                        if (!node.path("inject").asBoolean(false)) continue;
+                        JsonNode agents = node.path("agents");
+                        if (!agents.isObject()) continue;
+                        java.util.Iterator<String> names = agents.fieldNames();
+                        while (names.hasNext()) {
+                            String name = names.next();
+                            Map<String, Object> spec = new LinkedHashMap<>();
+                            spec.put("id", name);
+                            spec.put("on", true);
+                            invoke(web, "agentLayer", spec);
+                        }
+                    }
+                }
+            }
+            Path uiState = project.resolve(".pickleball").resolve("workbench-ui").resolve("ui-state.json");
+            if (Files.isRegularFile(uiState)) {
+                invoke(web, "restoreWhenReady", AgentStore.JSON.readTree(Files.readString(uiState)));
+            }
+            if (injectSession != null && !injectSession.isBlank()) {
+                for (ChatLog.Message message : ChatLog.history(project, injectSession, injectSession, 20)) {
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("text", message.text());
+                    row.put("agent", message.agent());
+                    invoke(web, "chat", List.of(row));
+                }
+            }
+        } catch (Exception failure) {
+            BrowserLog.warnOnce("inject-replay", "replay skipped: " + failure.getMessage());
+        }
+    }
+
+    private static void invoke(WebDriver web, String method, Object argument) throws IOException {
+        Map<String, Object> call = new LinkedHashMap<>();
+        call.put("m", method);
+        call.put("a", argument);
+        String json = AgentStore.JSON.writeValueAsString(call);
+        BrowserFacade facade = directPage(web);
+        if (facade != null) {
+            facade.evaluateIsolated("pkb-surface", "function(raw){" + RUNTIME_CALL + "}", json);
+            return;
+        }
+        if (web instanceof JavascriptExecutor executor) {
+            executor.executeScript("var raw = arguments[0];" + RUNTIME_CALL, json);
+        }
     }
 
     /** Second call for the same driver omits {@code pkb-runtime.js}. Tests read this source. */
