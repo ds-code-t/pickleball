@@ -210,7 +210,7 @@ Known open follow-ups, not passes: `docs/tech-debt.md` sections `Spine merge fol
 | A cow child with no file row did not supply parent bytes to a run. List and show already included the parent feature. `StoreQuery.file` and `StoreFeatureSource.bytesFor` now read that parent file unless the child deleted the path. | `AGENTS.md`, `docs/configuration.md`, `docs/release-notes.md`, `docs/agent/feature-map.md` | a1c51714f |
 | Warm glue reload was described only as putting `.pickleball/spine/classes` on the warm loader. That directory stays off the store worker application classpath. `StepRegistry` loads the class through `JavaStepHost.selectLoader` when `pkb_warm=on`. | `AGENTS.md`, `docs/configuration.md`, `docs/release-notes.md`, `docs/agent/feature-map.md` | a1c51714f |
 | An in-process `WorkbenchDirectRun` left `pkb_` system properties set after the launch. The launch snapshots `pkb_` and `cucumber.` properties and restores them when it returns. | `AGENTS.md`, `docs/configuration.md`, `docs/release-notes.md` | a1c51714f |
-| The merge scoreboard still described the session-rule follow-up as awaiting Dan. R6 recorded the allow-list in `docs/tech-debt.md`. | `docs/maintainer/3.0.0-spine/merge-r8-scoreboard.md` | this commit |
+| The merge scoreboard still described the session-rule follow-up as awaiting Dan. R6 recorded the allow-list in `docs/tech-debt.md`. | `docs/maintainer/3.0.0-spine/merge-r8-scoreboard.md` | 0a0929a2e |
 
 ## Environment and flake log
 
