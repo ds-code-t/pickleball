@@ -3,6 +3,7 @@ package tools.dscode.control.protocol;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.io.TempDir;
+import dev.domengine.session.BrowserSession;
 import dev.domengine.session.ChromeProcess;
 import tools.dscode.testsupport.PortableProcess;
 
@@ -185,6 +186,14 @@ class DirectControlProviderTest {
         assertTrue(failure.getMessage().contains("no DevTools"));
         Path shortLog = PickleballLocalLayout.root(temp).resolve("agent-log");
         assertFalse(Files.isRegularFile(shortLog) && Files.readString(shortLog).contains("\tstart\t"));
+    }
+
+    @Test
+    void chromeLookupAgreesWithTheSharedFinder() throws Exception {
+        String shared = BrowserSession.findChrome();
+        if (shared != null && !shared.isBlank()) {
+            assertTrue(chromeBinary().isPresent(), "protocol lookup missed " + shared);
+        }
     }
 
     @Test
@@ -434,6 +443,11 @@ class DirectControlProviderTest {
     }
 
     private static Optional<Path> chromeBinary() throws IOException {
+        String shared = BrowserSession.findChrome();
+        if (shared != null && !shared.isBlank()) {
+            Path found = Path.of(shared);
+            if (Files.isRegularFile(found)) return Optional.of(found);
+        }
         List<Path> candidates = new ArrayList<>();
         for (String variable : List.of("CHROME_BIN", "DOMENGINE_CHROME")) {
             String named = System.getenv(variable);
