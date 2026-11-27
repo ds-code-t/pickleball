@@ -160,6 +160,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-roadmap-7-scoreboard.md`
 - `docs/maintainer/3.0.0-roadmap-8-scoreboard.md`
 - `docs/maintainer/3.0.0-snapshot-coverage-audit.md`
+- `docs/maintainer/3.0.0-spine/merge-r8-scoreboard.md`
 - `docs/maintainer/3.0.0-spine/R1-scoreboard.md`
 - `docs/maintainer/3.0.0-spine/R2-scoreboard.md`
 - `docs/maintainer/3.0.0-spine/R3-scoreboard.md`
