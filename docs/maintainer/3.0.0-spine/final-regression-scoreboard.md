@@ -20,10 +20,10 @@ First-run rows are filled when that command finishes. Final-run rows are the gre
 | `.\gradlew.bat :dom-engine:test --console=plain` | final | 260 | 248 | 0 | 12 | 1m 1s | 4630c638f | 2026-11-27T23:26:19Z–23:27:14Z |
 | `.\gradlew.bat :pickleball-workbench:test --console=plain` | first | 295 | 294 | 1 | 0 | 27s | 4630c638f | before 2026-11-27T23:30:38Z |
 | `.\gradlew.bat :pickleball-workbench:test --console=plain` | final | 295 | 295 | 0 | 0 | 33s | 2995b98fa | 2026-11-27T23:32:19Z–23:32:44Z |
-| `.\gradlew.bat :pickleball-control-protocol:test --console=plain` | first | | | | | | | |
-| `.\gradlew.bat :pickleball-control-protocol:test --console=plain` | final | | | | | | | |
-| `.\gradlew.bat :pickleball-control-api:test --console=plain` | first | | | | | | | |
-| `.\gradlew.bat :pickleball-control-api:test --console=plain` | final | | | | | | | |
+| `.\gradlew.bat :pickleball-control-protocol:test --console=plain` | first | 122 | 121 | 0 | 1 | 9s | 334f2dba8 | 2026-11-27T23:33:23Z–23:33:26Z |
+| `.\gradlew.bat :pickleball-control-protocol:test --console=plain` | final | 123 | 123 | 0 | 0 | 15s | 3684931ed | 2026-11-27T23:40:08Z–23:40:13Z |
+| `.\gradlew.bat :pickleball-control-api:test --console=plain` | first | 31 | 31 | 0 | 0 | 17s | 334f2dba8 | 2026-11-27T23:34:22Z–23:34:25Z |
+| `.\gradlew.bat :pickleball-control-api:test --console=plain` | final | 31 | 31 | 0 | 0 | 17s | 334f2dba8 | 2026-11-27T23:34:22Z–23:34:25Z |
 | `.\gradlew.bat publishToMavenLocal` | first | n/a | n/a | n/a | n/a | | | |
 | `.\gradlew.bat publishToMavenLocal` | final | n/a | n/a | n/a | n/a | | | |
 | `mvnw @all` | first | | | | | | | |
@@ -71,6 +71,14 @@ Root `:test` skips (7), same on the first run and the final run, all pre-existin
 
 The workbench final row used `--rerun-tasks` so Gradle executed the tests on commit `2995b98fa`. The plain command on that commit was `UP-TO-DATE` and `BUILD SUCCESSFUL` in 5s. No workbench tests were skipped.
 
+`:pickleball-control-protocol:test` first-run skip (1), fixed before the final row:
+
+| Class | Count | Reason |
+|---|---:|---|
+| `DirectControlProviderTest` | 1 | `realCompositeAttachesQueriesAndCloseLeavesChromeRunning` aborted with `skipped: Chrome is not present`. `chromeBinary()` split `PATH` on `:` and looked for Unix names, so it missed `C:\Program Files\Google\Chrome\Application\chrome.exe`. |
+
+The final protocol row used `--rerun-tasks` so Gradle executed the tests on commit `3684931ed` (123 tests, 0 failures, 0 skipped). The plain command on that commit was `UP-TO-DATE` and `BUILD SUCCESSFUL` in 4s. No protocol tests were skipped. `:pickleball-control-api:test` had no skips. That module's sources are unchanged by `3684931ed`.
+
 ## Failures and fixes
 
 | Test or scenario | Error | Root cause | Fix SHA | Reproducing test | Before | After |
@@ -88,6 +96,7 @@ The workbench final row used `--rerun-tasks` so Gradle executed the tests on com
 | WarmWorkerReloadTest | second mark stayed `1` after a classpath prepend, and the first run was undefined before that | `.pickleball/spine/classes` on the worker application classpath pinned `glue.Mark`; the warm loader was not used for `StepRegistry.bind` | a1c51714f | WarmWorkerReloadTest | fail | pass (same focused run, 1m 2s, 2026-11-27) |
 | WorkbenchMcpRetrievalTest.everyToolDescriptionIsOneShortLine | `workbench_browser_page` description length 175; later `ui` length 164. `expected: <true> but was: <false>`. Module: 295 completed, 1 failed, BUILD FAILED in 27s | Each description gets ` Tier: <tier>.` appended, and the check allows 160 characters on one line. Eight blurbs were already over that cap | 2995b98fa | WorkbenchMcpRetrievalTest.everyToolDescriptionIsOneShortLine | fail (head 4630c638f) | pass (class XML 2026-11-27T23:30:38.673Z, 2 tests, 0 failures, 0.19s). Module on 2995b98fa: 295 tests, 0 failures, 0 skipped, BUILD SUCCESSFUL in 33s |
 | SuiteDualRunTest.consumerFeaturesMatch and serviceCallExecutionMatches on 7380c4407 | adapter FAILED, native PASSED. `consumerFeaturesMatch`: 8 features diverged. `serviceCallExecutionMatches`: 366 divergences. Full `:test` on that head: 2116 completed, 2 failed, 7 skipped, 1h 30m 52s | A jar-hash hydrate at suite start ran before the test created `src/test/resources/calls`, wiped leftover call rows, and stored 0 files because this repo has no default hydrate directory. The adapter then missed the call library | 2e032ba68 | SuiteDualRunTest.serviceCallExecutionMatches and consumerFeaturesMatch call `hydrateCallLibrary` after the link | fail (head 7380c4407) | pass (class XML start 2026-11-27T20:45:35.181Z, 12 tests, 0 failures, 3866.224s; serviceCallExecutionMatches 23.085s; consumerFeaturesMatch 3586.704s; BUILD SUCCESSFUL in 1h 4m 42s). Full `:test` on 1309439a7: 2116 tests, 0 failures, 7 skipped |
+| DirectControlProviderTest.realCompositeAttachesQueriesAndCloseLeavesChromeRunning | first protocol run skipped it: `Assumption failed: skipped: Chrome is not present`. `chromeLookupAgreesWithTheSharedFinder` then failed: `protocol lookup missed C:\Program Files\Google\Chrome\Application\chrome.exe` | `chromeBinary()` split `PATH` on `:` and looked for Unix chrome names. It never checked the Windows install path that `BrowserSession.findChrome()` uses | 3684931ed | DirectControlProviderTest.chromeLookupAgreesWithTheSharedFinder; DirectControlProviderTest.realCompositeAttachesQueriesAndCloseLeavesChromeRunning | skip on 334f2dba8; lookup test fail before the fix | pass (module XML 2026-11-27T23:40:08Z–23:40:13Z, 123 tests, 0 failures, 0 skipped). The live method took 3.1s in the class run and is not skipped in the module XML |
 
 ## Sweep
 
