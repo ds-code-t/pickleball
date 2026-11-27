@@ -233,23 +233,38 @@ public final class WorkbenchSessionCommands {
         return process;
     }
 
+    /**
+     * Starts the Node renderer in a detached pickleball JVM. That process writes
+     * {@code attach.json} and stays up. The controller {@code ui} command only
+     * prints a line, so it is not the window.
+     */
     static Process startUi(Path project, String runId, String agentId) throws IOException {
-        Path controllerJar = PickleballWorkbenchLauncher.extractEmbeddedPayload(project);
-        List<String> forwarded = new ArrayList<>();
-        forwarded.add("ui");
-        forwarded.add(project.toString());
-        if (runId != null && !runId.isBlank()) {
-            forwarded.add("--run-id");
-            forwarded.add(runId);
+        Path state = PickleballLocalLayout.workbenchStateRoot(project);
+        Files.createDirectories(state);
+        Path argFile = state.resolve("renderer.args");
+        String classpath = System.getProperty("java.class.path", "");
+        if (classpath.isBlank()) {
+            throw new IOException("error: the pickleball classpath is empty\nfix: open-window --run-id");
         }
-        if (agentId != null && !agentId.isBlank()) {
-            forwarded.add("--agent-id");
-            forwarded.add(agentId);
-        }
-        Path logFile = PickleballLocalLayout.workbenchStateRoot(project).resolve("window.log");
-        return startDetached(project, PickleballWorkbenchLauncher.command(
-                controllerJar, forwarded.toArray(String[]::new)
-        ), logFile);
+        StringBuilder text = new StringBuilder();
+        text.append("-cp\n");
+        text.append(quoteArg(classpath)).append('\n');
+        text.append("tools.dscode.launcher.WorkbenchRendererHost\n");
+        text.append(quoteArg(project.toAbsolutePath().normalize().toString())).append('\n');
+        if (runId != null && !runId.isBlank()) text.append(quoteArg("--run-id=" + runId)).append('\n');
+        if (agentId != null && !agentId.isBlank()) text.append(quoteArg("--agent-id=" + agentId)).append('\n');
+        Files.writeString(argFile, text.toString(), StandardCharsets.UTF_8);
+        List<String> command = new ArrayList<>();
+        command.add(PickleballWorkbenchLauncher.javaExecutable().toString());
+        command.add("@" + argFile.toAbsolutePath().normalize());
+        Path logFile = state.resolve("window.log");
+        return startDetached(project, command, logFile);
+    }
+
+    /** One argument-file token. Slashes avoid treating {@code \} as an escape. */
+    private static String quoteArg(String value) {
+        String slashed = value == null ? "" : value.replace('\\', '/');
+        return "\"" + slashed.replace("\"", "\\\"") + "\"";
     }
 
     private static int openWindow(
@@ -382,8 +397,9 @@ public final class WorkbenchSessionCommands {
     }
 
     /**
-     * A healthy {@code cli-session} already is the controller. {@code open-ui}
-     * starts the window in that JVM. Any other answer falls back to {@code ui}.
+     * A healthy {@code cli-session} already is the controller. {@code playback=OPENING}
+     * means that JVM is opening the window. {@code playback=NODE} means the window
+     * is the Node renderer, which {@link #startUi} starts in this process.
      */
     static boolean sharesController(SessionState session) {
         return session != null
@@ -407,7 +423,9 @@ public final class WorkbenchSessionCommands {
             for (int attempt = 0; attempt < 8; attempt++) {
                 JsonNode view = getJson(http, cli.get(), "/commands/" + id);
                 JsonNode result = view == null ? null : view.get("result");
-                if ("OPENING".equals(textOr(result, "playback", ""))) return true;
+                String playback = textOr(result, "playback", "");
+                if ("NODE".equals(playback)) return false;
+                if ("OPENING".equals(playback)) return true;
                 String status = textOr(view, "status", "");
                 if ("FAILED".equals(status) || "SUCCESS".equals(status)) return false;
                 sleep(Duration.ofMillis(50));

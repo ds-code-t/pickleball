@@ -857,6 +857,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/launcher/WorkbenchElementInspect.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchLaunchTiming.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchOneShotLaunch.java`
+- `src/main/java/tools/dscode/launcher/WorkbenchRendererHost.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchRunReports.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchRuntimeLibs.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchSessionCommands.java`
@@ -1312,6 +1313,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/OffsetFrameClickTest.java`
 - `src/test/java/tools/dscode/launcher/OneCallActTest.java`
 - `src/test/java/tools/dscode/launcher/OopifAutoAttachTest.java`
+- `src/test/java/tools/dscode/launcher/OpenWindowRendererTest.java`
 - `src/test/java/tools/dscode/launcher/OptInSetupTest.java`
 - `src/test/java/tools/dscode/launcher/OptionalAddonsLiveTest.java`
 - `src/test/java/tools/dscode/launcher/OverlapTest.java`
