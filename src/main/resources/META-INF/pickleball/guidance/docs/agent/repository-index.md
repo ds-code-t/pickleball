@@ -646,6 +646,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/engine/runtime/ResourceGate.java`
 - `src/main/java/tools/dscode/engine/runtime/SnapshotChannel.java`
 - `src/main/java/tools/dscode/engine/runtime/SnapshotContextWorker.java`
+- `src/main/java/tools/dscode/engine/runtime/SnapshotScenario.java`
 - `src/main/java/tools/dscode/engine/runtime/StepFlags.java`
 - `src/main/java/tools/dscode/engine/runtime/StepRows.java`
 - `src/main/java/tools/dscode/engine/runtime/StepWatchdog.java`
@@ -1086,6 +1087,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/engine/runtime/StepCeilingTest.java`
 - `src/test/java/tools/dscode/engine/runtime/StepWatchdogTest.java`
 - `src/test/java/tools/dscode/engine/runtime/SubprocessProbe.java`
+- `src/test/java/tools/dscode/engine/runtime/SubprocessScenarioProbe.java`
+- `src/test/java/tools/dscode/engine/runtime/SubprocessScenarioTest.java`
 - `src/test/java/tools/dscode/engine/runtime/SubprocessStepTest.java`
 - `src/test/java/tools/dscode/engine/runtime/VisualTargetTest.java`
 - `src/test/java/tools/dscode/engine/runtime/WarmClassLoaderTest.java`
