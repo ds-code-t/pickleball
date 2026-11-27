@@ -176,7 +176,7 @@ final class WorkbenchMcpTools {
                 )),
                 args -> services.events(longValue(args, "afterSequence"), integer(args, "limit")));
         add("workbench_browser_page",
-                "Compact snap of the live start host or isolate worker. Same rows as snap. Pass session to choose that id. A live session does not need a separate paused worker.",
+                "Compact snap of the live start host or isolate worker. Same rows as snap. Pass session to choose that id.",
                 schema(Map.of(
                         "target", stringProperty("browser:auto, a ref, or a short id. Default browser:auto."),
                         "session", stringProperty("Session id from start or isolate. Omit to use the current live session."),
@@ -196,7 +196,7 @@ final class WorkbenchMcpTools {
                 });
         add("workbench_browser_screenshot", "Capture the current browser screenshot. Prefer workbench_browser_page unless the image is required.", schema(Map.of()),
                 args -> services.browserScreenshot());
-        add("workbench_element_inspect", "Inspect with a Pickleball category or one engine query (css=, xpath=, text=, image=, near=, below=, above=, left-of=, right-of=, >> stages, AND/OR/NOT).",
+        add("workbench_element_inspect", "Inspect with a category or one engine query (css=, xpath=, text=, image=, near=, below=, above=, left-of=, right-of=, >>, AND/OR/NOT).",
                 schema(Map.of(
                         "category", stringProperty("Optional Pickleball element category. Omit when query is set."),
                         "text", stringProperty("Optional visible/context text for a category."),
@@ -390,7 +390,7 @@ final class WorkbenchMcpTools {
                     return services.go(Map.of());
                 });
         add("workbench_agent_command",
-                "Forward one agent command (observe, launch, chat, overlay, panel, guide, ask, ui-apply, html, capture) to the shared controller. Page UI: see ui_catalog.",
+                "Forward one agent command (observe, launch, chat, overlay, panel, guide, ask, ui-apply, html, capture) to the shared controller.",
                 schema(Map.of(
                         "op", stringProperty("Agent command name."),
                         "args", Map.of(
@@ -507,7 +507,7 @@ final class WorkbenchMcpTools {
                 )),
                 args -> forwardReady(dashboardQueryArgs(args)));
         add("workbench_dashboard_xref",
-                "Forward dashboard xref for one element: runs, paths, logs, screenshots, overlaps, summary, overlay, and chat. window writes HTML. Does not write the store.",
+                "Forward dashboard xref for one element: runs, paths, logs, screenshots, overlaps, summary, overlay, and chat. Does not write the store.",
                 schema(Map.of(
                         "id", stringProperty("Short id or element id. Optional."),
                         "selector", stringProperty("Selector hint. Optional."),
@@ -518,7 +518,7 @@ final class WorkbenchMcpTools {
                 )),
                 args -> forwardReady(dashboardXrefArgs(args)));
         add("workbench_dashboard_overlap",
-                "Forward dashboard overlap. Groups of runs whose times overlap, and the failure text shared by at least two runs in a group. Does not write the store.",
+                "Forward dashboard overlap: runs whose times overlap, and failure text shared by two runs. Does not write the store.",
                 schema(Map.of(
                         "from", stringProperty("ISO start. Optional."),
                         "to", stringProperty("ISO end. Optional."),
@@ -566,7 +566,7 @@ final class WorkbenchMcpTools {
                 schema(view),
                 args -> viewCommand("navigate", args));
         add("workbench_pw",
-                "Forward pw: one Playwright step (area and action, e.g. route fulfill, trace start, screenshot, emulate) or steps on one connection. Attaches over CDP to the live or named browser; never launches or downloads one.",
+                "Forward pw: one Playwright step (area and action) or steps on one connection. Attaches over CDP and does not launch or download a browser.",
                 schema(Map.of(
                         "area", stringProperty("page, context, storage, route, har, wait, locator, trace, video, screenshot, download, upload, dialog, emulate, tabs, frames, keyboard, mouse, or run."),
                         "action", stringProperty("The area's action, e.g. list, fulfill, start, press."),
@@ -584,7 +584,7 @@ final class WorkbenchMcpTools {
                 ), "method"),
                 args -> forwardReady(pwArgs("cdp", args)));
         add("workbench_browser_events",
-                "Forward browser-events: read the unified browser event stream (net, console, error, nav, dialog, ...) with a seq cursor; --start, --follow, --stop. Control tier.",
+                "Forward browser-events: unified stream (net, console, error, nav, dialog) with a seq cursor. Flags: --start, --follow, --stop.",
                 schema(Map.of(
                         "flags", stringProperty("Space-separated --name=value flags for browser-events; see help browser-events."),
                         "target", stringProperty("browser:cdp=<ws>. Omit for the live browser.")

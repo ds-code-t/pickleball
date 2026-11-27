@@ -23,7 +23,7 @@ public final class WorkbenchUiTools implements McpCommandContributor {
     @Override
     public void contribute(Sink sink) {
         sink.register("ui",
-                "Show page UI in one call: callouts, labels, panel, numbered guides that advance as the person acts, questions. Options: ui_catalog. Results: ui_poll.",
+                "Show page UI in one call: callouts, labels, panel, guides, and questions. Options: ui_catalog. Results: ui_poll.",
                 uiSchema(), arguments -> forward("ui-apply", arguments));
         sink.register("ui_poll",
                 "Wait for what the person did: step, guide, answer and click events plus chat, merged. Pass next as after and chatNext as chatAfter.",
