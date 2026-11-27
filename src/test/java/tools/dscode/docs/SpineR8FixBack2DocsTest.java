@@ -28,13 +28,13 @@ class SpineR8FixBack2DocsTest {
         assertTrue(configuration.contains("bidi intercept off --id="), configuration);
         assertTrue(configuration.contains("read back from that cache"), configuration);
         assertTrue(configuration.contains("window not found"), configuration);
-        assertTrue(configuration.contains("releases the claim on quit or close"), configuration);
+        assertTrue(configuration.contains("releases the claim on quit"), configuration);
 
         assertTrue(agents.contains("java @argfile"), agents);
         assertTrue(agents.contains("source-hashes.txt"), agents);
         assertTrue(agents.contains("stopped the warm JVM"), agents);
         assertTrue(agents.contains("bidi intercept off --id="), agents);
-        assertTrue(agents.contains("releases the claim on quit or close"), agents);
+        assertTrue(agents.contains("releases the claim on quit"), agents);
 
         assertTrue(playwright.contains("bidi intercept off --id="), playwright);
         assertTrue(playwright.contains("read back from that cache"), playwright);
