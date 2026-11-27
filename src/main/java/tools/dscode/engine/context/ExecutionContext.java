@@ -10,11 +10,16 @@ import tools.dscode.engine.model.EngineStep;
 import tools.dscode.engine.runtime.ResourceGate;
 import tools.dscode.engine.runtime.SnapshotChannel;
 import tools.dscode.engine.runtime.SnapshotContextWorker;
+import tools.dscode.engine.match.ForeignStepHosts;
 import tools.dscode.engine.runtime.WarmClassLoader;
 import tools.dscode.engine.runtime.WarmFlags;
 import tools.dscode.engine.runtime.WarmPackages;
 import tools.dscode.engine.runtime.WarmSpine;
+import tools.dscode.store.StoreGlueCompiler;
 
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
@@ -77,7 +82,7 @@ public final class ExecutionContext implements AutoCloseable {
         if (WarmFlags.enabled()) {
             Process child = admit(id);
             if (child == null) {
-                this.warmLoader = WarmSpine.shared().loader(id, new java.net.URL[0], WarmPackages.resolve(null));
+                this.warmLoader = WarmSpine.shared().loader(id, warmClassUrls(), WarmPackages.resolve(null));
             } else {
                 this.subprocess = child;
             }
@@ -88,6 +93,19 @@ public final class ExecutionContext implements AutoCloseable {
 
     public static ExecutionContext open(EngineScenario scenario) {
         return new ExecutionContext(scenario);
+    }
+
+    /** Classes directory the scenario JVM compiled into, when that directory exists. */
+    private static URL[] warmClassUrls() {
+        Path project = ForeignStepHosts.project();
+        if (project == null) project = Path.of("").toAbsolutePath().normalize();
+        Path classes = StoreGlueCompiler.warmClasses(project);
+        if (!Files.isDirectory(classes)) return new URL[0];
+        try {
+            return new URL[] {classes.toUri().toURL()};
+        } catch (MalformedURLException failure) {
+            return new URL[0];
+        }
     }
 
     public static ExecutionContext current() {

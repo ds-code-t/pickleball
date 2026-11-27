@@ -301,7 +301,7 @@ public final class StoreGlueCompiler {
     }
 
     private static IncrementalDecision compileHashed(Path root, List<Path> files) throws java.io.IOException {
-        Map<String, String> hashes = CHANGED_HASHES.computeIfAbsent(root.toString(), ignored -> new ConcurrentHashMap<>());
+        Map<String, String> hashes = CHANGED_HASHES.computeIfAbsent(root.toString(), ignored -> loadHashes(root));
         IncrementalDecision last = new IncrementalDecision("JavaCompiler", List.of("JavaCompiler"), false, "unchanged");
         boolean any = false;
         for (Path file : files) {
@@ -310,13 +310,50 @@ public final class StoreGlueCompiler {
             String previous = hashes.get(key);
             if (previous != null && previous.equals(hash)) continue;
             IncrementalDecision decision = compileIncremental(root, file);
-            if (decision.rebuild()) return decision;
+            if (decision.rebuild()) {
+                if (any) saveHashes(root, hashes);
+                return decision;
+            }
             hashes.put(key, hash);
             any = true;
             last = decision;
         }
-        if (any) reloadWarm(root);
+        if (any) {
+            saveHashes(root, hashes);
+            reloadWarm(root);
+        }
         return last;
+    }
+
+    private static Path hashFile(Path root) {
+        return root.resolve(".pickleball").resolve("spine").resolve("source-hashes.txt");
+    }
+
+    /** Lines are {@code hash<TAB>absolutePath}. A missing file compiles every source. */
+    private static Map<String, String> loadHashes(Path root) {
+        Map<String, String> hashes = new ConcurrentHashMap<>();
+        Path file = hashFile(root);
+        if (!Files.isRegularFile(file)) return hashes;
+        try {
+            for (String line : Files.readAllLines(file, StandardCharsets.UTF_8)) {
+                int tab = line.indexOf('\t');
+                if (tab <= 0 || tab >= line.length() - 1) continue;
+                hashes.put(line.substring(tab + 1), line.substring(0, tab));
+            }
+        } catch (java.io.IOException ignored) {
+            return hashes;
+        }
+        return hashes;
+    }
+
+    private static void saveHashes(Path root, Map<String, String> hashes) throws java.io.IOException {
+        Path file = hashFile(root);
+        Files.createDirectories(file.getParent());
+        StringBuilder body = new StringBuilder();
+        for (Map.Entry<String, String> entry : hashes.entrySet()) {
+            body.append(entry.getValue()).append('\t').append(entry.getKey()).append('\n');
+        }
+        Files.writeString(file, body.toString(), StandardCharsets.UTF_8);
     }
 
     private static void reloadWarm(Path project) {
