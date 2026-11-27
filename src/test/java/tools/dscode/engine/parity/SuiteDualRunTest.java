@@ -12,11 +12,14 @@ import tools.dscode.engine.model.ScenarioResult;
 import tools.dscode.engine.model.Status;
 import tools.dscode.engine.model.StepResult;
 import tools.dscode.expectedfailure.ExpectedFailureSteps;
+import tools.dscode.store.StoreHydrator;
 import tools.dscode.scenarioobject.ScenarioObjectSteps;
 import tools.dscode.testengine.parity.LaunchParitySteps;
 import tools.dscode.untilpass.UntilPassBrowserSteps;
 import com.example.pickleball.SyntaxProofSteps;
 import com.example.pickleball.support.LocalTestSite;
+import io.cucumber.core.runner.modularexecutions.CucumberScanUtil;
+import io.cucumber.core.runtime.FeaturePathLoadCache;
 
 import java.io.IOException;
 import java.nio.file.FileSystemException;
@@ -171,6 +174,7 @@ class SuiteDualRunTest {
                 copiedCalls = true;
             }
         }
+        hydrateCallLibrary();
         try (LocalTestSite site = LocalTestSite.start(8765)) {
             List<DualRun.Divergence> found = ParityHarness.compareFeature(
                     Path.of("maven-consumer-project/src/test/resources/features/service-call-execution.feature"),
@@ -199,6 +203,7 @@ class SuiteDualRunTest {
                 copiedCalls = true;
             }
         }
+        hydrateCallLibrary();
         try (LocalTestSite site = LocalTestSite.start(8765)) {
             Path resources = Path.of("maven-consumer-project/src/test/resources");
             for (Path feature : ParityHarness.featuresUnder(resources)) {
@@ -256,6 +261,19 @@ class SuiteDualRunTest {
             Files.deleteIfExists(file);
             Files.deleteIfExists(dir);
         }
+    }
+
+    /**
+     * The adapter loads an explicit call path from store rows. A jar-hash hydrate
+     * at suite start runs before this link exists, so the rows are stored here.
+     * A path-scoped hydrate does not wipe the rest of the store.
+     */
+    private static void hydrateCallLibrary() throws Exception {
+        StoreHydrator.hydrate(
+                Path.of("").toAbsolutePath().normalize(),
+                new StoreHydrator.Options(List.of("src/test/resources/calls"), false, false));
+        FeaturePathLoadCache.clear();
+        CucumberScanUtil.clearCache();
     }
 
     /** Copies the tree. Does not follow a link into the target. */
