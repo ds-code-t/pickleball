@@ -245,10 +245,14 @@ public final class PickleballWorkbenchLauncher {
         return VerbDispatch.run("spine", VerbArgs.capture(args), out, err);
     }
 
-    /** Selenium BiDi verbs. Returns {@code -1} when {@code args} are not a {@code bidi} invocation. */
+    /**
+     * Selenium BiDi verbs. Returns {@code -1} when {@code args} are not a {@code bidi} invocation.
+     * {@code script} and {@code intercept} hop to the JVM that holds the driver.
+     * {@code grid-attach} and help stay in this process.
+     */
     static int dispatchBidiIfAny(String[] args, PrintStream out, PrintStream err) {
-        if (!tools.dscode.browser.SeleniumBidiCommands.handles(args)) return -1;
-        return VerbDispatch.run("bidi", VerbArgs.capture(args), out, err);
+        if (args == null || args.length == 0 || args[0] == null || !"bidi".equals(args[0].trim())) return -1;
+        return BidiSessionForward.run(Path.of("").toAbsolutePath().normalize(), args, out, err);
     }
 
     /** Debug-port list. Returns {@code -1} when {@code args} are not a {@code browser} invocation. */

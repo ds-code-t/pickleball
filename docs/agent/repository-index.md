@@ -829,6 +829,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/launcher/AgentController.java`
 - `src/main/java/tools/dscode/launcher/AgentHop.java`
 - `src/main/java/tools/dscode/launcher/ArgsFiles.java`
+- `src/main/java/tools/dscode/launcher/BidiSessionForward.java`
 - `src/main/java/tools/dscode/launcher/BrowserAttach.java`
 - `src/main/java/tools/dscode/launcher/CompositeCommands.java`
 - `src/main/java/tools/dscode/launcher/ConsumerReadyCommands.java`
@@ -1024,6 +1025,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/architecture/CucumberBoundaryTest.java`
 - `src/test/java/tools/dscode/browser/AgentBoundaryTest.java`
 - `src/test/java/tools/dscode/browser/BidiAdapterTest.java`
+- `src/test/java/tools/dscode/browser/BidiCliSessionTest.java`
 - `src/test/java/tools/dscode/browser/BidiModulesTest.java`
 - `src/test/java/tools/dscode/browser/BrowserCacheAndLocalVersionTest.java`
 - `src/test/java/tools/dscode/browser/BrowserProtocolsTest.java`

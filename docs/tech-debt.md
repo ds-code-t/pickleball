@@ -49,12 +49,11 @@ The 3.0.0 retest-fix rounds (R, S) ran only targeted tests on the Linux box and 
 - **Spine R3, Windows only:** `JavaStepHostTest`, `GlueStaticScanTest`, `NodeStepHostTest`, `NodeStepHostTsTest`, `EngineDoesNotSpawnNodeTest`, `JsStepCatalogTest`, `JsStepRunTest`, `PlaywrightTestIngestTest`, `PlaywrightSpecHostTest`, and `PlaywrightSpecIngestLiveTest`.
 - **Spine R4, Windows only:** `VerbDispatchTest`, `McpDirectHotPathTest`, `VerbCatalogTest`, `ElementRecordTest`, `ArgsFileTest`, `AgentEnvelopeStoreTest`, `RouteModifyBodyTest`, `ExecuteStepsPwTest`, `DesktopLaunchTest`, `DesktopScreenshotVerbTest`, and `DesktopLaunch`.
 - **Spine R7, Windows only:** `RunSnapshotTest`, `ReportScriptTest`, `VisualTargetTest`, `PickleballExceptionTest`, `SnapFindIndexTest` (`tools.dscode.common.composite`), `SnapshotRetainTest`, and `CrossStoreTest`.
-- **Spine R8, Windows only:** `WarmClassLoaderTest`, `WarmColdParityTest`, `IncrementalGlueCompileTest`, `ResourceGateTest`, `BrowserVersionResolverTest`, `BrowserCacheAndLocalVersionTest`, `SeleniumBidiCommandTest`, `DebugPortOwnerTest`, `DebugPortAttachTest`, `SnapshotContextGateTest`, `WarmCdpTest`, `DesktopTreeCacheTest`, `WindowsStructureChangedTest`, `WarmGlueCompilePathTest`, `SubprocessStepTest`, and `WarmGlueScenarioTest`.
+- **Spine R8, Windows only:** `WarmClassLoaderTest`, `WarmColdParityTest`, `IncrementalGlueCompileTest`, `ResourceGateTest`, `BrowserVersionResolverTest`, `BrowserCacheAndLocalVersionTest`, `SeleniumBidiCommandTest`, `DebugPortOwnerTest`, `DebugPortAttachTest`, `SnapshotContextGateTest`, `WarmCdpTest`, `DesktopTreeCacheTest`, `WindowsStructureChangedTest`, `WarmGlueCompilePathTest`, `SubprocessStepTest`, `WarmGlueScenarioTest`, and `BidiCliSessionTest`.
 - **macOS, Safari:** channel `safari` selects Selenium `safaridriver` and the Windows test does not start a process. A live Safari run on macOS has not been executed.
 
 ## Spine R8 fix-back 2 (open, found in fix-back 1 verification 2026-11-26)
 
-3. `pickleball bidi` runs in the short-lived CLI JVM, where there is no Selenium session, so `bidi script` and `bidi intercept` never reach the live driver.
 4. The Windows UI Automation structure-changed handler is a PowerShell script block, so the event on a non-PowerShell thread may never write `changed` and the cached tree stays.
 5. Fix-back 1 rewrote the R8 roadmap below the original spec, and a `rebuild` decision does not stop the warm JVM, run the wrapper compile, and start that JVM again.
 6. Configuration, Playwright, agent, and release-note text claim the gate moves work, the warm loader reloads edited glue, and `bidi` reaches the live session before that behavior is delivered.

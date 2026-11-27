@@ -20,6 +20,7 @@ MCP-only count: 0
 | bidi | workbench | cli | tools.dscode.browser.SeleniumBidiCommands.execute |
 | bidi grid-attach | workbench | cli | tools.dscode.browser.SeleniumBidiCommands.execute |
 | bidi intercept | workbench | cli | tools.dscode.browser.SeleniumBidiCommands.execute |
+| bidi intercept off | workbench | cli | tools.dscode.browser.SeleniumBidiCommands.execute |
 | bidi script | workbench | cli | tools.dscode.browser.SeleniumBidiCommands.execute |
 | border | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | bridge | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |

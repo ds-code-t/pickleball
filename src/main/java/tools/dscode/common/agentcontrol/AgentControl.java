@@ -13,7 +13,10 @@ import tools.dscode.common.composite.CompositeLog;
 import tools.dscode.common.composite.CompositeRuntime;
 import tools.dscode.common.driver.DriverConstruction;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -274,6 +277,7 @@ public final class AgentControl {
                 case "capture-scenario" -> capture(project, runId, values);
                 case "capture-steps" -> captureSteps(project, runId, values);
                 case "record" -> record(project, runId, values);
+                case "bidi" -> bidi(extraArgs);
                 default -> fail(2, "unknown agent command: " + op);
             };
         }
@@ -2241,6 +2245,34 @@ public final class AgentControl {
         Map<String, Object> written = StepCapture.write(project, runId, args);
         written.put("ok", true);
         return new Result(0, written);
+    }
+
+    /** Runs {@code bidi} on this JVM's Selenium driver. The CLI posts here; this method does not post again. */
+    private static Result bidi(List<String> extraArgs) {
+        List<String> tokens = new ArrayList<>();
+        tokens.add("bidi");
+        if (extraArgs != null) {
+            for (String token : extraArgs) {
+                if (token != null) tokens.add(token);
+            }
+        }
+        ByteArrayOutputStream outBytes = new ByteArrayOutputStream();
+        ByteArrayOutputStream errBytes = new ByteArrayOutputStream();
+        int code = tools.dscode.browser.SeleniumBidiCommands.execute(
+                tokens.toArray(String[]::new),
+                new PrintStream(outBytes, true, StandardCharsets.UTF_8),
+                new PrintStream(errBytes, true, StandardCharsets.UTF_8)
+        );
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("ok", code == 0);
+        body.put("op", "bidi");
+        body.put("stdout", outBytes.toString(StandardCharsets.UTF_8));
+        body.put("stderr", errBytes.toString(StandardCharsets.UTF_8));
+        if (code != 0) {
+            String error = errBytes.toString(StandardCharsets.UTF_8).trim();
+            body.put("error", error.isBlank() ? "bidi command failed" : error);
+        }
+        return new Result(code, body);
     }
 
     private static Result record(Path project, String runId, Map<String, String> args) {

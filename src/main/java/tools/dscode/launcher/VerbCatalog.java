@@ -207,6 +207,7 @@ public final class VerbCatalog {
         add(rows, "bidi", "workbench", BIDI);
         add(rows, "bidi script", "workbench", BIDI);
         add(rows, "bidi intercept", "workbench", BIDI);
+        add(rows, "bidi intercept off", "workbench", BIDI);
         add(rows, "bidi grid-attach", "workbench", BIDI);
         add(rows, "browser", "workbench", BROWSER_PORTS);
         add(rows, "browser ports", "workbench", BROWSER_PORTS);

@@ -72,7 +72,7 @@ class SeleniumBidiLiveSessionTest {
         assertTrue(bidi.methods.contains("script.evaluate"), bidi.methods.toString());
         assertTrue(bidi.params.stream().anyMatch(text -> text.contains("return 1")), bidi.params.toString());
 
-        Capture intercept = run("bidi", "intercept", "--body=hello");
+        Capture intercept = run("bidi", "intercept", "--url=http://127.0.0.1/", "--body=hello");
         assertEquals(0, intercept.code, intercept.err);
         assertTrue(bidi.methods.contains("network.addIntercept"), bidi.methods.toString());
         assertTrue(bidi.methods.contains("network.provideResponse"), bidi.methods.toString());
@@ -86,7 +86,7 @@ class SeleniumBidiLiveSessionTest {
         System.setProperty("pkb_protocol", "playwright");
         AgentDriverHooks.ready(new PlaywrightBoundDriver());
 
-        Capture intercept = run("bidi", "intercept", "--body=hello");
+        Capture intercept = run("bidi", "intercept", "--url=http://127.0.0.1/", "--body=hello");
         assertEquals(2, intercept.code, intercept.err);
         assertTrue(intercept.err.contains("error:"));
         assertTrue(intercept.err.contains("Playwright"));
