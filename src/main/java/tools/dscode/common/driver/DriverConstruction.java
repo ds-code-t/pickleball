@@ -369,9 +369,10 @@ public final class DriverConstruction {
     }
 
     /**
-     * Quit and close on this same driver release the debug-port claim.
-     * {@link AgentDriverHooks#ready} binds this instance, and {@code quit()} sends
-     * {@link DriverCommand#QUIT} through the executor installed here.
+     * Quit on this same driver releases the debug-port claim. A single-window close
+     * does not, while the browser is still up. JVM shutdown still releases a claim
+     * that is still held. {@link AgentDriverHooks#ready} binds this instance, and
+     * {@code quit()} sends {@link DriverCommand#QUIT} through the executor installed here.
      */
     private static RemoteWebDriver watchQuit(RemoteWebDriver driver) {
         if (driver == null) return null;
@@ -396,7 +397,7 @@ public final class DriverConstruction {
         }
     }
 
-    /** Releases the bound driver after a successful quit or close, then closes the real executor. */
+    /** Releases the bound driver after a successful quit, then closes the real executor. */
     private static final class QuitReleasingExecutor implements CommandExecutor, Closeable {
         private final RemoteWebDriver driver;
         private final CommandExecutor delegate;
@@ -421,7 +422,7 @@ public final class DriverConstruction {
         }
 
         private static boolean releasesDebugPort(String name) {
-            return DriverCommand.QUIT.equals(name) || DriverCommand.CLOSE.equals(name);
+            return DriverCommand.QUIT.equals(name);
         }
     }
 

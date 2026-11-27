@@ -41,8 +41,19 @@ public final class BrowserVersionResolver {
         }
     }
 
-    /** A finished lookup. {@code binary} may be null when the version came from an injected install. */
-    public record Resolution(String channel, String version, String source, Adapter adapter, Path binary) {
+    /**
+     * A finished lookup. {@code binary} may be null when the version came from an injected install.
+     * {@code detail} is empty unless a cdn cache read-back used a different version than the one
+     * requested or downloaded. A numeric prefix that matches stays empty.
+     */
+    public record Resolution(String channel, String version, String source, Adapter adapter, Path binary, String detail) {
+        public Resolution(String channel, String version, String source, Adapter adapter, Path binary) {
+            this(channel, version, source, adapter, binary, "");
+        }
+
+        public Resolution {
+            detail = detail == null ? "" : detail;
+        }
     }
 
     /** Lists installs for one channel. An empty list is a miss. */
@@ -250,8 +261,10 @@ public final class BrowserVersionResolver {
         }
         if (downloaded != null) {
             Install installed = installedAfterDownload(channel, block.version, downloaded);
+            String note = versionNote(block.version, downloaded.version, installed.version);
+            if (!note.isEmpty()) BrowserLog.info("resolve", note);
             logResolve(block.version, source, installed.version);
-            return new Resolution(channel, shown(installed.version), source, adapterOf(block), installed.binary);
+            return new Resolution(channel, shown(installed.version), source, adapterOf(block), installed.binary, note);
         }
         Install fallback = best(cachedInstalls(channel), channel, "");
         if (fallback != null) {
@@ -655,6 +668,12 @@ public final class BrowserVersionResolver {
             }
         }
         return values;
+    }
+
+    /** Empty when the used build matches the request and the download. A prefix match is a match. */
+    private static String versionNote(String requested, String downloaded, String used) {
+        if (matches(requested, used) && matches(downloaded, used)) return "";
+        return "requested=" + shown(requested) + " downloaded=" + shown(downloaded) + " used=" + shown(used);
     }
 
     private static void logResolve(String requested, String source, String resolved) {
