@@ -1,10 +1,5 @@
 package tools.dscode.engine.runtime;
 
-import tools.dscode.engine.EngineOptions;
-import tools.dscode.engine.PickleballEngine;
-import tools.dscode.engine.model.RunResult;
-import tools.dscode.engine.model.Status;
-
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.FileDescriptor;
@@ -14,15 +9,17 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.List;
 
 /**
  * Cold JVM for one snapshot context. The warm loader is not on this process.
- * The parent sends one JSON line per step on stdin. This process runs that step
- * with {@code pkb_warm=off} and writes one JSON line to stdout. {@code close} exits
- * and frees the pool slot.
+ * The parent sends one JSON line per step on stdin. Every step of that parent
+ * scenario runs in one child scenario, with {@code pkb_warm=off}, and this
+ * process writes one JSON line back. {@code close} ends that child scenario
+ * and exits, which returns the pool slot.
  */
 public final class SnapshotContextWorker {
+    private static SnapshotScenario session;
+
     private SnapshotContextWorker() {
     }
 
@@ -34,18 +31,23 @@ public final class SnapshotContextWorker {
         System.setOut(sink);
         System.setErr(sink);
         BufferedReader in = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
-        String line;
-        while ((line = in.readLine()) != null) {
-            if (line.isBlank()) continue;
-            String op = SnapshotChannel.field(line, "op");
-            if ("close".equals(op)) {
-                writeLine(raw, SnapshotChannel.object("op", "closed", "ok", "true"));
-                break;
+        try {
+            String line;
+            while ((line = in.readLine()) != null) {
+                if (line.isBlank()) continue;
+                String op = SnapshotChannel.field(line, "op");
+                if ("close".equals(op)) {
+                    endSession();
+                    writeLine(raw, SnapshotChannel.object("op", "closed", "ok", "true"));
+                    break;
+                }
+                String response = "step".equals(op)
+                        ? runStep(line, captured)
+                        : SnapshotChannel.object("ok", "false", "status", "FAILED", "pid", pid(), "returned", "", "error", "unknown op", "log", "");
+                writeLine(raw, response);
             }
-            String response = "step".equals(op)
-                    ? runStep(line, captured)
-                    : SnapshotChannel.object("ok", "false", "status", "FAILED", "pid", pid(), "returned", "", "error", "unknown op", "log", "");
-            writeLine(raw, response);
+        } finally {
+            endSession();
         }
     }
 
@@ -56,26 +58,18 @@ public final class SnapshotContextWorker {
         String project = SnapshotChannel.field(line, "project");
         String gherkin = SnapshotChannel.field(line, "gherkin");
         try {
-            Class<?> glue = Class.forName(className);
             Path root = project == null || project.isBlank()
                     ? Path.of("").toAbsolutePath()
                     : Path.of(project);
-            EngineOptions options = EngineOptions.of(glue).project(root);
-            RunResult result = gherkin == null || gherkin.isBlank()
-                    ? PickleballEngine.run(List.of(text), options)
-                    : PickleballEngine.run(gherkin, options);
-            String returned = "";
-            if (!result.scenarios().isEmpty() && !result.scenarios().getFirst().steps().isEmpty()) {
-                returned = result.scenarios().getFirst().steps().getFirst().returned();
-            }
-            boolean passed = result.status() == Status.PASSED;
-            String error = passed ? "" : result.message();
+            if (session == null) session = SnapshotScenario.open(root, className);
+            else session.include(className);
+            SnapshotScenario.Outcome outcome = session.step(text, gherkin);
             return SnapshotChannel.object(
-                    "ok", passed ? "true" : "false",
-                    "status", result.status() == null ? "" : result.status().name(),
+                    "ok", outcome.ok() ? "true" : "false",
+                    "status", outcome.status(),
                     "pid", pid(),
-                    "returned", returned == null ? "" : returned,
-                    "error", error == null ? "" : error,
+                    "returned", outcome.returned() == null ? "" : outcome.returned(),
+                    "error", outcome.error() == null ? "" : outcome.error(),
                     "log", log(captured));
         } catch (Throwable thrown) {
             String message = thrown.getMessage() == null ? thrown.toString() : thrown.getMessage();
@@ -86,6 +80,17 @@ public final class SnapshotContextWorker {
                     "returned", "",
                     "error", message,
                     "log", log(captured));
+        }
+    }
+
+    private static void endSession() {
+        SnapshotScenario ending = session;
+        session = null;
+        if (ending == null) return;
+        try {
+            ending.close();
+        } catch (RuntimeException ignored) {
+            // The parent still receives the close line, then destroys this process.
         }
     }
 
