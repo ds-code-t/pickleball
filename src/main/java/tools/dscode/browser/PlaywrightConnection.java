@@ -14,6 +14,7 @@ import com.microsoft.playwright.options.ScreenshotType;
 import org.openqa.selenium.WebDriver;
 
 import java.net.URI;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -21,8 +22,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Playwright over CDP only (D12). Playwright is created with {@code PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1}, never runs
- * {@code install}, and never launches a browser: it joins an existing Chromium with
+ * Playwright over CDP only (D12). Playwright is created with {@code PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1}
+ * unless {@code browser.source} is {@code cdn} or {@code any}. It never launches a browser: it joins an existing Chromium with
  * {@code chromium().connectOverCDP(endpoint)}. The endpoint is, in order, the explicit argument, the
  * {@code pkb_cdp_endpoint} property, env {@code PKB_CDP_ENDPOINT}, then the CDP endpoint of the Chrome pickleball
  * launched (its WebDriver {@code se:cdp} / {@code debuggerAddress}). With none, {@link #connect} fails with
@@ -46,11 +47,13 @@ public final class PlaywrightConnection implements AutoCloseable {
     private final String endpoint;
     private final Playwright playwright;
     private final Browser browser;
+    private final int port;
 
-    private PlaywrightConnection(String endpoint, Playwright playwright, Browser browser) {
+    private PlaywrightConnection(String endpoint, Playwright playwright, Browser browser, int port) {
         this.endpoint = endpoint;
         this.playwright = playwright;
         this.browser = browser;
+        this.port = port;
     }
 
     /** Explicit, then {@code pkb_cdp_endpoint}, then {@code PKB_CDP_ENDPOINT}; null when none is configured. */
@@ -76,22 +79,38 @@ public final class PlaywrightConnection implements AutoCloseable {
         String key = endpoint.trim();
         PlaywrightConnection current = OPEN.get(key);
         if (current != null && current.browser.isConnected()) return current;
+        int port = portOf(key);
         synchronized (OPEN) {
             current = OPEN.get(key);
             if (current != null && current.browser.isConnected()) return current;
-            Playwright playwright = Playwright.create(new Playwright.CreateOptions().setEnv(DRIVER_ENV));
+            if (port > 0) DebugPortOwner.attach(port, "playwright", Path.of("").toAbsolutePath());
+            Playwright playwright = null;
             try {
+                playwright = Playwright.create(new Playwright.CreateOptions().setEnv(BrowserVersionResolver.playwrightEnv()));
                 Browser browser = playwright.chromium().connectOverCDP(key, new BrowserType.ConnectOverCDPOptions().setTimeout(15_000));
                 BrowserLog.info("playwright", "connectOverCDP " + redact(key));
-                PlaywrightConnection made = new PlaywrightConnection(key, playwright, browser);
+                PlaywrightConnection made = new PlaywrightConnection(key, playwright, browser, port);
                 OPEN.put(key, made);
                 return made;
             } catch (RuntimeException failure) {
-                playwright.close();
+                if (port > 0) DebugPortOwner.release(port, "playwright");
+                if (playwright != null) playwright.close();
                 throw new IllegalStateException("error: Playwright could not attach over CDP to " + redact(key) + ": "
                         + firstLine(failure.getMessage()) + "\nfix: check that a Chromium is listening there (curl <endpoint>/json/version); "
                         + "pickleball does not launch a Playwright browser.", failure);
             }
+        }
+    }
+
+    /** Port of an {@code http://host:port} or {@code host:port} endpoint. Zero when the endpoint has none. */
+    static int portOf(String endpoint) {
+        if (endpoint == null || endpoint.isBlank()) return -1;
+        String text = endpoint.trim();
+        try {
+            URI uri = URI.create(text.contains("://") ? text : "http://" + text);
+            return uri.getPort();
+        } catch (RuntimeException failure) {
+            return -1;
         }
     }
 
@@ -139,6 +158,7 @@ public final class PlaywrightConnection implements AutoCloseable {
     @Override
     public void close() {
         OPEN.remove(endpoint, this);
+        if (port > 0) DebugPortOwner.release(port, "playwright");
         try {
             playwright.close();
         } catch (RuntimeException ignored) {

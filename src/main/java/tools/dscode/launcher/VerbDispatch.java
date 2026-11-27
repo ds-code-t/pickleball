@@ -83,6 +83,9 @@ public final class VerbDispatch {
         if ("domengine".equals(family)) return PickleballWorkbenchLauncher.runDomEngine(argv, stdout, stderr);
         if ("dashboard".equals(family)) return tools.dscode.store.dashboard.DashboardCli.execute(argv, stdout, stderr);
         if ("cross".equals(family)) return CrossStore.execute(argv, stdout, stderr);
+        if ("spine".equals(family)) return SpineCli.execute(argv, stdout, stderr);
+        if ("bidi".equals(family)) return tools.dscode.browser.SeleniumBidiCommands.execute(argv, stdout, stderr);
+        if ("browser".equals(family)) return tools.dscode.browser.BrowserPorts.execute(argv, stdout, stderr);
         if ("log".equals(family) || "log-tail".equals(family)) {
             return tools.dscode.common.composite.DomLogCli.execute(argv, stdout, stderr);
         }

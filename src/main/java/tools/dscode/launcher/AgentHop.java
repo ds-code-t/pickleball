@@ -23,7 +23,7 @@ final class AgentHop {
             "capture-scenario", "capture-steps", "record", "screenshot", "selftest",
             "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "attach", "eval", "frame", "upload", "navigate",
             "ask-and-wait", "answer-wait", "wait-any", "pin", "toast", "checklist", "ui", "ref",
-            "start", "call", "execute-steps", "doctor",
+            "start", "call", "execute-steps", "doctor", "bidi",
             "inject", "input", "lease"
     );
 

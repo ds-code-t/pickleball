@@ -6,6 +6,7 @@ import io.cucumber.core.runner.CurrentScenarioState;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.openqa.selenium.chrome.ChromeOptions;
+import tools.dscode.browser.DebugPortOwner;
 import tools.dscode.common.mappings.MappingProcessor;
 import tools.dscode.engine.context.ExecutionContext;
 
@@ -28,6 +29,7 @@ class ApplyDebugPortTest {
     void reset() {
         CurrentScenarioState.globalDebugBrowser = false;
         CurrentScenarioState.currentScenarioState.remove();
+        DebugPortOwner.resetForTests();
         while (ExecutionContext.current() != null) {
             ExecutionContext.current().close();
         }

@@ -19,8 +19,16 @@ import java.util.Set;
  * Explicit flags win. {@code call} keeps its own args-file reader. MCP uses {@link #merge}.
  */
 public final class ArgsFiles {
-    private static final ObjectMapper JSON = new ObjectMapper();
     private static final Set<String> KNOWN = knownFlags();
+
+    /** Jackson stays unloaded until an args file is actually read. Help and usage errors do not need it. */
+    private static ObjectMapper json() {
+        return JsonHolder.JSON;
+    }
+
+    private static final class JsonHolder {
+        private static final ObjectMapper JSON = new ObjectMapper();
+    }
 
     private ArgsFiles() {
     }
@@ -164,7 +172,7 @@ public final class ArgsFiles {
     private static void mergeJson(String command, String text, Map<String, String> into) {
         JsonNode node;
         try {
-            node = JSON.readTree(text == null ? "" : text);
+            node = json().readTree(text == null ? "" : text);
         } catch (Exception failure) {
             throw failure("args file is not a JSON object", "pass a JSON object of flags");
         }
@@ -202,7 +210,8 @@ public final class ArgsFiles {
     private static boolean openFamily(String command) {
         return "store".equals(command) || "engine".equals(command) || "domengine".equals(command)
                 || "dashboard".equals(command) || "log".equals(command) || "log-tail".equals(command)
-                || "cross".equals(command);
+                || "cross".equals(command) || "spine".equals(command)
+                || "bidi".equals(command) || "browser".equals(command);
     }
 
     private static String fileToken(String token, String[] args, int index) {

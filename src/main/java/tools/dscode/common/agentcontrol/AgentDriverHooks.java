@@ -1,6 +1,7 @@
 package tools.dscode.common.agentcontrol;
 
 import org.openqa.selenium.WebDriver;
+import tools.dscode.browser.DebugPortOwner;
 
 /**
  * Registers every driver the existing launcher already started.
@@ -33,6 +34,7 @@ public final class AgentDriverHooks {
         String template = TEMPLATE.get();
         boolean owned = template != null && !template.isBlank();
         PageSurfaces.manage(driver, owned ? template : "", owned, Boolean.TRUE.equals(HOST.get()));
+        DebugPortOwner.bindPending(driver);
     }
 
     /**

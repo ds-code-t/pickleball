@@ -291,6 +291,7 @@ final class PageSurfaces {
     }
 
     private static void quitManaged(Managed managed) {
+        tools.dscode.browser.DebugPortOwner.releaseDriver(managed.driver);
         try {
             managed.driver.quit();
         } catch (RuntimeException failure) {

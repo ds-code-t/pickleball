@@ -176,6 +176,9 @@ public final class WorkbenchAgentCommands {
             safeErr.println(humanRefusal);
             return 2;
         }
+        if ("bidi".equals(parsed.command())) {
+            return BidiSessionForward.deliver(parsed.project(), args, safeOut, safeErr);
+        }
         if ("attach".equals(parsed.command()) && BrowserAttach.handles(args)) {
             // D13: --cdp-endpoint, --extension, --endpoint, --selenium, --discover; CDP routes end in attach --target=browser:cdp=.
             return BrowserAttach.run(args, parsed.project(), safeOut, safeErr, next -> run(next, out, err, maven));

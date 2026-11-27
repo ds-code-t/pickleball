@@ -18,9 +18,16 @@ MCP-only count: 0
 | attach | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | audit | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | audits | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
+| bidi | workbench | cli | tools.dscode.browser.SeleniumBidiCommands.execute |
+| bidi grid-attach | workbench | cli | tools.dscode.browser.SeleniumBidiCommands.execute |
+| bidi intercept | workbench | cli | tools.dscode.browser.SeleniumBidiCommands.execute |
+| bidi intercept off | workbench | cli | tools.dscode.browser.SeleniumBidiCommands.execute |
+| bidi script | workbench | cli | tools.dscode.browser.SeleniumBidiCommands.execute |
 | border | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | bridge | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | bridge-health | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
+| browser | workbench | cli | tools.dscode.browser.BrowserPorts.execute |
+| browser ports | workbench | cli | tools.dscode.browser.BrowserPorts.execute |
 | browser-events | workbench | stream | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | call | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | capture | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
@@ -236,7 +243,12 @@ MCP-only count: 0
 | show-run | workbench | cli | tools.dscode.launcher.WorkbenchSessionCommands.run |
 | snap | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | spine | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
+| spine sample | workbench | cli | tools.dscode.launcher.SpineCli.execute |
 | spine session | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
+| spine start | workbench | cli | tools.dscode.launcher.SpineCli.execute |
+| spine stop | workbench | cli | tools.dscode.launcher.SpineCli.execute |
+| spine warm | workbench | cli | tools.dscode.launcher.SpineCli.execute |
+| spine warm status | workbench | cli | tools.dscode.launcher.SpineCli.execute |
 | spotlight | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | start | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | status | workbench | cli | tools.dscode.launcher.WorkbenchSessionCommands.run |

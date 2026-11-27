@@ -51,6 +51,9 @@ public final class VerbCatalog {
     private static final String DASHBOARD = "tools.dscode.store.dashboard.DashboardCli.execute";
     private static final String CHAT = "tools.dscode.common.agentcontrol.AgentControl.execute";
     private static final String CROSS_STORE = "tools.dscode.launcher.CrossStore.execute";
+    private static final String SPINE = "tools.dscode.launcher.SpineCli.execute";
+    private static final String BIDI = "tools.dscode.browser.SeleniumBidiCommands.execute";
+    private static final String BROWSER_PORTS = "tools.dscode.browser.BrowserPorts.execute";
 
     /**
      * Commands the domengine MCP {@code surfaces} tool lists. That tool is an index of
@@ -208,6 +211,19 @@ public final class VerbCatalog {
         add(rows, "lease release", "workbench", AGENT);
         add(rows, "input block", "workbench", AGENT);
         add(rows, "ui page", "workbench", AGENT);
+        add(rows, "spine", "workbench", SPINE);
+        add(rows, "spine sample", "workbench", SPINE);
+        add(rows, "spine start", "workbench", SPINE);
+        add(rows, "spine stop", "workbench", SPINE);
+        add(rows, "spine warm", "workbench", SPINE);
+        add(rows, "spine warm status", "workbench", SPINE);
+        add(rows, "bidi", "workbench", BIDI);
+        add(rows, "bidi script", "workbench", BIDI);
+        add(rows, "bidi intercept", "workbench", BIDI);
+        add(rows, "bidi intercept off", "workbench", BIDI);
+        add(rows, "bidi grid-attach", "workbench", BIDI);
+        add(rows, "browser", "workbench", BROWSER_PORTS);
+        add(rows, "browser ports", "workbench", BROWSER_PORTS);
         add(rows, "cross", "workbench", CROSS_STORE);
         add(rows, "cross note", "workbench", CROSS_STORE);
         add(rows, "cross journal", "workbench", CROSS_STORE);

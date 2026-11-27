@@ -14,17 +14,24 @@ import org.openqa.selenium.edge.EdgeDriver;
 import org.openqa.selenium.edge.EdgeDriverService;
 import org.openqa.selenium.edge.EdgeOptions;
 import tools.dscode.browser.BrowserFacade;
+import tools.dscode.browser.BrowserVersionResolver;
+import tools.dscode.browser.DebugPortOwner;
 import tools.dscode.browser.ProtocolSelector;
 import tools.dscode.common.agentcontrol.AgentDriverHooks;
 import tools.dscode.common.agentcontrol.AgentLaunch;
 import tools.dscode.common.composite.CompositeRuntime;
+import org.openqa.selenium.remote.Command;
+import org.openqa.selenium.remote.CommandExecutor;
+import org.openqa.selenium.remote.DriverCommand;
 import org.openqa.selenium.remote.RemoteWebDriver;
+import org.openqa.selenium.remote.Response;
 import org.openqa.selenium.remote.http.ClientConfig;
 import org.openqa.selenium.remote.service.DriverService;
 
 import tools.dscode.common.coordination.AgentCoordination;
 
 import java.io.ByteArrayOutputStream;
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.File;
 import java.io.OutputStream;
@@ -110,6 +117,7 @@ public final class DriverConstruction {
     private static final String EDGE_OPTIONS_CAPABILITY = "ms:edgeOptions";
 
     public static RemoteWebDriver createDriver(ObjectNode configuration) throws Exception {
+        BrowserVersionResolver.prepare(configuration);
         ObjectNode config = requireConfiguration(configuration);
         String browserName = resolveBrowserName(config);
         ObjectNode driver = getDriverSection(config);
@@ -120,11 +128,13 @@ public final class DriverConstruction {
     }
 
     public static RemoteWebDriver createLocalDriver(ObjectNode configuration) throws Exception {
+        BrowserVersionResolver.prepare(configuration);
         ObjectNode config = requireConfiguration(configuration);
         return createLocalDriver(resolveBrowserName(config), getDriverSection(config), config);
     }
 
     public static RemoteWebDriver createRemoteDriver(ObjectNode configuration) throws Exception {
+        BrowserVersionResolver.prepare(configuration);
         ObjectNode config = requireConfiguration(configuration);
         return createRemoteDriver(resolveBrowserName(config), getDriverSection(config), config, "Driver remoteUrl not found");
     }
@@ -279,18 +289,23 @@ public final class DriverConstruction {
             ByteArrayOutputStream capture
     ) {
         try {
-            return newChromiumDriverOnce(browserName, driverConfig, fullConfiguration, clientConfig, service, capture);
-        } catch (RuntimeException failure) {
-            if (BIDI_REJECTED.get() || !tools.dscode.browser.BrowserProtocols.bidiEnabled() || !bidiRejected(failure)) throw failure;
-            if (BIDI_WARNED.compareAndSet(false, true)) {
-                System.err.println("WARN driver rejected webSocketUrl=true; BiDi is off for this session (pkb_bidi=false hides this)");
-            }
-            BIDI_REJECTED.set(true);
             try {
                 return newChromiumDriverOnce(browserName, driverConfig, fullConfiguration, clientConfig, service, capture);
-            } finally {
-                BIDI_REJECTED.set(false);
+            } catch (RuntimeException failure) {
+                if (BIDI_REJECTED.get() || !tools.dscode.browser.BrowserProtocols.bidiEnabled() || !bidiRejected(failure)) throw failure;
+                if (BIDI_WARNED.compareAndSet(false, true)) {
+                    System.err.println("WARN driver rejected webSocketUrl=true; BiDi is off for this session (pkb_bidi=false hides this)");
+                }
+                BIDI_REJECTED.set(true);
+                try {
+                    return newChromiumDriverOnce(browserName, driverConfig, fullConfiguration, clientConfig, service, capture);
+                } finally {
+                    BIDI_REJECTED.set(false);
+                }
             }
+        } catch (RuntimeException failure) {
+            DebugPortOwner.releasePending();
+            throw failure;
         }
     }
 
@@ -346,10 +361,69 @@ public final class DriverConstruction {
      * opened here. Agent direct access uses {@link tools.dscode.browser.AgentProtocolController}.
      */
     public static RemoteWebDriver ready(RemoteWebDriver driver) {
-        AgentDriverHooks.ready(driver);
-        CompositeRuntime.attach(driver);
-        scriptedProtocol(driver);
+        RemoteWebDriver watched = watchQuit(driver);
+        AgentDriverHooks.ready(watched);
+        CompositeRuntime.attach(watched);
+        scriptedProtocol(watched);
+        return watched;
+    }
+
+    /**
+     * Quit on this same driver releases the debug-port claim. A single-window close
+     * does not, while the browser is still up. JVM shutdown still releases a claim
+     * that is still held. {@link AgentDriverHooks#ready} binds this instance, and
+     * {@code quit()} sends {@link DriverCommand#QUIT} through the executor installed here.
+     */
+    private static RemoteWebDriver watchQuit(RemoteWebDriver driver) {
+        if (driver == null) return null;
+        CommandExecutor delegate = driver.getCommandExecutor();
+        if (delegate == null || delegate instanceof QuitReleasingExecutor) return driver;
+        setCommandExecutor(driver, new QuitReleasingExecutor(driver, delegate));
         return driver;
+    }
+
+    /** {@link RemoteWebDriver#setCommandExecutor} is protected. The built driver is that class. */
+    private static void setCommandExecutor(RemoteWebDriver driver, CommandExecutor executor) {
+        try {
+            java.lang.reflect.Method method = RemoteWebDriver.class.getDeclaredMethod(
+                    "setCommandExecutor", CommandExecutor.class);
+            method.setAccessible(true);
+            method.invoke(driver, executor);
+        } catch (ReflectiveOperationException | RuntimeException failure) {
+            throw new IllegalStateException(
+                    "error: debug port cannot watch driver quit\n"
+                            + "fix: DriverConstruction.ready installs the quit hook on the built driver",
+                    failure);
+        }
+    }
+
+    /** Releases the bound driver after a successful quit, then closes the real executor. */
+    private static final class QuitReleasingExecutor implements CommandExecutor, Closeable {
+        private final RemoteWebDriver driver;
+        private final CommandExecutor delegate;
+
+        private QuitReleasingExecutor(RemoteWebDriver driver, CommandExecutor delegate) {
+            this.driver = driver;
+            this.delegate = delegate;
+        }
+
+        @Override
+        public Response execute(Command command) throws IOException {
+            Response response = delegate.execute(command);
+            if (command != null && releasesDebugPort(command.getName())) {
+                DebugPortOwner.releaseDriver(driver);
+            }
+            return response;
+        }
+
+        @Override
+        public void close() throws IOException {
+            if (delegate instanceof Closeable closeable) closeable.close();
+        }
+
+        private static boolean releasesDebugPort(String name) {
+            return DriverCommand.QUIT.equals(name);
+        }
     }
 
     /**
@@ -760,7 +834,10 @@ public final class DriverConstruction {
     }
 
     public static String resolveBrowserName(ObjectNode fullConfiguration) {
-        String browserName = trimToNull(fullConfiguration.path("browser").asText(null));
+        JsonNode browser = fullConfiguration.path("browser");
+        String browserName = browser.isObject()
+                ? trimToNull(browser.path("channel").asText(null))
+                : trimToNull(browser.asText(null));
         if (browserName == null) {
             browserName = trimToNull(fullConfiguration.path("browserName").asText(null));
         }
@@ -811,6 +888,10 @@ public final class DriverConstruction {
         if (isDevToolsListening("127.0.0.1", debugPort)) {
             logInfo("Attaching to existing " + browserName + " browser on debugging port: " + debugPort);
             options.setExperimentalOption("debuggerAddress", "127.0.0.1:" + debugPort);
+            // A start that only publishes --remote-debugging-port does not claim. The same owner
+            // may attach again when a BiDi rejection rebuilds these options.
+            DebugPortOwner.attach(debugPort, "driver", Path.of("").toAbsolutePath());
+            DebugPortOwner.notePending(debugPort);
         } else {
             logInfo("Starting new " + browserName + " browser on debugging port: " + debugPort);
             options.addArguments("--remote-debugging-port=" + debugPort);
@@ -836,11 +917,17 @@ public final class DriverConstruction {
         if (portNode.isMissingNode()) {
             portNode = fullConfiguration.path("browser");
         }
+        if (portNode.isObject()) {
+            portNode = portNode.path("channel");
+        }
         if (portNode.isMissingNode()) {
             throw new RuntimeException("Failed to set debugging port. Cannot find debuggingPort, _pathKey, or browser.");
         }
 
-        String token = trimToNull(portNode.asText());
+        String token = trimToNull(portNode.asText(null));
+        if (token == null) {
+            throw new RuntimeException("Failed to set debugging port. Cannot find debuggingPort, _pathKey, or browser.");
+        }
         return 9000 + (Math.abs(token.toLowerCase(Locale.ROOT).hashCode()) % 1000);
     }
 

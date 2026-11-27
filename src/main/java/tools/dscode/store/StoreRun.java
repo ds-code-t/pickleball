@@ -1,10 +1,15 @@
 package tools.dscode.store;
 
 import tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner;
+import tools.dscode.engine.runtime.WarmFlags;
+import tools.dscode.engine.runtime.WarmProcessFile;
+import tools.dscode.launcher.SpineCli;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.Socket;
@@ -23,7 +28,9 @@ import java.util.concurrent.TimeUnit;
  * Fast path for {@code store run}. A warm JVM holds the cached classpath and
  * executes with the same engine as a normal run, with {@code pkb_store=true}
  * so feature bytes come from the database. Java glue is fingerprinted by size
- * and modification time. A change compiles once and restarts that JVM.
+ * and modification time. An incremental {@code JavaCompiler} compile keeps the
+ * worker and rewrites its fingerprint so the next scenario reloads the class.
+ * A wrapper compile or a rebuild stops that worker.
  */
 public final class StoreRun {
     public static final String CACHE = "classpath.cache";
@@ -64,18 +71,21 @@ public final class StoreRun {
             return new Outcome(0, "dry-run " + plan.line() + "\n", "", false, elapsed(started), plan);
         }
         if (plan.compile()) {
-            if (plan.compileCommand().isEmpty()) {
+            GlueCompile compiled = compileGlue(root);
+            if (compiled.command().isEmpty()) {
                 return new Outcome(1, "", "error: glue changed and this project has no mvnw or gradlew\n"
                         + "fix: compile the tests, then run store run again\n", false, elapsed(started), plan);
             }
-            int compiled = compile(root, plan.compileCommand());
-            if (compiled != 0) {
-                return new Outcome(compiled, "", "error: glue compile failed\nfix: run the project wrapper and read its log\n",
+            if (compiled.exit() != 0) {
+                return new Outcome(compiled.exit(), "", "error: glue compile failed\nfix: run the project wrapper and read its log\n",
                         false, elapsed(started), plan);
             }
             Files.createDirectories(state(root));
-            Files.writeString(state(root).resolve(FINGERPRINT), glueFingerprint(root), StandardCharsets.UTF_8);
-            stop(root);
+            String fingerprint = glueFingerprint(root);
+            Files.writeString(state(root).resolve(FINGERPRINT), fingerprint, StandardCharsets.UTF_8);
+            StoreLog.log(root, "run", "compile", "tool=" + compiled.tool() + " detail=" + oneLine(compiled.detail()));
+            if (!compiled.rebuild() && "JavaCompiler".equals(compiled.tool())) retargetWarm(root, fingerprint);
+            else stop(root);
             plan = plan(root);
         } else {
             Files.createDirectories(state(root));
@@ -85,7 +95,24 @@ public final class StoreRun {
             try {
                 StoreGlueCompiler.compile(root);
             } catch (IllegalStateException failure) {
-                return new Outcome(1, "", failure.getMessage() + "\n", false, elapsed(started), plan);
+                String message = failure.getMessage() == null ? "" : failure.getMessage();
+                if (message.contains("rebuild")) {
+                    List<String> command = compileCommand(root);
+                    if (command.isEmpty()) {
+                        return new Outcome(1, "", "error: glue changed and this project has no mvnw or gradlew\n"
+                                + "fix: compile the tests, then run store run again\n", false, elapsed(started), plan);
+                    }
+                    GlueCompile rebuilt = rebuildAndRestart(root, new StoreGlueCompiler.IncrementalDecision(
+                            "wrapper", command, true, message));
+                    if (rebuilt.exit() != 0) {
+                        String err = rebuilt.detail().contains("fix:")
+                                ? rebuilt.detail() + (rebuilt.detail().endsWith("\n") ? "" : "\n")
+                                : "error: glue compile failed\nfix: run the project wrapper and read its log\n";
+                        return new Outcome(rebuilt.exit(), "", err, false, elapsed(started), plan);
+                    }
+                } else {
+                    return new Outcome(1, "", message + "\n", false, elapsed(started), plan);
+                }
             } catch (Exception failure) {
                 return new Outcome(1, "", "error: glue compile failed\nfix: store glue compile\n", false, elapsed(started), plan);
             }
@@ -102,12 +129,32 @@ public final class StoreRun {
         }
         boolean reused = workerAlive(root, Files.readString(state(root).resolve(FINGERPRINT)).trim());
         if (!reused) startWorker(root);
-        List<String> properties = runProperties(dashD);
+        List<String> properties = coldUnlessSpine(root, dashD);
         String response = send(root, runRequest(root, properties), Duration.ofMinutes(10));
         int exit = exitCode(response);
         String body = body(response);
         StoreLog.log(root, "run", "worker", (reused ? "reused " : "started ") + "exit=" + exit);
         return new Outcome(exit, body, "", reused, elapsed(started), plan);
+    }
+
+    /** Keeps a live worker and records the fingerprint the next run will match. */
+    private static void retargetWarm(Path root, String fingerprint) {
+        Path file = state(root).resolve(WARM);
+        if (!Files.isRegularFile(file)) return;
+        try {
+            Warm warm = readWarm(file);
+            if (ProcessHandle.of(warm.pid()).isEmpty()) return;
+            Files.writeString(file,
+                    warm.pid() + "\n" + warm.port() + "\n" + fingerprint + "\n",
+                    StandardCharsets.UTF_8);
+        } catch (Exception ignored) {
+            // A warm file that cannot be read starts a new worker.
+        }
+    }
+
+    private static String oneLine(String detail) {
+        if (detail == null || detail.isEmpty()) return "";
+        return detail.replace('\r', ' ').replace('\n', ' ').trim();
     }
 
     public static void stop(Path project) {
@@ -184,6 +231,11 @@ public final class StoreRun {
 
     public static Path workerDirectory(Path project) {
         return state(root(project));
+    }
+
+    /** Classpath a cold subprocess uses. The wrapper cache, or `pkb_store_run_classpath`. */
+    public static String wrapperClasspath(Path project) throws java.io.IOException {
+        return String.join(java.io.File.pathSeparator, classpathEntries(project, false));
     }
 
     static List<String> classpathEntries(Path project, boolean prependClasses) throws java.io.IOException {
@@ -285,6 +337,93 @@ public final class StoreRun {
         return HexFormat.of().formatHex(digest.digest());
     }
 
+    /**
+     * Compiles changed glue. {@code StoreRun.execute} calls this when the fingerprint changes.
+     * When {@code pkb_warm=on} and the spine warm JVM is alive, only files whose source hash changed
+     * are compiled with {@code javax.tools.JavaCompiler} into {@code .pickleball/spine/classes}, and the
+     * warm loader is reloaded. A missing-symbol diagnostic stops that warm JVM, runs the project wrapper,
+     * and starts the warm JVM again. {@code pkb_warm=off} keeps the wrapper compile.
+     */
+    public static GlueCompile compileGlue(Path project) throws Exception {
+        Path root = root(project);
+        if (WarmFlags.enabled() && WarmProcessFile.alive(root)) {
+            StoreGlueCompiler.IncrementalDecision decision = StoreGlueCompiler.compileChanged(root);
+            if (decision.rebuild()) return rebuildAndRestart(root, decision);
+            return new GlueCompile(0, decision.tool(), decision.command(), false, decision.detail());
+        }
+        List<String> command = compileCommand(root);
+        if (command.isEmpty()) {
+            return new GlueCompile(1, "wrapper", List.of(), false,
+                    "error: glue changed and this project has no mvnw or gradlew\nfix: compile the tests, then run store run again");
+        }
+        int code = compile(root, command);
+        String detail = code == 0 ? "wrapper" : "error: glue compile failed\nfix: run the project wrapper and read its log";
+        return new GlueCompile(code, "wrapper", command, false, detail);
+    }
+
+    /** Result of {@link #compileGlue(Path)}. */
+    public record GlueCompile(int exit, String tool, List<String> command, boolean rebuild, String detail) {
+        public GlueCompile {
+            command = command == null ? List.of() : List.copyOf(command);
+            tool = tool == null ? "" : tool;
+            detail = detail == null ? "" : detail;
+        }
+
+        public String commandLine() {
+            return String.join(" ", command);
+        }
+    }
+
+    /**
+     * Stops the warm JVM, runs the wrapper, and starts the warm JVM again.
+     * A missing wrapper command or a failed compile does not start it.
+     */
+    private static GlueCompile rebuildAndRestart(Path root, StoreGlueCompiler.IncrementalDecision decision) throws Exception {
+        List<String> command = decision.command().isEmpty() ? compileCommand(root) : decision.command();
+        if (command.isEmpty()) {
+            return new GlueCompile(1, "wrapper", List.of(), true, decision.detail());
+        }
+        ByteArrayOutputStream stopErr = new ByteArrayOutputStream();
+        int stopped = SpineCli.execute(
+                new String[] {"spine", "stop", "--project=" + root.toAbsolutePath().normalize()},
+                silent(),
+                new PrintStream(stopErr, true, StandardCharsets.UTF_8));
+        if (stopped != 0) {
+            return new GlueCompile(stopped, "wrapper", command, true, withCli(decision.detail(), stopErr));
+        }
+        int code = compile(root, command);
+        if (code != 0) {
+            return new GlueCompile(code, "wrapper", command, true,
+                    "error: glue compile failed\nfix: run the project wrapper and read its log");
+        }
+        Path marker = root.resolve(".pickleball").resolve("spine").resolve("wrapper-compiled");
+        Files.createDirectories(marker.getParent());
+        Files.writeString(marker, String.join(" ", command), StandardCharsets.UTF_8);
+        ByteArrayOutputStream startErr = new ByteArrayOutputStream();
+        int started = SpineCli.execute(
+                new String[] {"spine", "start", "--project=" + root.toAbsolutePath().normalize()},
+                silent(),
+                new PrintStream(startErr, true, StandardCharsets.UTF_8));
+        if (started != 0) {
+            return new GlueCompile(started, "wrapper", command, true, withCli(decision.detail(), startErr));
+        }
+        String detail = decision.detail()
+                + "\nstopped the warm JVM"
+                + "\nran the wrapper compile"
+                + "\nstarted the warm JVM again";
+        return new GlueCompile(0, "wrapper", command, true, detail);
+    }
+
+    private static PrintStream silent() {
+        return new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8);
+    }
+
+    private static String withCli(String detail, ByteArrayOutputStream err) {
+        String extra = err.toString(StandardCharsets.UTF_8).trim();
+        if (extra.isEmpty()) return detail;
+        return detail + "\n" + extra;
+    }
+
     public static List<String> compileCommand(Path project) {
         Path root = root(project);
         boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
@@ -312,6 +451,17 @@ public final class StoreRun {
             }
         }
         return extra;
+    }
+
+    /**
+     * {@code store run} stays cold unless the spine warm JVM is already up.
+     * An explicit {@code -Dpkb_warm=on} is dropped when {@code warm.json} has no live pid.
+     */
+    public static List<String> coldUnlessSpine(Path project, List<String> extra) {
+        List<String> properties = new ArrayList<>(runProperties(extra));
+        if (WarmProcessFile.alive(project)) return List.copyOf(properties);
+        properties.removeIf(token -> token.startsWith("-Dpkb_warm=") || token.startsWith("-Dpkb_warm_packages="));
+        return List.copyOf(properties);
     }
 
     public static List<String> runProperties(List<String> extra) {

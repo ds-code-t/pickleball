@@ -10,6 +10,7 @@ import org.openqa.selenium.remote.RemoteWebDriver;
 import tools.dscode.browser.proto.BrowserEventHub;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.WeakHashMap;
@@ -46,6 +47,16 @@ public final class SeleniumBidiEvents {
             if (log != null) log.close();
             if (network != null) network.close();
         }
+    }
+
+    /** The five BiDi subscriptions {@link #watch(WebDriver, tools.dscode.browser.proto.BrowserEventHub)} registers. */
+    static List<String> eventNames() {
+        return List.of(
+                "onConsoleEntry",
+                "onJavaScriptException",
+                "onBeforeRequestSent",
+                "onResponseCompleted",
+                "onFetchError");
     }
 
     public static boolean enabled() {

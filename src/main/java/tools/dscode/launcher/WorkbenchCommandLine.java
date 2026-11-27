@@ -1073,7 +1073,7 @@ final class WorkbenchCommandLine {
      */
     private static final Set<String> POSITIONAL_COMMANDS = Set.of(
             "pw", "setup", "optional-install", "optional-uninstall", "call",
-            "query", "history-query", "execute-step", "status", "selftest", "record",
+            "query", "history-query", "execute-step", "status", "selftest", "record", "bidi",
             "inject", "spine", "chat", "lease", "input"
     );
 

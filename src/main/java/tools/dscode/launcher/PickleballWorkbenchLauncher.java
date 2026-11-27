@@ -76,6 +76,21 @@ public final class PickleballWorkbenchLauncher {
             if (dashboard != 0) exitProcess(dashboard);
             return;
         }
+        int spine = dispatchSpineIfAny(args, System.out, System.err);
+        if (spine >= 0) {
+            if (spine != 0) exitProcess(spine);
+            return;
+        }
+        int bidi = dispatchBidiIfAny(args, System.out, System.err);
+        if (bidi >= 0) {
+            if (bidi != 0) exitProcess(bidi);
+            return;
+        }
+        int browser = dispatchBrowserIfAny(args, System.out, System.err);
+        if (browser >= 0) {
+            if (browser != 0) exitProcess(browser);
+            return;
+        }
         int cross = dispatchCrossIfAny(args, System.out, System.err);
         if (cross >= 0) {
             if (cross != 0) exitProcess(cross);
@@ -219,6 +234,31 @@ public final class PickleballWorkbenchLauncher {
     static int dispatchDashboardIfAny(String[] args, PrintStream out, PrintStream err) {
         if (!tools.dscode.store.dashboard.DashboardCli.handles(args)) return -1;
         return VerbDispatch.run("dashboard", VerbArgs.capture(args), out, err);
+    }
+
+    /**
+     * Warm spine process. Returns {@code -1} when {@code args} are not a {@code spine} invocation.
+     * Dispatched before {@code cross} and {@code store}.
+     */
+    static int dispatchSpineIfAny(String[] args, PrintStream out, PrintStream err) {
+        if (!SpineCli.handles(args)) return -1;
+        return VerbDispatch.run("spine", VerbArgs.capture(args), out, err);
+    }
+
+    /**
+     * Selenium BiDi verbs. Returns {@code -1} when {@code args} are not a {@code bidi} invocation.
+     * {@code script} and {@code intercept} hop to the JVM that holds the driver.
+     * {@code grid-attach} and help stay in this process.
+     */
+    static int dispatchBidiIfAny(String[] args, PrintStream out, PrintStream err) {
+        if (args == null || args.length == 0 || args[0] == null || !"bidi".equals(args[0].trim())) return -1;
+        return BidiSessionForward.run(Path.of("").toAbsolutePath().normalize(), args, out, err);
+    }
+
+    /** Debug-port list. Returns {@code -1} when {@code args} are not a {@code browser} invocation. */
+    static int dispatchBrowserIfAny(String[] args, PrintStream out, PrintStream err) {
+        if (!tools.dscode.browser.BrowserPorts.handles(args)) return -1;
+        return VerbDispatch.run("browser", VerbArgs.capture(args), out, err);
     }
 
     /**

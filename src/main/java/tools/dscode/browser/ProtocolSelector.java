@@ -17,12 +17,14 @@ import java.util.Locale;
  * {@link Preference#LIBRARY} is the scripted path and always returns
  * {@link SeleniumAdapter}.
  *
- * <p>Playwright (D12) is selected with {@link Preference#PLAYWRIGHT}, or with {@code pkb_protocol=playwright}
- * (property, then env {@code PKB_PROTOCOL}) for {@link Preference#AUTO} and {@link Preference#DIRECT}. It joins the
- * driver's own browser over CDP ({@code pkb_cdp_endpoint} first, then the driver's {@code se:cdp} or
- * {@code debuggerAddress}) and never launches or downloads a browser. When it cannot attach, the selector logs one
- * WARN per reason and falls back quietly to the CDP, BiDi, or Selenium choice above. The default, with no setting,
- * is unchanged. Since D12 Playwright is a normal (unshaded) dependency, so this choice needs no extra jar.
+ * <p>Playwright (D12) is selected with {@link Preference#PLAYWRIGHT}, with {@code pkb_protocol=playwright}
+ * (property, then env {@code PKB_PROTOCOL}) for {@link Preference#AUTO} and {@link Preference#DIRECT}, or when
+ * {@link BrowserVersionResolver} resolved {@code browser.channel} to Playwright. It joins the driver's own browser
+ * over CDP ({@code pkb_cdp_endpoint} first, then the driver's {@code se:cdp} or {@code debuggerAddress}). When the
+ * resolved adapter was Playwright, a connect failure throws {@code error:} and {@code fix:} and does not open
+ * Selenium. Configs with no {@code browser.channel} keep the quiet CDP, BiDi, or Selenium fallback. {@code safari}
+ * and {@code pkb_protocol=selenium} use Selenium. Since D12 Playwright is a normal (unshaded) dependency, so this
+ * choice needs no extra jar.
  *
  * <p>{@link #both(WebDriver)} (E1) keeps a BiDi and a CDP socket together for Chromium when the session publishes
  * both: Selenium sessions ask for {@code webSocketUrl=true} by default ({@code pkb_bidi=false} turns it off).
@@ -100,9 +102,19 @@ public final class ProtocolSelector {
             return new SeleniumAdapter(driver);
         }
         Family family = classify(driver.getClass().getName(), browserName(driver));
-        if (choice == Preference.PLAYWRIGHT || "playwright".equals(configuredProtocol())) {
-            BrowserFacade playwright = playwright(driver, family);
+        BrowserVersionResolver.Adapter resolved = BrowserVersionResolver.adapter();
+        if (resolved == BrowserVersionResolver.Adapter.SELENIUM) {
+            BrowserLog.info("selector", "selenium channel");
+            return new SeleniumAdapter(driver);
+        }
+        boolean playwrightRequired = resolved == BrowserVersionResolver.Adapter.PLAYWRIGHT;
+        if (playwrightRequired || choice == Preference.PLAYWRIGHT || "playwright".equals(configuredProtocol())) {
+            BrowserFacade playwright = playwright(driver, family, playwrightRequired);
             if (playwright != null) return playwright;
+            if (playwrightRequired) {
+                throw new IllegalStateException("error: Playwright connect failed\n"
+                        + "fix: the resolved adapter is Playwright and pickleball does not fall back to Selenium");
+            }
         }
         try {
             if (family == Family.FIREFOX) {
@@ -174,9 +186,10 @@ public final class ProtocolSelector {
         return protocols;
     }
 
-    private static BrowserFacade playwright(WebDriver driver, Family family) {
+    private static BrowserFacade playwright(WebDriver driver, Family family, boolean required) {
         if (family != Family.CHROMIUM) {
-            BrowserLog.warnOnce("playwright-family", "Playwright attaches over CDP to Chromium only (family " + family + "); not selected");
+            BrowserLog.warnOnce("playwright-family", "Playwright attaches over CDP to Chromium only (family " + family + ")"
+                    + (required ? "" : "; not selected"));
             return null;
         }
         String endpoint = PlaywrightConnection.configuredEndpoint(null);
@@ -185,7 +198,9 @@ public final class ProtocolSelector {
             endpoint = uri == null ? null : uri.toString();
         }
         if (endpoint == null) {
-            BrowserLog.warnOnce("playwright-endpoint", "no CDP endpoint for Playwright; falling back");
+            BrowserLog.warnOnce("playwright-endpoint", required
+                    ? "no CDP endpoint for Playwright"
+                    : "no CDP endpoint for Playwright; falling back");
             return null;
         }
         try {
@@ -199,7 +214,8 @@ public final class ProtocolSelector {
             BrowserLog.info("selector", "playwright " + PlaywrightConnection.redact(endpoint));
             return facade;
         } catch (RuntimeException failure) {
-            BrowserLog.warnOnce("playwright-connect", "Playwright attach failed: " + firstLine(failure.getMessage()) + "; falling back");
+            BrowserLog.warnOnce("playwright-connect", "Playwright attach failed: " + firstLine(failure.getMessage())
+                    + (required ? "" : "; falling back"));
             return null;
         }
     }
@@ -240,6 +256,7 @@ public final class ProtocolSelector {
         };
         ProtocolSockets.resetForTests();
         BrowserLog.resetForTests();
+        BrowserVersionResolver.resetForTests();
     }
 
     private static String browserName(WebDriver driver) {

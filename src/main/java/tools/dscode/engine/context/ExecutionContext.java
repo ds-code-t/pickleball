@@ -7,9 +7,23 @@ import tools.dscode.common.mappings.ParsingMap;
 import tools.dscode.engine.EngineLog;
 import tools.dscode.engine.model.EngineScenario;
 import tools.dscode.engine.model.EngineStep;
+import tools.dscode.engine.runtime.ResourceGate;
+import tools.dscode.engine.runtime.SnapshotChannel;
+import tools.dscode.engine.runtime.SnapshotContextWorker;
+import tools.dscode.engine.match.ForeignStepHosts;
+import tools.dscode.engine.runtime.WarmClassLoader;
+import tools.dscode.engine.runtime.WarmFlags;
+import tools.dscode.engine.runtime.WarmPackages;
+import tools.dscode.engine.runtime.WarmSpine;
+import tools.dscode.store.StoreGlueCompiler;
 
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.concurrent.TimeUnit;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -50,6 +64,8 @@ public final class ExecutionContext implements AutoCloseable {
     private Phase phase = Phase.READY;
     private Object legacy;
     private Object rootStep;
+    private WarmClassLoader warmLoader;
+    private Process subprocess;
     private boolean closed;
 
     private ExecutionContext(EngineScenario scenario) {
@@ -63,12 +79,33 @@ public final class ExecutionContext implements AutoCloseable {
         this.parsingMap.getMaps().removeAll(MapConfigurations.MapType.RUN_MAP);
         this.parsingMap.addMaps(nodeMap);
         this.scopes.push(new LinkedHashMap<>());
+        if (WarmFlags.enabled()) {
+            Process child = admit(id);
+            if (child == null) {
+                this.warmLoader = WarmSpine.shared().loader(id, warmClassUrls(), WarmPackages.resolve(null));
+            } else {
+                this.subprocess = child;
+            }
+        }
         CURRENT.set(this);
         EngineLog.log(null, "context", id, "open " + this.scenario.name());
     }
 
     public static ExecutionContext open(EngineScenario scenario) {
         return new ExecutionContext(scenario);
+    }
+
+    /** Classes directory the scenario JVM compiled into, when that directory exists. */
+    private static URL[] warmClassUrls() {
+        Path project = ForeignStepHosts.project();
+        if (project == null) project = Path.of("").toAbsolutePath().normalize();
+        Path classes = StoreGlueCompiler.warmClasses(project);
+        if (!Files.isDirectory(classes)) return new URL[0];
+        try {
+            return new URL[] {classes.toUri().toURL()};
+        } catch (MalformedURLException failure) {
+            return new URL[0];
+        }
     }
 
     public static ExecutionContext current() {
@@ -187,11 +224,54 @@ public final class ExecutionContext implements AutoCloseable {
         return rootStep;
     }
 
+    /** The warm loader for this scenario. Null when {@code pkb_warm} is off or the gate started a cold JVM. */
+    public WarmClassLoader warmLoader() {
+        return warmLoader;
+    }
+
+    /** True when the heap gate started a cold JVM for this context. That JVM does not use the warm loader. */
+    public boolean subprocess() {
+        return subprocess != null;
+    }
+
+    /** Cold JVM for this context. Null when the gate kept the work in-process. */
+    public Process subprocessProcess() {
+        return subprocess;
+    }
+
+    private static Process admit(String snapshotId) {
+        try {
+            return ResourceGate.admit(Path.of("").toAbsolutePath(), snapshotId, SnapshotContextWorker.class.getName());
+        } catch (RuntimeException failure) {
+            throw failure;
+        } catch (Exception failure) {
+            throw new IllegalStateException("error: heap gate could not admit a context\nfix: spine sample", failure);
+        }
+    }
+
+    public void holdWarm(WarmClassLoader loader) {
+        this.warmLoader = loader;
+    }
+
     @Override
     public void close() {
         if (closed) return;
         closed = true;
         phase = Phase.CLOSED;
+        if (warmLoader != null) {
+            WarmSpine.shared().detach(id, warmLoader);
+            warmLoader = null;
+        }
+        if (subprocess != null) {
+            SnapshotChannel.close(subprocess);
+            subprocess.destroyForcibly();
+            try {
+                subprocess.waitFor(2, TimeUnit.SECONDS);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+            subprocess = null;
+        }
         if (CURRENT.get() == this) {
             if (previous == null) CURRENT.remove();
             else CURRENT.set(previous);

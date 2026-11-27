@@ -2,6 +2,9 @@
   "version": "2.1.18",
   "source": "src/main/java/tools/dscode/launcher/WorkbenchCommandLine.java",
   "engine": ["help", "inventory", "run", "step"],
+  "spine": ["sample", "start", "stop", "warm"],
+  "bidi": ["grid-attach", "intercept", "off", "script"],
+  "browser": ["ports"],
   "desktop": ["attach", "click", "close", "launch", "list", "query", "resolve", "screenshot", "snapshot", "type", "walk"],
   "commands": {
     "forwarded": [
