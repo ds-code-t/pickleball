@@ -64,6 +64,7 @@ public final class NativeScenarioRun {
     ) {
         ScenarioTrackCloser tracked = ScenarioTrackCloser.open(source);
         try {
+        tools.dscode.store.StoreExecution.adoptFork(options == null ? null : options.project());
         if (ExecutionContext.current() == null && CurrentScenarioState.currentScenarioState.get() == null) {
             MappingProcessor.resetCommonMaps();
         }

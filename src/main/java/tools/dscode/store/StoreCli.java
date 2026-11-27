@@ -18,7 +18,7 @@ import java.util.List;
  */
 public final class StoreCli {
     public static final List<String> COMMANDS = List.of(
-            "help", "migrate", "sandbox", "changes", "status", "hydrate", "extract", "hydrate-out",
+            "help", "migrate", "sandbox", "branch", "changes", "status", "hydrate", "extract", "hydrate-out",
             "history", "entity", "feature", "category", "file", "glue", "files", "features",
             "scenario", "scenarios", "step", "steps", "conflicts", "pin", "delta", "head",
             "enable", "tag", "var", "query", "sql", "timeline", "retain", "run", "run-classpath",
@@ -79,6 +79,7 @@ public final class StoreCli {
                 }
                 case "migrate" -> StoreMigrate.cli(tokens, stdout, stderr);
                 case "sandbox" -> StoreSandbox.execute(project, tokens, stdout, stderr);
+                case "branch" -> StoreBranch.execute(project, tokens, stdout, stderr);
                 case "changes" -> StoreChanges.execute(project, tokens, stdout, stderr);
                 case "status" -> status(project, json(tokens), stdout);
                 case "hydrate" -> hydrate(project, tokens, stdout, stderr);
@@ -172,6 +173,8 @@ public final class StoreCli {
                 Usage: store sandbox drop <name> [--force] [--project=<dir>]
                 Usage: store sandbox prune [--older-than=<duration>] [--owner=<id>] [--dry-run] [--with-history] [--vacuum] [--project=<dir>]
                 Usage: store sandbox merge <name> [--policy=fail|branch-wins|main-wins] [--dry-run] [--drop] [--json] [--project=<dir>]
+                Usage: store branch fork --from-run=<runId> [--name=<name>] [--json] [--project=<dir>]
+                Usage: store branch discard --name=<name> [--force] [--json] [--project=<dir>]
                 Usage: store changes [--sandbox=<name>] [--since=<seq>] [--table=<t>] [--limit=<n>] [--json] [--project=<dir>]
                 Usage: store status [--project=<dir>] [--json]
                 Usage: store pin show [--json] [--project=<dir>]
@@ -222,7 +225,7 @@ public final class StoreCli {
                 Usage: store diff --run=<a> --run=<b> [--json] [--project=<dir>]
                 Usage: store run-classpath --out=<file> [--project=<dir>]
                 Files stay the source of truth. The working copy is .pickleball/store/main.db and is gitignored. Opening it starts no process and downloads nothing.
-                store sandbox create defaults to --mode=cow. The child records schema_meta sandbox_mode=cow and _pkb_branch parent. Edits are deltas in that child. A delete is a tombstone. --mode=copy is an independent database with no parent. store sandbox promote requires --logs=clear|archive. --to=parent writes one expensive delta per changed head row on the parent. --to=top walks parents until main. Promote onto main syncs those files through store extract and skips a both-sides conflict. Promote onto another sandbox does not touch the working tree. --logs=clear deletes that sandbox's run_logs rows. --logs=archive leaves them and prefixes runs.note with archived. Set pkb_store_log=sandbox to log create and promote. The log names the sandbox and does not include payloads.
+                store sandbox create defaults to --mode=cow. The child records schema_meta sandbox_mode=cow and _pkb_branch parent. Edits are deltas in that child. A delete is a tombstone. --mode=copy is an independent database with no parent. store branch fork --from-run=<runId> creates a cow sandbox and copies that run's commit and head into the pin. The completed run is not updated. The first delta kind is fork. When --name is omitted, the name is the run id lowercased, with other characters replaced by hyphens, at most 48 characters, and prefixed when it would start with a digit. store branch discard --name=<name> deletes a fork whose only delta is that fork. A later delta needs --force. The parent is not changed. store sandbox promote requires --logs=clear|archive. --to=parent writes one expensive delta per changed head row on the parent. --to=top walks parents until main. Promote onto main syncs those files through store extract and skips a both-sides conflict. Promote onto another sandbox does not touch the working tree. --logs=clear deletes that sandbox's run_logs rows. --logs=archive leaves them and prefixes runs.note with archived. Set pkb_store_log=sandbox to log create and promote. The log names the sandbox and does not include payloads.
                 sandbox merge compares _pkb_base, the sandbox, and main by hash. The default policy fail writes nothing when any key conflicts, prints a text table, and saves sandboxes/<name>/merge-<time>.json. branch-wins and main-wins resolve those keys. One transaction applies the chosen rows, rebuilds derived feature rows, and re-baselines the sandbox. --dry-run writes nothing. --drop drops the sandbox after a successful merge. store changes lists the _pkb_changes rows for the bound database. --since and --limit page by sequence. pkb_store_changes_days (default 14) is how long store retain and sandbox prune keep those rows. Set pkb_store_log=merge,changes to log them.
                 status and hydrate --dry-run do not create a database when it is missing.
                 store pin show prints the commit pin (commit sha, time, and dirty). An empty git directory stores an empty sha and dirty 0. store delta list prints the append-only log. store delta undo appends an inverse delta and does not delete the undone row. store delta redo appends a copy of the delta that undo inverted. store head show prints the flattened head and rebuilds it when it is stale. store head rebuild replays the remaining deltas. After a flatten, more than 100 deltas are copied to delta_archive in runstate.db and removed from the source deltas table. store head rebuild --from-archive replays one archived seq and refuses a seq that is still in the live window. A tracked run freezes that head id and the enabled entity hashes in runstate.db and does not copy source.db. Set pkb_store_log=pin,delta to log pin, head, append, undo, redo, fold, and snapshot lines. The snapshot log entity is the run id.
@@ -757,15 +760,25 @@ public final class StoreCli {
             return 2;
         }
         try (StoreDatabase database = StoreDatabase.open(project)) {
-            UniversalEntity.Pin pin = UniversalEntity.refreshPin(database.connection(), project);
+            tools.dscode.store.sql.Binding scope = StoreScope.current();
+            boolean fork = scope != null && !scope.primary();
+            UniversalEntity.Pin pin = fork
+                    ? UniversalEntity.loadPin(database.connection())
+                    : UniversalEntity.refreshPin(database.connection(), project);
+            String headId = UniversalEntity.loadPinHead(database.connection());
+            String branch = StoreScope.label(scope);
             if (json(tokens)) {
                 stdout.println("{\"commitSha\":\"" + jsonEscape(pin.commitSha())
                         + "\",\"committedAt\":\"" + jsonEscape(pin.committedAt())
-                        + "\",\"dirty\":" + pin.dirty() + "}");
+                        + "\",\"dirty\":" + pin.dirty()
+                        + ",\"headId\":\"" + jsonEscape(headId)
+                        + "\",\"branch\":\"" + jsonEscape(branch) + "\"}");
             } else {
                 stdout.println("commit " + pin.commitSha());
                 stdout.println("committedAt " + pin.committedAt());
                 stdout.println("dirty " + (pin.dirty() ? 1 : 0));
+                if (!headId.isBlank()) stdout.println("head " + headId);
+                stdout.println("branch " + branch);
             }
             return 0;
         } catch (Exception failure) {

@@ -279,6 +279,10 @@ public final class WorkbenchUiServer {
     private static boolean rendererMutation(String verb, List<String> positionals) {
         if (verb == null) return false;
         if ("point".equals(verb) || "ask-answer".equals(verb)) return true;
+        if ("engine".equals(verb) && positionals != null && positionals.size() > 1
+                && "map".equals(positionals.get(0)) && "set".equals(positionals.get(1))) {
+            return true;
+        }
         if (!"store".equals(verb) || positionals == null || positionals.isEmpty()) return false;
         String family = positionals.get(0);
         if ("enable".equals(family) || "tag".equals(family) || "retain".equals(family)
@@ -286,6 +290,9 @@ public final class WorkbenchUiServer {
             return true;
         }
         String action = positionals.size() > 1 ? positionals.get(1) : "";
+        if ("branch".equals(family)) {
+            return "fork".equals(action) || "discard".equals(action) || "promote".equals(action) || "link".equals(action);
+        }
         return STORE_WRITES.contains(action);
     }
 

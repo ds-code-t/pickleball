@@ -20,6 +20,8 @@ button { margin-right: 8px; }
 <header>
 <h1 id="title">Pickleball</h1>
 <label>Branch <select id="branch"></select></label>
+<label>From run <input id="fork-run" type="text"></label>
+<button id="fork" type="button">Fork</button>
 <label>Search <input id="search" type="text"></label>
 <button id="lease" type="button">Lease</button>
 <label>Answer <input id="ask-id" type="text"><input id="ask-value" type="text">
@@ -69,7 +71,17 @@ button { margin-right: 8px; }
 </main>
 <script>
 const token = new URLSearchParams(location.search).get("t") || "";
-const accents = ["#1f6feb", "#0f7b4c", "#8a4b08", "#6e3cbc", "#9b2335", "#0b6e7a", "#3d4c6b", "#5c4a32"];
+let palette = [];
+let colorFor = function (name, colors) {
+    const list = colors || [];
+    if (!list.length) return "";
+    let hash = 0;
+    const text = name || "";
+    for (let index = 0; index < text.length; index++) hash = (hash + text.charCodeAt(index)) % list.length;
+    return list[hash];
+};
+let shownBranch = "main";
+let forkName = "";
 document.querySelectorAll("a").forEach(function (link) {
     const href = link.getAttribute("href");
     if (href && location.search && href.indexOf("?") < 0) link.setAttribute("href", href + location.search);
@@ -146,11 +158,10 @@ function editorLanguage(path) {
     return "java";
 }
 function paint(name) {
-    document.getElementById("title").textContent = name;
-    document.title = name;
-    let hash = 0;
-    for (let index = 0; index < name.length; index++) hash = (hash + name.charCodeAt(index)) % accents.length;
-    document.documentElement.style.setProperty("--accent", accents[hash]);
+    shownBranch = name || "main";
+    document.getElementById("title").textContent = shownBranch;
+    document.title = shownBranch;
+    if (palette.length) document.documentElement.style.setProperty("--accent", colorFor(shownBranch, palette));
 }
 function definitionMatches(source, stepText) {
     if (!stepText) return false;
@@ -361,6 +372,54 @@ document.getElementById("branch").addEventListener("change", function () {
     const name = document.getElementById("branch").value;
     callStore(["sandbox", "use", name]);
     paint(name);
+});
+document.getElementById("fork").addEventListener("click", async function () {
+    const run = document.getElementById("fork-run").value || "";
+    if (!run) return;
+    const result = await callStore(["branch", "fork", "--from-run=" + run, "--json"]);
+    const body = payload(result.out || "");
+    if (body && body.name) forkName = body.name;
+    if (body && body.branch) paint(body.branch);
+    else if (forkName) paint(forkName);
+});
+window.addEventListener("pagehide", function () {
+    if (!forkName) return;
+    const request = new XMLHttpRequest();
+    request.open("POST", "/store" + location.search, false);
+    request.setRequestHeader("content-type", "application/json");
+    request.setRequestHeader("x-pkb-ui-token", token);
+    request.send(JSON.stringify({ verb: "store", args: ["delta", "list", "--sandbox=" + forkName, "--json"] }));
+    let onlyFork = false;
+    try {
+        const parsed = JSON.parse(request.responseText);
+        const out = JSON.parse(parsed.out || "{}");
+        const entry = out.items && out.items.length ? out.items[0] : out;
+        const deltas = entry.deltas || [];
+        onlyFork = deltas.length > 0 && deltas.every(function (row) { return row.kind === "fork"; });
+    } catch (failure) {
+        onlyFork = false;
+    }
+    if (!onlyFork) return;
+    request.open("POST", "/store" + location.search, false);
+    request.setRequestHeader("content-type", "application/json");
+    request.setRequestHeader("x-pkb-ui-token", token);
+    request.send(JSON.stringify({ verb: "store", args: ["branch", "discard", "--name=" + forkName] }));
+});
+fetch("/colors.json" + location.search).then(function (response) { return response.json(); }).then(function (colors) {
+    if (Array.isArray(colors) && colors.length) {
+        palette = colors;
+        paint(shownBranch);
+    }
+}).catch(function () {});
+import("/color.mjs" + location.search).then(function (module) {
+    if (module && typeof module.colorFor === "function") {
+        colorFor = module.colorFor;
+        if (palette.length) paint(shownBranch);
+    }
+}).catch(function () {});
+callStore(["pin", "show", "--json"]).then(function (result) {
+    const body = payload(result.out || "");
+    if (body && body.branch) paint(body.branch);
 });
 callStore(["scenarios", "list", "--json"]).then(function (result) {
     if (result.out) {

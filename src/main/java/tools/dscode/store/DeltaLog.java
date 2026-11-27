@@ -23,6 +23,7 @@ public final class DeltaLog {
     public static final String DELETE = "delete";
     public static final String UNDO = "undo";
     public static final String REDO = "redo";
+    public static final String FORK = "fork";
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -57,6 +58,42 @@ public final class DeltaLog {
     public static long append(Connection connection, Path project, String kind, String table, String pk,
                               String before, String after, boolean expensive) throws SQLException {
         return append(connection, project, kind, table, pk, before, after, expensive, 0L);
+    }
+
+    /**
+     * First delta on a fork. The payload names the source run and head.
+     * The log entity is the branch name. Capability {@code delta} stays off unless named.
+     */
+    public static long fork(Connection connection, Path project, String branchName, String fromRun, String fromHead)
+            throws SQLException {
+        if (branchName == null || branchName.isBlank()) {
+            throw new IllegalArgumentException("delta needs a table and a primary key");
+        }
+        boolean own = connection.getAutoCommit();
+        if (own) connection.setAutoCommit(false);
+        try {
+            ObjectNode node = MAPPER.createObjectNode();
+            node.put("tbl", "branch");
+            node.put("pk", branchName);
+            node.putNull("before");
+            node.put("after", "{\"fromRun\":\"" + json(fromRun) + "\",\"fromHead\":\"" + json(fromHead) + "\"}");
+            node.put("fromRun", fromRun == null ? "" : fromRun);
+            node.put("fromHead", fromHead == null ? "" : fromHead);
+            long seq = UniversalEntity.insert(connection, """
+                    INSERT INTO deltas(at, actor, kind, payload_json, expensive)
+                    VALUES (?, ?, ?, ?, ?)
+                    """, Instant.now().toString(), actor(connection), FORK, node.toString(), 0);
+            HeadMaterializer.applyPending(connection, project);
+            if (own) connection.commit();
+            StoreLog.log(project, "delta", branchName, branchName,
+                    "append seq=" + seq + " kind=" + FORK + " pk=" + branchName + " expensive=0");
+            return seq;
+        } catch (SQLException | RuntimeException failure) {
+            if (own) connection.rollback();
+            throw failure;
+        } finally {
+            if (own) connection.setAutoCommit(true);
+        }
     }
 
     public static long undo(Connection connection, Path project) throws SQLException {
@@ -200,6 +237,11 @@ public final class DeltaLog {
                 parsed.after(),
                 parsed.undoOf(),
                 rows.getInt(6) != 0);
+    }
+
+    private static String json(String value) {
+        if (value == null || value.isEmpty()) return "";
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
     private static String textOrNull(JsonNode node) {

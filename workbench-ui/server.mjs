@@ -240,6 +240,26 @@ const server = http.createServer((req, res) => {
         return;
     }
     const assetPrefix = "/node_modules/";
+    if (req.method === "GET" && (name === "/color.mjs" || name === "/colors.json")) {
+        const file = path.resolve(root, name.slice(1));
+        const base = path.resolve(root);
+        if (file !== base && !file.startsWith(base + path.sep)) {
+            send(res, 404, "not found\n");
+            return;
+        }
+        if (!fs.existsSync(file) || !fs.statSync(file).isFile()) {
+            send(res, 404, "not found\n");
+            return;
+        }
+        const bytes = fs.readFileSync(file);
+        res.writeHead(200, {
+            "content-type": contentType(file),
+            "content-length": bytes.length,
+            "cache-control": "no-store"
+        });
+        res.end(bytes);
+        return;
+    }
     if (req.method === "GET" && name.startsWith(assetPrefix)) {
         const relative = name.slice(1);
         if (relative.split("/").includes("..")) {

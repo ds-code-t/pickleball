@@ -257,6 +257,7 @@ MCP-only count: 0
 | storage | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | storage-state | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | store | store | cli | tools.dscode.store.StoreCli.execute |
+| store branch | store | cli | tools.dscode.store.StoreCli.execute |
 | store category | store | cli | tools.dscode.store.StoreCli.execute |
 | store changes | store | cli | tools.dscode.store.StoreCli.execute |
 | store conflicts | store | cli | tools.dscode.store.StoreCli.execute |

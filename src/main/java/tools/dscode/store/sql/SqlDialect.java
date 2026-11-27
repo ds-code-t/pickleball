@@ -183,6 +183,7 @@ public final class SqlDialect {
                 commit_sha TEXT NOT NULL,
                 committed_at TEXT NOT NULL,
                 dirty INTEGER NOT NULL,
+                head_id TEXT NOT NULL DEFAULT '',
                 CHECK (id = 1)
             )
             """,
@@ -561,7 +562,7 @@ public final class SqlDialect {
      * A database that already has {@code hydration_spine} still needs columns added
      * by a later build. The full DDL stays on the slow path. This check looks up
      * the newest columns, then {@link #ensureHydrationColumns} when one is missing.
-     * {@code steps.context_scope}, {@code steps.visual_ref}, {@code step_definitions.host}, and the {@code fixtures} table are all required.
+     * {@code steps.context_scope}, {@code steps.visual_ref}, {@code step_definitions.host}, the {@code fixtures} table, and {@code pins.head_id} are all required.
      */
     private static void ensureAdditiveOnReady(SqlSession session) throws SQLException {
         if (additiveColumnsPresent(session)) return;
@@ -580,7 +581,9 @@ public final class SqlDialect {
                     && "visual_ref".equals(session.scalar(
                     "SELECT name FROM pragma_table_info('steps') WHERE name = ?", "visual_ref"))
                     && "fixtures".equals(session.scalar(
-                    "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'fixtures'"));
+                    "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'fixtures'"))
+                    && "head_id".equals(session.scalar(
+                    "SELECT name FROM pragma_table_info('pins') WHERE name = ?", "head_id"));
         } catch (SQLException ignored) {
             return false;
         }
@@ -636,6 +639,7 @@ public final class SqlDialect {
         addColumn(session, "steps", "context_mode", "TEXT");
         addColumn(session, "steps", "context_scope", "TEXT");
         addColumn(session, "steps", "visual_ref", "TEXT");
+        addColumn(session, "pins", "head_id", "TEXT NOT NULL DEFAULT ''");
         session.script("""
                 CREATE TABLE IF NOT EXISTS fixtures (
                     name TEXT NOT NULL,

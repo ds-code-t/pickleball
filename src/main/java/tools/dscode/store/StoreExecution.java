@@ -460,7 +460,38 @@ public final class StoreExecution {
         return StoreConfig.project();
     }
 
+    /**
+     * A fork must not append to the run id it was copied from.
+     * When this JVM is bound to a sandbox that does not own {@code pkb_run_id}, the id is replaced.
+     * Main, and a run that already belongs to this sandbox, stay on the caller id.
+     */
+    public static void adoptFork(Path project) {
+        try {
+            tools.dscode.store.sql.Binding binding = StoreScope.current();
+            if (binding == null || binding.primary()) return;
+            String current = System.getProperty("pkb_run_id");
+            if (current == null || current.isBlank()) return;
+            Path root = resolveProject(project);
+            String sandbox = null;
+            try (Connection connection = tools.dscode.store.sql.SqliteOpen.open(StorePaths.runState(root));
+                 PreparedStatement statement = connection.prepareStatement(
+                         "SELECT sandbox FROM runs WHERE run_id = ?")) {
+                statement.setString(1, current.trim());
+                try (ResultSet rows = statement.executeQuery()) {
+                    if (!rows.next()) return;
+                    sandbox = rows.getString(1);
+                }
+            }
+            if (sandbox == null) sandbox = "";
+            if (binding.sandboxColumn().equals(sandbox)) return;
+            System.setProperty("pkb_run_id", newRunId());
+        } catch (RuntimeException | SQLException ignored) {
+            // Tracking must not fail the scenario.
+        }
+    }
+
     private static Active active(Path project, String scenarioName, String uri, int scenarioLine, Integer examplesRow) {
+        adoptFork(project);
         Active active = ACTIVE.get();
         String key = scenarioKey(uri, scenarioLine);
         String recorded = recordedScenario(scenarioName);

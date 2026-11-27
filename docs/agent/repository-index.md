@@ -931,6 +931,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/store/sql/SqlStore.java`
 - `src/main/java/tools/dscode/store/sql/StoreFiles.java`
 - `src/main/java/tools/dscode/store/StoreArtifacts.java`
+- `src/main/java/tools/dscode/store/StoreBranch.java`
 - `src/main/java/tools/dscode/store/StoreChanges.java`
 - `src/main/java/tools/dscode/store/StoreCli.java`
 - `src/main/java/tools/dscode/store/StoreConfig.java`
@@ -1293,6 +1294,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/AutoSnapshotTest.java`
 - `src/test/java/tools/dscode/launcher/BackendHandoffLiveTest.java`
 - `src/test/java/tools/dscode/launcher/BidiSessionGateTest.java`
+- `src/test/java/tools/dscode/launcher/BranchColorTest.java`
 - `src/test/java/tools/dscode/launcher/BrowserAttachTest.java`
 - `src/test/java/tools/dscode/launcher/BrowserEventsBidiLiveTest.java`
 - `src/test/java/tools/dscode/launcher/BrowserEventsLiveTest.java`
@@ -1451,6 +1453,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/scenarioobject/ScenarioObjectSteps.java`
 - `src/test/java/tools/dscode/ScenarioObjectTest.java`
 - `src/test/java/tools/dscode/store/AgentEnvelopeStoreTest.java`
+- `src/test/java/tools/dscode/store/BranchForkTest.java`
 - `src/test/java/tools/dscode/store/CategoryEditTest.java`
 - `src/test/java/tools/dscode/store/ChangesCliTest.java`
 - `src/test/java/tools/dscode/store/ConflictChoiceTest.java`

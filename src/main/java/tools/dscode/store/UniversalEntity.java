@@ -95,6 +95,27 @@ public final class UniversalEntity {
         return new Pin(sha, at, dirty);
     }
 
+    /** Copies a finished run's commit and head onto this database. Does not read live git. */
+    public static void copyPin(Connection connection, String commitSha, String headId, boolean dirty) throws SQLException {
+        String sha = commitSha == null ? "" : commitSha;
+        String head = headId == null ? "" : headId;
+        String at = Instant.now().toString();
+        change(connection, """
+                INSERT INTO pins(id, commit_sha, committed_at, dirty, head_id) VALUES (1, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    commit_sha = excluded.commit_sha,
+                    committed_at = excluded.committed_at,
+                    dirty = excluded.dirty,
+                    head_id = excluded.head_id
+                """, sha, at, dirty ? 1 : 0, head);
+    }
+
+    /** Stored {@code pins.head_id}, or an empty string when the pin row is absent. */
+    public static String loadPinHead(Connection connection) throws SQLException {
+        String value = text(connection, "SELECT head_id FROM pins WHERE id = 1");
+        return value == null ? "" : value;
+    }
+
     public static Pin loadPin(Connection connection) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(
                 "SELECT commit_sha, committed_at, dirty FROM pins WHERE id = 1")) {
