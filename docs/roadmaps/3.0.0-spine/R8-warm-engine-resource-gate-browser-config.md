@@ -35,7 +35,7 @@ Closes the classloader open item, the Java hot-reload rule, and the dependency-c
 
 `GlueStaticScan` from R3 already warns. Do not make the warning a failure. The exact text stays `warn: static mutable field <Class>.<field> will survive a warm reload; move it to scenario state`.
 
-Incremental compile: `StoreGlueCompiler` gains a path that uses `javax.tools.JavaCompiler` for files whose source hash changed since the last warm compile. The first compile on `spine start` may shell out to the project wrapper (`mvnw.cmd` or `gradlew.bat`) once. Later single-file changes use `JavaCompiler` and do not spawn Maven or Gradle. When `pkb_warm=on` and `.pickleball/spine/warm.json` names a live process, `StoreRun.compileGlue` (the method `StoreRun.execute` calls) compiles those changed sources into `.pickleball/spine/classes` and reloads the warm loader. A missing-symbol diagnostic reports `rebuild` and runs the wrapper. `pkb_warm=off` keeps the wrapper compile. `warmCompile`'s first call still names the wrapper and does not run it. A new dependency in the source (an import whose package is not on the current classpath) is a rebuild: stop the warm JVM, run the wrapper compile, start again. Detect that by a compile error whose message contains `cannot find symbol` or `package ... does not exist` after a single-file compile. Do not guess from the import list alone.
+Incremental compile: `StoreGlueCompiler` gains a path that uses `javax.tools.JavaCompiler` for files whose source hash changed since the last warm compile. The first compile on `spine start` may shell out to the project wrapper (`mvnw.cmd` or `gradlew.bat`) once. Later single-file changes use `JavaCompiler` and do not spawn Maven or Gradle. A new dependency in the source (an import whose package is not on the current classpath) is a rebuild: stop the warm JVM, run the wrapper compile, start again. Detect that by a compile error whose message contains `cannot find symbol` or `package ... does not exist` after a single-file compile. Do not guess from the import list alone.
 
 CLI:
 
@@ -137,8 +137,8 @@ Adapter choice after resolution: `safari` uses Selenium `safaridriver`. `chrome`
 
 Opt-in verbs, off unless `browser.selenium.bidi: on` or `pkb_selenium_bidi=on`:
 
-- `bidi script` in `tools.dscode.browser.SeleniumBidiCommands` evaluates on the live Selenium session (`script.evaluate`).
-- `bidi intercept` replaces a Selenium response body through `network.provideResponse` after a `responseStarted` intercept. Playwright sessions refuse it.
+- `bidi script` in new class `tools.dscode.browser.SeleniumBidiCommands`
+- `bidi intercept` for a Selenium response-body replacement. Playwright sessions do not use it.
 - `bidi grid-attach --url=` through `DriverConstruction`
 
 Event subscriptions stay the five already in `SeleniumBidiEvents` (`onConsoleEntry`, `onJavaScriptException`, `onBeforeRequestSent`, `onResponseCompleted`, `onFetchError`), still gated by `pkb_scenario_events=on`. Do not add events.
@@ -173,9 +173,9 @@ Create `src/test/java/tools/dscode/browser/DebugPortOwnerTest.java`. Two attache
 
 Closes leftovers 6.3.6 and 6.7.3.
 
-**Warm Playwright/CDP.** When `pkb_warm=on` and `ResourceGate` returns `allow`, `spine start` opens one CDP connection to a browser the project config already names, using the existing `PlaywrightConnection` path, and holds it. `pkb_warm=off` does not open it. A `refuse` decision does not open it. The connection is closed on `spine stop`. This is the warm start leftover 6.3.6. It does not run when the gate refuses. `spine start` writes `-Dpkb_warm`, `-Dpkb_warm_packages`, `-Dpkb_heap_subprocess_percent`, `-Dpkb_heap_refuse_percent`, `-Dpkb_worker_pool`, and a clean `-Dpkb_cdp_endpoint` into `.pickleball/spine/java.args` when those properties are set. A credentialed endpoint is passed as `PKB_CDP_ENDPOINT` and is not written into `java.args`.
+**Warm Playwright/CDP.** When `pkb_warm=on` and `ResourceGate` returns `allow`, `spine start` opens one CDP connection to a browser the project config already names, using the existing `PlaywrightConnection` path, and holds it. `pkb_warm=off` does not open it. A `refuse` decision does not open it. The connection is closed on `spine stop`. This is the warm start leftover 6.3.6. It does not run when the gate refuses.
 
-**UIA cache.** `dev.domengine.desktop.DesktopTree` keeps one cached tree per attached window id when `pkb_warm=on`. Live Windows attach subscribes to the UI Automation structure-changed event for that window. The handler calls `DesktopTree.structureChanged`, which drops that window's entry. Close unsubscribes. A listener that does not start does not fail attach. Other platforms do not subscribe. `pkb_warm=off` does not cache. The cache byte size is checked by `ResourceGate` before insert. A tree that would cross the refuse line is not cached, and the call reads through. `pkb_engine_log=gate` entity `desktop` logs `cache hit`, `cache miss`, or `cache refuse`.
+**UIA cache.** `dev.domengine.desktop.DesktopTree` keeps one cached tree per attached window id when `pkb_warm=on`. A structure-changed event drops that window's entry. `pkb_warm=off` does not cache. The cache byte size is checked by `ResourceGate` before insert. A tree that would cross the refuse line is not cached, and the call reads through. `pkb_engine_log=gate` entity `desktop` logs `cache hit`, `cache miss`, or `cache refuse`.
 
 Remove tech-debt rows 6.3.6 and 6.7.3.
 

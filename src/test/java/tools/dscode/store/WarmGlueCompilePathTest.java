@@ -8,6 +8,10 @@ import tools.dscode.engine.match.JavaStepHost;
 import tools.dscode.engine.runtime.WarmClassLoader;
 import tools.dscode.engine.runtime.WarmProcessFile;
 import tools.dscode.engine.runtime.WarmSpine;
+import tools.dscode.launcher.SpineCli;
+
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -43,6 +47,10 @@ class WarmGlueCompilePathTest {
 
     @AfterEach
     void release() {
+        SpineCli.execute(
+                new String[] {"spine", "stop", "--project=" + project.toAbsolutePath()},
+                new PrintStream(new ByteArrayOutputStream()),
+                new PrintStream(new ByteArrayOutputStream()));
         StoreGlueCompiler.resetWarmState();
         WarmSpine.shared().reset();
         WarmProcessFile.delete(project);

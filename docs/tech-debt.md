@@ -49,12 +49,11 @@ The 3.0.0 retest-fix rounds (R, S) ran only targeted tests on the Linux box and 
 - **Spine R3, Windows only:** `JavaStepHostTest`, `GlueStaticScanTest`, `NodeStepHostTest`, `NodeStepHostTsTest`, `EngineDoesNotSpawnNodeTest`, `JsStepCatalogTest`, `JsStepRunTest`, `PlaywrightTestIngestTest`, `PlaywrightSpecHostTest`, and `PlaywrightSpecIngestLiveTest`.
 - **Spine R4, Windows only:** `VerbDispatchTest`, `McpDirectHotPathTest`, `VerbCatalogTest`, `ElementRecordTest`, `ArgsFileTest`, `AgentEnvelopeStoreTest`, `RouteModifyBodyTest`, `ExecuteStepsPwTest`, `DesktopLaunchTest`, `DesktopScreenshotVerbTest`, and `DesktopLaunch`.
 - **Spine R7, Windows only:** `RunSnapshotTest`, `ReportScriptTest`, `VisualTargetTest`, `PickleballExceptionTest`, `SnapFindIndexTest` (`tools.dscode.common.composite`), `SnapshotRetainTest`, and `CrossStoreTest`.
-- **Spine R8, Windows only:** `WarmClassLoaderTest`, `WarmColdParityTest`, `IncrementalGlueCompileTest`, `ResourceGateTest`, `BrowserVersionResolverTest`, `BrowserCacheAndLocalVersionTest`, `SeleniumBidiCommandTest`, `DebugPortOwnerTest`, `DebugPortAttachTest`, `SnapshotContextGateTest`, `WarmCdpTest`, `DesktopTreeCacheTest`, `WindowsStructureChangedTest`, `WarmGlueCompilePathTest`, `SubprocessStepTest`, `WarmGlueScenarioTest`, `BidiCliSessionTest`, and `WindowsStructureLiveTest`.
+- **Spine R8, Windows only:** `WarmClassLoaderTest`, `WarmColdParityTest`, `IncrementalGlueCompileTest`, `ResourceGateTest`, `BrowserVersionResolverTest`, `BrowserCacheAndLocalVersionTest`, `SeleniumBidiCommandTest`, `DebugPortOwnerTest`, `DebugPortAttachTest`, `SnapshotContextGateTest`, `WarmCdpTest`, `DesktopTreeCacheTest`, `WindowsStructureChangedTest`, `WarmGlueCompilePathTest`, `SubprocessStepTest`, `WarmGlueScenarioTest`, `BidiCliSessionTest`, `WindowsStructureLiveTest`, and `WarmRebuildRestartTest`.
 - **macOS, Safari:** channel `safari` selects Selenium `safaridriver` and the Windows test does not start a process. A live Safari run on macOS has not been executed.
 
 ## Spine R8 fix-back 2 (open, found in fix-back 1 verification 2026-11-26)
 
-5. Fix-back 1 rewrote the R8 roadmap below the original spec, and a `rebuild` decision does not stop the warm JVM, run the wrapper compile, and start that JVM again.
 6. Configuration, Playwright, agent, and release-note text claim the gate moves work, the warm loader reloads edited glue, and `bidi` reaches the live session before that behavior is delivered.
 7. A successful `cdn` download reports the requested version with a null binary, and a debug-port claim is released only through `PageSurfaces.quitManaged`.
 

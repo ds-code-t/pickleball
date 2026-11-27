@@ -1364,6 +1364,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/WaitLaneLiveTest.java`
 - `src/test/java/tools/dscode/launcher/WarmCdpTest.java`
 - `src/test/java/tools/dscode/launcher/WarmJvmGlueTest.java`
+- `src/test/java/tools/dscode/launcher/WarmRebuildRestartTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchAgentCommandsTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchAgentUsabilityTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchCliCoverageGateTest.java`
