@@ -65,3 +65,14 @@ These items stay out of `3.0.0-consumer-fixes`. The roadmap lists them under "No
 
 The `typescript` npm package is pinned in `workbench-ui/package.json` and packed into the jar next to `monaco-editor`, but nothing loads it today. Monaco has its own TypeScript language service, and `.ts` step definitions run through `NodeStepHost` on Node's built-in type stripping. Dan chose to keep it for now. Later, decide whether to drop it (smaller jar, one fewer pinned version) or use it as a fallback that converts `.ts` step files Node's type stripping cannot run (enums, namespaces, parameter properties, decorators) to plain JavaScript first.
 
+## Spine R5 fix-back 2 (open)
+
+1. `inject`, `input block`, and `lease` run in the short-lived CLI JVM, so the overlay, the input shield, and the lease never reach the JVM that holds the page.
+2. A click on a shown overlay returns early in `ours(node)`, so `overlay-poll` never receives the runtime event that sets `read_at`.
+3. `WorkbenchRendererHost` ignores `--run-id` and `--agent-id`, and `show-run` answers `SHOWN` without loading that run into the Node renderer.
+4. The Node renderer posts `/store` with no session, so a fresh project fails the session rule before a page can read or save glue.
+5. Renderer writes such as `store glue put` and `store var set` are not refused when another holder has the `ui` or `both` lease.
+6. `PolishRoadmapTest.warmPingIsUnderOneSecond` fails on Windows with `CreateProcess error=206` because the child JVM gets the full classpath on the command line.
+7. The fix-back 1 release note says `inject` and `input block` reach a real page through the CLI, and the guides still need a fix-back 2 description of the process boundary.
+8. Generated pages are served without a same-origin `Content-Security-Policy`.
+
