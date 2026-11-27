@@ -498,26 +498,12 @@ document.getElementById("fork").addEventListener("click", async function () {
 });
 window.addEventListener("pagehide", function () {
     if (!forkName) return;
-    const request = new XMLHttpRequest();
-    request.open("POST", "/store" + location.search, false);
-    request.setRequestHeader("content-type", "application/json");
-    request.setRequestHeader("x-pkb-ui-token", token);
-    request.send(JSON.stringify({ verb: "store", args: ["delta", "list", "--sandbox=" + forkName, "--json"] }));
-    let onlyFork = false;
-    try {
-        const parsed = JSON.parse(request.responseText);
-        const out = JSON.parse(parsed.out || "{}");
-        const entry = out.items && out.items.length ? out.items[0] : out;
-        const deltas = entry.deltas || [];
-        onlyFork = deltas.length > 0 && deltas.every(function (row) { return row.kind === "fork"; });
-    } catch (failure) {
-        onlyFork = false;
-    }
-    if (!onlyFork) return;
-    request.open("POST", "/store" + location.search, false);
-    request.setRequestHeader("content-type", "application/json");
-    request.setRequestHeader("x-pkb-ui-token", token);
-    request.send(JSON.stringify({ verb: "store", args: ["branch", "discard", "--name=" + forkName] }));
+    fetch("/store" + location.search, {
+        method: "POST",
+        keepalive: true,
+        headers: { "content-type": "application/json", "x-pkb-ui-token": token },
+        body: JSON.stringify({ verb: "store", args: ["branch", "discard", "--name=" + forkName] })
+    });
 });
 fetch("/colors.json" + location.search).then(function (response) { return response.json(); }).then(function (colors) {
     if (Array.isArray(colors) && colors.length) {

@@ -332,6 +332,9 @@ class WorkbenchPagesTest {
                 return { out: "{\\"ok\\":true}\\n", err: "" };
             }
             async function fetch(url, init) {
+                if (!init || init.body == null || init.body === "") {
+                    return { json: async () => ["#1f6feb", "#0f7b4c", "#8a4b08", "#6e3cbc", "#9b2335", "#0b6e7a"] };
+                }
                 const body = JSON.parse(init.body);
                 calls.push(body);
                 return { json: async () => reply(body) };
@@ -339,13 +342,19 @@ class WorkbenchPagesTest {
             global.document = document;
             global.location = location;
             global.fetch = fetch;
+            global.addEventListener = function () {};
             global.window = global;
             global.monaco = monaco;
             for (const id of ["title", "branch", "lease", "ask-id", "ask-value", "ask-answer", "search",
-                    "scenarios", "globals", "data", "sql", "definition-path", "open-definition", "save-definition",
+                    "scenarios", "globals", "data", "sql", "map", "logs", "screenshots",
+                    "definition-path", "open-definition", "save-definition",
                     "monaco", "definition-message", "scenario-body", "scenario-list", "step-list", "definition-list",
                     "globals-body", "data-body", "var-name", "var-value", "var-set", "query", "run-sql", "point",
-                    "point-session", "point-handle", "point-x", "point-y", "sql-body"]) {
+                    "point-session", "point-handle", "point-x", "point-y", "sql-body",
+                    "fork", "fork-run", "promote", "promote-logs", "promote-to", "link-off", "link-parent",
+                    "tree", "tree-file", "tree-body", "tab-map", "tab-logs", "tab-screenshots",
+                    "map-show", "map-set", "map-step", "map-key", "map-value", "map-body",
+                    "logs-body", "screenshots-body"]) {
                 make(id);
             }
             const report = { opened: "", matched: "", language: "", accent: "", data: "", definitions: "",

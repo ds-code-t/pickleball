@@ -23,7 +23,7 @@ The Node pages call verbs. They do not implement fork or promote themselves.
 
 `store branch fork --from-run=<runId> [--name=<name>] [--json]` creates a cow sandbox (R1 `CowSandbox`) whose pin copies the run's `commit_sha` and `head_id`. The completed run's rows in `runstate.db` are not updated. The new sandbox's first delta is `kind=fork` with payload `{"fromRun":"<id>","fromHead":"<headId>"}`.
 
-Entering dynamic mode in the Node shell is this verb. There is no automatic fork on a keystroke. `store branch discard --name=<name>` deletes an empty fork (only the `fork` delta, no later deltas) and does not touch the parent. A non-empty fork is refused without `--force`. The shell calls `discard` on exit when `store delta list` shows only the fork delta.
+Entering dynamic mode in the Node shell is this verb. There is no automatic fork on a keystroke. `store branch discard --name=<name>` deletes an empty fork (only the `fork` delta, no later deltas) and does not touch the parent. A non-empty fork is refused without `--force`. On exit the shell posts `store branch discard --name=<fork>` with one keepalive `fetch`. The verb deletes the fork only when the sole delta is the fork delta.
 
 The shell reads `store pin show` and sets the title to the branch name. Accent color is a deterministic color from the name (hash to a fixed six-color list in the page CSS). Two different names do not share a color unless the hash collides. The test asserts two known names map to the documented colors, not that the hash is collision-free.
 

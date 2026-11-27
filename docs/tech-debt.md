@@ -51,7 +51,7 @@ The 3.0.0 retest-fix rounds (R, S) ran only targeted tests on the Linux box and 
 - **Spine R7, Windows only:** `RunSnapshotTest`, `ReportScriptTest`, `VisualTargetTest`, `PickleballExceptionTest`, `SnapFindIndexTest` (`tools.dscode.common.composite`), `SnapshotRetainTest`, and `CrossStoreTest`.
 - **Spine R5, Windows only:** `WorkbenchUiServerTest`, `StoreSqlReadOnlyTest`, `InjectSessionTest`, `SessionAddressTest`, `ChatChannelTest`, `AskProgressPointTest`, `WorkbenchUiLicenseTest`, `LeaseAndBlockTest`, `UiPageDispatchTest`, `ChatFollowStreamTest`, `WorkbenchUiJarAssetsTest`, `GeneratedPageAccessTest`, `OpenWindowRendererTest`, `LeaseGateTest`, `InjectLivePageTest`, `OverlayReceiptAskTest`, `InputBlockLivePageTest`, `WorkbenchPagesTest`, `SessionRequiredTest`, `NodeDesignDocsTest`, `PageJvmRouteTest`, `OverlayAckLiveTest`, `RendererShownRunTest`, and `RendererStoreSessionTest`.
 - **Spine R8, Windows only:** `WarmClassLoaderTest`, `WarmColdParityTest`, `IncrementalGlueCompileTest`, `ResourceGateTest`, `BrowserVersionResolverTest`, `BrowserCacheAndLocalVersionTest`, `SeleniumBidiCommandTest`, `DebugPortOwnerTest`, `DebugPortAttachTest`, `SnapshotContextGateTest`, `WarmCdpTest`, `DesktopTreeCacheTest`, `WindowsStructureChangedTest`, `WarmGlueCompilePathTest`, `SubprocessStepTest`, `SubprocessScenarioTest`, `WarmGlueScenarioTest`, `BidiCliSessionTest`, `WindowsStructureLiveTest`, `WarmRebuildRestartTest`, `CdnDownloadRereadTest`, `DebugPortQuitTest`, `WarmWorkerReloadTest`, `CdnCacheFallbackTest`, and `SpineR8FixBack3DocsTest`, `SpineHelpMergeTest`, `SpineRouteCliTest`, `BidiSessionGateTest`, and `SpineCommandCoverageTest`.
-- **Spine R6, Windows only:** `SessionExemptTest`, `BranchForkTest`, `BranchColorTest`, `PreStepHookTest`, `ForkGluePutTest`, and `BranchTreeTest`.
+- **Spine R6, Windows only:** `SessionExemptTest`, `BranchForkTest`, `BranchColorTest`, `PreStepHookTest`, `ForkGluePutTest`, `BranchTreeTest`, `SpineR6PageLive`, `SpineR6FixBack1DiscardTest`, and `SpineR6FixBack1PageControlsTest`.
 - **macOS, Safari:** channel `safari` selects Selenium `safaridriver` and the Windows test does not start a process. A live Safari run on macOS has not been executed.
 
 ## Deferred from the 3.0.0 consumer-fixes branch (per Dan, 2026-11-25)
@@ -74,11 +74,6 @@ The `typescript` npm package is pinned in `workbench-ui/package.json` and packed
 - Warm-spine marker seam: `WarmWorkerReloadTest` writes the warm-spine marker with the test JVM's pid instead of a real `spine start` process.
 - Session rule scope for help/version/export-guidance (Dan, 2026-11-26). Exempt: `engine help`, `domengine version`, family help (`store`, `engine`, `domengine`, `dashboard`, `cross`, `spine`, `bidi`, `browser`, `log`, `log-tail`, including `<family> help`, `help <family>`, and `--help` or `-h`), and plain `export-guidance`. The allow-list is `VerbDispatch.SESSION_EXEMPT`. `export-guidance --warm` still needs a session because it starts the controller. `export-guidance <dir>` still treats the output folder as the project for the warm path, so that path is refused until `spine session new` has written a session there.
 - Revisit the session-rule exemption for help/version/export-guidance. Check later whether exempting those commands was right.
-
-## Spine R6 fix-back 1 (open)
-
-- Discard on exit sends two synchronous `XMLHttpRequest`s from `pagehide` (`store delta list`, then `store branch discard`). Current browsers block synchronous XHR during page dismissal, so an empty fork is never discarded.
-- Fork, map show and set, promote, and the branch tree are proven only by grepping `workbench-ui/pages/index.html`. A real browser has not driven those controls through the Node renderer and the `/store` bridge.
 
 ## Spine R6 follow-ups (open, 2026-11-27)
 
