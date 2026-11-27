@@ -3,6 +3,7 @@ package tools.dscode.launcher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.common.agentcontrol.SpineSession;
 import tools.dscode.common.agentfast.PushChannel;
 
 import tools.dscode.testsupport.PortableProcess;
@@ -77,12 +78,18 @@ class PolishRoadmapTest {
     @Test
     @Timeout(value = 90, unit = TimeUnit.SECONDS)
     void warmPingIsUnderOneSecond() throws Exception {
+        Path guidance = temp.resolve(".pickleball");
+        Files.createDirectories(guidance);
+        SpineSession.create(guidance, "agent-1");
         String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
-        Process process = new ProcessBuilder(
-                java, "-cp", System.getProperty("java.class.path"),
-                "tools.dscode.launcher.PickleballWorkbenchLauncher",
-                "export-guidance", temp.resolve(".pickleball").toString(), "--warm"
-        ).directory(temp.toFile()).start();
+        Path argFile = temp.resolve("warm-ping.args");
+        String classpath = System.getProperty("java.class.path", "").replace('\\', '/').replace("\"", "\\\"");
+        String guidanceArg = guidance.toAbsolutePath().toString().replace('\\', '/').replace("\"", "\\\"");
+        Files.writeString(argFile, "-cp\n\"" + classpath + "\"\n"
+                + "tools.dscode.launcher.PickleballWorkbenchLauncher\n"
+                + "export-guidance\n\"" + guidanceArg + "\"\n--warm\n", StandardCharsets.UTF_8);
+        Process process = new ProcessBuilder(java, "@" + argFile.toAbsolutePath())
+                .directory(temp.toFile()).start();
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
         Thread outPump = pump(process.getInputStream(), stdout);

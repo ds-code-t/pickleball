@@ -16,6 +16,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -48,6 +49,35 @@ class GeneratedPageAccessTest {
         Path written = project.resolve(".pickleball").resolve("workbench-ui").resolve("generated")
                 .resolve(id).resolve("store.html");
         assertTrue(Files.isRegularFile(written), "ui page did not write the catalog page");
+    }
+
+    @Test
+    void generatedPageSendsASameOriginContentSecurityPolicy() throws Exception {
+        String id = SpineSession.create(project, "agent-1");
+        Capture allowed = page(id, "store", "<p>catalog</p>");
+        assertEquals(0, allowed.code, allowed.err);
+        String sessionToken = sessionToken(id);
+        try (WorkbenchUiServer.Handle handle = WorkbenchUiServer.start(project)) {
+            String home = exchange(handle.port(), request("GET", "/?t=" + handle.token(), "127.0.0.1", ""), 8000);
+            assertTrue(status(home).startsWith("HTTP/1.1 200"), status(home));
+            assertFalse(home.toLowerCase(java.util.Locale.ROOT).contains("content-security-policy"), preview(home));
+            String generated = exchange(
+                    handle.port(),
+                    request("GET", "/ui/" + id + "/store?t=" + sessionToken, "127.0.0.1", ""),
+                    8000);
+            assertTrue(status(generated).startsWith("HTTP/1.1 200"), preview(generated));
+            String lower = generated.toLowerCase(java.util.Locale.ROOT);
+            assertTrue(lower.contains("content-security-policy"), preview(generated));
+            int header = lower.indexOf("content-security-policy");
+            int lineEnd = lower.indexOf("\n", header);
+            String policy = lineEnd < 0 ? lower.substring(header) : lower.substring(header, lineEnd);
+            assertTrue(policy.contains("connect-src 'self'"), policy);
+            assertTrue(policy.contains("script-src 'self'"), policy);
+            assertTrue(policy.contains("img-src 'self'"), policy);
+            assertTrue(policy.contains("frame-src 'self'"), policy);
+            assertFalse(policy.contains("http:"), policy);
+            assertFalse(policy.contains("https:"), policy);
+        }
     }
 
     @Test

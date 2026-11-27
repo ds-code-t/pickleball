@@ -6,6 +6,7 @@ import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import tools.dscode.control.protocol.PickleballLocalLayout;
+import tools.dscode.control.protocol.RunView;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -68,6 +69,8 @@ public final class WorkbenchRendererHost {
         }
         Path project = Path.of(args[0]).toAbsolutePath().normalize();
         try {
+            String runId = flag(args, "run-id");
+            if (!runId.isBlank()) writeShownRun(project, runId, flag(args, "agent-id"));
             serve(project);
         } catch (Exception failure) {
             String message = failure.getMessage() == null ? failure.toString() : failure.getMessage();
@@ -128,6 +131,19 @@ public final class WorkbenchRendererHost {
                 return;
             }
             if ("show-run".equals(op)) {
+                String runId = string(body.get("runId"));
+                if (runId.isBlank()) runId = string(body.get("run-id"));
+                if (!runId.isBlank()) {
+                    String agent = string(body.get("agent"));
+                    if (agent.isBlank()) agent = string(body.get("agentId"));
+                    try {
+                        writeShownRun(project, runId, agent);
+                    } catch (RuntimeException failure) {
+                        String message = failure.getMessage() == null ? "error: run was not loaded" : failure.getMessage();
+                        send(exchange, 400, Map.of("error", message));
+                        return;
+                    }
+                }
                 sendRaw(exchange, 200, stored("show", "SHOWN"));
                 return;
             }
@@ -183,6 +199,31 @@ public final class WorkbenchRendererHost {
         String text = JSON.writeValueAsString(payload);
         results.put(id, text);
         return text;
+    }
+
+    /**
+     * The Node renderer reads this file on each page request. {@code open-window}
+     * writes it before the server accepts traffic. {@code show-run} replaces it.
+     */
+    static void writeShownRun(Path project, String runId, String agentId) throws IOException {
+        RunView.Loaded loaded = RunView.load(project, runId);
+        Path file = project.resolve(".pickleball").resolve("workbench-ui").resolve("shown-run.json");
+        Files.createDirectories(file.getParent());
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("runId", loaded.runId());
+        payload.put("agentId", agentId == null ? "" : agentId);
+        payload.put("record", loaded.recordText());
+        Files.writeString(file, JSON.writeValueAsString(payload), StandardCharsets.UTF_8);
+    }
+
+    private static String flag(String[] args, String name) {
+        String prefix = "--" + name + "=";
+        if (args == null) return "";
+        for (int index = 1; index < args.length; index++) {
+            String arg = args[index];
+            if (arg != null && arg.startsWith(prefix)) return arg.substring(prefix.length());
+        }
+        return "";
     }
 
     private void writeAttach() throws IOException {

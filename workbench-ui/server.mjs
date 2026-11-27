@@ -46,14 +46,51 @@ function contentType(file) {
     return "application/octet-stream";
 }
 
-function send(res, status, body, type) {
+function send(res, status, body, type, extra) {
     const bytes = Buffer.from(body);
-    res.writeHead(status, {
+    const headers = {
         "content-type": type || "text/plain; charset=utf-8",
         "content-length": bytes.length,
         "cache-control": "no-store"
-    });
+    };
+    if (extra) {
+        for (const key of Object.keys(extra)) headers[key] = extra[key];
+    }
+    res.writeHead(status, headers);
     res.end(bytes);
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll("\"", "&quot;");
+}
+
+function shownRunMarker() {
+    if (!project) return "";
+    const file = path.join(project, ".pickleball", "workbench-ui", "shown-run.json");
+    let node;
+    try {
+        node = JSON.parse(fs.readFileSync(file, "utf8"));
+    } catch (failure) {
+        return "";
+    }
+    const runId = escapeHtml(node.runId || "");
+    const agentId = escapeHtml(node.agentId || "");
+    const record = escapeHtml(node.record || "");
+    return `<div id="shown-run" data-run-id="${runId}" data-agent-id="${agentId}">${record}</div>`;
+}
+
+function pageHtml() {
+    const html = fs.readFileSync(pageFile, "utf8");
+    const marker = shownRunMarker();
+    if (!marker) return html;
+    const text = html.toString("utf8");
+    const close = text.lastIndexOf("</body>");
+    if (close < 0) return text + marker;
+    return text.slice(0, close) + marker + text.slice(close);
 }
 
 function forward(verb, args, requestToken) {
@@ -176,7 +213,9 @@ function serveGenerated(req, res, url, name) {
         send(res, 404, "not found\n");
         return true;
     }
-    send(res, 200, fs.readFileSync(file, "utf8"), "text/html; charset=utf-8");
+    send(res, 200, fs.readFileSync(file, "utf8"), "text/html; charset=utf-8", {
+        "content-security-policy": "default-src 'self'; connect-src 'self'; script-src 'self' 'unsafe-inline'; img-src 'self'; frame-src 'self'; style-src 'self' 'unsafe-inline'; base-uri 'self'; form-action 'self'"
+    });
     return true;
 }
 
@@ -197,7 +236,7 @@ const server = http.createServer((req, res) => {
         return;
     }
     if (req.method === "GET" && (name === "/" || name === "/scenarios" || name === "/globals" || name === "/data" || name === "/sql")) {
-        send(res, 200, fs.readFileSync(pageFile), "text/html; charset=utf-8");
+        send(res, 200, pageHtml(), "text/html; charset=utf-8");
         return;
     }
     const assetPrefix = "/node_modules/";

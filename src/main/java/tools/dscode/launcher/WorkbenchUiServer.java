@@ -38,6 +38,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
@@ -78,7 +79,8 @@ public final class WorkbenchUiServer {
             throw new IOException("error: workbench renderer assets are missing\nfix: run the workbenchUi Gradle task");
         }
         String token = token();
-        HttpServer bridge = bridge(project, token);
+        String session = tools.dscode.common.agentcontrol.SpineSession.ensure(project);
+        HttpServer bridge = bridge(project, token, session);
         int bridgePort = bridge.getAddress().getPort();
         Path node = nodeBinary();
         if (node == null) {
@@ -182,15 +184,15 @@ public final class WorkbenchUiServer {
         }
     }
 
-    private static HttpServer bridge(Path project, String token) throws IOException {
+    private static HttpServer bridge(Path project, String token, String session) throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/", exchange -> bridge(exchange, project, token));
+        server.createContext("/", exchange -> bridge(exchange, project, token, session));
         server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
         server.start();
         return server;
     }
 
-    private static void bridge(HttpExchange exchange, Path project, String token) throws IOException {
+    private static void bridge(HttpExchange exchange, Path project, String token, String session) throws IOException {
         try {
             String remote = exchange.getRemoteAddress() == null ? "" : exchange.getRemoteAddress().getAddress().getHostAddress();
             if (!"127.0.0.1".equals(remote)) {
@@ -229,6 +231,25 @@ public final class WorkbenchUiServer {
             }
             flags.put(VerbArgs.ARGS, String.join("\n", positionals));
             if (!namedProject) flags.put("project", project.toAbsolutePath().normalize().toString());
+            if (flags.get("session") == null || flags.get("session").isBlank()) {
+                flags.put("session", session == null ? "" : session);
+            }
+            String agent = flags.get("agent");
+            if (agent == null || agent.isBlank()) agent = flags.get("agent-id");
+            if (rendererMutation(verb, positionals)) {
+                try {
+                    LeaseHold.require(project, flags.get("session"), "ui", agent);
+                } catch (IllegalArgumentException failure) {
+                    String message = failure.getMessage() == null ? "error: lease refused\nfix: lease release\n" : failure.getMessage();
+                    if (!message.endsWith("\n")) message = message + "\n";
+                    ObjectNode refused = JSON.createObjectNode();
+                    refused.put("code", 2);
+                    refused.put("out", "");
+                    refused.put("err", message);
+                    reply(exchange, 200, JSON.writeValueAsString(refused));
+                    return;
+                }
+            }
             ByteArrayOutputStream stdout = new ByteArrayOutputStream();
             ByteArrayOutputStream stderr = new ByteArrayOutputStream();
             int code = VerbDispatch.run(
@@ -245,6 +266,27 @@ public final class WorkbenchUiServer {
         } catch (RuntimeException failure) {
             reply(exchange, 500, "{\"code\":1,\"out\":\"\",\"err\":\"error: ui bridge failed\\nfix: pickleball ui\\n\"}");
         }
+    }
+
+    private static final Set<String> STORE_WRITES = Set.of(
+            "put", "set", "use", "remove", "delete", "add", "enable", "choose",
+            "hydrate", "extract", "merge", "promote", "create", "drop", "prune",
+            "retain", "record", "undo", "redo", "rebuild", "compile",
+            "scenario-add", "scenario-modify", "scenario-delete",
+            "step-add", "step-modify", "step-delete");
+
+    /** A renderer write. Reads stay open while another holder has the {@code ui} lease. */
+    private static boolean rendererMutation(String verb, List<String> positionals) {
+        if (verb == null) return false;
+        if ("point".equals(verb) || "ask-answer".equals(verb)) return true;
+        if (!"store".equals(verb) || positionals == null || positionals.isEmpty()) return false;
+        String family = positionals.get(0);
+        if ("enable".equals(family) || "tag".equals(family) || "retain".equals(family)
+                || "hydrate".equals(family) || "extract".equals(family)) {
+            return true;
+        }
+        String action = positionals.size() > 1 ? positionals.get(1) : "";
+        return STORE_WRITES.contains(action);
     }
 
     private static void reply(HttpExchange exchange, int status, String body) throws IOException {

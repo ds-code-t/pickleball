@@ -37,6 +37,16 @@ public final class SpineSession {
         return root.resolve(".pickleball").resolve("workbench-ui").resolve("sessions");
     }
 
+    /**
+     * The default session when one already exists, otherwise a new clean session.
+     * The renderer uses this at launch. {@code VerbDispatch} still does not create one.
+     */
+    public static String ensure(Path project) throws IOException {
+        String current = current(project);
+        if (current != null && Files.isRegularFile(file(project, current))) return current;
+        return create(project, DEFAULT_AGENT);
+    }
+
     /** Creates a clean session and makes it the default. */
     public static String create(Path project, String agent) throws IOException {
         String id = "s" + HexFormat.of().formatHex(random(4));
