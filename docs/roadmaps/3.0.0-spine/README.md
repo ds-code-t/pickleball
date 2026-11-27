@@ -4,7 +4,7 @@ Index for implementing `docs/plans/2026-11-25-sqlite-spine-plan.md`. The settled
 
 Every phase in every roadmap is mandatory and must be completed in full. Nothing is optional or deferred. The one exception is Linux and macOS testing, which stays in `docs/tech-debt.md` (Dan: test on Windows only).
 
-Each phase runs targeted tests only for what that phase changed. There are two regression tiers, described in [Regression tiers](final-regression.md). The short (Chrome + Windows) tier is the end-of-work regression. It runs on Dan's Windows PC only, with no Linux or macOS runs and no GitHub Actions runs, and only after every roadmap and fix is done and verified with targeted tests. The full tier covers every browser and platform and runs only when Dan explicitly asks.
+Each phase runs targeted tests only for what that phase changed. There are three regression tiers, described in [Regression tiers](final-regression.md). The short (Chrome + Windows) tier is the end-of-work regression. It runs on Dan's Windows PC only, with no Linux or macOS runs and no GitHub Actions runs, and only after every roadmap and fix is done and verified with targeted tests. The full tier covers every browser and platform and runs only when Dan explicitly asks. The [manual human-collaboration](manual-collaboration-regression.md) catalog runs as a whole only when Dan explicitly asks; a single test may run when a change may have impacted what it covers.
 
 ## Order
 

@@ -2,12 +2,13 @@
 
 Branch `3.0.0-spine` only. Never `master` or any 2.x branch. No tags, releases, publishing, or force-push.
 
-There are two regression tiers (Dan, 2026-11-27). Between phases and fixes, run targeted tests only: the classes and scenarios the change touched.
+There are three regression tiers (Dan, 2026-11-27). Between phases and fixes, run targeted tests only: the classes and scenarios the change touched.
 
 | Tier | Scope | When it may run |
 |---|---|---|
 | **Full** | Every suite and every function. Every browser the branch supports. Windows, Linux, and macOS. The consumer project. The CI-equivalent checks. Live and real-browser tests, headed and headless. | Never, unless Dan explicitly asks for the full regression. |
 | **Short (Chrome + Windows)** | The Windows suites on Dan's PC, limited to the Chrome browser. | The default end-of-work regression. It runs only when 100% completion is possible: every roadmap is implemented, and every phase and every fix has been verified with its targeted tests. |
+| **Manual human collaboration** | [A numbered catalog of agent-run instructions](manual-collaboration-regression.md) on a live headed Chrome page. The agent plays the human collaborator (Human Mode tools and the human view only) or the agent (every tool, including consumer direct control, HTML injection, listeners, and the DevTools interfaces). | The whole catalog: never, unless Dan explicitly asks. A single test: without asking, when it covers functionality that a new implementation may have impacted. |
 
 ## Short regression (Chrome + Windows)
 
@@ -55,15 +56,19 @@ The end-of-work pass also sweeps every roadmap item, and the fix-backs, through 
 
 ## Failures: batch the fixes (Dan, 2026-11-27)
 
-This applies to both tiers.
+This applies to every tier.
 
 1. Let the tier run to the end and collect every failure.
 2. Fix them all at once if practical. Fix each at the root with a reproducing test that fails before and passes after. Never weaken, skip, or delete a test.
 3. Run the targeted tests for all the fixes together.
 4. Do not run the tier again until every targeted test for every fix passes in that one batch. Do not rerun the tier after each single fix.
-5. Then run the short tier again. Run the full tier again only if Dan asks.
+5. Then run the short tier again. Run the full tier again only if Dan asks. For the manual tier, re-run only the manual tests that failed, unless Dan asks for the whole catalog.
 
 Flaky or environment-only problems go in `docs/tech-debt.md` with evidence, not as passes.
+
+## Manual human-collaboration regression
+
+The catalog, roles, setup, and the table for picking targeted tests are in [Manual human-collaboration regression](manual-collaboration-regression.md). The results template is `docs/maintainer/3.0.0-spine/manual-collaboration-scoreboard-template.md`. It is not part of the full or short tier, and neither of them triggers it. The batching rule above applies to its failures.
 
 ## Full regression
 
