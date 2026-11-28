@@ -29,6 +29,7 @@ Source: PKB-HCR run of 2026-11-28 on consumer `myq-release-testing`, Pickleball 
 | 24 | Popup `alwaysOnTop.applied=false` (`SetWindowPos`, exit 1) | Fixed (best effort, not run on Windows): the PowerShell had embedded double quotes that Java does not escape on the Windows command line; now quote-free, waits up to 10 s for the main or a child process window, and names exit 2/3 | `50b7aa6be` | `PopupOnTopWindowsTest` (quote-free script run on the box; `theScriptRunsOnWindows` Windows only), `PopupOnTopTest` | PC: `popup-open`, reply `alwaysOnTop.applied=true` and the window stays on top |
 | 18 | `upload-request` event `ref` was `#files`, but `upload --ref=#files` failed `unknown target` | Fixed: `act`/`upload --ref` takes a CSS selector (`#`, `.`, `[`, or `css=`) when it is not a known short id | `4a2b25b10` | `HcrRoundFourTest.aCssSelectorIsAcceptedAsAnActRef`, `HcrLiveFixesTest.uploadTakesTheCssRefTheUploadRequestNames` | Headed: on an upload-request, `upload --ref=<event ref> --file=<path>` |
 | 12 | Offline emulation did not reach a page a service worker controls | Fixed (CDP): `emulate --network` also applies to the page's service and shared workers (attached on demand) | `7ce9f47d8` | `NetworkTargetsTest`, `EmulateLiveTest.offlineReachesAServiceWorkerControlledPage` (not run on the box) | PC: a PWA page, `emulate --network=offline`, its fetches fail |
+| 13 | `wait-any --watch=<short id>:click` never fired; a foreign short id gave no error | Partly fixed (non-breaking slice): a page click also matches by the short id's full ref, and a short id from another run id adds a `warning` naming its run id. Scoping itself is unchanged; no strict error | `R13` | `ShortIdScopeWarningTest` (2), `ConsumerFixesP4WaitTest` | Headed: H finds Go, A runs `wait-any --watch=<H id>:click` (warning) and with its own id (fires on a click) |
 
 ## Owner decisions (Dan, 2026-11-28, t1239u)
 
@@ -46,7 +47,7 @@ These were "owner decision" items in the HCR run; Dan approved all four on 2026-
 | Item | Reason |
 |---|---|
 | 9 two card systems, `ask-answer` on page cards | One card API is a redesign. The catalog now uses the right verb for each card type. |
-| 13 short ids scoped per run id, foreign id gives no error | An error breaks existing wait-any unit tests that watch ids with no page; needs an id-scope design. |
+| 13 short ids scoped per run id (rest) | Warning and full-ref match shipped; a shared id space or a strict error is an id-scope design. |
 | 14 event streams tagged with the starter's run id | Run binding for streams, spill dirs and `downloads`: design work. |
 | 21, 22 H views miss agent surfaces; magnifier clone is clickable | View and exposure design. |
 | 26 covered button `visible=true`; act `bounds` 0,0,0,0 | Needs the visibility model reconciled between `snap` and `explain`. |

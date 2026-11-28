@@ -527,7 +527,7 @@ Tier: control.
 
 # help wait-any
 Usage: wait-any [--answer=<question>] [--chat=human|agent|any] [--watch=<short id>:click] [--timeout=<ms>]
-Returns whichever condition comes first and names it in fired (answer, chat, or watch). At least one condition is required. Events already stored are ignored. --chat does not treat source=system as a message. A click for another id does not fire --watch. An equal at prefers answer, then chat, then watch. Timeout exits 1 with error timeout. A bare timeout is milliseconds. A trailing s or ms wins. The wait does not hold the command lane.
+Returns whichever condition comes first and names it in fired (answer, chat, or watch). At least one condition is required. Events already stored are ignored. --chat does not treat source=system as a message. A click for another id does not fire --watch. Short ids are scoped per run id; a short id from another run id adds a warning to the reply. An equal at prefers answer, then chat, then watch. Timeout exits 1 with error timeout. A bare timeout is milliseconds. A trailing s or ms wins. The wait does not hold the command lane.
 Tier: control.
 
 # help watch

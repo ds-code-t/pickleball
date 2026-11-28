@@ -1127,6 +1127,7 @@ public final class AgentControl {
                 return fail(2, "wait-any --watch is <short id>:click");
             }
         }
+        String watchWarning = tools.dscode.common.agentfast.SessionIds.foreignWarning(watchId, runId);
         long timeout;
         try {
             timeout = timeoutMillis(args, 30_000L);
@@ -1154,16 +1155,21 @@ public final class AgentControl {
                 }
             }
             Result hit = waitAnyHit(project, runId, before, chatAfter, answerId, chatMode, watchId);
-            if (hit != null) return hit;
+            if (hit != null) return warned(hit, watchWarning);
             if (System.nanoTime() >= deadline) {
                 hit = waitAnyHit(project, runId, before, chatAfter, answerId, chatMode, watchId);
-                if (hit != null) return hit;
+                if (hit != null) return warned(hit, watchWarning);
                 Result failed = fail(1, "timeout");
                 failed.body().put("op", "wait-any");
-                return failed;
+                return warned(failed, watchWarning);
             }
             tools.dscode.common.agentfast.PushWake.await(wakeSeen, 50, deadline);
         }
+    }
+
+    private static Result warned(Result result, String warning) {
+        if (warning != null && !warning.isEmpty() && result.body() != null) result.body().put("warning", warning);
+        return result;
     }
 
     /** The earliest matching event in this pass, or null when nothing new matches. */
@@ -1217,7 +1223,10 @@ public final class AgentControl {
                     String id = event.get("id") == null ? "" : String.valueOf(event.get("id"));
                     String ref = event.get("ref") == null ? "" : String.valueOf(event.get("ref"));
                     String handle = event.get("handle") == null ? "" : String.valueOf(event.get("handle"));
-                    if (!watchId.equals(id) && !watchId.equals(ref) && !watchId.equals(handle)) continue;
+                    // A page click carries the element's full ref, not the short id the agent was given.
+                    String full = tools.dscode.common.agentfast.SessionIds.expand(watchId);
+                    boolean byFull = full != null && !full.equals(watchId) && (full.equals(ref) || full.equals(handle) || full.equals(id));
+                    if (!byFull && !watchId.equals(id) && !watchId.equals(ref) && !watchId.equals(handle)) continue;
                     Map<String, Object> fields = new LinkedHashMap<>();
                     fields.put("fired", "watch");
                     fields.put("id", watchId);

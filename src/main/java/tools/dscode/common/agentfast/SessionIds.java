@@ -25,6 +25,33 @@ public final class SessionIds {
         return SCOPE.computeIfAbsent(key, ignored -> "s" + SESSIONS.incrementAndGet());
     }
 
+    /** The run id a short id ({@code s2.h3}) was given to, or null when its scope is not known here. */
+    public static String ownerOf(String shortId) {
+        if (shortId == null) return null;
+        String token = shortId.trim();
+        int dot = token.indexOf(".h");
+        if (dot <= 0) return null;
+        String prefix = token.substring(0, dot);
+        for (Map.Entry<String, String> entry : SCOPE.entrySet()) {
+            if (prefix.equals(entry.getValue())) return entry.getKey();
+        }
+        return null;
+    }
+
+    /**
+     * HCR-13: short ids are scoped per run id. A blank string when {@code shortId} is this run's or unknown here,
+     * otherwise a warning naming the run id it belongs to.
+     */
+    public static String foreignWarning(String shortId, String runId) {
+        if (shortId == null || !shortId.trim().matches("s\\d+\\.h\\d+")) return "";
+        String owner = ownerOf(shortId);
+        if (owner == null) return "";
+        String key = runId == null || runId.isBlank() ? "session" : runId;
+        if (owner.equals(key)) return "";
+        return "short id " + shortId.trim() + " belongs to run id " + owner + ", not " + key
+                + "; short ids are scoped per run id, so find the element again with this --run-id";
+    }
+
     /** Same backend id keeps the same short id. The stored expansion updates. */
     public static String intern(String runId, long backend, String fullRef) {
         String scope = scope(runId);
