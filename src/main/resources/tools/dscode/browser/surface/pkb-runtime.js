@@ -1622,7 +1622,7 @@
       g.current = Math.min(g.current, g.steps.length) - 1;
       g.steps[g.current].done = false;
       g.pulse = true;
-      pushEvent({type: 'step', g: id, s: g.steps[g.current].n, done: false, how: 'agent'});
+      pushEvent({type: 'step', g: id, s: g.steps[g.current].n, done: false, how: 'agent', by: 'agent'});
       guideRender(g);
       schedule();
     }
@@ -1655,7 +1655,7 @@
   function guideDone(spec) {
     var id = String((spec && spec.id) || 'g1');
     if (!guides.has(id)) return {id: id, closed: true};
-    pushEvent({type: 'guide', g: id, done: true, how: 'agent'});
+    pushEvent({type: 'guide', g: id, done: true, how: 'agent', by: 'agent'});
     guideClose(id);
     return {id: id, closed: true};
   }

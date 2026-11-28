@@ -641,6 +641,40 @@ class OverlayRuntimeLiveTest {
         assertEquals(2, ((Number) back.body().get("current")).intValue());
     }
 
+    /** PKB-HCR bug 11: ui-apply --ttl was documented and ignored; the label stayed for good. */
+    @Test
+    void uiApplyTtlRemovesWhatItPlaced() throws Exception {
+        load("basic.html");
+        AgentControl.Result applied = run("ui-apply", Map.of("ttl", "1", "ops",
+                "[{\"c\":\"label\",\"t\":\"text:Save\",\"text\":\"Temporary\"}]"));
+        assertEquals(0, applied.exit(), String.valueOf(applied.body()));
+        assertEquals(1L, ((Number) browser.executeScript("return document.querySelectorAll('[data-pkb-kind=label]').length")).longValue());
+        long end = System.currentTimeMillis() + 6000;
+        long left = 1;
+        while (left != 0 && System.currentTimeMillis() < end) {
+            Thread.sleep(250);
+            left = ((Number) browser.executeScript("return document.querySelectorAll('[data-pkb-kind=label]').length")).longValue();
+        }
+        assertEquals(0L, left, "label still on the page after the ttl");
+    }
+
+    /** PKB-HCR bug 15: guide-back and guide-done are agent actions and their events say by=agent, not by=human. */
+    @Test
+    void guideBackAndDoneEventsAreByAgent() {
+        load("basic.html");
+        startGuide(THREE_STEPS);
+        run("guide-next", Map.of());
+        run("overlay-poll", Map.of());
+        assertEquals(0, run("guide-back", Map.of()).exit());
+        String back = String.valueOf(run("overlay-poll", Map.of()).body().get("items"));
+        assertTrue(back.contains("done=false") && back.contains("by=agent"), back);
+        assertFalse(back.contains("by=human"), back);
+        assertEquals(0, run("guide-done", Map.of()).exit());
+        String done = String.valueOf(run("overlay-poll", Map.of()).body().get("items"));
+        assertTrue(done.contains("type=guide") && done.contains("by=agent"), done);
+        assertFalse(done.contains("by=human"), done);
+    }
+
     /** ask with choices returns the person's pick as an answer event. */
     @Test
     void askConfirmReturnsTheChoice() {

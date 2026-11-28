@@ -147,12 +147,46 @@ final class UiBatch {
         }
     }
 
+    /** --ttl=<seconds> (1 to 86400). Anything else, or a missing value, means the ops stay. */
+    private static long ttlSeconds(String raw) {
+        if (raw == null || raw.isBlank()) return 0;
+        try {
+            long value = Long.parseLong(raw.trim());
+            return value >= 1 && value <= 86_400 ? value : 0;
+        } catch (NumberFormatException failure) {
+            return 0;
+        }
+    }
+
+    /** Removes what the batch placed once the ttl passes: each placed overlay gets its own undo verb. */
+    private static void expireLater(Path project, String runId, String agentId, List<String[]> expiring, long seconds) {
+        Thread timer = new Thread(() -> {
+            try {
+                Thread.sleep(seconds * 1000);
+            } catch (InterruptedException stop) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            for (String[] undo : expiring) {
+                try {
+                    AgentControl.dispatch(project, runId, undo[0], new LinkedHashMap<>(Map.of("id", undo[1])), List.of(), agentId);
+                } catch (Exception gone) {
+                    // The page or the placement is already gone.
+                }
+            }
+        }, "pkb-ui-apply-ttl");
+        timer.setDaemon(true);
+        timer.start();
+    }
+
     static AgentControl.Result apply(Path project, String runId, Map<String, String> args, String agentId) throws Exception {
         List<Map<String, Object>> ops = parse(project, args.get("ops"));
         boolean verbose = "true".equalsIgnoreCase(String.valueOf(args.get("verbose")));
         boolean needsPage = ops.stream().anyMatch(op -> !"chat".equals(op.get("c")));
         if (needsPage && !PageSurfaces.hasLivePage()) return AgentControl.failure(1, "ui-apply needs a live browser page; run launch first");
         List<Map<String, Object>> rows = new ArrayList<>();
+        List<String[]> expiring = new ArrayList<>();
+        long ttlSeconds = ttlSeconds(args.get("ttl"));
         boolean allOk = true;
         boolean cleared = false;
         int n = 0;
@@ -189,6 +223,9 @@ final class UiBatch {
                 row.put("ok", true);
                 Object id = result.body().get("id");
                 if (id != null) row.put("id", id);
+                if (ttlSeconds > 0 && id != null && component.removal().endsWith(" --id")) {
+                    expiring.add(new String[]{component.removal().split(" ")[0], String.valueOf(id)});
+                }
                 if (result.body().get("miss") instanceof List<?> miss && !miss.isEmpty()) row.put("miss", miss);
             } else {
                 allOk = false;
@@ -200,8 +237,10 @@ final class UiBatch {
             rows.add(row);
         }
         if (!cleared) UiState.sync(project, runId, args);
+        if (!expiring.isEmpty()) expireLater(project, runId, agentId, expiring, ttlSeconds);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("ok", allOk);
+        if (ttlSeconds > 0) body.put("ttl", ttlSeconds);
         body.put("ops", rows);
         return new AgentControl.Result(allOk ? 0 : 1, body);
     }
