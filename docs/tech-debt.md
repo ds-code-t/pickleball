@@ -96,3 +96,13 @@ The `typescript` npm package is pinned in `workbench-ui/package.json` and packed
 - No end-to-end `engine run --sandbox=<fork>` test of the pre-step hook; `PreStepHookTest` binds the fork with `StoreScope.bind` and calls `NativeScenarioRun` directly.
 - The page only offers `store branch link ... --off`; there is no `--on` control.
 
+
+## Final regression findings (open, 2026-11-27)
+
+Open items from the 3.0.0-spine final regression on Dan's Windows PC, recorded at `ef54a332e`. They are not passes.
+
+- Renderer lease identity. The Node renderer still sends no agent id and counts as `agent-1`, so a `ui` lease held by `agent-1` does not block the person in the renderer, and any page request can claim the holder with `--agent=`. The sweep marks this as a gap. The original note is under [Spine merge follow-ups (open, 2026-11-26)](#spine-merge-follow-ups-open-2026-11-26).
+- R4 ElementRecord roadmap contradiction. `docs/roadmaps/3.0.0-spine/R4-cli-mcp-universal-surface-verb-inventory.md` still says extra keys go under `extra` unless `--fields`. The shipped record passes those keys through. `AGENTS.md` and `docs/release-notes.md` describe the shipped behavior. The roadmap was not edited. See the docs-audit row in `docs/maintainer/3.0.0-spine/final-regression-scoreboard.md`.
+- The first root `:test` run failed 103 tests. The failures-and-fixes table groups them under eleven `a1c51714f` rows and does not name every method. No test methods were removed. The green `:test` on `c1bec073e` is 2119 tests, 2112 passed, 0 failed, 7 skipped. A later pass that needs the original method list should take it from the Surefire XML of the first run on `4383ed02e`, if that report is still on the PC.
+
+A new environmental failure from a later regression goes under this section.
