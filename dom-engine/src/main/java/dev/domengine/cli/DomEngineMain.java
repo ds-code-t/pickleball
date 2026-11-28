@@ -906,6 +906,10 @@ public final class DomEngineMain {
                   attach --live [--name WINDOW]   Windows UIA, macOS AX, or Linux AT-SPI
                   launch --exe PATH --name WINDOW   Windows: start the process and attach. Any other OS exits 2
                   screenshot --name WINDOW [--out file.png]   window rectangle from Windows UI Automation
+                  type --id SESSION [--node-id N] [--css CSS | --xpath XPATH | --pipeline EXPR | --selector EXPR | --role ROLE [--name ACCESSIBLE]] [--text CHARS] [--append=true]
+                    --id is the session attach or launch returned (launch prints JSON id). --name alone is the window title only for attach --live, launch, and screenshot.
+                    On type, --name is the accessible name and only applies with --role. --text is the characters and defaults to empty. --append=true appends; otherwise the value is replaced.
+                    --query is not a type flag. close uses --id.
                   snapshot --id ID [--screenshot file.png] [--out-dir DIR]
                   a fixture snapshot needs --screenshot
                   query and resolve use the same --pipeline, --css, --xpath, and --text as browser query

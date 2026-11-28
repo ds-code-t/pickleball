@@ -24,8 +24,8 @@ args: @<file> or --args-file=<file> is a JSON object of flags. An explicit flag 
 all: act answer-wait aria-snap arrow ask ask-and-wait ask-answer attach audit audits border bridge bridge-health browser-events call capture capture-scenario capture-steps cdp chat chat-history chat-poll chat-read chat-send chat-turn chat_wait checklist clock close-window confirm context-close context-list context-new controller-ping controller-start controller-status controller-stop csp diagnostic-run dialogs discover discover-hint doctor downloads drop emulate entity-lookup errors eval events example execute-step execute-steps explain export-guidance extension find find-element finish form-fill frame from-here gc-runs gc-versions guide guide-back guide-done guide-next har help highlight hint history history-query history-summary html-cleanup html-insert html-remove html-replace html-write inbox inject input insert-step inspect-page isolate kill label launch lease live-check logpoint magnifier mcp memory navigate net net-auth net-block net-body net-cache net-headers net-route net-unroute note observe open-run open-scenario open-window optional-install optional-list optional-uninstall overlay overlay-poll overlay-remove page-history panel-close panel-open panel-state pause perf permissions pin plan play point popup-close popup-open popup-status post presence print progress pw query record ref refresh relaunch-with-debug resolve-runvars save screencast screenshot security selftest session session-hold session-info session-list session-mode session-release session-start session-sync setup share-browser short-log show-run snap spine spotlight start status step-badge stop storage storage-state sw sync tab-activate tab-new tabs toast ui ui-apply ui-catalog ui-poll ui-verify unarrow unborder unhighlight unlabel unmagnifier unspotlight unstep-badge update-step upload use-version validate wait wait-any wait-for watch webauthn webmcp windows worker-check worker-restart worker-start worker-stop workspace-edit workspace-seed workspace-show ws-route
 
 # help act
-Usage: act --target=<selector> [--kind=click|type|hover|press|select|attach] [--query=<text>] [--ref=<ref>] [--pick=<n|name>] [--purpose=<token>] [--value=<text>] [--condition=title=<text>|text=<text>|url=<text>|ref=<id>:selected] [--snap=diff|auto] [--timeout=<ms>] [--budget-ms=<ms>] [--aria-ref=<eN> (refs from aria-snap --mode=ai, Playwright)]
-Without a query or ref the error is: act requires --query or --ref. With --pick and several hits the reply lists candidates and picked (index, name, why). --pick chooses one hit in the same snapshot, so the ref cannot go stale. A success includes checked and settleMs. Hover on a visible element is applied and dispatched. A click is applied when the page or that element's text or state changes. A covering mask that does not clear fails the click. --timeout is that wait in milliseconds, including a spinner or loading class. visible is whether the element is shown, the same value explain reports. Replies include frame. A short id (s1.h18) names that element and is not expanded to its accessible name. --human-override=<reason> is accepted on act (owner only, logged) and is not a verb flag. type reports via (cdp-insertText, cdp-keys, or input-chain), value, and verified; applied follows that read-back, including a selected option and an upload offer. An ambiguous reply lists each candidate with the reason it lost. --pick=<role> chooses the one hit with that role. --budget-ms is the same millisecond cap as find (best hits so far, budgetExceeded:true). Desktop type uses ValuePattern, then TextPattern plus SendInput, then SendInput. Live desktop input is refused unless the target window is foreground and its title matches (case-insensitive equality, or either title contains the other). The reply includes window. A fixture is not live and is not refused. act --kind=type keeps a document or edit when one matches, including over a nested button with the same label.
+Usage: act --target=<selector> [--kind=click|type|hover|press|select|scroll|attach] [--query=<text>] [--ref=<ref>] [--pick=<n|name>] [--purpose=<token>] [--value=<text>] [--condition=title=<text>|text=<text>|url=<text>|ref=<id>:selected] [--snap=diff|auto] [--timeout=<ms>] [--budget-ms=<ms>] [--aria-ref=<eN> (refs from aria-snap --mode=ai, Playwright)]
+Without a query or ref the error is: act requires --query or --ref. With --pick and several hits the reply lists candidates and picked (index, name, why). --pick chooses one hit in the same snapshot, so the ref cannot go stale. A success includes checked and settleMs. Hover on a visible element is applied and dispatched. A click is applied when the page or that element's text or state changes. A covering mask that does not clear fails the click. --timeout is that wait in milliseconds, including a spinner or loading class. visible is whether the element is shown, the same value explain reports. Replies include frame. A short id (s1.h18) names that element and is not expanded to its accessible name. --human-override=<reason> is accepted on act (owner only, logged) and is not a verb flag. type reports via (cdp-insertText, cdp-keys, or input-chain), value, and verified; applied follows that read-back, including a selected option and an upload offer. An ambiguous reply lists each candidate with the reason it lost. --pick=<role> chooses the one hit with that role. --budget-ms is the same millisecond cap as find (best hits so far, budgetExceeded:true). Desktop type uses ValuePattern, then TextPattern plus SendInput, then SendInput. Live desktop input is refused unless the target window is foreground and its title matches (case-insensitive equality, or either title contains the other). The reply includes window. A fixture is not live and is not refused. act --kind=type keeps a document or edit when one matches, including over a nested button with the same label. scroll is accepted by a human-locked session. The act body reports unknown kind for scroll and does not scroll the page. attach is refused while the session is human-locked.
 Tier: human.
 
 # help answer-wait
@@ -34,8 +34,8 @@ Reads the choice for a question ask or ask-and-wait --async already showed. Same
 Tier: control.
 
 # help ask
-Usage: ask --say=<question> [--choices=Yes,No] [--handle=<target>] [--id=<question>] [--sensitive=true] [--min-show=<ms>] [--run-id=<id>] [--type=text|choice|confirm] [--prompt=<question>] [--options=<a,b>]
---min-show keeps an unanswered card on screen at least that long. --choices is a comma list or a JSON array. Each choice is its own button. --type writes a card with no live page. A choice answer must be one of --options.
+Usage: ask --say=<question>|@file [--choices=Yes,No] [--handle=<target>] [--id=<question>] [--sensitive=true] [--min-show=<ms>] [--run-id=<id>] [--type=text|choice|confirm] [--prompt=<question>|@file] [--options=<a,b>]
+--min-show keeps an unanswered card on screen at least that long. --choices is a comma list or a JSON array. Each choice is its own button. A text card (no --choices) shows a text field named pkb-answer and a button labeled Send. Send, or Enter in the field, submits when the trimmed text is not blank. An empty field does not submit. The answer event is type=answer. --type writes a card with no live page. A choice answer must be one of --options. @file is a path relative to the project, or an absolute path. Use it to pass spaces and quotes on Windows. A missing file is error: and fix:.
 Tier: control.
 
 # help ask-and-wait
@@ -64,8 +64,8 @@ Writes {op,args} steps for execute-steps --file. Click and answer rows in --even
 Tier: control.
 
 # help cdp
-Usage: cdp --method=<Domain.method> [--params=<json>] [--target=browser:cdp=<ws> | --cdp-endpoint=<channel|url>]
-Sends one raw Chrome DevTools Protocol command to the current page through a Playwright CDP session and prints the result. Control tier.
+Usage: cdp --method=<Domain.method> [--params=<json>|@file] [--target=browser:cdp=<ws> | --cdp-endpoint=<channel|url>]
+Sends one raw Chrome DevTools Protocol command to the current page through a Playwright CDP session and prints the result. A value that starts with @ is a JSON object file, relative to the project or absolute. Use it to pass JSON on Windows without shell quoting. A missing file, or a value that is not a JSON object, fails before the browser connects. Control tier.
 Tier: control.
 
 # help chat
@@ -255,7 +255,8 @@ Usage: html-cleanup [--html=<page>]
 Tier: control.
 
 # help html-insert
-Usage: html-insert --handle=<id> --text=<html> [--where=before|after] [--html=<page>]
+Usage: html-insert --handle=<id> --text=<html>|@file [--where=before|after] [--html=<page>]
+@file is a path relative to the project, or an absolute path. Use it for markup that contains spaces or quotes. A missing file is error: and fix:.
 Tier: control.
 
 # help html-remove
@@ -355,15 +356,18 @@ Usage: play
 Tier: control.
 
 # help popup-close
-Usage: popup-close
+Usage: popup-close [--run-id=<id>]
+Closes the popup for that run id and waits up to 10 seconds. The result field exited is true when the profile and the host and browser pids are gone. Control tier.
 Tier: control.
 
 # help popup-open
-Usage: popup-open
+Usage: popup-open [--run-id=<id>]
+Opens or reuses the agent popup for the coordination run id (default session). No other flags are read. --on-top and --headless are not popup-open flags. Always-on-top is pkb_agent_popup_on_top (default true). pkb_agent_popup=off returns opened=false and fallback=off. No Chromium returns state=closed and fallback=no-chromium. --target=popup is not a flag of this verb. It routes other surface ops (chat-send, overlay, html-*, highlight) onto the popup. Control tier.
 Tier: control.
 
 # help popup-status
-Usage: popup-status
+Usage: popup-status [--run-id=<id>]
+Reads popup status for that run id and adds mode. Control tier.
 Tier: control.
 
 # help post
@@ -381,7 +385,7 @@ Tier: control.
 
 # help progress
 Usage: progress --pct=<0-100> [--label=<text>] [--session=<id>]
-pct is 0 through 100.
+pct is 0 through 100. The card is written to .pickleball/workbench-ui/progress/<session>.json. A blank --session uses session. It does not paint the start page, so snap of that page does not show a progress bar from this file.
 Tier: control.
 
 # help pw
@@ -457,8 +461,8 @@ A short id (s1.h18) names that element and is not expanded to its accessible nam
 Tier: control.
 
 # help start
-Usage: start --url=<page> | --url-key=<URL.key> --browser=<chrome|edge|chrome-headless> [--headed] [--hold=<seconds|forever>] [--panel] [--size=1600x1000] [--env=KEY=VALUE]
-Opens the browser, navigates, and waits until GET /health is ok. fixture: names a built-in page. --panel opens the page panel. live-start is start. The reply includes the agent envelope. The page engine is Chrome DevTools. --engine=selenium is rejected. A start that does not become healthy names the stage, stops the partial Chrome, and prints the log tail. A bare --headed is true, including when the next token is another flag (--headed --panel, or --headed last).
+Usage: start --url=<page> | --url-key=<URL.key> --browser=<chrome|edge|chrome-headless> [--headed] [--human] [--hold=<seconds|forever>] [--panel] [--size=1600x1000] [--env=KEY=VALUE]
+Opens the browser, navigates, and waits until GET /health is ok. fixture: names a built-in page. --panel opens the page panel. live-start is start. The reply includes the agent envelope. The page engine is Chrome DevTools. --engine=selenium is rejected. A start that does not become healthy names the stage, stops the partial Chrome, and prints the log tail. A bare --headed is true, including when the next token is another flag (--headed --panel, or --headed last). --human (or pkb_human_mode=on) locks the new session after a successful start. The owner is --agent (the same value as --agent-id). The child is LiveBrowserHost. Its classpath is this JVM's java.class.path when that path contains LiveBrowserHost, otherwise the versioned or .pickleball/workbench/classpath.cache when that file does, otherwise the classes that loaded this program. A Maven exec:java classpath that is only the classworlds launcher is not used. When none of those contain LiveBrowserHost, start fails and does not spawn.
 Tier: control.
 
 # help status

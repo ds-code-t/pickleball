@@ -106,3 +106,10 @@ Open items from the 3.0.0-spine final regression on Dan's Windows PC, recorded a
 - The first root `:test` run failed 103 tests. The failures-and-fixes table groups them under eleven `a1c51714f` rows and does not name every method. No test methods were removed. The green `:test` on `c1bec073e` is 2119 tests, 2112 passed, 0 failed, 7 skipped. A later pass that needs the original method list should take it from the Surefire XML of the first run on `4383ed02e`, if that report is still on the PC.
 
 A new environmental failure from a later regression goes under this section.
+
+## Doc and help gaps (2026-11-27)
+
+Closed on `3.0.0-spine-doc-gaps`. Help, `VerbTiers`, and `HumanLock` now name the same 13 human verbs. Popup usage, the `ws-route` rules shape, `@file` on `ask --say`, `html-insert --text`, and `cdp --params`, the `--agent` lock owner, and the catalog unclear notes listed in the build prompt are documented from the code that implements them.
+
+- `act --kind=scroll` passes `HumanLock` and `help act` lists it. `TargetVerb` still reports `unknown kind` and does not scroll the page. That is not a pass. Do not implement it on this branch.
+- `start` no longer forwards a Maven classworlds-only `java.class.path` to `LiveBrowserHost`. The 2026-11-23 `ClassNotFoundException` was that old path. The chooser is `ConsumerReadyCommands.hostClasspath`.

@@ -91,7 +91,9 @@ public final class HumanLock {
                 String kind = args.get("kind") == null || args.get("kind").isBlank() ? "click" : args.get("kind").trim();
                 if (!VerbTiers.HUMAN_ACT_KINDS.contains(kind)) {
                     return "error: act --kind=" + kind + " is not human input and this session is human-locked\n"
-                            + "fix: use click, type, press, hover, or select; file attachment and OS-level actions are unavailable in human mode "
+                            + "fix: use " + humanActKindList()
+                            + "; scroll passes this lock and the act body currently reports unknown kind"
+                            + "; file attachment and OS-level actions are unavailable in human mode "
                             + "(leave it with session-mode --human=off)";
                 }
             }
@@ -110,7 +112,23 @@ public final class HumanLock {
         String extra = "upload".equals(verb) || "attach".equals(verb)
                 ? " File attachment and OS-level actions are unavailable in human mode." : "";
         return "error: " + verb + " is a control-tier verb and this session is human-locked." + extra + "\n"
-                + "fix: use human-tier verbs (snap, find, act, wait, capture, chat-read, doctor), or leave human mode with session-mode --human=off";
+                + "fix: use human-tier verbs (" + humanVerbList() + "), or leave human mode with session-mode --human=off";
+    }
+
+    /** Alphabetical human verbs from {@link VerbTiers}, so the refusal cannot drift from the registry. */
+    static String humanVerbList() {
+        StringBuilder out = new StringBuilder();
+        for (Map.Entry<String, String> entry : VerbTiers.table().entrySet()) {
+            if (!VerbTiers.HUMAN.equals(entry.getValue())) continue;
+            if (!out.isEmpty()) out.append(", ");
+            out.append(entry.getKey());
+        }
+        return out.toString();
+    }
+
+    /** Alphabetical act kinds the lock accepts, including scroll. */
+    static String humanActKindList() {
+        return VerbTiers.HUMAN_ACT_KINDS.stream().sorted().collect(java.util.stream.Collectors.joining(", "));
     }
 
     /** A W3C action chain is human input when it is only key, pointer, wheel and pause actions at coordinates. */
