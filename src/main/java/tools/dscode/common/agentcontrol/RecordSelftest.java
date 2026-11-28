@@ -3,6 +3,7 @@ package tools.dscode.common.agentcontrol;
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.domengine.session.BrowserSession;
 import tools.dscode.common.agentfast.LiveChromeDriver;
+import tools.dscode.common.agentfast.PushChannel;
 import tools.dscode.common.composite.ElementOperations;
 import tools.dscode.common.recording.InteractionLog;
 import tools.dscode.common.recording.RecordingSession;
@@ -31,9 +32,16 @@ public final class RecordSelftest {
             return body;
         }
         BrowserSession session = null;
+        // The selftest records into a scratch project, never the real one: it used to leave the project's recorder
+        // state "recording" as session selftest-record with its steps and context note (PKB-HCR bug 7), and a
+        // selftest-record-* profile folder, which the next record --popin then reopened as a stale step editor.
+        boolean pushArmed = PushChannel.armed();
+        Path pushProject = PushChannel.project();
+        String pushSession = PushChannel.session();
+        Path profile = null;
         try {
-            Path root = project == null ? Path.of("") : project;
-            Path profile = Files.createTempDirectory(root, "selftest-record-");
+            profile = Files.createTempDirectory("selftest-record-");
+            Path root = profile;
             session = BrowserSession.launch("selftest-record", "about:blank", false, true, profile, List.of());
             LiveChromeDriver driver = new LiveChromeDriver(session);
             AgentDriverHooks.template("selftest-record");
@@ -100,6 +108,7 @@ public final class RecordSelftest {
             if (failure instanceof InterruptedException) Thread.currentThread().interrupt();
             return body;
         } finally {
+            PushChannel.restore(pushArmed, pushProject, pushSession);
             AgentDriverHooks.template(null);
             try {
                 AgentDriverHooks.quit();
@@ -114,6 +123,21 @@ public final class RecordSelftest {
                 }
             }
             PageSurfaces.resetRuntimeForTest();
+            if (profile != null) deleteQuietly(profile);
+        }
+    }
+
+    private static void deleteQuietly(Path dir) {
+        try (java.util.stream.Stream<Path> walk = Files.walk(dir)) {
+            walk.sorted(java.util.Comparator.reverseOrder()).forEach(path -> {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (java.io.IOException ignored) {
+                    // Chrome may still hold a file; the OS temp folder is cleaned later.
+                }
+            });
+        } catch (java.io.IOException | RuntimeException ignored) {
+            // Best effort.
         }
     }
 

@@ -42,6 +42,18 @@ public final class PushChannel {
         if (sessionId != null && !sessionId.isBlank()) session = sessionId;
     }
 
+    /** Whether a project is bound. */
+    public static boolean armed() {
+        return armed;
+    }
+
+    /** Puts back a binding read earlier with {@link #armed()}, {@link #project()} and {@link #session()}. */
+    public static void restore(boolean wasArmed, Path project, String sessionId) {
+        bound = project == null ? Path.of("") : project;
+        session = sessionId == null ? "" : sessionId;
+        armed = wasArmed;
+    }
+
     /** Session id for push rows. Empty until {@link #bind(Path, String)} sets one. */
     public static String session() {
         return session == null ? "" : session;

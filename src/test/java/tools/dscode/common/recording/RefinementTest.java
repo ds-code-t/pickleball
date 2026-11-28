@@ -117,6 +117,28 @@ class RefinementTest {
         assertFalse(text.contains("Pause"), text);
     }
 
+    /** PKB-HCR bug 7: selftest record left the real project's recorder state as session selftest-record. */
+    @Test
+    @Timeout(value = 90, unit = TimeUnit.SECONDS)
+    void selftestRecordLeavesTheProjectsRecorderStateAlone() throws Exception {
+        RecordingSession.start(temp, "keep-me");
+        RecordingSession.stop(temp);
+        Path state = RecordingSession.file(temp);
+        String before = java.nio.file.Files.readString(state);
+        Capture capture = run("selftest", temp.toString(), "record");
+        String text = capture.out + capture.err;
+        if (text.contains("no Chrome")) return;
+        assertEquals(0, capture.code, text);
+        assertEquals(before, java.nio.file.Files.readString(state), "recorder state of the project changed");
+        assertFalse(java.nio.file.Files.readString(state).contains("selftest-record"));
+        assertFalse(RecordingSession.recording(temp));
+        try (java.util.stream.Stream<Path> list = java.nio.file.Files.list(temp)) {
+            assertEquals(0, list.filter(p -> p.getFileName().toString().startsWith("selftest-record-")).count(),
+                    "profile folder left in the project");
+        }
+        assertEquals(0, InteractionLog.streamLines(temp).size(), "selftest rows landed in the project stream");
+    }
+
     private static Map<String, String> row(String id, String value) {
         Map<String, String> row = new LinkedHashMap<>();
         row.put("type", "input");
