@@ -6,7 +6,7 @@ Requires R1 and R2. Design: `docs/plans/2026-11-25-spine-design.md`, including t
 
 Every phase is mandatory and must be completed in full. Nothing in R3 is optional or deferred. Stop only on an honest test failure you cannot fix, or on a hard-rule violation.
 
-Targeted tests only. Full regression waits until the end of R8. Windows only. Append new Windows-only class names to `docs/tech-debt.md`. Never weaken, skip, or delete a test. Keep Gherkin. Step annotations stay single string literals. Never run `.\gradlew.bat --stop`.
+Targeted tests only. The end-of-work regression is the short (Chrome + Windows) tier in [Regression tiers](final-regression.md). It runs only after every roadmap and fix is done and verified with targeted tests. The full tier runs only when Dan asks. Windows only. Append new Windows-only class names to `docs/tech-debt.md`. Never weaken, skip, or delete a test. Keep Gherkin. Step annotations stay single string literals. Never run `.\gradlew.bat --stop`.
 
 Fetch and rebase before every push. Push after every green phase. Each git command stands alone. Before every push run `python scripts/sync_consumer_guidance.py` and `python scripts/refresh_agent_index.py`. R3 does not change surface-asset bytes unless a phase edits them; then update `tools.dscode.browser.SurfaceAssetsTest`.
 

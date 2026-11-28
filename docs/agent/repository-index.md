@@ -161,6 +161,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-roadmap-8-scoreboard.md`
 - `docs/maintainer/3.0.0-snapshot-coverage-audit.md`
 - `docs/maintainer/3.0.0-spine/final-regression-scoreboard.md`
+- `docs/maintainer/3.0.0-spine/manual-collaboration-scoreboard-template.md`
 - `docs/maintainer/3.0.0-spine/merge-r8-scoreboard.md`
 - `docs/maintainer/3.0.0-spine/R1-scoreboard.md`
 - `docs/maintainer/3.0.0-spine/R2-scoreboard.md`
@@ -226,6 +227,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/roadmaps/3.0.0-retest-fixes-r3-roadmap.md`
 - `docs/roadmaps/3.0.0-retest-fixes-roadmap.md`
 - `docs/roadmaps/3.0.0-spine/final-regression.md`
+- `docs/roadmaps/3.0.0-spine/manual-collaboration-regression.md`
 - `docs/roadmaps/3.0.0-spine/R1-core-hydration-spine-universal-entity.md`
 - `docs/roadmaps/3.0.0-spine/R2-cucumber-as-adapter-decoupling-ingest.md`
 - `docs/roadmaps/3.0.0-spine/R3-step-definition-language-adapters.md`

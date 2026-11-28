@@ -36,7 +36,7 @@ A mid-line `until`, a comma `until`, and a period-ending `until` loop while the 
 
 ## Deferred Linux and macOS tests (per Dan, 2026-11-24)
 
-The 3.0.0 retest-fix rounds (R, S) ran only targeted tests on the Linux box and the CI jobs (Windows, Linux live Chrome, macOS Store and core). These significant runs are deferred and have not been run for those changes. Run them before a 3.0.0 release:
+The 3.0.0 retest-fix rounds (R, S) ran only targeted tests on the Linux box and the CI jobs (Windows, Linux live Chrome, macOS Store and core). These significant runs are deferred and have not been run for those changes. They belong to the full regression tier in `docs/roadmaps/3.0.0-spine/final-regression.md`, which runs only when Dan explicitly asks. The short (Chrome + Windows) tier does not cover them:
 
 - **Linux, full suite:** a complete `./gradlew :test` (every class, not the per-phase targeted sets) on Linux with Chrome, Edge, and Firefox present.
 - **Linux, live collaboration and push:** `RetestFixesLiveTest`, `CollabFixesLiveTest`, `TwoActorRecipeLiveTest`, `OverlayRuntimeLiveTest`, `DomPushLiveTest`, `BrowserEventsLiveTest`, `BrowserEventsBidiLiveTest`, `MonitorLiveTest` in CI (they ran only on the box), plus headed (not headless) runs of the same classes.
@@ -62,6 +62,19 @@ These items stay out of `3.0.0-consumer-fixes`. The roadmap lists them under "No
 |---|---|
 
 R5 P2 and P3 already removed 6.5.2 Point, 6.5.3 typed card answers, 6.5.7 overlay read receipts, and 6.6.4 runtime injection on attached windows from this table. Point and typed answers live with `AskProgressPointTest` and the spine chat section of `docs/dynamic-control-api.md`. Overlay read receipts live with `OverlayReceiptAskTest` and `OverlayAckLiveTest`. Attached-window injection lives with `InjectLivePageTest` and `PageJvmRouteTest`. This pass does not put those rows back. R8 P3 and P4 removed 6.1.5, 6.3.6, and 6.7.3 because shared frame policy, warm CDP at start, and the UIA tree cache shipped. Those rows stay out.
+
+## Regression tier filters (open, 2026-11-27)
+
+The short (Chrome + Windows) tier in `docs/roadmaps/3.0.0-spine/final-regression.md` needs a filter that drops non-Chrome browser tests. None exists. No test class uses JUnit `@Tag`. No Gradle property maps to `excludeTags`. `--tests` can only include. Today these run or skip only because of what is installed:
+
+- Firefox live methods skip on Dan's PC only because Firefox and `geckodriver` are not installed: `LiveFirefoxSnapshotTest.liveFirefoxSnapshotHasScreenshotSourceBoxesAndPremap`, `BrowserProtocolsLiveTest.firefoxListsBidiAndNoCdpWhenPresent`, and `BrowserEventsBidiLiveTest.firefoxBidiWhenPresent`. They would run in the short tier once Firefox is installed.
+- Edge live snapshot methods skip on Windows only because their `edgeBinary()` reads Linux paths (`:`-separated `PATH`, `/opt/microsoft/msedge/msedge`): `LiveEdgeSnapshotTest.liveEdgeSnapshotWhenTheBinaryIsPresent` and `SnapshotCoverageTest.liveEdgeWhenPresent` (`dom-engine`). The same lookup means the full tier gets no Windows Edge snapshot coverage either.
+- Popup host and renderer window: on Windows `PopupBrowserLocator` prefers Edge from the registry. `AgentSurfacePopupLiveTest`, `PopupChatLiveTest`, and the `WorkbenchUiServer` window use Edge unless `PKB_AGENT_POPUP_BROWSER` (or `pkb_agent_popup_browser`) names Chrome. The short tier sets that variable. It is a workaround, not a tier filter.
+- Edge fallback when Chrome is missing: `OverlayAckLiveTest`, `PageJvmRouteTest`, `BidiCliSessionTest`, and the `SpineR6PageLive` classes (`SpineR6FixBack1DiscardTest`, `SpineR6FixBack1PageControlsTest`) quietly switch to Edge. No switch makes them fail instead. The short tier requires Chrome to be installed.
+- Consumer: no gap. `-Dpkb_runvars.pkb_browser=CHROME_HEADLESS` selects Chrome for `@all`.
+- Non-Windows tests: no gap for the short tier. Linux, macOS, and POSIX-only tests (`LiveDesktopSnapshotTest`, `MacAccessibilityScriptTest`, `PopupSandboxFallbackTest`, and the Linux and macOS branches of `SnapshotCoverageTest.liveDesktopWhenThePlatformExists`) skip themselves on Windows through assumptions.
+
+Proposed mechanism, not implemented: tag browser-specific live methods (`browser-firefox`, `browser-edge`, `browser-safari`) and OS-only methods. Add a Gradle property, for example `-Ppkb.regression=short`, that sets `excludeTags` on every `Test` task and sets `PKB_AGENT_POPUP_BROWSER` to Chrome. Make the Edge fallbacks fail when that property is set. Fix `edgeBinary()` to find Edge on Windows for the full tier.
 
 ## TypeScript package in the Workbench UI bundle (reinvestigate, per Dan, 2026-11-26)
 

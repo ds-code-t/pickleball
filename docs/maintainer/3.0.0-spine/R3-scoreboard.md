@@ -1,6 +1,6 @@
 # R3 scoreboard — step-definition language adapters
 
-Roadmap: `docs/roadmaps/3.0.0-spine/R3-step-definition-language-adapters.md`. Design: `docs/plans/2026-11-25-spine-design.md`. Branch `3.0.0-spine`. Every phase is mandatory. Windows only. Targeted tests per phase. Full regression is the last phase of R8, not this roadmap. Dan approves the design's Distribution and licensing section before P2.
+Roadmap: `docs/roadmaps/3.0.0-spine/R3-step-definition-language-adapters.md`. Design: `docs/plans/2026-11-25-spine-design.md`. Branch `3.0.0-spine`. Every phase is mandatory. Windows only. Targeted tests per phase. The end-of-work regression is the short (Chrome + Windows) tier in `docs/roadmaps/3.0.0-spine/final-regression.md`, not this roadmap. The full tier runs only when Dan asks. Dan approves the design's Distribution and licensing section before P2.
 
 | Phase | Items | Status | SHAs | CI | Targeted tests run (filters, pass/fail) | Windows live repro | Notes / blockers |
 |---|---|---|---|---|---|---|---|
