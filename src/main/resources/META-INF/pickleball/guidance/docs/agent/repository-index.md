@@ -1164,6 +1164,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/ControllerUtf8Test.java`
 - `src/test/java/tools/dscode/launcher/CrossStoreTest.java`
 - `src/test/java/tools/dscode/launcher/DesktopSameVerbTest.java`
+- `src/test/java/tools/dscode/launcher/DocGapsTest.java`
 - `src/test/java/tools/dscode/launcher/DoctorTest.java`
 - `src/test/java/tools/dscode/launcher/DomEngineCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/DomLogCliLaunchTest.java`
@@ -1193,6 +1194,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/LauncherCli.java`
 - `src/test/java/tools/dscode/launcher/LeaseAndBlockTest.java`
 - `src/test/java/tools/dscode/launcher/LeaseGateTest.java`
+- `src/test/java/tools/dscode/launcher/LiveHostClasspathTest.java`
 - `src/test/java/tools/dscode/launcher/MaskQuietTest.java`
 - `src/test/java/tools/dscode/launcher/McpDirectHotPathTest.java`
 - `src/test/java/tools/dscode/launcher/MonitorLiveTest.java`

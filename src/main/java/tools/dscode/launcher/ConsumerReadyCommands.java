@@ -14,6 +14,8 @@ import tools.dscode.store.StorePaths;
 import java.awt.GraphicsEnvironment;
 import java.io.IOException;
 import java.net.URI;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -25,12 +27,16 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.jar.JarFile;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Phase B1 verbs. Page commands with no {@code --run-id} use the session
@@ -44,6 +50,10 @@ final class ConsumerReadyCommands {
     private static final Duration HEALTH_TIMEOUT = Duration.ofSeconds(2);
     /** Covers Chrome's DevToolsActivePort wait. A slow first start can still become healthy. */
     static final int HEALTH_WAIT_SECONDS = 50;
+    /** Class-file entry the live-browser child must be able to load. */
+    static final String HOST_CLASS_ENTRY = "tools/dscode/common/agentfast/LiveBrowserHost.class";
+    private static final Pattern CACHE_VERSION = Pattern.compile("\"pickleballVersion\"\\s*:\\s*\"([^\"]+)\"");
+    private static final Pattern CACHE_COMPLETE = Pattern.compile("\"complete\"\\s*:\\s*(true|false)");
     private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(HEALTH_TIMEOUT).build();
 
     private ConsumerReadyCommands() {
@@ -639,6 +649,160 @@ final class ConsumerReadyCommands {
         return browser == null || !browser.toLowerCase(Locale.ROOT).contains("headless");
     }
 
+    /**
+     * Classpath for the {@code LiveBrowserHost} child. This JVM's {@code java.class.path}
+     * is used when it already contains that class. A Maven {@code exec:java} path that is
+     * only the classworlds launcher is not used. Next is the versioned or
+     * {@code .pickleball/workbench/classpath.cache} when that file contains the class,
+     * then the code source and loader URLs. None of those is an error and the child is not started.
+     */
+    static String hostClasspath(Path project, String javaClassPath) throws IOException {
+        if (classpathHasHost(javaClassPath)) return javaClassPath;
+        String cached = classpathFromHostCache(project);
+        if (classpathHasHost(cached)) return cached;
+        String loaded = classpathFromHostLoaders();
+        if (classpathHasHost(loaded)) return loaded;
+        throw new IOException("LiveBrowserHost is not on java.class.path, classpath.cache, or the classes that loaded this program. "
+                + "Run the project wrapper once so .pickleball/workbench/classpath.cache contains "
+                + "tools.dscode.common.agentfast.LiveBrowserHost. A classworlds-only path is not used.");
+    }
+
+    static boolean classpathHasHost(String classpath) {
+        if (classpath == null || classpath.isBlank()) return false;
+        for (String raw : classpath.split(java.io.File.pathSeparator, -1)) {
+            String entry = unquoteClasspathEntry(raw.trim());
+            if (entry.isEmpty()) continue;
+            try {
+                if (entryHasHost(Path.of(entry))) return true;
+            } catch (RuntimeException ignored) {
+                // A wrapper token that is not a path does not contain the host.
+            }
+        }
+        return false;
+    }
+
+    private static boolean entryHasHost(Path path) {
+        if (path == null) return false;
+        try {
+            if (Files.isDirectory(path)) return Files.isRegularFile(path.resolve(HOST_CLASS_ENTRY));
+            if (!Files.isRegularFile(path)) return false;
+            String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
+            if (!name.endsWith(".jar")) return false;
+            try (JarFile jar = new JarFile(path.toFile())) {
+                return jar.getEntry(HOST_CLASS_ENTRY) != null;
+            }
+        } catch (Exception failure) {
+            return false;
+        }
+    }
+
+    private static String classpathFromHostCache(Path project) {
+        if (project == null) return "";
+        for (Path file : hostCacheFiles(project)) {
+            if (!Files.isRegularFile(file)) continue;
+            try {
+                String joined = readHostCache(file);
+                if (classpathHasHost(joined)) return joined;
+            } catch (Exception ignored) {
+                // The next candidate, or the loader classpath, is the fallback.
+            }
+        }
+        return "";
+    }
+
+    private static List<Path> hostCacheFiles(Path project) {
+        List<Path> files = new ArrayList<>();
+        Path root = project.resolve(".pickleball");
+        String version = hostCacheVersion(root.resolve("current.json"));
+        if (version != null) {
+            files.add(root.resolve("v").resolve(version).resolve("workbench").resolve("classpath.cache"));
+        }
+        files.add(root.resolve("workbench").resolve("classpath.cache"));
+        return files;
+    }
+
+    private static String hostCacheVersion(Path current) {
+        if (!Files.isRegularFile(current)) return null;
+        try {
+            String json = Files.readString(current);
+            Matcher version = CACHE_VERSION.matcher(json);
+            if (!version.find()) return null;
+            String value = version.group(1).trim();
+            if (!safeCacheVersion(value)) return null;
+            Matcher complete = CACHE_COMPLETE.matcher(json);
+            if (complete.find() && !Boolean.parseBoolean(complete.group(1))) return null;
+            return value;
+        } catch (Exception failure) {
+            return null;
+        }
+    }
+
+    private static boolean safeCacheVersion(String value) {
+        if (value.isBlank()) return false;
+        if (value.contains("/") || value.contains("\\") || value.contains("..")) return false;
+        if (value.contains(":") || value.startsWith(".")) return false;
+        return !value.equals(".");
+    }
+
+    private static String readHostCache(Path file) throws IOException {
+        String text = Files.readString(file).trim();
+        if (text.isEmpty()) return "";
+        String first = text.lines().findFirst().orElse("");
+        return unquoteClasspathEntry(first.trim());
+    }
+
+    private static String classpathFromHostLoaders() {
+        LinkedHashSet<String> entries = new LinkedHashSet<>();
+        addHostCodeSource(tools.dscode.common.agentfast.LiveBrowserHost.class, entries);
+        addHostCodeSource(ConsumerReadyCommands.class, entries);
+        addHostLoaderUrls(tools.dscode.common.agentfast.LiveBrowserHost.class.getClassLoader(), entries);
+        addHostLoaderUrls(Thread.currentThread().getContextClassLoader(), entries);
+        return String.join(java.io.File.pathSeparator, entries);
+    }
+
+    private static void addHostCodeSource(Class<?> type, LinkedHashSet<String> entries) {
+        try {
+            if (type.getProtectionDomain().getCodeSource() == null
+                    || type.getProtectionDomain().getCodeSource().getLocation() == null) return;
+            Path path = Path.of(type.getProtectionDomain().getCodeSource().getLocation().toURI())
+                    .toAbsolutePath().normalize();
+            if (Files.exists(path)) entries.add(path.toString());
+        } catch (Exception ignored) {
+            // A missing code source is not a classpath entry.
+        }
+    }
+
+    private static void addHostLoaderUrls(ClassLoader loader, LinkedHashSet<String> entries) {
+        ClassLoader current = loader;
+        for (int guard = 0; current != null && guard < 8; guard++) {
+            if (current instanceof URLClassLoader urls) {
+                for (URL url : urls.getURLs()) {
+                    try {
+                        Path path = Path.of(url.toURI()).toAbsolutePath().normalize();
+                        if (Files.exists(path)) entries.add(path.toString());
+                    } catch (Exception ignored) {
+                        // Skip a URL that is not a file.
+                    }
+                }
+            }
+            current = current.getParent();
+        }
+    }
+
+    /** Strips one pair of Java argument-file quotes. A doubled backslash is one backslash. */
+    private static String unquoteClasspathEntry(String text) {
+        String body = text == null ? "" : text.trim();
+        if (body.length() < 2 || !body.startsWith("\"") || !body.endsWith("\"")) return body;
+        String inner = body.substring(1, body.length() - 1);
+        StringBuilder out = new StringBuilder(inner.length());
+        for (int index = 0; index < inner.length(); index++) {
+            char current = inner.charAt(index);
+            if (current == '\\' && index + 1 < inner.length()) out.append(inner.charAt(++index));
+            else out.append(current);
+        }
+        return out.toString();
+    }
+
     private static Process spawnHost(
             Path project,
             String id,
@@ -661,7 +825,7 @@ final class ConsumerReadyCommands {
                 StandardOpenOption.CREATE,
                 StandardOpenOption.APPEND
         );
-        String classpath = System.getProperty("java.class.path", "");
+        String classpath = hostClasspath(project, System.getProperty("java.class.path", ""));
         String cdpInput = System.getProperty("pkb_cdp_input");
         String inputFlag = cdpInput == null || cdpInput.isBlank() ? "" : "-Dpkb_cdp_input=" + quoteArg(cdpInput) + "\n";
         String body = inputFlag + String.join("\n",

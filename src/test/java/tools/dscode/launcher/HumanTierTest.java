@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import dev.domengine.session.BrowserSession;
+import tools.dscode.common.agentcontrol.HumanLock;
 import tools.dscode.control.protocol.VerbTiers;
 
 import java.io.ByteArrayOutputStream;
@@ -157,6 +158,62 @@ class HumanTierTest {
         java.nio.file.Files.writeString(file, "{\"target\":\"browser:auto\",\"kind\":\"click\",\"query\":\"Go\"}");
         Capture call = run("call", "act", "--args-file=" + file, "--human-override=agent", "--agent-id=owner-a", "--run-id=f3");
         assertFalse((call.out + call.err).contains("does not use --human-override"), call.out + call.err);
+    }
+
+    /** The refusal and help pages name the same verbs and act kinds as {@link VerbTiers}. */
+    @Test
+    void helpMatchesTheHumanRegistry() throws Exception {
+        HumanLock.lock(temp, "docs", "owner-a");
+        Capture refused = run("note", "--text=hi", "--run-id=docs");
+        assertEquals(2, refused.code, refused.err);
+        List<String> verbs = List.of(between(refused.err, "human-tier verbs (", ")").split(", "));
+        for (Map.Entry<String, String> entry : VerbTiers.table().entrySet()) {
+            if (!VerbTiers.HUMAN.equals(entry.getValue())) continue;
+            assertTrue(verbs.contains(entry.getKey()), entry.getKey() + " missing from " + verbs);
+        }
+        Capture kind = run("act", "--kind=drag", "--query=Go", "--run-id=docs");
+        assertEquals(2, kind.code, kind.err);
+        List<String> kinds = List.of(between(kind.err, "fix: use ", ";").split(", "));
+        for (String allowed : VerbTiers.HUMAN_ACT_KINDS) {
+            assertTrue(kinds.contains(allowed), allowed + " missing from " + kinds);
+        }
+        assertTrue(kind.err.contains("unknown kind"), kind.err);
+        String act = help("act");
+        assertTrue(act.contains("scroll"), act);
+        assertTrue(act.contains("unknown kind"), act);
+        String session = help("session-mode");
+        assertTrue(session.contains("The owner is --agent"), session);
+        assertTrue(session.contains("--human-override=<reason>"), session);
+        for (String verb : List.of("popup-open", "popup-status", "popup-close")) {
+            String page = help(verb);
+            assertTrue(page.startsWith("Usage: " + verb), page);
+            assertTrue(page.contains("Tier: control."), page);
+        }
+        assertTrue(help("popup-open").contains("are not popup-open flags"), help("popup-open"));
+        assertTrue(help("popup-open").contains("--target=popup is not a flag of this verb"), help("popup-open"));
+        assertTrue(help("capture").contains("--query is not a capture flag"), help("capture"));
+        assertTrue(help("ws-route").contains("closeCode"), help("ws-route"));
+        assertTrue(help("ws-route").contains("\"on\":\"ping\""), help("ws-route"));
+        assertTrue(help("dialogs").contains("already open"), help("dialogs"));
+    }
+
+    private static String between(String text, String start, String end) {
+        int from = text.indexOf(start);
+        assertTrue(from >= 0, start + " missing from " + text);
+        int begin = from + start.length();
+        int to = text.indexOf(end, begin);
+        assertTrue(to > begin, end + " missing from " + text);
+        return text.substring(begin, to);
+    }
+
+    private static String help(String verb) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        int code = WorkbenchCliHelp.answer(new String[]{"help", verb},
+                new PrintStream(out, true, StandardCharsets.UTF_8),
+                new PrintStream(err, true, StandardCharsets.UTF_8));
+        assertEquals(0, code, err.toString(StandardCharsets.UTF_8));
+        return out.toString(StandardCharsets.UTF_8);
     }
 
     Capture run(String... args) {

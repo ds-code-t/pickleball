@@ -701,6 +701,30 @@ public final class AgentControl {
 
     private static final java.util.Set<String> STEP_ACTIONS = java.util.Set.of("click", "input", "select", "check", "any");
 
+    /**
+     * A flag value, or the text of {@code @file}. Relative paths are from the project.
+     * A missing file names that directory.
+     */
+    static String readAtFile(Path project, String value, String flag) {
+        if (value == null) return "";
+        String text = value.trim();
+        if (!text.startsWith("@")) return value;
+        Path base = project == null ? Path.of("").toAbsolutePath().normalize() : project.toAbsolutePath().normalize();
+        Path file = Path.of(text.substring(1).trim());
+        if (!file.isAbsolute()) file = base.resolve(file).normalize();
+        else file = file.toAbsolutePath().normalize();
+        if (!java.nio.file.Files.isRegularFile(file)) {
+            throw new IllegalArgumentException("error: " + flag + " file not found: " + file
+                    + "\nfix: pass a path relative to the project (" + base + "), or an absolute path");
+        }
+        try {
+            return java.nio.file.Files.readString(file);
+        } catch (java.io.IOException failure) {
+            throw new IllegalArgumentException("error: cannot read " + file + ": " + failure.getMessage()
+                    + "\nfix: pass a path relative to the project (" + base + "), or an absolute path");
+        }
+    }
+
     /** Reads {@code --steps} as a JSON array, or {@code @file} relative to the project. */
     @SuppressWarnings("unchecked")
     static List<Map<String, Object>> guideSteps(Path project, String raw) throws Exception {
@@ -886,9 +910,16 @@ public final class AgentControl {
     private static Result ask(Path project, String runId, Map<String, String> args) throws Exception {
         if (present(args.get("type"))) return typedAsk(project, args);
         if (!present(args.get("say"))) return fail(2, "ask requires --say=<question>");
+        String say;
+        try {
+            say = readAtFile(project, args.get("say"), "say").trim();
+        } catch (IllegalArgumentException missing) {
+            return fail(2, missing.getMessage());
+        }
+        if (say.isBlank()) return fail(2, "ask requires --say=<question>");
         Map<String, Object> spec = new LinkedHashMap<>();
         spec.put("id", present(args.get("id")) ? args.get("id").trim() : "q" + ASK_SEQ.incrementAndGet());
-        spec.put("say", args.get("say").trim());
+        spec.put("say", say);
         if (present(args.get("choices"))) {
             List<String> choices = choiceList(args.get("choices"));
             if (choices.size() > 6) return fail(2, "ask --choices holds at most 6 answers");
@@ -947,7 +978,13 @@ public final class AgentControl {
         if (!type.equals("text") && !type.equals("choice") && !type.equals("confirm")) {
             return fail(2, "ask --type is text, choice, or confirm");
         }
-        String prompt = present(args.get("prompt")) ? args.get("prompt").trim() : present(args.get("say")) ? args.get("say").trim() : "";
+        String promptRaw = present(args.get("prompt")) ? args.get("prompt") : present(args.get("say")) ? args.get("say") : "";
+        String prompt;
+        try {
+            prompt = readAtFile(project, promptRaw, present(args.get("prompt")) ? "prompt" : "say").trim();
+        } catch (IllegalArgumentException missing) {
+            return fail(2, missing.getMessage());
+        }
         if (prompt.isBlank()) return fail(2, "ask --type requires --prompt");
         List<String> options = choiceList(present(args.get("options")) ? args.get("options") : args.get("choices"));
         if ("choice".equals(type) && options.isEmpty()) return fail(2, "ask --type=choice requires --options");
@@ -2234,12 +2271,18 @@ public final class AgentControl {
 
     private static Result html(Path project, String runId, Map<String, String> args, String op) throws Exception {
         if (!present(args.get("text"))) return fail(2, "html " + op + " requires --text");
+        String text;
+        try {
+            text = readAtFile(project, args.get("text"), "text");
+        } catch (IllegalArgumentException missing) {
+            return fail(2, missing.getMessage());
+        }
         Map<String, Object> placed = PageSurfaces.place(
                 explicitPage(project, args),
                 op,
                 expandHandle(args.get("handle")),
                 args.get("where"),
-                args.get("text"),
+                text,
                 "html",
                 integerOrNull(args.get("x")),
                 integerOrNull(args.get("y")),

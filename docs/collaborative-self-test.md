@@ -22,6 +22,8 @@ The same class and plugin on macOS or Linux:
 
 Omit the scratch path to use the consumer project. The routine file is then `.pickleball/recordings/routines/selftest.json` under that project.
 
+`start` launches `LiveBrowserHost` on a classpath that contains that class. This JVM's `java.class.path` is used when it already contains `LiveBrowserHost`. A Maven `exec:java` path that is only the classworlds launcher is not used. The next choice is `.pickleball/v/<version>/workbench/classpath.cache` when `current.json` is complete, otherwise `.pickleball/workbench/classpath.cache`, when that file contains the class. Otherwise the classes that loaded the launcher are used. When none of those contain `LiveBrowserHost`, `start` fails and does not spawn. The 2026-11-23 `ClassNotFoundException: tools.dscode.common.agentfast.LiveBrowserHost` was the old behavior of forwarding `java.class.path` unchanged.
+
 ## How to read a result
 
 Stdout is one JSON object. Read `ok`, `sentence`, and `skipped` when those fields are present. `sum` repeats `sentence`. `dashboard query`, `dashboard overlap`, and `dashboard xref` print that object directly (`op` is `query`, `overlap`, or `xref`). A failure also prints `error:` and `fix:` on stderr. `err.fix` is the short hint, such as `help record`. The stderr `fix:` line may be the help page for that hint.
@@ -275,7 +277,7 @@ Finish with `live-stop`. Do not add this section to `@all`.
 
 A repeatable test with two actors on one `start` session. `TwoActorRecipeLiveTest` runs scenarios 1, 2, and 5 of this recipe as a scripted version.
 
-- **Helper (human tier).** Runs under its own run id, locked with `session-mode --human=on --run-id=<helper>`. It uses only human-tier verbs: `snap`, `find`, `act`, `wait`, `capture`, `chat-read`, `doctor`, `explain`, and `help`. It talks to the agent only through what is on the page: cards, the panel composer, highlights, and guides. A control verb exits 2 with `error: <verb> is a control-tier verb`. The lock is per run id. There are no per-caller tiers.
+- **Helper (human tier).** Runs under its own run id, locked with `session-mode --human=on --run-id=<helper>`. It uses only human-tier verbs: `act`, `aria-snap`, `capture`, `chat-read`, `doctor`, `explain`, `find`, `help`, `input`, `screenshot`, `snap`, `wait`, and `wait-for`. `act` kinds are click, type, press, hover, select, and scroll. scroll passes the lock and the act body currently reports `unknown kind`, so the page does not scroll. A human `input` chain is only key, pointer, wheel, and pause at viewport coordinates. The lock owner is `--agent`. It talks to the agent only through what is on the page: cards, the panel composer, highlights, and guides. A control verb exits 2 with `error: <verb> is a control-tier verb`. The lock is per run id. There are no per-caller tiers.
 - **Agent (full access).** Runs under its own run id with control verbs. It waits without blocking the start host's lane: `ask-and-wait --async` with `answer-wait --id`, `wait-any` (the first of an answer, a chat line, or a click), and `chat-turn`.
 
 Start and attach in this order. This avoids the start race and the notes-file deadlock seen on 2026-11-23.

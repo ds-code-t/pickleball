@@ -136,6 +136,16 @@ final class PwCommand {
                 return fail(err, invalid.getMessage(), "pass --steps=<file or JSON array>; a relative path is from the project");
             }
         }
+        if ("cdp".equals(area)) {
+            String params = flags.get("params");
+            if (params != null && params.trim().startsWith("@")) {
+                try {
+                    flags.put("params", readParamsFile(project, params));
+                } catch (IllegalArgumentException invalid) {
+                    return fail(err, invalid.getMessage().replaceFirst("^error: ", ""), "pass --params=<json> or --params=@file");
+                }
+            }
+        }
         String endpoint;
         try {
             endpoint = endpoint(project, flags);
@@ -629,11 +639,45 @@ final class PwCommand {
         return MouseButton.valueOf(f.getOrDefault("button", "left").toUpperCase(Locale.ROOT));
     }
 
+    /** {@code --params} inline JSON, or {@code @file} relative to the project. The value must be a JSON object. */
+    static String readParamsFile(Path project, String value) {
+        if (value == null) return null;
+        String text = value.trim();
+        if (text.startsWith("@")) {
+            Path base = project == null ? Path.of("").toAbsolutePath().normalize() : project.toAbsolutePath().normalize();
+            Path file = Path.of(text.substring(1).trim());
+            if (!file.isAbsolute()) file = base.resolve(file).normalize();
+            else file = file.toAbsolutePath().normalize();
+            if (!Files.isRegularFile(file)) {
+                throw new IllegalArgumentException("error: params file not found: " + file
+                        + "\nfix: pass a path relative to the project (" + base + "), or an absolute path");
+            }
+            try {
+                text = Files.readString(file);
+            } catch (IOException failure) {
+                throw new IllegalArgumentException("error: cannot read " + file + ": " + failure.getMessage()
+                        + "\nfix: pass a path relative to the project (" + base + "), or an absolute path");
+            }
+        }
+        try {
+            com.google.gson.JsonElement parsed = JsonParser.parseString(text);
+            if (parsed == null || !parsed.isJsonObject()) {
+                throw new IllegalArgumentException("error: --params must be a JSON object\nfix: pass {\"expression\":\"1\"} or --params=@file");
+            }
+            return parsed.toString();
+        } catch (IllegalArgumentException invalid) {
+            throw invalid;
+        } catch (RuntimeException invalid) {
+            throw new IllegalArgumentException("error: --params must be a JSON object\nfix: pass {\"expression\":\"1\"} or --params=@file");
+        }
+    }
+
     private static void cdp(State s, Map<String, String> f, ObjectNode out) throws IOException {
         String method = require(f, "method");
         CDPSession session = s.page.context().newCDPSession(s.page);
         try {
             String params = f.get("params");
+            if (params != null && params.trim().startsWith("@")) params = readParamsFile(s.project, params);
             JsonObject result = params == null || params.isBlank() ? session.send(method) : session.send(method, JsonParser.parseString(params).getAsJsonObject());
             out.put("method", method);
             out.set("result", JSON.readTree(result.toString()));

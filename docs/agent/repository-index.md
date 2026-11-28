@@ -160,6 +160,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-roadmap-7-scoreboard.md`
 - `docs/maintainer/3.0.0-roadmap-8-scoreboard.md`
 - `docs/maintainer/3.0.0-snapshot-coverage-audit.md`
+- `docs/maintainer/3.0.0-spine/doc-gaps-scoreboard.md`
 - `docs/maintainer/3.0.0-spine/final-regression-scoreboard.md`
 - `docs/maintainer/3.0.0-spine/manual-collaboration-scoreboard-template.md`
 - `docs/maintainer/3.0.0-spine/merge-r8-scoreboard.md`
@@ -1334,6 +1335,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/ControllerUtf8Test.java`
 - `src/test/java/tools/dscode/launcher/CrossStoreTest.java`
 - `src/test/java/tools/dscode/launcher/DesktopSameVerbTest.java`
+- `src/test/java/tools/dscode/launcher/DocGapsTest.java`
 - `src/test/java/tools/dscode/launcher/DoctorTest.java`
 - `src/test/java/tools/dscode/launcher/DomEngineCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/DomLogCliLaunchTest.java`
@@ -1363,6 +1365,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/LauncherCli.java`
 - `src/test/java/tools/dscode/launcher/LeaseAndBlockTest.java`
 - `src/test/java/tools/dscode/launcher/LeaseGateTest.java`
+- `src/test/java/tools/dscode/launcher/LiveHostClasspathTest.java`
 - `src/test/java/tools/dscode/launcher/MaskQuietTest.java`
 - `src/test/java/tools/dscode/launcher/McpDirectHotPathTest.java`
 - `src/test/java/tools/dscode/launcher/MonitorLiveTest.java`

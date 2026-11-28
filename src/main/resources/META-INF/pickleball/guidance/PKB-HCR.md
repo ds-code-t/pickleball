@@ -56,7 +56,7 @@ Pass criteria come from the reply fields, events, exit codes, and page text name
 
 1. Use the `3.0.0-spine` worktree at the SHA being tested. Run `.\gradlew.bat publishToMavenLocal`, then `.\maven-consumer-project\mvnw.cmd -f maven-consumer-project\pom.xml -U -q test-compile`.
 2. Set `$env:PKB_AGENT_POPUP_BROWSER = 'C:\Program Files\Google\Chrome\Application\chrome.exe'` in every shell, so the popup host uses Chrome.
-3. Define `pkb`. The documented launcher is `.\mvnw.cmd -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=<verb and flags>"` (`docs/collaborative-self-test.md`). `start` spawns `LiveBrowserHost` with this JVM's `java.class.path`. Under `exec:java` that path is the Maven launcher, and the 2026-11-23 run failed with `ClassNotFoundException: tools.dscode.common.agentfast.LiveBrowserHost`. If `start` fails that way, write the test classpath once with `.\mvnw.cmd -q dependency:build-classpath "-Dmdep.outputFile=target\cp.txt" "-Dmdep.includeScope=test"`. Then use `java -cp "target\test-classes;target\classes;<contents of target\cp.txt>" tools.dscode.launcher.PickleballWorkbenchLauncher <verb> <flags>`. Record which form was used. A `start` failure under the documented form is a finding (**unclear** whether it is still current).
+3. Define `pkb`. The documented launcher is `.\mvnw.cmd -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=<verb and flags>"` (`docs/collaborative-self-test.md`). resolved: `start` uses `java.class.path` only when that path already contains `LiveBrowserHost`. A classworlds-only path is not used. The next choice is the versioned or `.pickleball/workbench/classpath.cache` when that file contains the class, then the classes that loaded the launcher. When none of those contain it, `start` fails and does not spawn. The 2026-11-23 `ClassNotFoundException: tools.dscode.common.agentfast.LiveBrowserHost` was the old path. Use the documented `exec:java` form.
 4. Create `C:\pkb-manual\site`. Copy `maven-consumer-project\src\test\resources\site\*` into it, and add the M0 files below. Serve it in its own shell with `python -m http.server 8765 --bind 127.0.0.1 --directory C:\pkb-manual\site`. Port 8765 makes the consumer `URL.*` keys in `configs/URL.yaml` resolve (`URL.components`, `URL.loading`, `URL.dialogs`). The manual page is `http://127.0.0.1:8765/manual.html`.
 5. A: `pkb controller-start`, then `pkb start --url=http://127.0.0.1:8765/manual.html --browser=chrome --headed=true --panel --hold=forever --size=1400x900`. Pass: exit 0, `sentence` `live browser ready, panel open`, `headed=true`. Then run `pkb doctor` until `health=ok` and `chrome=present`.
 6. H: only after step 5, run `pkb session-mode --human=on`, then a first `pkb snap`. The reply must not contain `warning: the human lock applies to the default run id`.
@@ -142,11 +142,11 @@ Areas: HL human lock and tiers, HV human view, CH chat, CA question cards and wa
 
 **HCR-02 (M-HL-02 Override is for the owner only)** — Role: A. Covers: `HumanLock` owner and override log.
 - Steps: `pkb session-mode --human=on --run-id=owned --agent=lead`. Then `pkb highlight --query=Go --preset=yellow --run-id=owned --agent=other --human-override=demo`. Then the same command with `--agent=lead`. Then `pkb session-mode --human=off --run-id=owned`.
-- Assert: the first call exits 2 with `--human-override is only for the session owner (lead)`. The second exits 0, and the composite log has a `human-lock override owned highlight reason=demo` line. `session-mode` with no `--human` prints the mode. **Unclear:** the help does not name `--agent` as the owner flag. It comes from the coordination agent id. Record what works.
+- Assert: the first call exits 2 with `--human-override is only for the session owner (lead)`. The second exits 0, and the composite log has a `human-lock override owned highlight reason=demo` line. `session-mode` with no `--human` prints the mode. resolved: the owner is `--agent` (the same value as `--agent-id`). Only that owner may pass `--human-override=<reason>`.
 
 **HCR-03 (M-HL-03 Human input forms)** — Role: H. Covers: `VerbTiers.HUMAN_ACT_KINDS`, `HumanLock.inputIsHuman`, `TargetVerb`, `ProtoVerbs` input.
 - Steps (H): `pkb act --kind=type --query=Email --value=h1@example.com`, then `act --kind=select --query=Size --value=Large`, `act --kind=hover --query=Go`, `act --kind=press --query=Email --value=Tab`, and `act --kind=click --query=Agree`. Then `pkb input --actions=@C:\pkb-manual\keys.json`, where the file holds a key chain that types `x` into the focused field. Then `pkb input --actions=@C:\pkb-manual\element.json`, where a pointer move has `origin` set to an element object. Then `pkb act --kind=scroll --query=Go`.
-- Assert: the five `act` calls exit 0. `snap --include=values` then shows `value=h1@example.com`, `Size` showing `Large`, and `checked=true` on Agree. The coordinate chain exits 0. The element-anchored chain exits 2 with `not human input`. **Unclear:** the lock allows `scroll`, but `act` usage lists no `scroll` kind. Record the reply.
+- Assert: the five `act` calls exit 0. `snap --include=values` then shows `value=h1@example.com`, `Size` showing `Large`, and `checked=true` on Agree. The coordinate chain exits 0. The element-anchored chain exits 2 with `not human input`. resolved: the lock allows `scroll` and `help act` lists it. The act body reports `unknown kind` and does not scroll the page.
 
 **HCR-04 (M-HL-04 start --human locks a new session)** — Role: A, then H. Covers: `start --human`, `humanRequested`. Run this after teardown, or in a second scratch project, never beside the main `start`.
 - Steps: `pkb start --url=fixture:form --browser=chrome --headed=true --human --run-id=solo`, then `pkb eval --expr=1 --run-id=solo`, then `pkb live-stop --all`.
@@ -169,7 +169,7 @@ Areas: HL human lock and tiers, HV human view, CH chat, CA question cards and wa
 - Assert: YAML of roles and names with `[ref=eN]`. After the click, `pkb find --query=Went` shows the `Went:` text with the current Email value. If the reply says Playwright is not on the session, record that as a gap: the human role then has no aria view.
 
 **HCR-08 (M-HV-04 Screenshot and capture (H))** — Covers: `screenshot`, `capture`.
-- Steps (H): `pkb screenshot --out=C:\pkb-manual\h-shot.png`, then `pkb capture --query=Go --out=C:\pkb-manual\h-go.png`. **Unclear:** `capture` usage names only `--target` and `--out`. Record whether `--query` scopes it.
+- Steps (H): `pkb screenshot --out=C:\pkb-manual\h-shot.png`, then `pkb capture --target=browser:auto --out=C:\pkb-manual\h-go.png`. resolved: `--query` is not a capture flag and does not crop. The file is the whole page, or the desktop window PNG when `--target` is desktop. An element crop is `pw screenshot --out=<file> --selector=<selector>`.
 - Assert: both files exist and open. H looks at the PNGs as a person would, and they show the page and the agent panel.
 
 **HCR-09 (M-HV-05 Name ranking and pkb surfaces (A→H))** — Covers: `find` exact-name ranking, `--purpose`, page control above pkb chat text (NEW-3 fix).
@@ -206,7 +206,7 @@ Areas: HL human lock and tiers, HV human view, CH chat, CA question cards and wa
 
 **HCR-16 (M-CA-03 Text, confirm, and sensitive cards (A→H))** — Covers: `ask --type=text|confirm`, `--sensitive=true`, `ui-poll --id`.
 - Steps: A runs `pkb ask --type=text --prompt=Your-code --id=q-text --sensitive=true`. H types `1234` in the card field (`pkb act --kind=type --query=Your-code --value=1234`) and clicks the card's submit button (found with `pkb find --purpose=card-option`). A runs `pkb ui-poll --id=q-text --wait=30`. Repeat with `--type=confirm --prompt=Proceed --id=q-conf`, and H clicks the confirm choice.
-- Assert: A gets an answer event for each card. The sensitive value is not in `overlay-poll` or `ui-poll` output, the event says it was answered, and H's `snap` shows `value=redacted` or nothing for that field. **Unclear:** how a text card submits (button name). Record the control H used.
+- Assert: A gets an answer event for each card. The sensitive value is not in `overlay-poll` or `ui-poll` output, the event says it was answered, and H's `snap` shows `value=redacted` or nothing for that field. resolved: a text card has a field named `pkb-answer` and a button labeled Send. Send, or Enter in the field, submits when the trimmed text is not blank. An empty field does not submit. The event is `type=answer`.
 
 **HCR-17 (M-CA-04 wait-any watch (A→H))** — Covers: `wait-any --watch=<short id>:click`.
 - Steps: H runs `pkb find --query=Go` and passes the short id to A out of band. This is the only out-of-band hand-off, standing in for "the agent points at Go". A starts `pkb wait-any --watch=<id>:click --chat=human --timeout=60s`. H clicks Go.
@@ -217,7 +217,7 @@ Areas: HL human lock and tiers, HV human view, CH chat, CA question cards and wa
 - Assert (H): `snap --include=cards` shows the card answered or closed, and its buttons are gone.
 
 **HCR-19 (M-CA-06 Quoted value chip (A→H))** — Covers: `.pkb-value` chip rendering.
-- Steps: A writes `C:\pkb-manual\say.txt` containing `Enter "abc" in Email`. **Unclear:** `ask --say` has no `@file` form. Use the guide in M-GD-01 for the quoted chip when a value with quotes cannot be passed.
+- Steps: A writes `C:\pkb-manual\say.txt` containing `Enter "abc" in Email`, then `pkb ask --say=@C:\pkb-manual\say.txt --id=q-chip`. resolved: `ask --say=@file` and `ask --prompt=@file` read that file. A path is relative to the project, or absolute. A missing file is `error:` and `fix:` and does not ask for a live page.
 - Assert (H): the screenshot shows `abc` as a chip, and the quote characters are kept in the card text.
 
 ### GD — guides
@@ -254,7 +254,7 @@ Areas: HL human lock and tiers, HV human view, CH chat, CA question cards and wa
 
 **HCR-27 (M-VS-04 Pin, toast, checklist, progress (A→H))** — Covers: `pin`, `toast`, `checklist`, `progress` (`progress` needs a spine `--session`, see M-LK-01).
 - Steps (A): `pkb pin --text=Pinned-note`, `pkb toast --text=Saved`, `pkb checklist --items=One|Two|Three`, then `pkb checklist --id=<id> --check=2`.
-- Assert (H): the toast and checklist appear in the screenshot, and row 2 is checked. The 2026-11-23 run found pins invisible to `snap` and `find`. Record whether `snap --include=placements` lists the pin now. **Unclear:** whether a person can tick a checklist row and whether that posts an event. H tries clicking row 3, and A checks `ui-poll`.
+- Assert (H): the toast and checklist appear in the screenshot, and row 2 is checked. The 2026-11-23 run found pins invisible to `snap` and `find`. Record whether `snap --include=placements` lists the pin now. resolved: a person can tick a checklist checkbox. The change posts `type=check` `source=human` with `id`, `check`, and `checked`, even when recording is off. `events --follow --type=check` reads it, and `ui-poll` keeps a `type=check` row. That tick is not `checklist --check`. H tries clicking row 3, and A checks `ui-poll`.
 
 **HCR-28 (M-VS-05 Batch UI and TTL (A, H check))** — Covers: `ui-catalog`, `ui-apply` (`--scope`, `--ttl`), `ui-poll`, `UiBatch`.
 - Steps (A): `pkb ui-catalog`, then `pkb ui-apply --ops=@C:\pkb-manual\ops.json --ttl=10`, where the file holds a label on `#email` and a toast. Wait 12 s.
@@ -271,7 +271,7 @@ Areas: HL human lock and tiers, HV human view, CH chat, CA question cards and wa
 - Assert (H): `find --query=Injected-note` and then `find --query=Replaced-block` are listed (or seen in the screenshot when pkb-layer text is not listed; record which). Then A runs `pkb html-remove --id=<insert id>` and `pkb html-cleanup`. H finds neither afterwards.
 
 **HCR-31 (M-HI-02 Injected script is inert (A))** — Covers: HTML neutralization.
-- Steps (A): `pkb html-insert --handle=go --text=@C:\pkb-manual\evil.html --where=after`. The file holds `<img src=x onerror="document.title='pwned'"><script>document.title='pwned'</script>`. **Unclear:** `--text` takes no `@file` in its usage. If it does not, pass `<img src=x onerror=document.title=1>`.
+- Steps (A): `pkb html-insert --handle=go --text=@C:\pkb-manual\evil.html --where=after`. The file holds `<img src=x onerror="document.title='pwned'"><script>document.title='pwned'</script>`. resolved: `html-insert --text=@file` reads the file. The body is not trimmed. A missing file is `error:` and `fix:`.
 - Assert: `pkb eval --expr=document.title` is still `Manual`. H's `snap` title is `Manual`.
 
 **HCR-32 (M-HI-03 Consumer direct DOM and JS (A, H check))** — Covers: `eval` (`--world=pkb|main`, `--await`, `--frame`), `form-fill`, `frame`.
@@ -359,7 +359,7 @@ Areas: HL human lock and tiers, HV human view, CH chat, CA question cards and wa
 Each DT test records the backend in the reply (`via=`). Chrome is the default target. A `--via=bidi` check is part of the test where the verb lists BiDi.
 
 **HCR-50 (M-DT-01 Raw CDP (A→H))** — Covers: `cdp`, `PwCommand`.
-- Steps (A): `pkb cdp --method=Runtime.evaluate --params={"expression":"document.getElementById('went').textContent='Went:cdp'"}`. Put the JSON in a file if the shell splits it. **Unclear:** `--params` has no `@file` form. Then `pkb cdp --method=Browser.getVersion`.
+- Steps (A): write `C:\pkb-manual\cdp.json` as `{"expression":"document.getElementById('went').textContent='Went:cdp'"}`, then `pkb cdp --method=Runtime.evaluate --params=@C:\pkb-manual\cdp.json`. resolved: `cdp --params=@file` reads a JSON object. A missing file or a value that is not an object fails before the browser connects. Then `pkb cdp --method=Browser.getVersion`.
 - Assert: H finds `Went:cdp`. The version reply names Chrome.
 
 **HCR-51 (M-DT-02 Playwright over CDP (A→H))** — Covers: `pw` areas (page, locator, screenshot, trace, video), `pw run`, `execute-steps` with a `pw` line.
@@ -380,7 +380,7 @@ Each DT test records the backend in the reply (`via=`). Chrome is the default ta
 
 **HCR-55 (M-DT-06 WebSocket routing (A))** — Covers: `ws-route` (Playwright only).
 - Steps: `pkb ws-route --match=ws://127.0.0.1:8799/* --rules=@C:\pkb-manual\ws-rules.json --via=playwright`.
-- Assert: **unclear.** The help gives no rules schema, and the fixture page opens no WebSocket. Record the reply, and log the gap if no rules shape is documented.
+- Assert: resolved: `--rules` is a JSON array. `on` is a substring (empty matches every message; `re:` is a regex search). `reply` is sent when that key is present, including empty. `close` true, or any `closeCode` key, closes the socket, and the code value is not sent. The first match wins. A rule does not need `reply` or `close`. Example: `[{"on":"ping","reply":"pong"}]`. The fixture page still opens no WebSocket, so record the command reply and do not treat a missing socket as a schema gap.
 
 **HCR-56 (M-DT-07 Emulation (A→H))** — Covers: `emulate`.
 - Steps (A): `pkb emulate --media=prefers-color-scheme:dark`, then `--vision=deuteranopia`, `--locale=de-DE --timezone=Europe/Berlin`, `--viewport=800x600@2`, `--network=offline`, `--show`, and `--reset`.
@@ -408,7 +408,7 @@ Each DT test records the backend in the reply (`via=`). Chrome is the default ta
 
 **HCR-62 (M-DT-13 JavaScript dialogs (H→A))** — Covers: `dialogs`, `DialogBlocksBindingTest` behavior.
 - Steps: A runs `pkb dialogs --policy=accept`, and H clicks `Alert`. A runs `pkb dialogs --policy=prompt:Ann`, and H clicks `Prompt`. A runs `pkb dialogs --policy=ask`, and H clicks `Alert`. Then A runs `pkb dialogs --policy=dismiss` and `pkb dialogs --policy=default`.
-- Assert: H finds `Dialog: alert closed`, then `Dialog: Ann`. Under `ask`, the alert stays open. H cannot answer it with H tools (a known gap, see the end of this page): H's `snap` either times out or reports the blocking dialog; record which. Whether `dismiss` closes an alert that is already open is **unclear**. Every dialog is a `kind=dialog` row.
+- Assert: H finds `Dialog: alert closed`, then `Dialog: Ann`. Under `ask`, the alert stays open. H cannot answer it with H tools (a known gap, see the end of this page): H's `snap` either times out or reports the blocking dialog; record which. resolved: `dialogs --policy=dismiss` answers the next dialog-open event. It does not close a dialog that is already open. A later policy applies to the next opening. Every dialog is a `kind=dialog` row.
 
 **HCR-63 (M-DT-14 Input chains and text (A, H))** — Covers: `input --actions`, `input --text --at`, `--release`, `--via`.
 - Steps: A runs `pkb input --text=typed-by-input --at=<short id of Email>`. H runs `pkb input --actions=@C:\pkb-manual\click-go.json` (a pointer move to Go's viewport point, then down and up). A runs `pkb input --actions=@C:\pkb-manual\click-go.json --via=bidi`, then `--via=cdp`, then `--release`.
@@ -442,21 +442,21 @@ Each DT test records the backend in the reply (`via=`). Chrome is the default ta
 
 **HCR-70 (M-PP-01 Agent popup window (A))** — Covers: `popup-open`, `popup-status`, `popup-close`, `PopupHost`, `PopupBrowserLocator`, popup chat.
 - Steps (A): `pkb popup-open`, then `pkb popup-status`, then `pkb chat-send --text=popup-hello --target=popup`, then `pkb overlay --text=Popup-note --target=popup` (`--target=popup` comes from the routing table in `docs/direct-control-handoff.md`; neither usage line lists it), then `pkb popup-close`.
-- Assert: the status shows a live host, browser Chrome (from `PKB_AGENT_POPUP_BROWSER`), and `alwaysOnTop.applied=true` on Windows. `popup-close` reports `exited=true`, and no host or browser pid remains. **Unclear:** `popup-open`, `popup-status`, and `popup-close` have no usage line in help, so their flags are unknown. H cannot see or drive the popup window with H tools (gap). A person would type in its Chat pane.
+- Assert: the status shows a live host, browser Chrome (from `PKB_AGENT_POPUP_BROWSER`), and `alwaysOnTop.applied=true` on Windows. `popup-close` reports `exited=true`, and no host or browser pid remains. resolved: `help popup-open`, `help popup-status`, and `help popup-close` print Usage. Each takes `--run-id`. `--on-top` and `--headless` are not `popup-open` flags. `--target=popup` routes other surface ops onto the popup. It does not open the window. Control tier. H cannot see or drive the popup window with H tools (gap). A person would type in its Chat pane.
 
 **HCR-71 (M-PP-02 Native highlight (A))** — Covers: `highlight --target=native`, the popup Instructions caption.
 - Steps (A): `pkb highlight --target=native --x=100 --y=100 --width=200 --height=80 --preset=outline-red`.
 - Assert: `drawn=true` on headed Windows, and the caption goes to the popup Instructions pane. H has no screen-level capture (gap). Only A and Dan's eyes can confirm the strips.
 
 **HCR-72 (M-PP-03 Desktop surface (A→H, Windows))** — Covers: `domengine desktop launch/attach/query/click/type/screenshot/close`, human `snap --target=desktop:app~<name>`.
-- Steps (A): `pkb domengine desktop launch --exe=notepad.exe --name=Notepad`. Then H runs `pkb snap --target=desktop:app~Notepad`. Then A runs `pkb domengine desktop type --name=Notepad --query=role=document --text=desktop-typed`. **Unclear:** the desktop type flags are not in the workbench help. Check `pkb help domengine` first and record the form used. Then H runs `pkb snap --target=desktop:app~Notepad` again, then A runs `pkb domengine desktop close --name=Notepad`.
+- Steps (A): `pkb domengine desktop launch --exe=notepad.exe --name=Notepad` and keep the JSON `id`. Then H runs `pkb snap --target=desktop:app~Notepad`. Then A runs `pkb domengine desktop type --id=<id> --role=document --text=desktop-typed`. resolved: `domengine help` lists `type --id` with `--text`, `--role`, `--name` (accessible name, only with `--role`), `--css`, `--xpath`, `--pipeline`, `--selector`, `--node-id`, and `--append=true`. `--query` is not a type flag. `--name` alone is the window title for attach, launch, and screenshot, not for type. `close` uses `--id`. Then H runs `pkb snap --target=desktop:app~Notepad` again, then A runs `pkb domengine desktop close --id=<id>`.
 - Assert: H's first snap lists the Notepad edit control, and the second shows the typed text. Close leaves no Notepad process.
 
 ### LK — spine session, lease, inject
 
 **HCR-73 (M-LK-01 Spine session surfaces (A))** — Covers: `spine session new/show/end`, `inject on/off`, `lease take/release`, `chat send/list`, `chat --follow`, `progress`, `point`.
 - Steps (A): `pkb spine session new --agent=agent-1`, then `pkb inject on`, `pkb lease take --target=browser`, `pkb lease take --target=browser` again, `pkb chat send --text=spine-hello`, `pkb chat list`, `pkb chat --follow --timeout=3`, `pkb progress --pct=40 --label=Working`, `pkb point --session=<id> --x=200 --y=200`, `pkb lease release --target=browser`, `pkb inject off`, and `pkb spine session end`.
-- Assert: the second `lease take` fails with `error:` and `fix:`. `chat list` shows `spine-hello`. Each verb exits 0 otherwise. **Unclear:** how a spine session relates to the `start` host page. Record whether H's `snap` shows the progress and point placements on the start page.
+- Assert: the second `lease take` fails with `error:` and `fix:`. `chat list` shows `spine-hello`. Each verb exits 0 otherwise. resolved: `spine session` is the overlay, lease, and inject session. It is not the browser page `start` opens. `progress` writes `.pickleball/workbench-ui/progress/<session>.json` and does not paint the start page, so H's `snap` does not show a progress bar from that file. `point` highlights on the coordination `--run-id`. H's `snap` shows that highlight only when it landed on the live start page.
 
 **HCR-74 (M-LK-02 Human lock is not the Workbench lease (A))** — Covers: `HumanLock` versus `WorkbenchControlLease`.
 - Assert: with `helper` locked, `pkb lease take --target=ui` under `agent` still works, and `session-mode` under `helper` is unaffected by the lease. The Workbench GUI "Take control" button is outside this catalog.
@@ -498,8 +498,7 @@ These are expected results, not failures. A run records each one it meets.
 - No human-tier way to answer a native JavaScript dialog (`dialogs --policy=ask` leaves it open), to pick a file in the OS file chooser, or to drive the popup window or the Workbench GUI.
 - No human-tier screen capture outside the page. Native highlight strips and the popup are visible only to a person or to A.
 - `call` is control tier. A human role over MCP needs an MCP client that offers only the human-tier tools.
-- `input` and `aria-snap` are human tier in `VerbTiers`, and the lock allows `act --kind=scroll`. `AGENTS.md`, `docs/dynamic-control-api.md`, `docs/collaborative-self-test.md`, and the `HumanLock` fix line list 11 human verbs and five act kinds. The docs need to catch up.
-- `popup-open`, `popup-status`, and `popup-close` have no usage line in `help`.
+- `act --kind=scroll` passes the human lock and `help act` lists it. The act body reports `unknown kind` and does not scroll the page.
 
 ## Earlier collaboration runs this catalog builds on
 
