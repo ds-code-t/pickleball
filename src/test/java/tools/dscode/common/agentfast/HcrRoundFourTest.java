@@ -1,9 +1,11 @@
 package tools.dscode.common.agentfast;
 
+import dev.domengine.tree.DomNode;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.atomic.AtomicLong;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -39,5 +41,17 @@ class HcrRoundFourTest {
     void theBlockProbeLooksOnlyForPickleballBlockOverlays() {
         assertTrue(TargetVerb.BLOCK_PROBE.contains("data-pkb-block"), TargetVerb.BLOCK_PROBE);
         assertTrue(TargetVerb.BLOCK_PROBE.contains("shadowRoot"), "the layer is a shadow root (HCR-10)");
+    }
+
+    @Test
+    void aLiveBoxFillsTheActReplyBounds() {
+        DomNode node = new DomNode();
+        assertTrue(TargetVerb.applyBox(node, "12.5,40,80,24"), "act bounds were 0,0,0,0 (HCR-26)");
+        assertTrue(node.hasBox);
+        assertEquals(80.0, node.width);
+        assertEquals(40.0, node.y);
+        assertFalse(TargetVerb.applyBox(new DomNode(), ""), "no live box keeps the node unchanged");
+        assertFalse(TargetVerb.applyBox(new DomNode(), "a,b,c,d"));
+        assertTrue(TargetVerb.BOX_PROBE.contains("getBoundingClientRect"));
     }
 }

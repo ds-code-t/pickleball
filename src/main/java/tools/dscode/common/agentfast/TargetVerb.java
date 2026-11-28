@@ -2861,6 +2861,41 @@ public final class TargetVerb {
         return raw == null ? "" : raw.trim();
     }
 
+    /** HCR-26: act replies reported bounds 0,0,0,0 when the target came without a box; read it live. */
+    static final String BOX_PROBE = "function(){try{var r=this.getBoundingClientRect();"
+            + "return [r.left,r.top,r.width,r.height].join(',');}catch(e){return '';}}";
+
+    private static void fillBox(CdpConnection cdp, DomNode node) {
+        if (node == null || node.hasBox || cdp == null) return;
+        try {
+            applyBox(node, callOnNode(cdp, cdpSessionOf(node), node, BOX_PROBE));
+        } catch (RuntimeException ignored) {
+            // No live box; the reply keeps zeros.
+        }
+    }
+
+    /** Applies {@code x,y,width,height} from {@link #BOX_PROBE}; anything else leaves the node unchanged. */
+    static boolean applyBox(DomNode node, String raw) {
+        if (node == null || raw == null) return false;
+        String[] parts = raw.trim().split(",");
+        if (parts.length != 4) return false;
+        try {
+            double x = Double.parseDouble(parts[0]);
+            double y = Double.parseDouble(parts[1]);
+            double width = Double.parseDouble(parts[2]);
+            double height = Double.parseDouble(parts[3]);
+            if (Double.isNaN(x + y + width + height)) return false;
+            node.x = x;
+            node.y = y;
+            node.width = width;
+            node.height = height;
+            node.hasBox = true;
+            return true;
+        } catch (NumberFormatException failure) {
+            return false;
+        }
+    }
+
     static final String BLOCK_PROBE = ""
             + "function(){"
             + "try{var el=this;if(!el||!el.getBoundingClientRect)return '';"
@@ -6370,6 +6405,7 @@ public final class TargetVerb {
     }
 
     private static void stamp(Map<String, Object> body, CdpConnection cdp, DomNode node) {
+        fillBox(cdp, node);
         Object existing = body.get("frame");
         if (existing instanceof String text && !text.isBlank()) return;
         String frame = "";

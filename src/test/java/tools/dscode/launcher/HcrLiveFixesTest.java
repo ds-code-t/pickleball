@@ -131,6 +131,17 @@ class HcrLiveFixesTest {
         assertTrue(missing.out.contains("CSS selector"), missing.out);
     }
 
+    /** HCR-26: an act reply's element bounds are the live box, not 0,0,0,0. */
+    @Test
+    @Timeout(value = 180, unit = TimeUnit.SECONDS)
+    void actReplyBoundsAreTheLiveBox() throws Exception {
+        start();
+        Capture clicked = agent("act", "--target=browser:auto", "--ref=#files", "--kind=hover");
+        assertEquals(0, clicked.code, clicked.err + clicked.out);
+        assertFalse(clicked.out.contains("\"width\":0,"), clicked.out);
+        assertFalse(clicked.out.contains("\"width\":0.0,"), clicked.out);
+    }
+
     /** Owner decision 2026-11-28 (HCR-28): start --run-id=agent names the live session agent. */
     @Test
     @Timeout(value = 180, unit = TimeUnit.SECONDS)
