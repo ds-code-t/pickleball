@@ -4242,11 +4242,24 @@ public final class TargetVerb {
         return true;
     }
 
-    private static List<DomNode> preferPage(List<DomNode> hits) {
+    static List<DomNode> preferPage(List<DomNode> hits) {
         if (hits == null || hits.size() < 2) return hits;
+        // HCR-22: a magnifier's inert copy is a picture of the control, never a second target.
+        List<DomNode> real = new ArrayList<>();
+        for (DomNode node : hits) if (!inertCopy(node)) real.add(node);
+        if (!real.isEmpty() && real.size() < hits.size()) hits = real;
+        if (hits.size() < 2) return hits;
         List<DomNode> page = new ArrayList<>();
         for (DomNode node : hits) if (!pkbOwned(node)) page.add(node);
         return page.isEmpty() || page.size() == hits.size() ? hits : page;
+    }
+
+    /** Inside a pickleball copy ({@code data-pkb-copy}, the magnifier clone), which is inert. */
+    static boolean inertCopy(DomNode node) {
+        for (DomNode cursor = node; cursor != null; cursor = cursor.parent) {
+            if (cursor.attributes.containsKey("data-pkb-copy")) return true;
+        }
+        return false;
     }
 
     /** Inside pickleball's layer, panel, cards, or recorder. Page-wide markers on html and body do not count. */

@@ -3,6 +3,7 @@ package tools.dscode.common.agentfast;
 import dev.domengine.tree.DomNode;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -53,5 +54,35 @@ class HcrRoundFourTest {
         assertFalse(TargetVerb.applyBox(new DomNode(), ""), "no live box keeps the node unchanged");
         assertFalse(TargetVerb.applyBox(new DomNode(), "a,b,c,d"));
         assertTrue(TargetVerb.BOX_PROBE.contains("getBoundingClientRect"));
+    }
+
+    @Test
+    void theMagnifierCopyIsNotASecondTarget() {
+        DomNode body = element("body");
+        DomNode real = child(body, "button");
+        real.attributes.put("data-pkb-anchor", "m1");
+        DomNode host = child(body, "div");
+        host.attributes.put("data-pkb-ui", "");
+        DomNode copy = child(host, "button");
+        copy.attributes.put("data-pkb-copy", "live");
+        assertTrue(TargetVerb.inertCopy(copy));
+        assertFalse(TargetVerb.inertCopy(real));
+        assertEquals(List.of(real), TargetVerb.preferPage(List.of(real, copy)), "H act --query=Go was ambiguous (HCR-22)");
+        assertEquals(List.of(copy), TargetVerb.preferPage(List.of(copy)), "a copy alone is still found");
+    }
+
+    private static DomNode element(String tag) {
+        DomNode node = new DomNode();
+        node.nodeType = 1;
+        node.localName = tag;
+        node.nodeName = tag.toUpperCase();
+        node.displayed = true;
+        return node;
+    }
+
+    private static DomNode child(DomNode parent, String tag) {
+        DomNode node = element(tag);
+        node.parent = parent;
+        return node;
     }
 }
