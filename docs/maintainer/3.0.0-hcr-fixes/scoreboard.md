@@ -19,3 +19,29 @@ Source: PKB-HCR run of 2026-11-28 on consumer `myq-release-testing`, Pickleball 
 | 15 | `guide-back` / `guide-done` events had `by=human` | Fixed | `079808da4` | `OverlayRuntimeLiveTest.guideBackAndDoneEventsAreByAgent` (by=human before) | Headed guide: agent `guide-back`, check `overlay-poll` |
 | 28b | Second `lease take` by the same holder said "another holder" | Fixed (message only; the second take is still refused by design) | `e4824649a` | `LeaseAndBlockTest.secondTakeFailsAndACleanSessionCannotBlockInput` | none |
 | G1 | Stale `agent-controller.classpath` and log after export | Fixed | `6d8d67fa0` | `StaleControllerFilesTest` (2; stale files kept before) | none |
+| D1 | Catalog and guidance: spine session first; `.pickleball/v/<version>/` paths and no `index.txt`; consumer S0 variant and the repo-only `URL.*` keys; comma quoting; wrong steps HCR-06/16/18/29/37/46; start-session event verbs | Fixed (docs) | `0ba02836a`, `0f0f72319` | validators (`sync_consumer_guidance.py`, `refresh_agent_index.py`, `verify_agent_contract.py`) | none |
+
+## Not done (needs a redesign or a longer investigation)
+
+| Item | Reason |
+|---|---|
+| 9 two card systems, `ask-answer` on page cards | One card API is a redesign. The catalog now uses the right verb for each card type. |
+| 10 `--block=true` does not stop human `act --kind=type` | Needs the human-lock path traced on a live Windows session. |
+| 12 offline emulation vs service worker | Needs emulation on worker targets. Only the `cleared` half is fixed. |
+| 13 short ids scoped per run id, foreign id gives no error | An error breaks existing wait-any unit tests that watch ids with no page; needs an id-scope design. |
+| 14 event streams tagged with the starter's run id | Run binding for streams, spill dirs and `downloads`: design work. |
+| 16 `frame --list` says no live browser | Needs a repro on a live `start` session. |
+| 17 desktop `--exe` resolved against the project | Windows-only; needs a desktop session. |
+| 18 `upload --ref=#files` | Needs CSS-selector refs in the upload resolver; not a one-line change. |
+| 19 `browser ports` shows none | Windows port discovery; needs the PC. |
+| 20 `act --kind=press --value=Enter` reports not applied | Needs the chat panel read-back traced live. |
+| 21, 22 H views miss agent surfaces; magnifier clone is clickable | View and exposure design. |
+| 23 `navigate` resets dock position; `panel-open --tab` | Needs the page runtime re-injection traced on a headed page. |
+| 24 popup `alwaysOnTop` | Windows `SetWindowPos`; needs the PC. |
+| 25 no `human-lock override` log line | Needs a decision on where the line is logged. |
+| 26 covered button `visible=true`; act `bounds` 0,0,0,0 | Needs the visibility model reconciled between `snap` and `explain`. |
+| 27 `wake` fields on `chat-turn` and `watch` | Needs a reply-shape decision. |
+| 28 `start --run-id` ignored; `progress` shows `session:"session"` | The envelope shows `session` when no run id is set; changing run-id binding is a design change. |
+| `doctor` exempt from the spine-session gate; `live-stop` plus `doctor --prune` | Owner decision (2026-11-26 exempt list is fixed). |
+| Slowdowns (client JVM start, `pkb batch`, first-call idle, `start` 23 s) | A persistent or batch client is a redesign. |
+| Noise (triple errors, `recent`/`cursors` on every reply, `--compact`, `--limit` newest, `--fields` format, `eval failed` text, `main.db` size, relative `--dir`/`--exe`) | Cross-cutting reply-shape changes. |
