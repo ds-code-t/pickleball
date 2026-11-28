@@ -120,7 +120,113 @@ final class PwCommand {
         }
     }
 
+    /** Default bound on one {@code pw} / {@code cdp} call (HCR-50/51: connectOverCDP hung with no error). */
+    static final long DEFAULT_TIMEOUT_MS = 30_000;
+    /** Extra time on top of a step's own {@code --timeout} so the step reports its own timeout first. */
+    static final long STEP_GRACE_MS = 15_000;
+    private static final ThreadLocal<java.util.concurrent.atomic.AtomicReference<String>> STAGE = new ThreadLocal<>();
+
+    private static void stage(String name) {
+        java.util.concurrent.atomic.AtomicReference<String> holder = STAGE.get();
+        if (holder != null) holder.set(name);
+    }
+
+    /** The bound for this call: {@code --timeout-ms}, else a step's {@code --wait-ms} plus grace, else 30 s (60 s for pw run). */
+    static long deadlineMs(Map<String, String> flags, String area) {
+        String explicit = flags.get("timeout-ms");
+        if (explicit != null && !explicit.isBlank()) {
+            try {
+                long ms = Long.parseLong(explicit.trim());
+                if (ms > 0) return ms;
+            } catch (NumberFormatException ignored) {
+                // Falls through to the default; the flag is reported by the step if it matters.
+            }
+        }
+        long base = "run".equals(area) ? 2 * DEFAULT_TIMEOUT_MS : DEFAULT_TIMEOUT_MS;
+        long own = stepWaitMs(flags.get("wait-ms"));
+        if ("run".equals(area)) {
+            try {
+                long sum = 0;
+                for (JsonNode step : steps(flags.get("steps"), null)) sum += stepWaitMs(step.path("wait-ms").asText(null));
+                own = Math.max(own, sum);
+            } catch (Exception unreadable) {
+                // Relative steps files are read later from the project; the default stays.
+            }
+        }
+        return own > 0 ? Math.max(base, own + STEP_GRACE_MS) : base;
+    }
+
+    private static long stepWaitMs(String raw) {
+        if (raw == null || raw.isBlank()) return 0;
+        try {
+            return (long) Double.parseDouble(raw.trim());
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+    }
+
+    /**
+     * Every {@code pw} and {@code cdp} call is bounded. Past the deadline the call fails with
+     * {@code error: pw|cdp ... timed out after <ms> ms at <stage>} and exit 1, and the Playwright connection it was
+     * using is closed so the next call starts clean. Output is held until the call ends so a late result is not
+     * printed after the timeout.
+     */
     static int run(String[] args, Path project, PrintStream out, PrintStream err) {
+        String command = args.length == 0 ? "" : args[0];
+        Map<String, String> flags = flags(args);
+        List<String> positional = positional(args, project);
+        String area = "cdp".equals(command) ? "cdp" : firstText(flags.get("area"), positional, 0);
+        String action = "cdp".equals(command) ? "send" : firstText(flags.get("action"), positional, 1);
+        long limit = deadlineMs(flags, area);
+        java.util.concurrent.atomic.AtomicReference<String> stage = new java.util.concurrent.atomic.AtomicReference<>("start");
+        java.io.ByteArrayOutputStream heldOut = new java.io.ByteArrayOutputStream();
+        java.io.ByteArrayOutputStream heldErr = new java.io.ByteArrayOutputStream();
+        java.util.concurrent.CompletableFuture<Integer> call = new java.util.concurrent.CompletableFuture<>();
+        Thread worker = new Thread(() -> {
+            STAGE.set(stage);
+            try (PrintStream o = new PrintStream(heldOut, true, StandardCharsets.UTF_8);
+                 PrintStream e = new PrintStream(heldErr, true, StandardCharsets.UTF_8)) {
+                call.complete(runBounded(args, project, o, e));
+            } catch (Throwable failure) {
+                call.completeExceptionally(failure);
+            } finally {
+                STAGE.remove();
+            }
+        }, "pkb-pw-call");
+        worker.setDaemon(true);
+        worker.start();
+        try {
+            int code = call.get(limit, java.util.concurrent.TimeUnit.MILLISECONDS);
+            out.print(heldOut.toString(StandardCharsets.UTF_8));
+            err.print(heldErr.toString(StandardCharsets.UTF_8));
+            out.flush();
+            err.flush();
+            return code;
+        } catch (java.util.concurrent.TimeoutException timedOut) {
+            String verb = "cdp".equals(area) ? "cdp" : "pw " + area + ("".equals(action) ? "" : " " + action);
+            String at = stage.get();
+            log(project, verb + " timed out after " + limit + " ms at " + at, "");
+            worker.interrupt();
+            try {
+                PlaywrightConnection.closeAll();
+            } catch (RuntimeException ignored) {
+                // Closing a hung driver is best effort.
+            }
+            return fail(err, verb + " timed out after " + limit + " ms at " + at,
+                    "connect".equals(at)
+                            ? "Playwright could not attach over CDP; check the browser with doctor --attach, or pass --cdp-endpoint=<url> (--timeout-ms=<ms> raises the bound)"
+                            : "the page did not answer; check for an open dialog or a paused page, or pass --timeout-ms=<ms>");
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            return fail(err, "pw interrupted", "run the call again");
+        } catch (java.util.concurrent.ExecutionException failed) {
+            Throwable cause = failed.getCause() == null ? failed : failed.getCause();
+            err.print(heldErr.toString(StandardCharsets.UTF_8));
+            return fail(err, "pw " + area + " " + action + " failed: " + firstLine(cause.getMessage()), "see help pw");
+        }
+    }
+
+    private static int runBounded(String[] args, Path project, PrintStream out, PrintStream err) {
         String command = args.length == 0 ? "" : args[0];
         List<String> positional = positional(args, project);
         Map<String, String> flags = flags(args);
@@ -147,6 +253,7 @@ final class PwCommand {
             }
         }
         String endpoint;
+        stage("endpoint");
         try {
             endpoint = endpoint(project, flags);
         } catch (IllegalStateException failure) {
@@ -157,13 +264,16 @@ final class PwCommand {
         }
         State state;
         try {
+            stage("connect");
             PlaywrightConnection connection = PlaywrightConnection.connect(endpoint);
+            stage("page");
             state = new State(project, connection, null);
             state.use(pick(connection, flags.get("page-url")));
         } catch (RuntimeException failure) {
             return fail(err, firstLine(failure.getMessage()).replaceFirst("^error: ", ""), "check the endpoint with doctor --attach; pickleball does not launch a Playwright browser");
         }
         log(project, area + " " + action, endpoint);
+        stage("cdp".equals(area) ? "cdp send" : area + " " + action);
         ObjectNode body = JSON.createObjectNode().put("ok", true).put("op", "cdp".equals(area) ? "cdp" : "pw").put("area", area).put("action", action);
         try {
             if ("run".equals(area)) {
