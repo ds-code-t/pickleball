@@ -1115,7 +1115,8 @@ tasks.withType(Sign).configureEach {
 // -Ppkb.test.liveForks (default 1). Do not add a JUnit tag; the list is the
 // measured set. Keep :testLive at 1 unless a later measurement shows a
 // higher liveForks value is safe for every class here, including the 20
-// that failed at 12 forks.
+// that failed at 12 forks. The 10 PMR-11 classes at the end of the list
+// were added on 2026-11-28 (70 in total).
 def pkbLiveTestClasses = [
     'io.cucumber.core.runner.UntilPassOverheadTest',
     'tools.dscode.browser.PlaywrightCdpLiveTest',
@@ -1176,6 +1177,18 @@ def pkbLiveTestClasses = [
     'tools.dscode.launcher.WorkbenchCliSurfaceCoverageTest',
     'tools.dscode.launcher.WorkbenchOneShotLaunchTest',
     'tools.dscode.launcher.WorkbenchSessionCommandsTest',
+    // PMR-11, 2026-11-28 short regression 199a3576 at 24 forks: these 10
+    // failed in :test and all passed rerun at 1 fork.
+    'tools.dscode.common.agentcontrol.ChatCursorTest',
+    'tools.dscode.common.agentcontrol.ConsumerFixesP2WaitTest',
+    'tools.dscode.launcher.FormFillKindTest',
+    'tools.dscode.launcher.FrameActTest',
+    'tools.dscode.launcher.JsStepRunTest',
+    'tools.dscode.launcher.NodeStepHostTest',
+    'tools.dscode.launcher.ScreencastLiveTest',
+    'tools.dscode.launcher.TwoActorRecipeLiveTest',
+    'tools.dscode.launcher.WaitLaneLiveTest',
+    'tools.dscode.store.StoreExecutionRecordingTest',
     'tools.dscode.store.StoreEntityUsageTest'
 ]
 def pkbLiveTestSimple = pkbLiveTestClasses.collect { String fqcn -> fqcn.substring(fqcn.lastIndexOf('.') + 1) } as Set
@@ -1232,7 +1245,7 @@ if (pkbTestForksRaw == null || pkbTestForksRaw.toString().trim().isEmpty()) {
 }
 
 // -Ppkb.test.liveForks is maxParallelForks for :testLive only. Default 1.
-// The 60 live/contention classes must not inherit -Ppkb.test.forks.
+// The 70 live/contention classes must not inherit -Ppkb.test.forks.
 def pkbTestLiveForksRaw = findProperty('pkb.test.liveForks')
 int pkbTestLiveForks
 if (pkbTestLiveForksRaw == null || pkbTestLiveForksRaw.toString().trim().isEmpty()) {
@@ -1250,7 +1263,7 @@ if (pkbTestLiveForksRaw == null || pkbTestLiveForksRaw.toString().trim().isEmpty
 
 allprojects {
     tasks.withType(Test).configureEach { task ->
-        def liveRoot = (task.project.path == ':' && task.name == 'testLive')
+        def liveRoot = (task.name == 'testLive')
         task.maxParallelForks = liveRoot ? pkbTestLiveForks : pkbTestForks
         task.minHeapSize = '64m'
         def heavyModule = task.project.path == ':' || task.project.path == ':dom-engine'
@@ -1295,7 +1308,7 @@ allprojects {
 gradle.projectsEvaluated {
     allprojects { project ->
         project.tasks.withType(Test).configureEach { task ->
-            def liveRoot = (task.project.path == ':' && task.name == 'testLive')
+            def liveRoot = (task.name == 'testLive')
             task.maxParallelForks = liveRoot ? pkbTestLiveForks : pkbTestForks
             task.minHeapSize = '64m'
             def heavyModule = task.project.path == ':' || task.project.path == ':dom-engine'
@@ -1355,7 +1368,7 @@ def pkbExclusiveLiveOrSerial = { String pattern ->
 
 tasks.register('testLive', Test) {
     group = 'verification'
-    description = 'Parallel-unsafe live/contention classes (60). Runs after :test at -Ppkb.test.liveForks (default 1).'
+    description = 'Parallel-unsafe live/contention classes (70). Runs after :test at -Ppkb.test.liveForks (default 1).'
     useJUnitPlatform {
         includeEngines 'junit-jupiter'
     }
@@ -1420,7 +1433,7 @@ gradle.taskGraph.whenReady { graph ->
         if (taskPatterns != null) patterns.addAll(taskPatterns)
     }
     if (patterns.isEmpty()) {
-        logger.lifecycle('testLive running the 60 live/contention classes after :test')
+        logger.lifecycle('testLive running the 70 live/contention classes after :test')
         logger.lifecycle('testSerial running SuiteDualRunTest after :testLive')
         return
     }

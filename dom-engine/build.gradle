@@ -43,6 +43,86 @@ tasks.named('test') {
     }
 }
 
+// Parallel-unsafe dom-engine classes (PMR-11). On 2026-11-28 at 24 forks
+// these three hit CDP timeouts while other forks drove Chrome; they pass
+// alone. They run in :dom-engine:testLive at one fork after :dom-engine:test.
+def domEngineLiveTestClasses = [
+    'dev.domengine.ActionSmokeTest',
+    'dev.domengine.LiveChromeObserveEventsTest',
+    'dev.domengine.premap.PreMapStalenessTest'
+]
+
+tasks.named('test') {
+    domEngineLiveTestClasses.each { String fqcn ->
+        exclude '**/' + fqcn.replace('.', '/') + '.class'
+    }
+}
+
+def domEngineLiveTask = tasks.register('testLive', Test) {
+    group = 'verification'
+    description = 'Parallel-unsafe dom-engine live Chrome classes (3). Runs after :dom-engine:test at one fork.'
+    useJUnitPlatform()
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    domEngineLiveTestClasses.each { String fqcn ->
+        include '**/' + fqcn.replace('.', '/') + '.class'
+    }
+    shouldRunAfter tasks.named('test')
+    mustRunAfter tasks.named('test')
+    testLogging {
+        events 'failed'
+        exceptionFormat = 'full'
+        showExceptions true
+        showCauses true
+        showStackTraces true
+    }
+}
+
+tasks.named('test') {
+    finalizedBy domEngineLiveTask
+}
+
+tasks.named('check') {
+    dependsOn domEngineLiveTask
+}
+
+// --tests on :dom-engine:test reaches :dom-engine:testLive too, so a filter
+// that names only a live class runs it here at one fork.
+def domEngineLiveMatches = { String pattern ->
+    if (pattern == null || pattern.isBlank()) return false
+    String head = pattern.contains('(') ? pattern.substring(0, pattern.indexOf('(')) : pattern
+    return domEngineLiveTestClasses.any { String fqcn ->
+        String simple = fqcn.substring(fqcn.lastIndexOf('.') + 1)
+        def rx = { String g -> '^' + g.split('\\*', -1).collect { java.util.regex.Pattern.quote(it) }.join('.*') + '$' }
+        fqcn.matches(rx(head)) || simple.matches(rx(head)) ||
+            head.startsWith(fqcn + '.') || head.startsWith(simple + '.')
+    }
+}
+def domEngineExclusiveLive = { String pattern ->
+    !pattern.contains('*') && domEngineLiveMatches(pattern)
+}
+gradle.taskGraph.whenReady { graph ->
+    def main = tasks.named('test', Test).get()
+    def live = domEngineLiveTask.get()
+    def patterns = new LinkedHashSet<String>()
+    for (def t : [main, live]) {
+        def p = t.filter.commandLineIncludePatterns
+        if (p != null) patterns.addAll(p)
+    }
+    if (patterns.isEmpty()) return
+    boolean wantLive = patterns.any { domEngineLiveMatches(it) }
+    boolean wantMain = patterns.any { !domEngineExclusiveLive(it) }
+    if (wantLive) {
+        live.filter.setCommandLineIncludePatterns(new ArrayList<String>(patterns))
+        live.filter.failOnNoMatchingTests = false
+    } else if (graph.hasTask(live)) {
+        live.enabled = false
+    }
+    if (!wantMain && graph.hasTask(main)) {
+        main.enabled = false
+    }
+}
+
 tasks.named('jar') {
     manifest {
         attributes('Main-Class': 'dev.domengine.cli.DomEngineMain')
