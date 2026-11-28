@@ -30,9 +30,11 @@ public final class UiLease {
         String name = holder == null || holder.isBlank() ? SpineSession.DEFAULT_AGENT : holder.trim();
         String blocking = blocking(project, id, useTarget);
         if (blocking != null) {
+            String held = holderOf(file(project, id, blocking), name);
             throw new IllegalArgumentException(
-                    "error: another holder already has the " + blocking + " lease ("
-                            + holderOf(file(project, id, blocking), name) + ")\n"
+                    (held.equals(name)
+                            ? "error: you already hold the " + blocking + " lease (" + held + "), and a second take is refused"
+                            : "error: another holder already has the " + blocking + " lease (" + held + ")") + "\n"
                             + "fix: lease release --target=" + blocking + " --session=" + id);
         }
         ObjectNode node = JSON.createObjectNode();

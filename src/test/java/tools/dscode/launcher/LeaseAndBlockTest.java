@@ -40,6 +40,9 @@ class LeaseAndBlockTest {
         assertTrue(second.code != 0, second.out);
         assertTrue(second.err.contains("error:"), second.err);
         assertTrue(second.err.contains("fix:"), second.err);
+        // HCR bug 28: the same holder taking twice is not "another holder".
+        assertFalse(second.err.contains("another holder"), second.err);
+        assertTrue(second.err.contains("you already hold"), second.err);
         assertTrue(Files.isRegularFile(lease));
 
         Run blockedClean = run("input", "block", "--on", "--session=" + id);
