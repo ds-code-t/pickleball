@@ -52,6 +52,10 @@ class InputLiveTest {
         server.createContext("/", exchange -> {
             String path = exchange.getRequestURI().getPath();
             String html = path.startsWith("/webauthn") ? WEBAUTHN
+                    : path.startsWith("/login")
+                    ? "<!doctype html><title>login</title><label>User name <input id=u value=ann></label>"
+                    + "<label>Password <input id=pw type=password value=secret1></label>"
+                    + "<label>Code <input id=otp autocomplete=one-time-code value=4711x></label><button>Sign in</button>"
                     : path.startsWith("/framed")
                     ? "<!doctype html><title>framed</title><button id=go>Submit</button><button>Cancel</button><iframe id=child src=\""
                     + childBase + "/child\"></iframe>"
@@ -247,6 +251,21 @@ class InputLiveTest {
         assertTrue(act.path("applied").asBoolean(), act.toString());
         assertEquals("1", eval(p, "String(window.clicks)"));
         assertTrue(Files.isDirectory(p.resolve(".pickleball")));
+    }
+
+    /** HCR-07: aria-snap (default and ai mode, and snap --aria) never prints a password or one-time code. */
+    @Test
+    void ariaSnapMasksPasswordAndOneTimeCode() throws Exception {
+        Path p = project("aria-secret");
+        go(p, base + "/login");
+        for (String[] args : new String[][]{{"aria-snap"}, {"aria-snap", "--mode=ai", "--boxes"}, {"snap", "--aria"}}) {
+            JsonNode snap = ok(p, args);
+            String text = snap.path("snapshot").asText();
+            assertFalse(text.contains("secret1"), String.join(" ", args) + " leaked the password: " + text);
+            assertFalse(text.contains("4711x"), String.join(" ", args) + " leaked the code: " + text);
+            assertTrue(text.contains("ann"), "ordinary values stay: " + text);
+            assertTrue(snap.toString().contains("[redacted]"), snap.toString());
+        }
     }
 
     @Test

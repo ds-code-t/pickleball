@@ -399,12 +399,15 @@ public final class WorkbenchAgentCommands {
             if (hasFlag(parsed.forwarded(), "--on")) args.put("on", "true");
             if (hasFlag(parsed.forwarded(), "--off")) args.put("off", "true");
         } else if ("input".equals(command)) {
+            // HCR-03/63: --actions and --release are W3C action chains. They run in the protocol
+            // host (ProtoVerbs), not the live page's --text typer, which only knows --text.
+            if (flag(parsed, "--actions") != null || hasFlag(parsed, "--release")) return null;
             op = "input";
             String text = parsed.coordination() == null ? null : parsed.coordination().text();
             if (text == null || text.isBlank()) text = flag(parsed, "--text");
             if (text != null) args.put("text", text);
-            String actions = flag(parsed, "--actions");
-            if (actions != null) args.put("actions", actions);
+            String at = flag(parsed, "--at");
+            if (at != null) args.put("at", at);
         } else {
             return null;
         }

@@ -120,6 +120,65 @@ class PageJvmRouteTest {
         assertTrue(refused.out.contains("fix:"), refused.out);
     }
 
+    /**
+     * HCR-03/63 on a live start session: {@code input --actions} and {@code --release} exited 2 "input needs --text",
+     * and {@code input --text --at=<id>} replied ok and typed nothing (also with an empty {@code --at}).
+     */
+    @Test
+    @Timeout(value = 180, unit = TimeUnit.SECONDS)
+    void inputActionsReleaseAndAtWorkOnTheLiveSession() throws Exception {
+        String browser = BrowserSession.findChrome() != null ? "chrome-headless"
+                : BrowserSession.findEdge() != null ? "edge-headless" : null;
+        assertNotNull(browser, "locally installed Chrome or Edge is required");
+        site = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        site.createContext("/fixture", exchange -> {
+            byte[] body = FIXTURE.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "text/html; charset=utf-8");
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+        site.start();
+        String url = "http://127.0.0.1:" + site.getAddress().getPort() + "/fixture";
+        String session = session();
+        Capture started = inProcess("start", "--url=" + url, "--browser=" + browser, "--session=" + session);
+        assertEquals(0, started.code, started.err + started.out);
+
+        Capture found = cli("find", "--query=Note", "--session=" + session);
+        assertEquals(0, found.code, found.out);
+        String id = JSON.readTree(jsonLine(found.out)).path("items").get(0).path("handle").asText("");
+        assertFalse(id.isBlank(), found.out);
+
+        Capture at = cli("input", "--text=hello", "--at=" + id, "--session=" + session);
+        assertEquals(0, at.code, at.out);
+        await("document.getElementById('note').value", "hello");
+
+        Capture emptyAt = cli("input", "--text=x", "--at=", "--session=" + session);
+        assertTrue(emptyAt.code != 0, "an empty --at is an error, not ok: " + emptyAt.out);
+        assertTrue(emptyAt.out.contains("--at needs a short id"), emptyAt.out);
+        assertEquals("hello", eval("document.getElementById('note').value"), "nothing typed for an empty --at");
+
+        eval("document.getElementById('note').value=''; document.getElementById('note').focus(); 'ok'");
+        String chain = "[{\"type\":\"key\",\"id\":\"k\",\"actions\":[{\"type\":\"keyDown\",\"value\":\"h\"},"
+                + "{\"type\":\"keyUp\",\"value\":\"h\"},{\"type\":\"keyDown\",\"value\":\"i\"},{\"type\":\"keyUp\",\"value\":\"i\"}]}]";
+        Capture actions = cli("input", "--actions=" + chain, "--via=cdp", "--session=" + session);
+        assertEquals(0, actions.code, actions.out);
+        assertFalse(actions.out.contains("input needs --text"), actions.out);
+        await("document.getElementById('note').value", "hi");
+
+        Capture release = cli("input", "--release", "--via=cdp", "--session=" + session);
+        assertEquals(0, release.code, release.out);
+        assertFalse(release.out.contains("input needs --text"), release.out);
+    }
+
+    /** The first line that is a JSON object. */
+    private static String jsonLine(String out) {
+        for (String line : out.split("\\R")) {
+            if (line.trim().startsWith("{")) return line.trim();
+        }
+        return out;
+    }
+
     private String session() throws Exception {
         Capture created = inProcess("spine", "session", "new");
         assertEquals(0, created.code, created.err + created.out);
@@ -264,6 +323,7 @@ class PageJvmRouteTest {
     private static final String FIXTURE = """
             <!DOCTYPE html><html><body>
             <button id="go">Go</button>
+            <input id="note" aria-label="Note">
             <script>
             window.clicks = 0;
             window.keys = 0;

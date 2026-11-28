@@ -464,6 +464,67 @@ public final class TargetVerb {
         }
     }
 
+    /**
+     * {@code input --text=<s> --at=<short id>} on a live page (HCR-03/63): focuses the element the id names,
+     * sends one {@code Input.insertText} into its frame, and reads the control back. {@code applied} is false when
+     * the text did not land; an unknown or empty id is an error, not {@code ok}.
+     */
+    public static Outcome insertTextAt(Path project, String runId, String at, String text) {
+        String id = at == null ? "" : at.trim();
+        if (id.isBlank()) {
+            Outcome missed = fail("input", "input --at needs a short id");
+            missed.body().put("fix", "find --query=<name>, then input --text=<s> --at=<short id>");
+            return new Outcome(2, missed.body());
+        }
+        RUN.set(runId);
+        try {
+            Hit hit = requireHit(id);
+            if ("desktop".equals(hit.kind)) return fail("input", "input --at is a browser short id");
+            Held page = openBrowser(browserOf(hit, null));
+            try {
+                CdpConnection cdp = page.session.connection();
+                DomNode root = tree(page.session);
+                DomNode node = freshNode(hit, cdp, root);
+                if (node == null) return staleRef("input");
+                String session = cdpSessionOf(node);
+                String read = "function(){ if('value' in this) return String(this.value);"
+                        + " if(this.isContentEditable) return String(this.innerText||''); return null; }";
+                String before = callOnNode(cdp, session, node, read);
+                focusNode(cdp, session, node);
+                boolean sent = insertText(cdp, session, text == null ? "" : text);
+                String after = callOnNode(cdp, session, node, read);
+                boolean readable = after != null;
+                boolean landed = sent && (!readable || !after.equals(before == null ? "" : before)
+                        || (text != null && !text.isEmpty() && after.contains(text)));
+                Map<String, Object> body = base("input", "cdp", "browser", null);
+                body.remove("chain");
+                body.put("at", id);
+                body.put("calls", 1);
+                body.put("applied", landed);
+                body.put("verified", readable && landed);
+                if (!landed) {
+                    body.put("ok", false);
+                    body.put("error", "not applied");
+                    body.put("fix", "act --ref=" + id + " --kind=type --value=<s> sets a textbox; input --text --at is for other controls");
+                    stamp(body, cdp, node);
+                    return new Outcome(1, body);
+                }
+                stamp(body, cdp, node);
+                return ok(body);
+            } finally {
+                page.release();
+            }
+        } catch (Miss failure) {
+            Outcome missed = fail("input", failure.error);
+            missed.body().put("fix", "find or snap on this page for a current short id");
+            return missed;
+        } catch (RuntimeException failure) {
+            return fail("input", failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage());
+        } finally {
+            RUN.remove();
+        }
+    }
+
     /** {@code --human-override} is owner-checked before this runs. Verbs do not treat it as their own flag. */
     private static Map<String, String> stripHumanOverride(String verb, Map<String, String> values) {
         if (values == null || !values.containsKey("human-override")) return values == null ? Map.of() : values;

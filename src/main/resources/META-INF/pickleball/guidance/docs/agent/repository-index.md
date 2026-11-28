@@ -894,6 +894,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/browser/JsErrorGateLiveTest.java`
 - `src/test/java/tools/dscode/browser/PlaywrightAdapterTest.java`
 - `src/test/java/tools/dscode/browser/PlaywrightCdpLiveTest.java`
+- `src/test/java/tools/dscode/browser/proto/AriaSnapRedactTest.java`
 - `src/test/java/tools/dscode/browser/proto/ConsumerFixesP2TabTest.java`
 - `src/test/java/tools/dscode/browser/proto/ConsumerFixesP3ProtoTest.java`
 - `src/test/java/tools/dscode/browser/proto/OwnStorageFilterTest.java`
@@ -1221,6 +1222,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/PlaywrightSpecIngestLiveTest.java`
 - `src/test/java/tools/dscode/launcher/PolishRoadmapTest.java`
 - `src/test/java/tools/dscode/launcher/PopupVerbCoverageTest.java`
+- `src/test/java/tools/dscode/launcher/PwCdpTimeoutTest.java`
 - `src/test/java/tools/dscode/launcher/PwCommandLiveTest.java`
 - `src/test/java/tools/dscode/launcher/QuietSlf4jTest.java`
 - `src/test/java/tools/dscode/launcher/RedirectedFrameTest.java`

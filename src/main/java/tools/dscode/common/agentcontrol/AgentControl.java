@@ -283,7 +283,7 @@ public final class AgentControl {
                 case "inject" -> injectLive(project, values, agentId);
                 case "input-block" -> inputBlockLive(project, values, agentId);
                 case "lease" -> leaseLive(project, values, agentId);
-                case "input" -> inputLive(project, values);
+                case "input" -> inputLive(project, runId, values);
                 case "highlight" -> highlight(project, runId, values);
                 case "unhighlight" -> unhighlight(project, runId, values);
                 case "overlay" -> overlay(project, runId, values);
@@ -372,10 +372,27 @@ public final class AgentControl {
     }
 
     /** Agent {@code input --text} types on the live page, inside the shield pass when one is up. */
-    private static Result inputLive(Path project, Map<String, String> values) {
+    private static Result inputLive(Path project, String runId, Map<String, String> values) {
         String text = values.get("text");
+        if (values.containsKey("actions") || values.containsKey("release")) {
+            return refusal("error: input --actions and --release run in the protocol host\nfix: input --actions=<json>|@chain.json [--release] (no --session forward)");
+        }
         if (text == null || text.isBlank()) {
-            return refusal("error: input needs --text\nfix: input --text=<keys> --session=<id>");
+            return refusal("error: input needs --text, --actions or --release\nfix: input --text=<keys> [--at=<short id>] --session=<id>, or input --actions=<json>");
+        }
+        if (values.containsKey("at")) {
+            String session = values.get("session");
+            boolean blocked = HumanLock.inputBlocked(project, session);
+            if (blocked) HumanLock.passAgentInput(project, session);
+            try {
+                tools.dscode.common.agentfast.TargetVerb.Outcome outcome =
+                        tools.dscode.common.agentfast.TargetVerb.insertTextAt(project, runId, values.get("at"), text);
+                Map<String, Object> body = new LinkedHashMap<>(outcome.body());
+                stampLiveFrame(body);
+                return new Result(outcome.exit(), body);
+            } finally {
+                if (blocked) HumanLock.restoreInputBlock(project, session);
+            }
         }
         WebDriver page = tools.dscode.common.agentfast.LiveBrowserHost.page();
         if (!(page instanceof tools.dscode.common.agentfast.LiveChromeDriver driver)) {

@@ -102,6 +102,10 @@ final class InputCommands {
     }
 
     private static ObjectNode dispatchInput(ProtoHost host, Map<String, String> f) throws Exception {
+        if (f != null && f.containsKey("at") && (f.get("at") == null || f.get("at").isBlank() || "true".equals(f.get("at")))
+                && (f.get("actions") == null || f.get("actions").isBlank())) {
+            throw new IllegalArgumentException("error: input --at needs a short id\nfix: find --query=<name>, then input --text=<s> --at=<short id>");
+        }
         if (oneInsertText(f)) {
             CdpSession.Target target = ContextCommands.target(host, f);
             host.cdp().send(target.sessionId, "Input.insertText", insertTextParams(f.get("text")));
@@ -610,12 +614,87 @@ final class InputCommands {
                 if (f.containsKey("boxes")) options.setBoxes(true);
                 if (f.get("depth") != null) options.setDepth(Integer.parseInt(f.get("depth")));
                 if ("ai".equals(f.get("mode"))) options.setMode(AriaSnapshotMode.AI);
-                return page.ariaSnapshot(options);
+                String snapshot = page.ariaSnapshot(options);
+                return redactAria(snapshot, secretValues(page), null);
             });
         });
         String mode = "ai".equals(f.get("mode")) ? "ai" : "default";
-        return ProtoJson.obj().put("op", "aria-snap").put("via", served.via().id()).put("mode", mode).put("boxes", f.containsKey("boxes"))
-                .put("snapshot", served.value());
+        ArrayNode redacted = ProtoJson.MAPPER.createArrayNode();
+        // Second pass on the reply: a secret-named textbox is masked even when its value was not read.
+        String snapshot = redactAria(served.value(), List.of(), redacted);
+        ObjectNode out = ProtoJson.obj().put("op", "aria-snap").put("via", served.via().id()).put("mode", mode).put("boxes", f.containsKey("boxes"))
+                .put("snapshot", snapshot);
+        if (snapshot != null && snapshot.contains(ProtoRedact.MASK)) out.put("redactedValues", true);
+        return out;
+    }
+
+    /** Password, one-time-code, card and {@code data-sensitive} field values in every frame of the page. */
+    static final String SECRET_VALUES_JS = "() => { const out = []; for (const el of document.querySelectorAll('input,textarea,[contenteditable]')) {"
+            + " const type = String(el.type || el.getAttribute('type') || '').toLowerCase();"
+            + " const auto = String(el.getAttribute('autocomplete') || '').toLowerCase();"
+            + " const secret = type === 'password' || auto.indexOf('password') >= 0 || auto.indexOf('cc-') >= 0"
+            + " || auto.indexOf('one-time-code') >= 0 || el.getAttribute('data-sensitive') === 'true';"
+            + " if (!secret) continue; const v = 'value' in el ? String(el.value || '') : String(el.innerText || '');"
+            + " if (v) out.push(v); } return out; }";
+
+    static List<String> secretValues(Page page) {
+        List<String> values = new java.util.ArrayList<>();
+        for (com.microsoft.playwright.Frame frame : page.frames()) {
+            try {
+                Object read = frame.evaluate(SECRET_VALUES_JS);
+                if (read instanceof List<?> list) {
+                    for (Object item : list) if (item != null && !String.valueOf(item).isEmpty()) values.add(String.valueOf(item));
+                }
+            } catch (RuntimeException detachedOrBlocked) {
+                // A frame that cannot be read still gets the name-based mask below.
+            }
+        }
+        return values;
+    }
+
+    private static final java.util.regex.Pattern ARIA_VALUE_LINE = java.util.regex.Pattern.compile(
+            "^(\\s*-\\s+(?:textbox|searchbox|combobox|spinbutton)\\b(?:\\s+\"((?:[^\"\\\\]|\\\\.)*)\")?[^:\\n]*?:\\s)(.+)$");
+    private static final java.util.regex.Pattern SECRET_NAME = java.util.regex.Pattern.compile(
+            "(?i)pass(word|wd|code|phrase)?\\b|secret|token|one[- ]?time|otp\\b|\\bpin\\b|cvv|cvc|security code|card number|api[ _-]?key");
+
+    /**
+     * HCR-07: Playwright prints a textbox's value after its name ({@code - textbox "Password" [ref=e3]: secret1}).
+     * The value is masked when it is one of the page's secret field values or when the accessible name is a
+     * secret name. Other lines are unchanged.
+     */
+    static String redactAria(String snapshot, java.util.Collection<String> secrets, ArrayNode redacted) {
+        if (snapshot == null || snapshot.isEmpty()) return snapshot;
+        java.util.Set<String> known = new java.util.HashSet<>();
+        if (secrets != null) for (String v : secrets) if (v != null && !v.isEmpty()) known.add(v);
+        String[] lines = snapshot.split("\n", -1);
+        StringBuilder out = new StringBuilder(snapshot.length());
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i];
+            java.util.regex.Matcher m = ARIA_VALUE_LINE.matcher(line);
+            if (m.matches()) {
+                String name = m.group(2) == null ? "" : m.group(2);
+                String value = m.group(3);
+                String bare = unquote(value.trim());
+                if (!ProtoRedact.MASK.equals(bare) && (known.contains(bare) || known.contains(value.trim()) || SECRET_NAME.matcher(name).find())) {
+                    line = m.group(1) + ProtoRedact.MASK;
+                    if (redacted != null) redacted.add("aria:" + name);
+                }
+            } else if (!known.isEmpty()) {
+                for (String v : known) {
+                    if (v.length() >= 4 && line.contains(v)) line = line.replace(v, ProtoRedact.MASK);
+                }
+            }
+            if (i > 0) out.append('\n');
+            out.append(line);
+        }
+        return out.toString();
+    }
+
+    private static String unquote(String value) {
+        if (value.length() >= 2 && (value.startsWith("\"") && value.endsWith("\"") || value.startsWith("'") && value.endsWith("'"))) {
+            return value.substring(1, value.length() - 1).replace("\\\"", "\"").replace("''", "'");
+        }
+        return value;
     }
 
     static ObjectNode ariaAct(ProtoHost host, Map<String, String> f) {
