@@ -24,6 +24,9 @@ Source: PKB-HCR run of 2026-11-28 on consumer `myq-release-testing`, Pickleball 
 | 16 | `frame --list/--enter/--reset` said `no live browser` on a live `start` | Fixed (frame with no `--target` now defaults to `browser:auto` like snap/find/act) | `5b27bf4d1` | `HcrLiveFixesTest.frameVerbsUseTheLiveBrowserWithoutTarget`, `HcrRoundFourTest.frameUsesTheLiveBrowserLikeTheOtherPageVerbs` | Headed `start`: `frame --list`, `frame --enter=<name>`, `frame --reset` |
 | 20 | `act --kind=press --value=Enter` said not applied although the chat line was sent / guide moved | Fixed (a pickleball surface event, such as a chat send or guide step, within 300 ms of the key counts as applied) | `5b27bf4d1` | `HcrLiveFixesTest.enterInThePanelComposerIsApplied`, `HcrRoundFourTest.aSurfaceEventDuringTheSettleCountsAsApplied` | Headed: type in the panel, H `act --kind=press --value=Enter --query=Message` exits 0 |
 | 23 | `navigate` reset the dock and panel place; `panel-open --tab=guide` answered `steps`; `--tab=chat` left the panel minimized | Fixed (navigate snapshots the shown state first, the snapshot carries the dock; reply `tab` is the `--tab` name; a `--tab` with no `--minimized` opens the panel) | `5b27bf4d1` | `HcrLiveFixesTest.panelOpenTabNamesUnminimizeAndNavigateKeepsPanelAndDock`, `HcrPanelTabTest` | Headed: drag the panel and dock, `navigate` to the same origin, both stay |
+| 17 | Desktop `--exe=notepad.exe` resolved against the project; `desktop type/close --id=<launch id>` said `session not found` in the next call | Fixed (best effort, not run on Windows): a bare name that is not a project file is looked up on `PATH`/`PATHEXT`; live desktop ids are kept in `<tmp>/domengine-desktop-sessions.properties` and re-attached by window name | `f5ff72a82` | `DesktopExeAndIdsTest` (3 run on the box; `notepadResolvesOnTheWindowsPath` Windows only) | PC: `domengine desktop launch --exe=notepad.exe --name=Notepad`, then `desktop type --id=<id> ...` and `desktop close --id=<id>` in separate calls |
+| 19 | `browser ports` printed `none` and `attach --discover` found nothing with a live `start` Chrome up | Fixed: both read the project's live-host file and its `/health` `cdp` (`<port> live-start`, candidate `live-start` first) | `fd51a7b55` | `BrowserPortsLiveStartTest` (2), `BrowserAttachTest.discoverListsTheProjectsLiveStartBrowserFirst` | PC: after `start`, `browser ports` and `attach --discover` |
+| 24 | Popup `alwaysOnTop.applied=false` (`SetWindowPos`, exit 1) | Fixed (best effort, not run on Windows): the PowerShell had embedded double quotes that Java does not escape on the Windows command line; now quote-free, waits up to 10 s for the main or a child process window, and names exit 2/3 | `50b7aa6be` | `PopupOnTopWindowsTest` (quote-free script run on the box; `theScriptRunsOnWindows` Windows only), `PopupOnTopTest` | PC: `popup-open`, reply `alwaysOnTop.applied=true` and the window stays on top |
 
 ## Not done (needs a redesign or a longer investigation)
 
@@ -33,11 +36,8 @@ Source: PKB-HCR run of 2026-11-28 on consumer `myq-release-testing`, Pickleball 
 | 12 offline emulation vs service worker | Needs emulation on worker targets. Only the `cleared` half is fixed. |
 | 13 short ids scoped per run id, foreign id gives no error | An error breaks existing wait-any unit tests that watch ids with no page; needs an id-scope design. |
 | 14 event streams tagged with the starter's run id | Run binding for streams, spill dirs and `downloads`: design work. |
-| 17 desktop `--exe` resolved against the project | Windows-only; needs a desktop session. |
 | 18 `upload --ref=#files` | Needs CSS-selector refs in the upload resolver; not a one-line change. |
-| 19 `browser ports` shows none | Windows port discovery; needs the PC. |
 | 21, 22 H views miss agent surfaces; magnifier clone is clickable | View and exposure design. |
-| 24 popup `alwaysOnTop` | Windows `SetWindowPos`; needs the PC. |
 | 25 no `human-lock override` log line | Needs a decision on where the line is logged. |
 | 26 covered button `visible=true`; act `bounds` 0,0,0,0 | Needs the visibility model reconciled between `snap` and `explain`. |
 | 27 `wake` fields on `chat-turn` and `watch` | Needs a reply-shape decision. |

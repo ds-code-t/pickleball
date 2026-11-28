@@ -1053,6 +1053,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/browser/BidiCliSessionTest.java`
 - `src/test/java/tools/dscode/browser/BidiModulesTest.java`
 - `src/test/java/tools/dscode/browser/BrowserCacheAndLocalVersionTest.java`
+- `src/test/java/tools/dscode/browser/BrowserPortsLiveStartTest.java`
 - `src/test/java/tools/dscode/browser/BrowserProtocolsTest.java`
 - `src/test/java/tools/dscode/browser/BrowserVersionResolverTest.java`
 - `src/test/java/tools/dscode/browser/CdnCacheFallbackTest.java`
@@ -1150,6 +1151,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentsurface/PopupLifecycleTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/PopupLogTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/PopupOnTopTest.java`
+- `src/test/java/tools/dscode/common/agentsurface/PopupOnTopWindowsTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/PopupRemovalKindTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/PopupSandboxFallbackTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/PopupSurfaceParityTest.java`
@@ -2041,6 +2043,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/desktop/DesktopAnnotations.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/DesktopLaunch.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/DesktopScreenshot.java`
+- `dom-engine/src/main/java/dev/domengine/desktop/DesktopSessionStore.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/DesktopTree.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/DesktopXPathAccel.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/GridDrivers.java`
@@ -2128,6 +2131,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/CliWireShapeTest.java`
 - `dom-engine/src/test/java/dev/domengine/ConformanceSuiteTest.java`
 - `dom-engine/src/test/java/dev/domengine/ConsumerFixesP3QueryTest.java`
+- `dom-engine/src/test/java/dev/domengine/desktop/DesktopExeAndIdsTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/DesktopLaunchTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/DesktopOneMatchTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/DesktopScreenshotTest.java`
