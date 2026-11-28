@@ -149,6 +149,7 @@ public final class DesktopTree {
         DomNode.renumber(root);
         Session session = new Session(id, "live", root, true, platform, name);
         SESSIONS.put(id, session);
+        DesktopSessionStore.remember(id, name);
         if (warmOn()) {
             WindowsStructureEvents.start(cacheKey(id, name), name);
         }
@@ -163,13 +164,31 @@ public final class DesktopTree {
 
     public static Session require(String id) {
         Session session = SESSIONS.get(id);
+        if (session == null) session = revive(id);
         if (session == null) throw new CdpException("session not found: " + id);
         return session;
     }
 
+    /** A live id from an earlier CLI process is attached again to the window it named. */
+    private static Session revive(String id) {
+        String window = DesktopSessionStore.windowOf(id);
+        if (window == null || window.isBlank()) return null;
+        EngineLog.info("desktop", "re-attach " + id + " " + window);
+        return attachLive(id, window);
+    }
+
     public static ObjectNode close(String id) {
         Session session = SESSIONS.get(id);
+        if (session == null && DesktopSessionStore.forget(id)) {
+            // Launched or attached by an earlier CLI process: closing drops the kept id.
+            ObjectNode node = Jsons.object();
+            node.put("ok", true);
+            node.put("id", id);
+            node.put("closed", true);
+            return node;
+        }
         if (session == null) throw new CdpException("session not found: " + id);
+        DesktopSessionStore.forget(id);
         String key = cacheKey(session.id, session.window);
         WindowsStructureEvents.stop(key);
         structureChanged(key);

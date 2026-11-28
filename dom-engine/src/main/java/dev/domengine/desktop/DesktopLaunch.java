@@ -42,7 +42,7 @@ public final class DesktopLaunch {
     /** Starts {@code exe}. A {@code .cmd} or {@code .bat} runs through {@code cmd.exe /c}. */
     public static Process start(Path exe) throws IOException {
         if (exe == null) throw new IOException("missing exe");
-        Path absolute = exe.toAbsolutePath().normalize();
+        Path absolute = resolveExe(exe.toString(), System.getenv("PATH"), System.getenv("PATHEXT"), Path.of("")).toAbsolutePath().normalize();
         String path = absolute.toString();
         String lower = path.toLowerCase(Locale.ROOT);
         List<String> command = new ArrayList<>();
@@ -60,6 +60,44 @@ public final class DesktopLaunch {
         Process process = builder.start();
         pump(process);
         return process;
+    }
+
+    /**
+     * A bare program name ({@code notepad.exe}, {@code notepad}) that is not a file under {@code cwd} is looked up on
+     * {@code PATH} (with each {@code PATHEXT} extension when it has none), like a shell. A path with a directory part
+     * is resolved against {@code cwd} as before. No match keeps the {@code cwd} path, so the error names it.
+     */
+    static Path resolveExe(String raw, String pathEnv, String pathExt, Path cwd) {
+        Path given = Path.of(raw);
+        Path local = cwd.resolve(given);
+        if (given.isAbsolute() || given.getNameCount() > 1 || raw.contains("/") || raw.contains("\\")) return local;
+        if (Files.isRegularFile(local)) return local;
+        List<String> names = new ArrayList<>();
+        names.add(raw);
+        String fileName = given.getFileName().toString();
+        if (!fileName.contains(".")) {
+            String exts = pathExt == null || pathExt.isBlank() ? ".EXE;.CMD;.BAT;.COM" : pathExt;
+            for (String ext : exts.split(";")) {
+                if (ext.isBlank()) continue;
+                names.add(raw + ext.toLowerCase(Locale.ROOT));
+                names.add(raw + ext);
+            }
+        }
+        if (pathEnv != null) {
+            for (String dir : pathEnv.split(java.io.File.pathSeparator)) {
+                if (dir.isBlank()) continue;
+                for (String name : names) {
+                    Path candidate;
+                    try {
+                        candidate = Path.of(dir.replace("\"", "")).resolve(name);
+                    } catch (RuntimeException invalid) {
+                        continue;
+                    }
+                    if (Files.isRegularFile(candidate)) return candidate;
+                }
+            }
+        }
+        return local;
     }
 
     /**
