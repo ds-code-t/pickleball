@@ -69,6 +69,7 @@ final class EmulateCommands {
             active.clear();
             if (host.stateMap().containsKey("emulate.network") && !"online".equals(host.stateMap().get("emulate.network"))) {
                 RouteCommands.conditions(host, Map.of("network", "online"));
+                out.withArray("cleared").add("network");
             }
             return out;
         }
@@ -378,7 +379,7 @@ final class EmulateCommands {
         ObjectNode active = out.putObject("active");
         active(host).forEach((k, v) -> active.putObject(k).put("value", v[0]).put("via", v[1]));
         Object network = host.stateMap().get("emulate.network");
-        if (network != null) active.putObject("network").put("value", String.valueOf(network));
+        if (network != null && !"online".equals(String.valueOf(network))) active.putObject("network").put("value", String.valueOf(network));
         Object clock = host.stateMap().get("clock.state");
         if (clock != null) active.putObject("clock").put("value", String.valueOf(clock));
         return out;

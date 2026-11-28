@@ -129,6 +129,18 @@ class EmulateLiveTest {
         assertTrue(bad.err().contains("--vision is one of"), bad.err());
     }
 
+    /** PKB-HCR bug 12: emulate --reset restored the network but did not list it in cleared. */
+    @Test
+    void resetListsTheNetworkItRestored() throws Exception {
+        Path p = project("net-reset");
+        go(p);
+        ok(p, "emulate", "--network=offline");
+        assertEquals("offline", ok(p, "emulate", "--show").path("active").path("network").path("value").asText());
+        JsonNode reset = ok(p, "emulate", "--reset");
+        assertTrue(reset.path("cleared").toString().contains("network"), reset.toString());
+        assertEquals(0, ok(p, "emulate", "--show").path("active").size());
+    }
+
     @Test
     void playwrightReportsWhatItCannotApply() throws Exception {
         Path p = project("pw-emulate");
