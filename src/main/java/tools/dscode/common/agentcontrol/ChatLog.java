@@ -70,6 +70,29 @@ final class ChatLog {
         }
     }
 
+    /**
+     * Stores a person's panel line once (HCR-12). The page pushes it through the binding as it is sent and the
+     * panel queue drains it again later; the page id is the key, so the second copy is dropped. Returns null when
+     * the line was already stored.
+     */
+    static Message sendHumanOnce(Path project, String runId, String text, String pageId) throws IOException {
+        String page = pageId == null ? "" : pageId.trim();
+        synchronized (ChatLog.class) {
+            if (!page.isBlank()) {
+                for (Message message : read(project, runId, "run")) {
+                    if (page.equals(message.pageId())) return null;
+                }
+            }
+            return send(project, runId, null, "human", "", text, page);
+        }
+    }
+
+    /** The live {@code start} session id that keys chat, or blank when there is no live session. */
+    static String liveScope(Path project) {
+        String scoped = scope(project, "");
+        return scoped == null ? "" : scoped;
+    }
+
     static List<Message> history(Path project, String runId, String channel, int limit) throws IOException {
         String useChannel = channel == null || channel.isBlank() ? "run" : channel;
         List<Message> all = read(project, runId, useChannel);

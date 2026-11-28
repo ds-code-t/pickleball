@@ -2165,7 +2165,7 @@ final class PageSurfaces {
             Object pageId = map.get("id");
             String page = pageId == null ? "" : String.valueOf(pageId);
             if (!page.isBlank() && !"null".equals(page)) pageIds.add(page);
-            ChatLog.send(project, runId, null, "human", "", text, page);
+            if (ChatLog.sendHumanOnce(project, runId, text, page) == null) continue;
             CompositeLog.info("chat", "panel human message chars=" + text.length());
             stored++;
         }
@@ -2352,7 +2352,30 @@ final class PageSurfaces {
         tools.dscode.common.agentfast.PushChannel.accept(event);
         tools.dscode.common.recording.InteractionLog.mirrorStream(
                 tools.dscode.common.agentfast.PushChannel.project(), event);
+        ingestHumanChat(event);
         return event;
+    }
+
+    /**
+     * HCR-12: a person's panel message goes into the run chat as it is sent, so {@code wait-any --chat=human},
+     * {@code chat-history} and {@code chat-turn} see it without an agent {@code chat-poll}. Only on a live
+     * {@code start} session, where chat is keyed by the session id; other hosts still drain the panel queue.
+     */
+    static void ingestHumanChat(Map<String, String> event) {
+        if (event == null || !"chat".equals(event.get("type")) || !"human".equalsIgnoreCase(event.get("source"))) return;
+        String text = event.get("text");
+        if (text == null || text.isBlank()) return;
+        Path project = tools.dscode.common.agentfast.PushChannel.project();
+        if (project == null || project.toString().isEmpty()) return;
+        try {
+            String live = ChatLog.liveScope(project);
+            if (live.isBlank()) return;
+            if (ChatLog.sendHumanOnce(project, live, text, event.getOrDefault("id", "")) != null) {
+                CompositeLog.info("chat", "panel human message pushed chars=" + text.length());
+            }
+        } catch (IOException | RuntimeException failure) {
+            CompositeLog.info("chat", "panel push ingest skipped " + failure.getMessage());
+        }
     }
 
     private static void flushPushed(Path project, String runId) throws IOException {

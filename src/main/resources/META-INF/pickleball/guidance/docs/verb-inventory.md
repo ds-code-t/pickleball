@@ -173,6 +173,8 @@ MCP-only count: 0
 | lease release | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | lease take | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | live-check | workbench | cli | tools.dscode.launcher.VerbDispatch.run |
+| live-start | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
+| live-stop | workbench | cli | tools.dscode.launcher.WorkbenchAgentCommands.run |
 | log | workbench | cli | tools.dscode.common.composite.DomLogCli.execute |
 | log tail | workbench | stream | tools.dscode.common.composite.DomLogCli.execute |
 | log-tail | workbench | cli | tools.dscode.common.composite.DomLogCli.execute |

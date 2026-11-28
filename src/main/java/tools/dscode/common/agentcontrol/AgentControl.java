@@ -1119,8 +1119,18 @@ public final class AgentControl {
             chatAfter = "0";
         }
         long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(Math.max(0, timeout));
+        long drainedAt = 0L;
         while (true) {
             long wakeSeen = tools.dscode.common.agentfast.PushWake.generation();
+            // HCR-12: panel lines also wait in the page queue; read it here as chat-poll does (at most every 250 ms).
+            if (!chatMode.isEmpty() && System.nanoTime() - drainedAt > 250_000_000L) {
+                drainedAt = System.nanoTime();
+                try {
+                    PageSurfaces.drainPanelChat(project, runId);
+                } catch (IOException | RuntimeException failure) {
+                    CompositeLog.info("ui", "wait-any panel drain skipped " + failure.getMessage());
+                }
+            }
             Result hit = waitAnyHit(project, runId, before, chatAfter, answerId, chatMode, watchId);
             if (hit != null) return hit;
             if (System.nanoTime() >= deadline) {

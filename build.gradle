@@ -1116,7 +1116,7 @@ tasks.withType(Sign).configureEach {
 // measured set. Keep :testLive at 1 unless a later measurement shows a
 // higher liveForks value is safe for every class here, including the 20
 // that failed at 12 forks. The 10 PMR-11 classes at the end of the list
-// were added on 2026-11-28 (70 in total).
+// were added on 2026-11-28 (70), then the HCR-fix live tests.
 def pkbLiveTestClasses = [
     'io.cucumber.core.runner.UntilPassOverheadTest',
     'tools.dscode.browser.PlaywrightCdpLiveTest',
@@ -1189,6 +1189,9 @@ def pkbLiveTestClasses = [
     'tools.dscode.launcher.TwoActorRecipeLiveTest',
     'tools.dscode.launcher.WaitLaneLiveTest',
     'tools.dscode.store.StoreExecutionRecordingTest',
+    // HCR fixes 2026-11-28: live start-session tests added with the fixes.
+    'tools.dscode.launcher.HumanChatPushLiveTest',
+    'tools.dscode.launcher.LiveStopVerbTest',
     'tools.dscode.store.StoreEntityUsageTest'
 ]
 def pkbLiveTestSimple = pkbLiveTestClasses.collect { String fqcn -> fqcn.substring(fqcn.lastIndexOf('.') + 1) } as Set
@@ -1245,7 +1248,7 @@ if (pkbTestForksRaw == null || pkbTestForksRaw.toString().trim().isEmpty()) {
 }
 
 // -Ppkb.test.liveForks is maxParallelForks for :testLive only. Default 1.
-// The 70 live/contention classes must not inherit -Ppkb.test.forks.
+// The 72 live/contention classes must not inherit -Ppkb.test.forks.
 def pkbTestLiveForksRaw = findProperty('pkb.test.liveForks')
 int pkbTestLiveForks
 if (pkbTestLiveForksRaw == null || pkbTestLiveForksRaw.toString().trim().isEmpty()) {
@@ -1368,7 +1371,7 @@ def pkbExclusiveLiveOrSerial = { String pattern ->
 
 tasks.register('testLive', Test) {
     group = 'verification'
-    description = 'Parallel-unsafe live/contention classes (70). Runs after :test at -Ppkb.test.liveForks (default 1).'
+    description = 'Parallel-unsafe live/contention classes (72). Runs after :test at -Ppkb.test.liveForks (default 1).'
     useJUnitPlatform {
         includeEngines 'junit-jupiter'
     }
@@ -1433,7 +1436,7 @@ gradle.taskGraph.whenReady { graph ->
         if (taskPatterns != null) patterns.addAll(taskPatterns)
     }
     if (patterns.isEmpty()) {
-        logger.lifecycle('testLive running the 70 live/contention classes after :test')
+        logger.lifecycle('testLive running the 72 live/contention classes after :test')
         logger.lifecycle('testSerial running SuiteDualRunTest after :testLive')
         return
     }

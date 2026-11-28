@@ -51,6 +51,8 @@ final class WorkbenchCommandLine {
             "ask-and-wait", "answer-wait", "wait-any", "pin", "toast", "checklist", "ui", "inject", "spine",
             "chat", "point", "progress", "lease",
             "ref", "controller-start", "controller-stop", "controller-status", "controller-ping",
+            // HCR teardown: help lists live-start and live-stop; parse rewrites them to start and start --stop.
+            "live-start", "live-stop",
             "help"
     );
     static final Set<String> SESSION_CLIENT_COMMANDS = Set.of(
