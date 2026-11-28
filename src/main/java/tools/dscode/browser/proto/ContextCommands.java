@@ -406,7 +406,7 @@ final class ContextCommands {
             }
             throw new IllegalStateException("error: no download finished in time\nfix: downloads --list, or raise --timeout");
         }
-        String rel = f.getOrDefault("dir", ".pickleball/runs/" + host.run() + "/downloads");
+        String rel = f.getOrDefault("dir", ".pickleball/runs/" + callerRun(f, host.run()) + "/downloads");
         Path dir = host.project().resolve(rel).normalize();
         if (!dir.startsWith(host.project().normalize())) throw new IllegalArgumentException("error: --dir must stay inside the project\nfix: downloads --dir=downloads");
         Files.createDirectories(dir);
@@ -511,5 +511,14 @@ final class ContextCommands {
 
     static boolean isBackend(BrowserProtocols.Served<?> served, Backend backend) {
         return served.via() == backend;
+    }
+
+    /** HCR-14: the calling run id ({@code _run} from the CLI, or {@code --run-id}), else the host's own run. */
+    static String callerRun(Map<String, String> f, String hostRun) {
+        for (String key : List.of("_run", "run-id")) {
+            String value = f == null ? null : f.get(key);
+            if (value != null && value.trim().matches("[A-Za-z0-9._-]{1,64}")) return value.trim();
+        }
+        return hostRun;
     }
 }

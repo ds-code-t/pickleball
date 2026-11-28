@@ -896,6 +896,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/browser/PlaywrightAdapterTest.java`
 - `src/test/java/tools/dscode/browser/PlaywrightCdpLiveTest.java`
 - `src/test/java/tools/dscode/browser/proto/AriaSnapRedactTest.java`
+- `src/test/java/tools/dscode/browser/proto/CallerRunTest.java`
 - `src/test/java/tools/dscode/browser/proto/ConsumerFixesP2TabTest.java`
 - `src/test/java/tools/dscode/browser/proto/ConsumerFixesP3ProtoTest.java`
 - `src/test/java/tools/dscode/browser/proto/NetworkTargetsTest.java`
@@ -1230,6 +1231,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/OwnerDecisionsTest.java`
 - `src/test/java/tools/dscode/launcher/PageJvmRouteTest.java`
 - `src/test/java/tools/dscode/launcher/PerfLiveTest.java`
+- `src/test/java/tools/dscode/launcher/PerfReportHostRunTest.java`
 - `src/test/java/tools/dscode/launcher/PickleballWorkbenchLauncherTest.java`
 - `src/test/java/tools/dscode/launcher/PlacementNowTest.java`
 - `src/test/java/tools/dscode/launcher/PlaywrightSpecHostTest.java`

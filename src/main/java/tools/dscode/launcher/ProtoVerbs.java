@@ -55,12 +55,30 @@ final class ProtoVerbs {
                 // E9: the Browser report section, read from the run's NDJSON spill; no browser needed.
                 String run = flags.getOrDefault("run-id", flags.getOrDefault("run", "live"));
                 Path folder = project.resolve(".pickleball").resolve("runs").resolve(run);
-                Map<String, Object> summary = tools.dscode.browser.BrowserReport.summarize(folder, Integer.parseInt(flags.getOrDefault("slowest", "10")));
+                int slowest = Integer.parseInt(flags.getOrDefault("slowest", "10"));
+                Map<String, Object> summary = tools.dscode.browser.BrowserReport.summarize(folder, slowest);
+                String spillRun = null;
+                if (summary.isEmpty()) {
+                    // HCR-14: the event host spills under the run id that started it; read that spill and say so.
+                    String hostRun = hostRun(project);
+                    if (hostRun != null && !hostRun.equals(run)) {
+                        Map<String, Object> shared = tools.dscode.browser.BrowserReport.summarize(
+                                project.resolve(".pickleball").resolve("runs").resolve(hostRun), slowest);
+                        if (!shared.isEmpty()) {
+                            summary = shared;
+                            spillRun = hostRun;
+                        }
+                    }
+                }
                 if (summary.isEmpty()) return fail(err, "error: no browser-events spill in .pickleball/runs/" + run + "\nfix: run browser-events (or a scenario) first, or pass --run-id=<run>");
                 java.nio.file.Files.createDirectories(folder.resolve("workbench"));
                 java.nio.file.Files.writeString(folder.resolve("workbench").resolve("browser.html"), tools.dscode.browser.BrowserReport.html(summary));
                 com.fasterxml.jackson.databind.node.ObjectNode reply = new com.fasterxml.jackson.databind.ObjectMapper().valueToTree(summary);
                 reply.put("ok", true).put("op", "perf").put("mode", "report").put("html", ".pickleball/runs/" + run + "/workbench/browser.html");
+                if (spillRun != null) {
+                    reply.put("spillRun", spillRun);
+                    reply.put("note", "the browser-events host spills under run " + spillRun + ", which started it; its rows were read");
+                }
                 out.println(reply);
                 return 0;
             }
@@ -193,6 +211,18 @@ final class ProtoVerbs {
         return value;
     }
 
+    /** The run id the running browser-events host was started with, or null. */
+    static String hostRun(Path project) {
+        try {
+            Path file = tools.dscode.browser.proto.ProtoHost.hostFile(project);
+            if (!java.nio.file.Files.isRegularFile(file)) return null;
+            String value = new com.fasterxml.jackson.databind.ObjectMapper().readTree(java.nio.file.Files.readString(file)).path("run").asText("");
+            return value.matches("[A-Za-z0-9._-]{1,64}") ? value : null;
+        } catch (java.io.IOException | RuntimeException failure) {
+            return null;
+        }
+    }
+
     static ObjectNode call(Path project, Map<String, String> flags, String verb, Map<String, String> payload) {
         String cdp = null;
         if (flags.containsKey("target") || flags.containsKey("cdp-endpoint")) cdp = PwCommand.endpoint(project, flags);
@@ -202,6 +232,8 @@ final class ProtoVerbs {
         String run = flags.getOrDefault("run-id", System.getenv("PKB_RUN_ID"));
         Map<String, String> sent = new LinkedHashMap<>(payload);
         for (String endpointFlag : List.of("target", "cdp-endpoint", "bidi-endpoint")) sent.remove(endpointFlag);
+        // HCR-14: the caller's run id, so per-run defaults (downloads dir) follow the caller, not the host's starter.
+        if (run != null && !run.isBlank()) sent.putIfAbsent("_run", run.trim());
         return ProtoClient.call(project, cdp, bidi, run, verb, sent);
     }
 
