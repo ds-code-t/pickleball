@@ -1070,6 +1070,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/browser/proto/AriaSnapRedactTest.java`
 - `src/test/java/tools/dscode/browser/proto/ConsumerFixesP2TabTest.java`
 - `src/test/java/tools/dscode/browser/proto/ConsumerFixesP3ProtoTest.java`
+- `src/test/java/tools/dscode/browser/proto/NetworkTargetsTest.java`
 - `src/test/java/tools/dscode/browser/proto/OwnStorageFilterTest.java`
 - `src/test/java/tools/dscode/browser/proto/RouteModifyBodyTest.java`
 - `src/test/java/tools/dscode/browser/proto/SourceMapsTest.java`
