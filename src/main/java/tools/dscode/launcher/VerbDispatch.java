@@ -106,7 +106,7 @@ public final class VerbDispatch {
             return SpineCli.execute(argv, stdout, stderr);
         }
         if ("bidi".equals(family)) return BidiSessionForward.run(project, argv, stdout, stderr);
-        if ("browser".equals(family)) return tools.dscode.browser.BrowserPorts.execute(argv, stdout, stderr);
+        if ("browser".equals(family)) return tools.dscode.browser.BrowserPorts.execute(argv, project, stdout, stderr);
         if ("log".equals(family) || "log-tail".equals(family)) {
             return tools.dscode.common.composite.DomLogCli.execute(argv, stdout, stderr);
         }

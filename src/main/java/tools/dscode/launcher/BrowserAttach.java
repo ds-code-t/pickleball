@@ -73,6 +73,11 @@ final class BrowserAttach {
 
         /** webSocketDebuggerUrl from {@code <base>/json/version}, or null. */
         String jsonVersion(String httpBase);
+
+        /** The browser websocket of the project's live {@code start} session, or null. */
+        default String liveStartCdp(Path project) {
+            return null;
+        }
     }
 
     static final Probes LIVE = new Probes() {
@@ -130,6 +135,11 @@ final class BrowserAttach {
                 if (failure instanceof InterruptedException) Thread.currentThread().interrupt();
                 return null;
             }
+        }
+
+        @Override
+        public String liveStartCdp(Path project) {
+            return tools.dscode.browser.BrowserPorts.liveStartCdp(project);
         }
     };
 
@@ -208,8 +218,15 @@ final class BrowserAttach {
 
     /** Candidates from the current user's own channel dirs and the localhost ports, de-duplicated. */
     static List<ObjectNode> discover(Probes p) {
+        return discover(p, null);
+    }
+
+    /** As {@link #discover(Probes)}, with the project's live {@code start} browser (its own debug port) first. */
+    static List<ObjectNode> discover(Probes p, Path project) {
         List<ObjectNode> out = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
+        String live = project == null ? null : p.liveStartCdp(project);
+        if (live != null && seen.add(port(live))) out.add(JSON.createObjectNode().put("source", "live-start").put("endpoint", live));
         for (String channel : CHANNELS) {
             String ws = activePort(userDataDir(channel, p), p);
             if (ws != null && seen.add(port(ws))) out.add(JSON.createObjectNode().put("source", "channel:" + channel).put("endpoint", ws));
@@ -330,7 +347,7 @@ final class BrowserAttach {
             }
             if (server != null) return playwrightServer(project, server, out, err);
             if (discover) {
-                List<ObjectNode> found = discover(p);
+                List<ObjectNode> found = discover(p, project);
                 if (pick == null) {
                     ObjectNode body = JSON.createObjectNode().put("ok", true).put("op", "attach").put("route", "discover");
                     ArrayNode list = body.putArray("candidates");

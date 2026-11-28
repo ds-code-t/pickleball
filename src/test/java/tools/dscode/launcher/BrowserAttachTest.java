@@ -110,6 +110,24 @@ class BrowserAttachTest {
         assertTrue(missing.get(5).path("note").asText().contains("WebDriver BiDi"));
     }
 
+    /** PKB-HCR 2026-11-28 item 19: the live start browser has its own debug port and was not discovered. */
+    @Test
+    void discoverListsTheProjectsLiveStartBrowserFirst() {
+        Fake fake = new Fake() {
+            @Override
+            public String liveStartCdp(Path project) {
+                return "ws://127.0.0.1:9333/devtools/browser/live";
+            }
+        };
+        fake.ports.add(9222);
+        fake.versions.put("http://127.0.0.1:9222", "ws://127.0.0.1:9222/devtools/browser/x");
+        List<com.fasterxml.jackson.databind.node.ObjectNode> found = BrowserAttach.discover(fake, Path.of("/p"));
+        assertEquals("live-start", found.get(0).path("source").asText(), found.toString());
+        assertEquals("ws://127.0.0.1:9333/devtools/browser/live", found.get(0).path("endpoint").asText());
+        assertEquals("port:9222", found.get(1).path("source").asText(), found.toString());
+        assertEquals(1, BrowserAttach.discover(fake).size(), "no project, no live start candidate");
+    }
+
     @Test
     void aStaleActivePortFileOrNonLocalPortIsNotACandidate() {
         Fake fake = new Fake();
