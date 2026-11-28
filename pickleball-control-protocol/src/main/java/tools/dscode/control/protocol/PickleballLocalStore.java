@@ -126,6 +126,7 @@ public final class PickleballLocalStore {
             PrintStream err
     ) throws IOException {
         cleanupLegacyGuidance(pickleball);
+        dropStaleControllerFiles(pickleball);
         Path versionRoot = PickleballLocalLayout.versionRoot(pickleball, version);
         Files.createDirectories(versionRoot);
         List<String> files = guidanceFiles();
@@ -913,6 +914,18 @@ public final class PickleballLocalStore {
         }
 
         cleanupLegacyGuidance(root);
+    }
+
+    /**
+     * The controller start writes {@code agent-controller.classpath} and appends to {@code agent-controller.log}.
+     * With no controller handle ({@code agent-controller.json}) both are leftovers of an old run (a classpath from
+     * a previous version, a log showing a long-fixed ClassNotFoundException), so an export removes them. A running
+     * controller keeps its files.
+     */
+    static void dropStaleControllerFiles(Path pickleball) throws IOException {
+        if (Files.exists(pickleball.resolve("agent-controller.json"))) return;
+        Files.deleteIfExists(pickleball.resolve("agent-controller.classpath"));
+        Files.deleteIfExists(pickleball.resolve("agent-controller.log"));
     }
 
     private static void cleanupLegacyGuidance(Path root) throws IOException {
