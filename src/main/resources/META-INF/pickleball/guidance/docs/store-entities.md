@@ -40,7 +40,7 @@ A scenario step receives that resolved field only when Store is on. With Store o
 
 With Store on, a missing database row is read from `store-entities/<Type>/<id>.entity` when that file is present. Resolution does not create a database when no tracked step is active. During a tracked step, that read inserts `entity_usages` with operation `read`. `value_ref` is the secret reference when the field holds one (`<password:qaDb>` or `~MASK;`). Otherwise it is `<entity:Type#id.field>`. The resolved cleartext is not stored. `store entity use <type> <id>` records `write` or `mention` (or `read`) on `--step` or the active step. A `--value-ref` that is not a reference is stored as `~MASK;`.
 
-`RECORD ENTITY: "<value>" as Type#id` writes the entity, a mention usage, and a `run_snapshot_entities` row for the tracked step. It does not run object construction, post-actions, or cleanup. A value that fails the secret check is stored as `~MASK;`. The step saves `recordedAccount` as `Type#id` when a scenario map is open. The consumer scenario is `@area-b-record-entity`.
+`RECORD ENTITY: "<value>" as Type#id` writes the entity, a mention usage, and a `run_snapshot_entities` row for the tracked step. When Store is on and `pkb_store_track` is not false, a step that is not already tracked is opened for that write. The process `pkb_run_id` is left as it was. An explicit false `pkb_store_track`, or Store off, still refuses with `error: RECORD ENTITY needs a tracked step` and `fix: set pkb_store_track=true`. It does not run object construction, post-actions, or cleanup. A value that fails the secret check is stored as `~MASK;`. The step saves `recordedAccount` as `Type#id` when a scenario map is open. The consumer scenario is `@area-b-record-entity`.
 
 ## CLI
 

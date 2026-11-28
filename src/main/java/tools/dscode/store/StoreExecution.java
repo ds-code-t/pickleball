@@ -171,9 +171,62 @@ public final class StoreExecution {
         }
     }
 
+    /**
+     * Opens a step for {@code RECORD ENTITY} when this process is not already tracking.
+     * Store off, and an explicit false {@code pkb_store_track}, leave the frame unset.
+     * A run id minted for the write is not left on the process.
+     * @return true when a tracked step is active
+     */
+    public static boolean openUntrackedRecord() {
+        StoreRunContext.Frame existing = StoreRunContext.current();
+        if (existing != null && existing.stepExecId() != null && !existing.stepExecId().isBlank()) return true;
+        String track = System.getProperty("pkb_store_track");
+        if (track != null && !track.isBlank() && StoreConfig.falsy(track)) return false;
+        try {
+            if (!StoreConfig.enabled()) return false;
+        } catch (RuntimeException failure) {
+            return false;
+        }
+        String previousRun = System.getProperty("pkb_run_id");
+        String previousTrack = System.getProperty("pkb_store_track");
+        boolean restoreRun = previousRun == null || previousRun.isBlank();
+        boolean restoreTrack = previousTrack == null || previousTrack.isBlank();
+        io.cucumber.core.runner.CurrentScenarioState state =
+                io.cucumber.core.runner.CurrentScenarioState.currentScenarioState.get();
+        String scenario = state == null || state.scenarioName == null ? "" : state.scenarioName;
+        String uri = "";
+        int line = 0;
+        if (state != null && state.pickle != null) {
+            if (state.pickle.getUri() != null) uri = state.pickle.getUri().toString();
+            if (state.pickle.getLocation() != null) line = state.pickle.getLocation().getLine();
+        }
+        String stepText = "RECORD ENTITY";
+        if (state != null && state.getCurrentStep() != null && state.getCurrentStep().getStepText() != null) {
+            stepText = state.getCurrentStep().getStepText();
+        }
+        try {
+            if (restoreTrack) System.setProperty("pkb_store_track", "true");
+            beforeStep(null, scenario, uri, line, stepText, 0);
+        } finally {
+            if (restoreTrack) {
+                if (previousTrack == null) System.clearProperty("pkb_store_track");
+                else System.setProperty("pkb_store_track", previousTrack);
+            }
+            if (restoreRun) {
+                if (previousRun == null) System.clearProperty("pkb_run_id");
+                else System.setProperty("pkb_run_id", previousRun);
+            }
+        }
+        StoreRunContext.Frame opened = StoreRunContext.current();
+        return opened != null && opened.stepExecId() != null && !opened.stepExecId().isBlank();
+    }
+
     /** Closes the step opened by {@link #beforeStep}. A finish without a start still upserts. */
     public static void afterStep(String status) {
-        if (!shouldTrack()) return;
+        if (!shouldTrack()) {
+            StoreRunContext.clear();
+            return;
+        }
         try {
             Active active = ACTIVE.get();
             if (active == null || active.current == null) {

@@ -672,7 +672,7 @@ A bare `pkb_stepMaxTime` integer is minutes. A unit is accepted, such as `90s` o
 
 `pkb_stepRepeatMaxTime` still works as a deprecated alias. A bare integer is seconds. Using it logs a warning: `pkb_stepRepeatMaxTime is deprecated. Use pkb_stepMaxTime (minutes, or a unit such as 90s).` If both are set, `pkb_stepMaxTime` wins and the warning is still logged. When neither is set, the cap is 60 minutes.
 
-A positive count N allows exactly N passes of a block `until` and of an inline `until`. The check before the next pass sees how many passes have already finished. An inline `until` loops while the condition is true. A falsy condition does not run the phrases that follow it on that line.
+A positive count N allows exactly N passes of a block `until` and of an inline `until`. The check before the next pass sees how many passes have already finished. An inline `until` with a comparison, such as `equals`, loops while the condition is true. A falsy condition does not run the phrases that follow it on that line. A comma `until` whose condition is one element and has no comparison word selects that branch once, the way `if` does. `, until "abc", save "yes" as "q"` runs the save once. `, until "", save "no" as "q"` does not run the save. That form does not spend `pkb_stepRepeatMaxCount`.
 
 ```gherkin
 * , until the Step Repetition is 3:

@@ -26,4 +26,4 @@ The passing check is [`release-2-1-16.feature`](../maven-consumer-project/src/te
 
 ## Record an entity
 
-`RECORD ENTITY: "<value>" as Type#id` writes a store entity during the current tracked step. It does not use `constructor`, `postActions`, or `cleanup`. A value that fails the secret check is stored as `~MASK;`. The consumer scenario is `@area-b-record-entity` in [`area-b-control-flow.feature`](../maven-consumer-project/src/test/resources/features/area-b-control-flow.feature).
+`RECORD ENTITY: "<value>" as Type#id` writes a store entity during the current tracked step. When Store is on and `pkb_store_track` is not false, a step that is not already tracked is opened for that write and the run id is not left set on the process. An explicit false `pkb_store_track`, or Store off, still refuses with `error: RECORD ENTITY needs a tracked step` and `fix: set pkb_store_track=true`. It does not use `constructor`, `postActions`, or `cleanup`. A value that fails the secret check is stored as `~MASK;`. The consumer scenario is `@area-b-record-entity` in [`area-b-control-flow.feature`](../maven-consumer-project/src/test/resources/features/area-b-control-flow.feature).

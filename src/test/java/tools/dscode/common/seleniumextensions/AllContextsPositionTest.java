@@ -38,6 +38,14 @@ class AllContextsPositionTest {
     }
 
     @Test
+    void foreignPresenceCountsAsDisplayed() {
+        ElementMatch match = ElementMatch.resolved("Loading");
+        ElementWrapper foreign = ElementWrapper.foreignPresence(driver, match);
+        assertTrue(foreign.foreignContext);
+        assertTrue(tools.dscode.common.composite.ElementOperations.displayed(foreign));
+    }
+
+    @Test
     void theThirdButtonMatchesSeleniumAndWrapsOnce() {
         ElementMatch match = ElementMatch.resolved("Button");
         match.elementPosition = "3";

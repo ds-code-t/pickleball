@@ -216,7 +216,11 @@ final class ElementReads {
     }
 
     static boolean displayed(WebElement element) {
+        if (element instanceof tools.dscode.common.seleniumextensions.ElementWrapper wrapper && wrapper.foreignContext) {
+            return true;
+        }
         WebElement raw = unwrap(element);
+        if (raw == null) return false;
         if (raw instanceof CompositeWebElement composite) return composite.isDisplayed();
         return raw.isDisplayed();
     }

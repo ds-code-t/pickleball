@@ -100,6 +100,26 @@ class NativeDynamicExecutionTest {
     }
 
     @Test
+    void oneElementCommaUntilSelectsABranchOnce() {
+        RunResult result = PickleballEngine.run("""
+                Feature: Until
+                  Scenario: One
+                    * , save "untouched" as "untilYes"
+                    * , save "untouched" as "untilNo"
+                    * , until "abc", save "yes" as "untilYes"
+                    * , until "", save "no" as "untilNo"
+                    * native read "untilYes"
+                    * native read "untilNo"
+                """, EngineOptions.of(ReadGlue.class));
+        assertEquals(Status.PASSED, result.status(), result.message());
+        List<String> returned = result.scenarios().getFirst().steps().stream()
+                .map(step -> step.returned() == null ? "" : step.returned())
+                .toList();
+        assertEquals("yes", returned.get(returned.size() - 2), result.toString());
+        assertEquals("untouched", returned.get(returned.size() - 1), result.toString());
+    }
+
+    @Test
     void blockConditionalSavesOnlyTheTakenBranch() {
         RunResult taken = PickleballEngine.run("""
                 Feature: If

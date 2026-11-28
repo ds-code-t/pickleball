@@ -14,6 +14,10 @@ public final class RecordedEntity {
     }
 
     public static void write(String value, String type, String id) {
+        if (!StoreExecution.openUntrackedRecord()) {
+            throw new IllegalStateException(
+                    "error: RECORD ENTITY needs a tracked step\nfix: set pkb_store_track=true");
+        }
         StoreRunContext.Frame frame = StoreRunContext.current();
         if (frame == null || frame.stepExecId() == null || frame.stepExecId().isBlank()) {
             throw new IllegalStateException(

@@ -605,8 +605,18 @@ public abstract class PhraseData extends PassedData {
             throw unknownWord();
         }
         List<PhraseData> body = commaBody();
-        tools.dscode.engine.runtime.StepWatchdog.markRepeating(true);
+        // A one-element until has no comparison word. It selects the comma
+        // branch once, the way if does, and does not spend the repeat cap.
+        boolean branchOnce = untilPhrase && !body.isEmpty()
+                && (operation == null || operation == AssertionOperations.TRUE);
+        tools.dscode.engine.runtime.StepWatchdog.markRepeating(!branchOnce);
         try {
+            if (branchOnce) {
+                if (untilCondition()) {
+                    runUntilBody(body);
+                }
+                return;
+            }
             while (true) {
                 String stop = untilCeilingMessage();
                 if (stop != null) {
@@ -615,14 +625,7 @@ public abstract class PhraseData extends PassedData {
                 if (!untilCondition()) {
                     break;
                 }
-                untilPasses++;
-                for (PhraseData part : body) {
-                    part.evaluationsResolved = false;
-                    if (part instanceof Phrase phrase) {
-                        phrase.executePhrase();
-                        phrase.resolveResults();
-                    }
-                }
+                runUntilBody(body);
             }
         } finally {
             tools.dscode.engine.runtime.StepWatchdog.markRepeating(false);
@@ -632,6 +635,17 @@ public abstract class PhraseData extends PassedData {
                 if (after != null) {
                     after.setPreviousPhrase(this);
                 }
+            }
+        }
+    }
+
+    private void runUntilBody(List<PhraseData> body) {
+        untilPasses++;
+        for (PhraseData part : body) {
+            part.evaluationsResolved = false;
+            if (part instanceof Phrase phrase) {
+                phrase.executePhrase();
+                phrase.resolveResults();
             }
         }
     }

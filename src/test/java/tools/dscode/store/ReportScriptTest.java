@@ -24,6 +24,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Report scripts name a head and step references. They do not embed screenshot bytes or cleartext secrets. */
@@ -180,6 +181,27 @@ class ReportScriptTest {
         assertTrue(page.contains("the card was declined"), page);
         assertFalse(page.contains("fixture-secret-r7"), page);
         assertTrue(page.contains("~MASK;"), page);
+    }
+
+    @Test
+    void recordEntityOpensAStepWhenTheSuiteDidNotTrack() throws Exception {
+        set("pkb_store", "true");
+        set("pkb_store_project", project.toAbsolutePath().normalize().toString());
+        System.clearProperty("pkb_store_track");
+        System.clearProperty("pkb_run_id");
+        StoreRunContext.clear();
+        ObjectRegistrationSteps.recordEntity("Ada", "Account", "ada");
+        assertTrue(payload("Account", "ada").contains("Ada"), payload("Account", "ada"));
+        assertFalse(StoreExecution.shouldTrack());
+        assertTrue(System.getProperty("pkb_run_id") == null || System.getProperty("pkb_run_id").isBlank());
+        StoreRunContext.clear();
+
+        set("pkb_store_track", "false");
+        StoreRunContext.clear();
+        IllegalStateException refused = assertThrows(
+                IllegalStateException.class,
+                () -> ObjectRegistrationSteps.recordEntity("Ada", "Account", "opt-out"));
+        assertTrue(refused.getMessage().contains("RECORD ENTITY needs a tracked step"), refused.getMessage());
     }
 
     @Test
