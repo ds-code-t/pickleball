@@ -27,6 +27,18 @@ Source: PKB-HCR run of 2026-11-28 on consumer `myq-release-testing`, Pickleball 
 | 17 | Desktop `--exe=notepad.exe` resolved against the project; `desktop type/close --id=<launch id>` said `session not found` in the next call | Fixed (best effort, not run on Windows): a bare name that is not a project file is looked up on `PATH`/`PATHEXT`; live desktop ids are kept in `<tmp>/domengine-desktop-sessions.properties` and re-attached by window name | `f5ff72a82` | `DesktopExeAndIdsTest` (3 run on the box; `notepadResolvesOnTheWindowsPath` Windows only) | PC: `domengine desktop launch --exe=notepad.exe --name=Notepad`, then `desktop type --id=<id> ...` and `desktop close --id=<id>` in separate calls |
 | 19 | `browser ports` printed `none` and `attach --discover` found nothing with a live `start` Chrome up | Fixed: both read the project's live-host file and its `/health` `cdp` (`<port> live-start`, candidate `live-start` first) | `fd51a7b55` | `BrowserPortsLiveStartTest` (2), `BrowserAttachTest.discoverListsTheProjectsLiveStartBrowserFirst` | PC: after `start`, `browser ports` and `attach --discover` |
 | 24 | Popup `alwaysOnTop.applied=false` (`SetWindowPos`, exit 1) | Fixed (best effort, not run on Windows): the PowerShell had embedded double quotes that Java does not escape on the Windows command line; now quote-free, waits up to 10 s for the main or a child process window, and names exit 2/3 | `50b7aa6be` | `PopupOnTopWindowsTest` (quote-free script run on the box; `theScriptRunsOnWindows` Windows only), `PopupOnTopTest` | PC: `popup-open`, reply `alwaysOnTop.applied=true` and the window stays on top |
+| 18 | `upload-request` event `ref` was `#files`, but `upload --ref=#files` failed `unknown target` | Fixed: `act`/`upload --ref` takes a CSS selector (`#`, `.`, `[`, or `css=`) when it is not a known short id | `4a2b25b10` | `HcrRoundFourTest.aCssSelectorIsAcceptedAsAnActRef`, `HcrLiveFixesTest.uploadTakesTheCssRefTheUploadRequestNames` | Headed: on an upload-request, `upload --ref=<event ref> --file=<path>` |
+
+## Owner decisions (Dan, 2026-11-28, t1239u)
+
+These were "owner decision" items in the HCR run; Dan approved all four on 2026-11-28.
+
+| # | Decision (2026-11-28) | Commit | Tests |
+|---|---|---|---|
+| OD1 (HCR-25) | Each `--human-override` writes one line (who, verb, time, reason) to the session event log `.pickleball/runs/<run-id>/agent/session-events.jsonl`; the composite log location (`<tmp>/pickleball-composite-logs/composite-YYYY-MM-DD.log`, `pkb_composite_log_dir`) is documented in `docs/dynamic-control-api.md` | `OD` | `HumanLockOverrideLogTest` (2) |
+| OD2 (HCR-28) | `start --run-id=X` names the live session X (`[A-Za-z0-9._-]{1,64}`, else exit 2); a `live<12 hex>` id is made only when none is given. `progress` reports `--session`, else the run id, else the live start id | `OD` | `OwnerDecisionsTest.startUsesTheGivenRunIdAndMakesOneOnlyWhenNoneIsGiven`, `.progressNamesTheRealSession`, `HcrLiveFixesTest.startHonorsTheRunId` |
+| OD3 | Read-only `doctor` skips the spine-session gate. This supersedes the 2026-11-26 exempt list for doctor only; `doctor --prune` (mutating) still needs a session | `OD` | `OwnerDecisionsTest.readOnlyDoctorSkipsTheSessionGateAndPruneDoesNot`, `SessionExemptTest`, `SessionRequiredTest` |
+| OD4 | `doctor --prune` removes only session records whose process is gone (live start host file and its consumer session file, worker bridge, legacy `cli-session.json`), prints `removed=` lines and `pruned=<n>`, never touches a record whose pid is alive; spine sessions carry no pid and are not pruned | `OD` | `OwnerDecisionsTest.pruneRemovesOnlyRecordsWhoseProcessIsGone`, `.pruneLeavesALiveHostAlone`, `GuidanceCommandGoldenTest` (help) |
 
 ## Not done (needs a redesign or a longer investigation)
 
@@ -36,12 +48,8 @@ Source: PKB-HCR run of 2026-11-28 on consumer `myq-release-testing`, Pickleball 
 | 12 offline emulation vs service worker | Needs emulation on worker targets. Only the `cleared` half is fixed. |
 | 13 short ids scoped per run id, foreign id gives no error | An error breaks existing wait-any unit tests that watch ids with no page; needs an id-scope design. |
 | 14 event streams tagged with the starter's run id | Run binding for streams, spill dirs and `downloads`: design work. |
-| 18 `upload --ref=#files` | Needs CSS-selector refs in the upload resolver; not a one-line change. |
 | 21, 22 H views miss agent surfaces; magnifier clone is clickable | View and exposure design. |
-| 25 no `human-lock override` log line | Needs a decision on where the line is logged. |
 | 26 covered button `visible=true`; act `bounds` 0,0,0,0 | Needs the visibility model reconciled between `snap` and `explain`. |
 | 27 `wake` fields on `chat-turn` and `watch` | Needs a reply-shape decision. |
-| 28 `start --run-id` ignored; `progress` shows `session:"session"` | The envelope shows `session` when no run id is set; changing run-id binding is a design change. |
-| `doctor` exempt from the spine-session gate; `live-stop` plus `doctor --prune` | Owner decision (2026-11-26 exempt list is fixed). |
 | Slowdowns (client JVM start, `pkb batch`, first-call idle, `start` 23 s) | A persistent or batch client is a redesign. |
 | Noise (triple errors, `recent`/`cursors` on every reply, `--compact`, `--limit` newest, `--fields` format, `eval failed` text, `main.db` size, relative `--dir`/`--exe`) | Cross-cutting reply-shape changes. |

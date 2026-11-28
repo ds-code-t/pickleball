@@ -141,7 +141,8 @@ Usage: discover-hint [--json]
 Tier: control.
 
 # help doctor
-Usage: doctor
+Usage: doctor [--prune]
+Read-only doctor needs no spine session. --prune removes only session records whose process is gone (live start host, worker bridge, cli-session), prints removed= lines and pruned=<n>, never touches a live record, and needs a session.
 Reports chrome, session, health, headed, pid, bridge, worker, lease, leaseLeft, orphans, frame, placed, and waits. chrome=present only while the recorded Chrome pid is alive. lease is open when leaseLeft is 0. live-stop clears the session. No session still exits 0. waits is how many blocking waits are off the command lane. A wait in progress stays health=ok. protocols= is the probed browser. protocols.start= labels that same probe. protocols.worker= labels the isolate worker when its pid is alive.
 Tier: human.
 

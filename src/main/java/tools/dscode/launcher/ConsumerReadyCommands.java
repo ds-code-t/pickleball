@@ -131,7 +131,12 @@ final class ConsumerReadyCommands {
             }
         }
         Map<String, String> env = env(parsed);
-        String id = "live" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+        // Owner decision 2026-11-28 (HCR-28): start --run-id=X names the live session X; an id is made only when none is given.
+        String id = liveId(parsed.coordination() == null ? null : parsed.coordination().runId());
+        if (id == null) {
+            err.print(WorkbenchCliHelp.usageError("start --run-id is letters, digits, dot, dash or underscore (1 to 64)", "start"));
+            return 2;
+        }
         String token = UUID.randomUUID().toString().replace("-", "");
         boolean headed = headed(parsed, browser);
         Path logFile = project.resolve(".pickleball").resolve("logs").resolve("live-browser.log");
@@ -413,6 +418,13 @@ final class ConsumerReadyCommands {
 
     static int doctor(WorkbenchCommandLine.Parsed parsed, java.io.PrintStream out, java.io.PrintStream err) {
         Path project = parsed.project();
+        String[] pruneTokens = parsed.forwarded();
+        if (pruneTokens != null && java.util.Arrays.asList(pruneTokens).contains("--prune")) {
+            List<String> removed = prune(project);
+            for (String line : removed) out.println("removed=" + line);
+            out.println("pruned=" + removed.size());
+            return 0;
+        }
         String chrome = tools.dscode.control.protocol.BrowserPresence.chromeUp(project) ? "present" : "absent";
         String session = sessionId(project);
         if (session == null || session.isBlank()) session = "absent";
@@ -983,6 +995,58 @@ final class ConsumerReadyCommands {
         Files.write(logFile, java.util.Arrays.copyOfRange(all, start, all.length));
     }
 
+    /**
+     * Owner decision, Dan 2026-11-28 (t1239u): {@code doctor --prune} removes only session records whose process is
+     * gone and returns what it removed. A record whose pid is alive is never touched; spine sessions carry no pid
+     * and are not pruned.
+     */
+    static List<String> prune(Path project) {
+        List<String> removed = new java.util.ArrayList<>();
+        Path root = project.toAbsolutePath().normalize();
+        Optional<LiveHostFile.Host> host = LiveHostFile.read(project);
+        Path session = sessionFile(project);
+        if (host.isPresent() && !alive(host.get().pid())) {
+            String why = " (live start host pid " + host.get().pid() + " gone)";
+            if (deleteRecord(LiveHostFile.file(project))) removed.add(relative(root, LiveHostFile.file(project)) + why);
+            if (deleteRecord(session)) removed.add(relative(root, session) + why);
+        } else if (host.isEmpty() && Files.isRegularFile(session)) {
+            if (deleteRecord(session)) removed.add(relative(root, session) + " (no live start host)");
+        }
+        Optional<LiveBridgeFile.Bridge> bridge = LiveBridgeFile.read(project);
+        if (bridge.isPresent() && !alive(bridge.get().pid())) {
+            Path file = LiveBridgeFile.file(project);
+            if (deleteRecord(file)) removed.add(relative(root, file) + " (worker pid " + bridge.get().pid() + " gone)");
+        }
+        Path legacy = project.resolve(".pickleball").resolve("workbench").resolve("cli-session.json");
+        long legacyPid = pidIn(legacy);
+        if (legacyPid > 0 && !alive(legacyPid) && deleteRecord(legacy)) {
+            removed.add(relative(root, legacy) + " (pid " + legacyPid + " gone)");
+        }
+        return removed;
+    }
+
+    private static long pidIn(Path file) {
+        if (!Files.isRegularFile(file)) return 0L;
+        try {
+            return JSON.readTree(file.toFile()).path("pid").asLong(0L);
+        } catch (IOException | RuntimeException failure) {
+            return 0L;
+        }
+    }
+
+    private static boolean deleteRecord(Path file) {
+        try {
+            return Files.deleteIfExists(file);
+        } catch (IOException failure) {
+            return false;
+        }
+    }
+
+    private static String relative(Path root, Path file) {
+        Path absolute = file.toAbsolutePath().normalize();
+        return (absolute.startsWith(root) ? root.relativize(absolute) : absolute).toString().replace('\\', '/');
+    }
+
     private static boolean alive(long pid) {
         return pid > 0 && ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false);
     }
@@ -1290,6 +1354,25 @@ final class ConsumerReadyCommands {
             return body == null ? Map.of() : body;
         } catch (IOException | RuntimeException failure) {
             return Map.of();
+        }
+    }
+
+    /** The run id given to start, or a generated {@code live<12 hex>} when none; null when the given id is unsafe. */
+    static String liveId(String runId) {
+        if (runId == null || runId.isBlank()) return "live" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+        String id = runId.trim();
+        return id.matches("[A-Za-z0-9._-]{1,64}") ? id : null;
+    }
+
+    /** The id of the live start session in {@code project}, or null. */
+    static String liveSessionId(Path project) {
+        try {
+            Path file = sessionFile(project);
+            if (!Files.isRegularFile(file)) return null;
+            String id = JSON.readTree(Files.readString(file, StandardCharsets.UTF_8)).path("id").asText("");
+            return id.isBlank() ? null : id;
+        } catch (IOException | RuntimeException failure) {
+            return null;
         }
     }
 

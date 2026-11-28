@@ -745,8 +745,9 @@ public final class WorkbenchAgentCommands {
 
     private static int progress(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
         try {
-            String session = flag(parsed, "--session");
             String runId = spineRunId(parsed);
+            String session = progressSession(flag(parsed, "--session"), runId,
+                    ConsumerReadyCommands.liveSessionId(parsed.project()));
             String agent = agentIdOf(parsed);
             Map<String, Object> card = tools.dscode.common.agentcontrol.ProgressCard.write(
                     parsed.project(), session, flag(parsed, "--pct"), flag(parsed, "--label"));
@@ -758,6 +759,14 @@ public final class WorkbenchAgentCommands {
             err.print(WorkbenchCliHelp.structured("progress failed: " + failure.getMessage(), "progress --pct=0"));
             return 1;
         }
+    }
+
+    /** Owner decision 2026-11-28 (HCR-28): progress names the real session: --session, the run id, then the live start id. */
+    static String progressSession(String flag, String runId, String liveId) {
+        if (flag != null && !flag.isBlank()) return flag.trim();
+        if (runId != null && !runId.isBlank() && !"session".equals(runId)) return runId.trim();
+        if (liveId != null && !liveId.isBlank()) return liveId.trim();
+        return "session";
     }
 
     private static String spineRunId(WorkbenchCommandLine.Parsed parsed) {

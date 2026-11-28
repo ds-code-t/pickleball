@@ -53,6 +53,30 @@ public final class HumanLock {
         return was;
     }
 
+    /** The session event log: one JSON line per event, in the run's agent store. */
+    public static Path eventLog(Path project, String runId) {
+        return AgentStore.root(project, runId).resolve("session-events.jsonl");
+    }
+
+    /**
+     * Owner decision 2026-11-28 (HCR-25): every {@code --human-override} writes one line (who, verb, time) to the
+     * session event log, whatever {@code pkb_composite_log} says.
+     */
+    static void logOverride(Path project, String runId, String verb, String by, String reason) {
+        try {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("at", AgentStore.now());
+            row.put("type", "human-lock-override");
+            row.put("session", key(runId));
+            row.put("by", by == null || by.isBlank() ? "owner" : by);
+            row.put("verb", verb);
+            row.put("reason", reason == null ? "" : reason);
+            AgentStore.appendCapped(eventLog(project, runId), JSON.writeValueAsString(row));
+        } catch (IOException failure) {
+            CompositeLog.info("human-lock", "override log skipped " + failure.getMessage());
+        }
+    }
+
     public static boolean locked(Path project, String runId) {
         return Files.isRegularFile(file(project, runId));
     }
@@ -83,6 +107,7 @@ public final class HumanLock {
                         + "fix: run it as the owner, or leave human mode with session-mode --human=off";
             }
             CompositeLog.info("human-lock", "override " + key(runId) + " " + verb + " reason=" + override.trim());
+            logOverride(project, runId, verb, caller, override.trim());
             return null;
         }
         String tier = VerbTiers.tier(verb);

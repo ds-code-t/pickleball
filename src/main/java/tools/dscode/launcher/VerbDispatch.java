@@ -34,7 +34,8 @@ import java.util.Set;
  * four run here after the gate. A bare {@code session} stays the forwarded controller launch.
  * Dan, 2026-11-26 ({@code prompts/build-3.0.0-spine-R6.md} phase P0): {@code engine help},
  * {@code domengine version}, family help, and plain {@code export-guidance} are exempt.
- * {@code export-guidance --warm} is not.</p>
+ * {@code export-guidance --warm} is not. Dan, 2026-11-28: read-only {@code doctor} is exempt too;
+ * {@code doctor --prune} is not.</p>
  */
 public final class VerbDispatch {
     /**
@@ -275,15 +276,33 @@ public final class VerbDispatch {
      * {@code spine session new}, or one exact key in {@link #SESSION_EXEMPT}.
      * {@code --warm} blocks the exemption so {@code export-guidance --warm} still needs a session.
      */
-    private static boolean sessionExempt(String[] argv) {
+    static boolean sessionExempt(String[] argv) {
         if (createsSession(argv)) return true;
         if (argv == null) return false;
+        if (readOnlyDoctor(argv)) return true;
         for (String token : argv) {
             if (token == null) continue;
             if ("--warm".equals(token) || token.startsWith("--warm=")) return false;
         }
         String key = exemptKey(argv);
         return key != null && SESSION_EXEMPT.contains(key);
+    }
+
+    /** Doctor flags that change files. They keep the session gate. */
+    static final Set<String> MUTATING_DOCTOR_FLAGS = Set.of("--prune");
+
+    /**
+     * Owner decision, Dan 2026-11-28 (t1239u, HCR): read-only {@code doctor} skips the session gate. This supersedes
+     * the 2026-11-26 exempt list for doctor only; {@code doctor --prune} (it deletes records) still needs a session.
+     */
+    static boolean readOnlyDoctor(String[] argv) {
+        if (argv.length == 0 || argv[0] == null || !"doctor".equals(argv[0].trim())) return false;
+        for (String token : argv) {
+            if (token == null) continue;
+            String flag = token.split("=", 2)[0];
+            if (MUTATING_DOCTOR_FLAGS.contains(flag)) return false;
+        }
+        return true;
     }
 
     /** Positionals joined, with {@code --help} or {@code -h} kept. Paths and other flags drop out. */
