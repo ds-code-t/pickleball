@@ -6273,15 +6273,19 @@ public final class TargetVerb {
         if (existing instanceof String text && !text.isBlank()) return;
         String frame = "";
         if (node != null && node.frameId != null && !node.frameId.isBlank() && !"main".equals(node.frameId)) frame = node.frameId;
-        if (frame.isBlank() && cdp != null) {
+        String main = "";
+        if (cdp != null) {
             try {
-                frame = mainFrameId(cdp);
+                main = mainFrameId(cdp);
             } catch (RuntimeException ignored) {
-                frame = "";
+                main = "";
             }
         }
+        if (frame.isBlank()) frame = main;
         if (!frame.isBlank()) body.put("frame", frame);
         else body.put("frame", "top");
+        // The main document is not an iframe: a recorder must not write `in the "<id>" IFrame,` for it.
+        if (frame.isBlank() || frame.equals(main)) body.put("frameTop", true);
     }
 
     private static void stampDesktop(Map<String, Object> body, DesktopTree.Session session) {

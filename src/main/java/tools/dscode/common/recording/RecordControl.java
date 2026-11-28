@@ -98,7 +98,9 @@ public final class RecordControl {
         row.put("surface", surface);
         if ("desktop".equals(surface)) row.put("window", InteractionLog.first(flags.get("target"), "desktop"));
         Object frame = body == null ? null : body.get("frame");
-        if (frame != null) row.put("frame", String.valueOf(frame));
+        boolean top = body != null && Boolean.TRUE.equals(body.get("frameTop"));
+        if (top || "live".equals(String.valueOf(frame))) row.put("frame", "top");
+        else if (frame != null) row.put("frame", String.valueOf(frame));
         InteractionLog.accept(project, row);
     }
 

@@ -360,7 +360,7 @@ public final class StepGenerator {
 
     private static String withFrame(Map<String, String> row, String text) {
         String frame = InteractionLog.first(row.get("frame"), "");
-        if (frame.isBlank() || "top".equalsIgnoreCase(frame) || "main".equalsIgnoreCase(frame)
+        if (frame.isBlank() || "top".equalsIgnoreCase(frame) || "main".equalsIgnoreCase(frame) || "live".equalsIgnoreCase(frame)
                 || "desktop".equalsIgnoreCase(frame) || "null".equals(frame)) {
             return text;
         }
@@ -424,10 +424,22 @@ public final class StepGenerator {
         String leftId = InteractionLog.first(left.get("id"), "");
         String rightId = InteractionLog.first(right.get("id"), "");
         if (!leftId.isBlank() && leftId.equals(rightId)) return true;
-        if (!leftId.isBlank() || !rightId.isBlank()) return false;
+        if (!leftId.isBlank() && !rightId.isBlank()) return false;
+        if (!sameFrame(left, right)) return false;
+        // An agent act row names the field by its query; the page row for the same typing carries the element id too.
         String a = InteractionLog.first(left.get("name"), left.get("target"));
         String b = InteractionLog.first(right.get("name"), right.get("target"));
         return !a.isBlank() && a.equals(b);
+    }
+
+    private static boolean sameFrame(Map<String, String> left, Map<String, String> right) {
+        return topFrame(left.get("frame")) && topFrame(right.get("frame"))
+                || InteractionLog.first(left.get("frame"), "").equals(InteractionLog.first(right.get("frame"), ""));
+    }
+
+    private static boolean topFrame(String frame) {
+        return frame == null || frame.isBlank() || "top".equalsIgnoreCase(frame) || "main".equalsIgnoreCase(frame)
+                || "live".equalsIgnoreCase(frame) || "null".equals(frame);
     }
 
     static String gherkin(List<String> steps) {

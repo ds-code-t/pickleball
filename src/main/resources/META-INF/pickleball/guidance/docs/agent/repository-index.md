@@ -1036,6 +1036,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/mappings/queries/TopLevelCollectionTest.java`
 - `src/test/java/tools/dscode/common/mappings/UndefinedDollarStepTest.java`
 - `src/test/java/tools/dscode/common/recording/CollaborativeRecordingTest.java`
+- `src/test/java/tools/dscode/common/recording/RecordedFrameStepsTest.java`
 - `src/test/java/tools/dscode/common/recording/RefinementTest.java`
 - `src/test/java/tools/dscode/common/recording/StepEditorTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/AgentDiscoverPlannerTest.java`
