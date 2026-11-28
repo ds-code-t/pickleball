@@ -177,10 +177,13 @@ class HumanTierTest {
         for (String allowed : VerbTiers.HUMAN_ACT_KINDS) {
             assertTrue(kinds.contains(allowed), allowed + " missing from " + kinds);
         }
-        assertTrue(kind.err.contains("unknown kind"), kind.err);
+        assertTrue(kind.err.contains("scroll passes this lock"), kind.err);
+        assertFalse(kind.err.contains("unknown kind"), kind.err);
         String act = help("act");
         assertTrue(act.contains("scroll"), act);
-        assertTrue(act.contains("unknown kind"), act);
+        assertTrue(act.contains("--dx") && act.contains("--dy"), act);
+        assertFalse(act.contains("unknown kind"), act);
+        assertFalse(act.contains("does not scroll the page"), act);
         String session = help("session-mode");
         assertTrue(session.contains("The owner is --agent"), session);
         assertTrue(session.contains("--human-override=<reason>"), session);

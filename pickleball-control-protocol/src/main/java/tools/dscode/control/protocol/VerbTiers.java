@@ -11,8 +11,7 @@ import java.util.TreeSet;
  * ({@code snap}, {@code find}, {@code screenshot}, {@code capture}, {@code explain}, {@code aria-snap}),
  * input a person could give ({@code act} click/type/press/hover/select/scroll through the lock, {@code wait},
  * {@code wait-for}, and coordinate {@code input}), read-only {@code chat-read}, {@code doctor}, and {@code help}.
- * {@code HUMAN_ACT_KINDS} includes {@code scroll}. The lock accepts it. The act body still reports
- * {@code unknown kind} for scroll and does not scroll the page. Everything else is {@code control}: DOM and JS,
+ * {@code HUMAN_ACT_KINDS} includes {@code scroll}. The lock accepts it, and {@code act --kind=scroll} scrolls the page or a named element. Everything else is {@code control}: DOM and JS,
  * injection, ui-apply, ask, guide, highlight, CDP, full maps, form-fill, attach and upload, navigate, start and stop.
  * Help, the inventory, and MCP descriptions read this class; a gate test fails when a verb has no tier.
  */

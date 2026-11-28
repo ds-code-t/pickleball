@@ -2669,6 +2669,8 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "mode");
         copyFlag(args, parsed, "mutate");
         copyFlag(args, parsed, "kind");
+        copyFlag(args, parsed, "dx");
+        copyFlag(args, parsed, "dy");
         copyFlag(args, parsed, "condition");
         copyFlag(args, parsed, "timeout");
         copyFlag(args, parsed, "answer");

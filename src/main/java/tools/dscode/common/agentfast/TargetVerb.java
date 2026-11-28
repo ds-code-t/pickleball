@@ -80,7 +80,8 @@ public final class TargetVerb {
     private static final Set<String> ACT_KEYS = Set.of(
             "target", "kind", "query", "ref", "value", "snap", "run-id", "agent", "agent-id",
             "fixture", "timeout", "condition", "frame", "group", "sequence",
-            "format", "fields", "where", "limit", "budget", "budget-ms", "pick", "session", "sessionId", "exposure", "purpose", "file", "human", "refind", "identity"
+            "format", "fields", "where", "limit", "budget", "budget-ms", "pick", "session", "sessionId", "exposure", "purpose", "file", "human", "refind", "identity",
+            "dx", "dy"
     );
 
     /** Time budget for the find or act that is running on this thread. */
@@ -844,12 +845,20 @@ public final class TargetVerb {
         String ref = blank(args.get("ref"));
         if (ref.isBlank() && "ref".equals(target.kind())) ref = target.raw();
         if (ref.isBlank() && SessionIds.expand(blank(args.get("query"))) != null) ref = blank(args.get("query"));
+        String actKind = blank(args.get("kind"));
+        if ("scroll".equals(actKind) && "desktop".equals(target.kind())) {
+            return desktopScrollUnsupported();
+        }
         if (ref.isBlank() && blank(args.get("query")).isBlank() && blank(args.get("identity")).isBlank()
                 && blank(args.get("purpose")).isBlank()) {
+            if ("scroll".equals(actKind)) return pageScroll(project, runId, target, args);
             return fail("act", "act requires --query or --ref");
         }
         Hit hit = ref.isBlank() ? null : requireHit(ref);
-        if (hit != null && "desktop".equals(hit.kind)) return actDesktop(project, runId, hit, args);
+        if (hit != null && "desktop".equals(hit.kind)) {
+            if ("scroll".equals(actKind)) return desktopScrollUnsupported();
+            return actDesktop(project, runId, hit, args);
+        }
         if ("desktop".equals(target.kind())) return actDesktop(project, runId, target, args);
         Held page = openBrowser(hit == null ? target : browserOf(hit, target));
         try {
@@ -1017,6 +1026,7 @@ public final class TargetVerb {
                 putShadow(body, node);
                 putMask(body, mask);
                 putReadBack(body, node, true, args);
+                putScrollReadBack(body, args);
                 return ok(body);
             }
             if (effect.quiet()) {
@@ -1054,6 +1064,7 @@ public final class TargetVerb {
                 putShadow(body, node);
                 putMask(body, mask);
                 putReadBack(body, node, true, args);
+                putScrollReadBack(body, args);
                 return ok(body);
             }
             if (!effect.applied()) {
@@ -1090,6 +1101,7 @@ public final class TargetVerb {
             putShadow(body, node);
             putMask(body, mask);
             putReadBack(body, node, true, args);
+            putScrollReadBack(body, args);
             return ok(body);
         } finally {
             page.release();
@@ -1445,6 +1457,7 @@ public final class TargetVerb {
         List<String> autoBefore = wantAuto ? compactDesktop(session, runId) : List.of();
         Outcome refused = foregroundRefusal(session);
         if (refused != null) return refused;
+        if ("scroll".equals(blank(args.get("kind")))) return desktopScrollUnsupported();
         boolean live = desktopAct(session, node, args);
         DesktopTree.Session after = DesktopTree.open(session.id());
         if (after == null) after = session;
@@ -1489,6 +1502,7 @@ public final class TargetVerb {
         List<SnapRow> rowsBefore = desktopRows(session);
         boolean wantAuto = "auto".equals(blank(args.get("snap")));
         List<String> autoBefore = wantAuto ? compactDesktop(session, runId) : List.of();
+        if ("scroll".equals(blank(args.get("kind")))) return desktopScrollUnsupported();
         boolean live = desktopAct(session, node, args);
         DesktopTree.Session after = DesktopTree.open(session.id());
         if (after == null) after = session;
@@ -1519,6 +1533,7 @@ public final class TargetVerb {
         switch (kind) {
             case "type" -> DesktopTree.type(session.id(), flagsWithNode(session, node, flags));
             case "click", "hover", "press", "select" -> DesktopTree.click(session, node);
+            case "scroll" -> throw new Miss("act --kind=scroll is not supported on desktop");
             default -> throw new Miss("unknown kind " + kind);
         }
         if (!session.live()) return false;
@@ -2355,6 +2370,7 @@ public final class TargetVerb {
             case "press" -> "key";
             case "select" -> "click";
             case "click" -> "click";
+            case "scroll" -> "scroll";
             default -> throw new Miss("unknown kind " + kind);
         };
         Map<String, String> flags = new LinkedHashMap<>();
@@ -2379,6 +2395,9 @@ public final class TargetVerb {
         // A collapsed panel still has a composer node. Typing or selecting it must not report applied.
         if (("type".equals(kind) || "select".equals(kind)) && controlHidden(control)) {
             return Effect.refused(inputOff ? "js" : "cdp", "hidden: the control is inside a collapsed or hidden container");
+        }
+        if ("scroll".equals(kind)) {
+            return scrollNode(project, runId, session, node, args, inputOff);
         }
         String framed = cdpSessionOf(node);
         if ("click".equals(kind)) {
@@ -2447,6 +2466,173 @@ public final class TargetVerb {
         }
     }
 
+
+    private static final ThreadLocal<Map<String, Object>> LAST_SCROLL = new ThreadLocal<>();
+
+    private static Outcome desktopScrollUnsupported() {
+        Outcome failed = fail("act", "act --kind=scroll is not supported on desktop");
+        failed.body().put("fix", "scroll a browser page; desktop backends do not implement scroll");
+        return failed;
+    }
+
+    private static double parseDelta(Map<String, String> args, String key) {
+        String raw = blank(args.get(key));
+        if (raw.isBlank()) return 0;
+        try {
+            return Double.parseDouble(raw.trim());
+        } catch (NumberFormatException bad) {
+            throw new Miss("act --" + key + " must be a number");
+        }
+    }
+
+    private static JsonNode evaluateValue(CdpConnection cdp, String sessionId, String expression) {
+        ObjectNode params = Jsons.object();
+        params.put("expression", expression);
+        params.put("returnByValue", true);
+        JsonNode value = sessionId == null || sessionId.isBlank()
+                ? cdp.call("Runtime.evaluate", params, Duration.ofSeconds(5))
+                : cdp.call("Runtime.evaluate", params, sessionId, Duration.ofSeconds(5));
+        if (value.has("exceptionDetails")) return Jsons.object();
+        return value.path("result").path("value");
+    }
+
+    private static JsonNode readWindowScroll(CdpConnection cdp, String sessionId) {
+        JsonNode value = evaluateValue(cdp, sessionId,
+                "(function(){return {scrollX:window.scrollX||0,scrollY:window.scrollY||0,innerHeight:window.innerHeight||0};})()");
+        return value == null || value.isMissingNode() || value.isNull() ? Jsons.object() : value;
+    }
+
+    private static void rememberScroll(double dx, double dy, boolean intoView, JsonNode window, DomNode node, CdpConnection cdp, String sessionId) {
+        Map<String, Object> report = new LinkedHashMap<>();
+        report.put("dx", dx);
+        report.put("dy", dy);
+        report.put("into_view", intoView);
+        if (window != null) {
+            report.put("scrollX", window.path("scrollX").asDouble(0));
+            report.put("scrollY", window.path("scrollY").asDouble(0));
+        }
+        if (node != null) {
+            String raw = callOnNode(cdp, sessionId == null ? "" : sessionId, node,
+                    "function(){return JSON.stringify({scrollLeft:this.scrollLeft||0,scrollTop:this.scrollTop||0});}");
+            if (raw != null && !raw.isBlank()) {
+                try {
+                    JsonNode el = Jsons.MAPPER.readTree(raw);
+                    report.put("scrollLeft", el.path("scrollLeft").asDouble(0));
+                    report.put("scrollTop", el.path("scrollTop").asDouble(0));
+                } catch (Exception ignored) {
+                    // Window positions are already on the report.
+                }
+            }
+        }
+        LAST_SCROLL.set(report);
+    }
+
+    private static void putScrollReadBack(Map<String, Object> body, Map<String, String> args) {
+        if (body == null || !"scroll".equals(blank(args == null ? null : args.get("kind")))) {
+            LAST_SCROLL.remove();
+            return;
+        }
+        Map<String, Object> report = LAST_SCROLL.get();
+        LAST_SCROLL.remove();
+        if (report != null) body.putAll(report);
+    }
+
+    /** Page-level scroll when {@code act --kind=scroll} has no query or ref. */
+    private static Outcome pageScroll(Path project, String runId, TargetSelector.Parsed target, Map<String, String> args) {
+        LAST_SCROLL.remove();
+        Held page = openBrowser(resolved(target, args));
+        try {
+            CdpConnection cdp = page.session.connection();
+            JsonNode before = readWindowScroll(cdp, "");
+            boolean dxPresent = !blank(args.get("dx")).isBlank();
+            boolean dyPresent = !blank(args.get("dy")).isBlank();
+            double dx = dxPresent ? parseDelta(args, "dx") : 0;
+            double dy;
+            if (!dxPresent && !dyPresent) {
+                dy = before.path("innerHeight").asDouble(0);
+                if (dy <= 0) dy = 400;
+            } else {
+                dy = dyPresent ? parseDelta(args, "dy") : 0;
+            }
+            evaluateValue(cdp, "", "window.scrollBy(" + dx + "," + dy + "); true");
+            JsonNode after = readWindowScroll(cdp, "");
+            rememberScroll(dx, dy, false, after, null, cdp, "");
+            Map<String, Object> body = base("act", "cdp", "browser", target);
+            body.put("applied", true);
+            body.put("kind", "scroll");
+            body.put("docVersion", docVersion(cdp));
+            stamp(body, cdp, null);
+            putEntered(body, runId, cdp);
+            putScrollReadBack(body, args);
+            return ok(body);
+        } finally {
+            page.release();
+        }
+    }
+
+    /**
+     * Scrolls {@code node} into view, then wheels by {@code --dx}/{@code --dy} when a delta is set.
+     * Absent deltas stay 0, which is the engine into-view-only path.
+     */
+    private static Effect scrollNode(
+            Path project,
+            String runId,
+            BrowserSession session,
+            DomNode node,
+            Map<String, String> args,
+            boolean inputOff
+    ) {
+        CdpConnection cdp = session.connection();
+        String framed = cdpSessionOf(node);
+        double dx = parseDelta(args, "dx");
+        double dy = parseDelta(args, "dy");
+        if (inputOff) {
+            FallbackLog.note(project, runId, "act", "cdp", "js", "cdp input disabled");
+            return jsScroll(cdp, framed, node, dx, dy);
+        }
+        try {
+            if (framed.isBlank()) {
+                Map<String, String> flags = new LinkedHashMap<>();
+                flags.put("node-id", Long.toString(node.backendNodeId));
+                flags.put("dx", "0");
+                flags.put("dy", "0");
+                PageActions.act(session, "scroll", flags);
+                if (dx != 0 || dy != 0) {
+                    flags.put("dx", Double.toString(dx));
+                    flags.put("dy", Double.toString(dy));
+                    PageActions.act(session, "scroll", flags);
+                }
+            } else {
+                jsScroll(cdp, framed, node, dx, dy);
+            }
+            rememberScroll(dx, dy, true, readWindowScroll(cdp, framed), node, cdp, framed);
+            return Effect.changed("cdp");
+        } catch (CdpException failure) {
+            String message = failure.getMessage() == null ? "" : failure.getMessage();
+            FallbackLog.note(project, runId, "act", "cdp", "js", message.isBlank() ? "cdp input disabled" : message);
+            Effect js = jsScroll(cdp, framed, node, dx, dy);
+            rememberScroll(dx, dy, true, readWindowScroll(cdp, framed), node, cdp, framed);
+            return js;
+        }
+    }
+
+    private static Effect jsScroll(CdpConnection cdp, String sessionId, DomNode node, double dx, double dy) {
+        String script = "function(){"
+                + "this.scrollIntoView({block:'nearest',inline:'nearest'});"
+                + "var dx=" + dx + ",dy=" + dy + ";"
+                + "if(dx||dy){"
+                + "var overflow=(getComputedStyle(this).overflow+' '+getComputedStyle(this).overflowY+' '+getComputedStyle(this).overflowX);"
+                + "if((this.scrollHeight>this.clientHeight||this.scrollWidth>this.clientWidth)&&/auto|scroll/.test(overflow)) this.scrollBy(dx,dy);"
+                + "else window.scrollBy(dx,dy);"
+                + "}"
+                + "return JSON.stringify({scrollX:window.scrollX||0,scrollY:window.scrollY||0,scrollLeft:this.scrollLeft||0,scrollTop:this.scrollTop||0});"
+                + "}";
+        String read = callOnNode(cdp, sessionId == null ? "" : sessionId, node, script);
+        if (read == null) return Effect.refused("js", "detached");
+        rememberScroll(dx, dy, true, readWindowScroll(cdp, sessionId), node, cdp, sessionId);
+        return Effect.changed("js");
+    }
+
     /** One click on a same-origin frame node. Coordinates from that document miss the parent viewport. */
     private static Effect clickInPlace(CdpConnection cdp, DomNode node) {
         String before = pageMark(cdp);
@@ -2485,13 +2671,14 @@ public final class TargetVerb {
                     + " this.dispatchEvent(new MouseEvent('mouseenter',{bubbles:true}));"
                     + " this.dispatchEvent(new MouseEvent('mousemove',{bubbles:true})); return true; }";
             case "click", "press" -> "function(){ this.click(); return true; }";
+            case "scroll" -> "function(){ this.scrollIntoView({block:'nearest',inline:'nearest'}); return true; }";
             default -> "";
         };
         if (script.isBlank()) return new Effect("cdp", false);
         String read = callOnNode(cdp, sessionId, node, script);
         if (read == null) return "click".equals(kind) ? Effect.refused("cdp", "detached") : new Effect("cdp", false);
         if ("type".equals(kind) || "select".equals(kind)) return new Effect("cdp", valueMatches(value, read));
-        if ("hover".equals(kind)) return Effect.changed("cdp");
+        if ("hover".equals(kind) || "scroll".equals(kind)) return Effect.changed("cdp");
         if ("click".equals(kind)) {
             return clickReadBack(signature, nodeSignature(cdp, sessionId, node), clickSettled(cdp, sessionId, before, "cdp"));
         }
@@ -2731,6 +2918,9 @@ public final class TargetVerb {
                 + " el.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));"
                 + " el.dispatchEvent(new MouseEvent('mouseenter',{bubbles:true}));"
                 + " el.dispatchEvent(new MouseEvent('mousemove',{bubbles:true})); return {ok:true}; }"
+                + "if(kind==='scroll'){ el.scrollIntoView({block:'nearest',inline:'nearest'});"
+                + " return {ok:true,scrollX:window.scrollX||0,scrollY:window.scrollY||0,"
+                + "scrollLeft:el.scrollLeft||0,scrollTop:el.scrollTop||0}; }"
                 + "el.click(); return {ok:true};"
                 + "})()";
         ObjectNode params = Jsons.object();
@@ -2746,7 +2936,7 @@ public final class TargetVerb {
             return new Effect("js", valueMatches(value, read));
         }
         if ("click".equals(kind)) return clickReadBack(signature, nodeSignature(cdp, "", node), clickSettled(cdp, "", before, "js"));
-        if ("hover".equals(kind)) return Effect.changed("js");
+        if ("hover".equals(kind) || "scroll".equals(kind)) return Effect.changed("js");
         return new Effect("js", !before.equals(pageMark(cdp)));
     }
 

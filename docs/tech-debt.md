@@ -111,9 +111,12 @@ Open items from the 3.0.0-spine final regression on Dan's Windows PC, recorded a
 
 A new environmental failure from a later regression goes under this section.
 
+## act --kind=scroll (closed, 3.0.0-spine-act-scroll)
+
+`act --kind=scroll` maps to the dom-engine `scroll` verb. With `--query` or `--ref` the node is scrolled into view, then wheeled by `--dx`/`--dy` when a delta is set (omitted deltas are 0, into-view only). Without a target the page scrolls by `--dx`/`--dy`; when both are omitted, `dy` is one viewport height. The reply reports `dx`, `dy`, `into_view`, `scrollX`, and `scrollY` (and `scrollLeft`/`scrollTop` for an element). Desktop scroll is not supported and returns an error with a fix; it is not `unknown kind`. Human Mode allows the kind. This closes the leftover from the doc-gaps branch.
+
 ## Doc and help gaps (2026-11-27)
 
 Closed on `3.0.0-spine-doc-gaps`. Help, `VerbTiers`, and `HumanLock` now name the same 13 human verbs. Popup usage, the `ws-route` rules shape, `@file` on `ask --say`, `html-insert --text`, and `cdp --params`, the `--agent` lock owner, and the catalog unclear notes listed in the build prompt are documented from the code that implements them.
 
-- `act --kind=scroll` passes `HumanLock` and `help act` lists it. `TargetVerb` still reports `unknown kind` and does not scroll the page. That is not a pass. Do not implement it on this branch.
 - `start` no longer forwards a Maven classworlds-only `java.class.path` to `LiveBrowserHost`. The 2026-11-23 `ClassNotFoundException` was that old path. The chooser is `ConsumerReadyCommands.hostClasspath`.
