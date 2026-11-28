@@ -2,6 +2,7 @@ package tools.dscode.coredefinitions;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.cucumber.core.runner.CurrentScenarioState;
 import io.cucumber.core.runner.StepExtension;
 import io.cucumber.core.stepexpression.DocStringBuilder;
 import io.cucumber.java.en.Given;
@@ -305,7 +306,26 @@ public class ObjectRegistrationSteps {
 
     @Given("^RECORD ENTITY: \"([^\"]*)\" as ([A-Za-z][A-Za-z0-9]*)#([A-Za-z0-9._-]+)$")
     public static void recordEntity(String value, String type, String id) {
-        tools.dscode.store.RecordedEntity.write(value, type, id);
+        CurrentScenarioState state = CurrentScenarioState.currentScenarioState.get();
+        String scenario = "";
+        String uri = "";
+        int line = 0;
+        String step = "RECORD ENTITY";
+        if (state != null) {
+            scenario = state.scenarioName == null ? "" : state.scenarioName;
+            uri = state.trackedUri();
+            line = state.trackedLine();
+            StepExtension running = getRunningStep();
+            if (running != null && running.getStepText() != null && !running.getStepText().isBlank()) {
+                step = running.getStepText();
+            }
+        }
+        tools.dscode.store.StoreExecution.prepareRecord(scenario, uri, line, step);
+        try {
+            tools.dscode.store.RecordedEntity.write(value, type, id);
+        } finally {
+            tools.dscode.store.StoreExecution.clearRecordHint();
+        }
         try {
             tools.dscode.Values.saveValue("recordedAccount", type + "#" + id);
         } catch (RuntimeException ignored) {

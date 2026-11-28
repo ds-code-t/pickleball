@@ -177,6 +177,18 @@ public class CurrentScenarioState extends ScenarioMapping {
         this.featureName = featureName == null ? "" : featureName;
     }
 
+    /** Uri of the running pickle, or blank when this state has no pickle. */
+    public String trackedUri() {
+        if (pickle == null || pickle.getUri() == null) return "";
+        return pickle.getUri().toString();
+    }
+
+    /** Line of the running pickle, or 0 when this state has no pickle. */
+    public int trackedLine() {
+        if (pickle == null || pickle.getLocation() == null) return 0;
+        return pickle.getLocation().getLine();
+    }
+
 
     public static CachingGlue getGlue() {
         if (getCurrentScenarioState() == null) return null;

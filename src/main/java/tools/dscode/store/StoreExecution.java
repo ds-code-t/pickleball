@@ -171,6 +171,25 @@ public final class StoreExecution {
         }
     }
 
+    private static final ThreadLocal<String[]> RECORD_HINT = new ThreadLocal<>();
+
+    /**
+     * Scenario text for the next {@link #openUntrackedRecord()}. The store does not read the runner.
+     */
+    public static void prepareRecord(String scenario, String uri, int line, String stepText) {
+        RECORD_HINT.set(new String[] {
+                scenario == null ? "" : scenario,
+                uri == null ? "" : uri,
+                Integer.toString(line),
+                stepText == null || stepText.isBlank() ? "RECORD ENTITY" : stepText
+        });
+    }
+
+    /** Drops the hint from {@link #prepareRecord}. */
+    public static void clearRecordHint() {
+        RECORD_HINT.remove();
+    }
+
     /**
      * Opens a step for {@code RECORD ENTITY} when this process is not already tracking.
      * Store off, and an explicit false {@code pkb_store_track}, leave the frame unset.
@@ -191,19 +210,18 @@ public final class StoreExecution {
         String previousTrack = System.getProperty("pkb_store_track");
         boolean restoreRun = previousRun == null || previousRun.isBlank();
         boolean restoreTrack = previousTrack == null || previousTrack.isBlank();
-        io.cucumber.core.runner.CurrentScenarioState state =
-                io.cucumber.core.runner.CurrentScenarioState.currentScenarioState.get();
-        String scenario = state == null || state.scenarioName == null ? "" : state.scenarioName;
-        String uri = "";
+        String[] hint = RECORD_HINT.get();
+        String scenario = hint == null || hint[0] == null ? "" : hint[0];
+        String uri = hint == null || hint[1] == null ? "" : hint[1];
         int line = 0;
-        if (state != null && state.pickle != null) {
-            if (state.pickle.getUri() != null) uri = state.pickle.getUri().toString();
-            if (state.pickle.getLocation() != null) line = state.pickle.getLocation().getLine();
+        if (hint != null && hint[2] != null) {
+            try {
+                line = Integer.parseInt(hint[2]);
+            } catch (NumberFormatException ignored) {
+                line = 0;
+            }
         }
-        String stepText = "RECORD ENTITY";
-        if (state != null && state.getCurrentStep() != null && state.getCurrentStep().getStepText() != null) {
-            stepText = state.getCurrentStep().getStepText();
-        }
+        String stepText = hint == null || hint[3] == null || hint[3].isBlank() ? "RECORD ENTITY" : hint[3];
         try {
             if (restoreTrack) System.setProperty("pkb_store_track", "true");
             beforeStep(null, scenario, uri, line, stepText, 0);
