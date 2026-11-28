@@ -2,6 +2,8 @@
 
 Source: PKB-HCR run of 2026-11-28 on consumer `myq-release-testing`, Pickleball `199a3576`, Windows, headed Chrome (40 pass, 27 fail, 6 partial, 2 not run). Branch `3.0.0-hcr-fixes` off `3.0.0-spine`. Fixed directly on the box without Grok sessions, highest impact first. Each fix has a test that failed before the fix and passes after it. Box runs are Linux headless Chrome; the Windows and headed check is listed per row.
 
+Round of 2026-11-28 (05:05–05:50 MST): items 10, 16, 20, 23, 17, 19, 24, 18, 12, 13 (slice), 27, 9 (slice), 26 (bounds), 14 (slice), 22 (copy) and the four owner decisions; `3.0.0-spine` fast-forwarded to this branch at the end of the round. Tests marked "not run on the box" are live or Windows-only and are in the combined Windows command.
+
 | Item | Report bug | Status | Commit | Tests (fail before, pass after) | Windows/headed check |
 |---|---|---|---|---|---|
 | PMR-11 | Parallel isolation | Done | `37f0b5c95` | `:testLive` now 70 classes; `:dom-engine:testLive` runs `ActionSmokeTest`, `LiveChromeObserveEventsTest`, `premap.PreMapStalenessTest` at one fork | Short tier at 24 forks |
@@ -34,7 +36,7 @@ Source: PKB-HCR run of 2026-11-28 on consumer `myq-release-testing`, Pickleball 
 | 9 | `ask-answer --id` on a visible page card failed; `ask --type` never rendered | Partly fixed (non-breaking slice): `ask-answer` answers a page card like a click (answer event, wake, card closes; any run id may answer; unlisted option exits 2), and `ask --type` also shows the card when a page is live (`shown`). Two stores remain | `ef9bfbaee` | `AskAnswerPageCardTest` (2), `HcrLiveFixesTest.askAnswerAnswersAPageCardAndTypedAsksRender` (not run on the box) | Headed: A `ask --say --choices=Yes,No --id=q1`, H `ask-answer --id=q1 --value=Yes`, A `answer-wait --id=q1` returns Yes and the card closes |
 | 26 | `act` replies always reported `bounds` 0,0,0,0 | Partly fixed (bounds half): when the target came without a box the reply reads its live `getBoundingClientRect` | `196d21ce1` | `HcrRoundFourTest.aLiveBoxFillsTheActReplyBounds`, `HcrLiveFixesTest.actReplyBoundsAreTheLiveBox` (not run on the box), `ActHonestyTest` | Headed: `act --ref=<button> --kind=hover`, `element.bounds` has a size |
 | 14 | Streams started by A spilled under `runs/helper`; `perf --report --run-id=agent` found nothing; `downloads` dir under `runs/helper` | Partly fixed (non-breaking slice): the CLI sends the caller's run id to the event host, so the default `downloads` dir follows the caller; `perf --report` falls back to the host's run spill and says so (`spillRun`, `note`). Rows keep the host's `run` tag | `cb386be85` | `CallerRunTest`, `PerfReportHostRunTest` (2) | PC: H `start`, A `--run-id=agent` `downloads --deny` dir is `runs/agent/downloads`; A `perf --report --run-id=agent` returns `spillRun` |
-| 22 | Magnifier copy made `act --query=Go` ambiguous | Partly fixed (copy half): a hit inside a `data-pkb-copy` (the inert magnifier clone) is dropped when a real hit exists | `PENDING22` | `HcrRoundFourTest.theMagnifierCopyIsNotASecondTarget`, `ConsumerFixesP3ViewTest` | Headed: `magnifier` on Go, H `act --query=Go` clicks the page Go |
+| 22 | Magnifier copy made `act --query=Go` ambiguous | Partly fixed (copy half): a hit inside a `data-pkb-copy` (the inert magnifier clone) is dropped when a real hit exists | `b1fc63178` | `HcrRoundFourTest.theMagnifierCopyIsNotASecondTarget`, `ConsumerFixesP3ViewTest` | Headed: `magnifier` on Go, H `act --query=Go` clicks the page Go |
 
 ## Owner decisions (Dan, 2026-11-28, t1239u)
 
