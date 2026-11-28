@@ -1,11 +1,15 @@
 package tools.dscode.engine;
 
 import java.io.IOException;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Toggleable, per-capability, per-entity, date-stamped, size-capped engine log.
@@ -18,6 +22,8 @@ import java.util.Arrays;
  */
 public final class EngineLog {
     public static final int DEFAULT_MAX_BYTES = 1_048_576;
+    /** Same-JVM gate. FileChannel.lock throws if this JVM already holds the region. */
+    private static final ConcurrentHashMap<Path, Object> GATES = new ConcurrentHashMap<>();
 
     private EngineLog() {
     }
@@ -61,23 +67,31 @@ public final class EngineLog {
         String who = entity == null || entity.isBlank() ? "-" : entity;
         String line = Instant.now() + " " + capability + " " + who + " " + (message == null ? "" : message) + "\n";
         Path file = project.resolve(".pickleball").resolve("engine").resolve("engine.log");
-        try {
-            Files.createDirectories(file.getParent());
-            byte[] existing = Files.isRegularFile(file) ? Files.readAllBytes(file) : new byte[0];
-            byte[] addition = line.getBytes(StandardCharsets.UTF_8);
-            byte[] combined = Arrays.copyOf(existing, existing.length + addition.length);
-            System.arraycopy(addition, 0, combined, existing.length, addition.length);
-            int max = maxBytes();
-            if (combined.length > max) {
-                int start = combined.length - max;
-                int newline = start;
-                while (newline < combined.length && combined[newline] != '\n') newline++;
-                if (newline < combined.length - 1) start = newline + 1;
-                combined = Arrays.copyOfRange(combined, start, combined.length);
+        Object gate = GATES.computeIfAbsent(file.toAbsolutePath().normalize(), ignored -> new Object());
+        synchronized (gate) {
+            try {
+                Files.createDirectories(file.getParent());
+                // One lock per log so two test workers appending the same file cannot drop a line.
+                Path lockFile = file.resolveSibling("engine.log.lock");
+                try (FileChannel channel = FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+                     FileLock ignored = channel.lock()) {
+                    byte[] existing = Files.isRegularFile(file) ? Files.readAllBytes(file) : new byte[0];
+                    byte[] addition = line.getBytes(StandardCharsets.UTF_8);
+                    byte[] combined = Arrays.copyOf(existing, existing.length + addition.length);
+                    System.arraycopy(addition, 0, combined, existing.length, addition.length);
+                    int max = maxBytes();
+                    if (combined.length > max) {
+                        int start = combined.length - max;
+                        int newline = start;
+                        while (newline < combined.length && combined[newline] != '\n') newline++;
+                        if (newline < combined.length - 1) start = newline + 1;
+                        combined = Arrays.copyOfRange(combined, start, combined.length);
+                    }
+                    Files.write(file, combined);
+                }
+            } catch (IOException ignored) {
+                // Logging must not fail a run.
             }
-            Files.write(file, combined);
-        } catch (IOException ignored) {
-            // Logging must not fail a run.
         }
     }
 

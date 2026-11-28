@@ -1130,20 +1130,47 @@ tasks.test {
     def workbenchClasses = rootProject.project(':pickleball-workbench').layout.buildDirectory.dir('classes/java/main')
     dependsOn ':pickleball-workbench:classes'
     classpath = files(wovenExpanded, controlApiClasses, sourceSets.consumerGlue.output, workbenchClasses) + classpath + files(consumerResources)
+    // SuiteDualRunTest binds port 8765, links src/test/resources/calls, and
+    // hydrates this repo's store. It runs in :testSerial after this task.
+    exclude '**/SuiteDualRunTest.class'
 }
 
-// One test worker, a bounded heap, and a capped console so a full dual-run
-// fits beside the Gradle JVM. maxHeapSize is a ceiling; smaller tests do not
-// reserve it. CI runs the same tasks and has room for this ceiling.
+// -Ppkb.test.forks sets maxParallelForks on every Test task. Default 1 so CI
+// stays one worker. The ceiling stays high enough for SuiteDualRunTest and
+// live Chrome. minHeapSize is what a light worker reserves. SerialGC plus the
+// free-ratio flags return heap a light class does not need. Code cache
+// reservation is 32m so 80 forks fit in 64 GB beside the 768m Gradle JVM.
+def pkbTestForksRaw = findProperty('pkb.test.forks')
+int pkbTestForks
+if (pkbTestForksRaw == null || pkbTestForksRaw.toString().trim().isEmpty()) {
+    pkbTestForks = 1
+} else {
+    try {
+        pkbTestForks = Integer.parseInt(pkbTestForksRaw.toString().trim())
+    } catch (NumberFormatException ignored) {
+        throw new GradleException("pkb.test.forks must be an integer, was '${pkbTestForksRaw}'")
+    }
+    if (pkbTestForks < 1) {
+        throw new GradleException("pkb.test.forks must be >= 1, was ${pkbTestForks}")
+    }
+}
+
 allprojects {
     tasks.withType(Test).configureEach { task ->
-        task.maxParallelForks = 1
-        task.maxHeapSize = '1536m'
-        task.minHeapSize = '128m'
+        task.maxParallelForks = pkbTestForks
+        task.minHeapSize = '64m'
+        def heavyModule = task.project.path == ':' || task.project.path == ':dom-engine'
+        task.maxHeapSize = heavyModule ? '1536m' : '768m'
+        task.systemProperty('pkb.test.forks', Integer.toString(pkbTestForks))
+        task.systemProperty('pkb.test.maxHeap', task.maxHeapSize)
+        def lockDir = task.project.layout.buildDirectory.dir('pkb-test-locks')
+        task.systemProperty('pkb.test.lockDir', lockDir.get().asFile.absolutePath)
         task.jvmArgs(
                 '-XX:+UseSerialGC',
+                '-XX:MinHeapFreeRatio=10',
+                '-XX:MaxHeapFreeRatio=20',
                 '-XX:MaxMetaspaceSize=384m',
-                '-XX:ReservedCodeCacheSize=64m',
+                '-XX:ReservedCodeCacheSize=32m',
                 '-Xss384k',
                 '-XX:MaxDirectMemorySize=64m',
                 '-Dpkb.test.console.cap=on',
@@ -1160,8 +1187,92 @@ allprojects {
         task.systemProperty('pkb.test.console.dir', consoleDir.get().asFile.absolutePath)
         task.doFirst {
             consoleDir.get().asFile.mkdirs()
+            logger.lifecycle("pkb.test.forks ${task.path} maxParallelForks=${task.maxParallelForks} maxHeap=${task.maxHeapSize} minHeap=${task.minHeapSize}")
         }
     }
+}
+
+// Last writer: a module Test block must not pin maxParallelForks back to 1.
+gradle.projectsEvaluated {
+    allprojects { project ->
+        project.tasks.withType(Test).configureEach { task ->
+            task.maxParallelForks = pkbTestForks
+            task.minHeapSize = '64m'
+            def heavyModule = task.project.path == ':' || task.project.path == ':dom-engine'
+            task.maxHeapSize = heavyModule ? '1536m' : '768m'
+        }
+    }
+}
+
+// Serial group. One class, after the fork pool, so port 8765 and the repo
+// calls link are not shared with other workers. maxParallelForks still follows
+// -Ppkb.test.forks; a single class uses one worker.
+def suiteDualRunClass = 'tools.dscode.engine.parity.SuiteDualRunTest'
+def suiteDualRunSimple = 'SuiteDualRunTest'
+
+def pkbGlob = { String pattern, String text ->
+    if (pattern == null || text == null) return false
+    StringBuilder regex = new StringBuilder('^')
+    for (int i = 0; i < pattern.length(); i++) {
+        char ch = pattern.charAt(i)
+        if (ch == '*') regex.append('.*')
+        else regex.append(java.util.regex.Pattern.quote(String.valueOf(ch)))
+    }
+    regex.append('$')
+    return text.matches(regex.toString())
+}
+
+def suiteDualRunMatches = { String pattern ->
+    if (pattern == null || pattern.isBlank()) return false
+    if (pkbGlob(pattern, suiteDualRunClass) || pkbGlob(pattern, suiteDualRunSimple)) return true
+    if (pattern.startsWith(suiteDualRunClass + '.') || pattern.startsWith(suiteDualRunSimple + '.')) return true
+    int dot = pattern.lastIndexOf('.')
+    if (dot <= 0) return false
+    String head = pattern.substring(0, dot)
+    return pkbGlob(head, suiteDualRunClass) || pkbGlob(head, suiteDualRunSimple)
+}
+
+tasks.register('testSerial', Test) {
+    group = 'verification'
+    description = 'Serial group. SuiteDualRunTest binds port 8765, links src/test/resources/calls, and hydrates this repo store. Runs after :test.'
+    useJUnitPlatform {
+        includeEngines 'junit-jupiter'
+    }
+    include '**/SuiteDualRunTest.class'
+    dependsOn 'expandWoven', 'publishToMavenLocal', 'compileConsumerGlueJava', ':pickleball-control-api:classes', ':pickleball-workbench:classes'
+    dependsOn tasks.named('shadowJar'), tasks.named('sourcesJar')
+    shouldRunAfter tasks.named('test')
+}
+
+def pkbTestTask = tasks.named('test', Test)
+def pkbSerialTask = tasks.named('testSerial', Test)
+pkbSerialTask.configure {
+    testClassesDirs = pkbTestTask.get().testClassesDirs
+    classpath = pkbTestTask.get().classpath
+}
+pkbTestTask.configure {
+    finalizedBy pkbSerialTask
+}
+
+gradle.taskGraph.whenReady { graph ->
+    def serial = pkbSerialTask.get()
+    if (!graph.hasTask(serial)) return
+    def patterns = new LinkedHashSet<String>()
+    def mainPatterns = pkbTestTask.get().filter.commandLineIncludePatterns
+    def serialPatterns = serial.filter.commandLineIncludePatterns
+    if (mainPatterns != null) patterns.addAll(mainPatterns)
+    if (serialPatterns != null) patterns.addAll(serialPatterns)
+    if (patterns.isEmpty()) {
+        logger.lifecycle('testSerial running SuiteDualRunTest after :test')
+        return
+    }
+    if (!patterns.any { suiteDualRunMatches(it) }) {
+        serial.enabled = false
+        logger.lifecycle('testSerial skipped; --tests does not include SuiteDualRunTest')
+        return
+    }
+    serial.filter.setCommandLineIncludePatterns(new ArrayList<String>(patterns))
+    logger.lifecycle("testSerial include ${patterns}")
 }
 
 // workbenchUi depends on ajcMain, not classes: classes depends on processResources.

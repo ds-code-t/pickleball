@@ -12,6 +12,7 @@ import tools.dscode.common.composite.CompositeRuntime;
 import tools.dscode.common.driver.DriverConstruction;
 import tools.dscode.common.mappings.MappingProcessor;
 import tools.dscode.engine.context.ExecutionContext;
+import tools.dscode.testsupport.SerialResource;
 
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
@@ -27,6 +28,7 @@ import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
  * A driver built by {@link DriverConstruction#ready} releases its debug port when that driver is quit.
  * No browser is downloaded.
  */
+@SerialResource("cwd-cli-session")
 class DebugPortQuitTest {
     @AfterEach
     void reset() {

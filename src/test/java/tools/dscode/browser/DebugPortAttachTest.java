@@ -12,6 +12,7 @@ import tools.dscode.common.agentcontrol.AgentDriverHooks;
 import tools.dscode.common.driver.DriverConstruction;
 import tools.dscode.common.mappings.MappingProcessor;
 import tools.dscode.engine.context.ExecutionContext;
+import tools.dscode.testsupport.SerialResource;
 
 import java.lang.reflect.Proxy;
 import java.net.InetSocketAddress;
@@ -30,6 +31,7 @@ import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
  * Production attach path. A listening debug port is claimed by {@code applyDebugPort}.
  * A browser this process only starts is not claimed. No browser is downloaded.
  */
+@SerialResource("cwd-cli-session")
 class DebugPortAttachTest {
     @AfterEach
     void reset() {

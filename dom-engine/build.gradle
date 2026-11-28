@@ -33,7 +33,7 @@ tasks.withType(JavaCompile).configureEach {
 
 tasks.named('test') {
     useJUnitPlatform()
-    maxParallelForks = 1
+    // Forks and heap come from the root build (-Ppkb.test.forks). Do not pin 1 here.
     testLogging {
         events 'failed'
         exceptionFormat = 'full'

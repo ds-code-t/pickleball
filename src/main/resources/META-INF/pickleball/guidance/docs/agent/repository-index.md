@@ -1433,6 +1433,12 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/testengine/WorkspaceLaunchTest.java`
 - `src/test/java/tools/dscode/testengine/WorkspaceSeedTest.java`
 - `src/test/java/tools/dscode/testsupport/CappedTestConsole.java`
+- `src/test/java/tools/dscode/testsupport/EngineLogConcurrencyTest.java`
+- `src/test/java/tools/dscode/testsupport/ForkCountPublishedTest.java`
+- `src/test/java/tools/dscode/testsupport/SerialFileLock.java`
+- `src/test/java/tools/dscode/testsupport/SerialFileLockTest.java`
+- `src/test/java/tools/dscode/testsupport/SerialResource.java`
+- `src/test/java/tools/dscode/testsupport/SerialResourceLock.java`
 - `src/test/java/tools/dscode/untilpass/UntilPassBrowserSteps.java`
 - `src/test/java/tools/dscode/untilpass/UntilPassChromeLookupTest.java`
 - `src/test/java/tools/dscode/warmglue/WarmGlueSteps.java`

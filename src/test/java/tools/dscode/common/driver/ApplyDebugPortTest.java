@@ -9,6 +9,7 @@ import org.openqa.selenium.chrome.ChromeOptions;
 import tools.dscode.browser.DebugPortOwner;
 import tools.dscode.common.mappings.MappingProcessor;
 import tools.dscode.engine.context.ExecutionContext;
+import tools.dscode.testsupport.SerialResource;
 
 import java.net.InetSocketAddress;
 import java.util.List;
@@ -24,6 +25,7 @@ import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
  * {@code AgentControl} {@code launch --start} calls {@code createLocalDriver},
  * which calls {@code applyDebugPort} with no scenario state. That seam is this test.
  */
+@SerialResource("cwd-cli-session")
 class ApplyDebugPortTest {
     @AfterEach
     void reset() {
