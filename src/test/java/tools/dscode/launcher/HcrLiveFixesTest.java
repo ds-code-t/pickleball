@@ -29,6 +29,7 @@ class HcrLiveFixesTest {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String PAGE = "<!DOCTYPE html><html><head><title>HCR</title></head><body>"
             + "<button id=\"go\">Go</button><input id=\"note\" aria-label=\"Note\">"
+            + "<input type=\"file\" id=\"files\" aria-label=\"Files\">"
             + "<iframe id=\"inner\" name=\"inner\" srcdoc=\"<button>Inner</button>\"></iframe></body></html>";
 
     @TempDir
@@ -112,6 +113,32 @@ class HcrLiveFixesTest {
         }
         assertTrue(state.toString().contains("\"x\":300"), "panel moved by navigate: " + state);
         assertTrue(state.toString().contains("\"collapsed\":true"), "dock reset by navigate: " + state);
+    }
+
+    /** HCR-18: the upload-request event names the input #files, and upload --ref=#files failed unknown target. */
+    @Test
+    @Timeout(value = 180, unit = TimeUnit.SECONDS)
+    void uploadTakesTheCssRefTheUploadRequestNames() throws Exception {
+        start();
+        Path file = Files.writeString(temp.resolve("upload.txt"), "hello");
+        Capture uploaded = agent("upload", "--target=browser:auto", "--ref=#files", "--file=" + file);
+        assertEquals(0, uploaded.code, uploaded.err + uploaded.out);
+        assertFalse(uploaded.out.contains("unknown target"), uploaded.out);
+        Capture count = agent("eval", "--target=browser:auto", "--expr=document.getElementById('files').files.length", "--world=main");
+        assertTrue(count.out.contains("1"), count.out);
+        Capture missing = agent("upload", "--target=browser:auto", "--ref=#nope", "--file=" + file);
+        assertTrue(missing.code != 0, missing.out);
+        assertTrue(missing.out.contains("CSS selector"), missing.out);
+    }
+
+    /** Owner decision 2026-11-28 (HCR-28): start --run-id=agent names the live session agent. */
+    @Test
+    @Timeout(value = 180, unit = TimeUnit.SECONDS)
+    void startHonorsTheRunId() throws Exception {
+        start();
+        assertEquals("agent", ConsumerReadyCommands.liveSessionId(temp));
+        Capture progress = agent("progress", "--pct=10");
+        assertTrue(progress.out.contains("\"session\":\"agent\""), progress.out);
     }
 
     private Path start() throws Exception {

@@ -916,7 +916,13 @@ public final class TargetVerb {
         if ("scroll".equals(actKind) && "desktop".equals(target.kind())) {
             return desktopScrollUnsupported();
         }
-        if (ref.isBlank() && blank(args.get("query")).isBlank() && blank(args.get("identity")).isBlank()
+        // An upload-request event names its input by CSS (#files); --ref takes that as well as a short id.
+        String css = "";
+        if (cssRef(ref) && !knownHit(ref)) {
+            css = ref.startsWith("css=") ? ref.substring(4).trim() : ref;
+            ref = "";
+        }
+        if (ref.isBlank() && css.isBlank() && blank(args.get("query")).isBlank() && blank(args.get("identity")).isBlank()
                 && blank(args.get("purpose")).isBlank()) {
             if ("scroll".equals(actKind)) return pageScroll(project, runId, target, args);
             return fail("act", "act requires --query or --ref");
@@ -945,6 +951,17 @@ public final class TargetVerb {
                 }
                 refound.remove("backend");
                 query = blank(args.get("query"));
+            } else if (!css.isBlank()) {
+                long backend = cssBackend(page.session.connection(), css);
+                node = backend > 0 ? findNode(root, "", backend) : null;
+                if (node == null) {
+                    Outcome missed = fail("act", "not found");
+                    missed.body().put("fix", "no element matches the CSS selector " + css + "; snap and act by short id");
+                    stamp(missed.body(), page.session.connection(), null);
+                    putEntered(missed.body(), runId, page.session.connection());
+                    return missed;
+                }
+                query = css;
             } else if (hit != null) {
                 node = freshNode(hit, page.session.connection(), root);
                 if (node == null && refindRequested(args)) {
@@ -3771,6 +3788,35 @@ public final class TargetVerb {
         if (hit == null && ref != null) hit = HITS.get(ref);
         if (hit == null) throw new Miss("unknown target");
         return hit;
+    }
+
+    /** A CSS selector given as --ref ({@code #files}, {@code .upload}, {@code [name=f]}, {@code css=...}). */
+    static boolean cssRef(String ref) {
+        if (ref == null || ref.isBlank()) return false;
+        String value = ref.trim();
+        if (value.startsWith("css=")) return value.length() > 4;
+        return value.length() > 1 && (value.charAt(0) == '#' || value.charAt(0) == '.' || value.charAt(0) == '[');
+    }
+
+    private static boolean knownHit(String ref) {
+        try {
+            return requireHit(ref) != null;
+        } catch (Miss missing) {
+            return false;
+        }
+    }
+
+    /** The backend node id of the first element matching {@code selector} in the top document, or 0. */
+    private static long cssBackend(CdpConnection cdp, String selector) {
+        ObjectNode params = Jsons.object();
+        params.put("expression", "(function(){try{return document.querySelector(" + jsString(selector) + ");}catch(e){return null;}})()");
+        JsonNode found = cdp.call("Runtime.evaluate", params, Duration.ofSeconds(5));
+        String objectId = found.path("result").path("objectId").asText("");
+        if (objectId.isBlank()) return 0L;
+        ObjectNode describe = Jsons.object();
+        describe.put("objectId", objectId);
+        JsonNode node = cdp.call("DOM.describeNode", describe, Duration.ofSeconds(5));
+        return node.path("node").path("backendNodeId").asLong(0L);
     }
 
     private static boolean desktopHit(String ref) {

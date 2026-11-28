@@ -26,6 +26,16 @@ class HcrRoundFourTest {
     }
 
     @Test
+    void aCssSelectorIsAcceptedAsAnActRef() {
+        assertTrue(TargetVerb.cssRef("#files"), "upload-request names its input #files (HCR-18)");
+        assertTrue(TargetVerb.cssRef("[name=upload]"));
+        assertTrue(TargetVerb.cssRef("css=input[type=file]"));
+        assertFalse(TargetVerb.cssRef("s1.h4"), "a short id is not CSS");
+        assertFalse(TargetVerb.cssRef("ref:3"));
+        assertFalse(TargetVerb.cssRef("#"));
+    }
+
+    @Test
     void theBlockProbeLooksOnlyForPickleballBlockOverlays() {
         assertTrue(TargetVerb.BLOCK_PROBE.contains("data-pkb-block"), TargetVerb.BLOCK_PROBE);
         assertTrue(TargetVerb.BLOCK_PROBE.contains("shadowRoot"), "the layer is a shadow root (HCR-10)");
