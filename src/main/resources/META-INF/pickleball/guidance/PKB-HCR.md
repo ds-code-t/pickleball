@@ -16,16 +16,16 @@ Any agent should recognize these phrases:
 - **One test or a few tests:** may run without asking, when they cover functionality that a new implementation may have impacted. Pick them with the "Covers" line on each test and the [Targeted selection](#targeted-selection) table. Record why each one was picked.
 - **Failures:** the batching rule in Regression tiers applies. Let the run finish and collect every failure. Fix them together, each at the root with a reproducing automated test where one can exist. Run the targeted tests for the whole batch together. Then re-run only the manual tests that failed. Do not re-run the whole catalog unless Dan asks.
 - **Platform:** Dan's Windows PC with Google Chrome, as in the short tier. No GitHub Actions. Linux and macOS desktop tests (M-PP-03) belong to a full-tier request.
-- **Results:** copy the PKB-HCR scoreboard template to a dated results file and fill it in. In this repository the template is `PKB-HCR-scoreboard.md` and the usual results path is a dated `pkb-hcr-<yyyy-mm-dd>.md` file. In a consumer project, copy `.pickleball/PKB-HCR-scoreboard.md` (see below). Times are MST (America/Phoenix).
+- **Results:** copy the PKB-HCR scoreboard template to a dated results file and fill it in. In this repository the template is `PKB-HCR-scoreboard.md` and the usual results path is a dated `pkb-hcr-<yyyy-mm-dd>.md` file. In a consumer project, copy `.pickleball/v/<version>/PKB-HCR-scoreboard.md` (see below). Times are MST (America/Phoenix).
 
 ## For a consumer project's agent
 
 This catalog ships in the published Pickleball jar, so a consumer agent does not need this source repository.
 
-1. **Where to find it.** After a successful `export-guidance`, the catalog is `.pickleball/PKB-HCR.md` and the scoreboard template is `.pickleball/PKB-HCR-scoreboard.md`. Both are listed in `.pickleball/index.txt`. Inside the jar they are `META-INF/pickleball/guidance/PKB-HCR.md` and `META-INF/pickleball/guidance/PKB-HCR-scoreboard.md`.
-2. **What to load first.** Follow the consumer project's `AGENTS.md`: run `export-guidance`, then read `.pickleball/AGENT-GUIDE.md`. Then load `.pickleball/PKB-HCR.md` and stay on this file for setup, roles, and the tests.
+1. **Where to find it.** After a successful `export-guidance`, the catalog is `.pickleball/v/<version>/PKB-HCR.md` (for example `.pickleball/v/3.0.0/PKB-HCR.md`) and the scoreboard template is `.pickleball/v/<version>/PKB-HCR-scoreboard.md`. Both are listed in that folder's `GUIDANCE-MANIFEST.json`; there is no `index.txt` in a consumer project. Inside the jar they are `META-INF/pickleball/guidance/PKB-HCR.md` and `META-INF/pickleball/guidance/PKB-HCR-scoreboard.md`.
+2. **What to load first.** Follow the consumer project's `AGENTS.md`: run `export-guidance`, then read `.pickleball/AGENT-GUIDE.md`. Then load `.pickleball/v/<version>/PKB-HCR.md` and stay on this file for setup, roles, and the tests.
 3. **Roles.** When the test role is **H** (human collaborator), the agent is limited to Human Mode tools and the human (composite) views: `snap` and `find` at `exposure=human`, plus `aria-snap`, `screenshot`, and `capture`. When the role is **A** (agent), it may use every tool, including control-tier verbs. The Roles table below is the contract. Keep H and A notes separate. An H assertion may use only H output.
-4. **How to record results.** Copy `.pickleball/PKB-HCR-scoreboard.md` to a dated file the owner names (for example `pkb-hcr-<yyyy-mm-dd>.md` in the consumer project) and fill every HCR id that was in scope.
+4. **How to record results.** Copy `.pickleball/v/<version>/PKB-HCR-scoreboard.md` to a dated file the owner names (for example `pkb-hcr-<yyyy-mm-dd>.md` in the consumer project) and fill every HCR id that was in scope.
 5. **Explicit request only.** The whole catalog runs only when the project owner explicitly asks, for example `Run PKB-HCR`. Do not start it unprompted. A single test such as `Run PKB-HCR HCR-12` may run when the request names it, or when a new implementation may have impacted what that test covers.
 
 ## Roles
@@ -43,16 +43,20 @@ Pass criteria come from the reply fields, events, exit codes, and page text name
 
 ## Conventions
 
+- **Spine session first.** Since 2026-11-26 every verb exits 2 `error: missing session` until `pkb spine session new --agent=<id>` has run once for the project. Only `help`, family help, plain `export-guidance`, and the verbs in `VerbDispatch.SESSION_EXEMPT` skip that. Run it before `controller-start` or `doctor`. `pkb spine session show` confirms it.
+
 - `pkb <verb> ...` is the consumer launcher, run from `maven-consumer-project` (see Setup S0, step 3).
 - Every A command ends with `--run-id=agent` and every H command ends with `--run-id=helper`. That flag is left out below.
 - `snap`, `find`, `act`, `wait`, `wait-for`, `explain`, `capture`, `eval`, `form-fill`, and `watch` take `--target=browser:auto`. It is left out below unless the test uses another target.
-- With the Maven launcher form, keep flag values free of spaces. With the `java -cp` form in PowerShell, put a flag that holds spaces or `| { } < > ;` in single quotes (`'--fields=pw=secret1|email=a@b.c'`). Put JSON in a file under `C:\pkb-manual\` and pass `@file` or `--args-file` where the verb accepts it. Otherwise use a hyphenated word (`--say=Pick-one`).
+- With the Maven launcher form, keep flag values free of spaces. With the `java -cp` form in PowerShell, put a flag that holds spaces, a comma, or `| { } < > ;` in single quotes (`'--choices=Alpha,Beta'`, `'--include=values,cards'`; an unquoted comma becomes a space-separated PowerShell array) (`'--fields=pw=secret1|email=a@b.c'`). Put JSON in a file under `C:\pkb-manual\` and pass `@file` or `--args-file` where the verb accepts it. Otherwise use a hyphenated word (`--say=Pick-one`).
 - Every step records the wall-clock time (MST), the exit code, and the envelope `ms` or `timing.workerMs`. A verb that takes more than 2 s while the other side waits is a lane problem: record it as a failure.
 - **Unclear** marks a capability whose name or behavior the branch documents but does not make clear. Run it, record what happened, and list it under Gaps on the scoreboard. It is not a pass or a fail.
 
 ## Setup
 
 ### S0 — once per run
+
+**Consumer project (no Pickleball source repo).** Skip step 1 and the `maven-consumer-project` paths below. Your project already resolves the published Pickleball jar. Run `export-guidance`, `pkb spine session new --agent=agent-1`, then define `pkb` with your own launcher (the `exec:java` form below from your project root). Copy the M0 files into your own site folder and serve it on 8765. The keys `URL.components`, `URL.loading`, `URL.dialogs` and the `@primary-navigation` pack exist only in the source repository's `maven-consumer-project`; use `--url=http://127.0.0.1:8765/<page>` and skip the tests that need them (HCR-36 iframe clause, HCR-47, HCR-52, HCR-72), or record them as not run.
 
 1. Use the `3.0.0-spine` worktree at the SHA being tested. Run `.\gradlew.bat publishToMavenLocal`, then `.\maven-consumer-project\mvnw.cmd -f maven-consumer-project\pom.xml -U -q test-compile`.
 2. Set `$env:PKB_AGENT_POPUP_BROWSER = 'C:\Program Files\Google\Chrome\Application\chrome.exe'` in every shell, so the popup host uses Chrome.
@@ -162,7 +166,7 @@ Areas: HL human lock and tiers, HV human view, CH chat, CA question cards and wa
 **HCR-06 (M-HV-02 Collaboration fields in the human view (A→H))** — Covers: `ElementRecord`, snap `--include`, redaction, `data-pkb-*` attributes.
 - Steps (A): `pkb form-fill --fields=pw=secret1|email=a2@example.com`, `pkb highlight --query=Go --preset=yellow`, `pkb ask --say=Pick-one --choices=Alpha,Beta --id=q-hv`, and `pkb chat-send --text=hello-hv`.
 - Assert (H): `pkb snap --include=values,highlights,cards,chat` shows `value=redacted` on Password, `value=a2@example.com`, `highlight=yellow` on Go, `card=q-hv "Pick-one" open` on the Alpha and Beta rows, and a `message` row `msg=<id> agent <status>` for `hello-hv`. `--include=values` alone drops the other keys.
-- Cleanup (A): `pkb unhighlight`, and close the card with `pkb ask-answer --id=q-hv --value=Alpha`.
+- Cleanup (A): `pkb unhighlight`, and H closes the card by clicking Alpha (`pkb act --kind=click --query=Alpha`). `ask-answer` only answers stored cards (`ask --type=...`), not page cards.
 
 **HCR-07 (M-HV-03 Aria view and aria refs (H))** — Covers: `aria-snap`, `act --aria-ref`, Playwright on the start session.
 - Steps (H): `pkb aria-snap --mode=ai`, then `pkb act --aria-ref=<eN of Go> --kind=click`.
@@ -205,7 +209,7 @@ Areas: HL human lock and tiers, HV human view, CH chat, CA question cards and wa
 - Assert: the first wait exits 1 with `timeout`, and H sees the card `timed-out` or gone. The second wait returns `Yes`.
 
 **HCR-16 (M-CA-03 Text, confirm, and sensitive cards (A→H))** — Covers: `ask --type=text|confirm`, `--sensitive=true`, `ui-poll --id`.
-- Steps: A runs `pkb ask --type=text --prompt=Your-code --id=q-text --sensitive=true`. H types `1234` in the card field (`pkb act --kind=type --query=Your-code --value=1234`) and clicks the card's submit button (found with `pkb find --purpose=card-option`). A runs `pkb ui-poll --id=q-text --wait=30`. Repeat with `--type=confirm --prompt=Proceed --id=q-conf`, and H clicks the confirm choice.
+- Steps: A runs `pkb ask --say=Your-code --id=q-text --sensitive=true` (a page card with no `--choices` shows the field `pkb-answer` and a Send button; `ask --type=...` writes a stored card that never renders, so it is not used here). H types `1234` in the field (`pkb act --kind=type --query=pkb-answer --value=1234`) and clicks Send (`pkb act --kind=click --query=Send`). A runs `pkb ui-poll --id=q-text --wait=30`. Repeat with `pkb ask --say=Proceed --choices=Yes,No --id=q-conf`, and H clicks Yes. Card controls carry no `purpose`, so do not search with `--purpose=card-option`.
 - Assert: A gets an answer event for each card. The sensitive value is not in `overlay-poll` or `ui-poll` output, the event says it was answered, and H's `snap` shows `value=redacted` or nothing for that field. resolved: a text card has a field named `pkb-answer` and a button labeled Send. Send, or Enter in the field, submits when the trimmed text is not blank. An empty field does not submit. The event is `type=answer`.
 
 **HCR-17 (M-CA-04 wait-any watch (A→H))** — Covers: `wait-any --watch=<short id>:click`.
@@ -213,8 +217,8 @@ Areas: HL human lock and tiers, HV human view, CH chat, CA question cards and wa
 - Assert: `fired=watch`. Clicking another control does not fire it.
 
 **HCR-18 (M-CA-05 Agent answers a card (A, H check))** — Covers: `ask-answer`.
-- Steps: A runs `pkb ask --say=Agent-answers --choices=One,Two --id=q-aa`, then `pkb ask-answer --id=q-aa --value=Two`.
-- Assert (H): `snap --include=cards` shows the card answered or closed, and its buttons are gone.
+- Steps: A runs `pkb ask --type=choice --prompt=Agent-answers --options=One,Two --id=q-aa` (a stored card), then `pkb ask-answer --id=q-aa --value=Two`. `ask-answer` does not see page cards from `ask --say`.
+- Assert: `pkb ui-poll --id=q-aa` returns `type=answer value=Two`. A stored card has no live page, so there is no H snap assertion.
 
 **HCR-19 (M-CA-06 Quoted value chip (A→H))** — Covers: `.pkb-value` chip rendering.
 - Steps: A writes `C:\pkb-manual\say.txt` containing `Enter "abc" in Email`, then `pkb ask --say=@C:\pkb-manual\say.txt --id=q-chip`. resolved: `ask --say=@file` and `ask --prompt=@file` read that file. A path is relative to the project, or absolute. A missing file is `error:` and `fix:` and does not ask for a live page.
@@ -261,7 +265,7 @@ Areas: HL human lock and tiers, HV human view, CH chat, CA question cards and wa
 - Assert: the catalog lists every component in `UiCatalog.coveredVerbs`. H sees the label before the TTL and does not see it after.
 
 **HCR-29 (M-VS-06 Placements follow layout changes (A, H check))** — Covers: `pkb-runtime.js` tracking through scroll, resize, and zoom.
-- Steps (A): place a label on Go, then `pkb emulate --viewport=900x700`, then `pkb ui-verify`, then `pkb emulate --reset`.
+- Steps (A): place a label on Go, then `pkb emulate --viewport=900x700` (the M0 fixture must position Go from the viewport, for example `position:absolute; right:10%`, or the label has no reason to move), then `pkb ui-verify`, then `pkb emulate --reset`.
 - Assert: the `rect` moves with Go. H's screenshot shows the label still on Go.
 
 ### HI — HTML injection
@@ -299,7 +303,7 @@ Areas: HL human lock and tiers, HV human view, CH chat, CA question cards and wa
 - Assert: the script has the Go click and one step for Email. It has no `Pause` or hover step, and no panel or toolbar step. `record --stop` says `recording stopped`. On `URL.loading`, a click inside an iframe is recorded as `in the "<id>" IFrame` plus the inner element.
 
 **HCR-37 (M-RC-02 Step editor edits (A, H check))** — Covers: `record --editor/--edit/--move/--nest/--outdent/--add/--delete/--save/--load/--list/--export/--run/--inject`.
-- Steps (A): `pkb record --editor`, then `pkb record --add --text=click-the-Go-button`, `--edit --index=1 --text=...`, `--move --from=1 --to=2`, `--nest --index=2`, `--outdent --index=2`, and `--delete --index=2`. Then `pkb record --save --name=manual1`, `pkb record --list`, `pkb record --export --name=manual1 --format=feature --out=C:\pkb-manual\manual1.feature`, `pkb record --inject --kind=click --query=Go`, and `pkb record --run --name=manual1`.
+- Steps (A): `pkb record --start`, then `pkb record --editor`. Editor indexes are 0-based. Add a real step phrase, not a slug: `pkb record --add --text='click the "Go" Button'` (a leading comma is added for you), then `--edit --index=0 --text=...`, `--move --from=0 --to=1`, `--nest --index=1`, `--outdent --index=1`, and `--delete --index=1`. Then `pkb record --save --name=manual1`, `pkb record --list`, `pkb record --export --name=manual1 --format=feature --out=C:\pkb-manual\manual1.feature`, `pkb record --inject --kind=click --query=Go` (needs the recording started above), and `pkb record --run --name=manual1`.
 - Assert: each reply reflects the change. H sees the editor rows change in its `snap`. The exported feature has Gherkin steps. `record --run` clicks Go (H finds `Went:` updated).
 
 **HCR-38 (M-RC-03 Editor pop-out (A))** — Covers: `record --popout/--popin --panel=editor`.
@@ -340,14 +344,14 @@ Areas: HL human lock and tiers, HV human view, CH chat, CA question cards and wa
 - Assert: each returns after H's click with `wake=push` (or `wake=poll`, recorded as a finding) and `pushLagMs` under 1000.
 
 **HCR-46 (M-LS-03 Person-side waits (A→H))** — Covers: human `wait`, `wait-for`.
-- Steps: H starts `pkb wait-for --condition=New --timeout=60000`. A clicks `Add row` (`pkb act --kind=click --query=Add-row`). Then H starts `pkb wait --condition=new-message --from=agent --timeout=60000`, and A runs `pkb chat-send --text=ping`.
+- Steps: H starts `pkb wait-for --condition=New --timeout=60000` after reloading the manual page (HCR-45 leaves `New row` buttons behind, and then `--condition=New` passes at once, so run HCR-46 before HCR-45 or reload first). A clicks `Add row` (`pkb act --kind=click --query=Add-row`). Then H starts `pkb wait --condition=new-message --from=agent --timeout=60000`, and A runs `pkb chat-send --text=ping`.
 - Assert: both H waits return without H polling.
 
 **HCR-47 (M-LS-04 Collaboration waits use push (A))** — Covers: `pkb_push_wake`, `ui-poll --wait`, `chat-poll --wait`.
 - Assert: in M-CA-01 and M-CH-01, the replies show `wake=push` and a `wakeMs`. Record the values.
 
 **HCR-48 (M-LS-05 Event streams (A))** — Covers: `observe`, `events`, `browser-events --follow`, `chat --follow`, `record --follow`.
-- Steps (A): `pkb observe --type=Network --url=data.json --limit=5` after H clicks `Load data`. Then `pkb browser-events --follow --kinds=console --wait-ms=20000` while H clicks `Log`. Then `pkb events --follow --timeout=5`.
+- Steps (A): `pkb observe --type=Network --url=data.json --limit=5` after H clicks `Load data`. Then `pkb browser-events --follow --kinds=console --wait-ms=20000` while H clicks `Log`. Then `pkb events --follow --timeout=5` only on a Workbench worker session: on a `start` session `events --follow --type=...` fails `No healthy Workbench session`. On a `start` session use `pkb browser-events --follow --kinds=<kind>` for page events and `pkb chat --follow` for chat.
 - Assert: each stream returns those rows and ends on its timeout. A stream leaves no process behind (`doctor`).
 
 **HCR-49 (M-LS-06 Page errors and logpoints (H→A))** — Covers: `errors`, `logpoint`, source location.

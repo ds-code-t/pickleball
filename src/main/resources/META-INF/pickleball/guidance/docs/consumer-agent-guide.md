@@ -70,11 +70,11 @@ Replies are one envelope (v, ok, op, ms, state, sum, items, next, trunc, err). `
 
 ## Generated guidance lifecycle
 
-`export-guidance` writes version-matched managed guidance files and `GUIDANCE-MANIFEST.json`. It ignores `.pickleball` via `.gitignore` or `.git/info/exclude`. If export fails, existing files are potentially stale. Stale does not mean an old run.
+Run `spine session new --agent=<id>` once per project first: since 2026-11-26 every verb except help and plain `export-guidance` exits 2 `missing session` without it. `export-guidance` writes version-matched managed guidance files and `GUIDANCE-MANIFEST.json` under `.pickleball/v/<version>/`. `.pickleball/AGENT-GUIDE.md` is a copy of that version's guide. It ignores `.pickleball` via `.gitignore` or `.git/info/exclude`. If export fails, existing files are potentially stale. Stale does not mean an old run.
 
 ## Generated Maven consumer reference
 
-`.pickleball/maven-consumer-project/` is a read-only snapshot. Do not copy, modify, or run it.
+When present, the read-only Maven consumer snapshot is in the version folder, `.pickleball/v/<version>/maven-consumer-project/` (for example `.pickleball/v/3.0.0/`), not directly under `.pickleball/`. Do not copy, modify, or run it.
 
 ## First-read
 
