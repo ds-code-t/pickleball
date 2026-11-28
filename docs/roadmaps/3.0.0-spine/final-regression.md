@@ -33,15 +33,17 @@ Run it only at the end of the whole implementation. All roadmaps must be impleme
 
 ### Commands
 
-Run them in this order, each on its own, in the `3.0.0-spine` worktree:
+Run them in this order, each on its own, in the `3.0.0-spine` worktree. On Dan's Windows PC, pass the fork properties below. CI and the Linux box keep the default of 1 fork (omit the `-P` flags).
+
+On 2026-11-27, `:test --rerun-tasks -Ppkb.test.forks=24` on the PC took about 8 minutes: 2118 tests, 79 failed in 60 classes. Those 60 classes rerun at 12 forks: 497 ran, 24 failed (20 classes). The same 24 methods rerun at 1 fork: 96 ran, 0 failed. They are parallel-contention failures (live Chrome/CDP attach, Playwright CDP, timing budgets, popups), not product bugs. Those 60 classes now run in `:testLive` at `-Ppkb.test.liveForks` (default 1). `:test` excludes them and may use `-Ppkb.test.forks=24`. `:test` then runs `:testLive` and `:testSerial` (`SuiteDualRunTest`, port 8765 and the repo calls link). Do not raise `liveForks` above 1 unless a later measurement shows it is safe for every class in that group, including the 20 that failed at 12 forks.
 
 ```
 $env:PKB_AGENT_POPUP_BROWSER = 'C:\Program Files\Google\Chrome\Application\chrome.exe'
-.\gradlew.bat :test --console=plain
-.\gradlew.bat :dom-engine:test --console=plain
-.\gradlew.bat :pickleball-workbench:test --console=plain
-.\gradlew.bat :pickleball-control-protocol:test --console=plain
-.\gradlew.bat :pickleball-control-api:test --console=plain
+.\gradlew.bat :test -Ppkb.test.forks=24 -Ppkb.test.liveForks=1 --console=plain
+.\gradlew.bat :dom-engine:test -Ppkb.test.forks=24 --console=plain
+.\gradlew.bat :pickleball-workbench:test -Ppkb.test.forks=24 --console=plain
+.\gradlew.bat :pickleball-control-protocol:test -Ppkb.test.forks=24 --console=plain
+.\gradlew.bat :pickleball-control-api:test -Ppkb.test.forks=24 --console=plain
 .\gradlew.bat verifyStrictControllerIsolation --console=plain
 .\gradlew.bat publishToMavenLocal
 .\maven-consumer-project\mvnw.cmd -f maven-consumer-project\pom.xml -U test -Dpkb_runvars.pkb_browser=CHROME_HEADLESS -Dpkb_runvars.pkb_tags=@all
@@ -50,7 +52,7 @@ python scripts/refresh_agent_index.py --check
 python scripts/sync_consumer_guidance.py --check
 ```
 
-Use the real Chrome path if it differs. `publishToMavenLocal` writes only to the local `~/.m2`. `@all` is allowed here because this is the end of the work, not a Workbench migration check.
+Use the real Chrome path if it differs. `publishToMavenLocal` writes only to the local `~/.m2`. `@all` is allowed here because this is the end of the work, not a Workbench migration check. The `:test` line already runs `:testLive` and `:testSerial` after the fork pool; you do not need to name those tasks separately. `--tests` still routes a class to `:test`, `:testLive`, or `:testSerial`.
 
 The end-of-work pass also sweeps every roadmap item, and the fix-backs, through its production caller, and audits the docs. Record the results in `docs/maintainer/3.0.0-spine/final-regression-scoreboard.md`.
 
@@ -78,16 +80,16 @@ Never, unless Dan explicitly asks for the full regression. Finishing the roadmap
 
 ### Scope and commands
 
-Run everything below on each platform. Record each command's totals and every skip with its reason.
+Run everything below on each platform. Record each command's totals and every skip with its reason. Linux and macOS commands stay at the default of 1 fork unless a later measurement on that platform says otherwise.
 
-**Windows (Dan's PC).** Install Chrome, Edge, Firefox with `geckodriver` on `PATH`, and PowerShell 7 (`pwsh`). Leave `PKB_AGENT_POPUP_BROWSER` unset so the popup host uses its Windows default.
+**Windows (Dan's PC).** Install Chrome, Edge, Firefox with `geckodriver` on `PATH`, and PowerShell 7 (`pwsh`). Leave `PKB_AGENT_POPUP_BROWSER` unset so the popup host uses its Windows default. The same fork properties as the short tier are recommended: `-Ppkb.test.forks=24 -Ppkb.test.liveForks=1` on `:test`, and `-Ppkb.test.forks=24` on the module test tasks.
 
 ```
-.\gradlew.bat :test --console=plain
-.\gradlew.bat :dom-engine:test --console=plain
-.\gradlew.bat :pickleball-workbench:test --console=plain
-.\gradlew.bat :pickleball-control-protocol:test --console=plain
-.\gradlew.bat :pickleball-control-api:test --console=plain
+.\gradlew.bat :test -Ppkb.test.forks=24 -Ppkb.test.liveForks=1 --console=plain
+.\gradlew.bat :dom-engine:test -Ppkb.test.forks=24 --console=plain
+.\gradlew.bat :pickleball-workbench:test -Ppkb.test.forks=24 --console=plain
+.\gradlew.bat :pickleball-control-protocol:test -Ppkb.test.forks=24 --console=plain
+.\gradlew.bat :pickleball-control-api:test -Ppkb.test.forks=24 --console=plain
 .\gradlew.bat verifyStrictControllerIsolation --console=plain
 .\gradlew.bat publishToMavenLocal
 .\maven-consumer-project\mvnw.cmd -f maven-consumer-project\pom.xml -U test -Dpkb_runvars.pkb_browser=CHROME_HEADLESS -Dpkb_runvars.pkb_tags=@all

@@ -34,6 +34,10 @@ A trailing `with local context` sets `steps.context_mode` to `local` and `Elemen
 
 A mid-line `until`, a comma `until`, and a period-ending `until` loop while the condition is true. `PhraseData.runUntilOperation` is that loop. It stops at `max_iterations` or `timeout_seconds` when the step row sets them, and at `pkb_stepRepeatMaxCount` or `pkb_stepMaxTime` when those columns are null. A block `until` ending in `:` or `?` keeps the nested-step loop and honors the same per-step ceiling. An assertion-chain member is the condition check and does not start that inline loop.
 
+## Parallel-unsafe live tests (closed, 3.0.0-spine-parallel-tests)
+
+On Dan's Windows PC, 2026-11-27, `:test --rerun-tasks -Ppkb.test.forks=24` ran 2118 tests in about 8 minutes and failed 79 tests in 60 classes. A rerun of those 60 classes at 12 forks ran 497 tests and failed 24 (20 classes). The same 24 methods at 1 fork ran 96 tests and failed 0. The failures were parallel contention (live Chrome/CDP attach, Playwright CDP, timing budgets, popups), not product bugs. Those 60 classes now run in `:testLive` at `-Ppkb.test.liveForks` (default 1) and are excluded from the `:test` fork pool. `:test` finalizes `:testLive`, which finalizes `:testSerial` (`SuiteDualRunTest`). CI and the box stay at 1 fork when the properties are omitted. The recommended PC command is `-Ppkb.test.forks=24 -Ppkb.test.liveForks=1`. Do not raise `liveForks` above 1 without a new measurement that includes the 20 classes that still failed at 12 forks.
+
 ## Deferred Linux and macOS tests (per Dan, 2026-11-24)
 
 The 3.0.0 retest-fix rounds (R, S) ran only targeted tests on the Linux box and the CI jobs (Windows, Linux live Chrome, macOS Store and core). These significant runs are deferred and have not been run for those changes. They belong to the full regression tier in `docs/roadmaps/3.0.0-spine/final-regression.md`, which runs only when Dan explicitly asks. The short (Chrome + Windows) tier does not cover them:

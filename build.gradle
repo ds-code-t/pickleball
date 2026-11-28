@@ -1108,6 +1108,78 @@ tasks.withType(Sign).configureEach {
     onlyIf { !isMavenLocalPublish }
 }
 
+// Parallel-unsafe live/contention group. These 60 classes failed under
+// :test -Ppkb.test.forks=24 on Dan's PC (2118 tests, 79 failed, 60 classes)
+// and passed when rerun at 1 fork. Twenty of them also failed at 12 forks
+// and then passed at 1. They run in :testLive, whose fork count is
+// -Ppkb.test.liveForks (default 1). Do not add a JUnit tag; the list is the
+// measured set. Keep :testLive at 1 unless a later measurement shows a
+// higher liveForks value is safe for every class here, including the 20
+// that failed at 12 forks.
+def pkbLiveTestClasses = [
+    'io.cucumber.core.runner.UntilPassOverheadTest',
+    'tools.dscode.browser.PlaywrightCdpLiveTest',
+    'tools.dscode.common.agentcontrol.AgentLiveFixTest',
+    'tools.dscode.common.agentcontrol.ConsumerFixesP4WaitTest',
+    'tools.dscode.common.agentcontrol.LiveChromeCdpTest',
+    'tools.dscode.common.agentcontrol.NoiseRecordingTest',
+    'tools.dscode.common.agentcontrol.NoReinjectTest',
+    'tools.dscode.common.agentcontrol.OverlayRuntimeLiveTest',
+    'tools.dscode.common.agentcontrol.ScriptQualityTest',
+    'tools.dscode.common.agentfast.SelftestCpuBenchTest',
+    'tools.dscode.common.agentfast.TimingFieldsTest',
+    'tools.dscode.common.agentsurface.AgentSurfaceRouterTest',
+    'tools.dscode.common.agentsurface.live.AgentSurfacePopupLiveTest',
+    'tools.dscode.common.agentsurface.PopupBridgeTest',
+    'tools.dscode.common.composite.live.JavaEngineFlagsLiveTest',
+    'tools.dscode.common.composite.live.JavaEngineXPathLiveTest',
+    'tools.dscode.common.dataelements.NamespaceXmlTest',
+    'tools.dscode.common.recording.RefinementTest',
+    'tools.dscode.common.recording.StepEditorTest',
+    'tools.dscode.launcher.ActConditionCoverTest',
+    'tools.dscode.launcher.AgentControllerTest',
+    'tools.dscode.launcher.AskIdTest',
+    'tools.dscode.launcher.BackendHandoffLiveTest',
+    'tools.dscode.launcher.BrowserAttachTest',
+    'tools.dscode.launcher.BrowserEventsLiveTest',
+    'tools.dscode.launcher.BrowserLostRunIdTest',
+    'tools.dscode.launcher.ClosedShadowResolveTest',
+    'tools.dscode.launcher.CollabFixesLiveTest',
+    'tools.dscode.launcher.ConfirmTest',
+    'tools.dscode.launcher.ConsumerFixesP3LiveTest',
+    'tools.dscode.launcher.ContextLiveTest',
+    'tools.dscode.launcher.DomPushLiveTest',
+    'tools.dscode.launcher.ElementSnapDiffTest',
+    'tools.dscode.launcher.EmulateLiveTest',
+    'tools.dscode.launcher.ErrorsLiveTest',
+    'tools.dscode.launcher.FallbackLoggedTest',
+    'tools.dscode.launcher.FrameInReplyTest',
+    'tools.dscode.launcher.InputLiveTest',
+    'tools.dscode.launcher.JsFallbackHonestyTest',
+    'tools.dscode.launcher.MaskQuietTest',
+    'tools.dscode.launcher.MonitorLiveTest',
+    'tools.dscode.launcher.OneCallActTest',
+    'tools.dscode.launcher.OpenWindowRendererTest',
+    'tools.dscode.launcher.OverlayAckLiveTest',
+    'tools.dscode.launcher.PerfLiveTest',
+    'tools.dscode.launcher.PlacementNowTest',
+    'tools.dscode.launcher.PwCommandLiveTest',
+    'tools.dscode.launcher.RedirectedFrameTest',
+    'tools.dscode.launcher.RefWaitTest',
+    'tools.dscode.launcher.RouteLiveTest',
+    'tools.dscode.launcher.SnapBudgetTest',
+    'tools.dscode.launcher.SnapshotDiffOnActTest',
+    'tools.dscode.launcher.SpineR6FixBack1PageControlsTest',
+    'tools.dscode.launcher.TargetAgnosticApiTest',
+    'tools.dscode.launcher.TargetCoverageTest',
+    'tools.dscode.launcher.VisibleFlagTest',
+    'tools.dscode.launcher.WorkbenchCliSurfaceCoverageTest',
+    'tools.dscode.launcher.WorkbenchOneShotLaunchTest',
+    'tools.dscode.launcher.WorkbenchSessionCommandsTest',
+    'tools.dscode.store.StoreEntityUsageTest'
+]
+def pkbLiveTestSimple = pkbLiveTestClasses.collect { String fqcn -> fqcn.substring(fqcn.lastIndexOf('.') + 1) } as Set
+
 tasks.test {
     useJUnitPlatform {
         includeEngines("junit-jupiter")
@@ -1133,6 +1205,10 @@ tasks.test {
     // SuiteDualRunTest binds port 8765, links src/test/resources/calls, and
     // hydrates this repo's store. It runs in :testSerial after this task.
     exclude '**/SuiteDualRunTest.class'
+    // Parallel-unsafe live/contention classes run in :testLive, not this pool.
+    pkbLiveTestClasses.each { String fqcn ->
+        exclude '**/' + fqcn.substring(fqcn.lastIndexOf('.') + 1) + '.class'
+    }
 }
 
 // -Ppkb.test.forks sets maxParallelForks on every Test task. Default 1 so CI
@@ -1155,13 +1231,32 @@ if (pkbTestForksRaw == null || pkbTestForksRaw.toString().trim().isEmpty()) {
     }
 }
 
+// -Ppkb.test.liveForks is maxParallelForks for :testLive only. Default 1.
+// The 60 live/contention classes must not inherit -Ppkb.test.forks.
+def pkbTestLiveForksRaw = findProperty('pkb.test.liveForks')
+int pkbTestLiveForks
+if (pkbTestLiveForksRaw == null || pkbTestLiveForksRaw.toString().trim().isEmpty()) {
+    pkbTestLiveForks = 1
+} else {
+    try {
+        pkbTestLiveForks = Integer.parseInt(pkbTestLiveForksRaw.toString().trim())
+    } catch (NumberFormatException ignored) {
+        throw new GradleException("pkb.test.liveForks must be an integer, was '${pkbTestLiveForksRaw}'")
+    }
+    if (pkbTestLiveForks < 1) {
+        throw new GradleException("pkb.test.liveForks must be >= 1, was ${pkbTestLiveForks}")
+    }
+}
+
 allprojects {
     tasks.withType(Test).configureEach { task ->
-        task.maxParallelForks = pkbTestForks
+        def liveRoot = (task.project.path == ':' && task.name == 'testLive')
+        task.maxParallelForks = liveRoot ? pkbTestLiveForks : pkbTestForks
         task.minHeapSize = '64m'
         def heavyModule = task.project.path == ':' || task.project.path == ':dom-engine'
         task.maxHeapSize = heavyModule ? '1536m' : '768m'
         task.systemProperty('pkb.test.forks', Integer.toString(pkbTestForks))
+        task.systemProperty('pkb.test.liveForks', Integer.toString(pkbTestLiveForks))
         task.systemProperty('pkb.test.maxHeap', task.maxHeapSize)
         def lockDir = task.project.layout.buildDirectory.dir('pkb-test-locks')
         task.systemProperty('pkb.test.lockDir', lockDir.get().asFile.absolutePath)
@@ -1187,7 +1282,11 @@ allprojects {
         task.systemProperty('pkb.test.console.dir', consoleDir.get().asFile.absolutePath)
         task.doFirst {
             consoleDir.get().asFile.mkdirs()
-            logger.lifecycle("pkb.test.forks ${task.path} maxParallelForks=${task.maxParallelForks} maxHeap=${task.maxHeapSize} minHeap=${task.minHeapSize}")
+            if (task.project.path == ':' && task.name == 'testLive') {
+                logger.lifecycle("pkb.test.liveForks ${task.path} maxParallelForks=${task.maxParallelForks} maxHeap=${task.maxHeapSize} minHeap=${task.minHeapSize}")
+            } else {
+                logger.lifecycle("pkb.test.forks ${task.path} maxParallelForks=${task.maxParallelForks} maxHeap=${task.maxHeapSize} minHeap=${task.minHeapSize}")
+            }
         }
     }
 }
@@ -1196,7 +1295,8 @@ allprojects {
 gradle.projectsEvaluated {
     allprojects { project ->
         project.tasks.withType(Test).configureEach { task ->
-            task.maxParallelForks = pkbTestForks
+            def liveRoot = (task.project.path == ':' && task.name == 'testLive')
+            task.maxParallelForks = liveRoot ? pkbTestLiveForks : pkbTestForks
             task.minHeapSize = '64m'
             def heavyModule = task.project.path == ':' || task.project.path == ':dom-engine'
             task.maxHeapSize = heavyModule ? '1536m' : '768m'
@@ -1204,11 +1304,12 @@ gradle.projectsEvaluated {
     }
 }
 
-// Serial group. One class, after the fork pool, so port 8765 and the repo
-// calls link are not shared with other workers. maxParallelForks still follows
-// -Ppkb.test.forks; a single class uses one worker.
+// Parallel-unsafe live group. After :test, before :testSerial, at
+// -Ppkb.test.liveForks (default 1). Serial group stays one class after that
+// so port 8765 and the repo calls link are not shared with other workers.
 def suiteDualRunClass = 'tools.dscode.engine.parity.SuiteDualRunTest'
 def suiteDualRunSimple = 'SuiteDualRunTest'
+
 
 def pkbGlob = { String pattern, String text ->
     if (pattern == null || text == null) return false
@@ -1222,57 +1323,128 @@ def pkbGlob = { String pattern, String text ->
     return text.matches(regex.toString())
 }
 
-def suiteDualRunMatches = { String pattern ->
-    if (pattern == null || pattern.isBlank()) return false
-    if (pkbGlob(pattern, suiteDualRunClass) || pkbGlob(pattern, suiteDualRunSimple)) return true
-    if (pattern.startsWith(suiteDualRunClass + '.') || pattern.startsWith(suiteDualRunSimple + '.')) return true
+def pkbClassMatches = { String pattern, String fqcn, String simple ->
+    if (pattern == null || pattern.isBlank() || fqcn == null) return false
+    if (pkbGlob(pattern, fqcn) || (simple != null && pkbGlob(pattern, simple))) return true
+    if (pattern.startsWith(fqcn + '.') || (simple != null && pattern.startsWith(simple + '.'))) return true
     int dot = pattern.lastIndexOf('.')
     if (dot <= 0) return false
     String head = pattern.substring(0, dot)
-    return pkbGlob(head, suiteDualRunClass) || pkbGlob(head, suiteDualRunSimple)
+    return pkbGlob(head, fqcn) || (simple != null && pkbGlob(head, simple))
+}
+
+def suiteDualRunMatches = { String pattern ->
+    return pkbClassMatches(pattern, suiteDualRunClass, suiteDualRunSimple)
+}
+
+def pkbLiveMatches = { String pattern ->
+    return pkbLiveTestClasses.any { String fqcn ->
+        pkbClassMatches(pattern, fqcn, fqcn.substring(fqcn.lastIndexOf('.') + 1))
+    }
+}
+
+def pkbExclusiveLiveOrSerial = { String pattern ->
+    if (pattern == null || pattern.isBlank()) return false
+    if (suiteDualRunMatches(pattern) && !pattern.contains('*')) return true
+    return pkbLiveTestClasses.any { String fqcn ->
+        String simple = fqcn.substring(fqcn.lastIndexOf('.') + 1)
+        if (pattern.contains('*')) return false
+        return pkbClassMatches(pattern, fqcn, simple)
+    }
+}
+
+tasks.register('testLive', Test) {
+    group = 'verification'
+    description = 'Parallel-unsafe live/contention classes (60). Runs after :test at -Ppkb.test.liveForks (default 1).'
+    useJUnitPlatform {
+        includeEngines 'junit-jupiter'
+    }
+    pkbLiveTestClasses.each { String fqcn ->
+        include '**/' + fqcn.substring(fqcn.lastIndexOf('.') + 1) + '.class'
+    }
+    dependsOn 'expandWoven', 'publishToMavenLocal', 'compileConsumerGlueJava', ':pickleball-control-api:classes', ':pickleball-workbench:classes'
+    dependsOn tasks.named('shadowJar'), tasks.named('sourcesJar')
+    dependsOn tasks.named('verifyPlaywrightPackaging'), tasks.named('verifySqlitePackaging')
+    shouldRunAfter tasks.named('test')
+    mustRunAfter tasks.named('test')
 }
 
 tasks.register('testSerial', Test) {
     group = 'verification'
-    description = 'Serial group. SuiteDualRunTest binds port 8765, links src/test/resources/calls, and hydrates this repo store. Runs after :test.'
+    description = 'Serial group. SuiteDualRunTest binds port 8765, links src/test/resources/calls, and hydrates this repo store. Runs after :testLive.'
     useJUnitPlatform {
         includeEngines 'junit-jupiter'
     }
     include '**/SuiteDualRunTest.class'
     dependsOn 'expandWoven', 'publishToMavenLocal', 'compileConsumerGlueJava', ':pickleball-control-api:classes', ':pickleball-workbench:classes'
     dependsOn tasks.named('shadowJar'), tasks.named('sourcesJar')
-    shouldRunAfter tasks.named('test')
+    shouldRunAfter tasks.named('test'), tasks.named('testLive')
+    mustRunAfter tasks.named('test'), tasks.named('testLive')
 }
 
 def pkbTestTask = tasks.named('test', Test)
+def pkbLiveTask = tasks.named('testLive', Test)
 def pkbSerialTask = tasks.named('testSerial', Test)
+pkbLiveTask.configure {
+    testClassesDirs = pkbTestTask.get().testClassesDirs
+    classpath = pkbTestTask.get().classpath
+    testLogging {
+        events 'failed'
+        exceptionFormat 'full'
+        showCauses true
+        showStackTraces true
+    }
+}
 pkbSerialTask.configure {
     testClassesDirs = pkbTestTask.get().testClassesDirs
     classpath = pkbTestTask.get().classpath
 }
 pkbTestTask.configure {
+    finalizedBy pkbLiveTask
+}
+pkbLiveTask.configure {
     finalizedBy pkbSerialTask
 }
 
+tasks.named('check') {
+    dependsOn pkbLiveTask, pkbSerialTask
+}
+
 gradle.taskGraph.whenReady { graph ->
+    def live = pkbLiveTask.get()
     def serial = pkbSerialTask.get()
-    if (!graph.hasTask(serial)) return
+    def main = pkbTestTask.get()
     def patterns = new LinkedHashSet<String>()
-    def mainPatterns = pkbTestTask.get().filter.commandLineIncludePatterns
-    def serialPatterns = serial.filter.commandLineIncludePatterns
-    if (mainPatterns != null) patterns.addAll(mainPatterns)
-    if (serialPatterns != null) patterns.addAll(serialPatterns)
+    for (def task : [main, live, serial]) {
+        def taskPatterns = task.filter.commandLineIncludePatterns
+        if (taskPatterns != null) patterns.addAll(taskPatterns)
+    }
     if (patterns.isEmpty()) {
-        logger.lifecycle('testSerial running SuiteDualRunTest after :test')
+        logger.lifecycle('testLive running the 60 live/contention classes after :test')
+        logger.lifecycle('testSerial running SuiteDualRunTest after :testLive')
         return
     }
-    if (!patterns.any { suiteDualRunMatches(it) }) {
+    boolean wantLive = patterns.any { pkbLiveMatches(it) }
+    boolean wantSerial = patterns.any { suiteDualRunMatches(it) }
+    boolean wantMain = patterns.any { !pkbExclusiveLiveOrSerial(it) }
+    if (!wantLive && graph.hasTask(live)) {
+        live.enabled = false
+        logger.lifecycle('testLive skipped; --tests does not include a live/contention class')
+    } else if (wantLive) {
+        live.filter.setCommandLineIncludePatterns(new ArrayList<String>(patterns))
+        logger.lifecycle("testLive include ${patterns}")
+    }
+    if (!wantSerial && graph.hasTask(serial)) {
         serial.enabled = false
         logger.lifecycle('testSerial skipped; --tests does not include SuiteDualRunTest')
-        return
+    } else if (wantSerial) {
+        serial.filter.setCommandLineIncludePatterns(new ArrayList<String>(patterns))
+        logger.lifecycle("testSerial include ${patterns}")
     }
-    serial.filter.setCommandLineIncludePatterns(new ArrayList<String>(patterns))
-    logger.lifecycle("testSerial include ${patterns}")
+    if (!wantMain && graph.hasTask(main)) {
+        main.enabled = false
+        logger.lifecycle('test skipped; --tests is only a live/contention or SuiteDualRunTest class')
+    }
 }
 
 // workbenchUi depends on ajcMain, not classes: classes depends on processResources.
