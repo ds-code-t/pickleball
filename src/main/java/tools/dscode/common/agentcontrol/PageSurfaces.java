@@ -2303,6 +2303,12 @@ final class PageSurfaces {
         return value != null && !String.valueOf(value).isBlank();
     }
 
+    private static final java.util.concurrent.atomic.AtomicLong SURFACE_EVENTS = new java.util.concurrent.atomic.AtomicLong();
+
+    static long surfaceEvents() {
+        return SURFACE_EVENTS.get();
+    }
+
     private static void installSurface(WebDriver web, BrowserFacade facade) {
         if (dialogOpen(web)) return;
         if (!SURFACE_PROTOCOL.add(System.identityHashCode(web))) return;
@@ -2314,6 +2320,7 @@ final class PageSurfaces {
                 Map<String, String> event = bindingEvent(name, payload);
                 if (event != null && !event.isEmpty()) {
                     PUSHED.add(event);
+                    if (!"mutation".equals(event.get("type"))) SURFACE_EVENTS.incrementAndGet();
                     tools.dscode.common.agentfast.PushWake.signal();
                 }
             }, "pkb-surface");
@@ -2322,6 +2329,7 @@ final class PageSurfaces {
                 Map<String, String> event = bindingEvent(name, payload);
                 if (event != null && !event.isEmpty()) {
                     PUSHED.add(event);
+                    if (!"mutation".equals(event.get("type"))) SURFACE_EVENTS.incrementAndGet();
                     tools.dscode.common.agentfast.PushWake.signal();
                 }
             });

@@ -1192,6 +1192,7 @@ def pkbLiveTestClasses = [
     // HCR fixes 2026-11-28: live start-session tests added with the fixes.
     'tools.dscode.launcher.HumanChatPushLiveTest',
     'tools.dscode.launcher.LiveStopVerbTest',
+    'tools.dscode.launcher.HcrLiveFixesTest',
     'tools.dscode.store.StoreEntityUsageTest'
 ]
 def pkbLiveTestSimple = pkbLiveTestClasses.collect { String fqcn -> fqcn.substring(fqcn.lastIndexOf('.') + 1) } as Set

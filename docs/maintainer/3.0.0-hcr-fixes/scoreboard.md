@@ -20,23 +20,23 @@ Source: PKB-HCR run of 2026-11-28 on consumer `myq-release-testing`, Pickleball 
 | 28b | Second `lease take` by the same holder said "another holder" | Fixed (message only; the second take is still refused by design) | `e4824649a` | `LeaseAndBlockTest.secondTakeFailsAndACleanSessionCannotBlockInput` | none |
 | G1 | Stale `agent-controller.classpath` and log after export | Fixed | `6d8d67fa0` | `StaleControllerFilesTest` (2; stale files kept before) | none |
 | D1 | Catalog and guidance: spine session first; `.pickleball/v/<version>/` paths and no `index.txt`; consumer S0 variant and the repo-only `URL.*` keys; comma quoting; wrong steps HCR-06/16/18/29/37/46; start-session event verbs | Fixed (docs) | `0ba02836a`, `0f0f72319` | validators (`sync_consumer_guidance.py`, `refresh_agent_index.py`, `verify_agent_contract.py`) | none |
+| 10 | `--block=true` overlay did not stop a human `act --kind=type` | Fixed (code reading; type, select and press now check for a pickleball block overlay over the field, like click) | `R4A` | `HcrLiveFixesTest.blockOverlayRefusesTypingIntoTheBlockedField`, `HcrRoundFourTest.theBlockProbeLooksOnlyForPickleballBlockOverlays` | Headed: `overlay --handle=<Note id> --block=true`, then H `act --kind=type --query=Note` is refused `covered` |
+| 16 | `frame --list/--enter/--reset` said `no live browser` on a live `start` | Fixed (frame with no `--target` now defaults to `browser:auto` like snap/find/act) | `R4A` | `HcrLiveFixesTest.frameVerbsUseTheLiveBrowserWithoutTarget`, `HcrRoundFourTest.frameUsesTheLiveBrowserLikeTheOtherPageVerbs` | Headed `start`: `frame --list`, `frame --enter=<name>`, `frame --reset` |
+| 20 | `act --kind=press --value=Enter` said not applied although the chat line was sent / guide moved | Fixed (a pickleball surface event, such as a chat send or guide step, within 300 ms of the key counts as applied) | `R4A` | `HcrLiveFixesTest.enterInThePanelComposerIsApplied`, `HcrRoundFourTest.aSurfaceEventDuringTheSettleCountsAsApplied` | Headed: type in the panel, H `act --kind=press --value=Enter --query=Message` exits 0 |
+| 23 | `navigate` reset the dock and panel place; `panel-open --tab=guide` answered `steps`; `--tab=chat` left the panel minimized | Fixed (navigate snapshots the shown state first, the snapshot carries the dock; reply `tab` is the `--tab` name; a `--tab` with no `--minimized` opens the panel) | `R4A` | `HcrLiveFixesTest.panelOpenTabNamesUnminimizeAndNavigateKeepsPanelAndDock`, `HcrPanelTabTest` | Headed: drag the panel and dock, `navigate` to the same origin, both stay |
 
 ## Not done (needs a redesign or a longer investigation)
 
 | Item | Reason |
 |---|---|
 | 9 two card systems, `ask-answer` on page cards | One card API is a redesign. The catalog now uses the right verb for each card type. |
-| 10 `--block=true` does not stop human `act --kind=type` | Needs the human-lock path traced on a live Windows session. |
 | 12 offline emulation vs service worker | Needs emulation on worker targets. Only the `cleared` half is fixed. |
 | 13 short ids scoped per run id, foreign id gives no error | An error breaks existing wait-any unit tests that watch ids with no page; needs an id-scope design. |
 | 14 event streams tagged with the starter's run id | Run binding for streams, spill dirs and `downloads`: design work. |
-| 16 `frame --list` says no live browser | Needs a repro on a live `start` session. |
 | 17 desktop `--exe` resolved against the project | Windows-only; needs a desktop session. |
 | 18 `upload --ref=#files` | Needs CSS-selector refs in the upload resolver; not a one-line change. |
 | 19 `browser ports` shows none | Windows port discovery; needs the PC. |
-| 20 `act --kind=press --value=Enter` reports not applied | Needs the chat panel read-back traced live. |
 | 21, 22 H views miss agent surfaces; magnifier clone is clickable | View and exposure design. |
-| 23 `navigate` resets dock position; `panel-open --tab` | Needs the page runtime re-injection traced on a headed page. |
 | 24 popup `alwaysOnTop` | Windows `SetWindowPos`; needs the PC. |
 | 25 no `human-lock override` log line | Needs a decision on where the line is logged. |
 | 26 covered button `visible=true`; act `bounds` 0,0,0,0 | Needs the visibility model reconciled between `snap` and `explain`. |

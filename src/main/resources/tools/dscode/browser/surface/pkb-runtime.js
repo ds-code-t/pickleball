@@ -2636,6 +2636,7 @@
     var st = panel.state;
     ['x', 'y', 'w', 'h'].forEach(function (k) { if (opts[k] != null && opts[k] !== '' && isFinite(+opts[k])) st[k] = +opts[k]; });
     if (opts.min != null) st.min = opts.min === true || opts.min === 'true';
+    else if (opts.tab) st.min = false;
     if (opts.dockCollapsed != null) dockCollapse(opts.dockCollapsed === true || opts.dockCollapsed === 'true');
     if (opts.title) panel.title.textContent = String(opts.title).slice(0, 80);
     if (opts.theme === 'light' || opts.theme === 'dark') { panel.card.setAttribute('data-theme', opts.theme); panel.pill.setAttribute('data-theme', opts.theme); }
@@ -2691,7 +2692,8 @@
   var pendingItems = [];
 
   function snapshot() {
-    var out = {v: 1, url: location.href, items: [], guides: [], panel: panel ? window.__pkbPanelState : null};
+    var out = {v: 1, url: location.href, items: [], guides: [], panel: panel ? window.__pkbPanelState : null,
+      dock: dock ? {x: dock.state.x, y: dock.state.y, collapsed: !!dock.state.collapsed} : null};
     items.forEach(function (item) {
       if (!item.host.isConnected) return;
       var copy = item.host.cloneNode(true);
@@ -2747,6 +2749,13 @@
       if (!guides.has(rec.spec.id)) guide({id: rec.spec.id, steps: rec.spec.steps, scroll: false, at: rec.at, tab: false});
     });
     if (snap.panel && !panel) panelOpen({x: snap.panel.x, y: snap.panel.y, w: snap.panel.w, h: snap.panel.h, min: snap.panel.min, tab: snap.panel.tab, focus: false});
+    if (snap.dock && dock) {
+      // The dock keeps the place it had before the navigate, not the default corner.
+      if (snap.dock.x != null && isFinite(+snap.dock.x)) { dock.state.x = +snap.dock.x; dock.state.y = +snap.dock.y; }
+      dock.state.collapsed = !!snap.dock.collapsed;
+      dockPlace();
+      dockSave();
+    }
     restoreApplied = true;
   }
 

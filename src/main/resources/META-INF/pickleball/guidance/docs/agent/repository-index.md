@@ -919,6 +919,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentcontrol/DialogBlocksBindingTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/FallbackLogTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/ForgetLeavesPanelTest.java`
+- `src/test/java/tools/dscode/common/agentcontrol/HcrPanelTabTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/HumanValueTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/IframeRecordingTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/InjectLivePageTest.java`
@@ -950,6 +951,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentfast/FallbackRunCapTest.java`
 - `src/test/java/tools/dscode/common/agentfast/FormatViewTest.java`
 - `src/test/java/tools/dscode/common/agentfast/FormFillInteractionTest.java`
+- `src/test/java/tools/dscode/common/agentfast/HcrRoundFourTest.java`
 - `src/test/java/tools/dscode/common/agentfast/HostLanesTest.java`
 - `src/test/java/tools/dscode/common/agentfast/LeanReplyTest.java`
 - `src/test/java/tools/dscode/common/agentfast/LiveReplyRulesTest.java`
@@ -1186,6 +1188,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/GcRunsDryRunTest.java`
 - `src/test/java/tools/dscode/launcher/GeneratedPageAccessTest.java`
 - `src/test/java/tools/dscode/launcher/GuidanceCommandGoldenTest.java`
+- `src/test/java/tools/dscode/launcher/HcrLiveFixesTest.java`
 - `src/test/java/tools/dscode/launcher/HeadedFlagTest.java`
 - `src/test/java/tools/dscode/launcher/HoldJvmFlagsTest.java`
 - `src/test/java/tools/dscode/launcher/HousekeepingRoadmapTest.java`

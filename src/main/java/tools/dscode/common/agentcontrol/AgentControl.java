@@ -49,6 +49,16 @@ public final class AgentControl {
         AgentDriverHooks.quit();
     }
 
+    /** Pickleball surface events (chat, guide steps, cards) the page has pushed; page mutations are not counted. */
+    public static long surfaceEvents() {
+        return PageSurfaces.surfaceEvents();
+    }
+
+    /** Snapshots what is shown on the live page (panel position, dock, placements) so a navigate restores it. */
+    public static void syncUiState(Path project, String runId) {
+        UiState.sync(project, runId, null);
+    }
+
     /** Puts the live Selenium document back on the top frame. A missing driver is a no-op. */
     public static void resetLiveDocument() {
         WebDriver web = PageSurfaces.liveDriver();
@@ -712,8 +722,20 @@ public final class AgentControl {
         Map<String, Object> body = ok("Agent panel open on the page.");
         body.put("op", "panel-open");
         body.put("target", "page");
-        body.put("panel", AgentStore.JSON.readValue(reply, Map.class));
+        Map<?, ?> panelState = AgentStore.JSON.readValue(reply, Map.class);
+        body.put("panel", panelState);
+        // panel.tab is the pane id (steps, record); tab is the name panel-open --tab takes.
+        body.put("tab", publicTab(String.valueOf(panelState.get("tab"))));
         return new Result(0, body);
+    }
+
+    static String publicTab(String pane) {
+        return switch (pane == null ? "" : pane) {
+            case "steps" -> "guide";
+            case "record" -> "recorder";
+            case "null", "" -> "chat";
+            default -> pane;
+        };
     }
 
     private static final java.util.Set<String> STEP_ACTIONS = java.util.Set.of("click", "input", "select", "check", "any");

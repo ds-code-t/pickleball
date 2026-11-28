@@ -535,9 +535,9 @@ public final class TargetVerb {
     }
 
     /** Page verbs with no selector use the browser this process already has open. */
-    private static boolean needsLiveTarget(String verb) {
+    static boolean needsLiveTarget(String verb) {
         return switch (verb == null ? "" : verb) {
-            case "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "eval", "upload", "navigate" -> true;
+            case "snap", "find", "act", "form-fill", "wait", "wait-for", "watch", "explain", "capture", "eval", "upload", "navigate", "frame" -> true;
             default -> false;
         };
     }
@@ -668,6 +668,12 @@ public final class TargetVerb {
         try {
             CdpConnection cdp = page.session.connection();
             String before = href(cdp, "");
+            try {
+                // A person may have dragged the panel or dock since the last ui command; the restore uses this.
+                tools.dscode.common.agentcontrol.AgentControl.syncUiState(project, runId);
+            } catch (RuntimeException ignored) {
+                // Best effort: navigate still runs.
+            }
             ObjectNode params = Jsons.object();
             params.put("url", url);
             JsonNode sent = cdp.call("Page.navigate", params, Duration.ofSeconds(30));
@@ -2465,6 +2471,11 @@ public final class TargetVerb {
             String coveredBy = coverOf(session.connection(), framed, acted);
             if (!coveredBy.isBlank()) return Effect.covered(inputOff ? "js" : "cdp", coveredBy);
         }
+        if ("type".equals(kind) || "select".equals(kind) || "press".equals(kind)) {
+            // A --block=true overlay stops typing, selecting and keys too, not only clicks.
+            String blockedBy = blockOf(session.connection(), framed, "select".equals(kind) ? control : acted);
+            if (!blockedBy.isBlank()) return Effect.covered(inputOff ? "js" : "cdp", blockedBy);
+        }
         if ("type".equals(kind)) return typeInto(session.connection(), node, value, inputOff);
         if (!framed.isBlank()) return actInFrame(session.connection(), framed, kind, value, node);
         if ("click".equals(kind) && insideFrame(node) && !closedShadow(acted)) {
@@ -2490,6 +2501,7 @@ public final class TargetVerb {
             if (!"hover".equals(kind)) markActing(session.connection(), AGENT_ACTING_TAIL_MS, runId, !humanRun(project, runId));
             String probe = "click".equals(kind) ? collabProbe(session.connection(), "", acted, true) : "";
             String keySignature = "press".equals(kind) ? nodeSignature(session.connection(), "", node) : "";
+            long surfaceBefore = "press".equals(kind) ? tools.dscode.common.agentcontrol.AgentControl.surfaceEvents() : 0L;
             LiveXPath.use(session.connection());
             try {
                 PageActions.act(session, verb, flags);
@@ -2514,6 +2526,11 @@ public final class TargetVerb {
             if (!before.equals(pageMark(session.connection()))) return Effect.changed("cdp");
             if ("press".equals(kind) && pressMoved(keySignature, nodeSignature(session.connection(), "", node),
                     collabProbe(session.connection(), "", node, false))) {
+                return Effect.changed("cdp");
+            }
+            // Enter in the agent panel sends a chat line or moves a guide on: the page pushes a surface event.
+            if ("press".equals(kind) && surfaceMoved(surfaceBefore,
+                    tools.dscode.common.agentcontrol.AgentControl::surfaceEvents, PRESS_SETTLE_MS)) {
                 return Effect.changed("cdp");
             }
             return new Effect("cdp", false);
@@ -2816,6 +2833,32 @@ public final class TargetVerb {
                 + "return role;}catch(e){return '';}}");
         return raw == null ? "" : raw.trim();
     }
+
+    /**
+     * The pickleball block overlay ({@code --block=true}) over the node's center, or blank. Only an element
+     * inside {@code [data-pkb-block=true]} counts, so ordinary page covers do not refuse typing.
+     */
+    private static String blockOf(CdpConnection cdp, String sessionId, DomNode node) {
+        if (node == null) return "";
+        String raw = callOnNode(cdp, sessionId, node, BLOCK_PROBE);
+        return raw == null ? "" : raw.trim();
+    }
+
+    static final String BLOCK_PROBE = ""
+            + "function(){"
+            + "try{var el=this;if(!el||!el.getBoundingClientRect)return '';"
+            + "var r=el.getBoundingClientRect();if(r.width<1||r.height<1)return '';"
+            + "var x=r.left+r.width/2,y=r.top+r.height/2;"
+            + "var doc=el.ownerDocument||document;var top=doc.elementFromPoint?doc.elementFromPoint(x,y):null;"
+            + "var guard=0;while(top&&top.shadowRoot&&guard++<8){"
+            + "var inner=top.shadowRoot.elementFromPoint(x,y);if(!inner||inner===top)break;top=inner;}"
+            + "var cursor=top,hops=0;"
+            + "while(cursor&&hops++<40){"
+            + "if(cursor===el)return '';"
+            + "if(cursor.getAttribute&&cursor.getAttribute('data-pkb-block')==='true')return 'pkb block overlay';"
+            + "if(cursor.parentElement){cursor=cursor.parentElement;continue;}"
+            + "var root=cursor.getRootNode?cursor.getRootNode():null;cursor=root&&root.host?root.host:null;}"
+            + "return '';}catch(e){return '';}}";
 
     /** A click was sent once. Wait for a visible change, and do not send it again. */
     private static Effect clickSettled(CdpConnection cdp, String sessionId, String before, String used) {
@@ -3289,6 +3332,18 @@ public final class TargetVerb {
      * A key was sent to the node after it was focused. It landed when focus left the node (Tab, Escape),
      * or the node's value, selection, or state moved (Enter, arrows).
      */
+    static final long PRESS_SETTLE_MS = 300;
+
+    /** True when a pickleball surface event (chat send, guide step) arrived within {@code settleMs} of the key. */
+    static boolean surfaceMoved(long before, java.util.function.LongSupplier now, long settleMs) {
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(Math.max(0, settleMs));
+        while (true) {
+            if (now.getAsLong() > before) return true;
+            if (System.nanoTime() >= deadline) return false;
+            sleep(25);
+        }
+    }
+
     static boolean pressMoved(String signatureBefore, String signatureAfter, String probeAfter) {
         if (signatureApplied(signatureBefore, signatureAfter)) return true;
         if (probeAfter == null || probeAfter.isBlank()) return false;
