@@ -51,6 +51,16 @@ class EmulateLiveTest {
     static void start() throws Exception {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", exchange -> {
+            String path = exchange.getRequestURI().getPath();
+            String sw = SW_FILES.get(path);
+            if (sw != null) {
+                byte[] body = sw.getBytes(StandardCharsets.UTF_8);
+                exchange.getResponseHeaders().add("Content-Type", path.endsWith(".js") ? "text/javascript" : path.equals("/sw-data") ? "text/plain" : "text/html");
+                exchange.sendResponseHeaders(200, body.length);
+                exchange.getResponseBody().write(body);
+                exchange.close();
+                return;
+            }
             boolean ua = exchange.getRequestURI().getPath().equals("/ua");
             byte[] body = (ua ? String.valueOf(exchange.getRequestHeaders().getFirst("User-Agent")) : PAGE).getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", ua ? "text/plain" : "text/html");
@@ -127,6 +137,31 @@ class EmulateLiveTest {
         PwCommandLiveTest.Capture bad = PwCommandLiveTest.agentIn(p, "emulate", "--vision=sepia", "--target=browser:cdp=" + endpoint);
         assertEquals(1, bad.code());
         assertTrue(bad.err().contains("--vision is one of"), bad.err());
+    }
+
+    static final java.util.Map<String, String> SW_FILES = java.util.Map.of(
+            "/sw.js", "self.addEventListener('install', e => self.skipWaiting());"
+                    + "self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));"
+                    + "self.addEventListener('fetch', e => e.respondWith(fetch(e.request)));",
+            "/sw-page", "<!DOCTYPE html><html><body><script>navigator.serviceWorker.register('/sw.js');</script></body></html>",
+            "/sw-data", "fresh");
+
+    /** PKB-HCR bug 12: offline emulation did not reach a page a service worker controls. */
+    @Test
+    void offlineReachesAServiceWorkerControlledPage() throws Exception {
+        Path p = project("net-sw");
+        ok(p, "pw", "page", "goto", "--url=" + base + "/sw-page");
+        String controlled = "";
+        for (int attempt = 0; attempt < 40 && !"true".equals(controlled); attempt++) {
+            Thread.sleep(250);
+            controlled = eval(p, "String(!!navigator.serviceWorker.controller)");
+        }
+        assertEquals("true", controlled, "the service worker never took control");
+        assertEquals("fresh", eval(p, "fetch('/sw-data').then(r => r.text()).catch(() => 'offline')"));
+        ok(p, "emulate", "--network=offline", "--via=cdp");
+        assertEquals("offline", eval(p, "fetch('/sw-data?x=' + Date.now()).then(r => r.text()).catch(() => 'offline')"),
+                "the worker's fetch went to the network while the page was offline");
+        ok(p, "emulate", "--reset");
     }
 
     /** PKB-HCR bug 12: emulate --reset restored the network but did not list it in cleared. */

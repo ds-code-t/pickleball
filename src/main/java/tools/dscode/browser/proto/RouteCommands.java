@@ -418,8 +418,13 @@ final class RouteCommands {
                     p.put("latency", latency);
                     p.put("downloadThroughput", throttled ? down * 1024 / 8 : -1);
                     p.put("uploadThroughput", throttled ? up * 1024 / 8 : -1);
-                    for (CdpSession.Target t : pages(host)) {
-                        host.cdp().send(t.sessionId, "Network.enable", Map.of());
+                    for (CdpSession.Target t : networkTargets(host)) {
+                        try {
+                            host.cdp().send(t.sessionId, "Network.enable", Map.of());
+                        } catch (RuntimeException workerWithoutNetwork) {
+                            if ("page".equals(t.type)) throw workerWithoutNetwork;
+                            continue;
+                        }
                         try {
                             host.cdp().send(t.sessionId, "Network.emulateNetworkConditions", p);
                         } catch (RuntimeException removed) {
@@ -780,6 +785,27 @@ final class RouteCommands {
     }
 
     /** Attached page targets, waiting briefly for the first one on a host that just connected. */
+    /**
+     * Pages plus the page's service and shared workers (HCR-12): a page a service worker controls fetches through
+     * the worker, so offline on the page alone does not reach it.
+     */
+    static List<CdpSession.Target> networkTargets(ProtoHost host) {
+        List<CdpSession.Target> out = new java.util.ArrayList<>(pages(host));
+        try {
+            host.cdp().attachWorkers();
+        } catch (RuntimeException ignored) {
+            // A browser without target listing still gets the pages.
+        }
+        out.addAll(workerTargets(host.cdp().all()));
+        return out;
+    }
+
+    static List<CdpSession.Target> workerTargets(List<CdpSession.Target> all) {
+        List<CdpSession.Target> out = new java.util.ArrayList<>();
+        for (CdpSession.Target t : all) if (t != null && CdpSession.WORKERS.contains(t.type)) out.add(t);
+        return out;
+    }
+
     static List<CdpSession.Target> pages(ProtoHost host) {
         List<CdpSession.Target> pages = host.cdp().pages();
         if (!pages.isEmpty()) return pages;
