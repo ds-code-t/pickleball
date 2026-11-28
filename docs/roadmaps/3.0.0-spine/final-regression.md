@@ -8,7 +8,7 @@ There are three regression tiers (Dan, 2026-11-27). Between phases and fixes, ru
 |---|---|---|
 | **Full** | Every suite and every function. Every browser the branch supports. Windows, Linux, and macOS. The consumer project. The CI-equivalent checks. Live and real-browser tests, headed and headless. | Never, unless Dan explicitly asks for the full regression. |
 | **Short (Chrome + Windows)** | The Windows suites on Dan's PC, limited to the Chrome browser. | The default end-of-work regression. It runs only when 100% completion is possible: every roadmap is implemented, and every phase and every fix has been verified with its targeted tests. |
-| **Manual human collaboration** | [A numbered catalog of agent-run instructions](manual-collaboration-regression.md) on a live headed Chrome page. The agent plays the human collaborator (Human Mode tools and the human view only) or the agent (every tool, including consumer direct control, HTML injection, listeners, and the DevTools interfaces). | The whole catalog: never, unless Dan explicitly asks. A single test: without asking, when it covers functionality that a new implementation may have impacted. |
+| **Manual human collaboration (PKB-HCR)** | [PKB-HCR](manual-collaboration-regression.md): a numbered catalog of 75 agent-run instructions (HCR-01 through HCR-75) on a live headed Chrome page. Invoke with `Run PKB-HCR`, `Run PKB-HCR HCR-12`, or `Run PKB-HCR paired only`. The agent plays the human collaborator (Human Mode tools and the human view only) or the agent (every tool, including consumer direct control, HTML injection, listeners, and the DevTools interfaces). | The whole catalog: never, unless Dan explicitly asks (`Run PKB-HCR`). A single test: without asking, when it covers functionality that a new implementation may have impacted, or when the request names it. |
 
 ## Short regression (Chrome + Windows)
 
@@ -66,9 +66,9 @@ This applies to every tier.
 
 Flaky or environment-only problems go in `docs/tech-debt.md` with evidence, not as passes.
 
-## Manual human-collaboration regression
+## Manual human-collaboration regression (PKB-HCR)
 
-The catalog, roles, setup, and the table for picking targeted tests are in [Manual human-collaboration regression](manual-collaboration-regression.md). The results template is `docs/maintainer/3.0.0-spine/manual-collaboration-scoreboard-template.md`. It is not part of the full or short tier, and neither of them triggers it. The batching rule above applies to its failures.
+**PKB-HCR** (pickleball Human Collaboration Regression) is the tag for this tier. The catalog, roles, setup, invocation phrases, and the table for picking targeted tests are in [PKB-HCR](manual-collaboration-regression.md). The results template is `docs/maintainer/3.0.0-spine/manual-collaboration-scoreboard-template.md`. After `export-guidance` a consumer agent loads `.pickleball/PKB-HCR.md`. It is not part of the full or short tier, and neither of them triggers it. The batching rule above applies to its failures.
 
 ## Full regression
 

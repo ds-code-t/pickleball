@@ -611,7 +611,7 @@ def resolve_exported_doc(from_relative: str, target: str) -> str | None:
     raw = raw.split("#", 1)[0].split("?", 1)[0].strip()
     if not raw or raw.endswith("/"):
         return None
-    if raw.startswith("docs/") or raw.startswith("maven-consumer-project/") or raw == "AGENT-GUIDE.md":
+    if raw.startswith("docs/") or raw.startswith("maven-consumer-project/") or raw in {"AGENT-GUIDE.md", "PKB-HCR.md", "PKB-HCR-scoreboard.md"}:
         resolved = posixpath.normpath(raw)
     else:
         resolved = posixpath.normpath(posixpath.join(posixpath.dirname(from_relative), raw))

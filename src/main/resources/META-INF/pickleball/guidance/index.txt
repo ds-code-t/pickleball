@@ -1,4 +1,7 @@
 AGENT-GUIDE.md
+PKB-HCR-scoreboard.md
+PKB-HCR.md
+docs/PKB-HCR.md
 docs/README.md
 docs/agent/README.md
 docs/agent/change-checklist.md

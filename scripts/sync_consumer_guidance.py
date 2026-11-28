@@ -46,6 +46,12 @@ MAINTAINER_ONLY_PREFIXES = (
     "docs/roadmaps/",
     "docs/audits/",
 )
+# PKB-HCR lives under docs/roadmaps/ (and its scoreboard under docs/maintainer/),
+# which are otherwise omitted from the consumer guidance mirror. Export copies
+# them to well-known names so a consumer agent can find them without the repo.
+PKB_HCR_CATALOG = ROOT / "docs/roadmaps/3.0.0-spine/manual-collaboration-regression.md"
+PKB_HCR_SCOREBOARD = ROOT / "docs/maintainer/3.0.0-spine/manual-collaboration-scoreboard-template.md"
+
 # Planning notes stay in the source repository index. Export omits them.
 EXPORT_ONLY_DOCS = (
     "docs/ai-diagnostic-reporting-plan.md",
@@ -119,6 +125,39 @@ def consumer_reference_entries() -> list[str]:
     ]
 
 
+def _rewrite_unexported_doc_refs(text: str) -> str:
+    """Packaged PKB-HCR files must not link to roadmaps/ or maintainer/ pages."""
+    text = re.sub(r"\[([^\]]*)\]\(final-regression\.md(?:#[^)]*)?\)", r"\1", text)
+    replacements = (
+        ("`docs/maintainer/3.0.0-spine/manual-collaboration-scoreboard-template.md`", "`PKB-HCR-scoreboard.md`"),
+        ("`docs/roadmaps/3.0.0-spine/manual-collaboration-regression.md`", "`PKB-HCR.md`"),
+        ("`docs/maintainer/3.0.0-spine/manual-collaboration-<yyyy-mm-dd>.md`", "a dated `pkb-hcr-<yyyy-mm-dd>.md` file"),
+        ("`docs/maintainer/3.0.0-collab-test/`", "the 2026-11-23 collaboration test notes in the source repository"),
+    )
+    for old, new in replacements:
+        text = text.replace(old, new)
+    def tick(match: re.Match[str]) -> str:
+        path = match.group(1)
+        if "scoreboard" in path:
+            return "`PKB-HCR-scoreboard.md`"
+        if "manual-collaboration-regression" in path:
+            return "`PKB-HCR.md`"
+        return "that page in the source repository"
+    return re.sub(r"`(docs/(?:roadmaps|maintainer)/[A-Za-z0-9_./-]+\.md)`", tick, text)
+
+
+def package_pkb_hcr_catalog() -> bytes:
+    if not PKB_HCR_CATALOG.is_file():
+        raise FileNotFoundError(f"Missing PKB-HCR catalog: {PKB_HCR_CATALOG}")
+    return _rewrite_unexported_doc_refs(PKB_HCR_CATALOG.read_text(encoding="utf-8")).encode("utf-8")
+
+
+def package_pkb_hcr_scoreboard() -> bytes:
+    if not PKB_HCR_SCOREBOARD.is_file():
+        raise FileNotFoundError(f"Missing PKB-HCR scoreboard template: {PKB_HCR_SCOREBOARD}")
+    return _rewrite_unexported_doc_refs(PKB_HCR_SCOREBOARD.read_text(encoding="utf-8")).encode("utf-8")
+
+
 def expected_files() -> dict[str, bytes]:
     files: dict[str, bytes] = {}
 
@@ -133,6 +172,9 @@ def expected_files() -> dict[str, bytes]:
         if excluded_consumer_doc(doc_path):
             continue
         files[doc_path] = consumer_doc_bytes(doc_path, source)
+
+    files["PKB-HCR.md"] = package_pkb_hcr_catalog()
+    files["PKB-HCR-scoreboard.md"] = package_pkb_hcr_scoreboard()
 
     index_entries = sorted([*files, *consumer_reference_entries()])
     files["index.txt"] = ("\n".join(index_entries) + "\n").encode("utf-8")
