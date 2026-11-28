@@ -1083,6 +1083,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/browser/SurfaceAssetsTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/AgentDataFoundationTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/AgentLiveFixTest.java`
+- `src/test/java/tools/dscode/common/agentcontrol/AskAnswerPageCardTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/AskProgressPointTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/BindingEventTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/ChatChannelTest.java`

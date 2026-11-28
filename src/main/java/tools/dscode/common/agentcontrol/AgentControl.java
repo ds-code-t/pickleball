@@ -948,7 +948,7 @@ public final class AgentControl {
     }
 
     private static Result ask(Path project, String runId, Map<String, String> args) throws Exception {
-        if (present(args.get("type"))) return typedAsk(project, args);
+        if (present(args.get("type"))) return typedAsk(project, runId, args);
         if (!present(args.get("say"))) return fail(2, "ask requires --say=<question>");
         String say;
         try {
@@ -988,6 +988,7 @@ public final class AgentControl {
                 String.valueOf(spec.get("say")),
                 shownChoices
         );
+        PAGE_CARDS.put(String.valueOf(spec.get("id")), new PageCard(runId, args.get("session"), List.copyOf(shownChoices)));
         CompositeLog.info("ui", "ask " + reply);
         Map<String, Object> body = ok("Question shown on the page; the answer arrives as an answer event in overlay-poll.");
         body.put("op", "ask");
@@ -999,6 +1000,10 @@ public final class AgentControl {
     private static Result askAnswer(Path project, String runId, Map<String, String> args) throws Exception {
         String session = present(args.get("session")) ? args.get("session") : runId;
         String id = args.get("id");
+        if (present(id)) {
+            Result page = answerPageCard(project, id.trim(), args.get("value"));
+            if (page != null) return page;
+        }
         AskCards.answer(project, session, id, args.get("value"));
         Map<String, Object> card = AskCards.answered(project, session);
         Map<String, Object> body = ok("Answer stored. ui-poll returns type and value.");
@@ -1012,8 +1017,63 @@ public final class AgentControl {
         return new Result(0, body);
     }
 
+    /**
+     * HCR-9: a page card ({@code ask --say}) is answered like a click on it. The answer row goes to the run's
+     * overlay events, where {@code ask-and-wait}, {@code answer-wait} and {@code ui-poll} read answers, and the
+     * card closes on the page. Null when no page card with this id is known, so the stored-card error stays.
+     */
+    private static Result answerPageCard(Path project, String id, String value) throws Exception {
+        String useValue = value == null ? "" : value.trim();
+        PageCard shown = PAGE_CARDS.get(id);
+        if (shown == null) return null;
+        String runId = shown.runId();
+        if (!shown.choices().isEmpty() && !shown.choices().contains(useValue) && !useValue.isBlank()) {
+            return fail(2, "error: option is not listed\nfix: use one of " + String.join(", ", shown.choices()));
+        }
+        if (useValue.isBlank()) return fail(2, "error: missing answer\nfix: ask-answer --id=" + id + " --value=<one of the card's choices>");
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("type", "answer");
+        row.put("id", id);
+        row.put("choice", useValue);
+        row.put("value", useValue);
+        row.put("by", "agent");
+        row.put("source", "ask-answer");
+        row.put("at", AgentStore.now());
+        AgentStore.appendCapped(AgentStore.root(project, runId).resolve("overlay-events.jsonl"), AgentStore.JSON.writeValueAsString(row));
+        tools.dscode.common.agentfast.PushWake.signal();
+        boolean closed = false;
+        if (PageSurfaces.hasLivePage()) {
+            try {
+                PageSurfaces.runtimeCall("askClose", id, false);
+                closed = true;
+            } catch (RuntimeException failure) {
+                CompositeLog.info("ui", "ask-answer close skipped " + failure.getMessage());
+            }
+        }
+        PAGE_CARDS.remove(id);
+        try {
+            AskCards.answer(project, shown.session(), id, useValue);
+        } catch (IllegalArgumentException | IOException ignored) {
+            // The stored copy is a convenience for ui-poll; the answer event above is the answer.
+        }
+        Map<String, Object> body = ok("Page card answered.");
+        body.put("op", "ask-answer");
+        body.put("id", id);
+        body.put("type", "page");
+        body.put("value", useValue);
+        body.put("closed", closed);
+        return new Result(0, body);
+    }
+
+    /** A page card ({@code ask --say}) this process showed: the asking run id, its session, and its choices. */
+    record PageCard(String runId, String session, List<String> choices) {
+    }
+
+    /** Page cards by card id, so any run id may answer the card the asker is waiting on. */
+    static final Map<String, PageCard> PAGE_CARDS = new java.util.concurrent.ConcurrentHashMap<>();
+
     /** A card with no live page. {@code choice} answers must be one of {@code --options}. */
-    private static Result typedAsk(Path project, Map<String, String> args) throws Exception {
+    private static Result typedAsk(Path project, String runId, Map<String, String> args) throws Exception {
         String type = args.get("type").trim().toLowerCase(java.util.Locale.ROOT);
         if (!type.equals("text") && !type.equals("choice") && !type.equals("confirm")) {
             return fail(2, "ask --type is text, choice, or confirm");
@@ -1035,6 +1095,23 @@ public final class AgentControl {
         body.put("op", "ask");
         body.put("session", card.get("session"));
         body.putAll(card);
+        // HCR-9: with a live page the typed card is shown too (choice and confirm as buttons, text as a field).
+        boolean shown = false;
+        if (PageSurfaces.hasLivePage()) {
+            String cardId = String.valueOf(card.get("id"));
+            Map<String, Object> spec = new LinkedHashMap<>();
+            spec.put("id", cardId);
+            spec.put("say", prompt);
+            if (!"text".equals(type)) spec.put("choices", options);
+            try {
+                String reply = PageSurfaces.runtimeCall("ask", spec, true);
+                shown = reply != null && !"null".equals(reply);
+            } catch (RuntimeException failure) {
+                CompositeLog.info("ui", "typed ask not shown " + failure.getMessage());
+            }
+            if (shown) PAGE_CARDS.put(cardId, new PageCard(runId, args.get("session"), "text".equals(type) ? List.of() : List.copyOf(options)));
+        }
+        body.put("shown", shown);
         return new Result(0, body);
     }
 

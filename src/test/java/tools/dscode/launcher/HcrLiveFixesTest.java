@@ -141,6 +141,22 @@ class HcrLiveFixesTest {
         assertTrue(progress.out.contains("\"session\":\"agent\""), progress.out);
     }
 
+    /** HCR-9: ask-answer answers a page card, and ask --type shows a card on a live page. */
+    @Test
+    @Timeout(value = 180, unit = TimeUnit.SECONDS)
+    void askAnswerAnswersAPageCardAndTypedAsksRender() throws Exception {
+        start();
+        assertEquals(0, agent("ask", "--say=Proceed?", "--choices=Yes,No", "--id=q1").code);
+        Capture answered = helper("ask-answer", "--id=q1", "--value=Yes");
+        assertEquals(0, answered.code, answered.err + answered.out);
+        Capture waited = agent("answer-wait", "--id=q1", "--timeout=5000", "--choices=Yes,No");
+        assertEquals(0, waited.code, waited.err + waited.out);
+        assertTrue(waited.out.contains("Yes"), waited.out);
+        Capture typed = agent("ask", "--type=confirm", "--prompt=Sure?", "--id=c1");
+        assertEquals(0, typed.code, typed.err + typed.out);
+        assertTrue(typed.out.contains("\"shown\":true"), typed.out);
+    }
+
     private Path start() throws Exception {
         assumeTrue(BrowserSession.findChrome() != null, "skipped: chrome is not on PATH");
         Path page = temp.resolve("hcr.html");

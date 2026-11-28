@@ -31,6 +31,7 @@ Source: PKB-HCR run of 2026-11-28 on consumer `myq-release-testing`, Pickleball 
 | 12 | Offline emulation did not reach a page a service worker controls | Fixed (CDP): `emulate --network` also applies to the page's service and shared workers (attached on demand) | `7ce9f47d8` | `NetworkTargetsTest`, `EmulateLiveTest.offlineReachesAServiceWorkerControlledPage` (not run on the box) | PC: a PWA page, `emulate --network=offline`, its fetches fail |
 | 13 | `wait-any --watch=<short id>:click` never fired; a foreign short id gave no error | Partly fixed (non-breaking slice): a page click also matches by the short id's full ref, and a short id from another run id adds a `warning` naming its run id. Scoping itself is unchanged; no strict error | `caabbca29` | `ShortIdScopeWarningTest` (2), `ConsumerFixesP4WaitTest` | Headed: H finds Go, A runs `wait-any --watch=<H id>:click` (warning) and with its own id (fires on a click) |
 | 27 | `chat-turn` and `watch` replies had no `wake` / `wakeMs` | Fixed (additive fields; `pushLagMs` stays on mutation rows) | `47bf7f04c` | `WakeFieldsTest`, `LeanReplyTest`, `LiveReplyRulesTest`, `CompactReplyTest` | none |
+| 9 | `ask-answer --id` on a visible page card failed; `ask --type` never rendered | Partly fixed (non-breaking slice): `ask-answer` answers a page card like a click (answer event, wake, card closes; any run id may answer; unlisted option exits 2), and `ask --type` also shows the card when a page is live (`shown`). Two stores remain | `PENDING9` | `AskAnswerPageCardTest` (2), `HcrLiveFixesTest.askAnswerAnswersAPageCardAndTypedAsksRender` (not run on the box) | Headed: A `ask --say --choices=Yes,No --id=q1`, H `ask-answer --id=q1 --value=Yes`, A `answer-wait --id=q1` returns Yes and the card closes |
 
 ## Owner decisions (Dan, 2026-11-28, t1239u)
 
@@ -47,7 +48,7 @@ These were "owner decision" items in the HCR run; Dan approved all four on 2026-
 
 | Item | Reason |
 |---|---|
-| 9 two card systems, `ask-answer` on page cards | One card API is a redesign. The catalog now uses the right verb for each card type. |
+| 9 rest: one card store | Merging the stored and page card stores into one API is a redesign; the slice above bridges them. |
 | 13 short ids scoped per run id (rest) | Warning and full-ref match shipped; a shared id space or a strict error is an id-scope design. |
 | 14 event streams tagged with the starter's run id | Run binding for streams, spill dirs and `downloads`: design work. |
 | 21, 22 H views miss agent surfaces; magnifier clone is clickable | View and exposure design. |
