@@ -253,6 +253,25 @@ class InputLiveTest {
         assertTrue(Files.isDirectory(p.resolve(".pickleball")));
     }
 
+    /** HCR-03/63 outside the live session: input --text --at focuses the target first (it typed nowhere before). */
+    @Test
+    void textAtFocusesTheTargetOnTheProtocolPath() throws Exception {
+        Path p = project("text-at");
+        go(p, base + "/login");
+        eval(p, "document.getElementById('u').value='';document.getElementById('otp').value='';document.activeElement.blur();'x'");
+        JsonNode typed = ok(p, "input", "--text=Zed", "--at=#u");
+        assertTrue(typed.path("focused").asBoolean(), typed.toString());
+        assertEquals("Zed", eval(p, "document.getElementById('u').value"));
+        assertEquals("", eval(p, "document.getElementById('otp').value"), "other field untouched");
+        PwCommandLiveTest.Capture missing = run(p, "input", "--text=Q", "--at=#nope");
+        assertEquals(1, missing.code(), missing.out() + missing.err());
+        assertTrue((missing.out() + missing.err()).contains("matches no element"), missing.out() + missing.err());
+        PwCommandLiveTest.Capture shortId = run(p, "input", "--text=Q", "--at=s1.h2");
+        assertEquals(1, shortId.code(), shortId.out() + shortId.err());
+        assertTrue((shortId.out() + shortId.err()).contains("short id"), shortId.out() + shortId.err());
+        assertEquals("Zed", eval(p, "document.getElementById('u').value"));
+    }
+
     /** HCR-07: aria-snap (default and ai mode, and snap --aria) never prints a password or one-time code. */
     @Test
     void ariaSnapMasksPasswordAndOneTimeCode() throws Exception {

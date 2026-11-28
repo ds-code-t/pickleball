@@ -86,6 +86,34 @@ final class InputCommands {
         return text != null && !text.isBlank() && at != null && !at.isBlank();
     }
 
+    private static final java.util.regex.Pattern SHORT_ID = java.util.regex.Pattern.compile("s\\d+\\.h\\d+");
+
+    /** Focuses the --at target (CSS selector or backend node id) and fails when it is missing or cannot take focus. */
+    static void focusAt(ProtoHost host, CdpSession.Target target, String at) throws Exception {
+        if (SHORT_ID.matcher(at).matches()) {
+            throw new IllegalArgumentException("error: input --at=" + at + " is a short id from the live start session, "
+                    + "and this session has none\nfix: use the live session (pickleball start), or --at=<css selector> or --at=<backend node id>");
+        }
+        if (at.chars().allMatch(Character::isDigit)) {
+            try {
+                host.cdp().send(target.sessionId, "DOM.focus", ContextCommands.p("backendNodeId", Integer.parseInt(at)));
+            } catch (RuntimeException failure) {
+                throw new IllegalArgumentException("error: input --at=" + at + " could not be focused: "
+                        + String.valueOf(failure.getMessage()).lines().findFirst().orElse("")
+                        + "\nfix: find the element again and pass its current backend node id");
+            }
+            return;
+        }
+        String expression = "(function(sel){var e=document.querySelector(sel);if(!e)return 'missing';e.focus();"
+                + "return document.activeElement===e?'ok':'nofocus'})(" + ProtoJson.MAPPER.writeValueAsString(at) + ")";
+        String result = host.cdp().send(target.sessionId, "Runtime.evaluate",
+                ContextCommands.p("expression", expression, "returnByValue", true)).path("result").path("value").asText("");
+        if (!"ok".equals(result)) {
+            throw new IllegalArgumentException("error: input --at=" + at + (("missing".equals(result)) ? " matches no element" : " cannot take focus")
+                    + "\nfix: pass a CSS selector for an editable element, for example --at=#note");
+        }
+    }
+
     static Map<String, Object> insertTextParams(String text) {
         return Map.of("text", text == null ? "" : text);
     }
@@ -108,8 +136,11 @@ final class InputCommands {
         }
         if (oneInsertText(f)) {
             CdpSession.Target target = ContextCommands.target(host, f);
+            // Without a live start session there are no short ids, so --at is a CSS selector or a backend node id.
+            // It is focused first: Input.insertText types into whatever has focus, and used to type nowhere.
+            focusAt(host, target, f.get("at").trim());
             host.cdp().send(target.sessionId, "Input.insertText", insertTextParams(f.get("text")));
-            return ProtoJson.obj().put("op", "input").put("via", "cdp").put("at", f.get("at")).put("calls", 1);
+            return ProtoJson.obj().put("op", "input").put("via", "cdp").put("at", f.get("at")).put("focused", true).put("calls", 2);
         }
         boolean release = f.containsKey("release") && !f.containsKey("actions");
         JsonNode chain = release ? null : chain(host, f.get("actions"));
