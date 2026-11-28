@@ -1,5 +1,7 @@
 package tools.dscode.browser.proto;
 
+import com.microsoft.playwright.BrowserContext;
+import com.microsoft.playwright.Dialog;
 import com.microsoft.playwright.Page;
 import tools.dscode.browser.PlaywrightConnection;
 
@@ -30,6 +32,11 @@ public final class PwBridge implements AutoCloseable {
     private final String endpoint;
     private volatile PlaywrightConnection connection;
     private volatile int listeners;
+    private volatile boolean holdDialogs;
+    private final List<BrowserContext> held = new java.util.ArrayList<>();
+    /** A context listener that answers nothing: while it is installed Playwright does not auto-dismiss a dialog. */
+    private final java.util.function.Consumer<Dialog> keepOpen = dialog -> {
+    };
 
     public PwBridge(String endpoint) {
         this.endpoint = endpoint;
@@ -39,6 +46,7 @@ public final class PwBridge implements AutoCloseable {
     public <T> T call(Function<PlaywrightConnection, T> work) {
         Future<T> future = thread.submit(() -> {
             if (connection == null) connection = PlaywrightConnection.connect(endpoint);
+            syncDialogHold();
             return work.apply(connection);
         });
         try {
@@ -59,6 +67,42 @@ public final class PwBridge implements AutoCloseable {
         if (url != null && !url.isBlank()) for (Page page : pages) if (page.url().contains(url)) return page;
         for (Page page : pages) if (!page.url().startsWith("devtools://") && !page.url().startsWith("chrome-extension://")) return page;
         return connection.page(null);
+    }
+
+    /**
+     * A Playwright client with no dialog listener auto-dismisses every dialog it sees, before a {@code dialogs}
+     * policy on CDP or BiDi can answer it. While a policy is set the bridge keeps a no-op context listener, so the
+     * policy (or the person) answers the dialog. Takes effect now when attached, else on the first call.
+     */
+    public void holdDialogs(boolean on) {
+        holdDialogs = on;
+        if (connection == null) return;
+        try {
+            thread.submit(this::syncDialogHold).get(10, TimeUnit.SECONDS);
+        } catch (Exception failure) {
+            if (failure instanceof InterruptedException) Thread.currentThread().interrupt();
+        }
+    }
+
+    /** Runs on the Playwright thread. */
+    private void syncDialogHold() {
+        if (connection == null) return;
+        if (holdDialogs) {
+            for (BrowserContext context : connection.browser().contexts()) {
+                if (held.contains(context)) continue;
+                context.onDialog(keepOpen);
+                held.add(context);
+            }
+        } else if (!held.isEmpty()) {
+            for (BrowserContext context : held) {
+                try {
+                    context.offDialog(keepOpen);
+                } catch (RuntimeException ignored) {
+                    // The context is gone.
+                }
+            }
+            held.clear();
+        }
     }
 
     public void listening(boolean on) {

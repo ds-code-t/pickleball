@@ -370,6 +370,26 @@ class ContextLiveTest {
         assertEquals(1, bad.code());
     }
 
+    /**
+     * PKB-HCR-62: aria-snap and ws-route attach the host's own Playwright client. A Playwright client with no dialog
+     * listener auto-dismisses dialogs, so `ask` closed as dismissed and `prompt:Ann` failed with No dialog is showing.
+     * The dialogs policy now wins over that attached session.
+     */
+    @Test
+    void dialogsPolicyWinsOverTheHostPlaywrightSession() throws Exception {
+        Path p = project("dialogs-pw-attached");
+        go(p, "/");
+        assertEquals("prompt", ok(p, "dialogs", "--policy=prompt:Ann", "--via=cdp").path("policy").asText());
+        ok(p, "aria-snap");
+        ok(p, "ws-route", "--match=*/never-a-socket", "--rules=[]");
+        eval(p, "window.done=0,window.c=null,window.p=null,window.dialogs(1500)");
+        tools.dscode.browser.PlaywrightConnection.closeAll();
+        handledAlert(p, "prompt");
+        assertEquals("true|Ann", eval(p, "window.c+'|'+window.p"), "prompt:Ann answered by the policy, not dismissed by Playwright");
+        JsonNode rows = BrowserEventsLiveTest.ok(p, "browser-events", "--since=0", "--kinds=dialog", "--limit=500");
+        assertFalse(rows.toString().contains("unanswered"), rows.toString());
+    }
+
     @Test
     void tabNewStaysOffTheProtocolTargetUnlessActivate() throws Exception {
         Path p = project("tab-activate-default");

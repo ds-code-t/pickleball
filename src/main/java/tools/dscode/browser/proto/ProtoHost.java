@@ -333,6 +333,12 @@ public final class ProtoHost {
         return first;
     }
 
+    /** Keeps an attached Playwright client from auto-dismissing dialogs while a dialogs policy owns them. */
+    public synchronized void holdPlaywrightDialogs(boolean on) {
+        if (cdpEndpoint == null || protocols().firefox()) return;
+        pw().holdDialogs(on);
+    }
+
     public synchronized PwBridge pw() {
         if (cdpEndpoint == null || protocols().firefox()) {
             throw new tools.dscode.browser.UnsupportedProtocolOperation("playwright", "playwright", "Playwright attaches to Chromium over CDP only");

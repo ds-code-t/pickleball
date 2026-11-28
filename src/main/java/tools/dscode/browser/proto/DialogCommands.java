@@ -50,6 +50,8 @@ final class DialogCommands {
             throw new IllegalArgumentException("error: --policy is accept, dismiss, prompt:<text>, ask or default\nfix: dialogs --policy=accept");
         }
         host.stateMap().put("dialogs.policy", policy);
+        // The policy wins over an attached Playwright session (aria-snap, clock, ws-route): no auto-dismiss.
+        host.holdPlaywrightDialogs(!"default".equals(policy));
         if (!host.stateMap().containsKey("events.source")) EventCommands.start(host, f.containsKey("via") ? Map.of("via", f.get("via")) : Map.of());
         BrowserProtocols.Served<String> served = host.protocols().serve("dialogs", f.get("via"), backend -> {
             switch (backend) {
