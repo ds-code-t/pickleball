@@ -1423,6 +1423,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/SpineR6FixBack1PageControlsTest.java`
 - `src/test/java/tools/dscode/launcher/SpineR6PageLive.java`
 - `src/test/java/tools/dscode/launcher/SpineRouteCliTest.java`
+- `src/test/java/tools/dscode/launcher/StaleControllerFilesTest.java`
 - `src/test/java/tools/dscode/launcher/StartDrivesPageTest.java`
 - `src/test/java/tools/dscode/launcher/StartHealthMessageTest.java`
 - `src/test/java/tools/dscode/launcher/StartLaunchesBrowserTest.java`

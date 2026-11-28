@@ -18,3 +18,4 @@ Source: PKB-HCR run of 2026-11-28 on consumer `myq-release-testing`, Pickleball 
 | 12b | `emulate --reset` omitted `network` from `cleared` (the service-worker half of bug 12 is not fixed) | Fixed (reset reply only) | `fe4d3ad96` | `EmulateLiveTest.resetListsTheNetworkItRestored` | none |
 | 15 | `guide-back` / `guide-done` events had `by=human` | Fixed | `079808da4` | `OverlayRuntimeLiveTest.guideBackAndDoneEventsAreByAgent` (by=human before) | Headed guide: agent `guide-back`, check `overlay-poll` |
 | 28b | Second `lease take` by the same holder said "another holder" | Fixed (message only; the second take is still refused by design) | `e4824649a` | `LeaseAndBlockTest.secondTakeFailsAndACleanSessionCannotBlockInput` | none |
+| G1 | Stale `agent-controller.classpath` and log after export | Fixed | `6d8d67fa0` | `StaleControllerFilesTest` (2; stale files kept before) | none |
