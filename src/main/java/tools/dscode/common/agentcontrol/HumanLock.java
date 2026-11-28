@@ -92,7 +92,7 @@ public final class HumanLock {
                 if (!VerbTiers.HUMAN_ACT_KINDS.contains(kind)) {
                     return "error: act --kind=" + kind + " is not human input and this session is human-locked\n"
                             + "fix: use " + humanActKindList()
-                            + "; scroll passes this lock and the act body currently reports unknown kind"
+                            + "; scroll passes this lock and scrolls the page or a named element"
                             + "; file attachment and OS-level actions are unavailable in human mode "
                             + "(leave it with session-mode --human=off)";
                 }

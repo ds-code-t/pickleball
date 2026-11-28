@@ -1210,8 +1210,10 @@ final class WorkbenchMcpTools {
         view.put("depth", cliNumber("Levels under --within. A number or a string."));
         view.put("group", stringProperty("role or type."));
         view.put("priority", stringProperty("on to order controls."));
-        view.put("kind", stringProperty("act kind: click, type, hover, press, or select."));
+        view.put("kind", stringProperty("act kind: click, type, hover, press, select, or scroll."));
         view.put("value", stringProperty("Value for type or select."));
+        view.put("dx", cliNumber("act --kind=scroll horizontal delta in pixels. A number or a string."));
+        view.put("dy", cliNumber("act --kind=scroll vertical delta in pixels. A number or a string."));
         view.put("text", stringProperty("chat-turn text."));
         view.put("timeout", cliNumber("Seconds to wait. A number or a string."));
         view.put("until", stringProperty("Watch or chat-turn condition."));
@@ -1318,7 +1320,7 @@ final class WorkbenchMcpTools {
         if (args == null) return forwarded;
         for (String key : List.of(
                 "target", "session", "query", "ref", "fields", "budget", "format", "limit", "where", "within",
-                "depth", "group", "priority", "kind", "value", "text", "timeout", "until", "pick", "mode", "out",
+                "depth", "group", "priority", "kind", "value", "dx", "dy", "text", "timeout", "until", "pick", "mode", "out",
                 "channel", "frame", "condition", "url", "include", "exposure", "since", "purpose", "file"
         )) {
             String value = optionalAny(args, key);
@@ -1335,7 +1337,7 @@ final class WorkbenchMcpTools {
 
     private static final java.util.Set<String> VIEW_KEYS = java.util.Set.of(
             "target", "session", "sessionId", "query", "ref", "fields", "budget", "format", "limit", "where",
-            "within", "depth", "group", "priority", "kind", "value", "text", "timeout", "until", "pick",
+            "within", "depth", "group", "priority", "kind", "value", "dx", "dy", "text", "timeout", "until", "pick",
             "runId", "mode", "out", "channel", "frame", "condition", "url", "include", "exposure", "since", "purpose", "file"
     );
 

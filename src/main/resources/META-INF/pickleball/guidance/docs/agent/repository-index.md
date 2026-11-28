@@ -1130,6 +1130,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureSteps.java`
 - `src/test/java/tools/dscode/GuidancePackagingTest.java`
 - `src/test/java/tools/dscode/launcher/ActConditionCoverTest.java`
+- `src/test/java/tools/dscode/launcher/ActScrollTest.java`
 - `src/test/java/tools/dscode/launcher/AgentControllerTest.java`
 - `src/test/java/tools/dscode/launcher/AgentExpansionTest.java`
 - `src/test/java/tools/dscode/launcher/AgentFastCliTest.java`

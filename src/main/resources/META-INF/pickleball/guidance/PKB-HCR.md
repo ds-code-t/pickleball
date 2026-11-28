@@ -146,7 +146,7 @@ Areas: HL human lock and tiers, HV human view, CH chat, CA question cards and wa
 
 **HCR-03 (M-HL-03 Human input forms)** — Role: H. Covers: `VerbTiers.HUMAN_ACT_KINDS`, `HumanLock.inputIsHuman`, `TargetVerb`, `ProtoVerbs` input.
 - Steps (H): `pkb act --kind=type --query=Email --value=h1@example.com`, then `act --kind=select --query=Size --value=Large`, `act --kind=hover --query=Go`, `act --kind=press --query=Email --value=Tab`, and `act --kind=click --query=Agree`. Then `pkb input --actions=@C:\pkb-manual\keys.json`, where the file holds a key chain that types `x` into the focused field. Then `pkb input --actions=@C:\pkb-manual\element.json`, where a pointer move has `origin` set to an element object. Then `pkb act --kind=scroll --query=Go`.
-- Assert: the five `act` calls exit 0. `snap --include=values` then shows `value=h1@example.com`, `Size` showing `Large`, and `checked=true` on Agree. The coordinate chain exits 0. The element-anchored chain exits 2 with `not human input`. resolved: the lock allows `scroll` and `help act` lists it. The act body reports `unknown kind` and does not scroll the page.
+- Assert: the five `act` calls exit 0. `snap --include=values` then shows `value=h1@example.com`, `Size` showing `Large`, and `checked=true` on Agree. The coordinate chain exits 0. The element-anchored chain exits 2 with `not human input`. `pkb act --kind=scroll --query=Go` exits 0, `applied` is true, and the reply reports `dx`, `dy`, and `scrollX`/`scrollY`; the page or element actually moves. A human-locked session allows the kind. Desktop scroll is not part of this test.
 
 **HCR-04 (M-HL-04 start --human locks a new session)** — Role: A, then H. Covers: `start --human`, `humanRequested`. Run this after teardown, or in a second scratch project, never beside the main `start`.
 - Steps: `pkb start --url=fixture:form --browser=chrome --headed=true --human --run-id=solo`, then `pkb eval --expr=1 --run-id=solo`, then `pkb live-stop --all`.
@@ -290,7 +290,7 @@ Areas: HL human lock and tiers, HV human view, CH chat, CA question cards and wa
 
 **HCR-35 (M-PT-03 Hidden composer is not clickable (H))** — Covers: human hit-test on a collapsed panel.
 - Steps: A collapses the panel. H runs `act --kind=type --purpose=message --query=Message --value=x`.
-- Assert: refused as `hidden`. **Unclear:** the 2026-11-24 note says `find` drops the row in the human view instead of listing it with `visible=false`. Record which happens.
+- Assert: refused as `hidden`. After the panel is minimized, `find --query=Message` in a human-locked session (default `--exposure=human`) drops the Message row; it does not list it with `visible=false`. A minimized panel hides the composer with the HTML `hidden` attribute, which is not the a11y `collapsed` / `aria-expanded=false` state. Human exposure keeps only a collapsed control (`collapsed=true`) with `visible=false`; other hidden rows are dropped. `find --exposure=full` lists the hidden Message composer with `visible=false`.
 
 ### RC — recording and step editor
 
@@ -321,7 +321,7 @@ Areas: HL human lock and tiers, HV human view, CH chat, CA question cards and wa
 
 **HCR-42 (M-UP-03 Drag and drop (A→H))** — Covers: `drop`.
 - Steps (A): `pkb drop --selector=#files --file=C:\pkb-manual\a.txt`.
-- Assert: the reply names the drop events. **Unclear:** a drop on a file input may not change `files`. Record H's `Picked:` text.
+- Assert: the reply is `op=drop` and reports `via` and the `files` count (the number of paths dropped, not `input.files`). A CDP or BiDi drop dispatches `dragenter`, `dragover`, and `drop` with a DataTransfer of those files; it does not assign `input.files` or fire `change`. After that path, `#files` stays empty and H still sees `Picked:` unchanged (the catalog page only updates `Picked:` from the input's `change` handler). Use `upload --selector=#files --file=C:\pkb-manual\a.txt` (or `act --kind=attach`) to set a file input. Playwright `drop --via=playwright` uses Locator.drop and is not required to populate `input.files` either.
 
 ### NV — navigation and re-injection
 
@@ -368,7 +368,7 @@ Each DT test records the backend in the reply (`via=`). Chrome is the default ta
 
 **HCR-52 (M-DT-03 Selenium BiDi verbs (A))** — Covers: `bidi script`, `bidi intercept`, `SeleniumBidiCommands`. Needs a Selenium session: an `isolate` worker with `--runvar=pkb_selenium_bidi=on --runvar=pkb_browser=CHROME` (or `browser.selenium.bidi: on`). The `bidi` verbs also need `--session=<id>` or the default session from `spine session new`.
 - Steps (A): `pkb spine session new --agent=agent-1`, then `pkb isolate --tags=@primary-navigation --runvar=pkb_selenium_bidi=on --runvar=pkb_browser=CHROME --run-id=bidi`. Then `pkb bidi script --source=document.title --run-id=bidi`, `pkb bidi intercept --url=*data.json* --body=bidi-body --run-id=bidi`, and `pkb bidi intercept off --id=<id> --run-id=bidi`. Stop the worker with `pkb stop --run-id=bidi`.
-- Assert: the title comes back, an intercept id is returned, and `off` removes it. **Unclear:** which consumer tag gives a page with a fetch to intercept. Record the page used. `bidi grid-attach` needs a Grid URL. Run it only if Dan provides one, otherwise record it as not run.
+- Assert: the title comes back, an intercept id is returned, and `off` removes it. `@primary-navigation` is the consumer primary-navigation pack and does not fetch `data.json`. The page with that fetch is this catalog's own manual fixture (Setup: the `#load` button runs `fetch('data.json')` and writes `Data: ...`). After the worker is up, navigate that session to the manual fixture (or start Chrome on that file) before `bidi intercept --url=*data.json*` and a `Load data` click. `bidi script --source=document.title` works on any loaded page and does not need a fetch. `bidi grid-attach` needs a Grid URL that Dan provides; otherwise record it as not run.
 
 **HCR-53 (M-DT-04 Network capture (H→A))** — Covers: `net --capture-bodies`, net rows, `net-body`, `har`.
 - Steps: A runs `pkb net --capture-bodies=all`, then `pkb har --start`. H clicks `Load data`. A runs `pkb browser-events --kinds=net --match=data.json --limit=3`, then `pkb net-body --request-id=<id>`, then `pkb har --stop --out=C:\pkb-manual\s.har`.
@@ -498,7 +498,7 @@ These are expected results, not failures. A run records each one it meets.
 - No human-tier way to answer a native JavaScript dialog (`dialogs --policy=ask` leaves it open), to pick a file in the OS file chooser, or to drive the popup window or the Workbench GUI.
 - No human-tier screen capture outside the page. Native highlight strips and the popup are visible only to a person or to A.
 - `call` is control tier. A human role over MCP needs an MCP client that offers only the human-tier tools.
-- `act --kind=scroll` passes the human lock and `help act` lists it. The act body reports `unknown kind` and does not scroll the page.
+- `act --kind=scroll` passes the human lock, `help act` lists it, and the act scrolls the page or a named element. The reply reports `dx`, `dy`, `into_view`, `scrollX`, and `scrollY`.
 
 ## Earlier collaboration runs this catalog builds on
 
