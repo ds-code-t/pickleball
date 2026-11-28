@@ -30,6 +30,7 @@ Source: PKB-HCR run of 2026-11-28 on consumer `myq-release-testing`, Pickleball 
 | 18 | `upload-request` event `ref` was `#files`, but `upload --ref=#files` failed `unknown target` | Fixed: `act`/`upload --ref` takes a CSS selector (`#`, `.`, `[`, or `css=`) when it is not a known short id | `4a2b25b10` | `HcrRoundFourTest.aCssSelectorIsAcceptedAsAnActRef`, `HcrLiveFixesTest.uploadTakesTheCssRefTheUploadRequestNames` | Headed: on an upload-request, `upload --ref=<event ref> --file=<path>` |
 | 12 | Offline emulation did not reach a page a service worker controls | Fixed (CDP): `emulate --network` also applies to the page's service and shared workers (attached on demand) | `7ce9f47d8` | `NetworkTargetsTest`, `EmulateLiveTest.offlineReachesAServiceWorkerControlledPage` (not run on the box) | PC: a PWA page, `emulate --network=offline`, its fetches fail |
 | 13 | `wait-any --watch=<short id>:click` never fired; a foreign short id gave no error | Partly fixed (non-breaking slice): a page click also matches by the short id's full ref, and a short id from another run id adds a `warning` naming its run id. Scoping itself is unchanged; no strict error | `caabbca29` | `ShortIdScopeWarningTest` (2), `ConsumerFixesP4WaitTest` | Headed: H finds Go, A runs `wait-any --watch=<H id>:click` (warning) and with its own id (fires on a click) |
+| 27 | `chat-turn` and `watch` replies had no `wake` / `wakeMs` | Fixed (additive fields; `pushLagMs` stays on mutation rows) | `R27` | `WakeFieldsTest`, `LeanReplyTest`, `LiveReplyRulesTest`, `CompactReplyTest` | none |
 
 ## Owner decisions (Dan, 2026-11-28, t1239u)
 
@@ -51,6 +52,5 @@ These were "owner decision" items in the HCR run; Dan approved all four on 2026-
 | 14 event streams tagged with the starter's run id | Run binding for streams, spill dirs and `downloads`: design work. |
 | 21, 22 H views miss agent surfaces; magnifier clone is clickable | View and exposure design. |
 | 26 covered button `visible=true`; act `bounds` 0,0,0,0 | Needs the visibility model reconciled between `snap` and `explain`. |
-| 27 `wake` fields on `chat-turn` and `watch` | Needs a reply-shape decision. |
 | Slowdowns (client JVM start, `pkb batch`, first-call idle, `start` 23 s) | A persistent or batch client is a redesign. |
 | Noise (triple errors, `recent`/`cursors` on every reply, `--compact`, `--limit` newest, `--fields` format, `eval failed` text, `main.db` size, relative `--dir`/`--exe`) | Cross-cutting reply-shape changes. |

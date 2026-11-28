@@ -945,6 +945,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentcontrol/UiChatVisibilityTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/UiStateTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/UnownedDriverQuitTest.java`
+- `src/test/java/tools/dscode/common/agentcontrol/WakeFieldsTest.java`
 - `src/test/java/tools/dscode/common/agentfast/ActHonestyTest.java`
 - `src/test/java/tools/dscode/common/agentfast/CollabRowsTest.java`
 - `src/test/java/tools/dscode/common/agentfast/CompactReplyTest.java`

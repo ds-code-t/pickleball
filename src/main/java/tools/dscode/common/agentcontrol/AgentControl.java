@@ -196,6 +196,7 @@ public final class AgentControl {
             if (values.get("scope") != null && !values.get("scope").isBlank()) UiState.scope(values.get("scope"));
             if (values.get("ttl") != null && !values.get("ttl").isBlank()) UiState.expires(values.get("ttl"), 0L);
             Result result = dispatch(project, runId, op, values, extraArgs, agentId);
+            if (result.exit() == 0 && WAKE_OPS.contains(op)) wakeFields(result.body());
             if (tools.dscode.common.agentfast.StandardView.requested(values)) {
                 result = new Result(result.exit(), tools.dscode.common.agentfast.StandardView.applyBody(result.body(), values));
             }
@@ -1282,6 +1283,18 @@ public final class AgentControl {
         double parsed = Double.parseDouble(raw);
         long millis = seconds ? Math.round(parsed * 1000.0) : Math.round(parsed);
         return Math.max(0L, millis);
+    }
+
+    /** HCR-27: blocking replies that woke on a page push say so, like wait and ask-and-wait. */
+    static final java.util.Set<String> WAKE_OPS = java.util.Set.of("chat-turn", "watch");
+
+    static void wakeFields(Map<String, Object> body) {
+        if (body == null) return;
+        body.putIfAbsent("wake", tools.dscode.common.agentfast.PushWake.mode());
+        long signalled = tools.dscode.common.agentfast.PushWake.lastSignalNanos();
+        if (signalled > 0 && !body.containsKey("wakeMs")) {
+            body.put("wakeMs", Math.max(0, (System.nanoTime() - signalled) / 1_000_000L));
+        }
     }
 
     private static Result answered(String op, String id, String value) {
